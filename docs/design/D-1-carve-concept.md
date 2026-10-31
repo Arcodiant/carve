@@ -159,3 +159,4 @@ process and a protocol between the two.
 | # | What is missing | Priority | Interim |
 |---|---|---|---|
 | 1 | A named error when Vulkan cannot start: with no driver, `IGameLoop.Initialise` throws `ArgumentNullException` for `ptr` from inside `Vulkan.Instance.Create` | Low | `EngineThread` words the fault itself, naming Vulkan |
+| 2 | An in-memory PNG encode: `IRenderTargetReadback.WritePngAsync` writes only to a path, and `DecodedImage` has no encoder, while `render` must write nothing to disk | Low | `RenderTool` calls `StbImageWriteSharp` directly on `ToDecodedImage`'s bytes |
