@@ -21,8 +21,8 @@ internal sealed class RenderRequest(RenderView view)
 }
 
 /// <summary>
-/// From the tool to the frame thread. Holds nothing of the engine, so a tool can reach it on a
-/// machine where the engine's services cannot be built.
+/// From the tool to the frame thread. Needs no engine service, so a tool can resolve it with no
+/// device; the frames it returns do carry engine pixels.
 /// </summary>
 internal class RenderQueue
 {

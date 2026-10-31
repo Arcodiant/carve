@@ -49,7 +49,7 @@ description: >-
 
 `docs/tasks/T-2-server-host-and-extension-api.md:70` against `src/Carve.Server/EngineStatus.cs`. Tracker hygiene. As built lists `IsReady`, `IsFaulted`, `FaultMessage`, `WhenSettled`; commit d6af7da removed the first two and did not touch T-2. Also reported by the whole-diff pass.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ## Findings: kernel and define_mesh (claude-opus-5-5)
 
@@ -163,37 +163,37 @@ description: >-
 
 `README.md:22`, `NuGet.config:7,10-13`. Correctness. The prerequisites are the .NET SDK and a Vulkan device, but the `dotnet run` entry restores `Arcodiant.Empyrean*` and `Arcodiant.Vulkan*` only from `http://localhost:5555/v3/index.json`. Elsewhere the entry cannot restore, and the README does not say why. Read from the config, not tested with the feed down.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### Retrospective says MetadataLoadContext is still floating
 
 `docs/milestones/M-1-a-cube-you-can-see.md:102`. Tracker hygiene. *Known and left* reports the floating `10.0.*`, which d6af7da pinned (10.0.14).
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### Test packages float, with literal versions in a new .csproj
 
 `tests/Carve.Server.Tests/Carve.Server.Tests.csproj:9-11`, copied from `tests/Carve.Core.Tests/Carve.Core.Tests.csproj:9-11`. `Microsoft.NET.Test.Sdk` `17.*`, `xunit.v3` `1.*`, `xunit.runner.visualstudio` `3.*` float with no lock file, so `verify` can change with no commit. CLAUDE.md's rule names only the engine version; every other package goes through `Directory.Build.props`.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### "Triangulated only on export" and the edge-connected structure have no recorded exception
 
 `CLAUDE.md:44`, `docs/design/D-1-carve-concept.md:95-96`, `src/Carve.Server/MeshBridge.cs:16`, `src/Carve.Core/PolygonMesh.cs:26`. Design decisions. D-1 says an edge-connected structure, triangulated on export; as built it is plain indexed storage, triangulated for every render and for validation. T-1's Notes accept both, but D-1 has no `Exceptions:` entry and CLAUDE.md's sentence no longer matches.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### verify's description omits the scenario run and the Vulkan requirement
 
 `CLAUDE.md:63`, `scripts/verify.ps1:3-4`. Tracker hygiene. Both say build plus tests; since T-6 the script also runs `run-scenario.ps1 cube`, so verify needs a Vulkan device.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### T-4's As built and RenderQueue's summary say it holds no engine type
 
 `docs/tasks/T-4-shaded-render-tool.md:64`, `src/Carve.Server/RenderQueue.cs:2,7,24-25`. Tracker hygiene. `RenderedFrame(RenderTargetPixels Pixels, ...)` is what `Post` returns. What is true is narrower: the queue needs no engine service, so a tool can resolve it with no device.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ## Summary
 

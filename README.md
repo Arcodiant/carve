@@ -19,6 +19,8 @@ path to where this repo is checked out):
 }
 ```
 
-It needs the .NET SDK and a Vulkan device (a GPU with a current driver); there
+It needs the .NET SDK, the Empyrean package feed (the local feed `empyrean-local` in
+`NuGet.config`, `http://localhost:5555/v3/index.json`; without it `dotnet run` cannot restore),
+and a Vulkan device (a GPU with a current driver); there
 is no window, every look is an offscreen render. If no device is found the
 server stays up and the `render` tool says so.

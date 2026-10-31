@@ -41,7 +41,7 @@ Every plan, for a milestone or a task, keeps these:
   stdout; logs go to stderr or the temp folder.
 
 - **Renders are Empyrean's**, so a screenshot shows the model as the game would.
-- **The mesh is polygons**, triangulated only on export. Work persists in a native
+- **The mesh is polygons**, triangles are a derived view for render and export, never stored. Work persists in a native
   Carve file; `.glb` is what reaches a game.
 - **The product has no window.** Every look is an offscreen render.
 
@@ -60,7 +60,7 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `tests/Carve.Server.Tests` | xunit tests that start the real `carve`, incl. the no-extension guard |
 | `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
 | `tests/Carve.Scenario.Tiny` | The scenario the debug extension's tests stack on it |
-| `scripts/verify.ps1` | Build warnings-as-errors + all tests; cairn's `verify` hook |
+| `scripts/verify.ps1` | Build warnings-as-errors + all tests + the cube scenario (needs a Vulkan device); cairn's `verify` hook |
 | `scripts/run-scenario.ps1` | Builds, then runs one scenario on the real `carve`; returns its exit code and run folder |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |

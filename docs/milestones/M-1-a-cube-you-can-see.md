@@ -99,7 +99,6 @@ Task order: T-1 and T-2 side by side; then T-3, T-4, T-5, T-6, T-7 in sequence.
 
 - Two views cannot show every face: the T-7 agent could not see the second roof slope and leaned on `closed: true`. A third view or a chosen direction is the likely next pressure on tool shape.
 - `carve-<pid>.log` files in `$env:TEMP` are never cleared.
-- `tests/Carve.Server.Tests.Extension` references `System.Reflection.MetadataLoadContext` at a floating `10.0.*`.
 - `user-data` in the run folder is consumed by nothing yet.
 - `branches/task/T-1` to `T-7` remain on disk, unregistered from git, because `finish` could not remove a member's own working directory. T-4, T-5, T-6 and T-7 hold artifacts there.
 

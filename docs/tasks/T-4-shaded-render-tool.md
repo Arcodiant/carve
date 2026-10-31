@@ -61,7 +61,7 @@ Ran on Opus 5.5 (`claude-opus-5-5`). `verify` passes, and the frames were looked
   - These are the projections of the face centres, `RenderTests.PixelOf`; another mesh needs its own, from `ViewFraming.Frame`.
 - `RenderSystem` takes one `Update` to apply a new mesh or a new view and one more to render, so a render costs up to two 50 ms steps on a change, none on a repeat. Requests with the same view in one `Update` all render in it, unless the store moves: `RenderPump` (the sequencing, split from `RenderSystem` so it tests with no device) peeks at the queue and then reads the store before every request, in that order, so a render posted after `define_mesh` returned shows that mesh or a newer one and never the empty `_report`. A version change ends the `Update` with the request still queued. `RenderTests` has the overlapping burst on the real `carve`, with a same-count mesh compared on the image; `RenderPumpTests` puts the calls at exact points.
 - The same calls gave byte-equal PNGs within one process across a front, back, front sequence (`The_default_view_is_front_and_a_repeat_is_the_same_image`). Two processes were not compared here; T-6 does that.
-- `EngineStatus` gained `WhenStopped`: completes when the frame thread ends, never throws. `RenderQueue` holds no engine type, so a tool can hold it on a machine with no device.
+- `EngineStatus` gained `WhenStopped`: completes when the frame thread ends, never throws. `RenderQueue` needs no engine service, so a tool can resolve it on a machine with no device (it carries `RenderedFrame`, which holds engine pixels).
 
 **Readings of the spec.**
 

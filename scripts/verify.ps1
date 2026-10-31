@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     The project's `cairn verify` tests check: build the whole solution warnings-as-errors,
-    then run every test project. Exits non-zero on any failure.
+    then run every test project and the cube scenario (`run-scenario.ps1 cube`, which needs a
+    Vulkan device). Exits non-zero on any failure.
 #>
 [CmdletBinding()]
 param()

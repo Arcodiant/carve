@@ -98,6 +98,8 @@ on export. Operations keep their meaning on a logical face or edge loop.
 **Alternatives:** triangles only, a simpler kernel that loses the logical faces.
 **Would change if:** the structure's cost outweighs its use once cut and extrude
 exist, seen in how agents actually use them.
+**Exceptions:**
+- M-1 — stores plain indexed polygons, and triangulates as a derived view for render, validation and export, never stored; the edge-connected structure is decided in M-2.
 
 ### A Carve file, and .glb export
 
