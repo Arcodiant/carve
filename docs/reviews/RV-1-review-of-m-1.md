@@ -57,67 +57,67 @@ description: >-
 
 `src/Carve.Server/DefineMeshTool.cs:64-66`, `:72`. Correctness (T-3 Goal: "exactly what is wrong"). The typed `double[][]`/`int[][]` parameters fail in SDK binding before `Run` validates. Each returns only `An error occurred invoking 'define_mesh'.`: `"faces":[[0,1.5,2]]`, `[[0,1.0,2]]`, `[[0,99999999999,2]]`, `[[0,null,2]]`, `"vertices":[[0,0,0],[1,null,0],[0,1,0]]`, a vertex `[1,"x",0]`, `"vertices":null`, `"faces":null`, a missing `faces`, `{}`. That contradicts the description at `:31-32`, and one fractional index hides every other problem. T-3's As built on this is inaccurate. No test covers these.
 
-**Outcome:** fixed: `define_mesh` binds `JsonElement?` and validates itself; every listed input returns a tool error naming the element, together; published schema unchanged (pinned by a test); T-3 As built corrected.
+**Outcome:** fixed
 
 ### Single-precision squares overflow and underflow, so large faces get a zero normal and faces at either extreme are refused for the wrong reason
 
 `src/Carve.Core/PolygonMesh.cs:120,139-140,153,159`, `src/Carve.Core/Triangulator.cs:37-38`. Correctness. `Vector3.Length()` squares a Newell vector of order size^2, overflowing at side about 1e10 and underflowing at about 1e-12. Triangle `[0,0,0],[1e10,0,0],[0,1e10,0]`: accepted, `FaceNormal(0)` is `<0,0,0>`, area Infinity. Quad of side 1e10: refused as "cannot be triangulated". Side 1e20 and side 1e-12: refused as "zero area". Side 1e-11: accepted with non-unit normals (z 0.9921 and 1.0097). No test exceeds scale 1000.
 
-**Outcome:** fixed: Newell, length, area, basis and clipping are done in double relative to a face vertex; FaceNormal is a unit vector from side 1e-12 to 1e20; tolerance values unchanged.
+**Outcome:** fixed
 
 ### A self-intersecting outline can be accepted and draws overlapping triangles
 
 `src/Carve.Core/Triangulator.cs:50-85`, error text at `src/Carve.Core/PolygonMesh.cs:110-111`. Correctness (T-1: "A face it cannot clip is a validation error, not a bad draw"). Nothing checks the outline is simple. The double-wound hexagon `[0,0],[4,0],[2,3],[0.1,0.1],[3.9,0.1],[2,2.5]` (z=0), `faces:[[0,1,2,3,4,5]]`, with crossing edges 2-3 and 5-0, is accepted with no warning and gives total area 10.535 inside an outer triangle of area 6.
 
-**Outcome:** fixed: a face with two properly crossing non-adjacent edges (in its normal's plane, double) is a `faces[i]` error naming the crossing; touching is not reported. A face that cannot be clipped keeps its wording and is reported first.
+**Outcome:** fixed
 
 ### The "failed call keeps the previous mesh" test does not look at the mesh
 
 `tests/Carve.Server.Tests/DefineMeshTests.cs:75-78`. Tests cover the Scope. It asserts only `isError` and the text "unchanged". A `Run` that cleared the store on failure would pass. The `render` caption's counts are available to check.
 
-**Outcome:** fixed: the test now renders after the failed call and asserts the caption `8 vertices, 6 faces`.
+**Outcome:** fixed
 
 ### The bowtie test never reaches the triangulator failure path
 
 `tests/Carve.Core.Tests/MeshValidationTests.cs:63-67`, path at `src/Carve.Core/PolygonMesh.cs:110-111`. Tests cover the Scope. `(0,0),(1,1),(1,0),(0,1)` has Newell area exactly 0, so it stops at the zero-area check and the test passes with lines 110-111 deleted. `(0,0),(2,2),(2,0),(0,1)` reaches the path; the test should also assert the message.
 
-**Outcome:** fixed: the test uses the asymmetric bowtie and asserts the single error and its message.
+**Outcome:** fixed
 
 ### One non-finite or malformed vertex suppresses area and clipping checks on every face
 
 `src/Carve.Core/PolygonMesh.cs:65,102`, `src/Carve.Server/DefineMeshTool.cs:80`. Correctness (T-3: "not the first problem only"). `coordsOk` is global. `{"vertices":[[0,0,0],[1,0,0],[2,0,0],[1e39,0,0]],"faces":[[0,1,2]]}` reports only `vertices[3]`; face 0 uses no bad vertex and is collinear, but its error appears only on the next call. The check should skip only faces touching a bad vertex.
 
-**Outcome:** fixed: non-finite vertices are tracked per vertex; area and clipping are skipped only for faces that use one.
+**Outcome:** fixed
 
 ### Ear clipping silently omits real vertices of a many-sided face
 
 `src/Carve.Core/Triangulator.cs:68-77`, `:46`. Correctness. The collinear fallback's `|cross| <= 1e-9 * size^2` is relative to the whole face, so short edges fall below it: a regular 4096-gon of radius 1 yields triangles using 4094 of 4096 vertices (8182 of 8192 for n=8192). `MeshReport` counts them as used, and a neighbouring face gets a T-junction. The 1e-9 is a bare literal, not `PolygonMesh.ZeroAreaTolerance`.
 
-**Outcome:** fixed: ear convexity and collinearity are judged against the local edges (`Triangulator.CollinearTolerance`, same 1e-9 value, a named constant); a regular 4096-gon keeps all 4096 vertices.
+**Outcome:** fixed
 
 ### Newell vector is not centred, so exactly planar faces far from the origin get a false non-planar warning
 
 `src/Carve.Core/PolygonMesh.cs:126-133`, `src/Carve.Core/MeshReport.cs:95-101`. Correctness. Multiplying by `a + b` puts rounding noise into the normal at large offsets. The exactly planar quad `<65536,65536,-131072> <65537.375,65535.5,-131072.875> <65536.125,65536.875,-131073> <65534.75,65537.375,-131072.125>` warns `0.00939 off its plane (limit 0.000338)`. Of 2000 random planar quads, 779 warned at offset 65536, none at 10000 or below. Subtracting a face vertex first removes it.
 
-**Outcome:** fixed: the normal, planarity centroid and distances are computed in double relative to a face vertex; the quoted quad no longer warns.
+**Outcome:** fixed
 
 ### Edges shared by more than two faces never report inconsistent winding
 
 `src/Carve.Core/MeshReport.cs:80-88`. Correctness. `c.Forward == 2 || c.Backward == 2` is reached only when `total == 2`. Faces `[0,1,2],[0,1,3],[0,1,4]` all run 0 to 1 and report only `edge is shared by 3 faces`.
 
-**Outcome:** fixed: an edge crossed in the same direction by two or more faces reports InconsistentWinding beside NonManifoldEdge.
+**Outcome:** fixed
 
 ### Smaller define_mesh input-handling defects
 
 `src/Carve.Server/DefineMeshTool.cs:91-95,103`, `src/Carve.Core/PolygonMesh.cs:83`. Correctness. `"faces":[null]` is reported twice for one problem. `"faces":[[0,"1",2]]` is accepted as index 1 although the schema says integer. `{"vertices":[],"faces":[[0,1,2]]}` gives `index 0 is out of range 0..-1`.
 
-**Outcome:** fixed: a null face is reported once; a string index is an error; with no vertices the message reads `index 0 is out of range: there are no vertices`.
+**Outcome:** fixed
 
 ### No test covers immutability of the mesh against the caller's arrays
 
 `tests/Carve.Core.Tests/MeshValidationTests.cs` (absent). Tests cover the Scope (T-1: "immutable"). The code is correct, but no test pins it, and T-3's `ModelStore` thread-safety claim rests on it.
 
-**Outcome:** fixed: `KernelReviewTests` pins that changing the caller's arrays leaves the mesh unchanged and that its lists reject writes.
+**Outcome:** fixed
 
 ## Findings: extension API and harness (claude-opus-5-5)
 
