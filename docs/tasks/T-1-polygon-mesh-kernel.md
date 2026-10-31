@@ -4,7 +4,7 @@ description: >-
 ---
 # T-1 — Polygon mesh kernel
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
