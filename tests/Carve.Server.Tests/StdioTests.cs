@@ -17,7 +17,8 @@ public class StdioTests
 
         await carve.SendAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
         var list = await carve.ReadResponseAsync(2, Answer);
-        Assert.Equal(0, list.GetProperty("result").GetProperty("tools").GetArrayLength());
+        Assert.Contains("define_mesh", list.GetProperty("result").GetProperty("tools").EnumerateArray()
+            .Select(t => t.GetProperty("name").GetString()));
 
         carve.CloseStdin();
         Assert.Equal(0, await carve.WaitForExitAsync(Exit));
