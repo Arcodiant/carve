@@ -89,8 +89,11 @@ public class LoaderTests
         await carve.SendAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
         var list = await carve.ReadResponseAsync(2, Answer);
 
-        var tool = Assert.Single(list.GetProperty("result").GetProperty("tools").EnumerateArray());
-        Assert.Equal("test_ping", tool.GetProperty("name").GetString());
+        // Beside the product's own tools, not instead of them.
+        var names = list.GetProperty("result").GetProperty("tools").EnumerateArray()
+            .Select(t => t.GetProperty("name").GetString()).ToArray();
+        Assert.Contains("test_ping", names);
+        Assert.Contains("define_mesh", names);
     }
 
     [Fact]
