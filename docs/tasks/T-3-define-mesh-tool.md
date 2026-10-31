@@ -4,7 +4,7 @@ description: >-
 ---
 # T-3 — define_mesh tool
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
