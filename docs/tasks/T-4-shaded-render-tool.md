@@ -4,7 +4,7 @@ description: >-
 ---
 # T-4 — Shaded render tool
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
