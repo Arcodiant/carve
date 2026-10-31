@@ -1,0 +1,9 @@
+# Managed by the cairn skill. Do not hand-edit `contract:`.
+contract: 6
+synced: unset — run `cairn sync` to stamp a date
+major: 0
+publish:
+verify:
+release:
+review:
+unmanaged: []

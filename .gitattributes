@@ -1,0 +1,12 @@
+# Managed by the cairn skill.
+# No committed generated/index files (see references/artifacts.md), so nothing in
+# docs/ needs a custom merge driver — with one exception.
+#
+# The pending changelog accumulates one bullet per task/bug `finish`. Sibling
+# members of the same batch/milestone are dispatched in parallel and each appends
+# to it independently, so a plain three-way merge conflicts on every sibling after
+# the first — on exactly the fan-out references/orchestration.md prescribes.
+# `union` keeps both sides' bullets instead: order within the file carries no
+# meaning, and the container's own `finish` finalizes the accumulated list into a
+# versioned file anyway.
+docs/changelog/UNRELEASED.md merge=union

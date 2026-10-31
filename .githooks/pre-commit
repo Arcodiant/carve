@@ -1,0 +1,23 @@
+#!/bin/sh
+# Managed by the cairn skill. Opt in with: git config core.hooksPath .githooks
+# Runs `cairn lint` before any commit that touches this docs project.
+
+DOCS_DIR="$CAIRN_DOCS_DIR"
+if [ -z "$DOCS_DIR" ]; then
+  DOCS_DIR="."
+fi
+
+if ! git diff --cached --name-only | grep -q "^${DOCS_DIR#./}/"; then
+  exit 0
+fi
+
+if ! command -v cairn >/dev/null 2>&1; then
+  echo "cairn CLI not on PATH — skipping lint (install it to get this check)" >&2
+  exit 0
+fi
+
+if ! cairn lint; then
+  echo "" >&2
+  echo "cairn lint failed — fix the issues above, or commit with --no-verify to bypass." >&2
+  exit 1
+fi

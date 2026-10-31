@@ -1,0 +1,25 @@
+# cairn: generated listing pages, never committed
+docs/tasks/index.md
+docs/bugs/index.md
+docs/batches/index.md
+docs/milestones/index.md
+docs/design/index.md
+docs/reviews/index.md
+docs/milestones.md
+.cairn/
+__pycache__/
+*.pyc
+
+# Worktrees of this same repo; their content belongs to their own branches.
+branches/
+bin/
+obj/
+*.user
+.vs/
+site/
+TestResults/
+logs/
+# Review artefacts, captures and raw content: kept across task finishes, never committed.
+artifacts/
+# Per-machine Claude permissions; shared settings live on the `workspace` branch.
+.claude/settings.local.json
