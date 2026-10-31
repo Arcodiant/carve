@@ -52,8 +52,11 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | Path | What |
 |---|---|
 | `src/Carve.Core` | Engine-free modelling kernel |
+| `src/Carve.Extensibility` | The public extension API: `ICarveExtension`, `CarveHostBuilderContext` |
 | `src/Carve.Server` | The shipped product, the `carve` MCP server |
 | `tests/Carve.Core.Tests` | xunit tests of the kernel, incl. the engine-free guard |
+| `tests/Carve.Server.Tests` | xunit tests that start the real `carve`, incl. the no-extension guard |
+| `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
 | `scripts/verify.ps1` | Build warnings-as-errors + all tests; cairn's `verify` hook |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
