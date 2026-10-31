@@ -52,7 +52,7 @@ Scenarios: none here, the harness arrives in T-5. Update `CLAUDE.md`'s *Layout* 
 
 ### As built
 
-Ran on Opus 5.5 (`claude-opus-5-5`). `verify` passes; a plain launch on this machine (RTX, Vulkan present) logged `Engine ready`, answered `initialize` in 0.3 s and exited 0 in 0.1 s on stdin EOF. The frame thread off the main thread broke nothing, so no engine need.
+Ran on Opus 5.5 (`claude-opus-5-5`). `verify` passes; a plain launch on this machine (RTX, Vulkan present) logged `Engine ready`, answered `initialize` in 0.3 s and exited 0 in 0.1 s on stdin EOF. The frame thread off the main thread broke nothing.
 
 **For T-3 and T-4, declaring a tool.** A file of its own in `src/Carve.Server`, nothing else to edit: `WithToolsFromAssembly` finds it. Tried end to end with a throwaway tool, internal or public class alike:
 
@@ -67,7 +67,7 @@ internal static class DefineMeshTool
 
 Parameters of a type in the container are injected and left out of the schema; the rest are the tool's arguments. Engine systems and render pipeline registrations do need a line in `Program.cs`, beside `AddEmpyreanConfiguration`; a system that lives there is first-wins against nothing.
 
-**`EngineStatus`** (`Carve.Server`, a singleton, injectable into a tool): `IsReady`, `IsFaulted`, `FaultMessage`, and `Task WhenSettled`, which completes when the engine is ready, faulted or stopped and **never throws**. So: `await status.WhenSettled; if (status.FaultMessage is { } m) ...`. A fault can arrive after it has completed, so read the state every call. `FaultMessage` is the innermost exception's message and is not guaranteed to say Vulkan; T-4 words its own error around it.
+**`EngineStatus`** (`Carve.Server`, a singleton, injectable into a tool): `IsReady`, `IsFaulted`, `FaultMessage`, and `Task WhenSettled`, which completes when the engine is ready, faulted or stopped and **never throws**. So: `await status.WhenSettled; if (status.FaultMessage is { } m) ...`. A fault can arrive after it has completed, so read the state every call. `FaultMessage` already names Vulkan (`Engine failed (is a Vulkan device available?): ...`), because the engine's own message on a machine with no driver is a bare `Value cannot be null. (Parameter 'ptr')`: engine need 1 in D-1. T-4 can pass it straight through.
 
 **For T-5, the extension API** (`Carve.Extensibility`, the type `ICarveExtension`): `void ConfigureHost(CarveHostBuilderContext context)` (the pre-build hook; `context.Services`, `.Configuration`, `.Mcp`) and `void OnStarted(IServiceProvider services)` (the started hook, after `host.StartAsync`, engine still starting). Each is called on a public concrete type with a public parameterless constructor; every such type in a listed DLL is instantiated, ordered by full name, and the list by `Carve:Extensions:0`, `:1`, ... (a single `Carve:Extensions=path` also works).
 
