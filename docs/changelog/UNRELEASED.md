@@ -5,3 +5,4 @@
 - T-3: An agent defines a polygon mesh by coordinates through define_mesh and gets counts, bounds and warnings back
 - T-4: An agent calls render and gets a shaded Empyrean image of the current mesh from the front or the back
 - T-5: A debug extension drives the product unattended through an in-memory MCP client with a fixed clock, seed and run folder
+- T-6: The cube scenario renders a cube and an L-block from both views, proves byte-equal frames and runs in verify

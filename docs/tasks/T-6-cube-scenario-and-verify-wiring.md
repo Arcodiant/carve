@@ -4,7 +4,7 @@ description: >-
 ---
 # T-6 — Cube scenario and verify wiring
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -45,3 +45,17 @@ Look at every frame, kept in `artifacts/`, and show the person the cube `front`,
 - No golden tolerance is chosen. Anything that would add one, or loosen the 10/255 check, goes back to the person.
 - Six frames at one size: look at them together at the end.
 - Say which frames were looked at in the closing report.
+
+### As built
+
+Ran on Sonnet 5.5 (`claude-sonnet-5-5`).
+
+**Files.** `scenarios/Carve.Scenario.Cube` (`CubeScenario`, `CubeExtension`), added to `Carve.slnx`; `scripts/verify.ps1` runs `run-scenario.ps1 cube` after the tests (comment: needs a Vulkan device); `CLAUDE.md` Layout row added and the "first milestone adds" line removed. `run-scenario.ps1` found the project under `scenarios/` as is.
+
+**Frames (8, `artifacts/scenarios/cube/<n>/frames/`).** cube-front, cube-back, cube-front-again, lblock-front, lblock-back, longbox-front, cube-flipped-front, after-error-front. All eight were looked at (one contact sheet, plus the person's review in `G:\My Drive\artifacts\carve\M-1\T-6\round-1`): **approved** with no notes, judged on cube front, cube back and L-block front. The flipped-face cube loses its +Z face (back-face culled); that is what the record shows.
+
+**Checks in the scenario.** Four background corners on every frame; cube front top > +Z > +X and back -Z > -X > underside, each step at least 10 in G (T-4's sample points, hard-coded; `back` is the as-built order, per the person); cube front repeat byte-equal; L-block closed, no warnings, notch pixel (321, 185) is background in front (the sight line through (1.8, 1.8, 1) never meets the solid; position computed from T-4's framing maths); long box: every border pixel is background; flipped cube warns; a bad index is a tool error and the next render is byte-equal to the frame before it.
+
+**Two runs.** `run-scenario.ps1 cube` run twice (folders 1 and 2), exit 0 each: all 8 PNGs identical byte for byte (`cmp`), and `run.json` identical. Same machine (RTX 5070 Ti) only.
+
+**Not checked:** other GPUs or machines; the L-block back view by pixels (looked at only); a hang's timeout.
