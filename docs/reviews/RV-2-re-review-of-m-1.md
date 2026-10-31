@@ -31,7 +31,7 @@ description: >-
 
 `src/Carve.Core/PolygonMesh.cs:139-156,179-184` against `src/Carve.Server/ViewFraming.cs:43-52,72-77`, `src/Carve.Server/RenderTool.cs:21`. Correctness: a regression from the scale fix, reported by both re-reviewers. The kernel moved to double, but framing is single precision. The worked cube scaled by s, then `render`, on the real server: s=1 to 1e18 and 1e-10, 1e-14 draw the same image; s=1e19, 1e-15, 1e-20, 1e-30 succeed with the normal caption and 0 foreground pixels; s=1e20, 1e30 give `The render failed: The front view could not be set up: nearPlaneDistance ('NaN') must be greater than '0'`. At 8cbd23f such faces were refused, so an error became a false success.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### A folded outline is still accepted, and a real vertex is still dropped from the triangles
 
@@ -75,13 +75,13 @@ description: >-
 
 `src/Carve.Server/ViewFraming.cs:50,72`, comment at `:47-48`, `src/Carve.Server/RenderTool.cs:18`, `docs/tasks/T-4-shaded-render-tool.md:74`. Correctness; tests cover the Scope. RV-1's framing finding, moved rather than closed. `eye` rounds to float, so the view direction stops matching the corners framing computed. Unit cube at (o,o,o) on the real `carve`: fine at 1e6; 3e6 back draws 24,778 and touches the edge; 4e6 cropped at two edges in both views; 7e6 back x 359..511; 8e6 is 2 pixels; 1e7 is 1 pixel. The same ratio occurs close in: a box of side 4e-5 at (100,100,100) reaches 1.07 in device units. Tests stop at 1e6.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The 1e-15 constant blanks a good mesh, and its stated reason is false
 
 `src/Carve.Server/ViewFraming.cs:28-29,50`, `docs/tasks/T-4-shaded-render-tool.md:73`. Correctness; CLAUDE.md "Ask, don't land". A cube of side 1.2e-15 renders in full; sides 1.1e-15, 1e-15, 1e-16, 1e-20 are accepted and give 0 pixels with no error. The comment says look-at lengths underflow below it; with `SmallestRadius = 0` the matrices stay exact down to side 1e-22.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### A steady stream of define_mesh keeps a queued render from ever being drawn
 
