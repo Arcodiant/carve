@@ -210,6 +210,72 @@ public sealed partial class DebugExtensionTests : IDisposable
     }
 
     [Fact]
+    public async Task A_host_stop_before_the_scenario_concludes_exits_non_zero_and_the_log_says_so()
+    {
+        using var carve = new CarveProcess(InFolder("--Tiny:Mode=stop-host"));
+
+        Assert.True(1 == await carve.WaitForExitAsync(Run), carve.Stderr);
+
+        Assert.Contains("the host stopped before the scenario concluded", carve.Stderr);
+        var log = Log();
+        Assert.Equal("failed", log.GetProperty("outcome").GetString());
+        Assert.Contains("host stopped", log.GetProperty("failure").GetString());
+    }
+
+    [Fact]
+    public async Task A_command_line_switch_beats_an_earlier_extensions_default_for_a_later_hook()
+    {
+        using var carve = new CarveProcess(InFolder("--Tiny:Mode=configure-pacing", "--Empyrean:Time:PaceToFixedStep=true"));
+
+        Assert.True(0 == await carve.WaitForExitAsync(Run), carve.Stderr);
+
+        Assert.Contains("tiny: pacing at configure true", carve.Stderr);
+    }
+
+    [Fact]
+    public async Task A_named_folder_with_files_but_no_run_json_is_refused_and_left_alone()
+    {
+        var kept = Path.Combine(Folder, "frames", "holiday.jpg");
+        Directory.CreateDirectory(Path.GetDirectoryName(kept)!);
+        File.WriteAllText(kept, "mine");
+
+        using var carve = new CarveProcess(InFolder());
+
+        Assert.Equal(1, await carve.WaitForExitAsync(Run));
+        Assert.Contains("no run.json", carve.Stderr);
+        Assert.True(File.Exists(kept));
+    }
+
+    [Fact]
+    public async Task An_empty_named_folder_without_run_json_is_used()
+    {
+        Directory.CreateDirectory(Path.Combine(Folder, "frames"));
+
+        using var carve = new CarveProcess(InFolder());
+
+        Assert.True(0 == await carve.WaitForExitAsync(Run), carve.Stderr);
+    }
+
+    [Fact]
+    public async Task The_script_fails_a_run_that_wrote_to_stdout_and_repeats_what_it_wrote()
+    {
+        var (code, _, stderr) = await ScriptAsync($"tiny -NoBuild -CarveArguments '--Carve:Debug:RunFolder={Folder}','--Tiny:Mode=stdout'");
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("which belongs to MCP", stderr);
+        Assert.Contains("tiny: this belongs to MCP", stderr);
+    }
+
+    [Fact]
+    public async Task The_script_finds_the_scenario_whatever_the_case_of_its_name()
+    {
+        var (code, stdout, _) = await ScriptAsync($"TINY -NoBuild -CarveArguments '--Carve:Debug:RunFolder={Folder}'");
+
+        Assert.Equal(0, code);
+        Assert.Equal(Folder, stdout.Trim());
+    }
+
+    [Fact]
     public async Task The_script_refuses_a_scenario_that_does_not_exist()
     {
         var (code, _, stderr) = await ScriptAsync("no-such-scenario -NoBuild");

@@ -21,10 +21,15 @@ $root = Split-Path $PSScriptRoot -Parent
 
 function Write-Err([string]$text) { [Console]::Error.WriteLine($text) }
 
+# Matched without regard to case, so it does not rest on a case-insensitive filesystem.
 $scenario = @('scenarios', 'tests') |
-    ForEach-Object { Join-Path $root $_ "Carve.Scenario.$Name" "Carve.Scenario.$Name.csproj" } |
+    ForEach-Object { Join-Path $root $_ } |
     Where-Object { Test-Path $_ } |
-    Select-Object -First 1
+    ForEach-Object { Get-ChildItem $_ -Directory } |
+    Where-Object { $_.Name -ieq "Carve.Scenario.$Name" } |
+    ForEach-Object { Get-ChildItem $_.FullName -File -Filter '*.csproj' } |
+    Where-Object { $_.Name -ieq "$($_.Directory.Name).csproj" } |
+    Select-Object -First 1 -ExpandProperty FullName
 if (-not $scenario) {
     Write-Err "run-scenario: no project Carve.Scenario.$Name under scenarios/ or tests/"
     exit 2
@@ -75,7 +80,8 @@ try {
     $lines | ForEach-Object { Write-Err $_ }
 
     if ((Get-Item $stdout).Length -ne 0) {
-        Write-Err "run-scenario: carve wrote $((Get-Item $stdout).Length) bytes to stdout, which belongs to MCP"
+        Write-Err "run-scenario: carve wrote $((Get-Item $stdout).Length) bytes to stdout, which belongs to MCP; it wrote:"
+        Get-Content $stdout | ForEach-Object { Write-Err "  $_" }
         if ($code -eq 0) { $code = 1 }
     }
 

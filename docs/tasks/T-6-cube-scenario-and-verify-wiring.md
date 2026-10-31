@@ -56,6 +56,8 @@ Ran on Sonnet 5.5 (`claude-sonnet-5-5`).
 
 **Checks in the scenario.** Four background corners on every frame; cube front top > +Z > +X and back -Z > -X > underside, each step at least 10 in G (T-4's sample points, hard-coded; `back` is the as-built order, per the person); cube front repeat byte-equal; L-block closed, no warnings, notch pixel (321, 185) is background in front (the sight line through (1.8, 1.8, 1) never meets the solid; position computed from T-4's framing maths); long box: every border pixel is background; flipped cube warns; a bad index is a tool error and the next render is byte-equal to the frame before it.
 
+**Drawn-pixel checks (review RV-1).** The L-block front and back, long box, flipped cube and after-error frames each also need at least 14,000 non-background pixels of 262,144 (measured 88,829 and 94,688, 28,563, 53,660 and 53,660; about half the smallest). With a temporary patch that turned the camera 1000 units aside from the fourth render on, the scenario failed at `lblock-front` (0 drawn) and the patch was reverted. The checks were not each shown to fail on their own frame. The frames stayed byte-identical.
+
 **Two runs.** `run-scenario.ps1 cube` run twice (folders 1 and 2), exit 0 each: all 8 PNGs identical byte for byte (`cmp`), and `run.json` identical. Same machine (RTX 5070 Ti) only.
 
 **Not checked:** other GPUs or machines; the L-block back view by pixels (looked at only); a hang's timeout.

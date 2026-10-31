@@ -3,6 +3,7 @@ using Carve.Extensibility;
 using Empyrean;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.Protocol;
 
@@ -11,7 +12,16 @@ namespace Carve.Scenario.Tiny;
 /// <summary>Registers the scenario, as every scenario extension does.</summary>
 public sealed class TinyExtension : ICarveExtension
 {
-    public void ConfigureHost(CarveHostBuilderContext context) => context.Services.AddSingleton<IScenario, TinyScenario>();
+    public void ConfigureHost(CarveHostBuilderContext context)
+    {
+        context.Services.AddSingleton<IScenario, TinyScenario>();
+
+        // Read here, after the debug extension's hook, to see whose value is on top.
+        if (context.Configuration["Tiny:Mode"] == "configure-pacing")
+        {
+            Console.Error.WriteLine($"tiny: pacing at configure {context.Configuration["Empyrean:Time:PaceToFixedStep"]}");
+        }
+    }
 
     public void OnStarted(IServiceProvider services)
     {
@@ -19,7 +29,7 @@ public sealed class TinyExtension : ICarveExtension
 }
 
 /// <summary>Calls <c>tools/list</c>; under <c>Tiny:Mode</c> it exercises one thing the driver promises.</summary>
-public sealed class TinyScenario(IConfiguration configuration, SeededRandom random, IServiceProvider services) : IScenario
+public sealed class TinyScenario(IConfiguration configuration, SeededRandom random, IServiceProvider services, IHostApplicationLifetime lifetime) : IScenario
 {
     private static readonly object Quad = new
     {
@@ -73,6 +83,17 @@ public sealed class TinyScenario(IConfiguration configuration, SeededRandom rand
 
             case "bytes":
                 driver.AssertBytesEqual("tiny bytes", [1, 2, 3], [1, 2, 4]);
+                break;
+
+            case "stop-host":
+                // Stops the host, then waits on something that is not the driver.
+                lifetime.StopApplication();
+                await Task.Delay(TimeSpan.FromSeconds(30));
+                break;
+
+            case "stdout":
+                Console.Out.WriteLine("tiny: this belongs to MCP");
+                Console.Out.Flush();
                 break;
 
             case "clock":

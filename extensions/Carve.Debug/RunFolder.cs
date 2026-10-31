@@ -26,15 +26,24 @@ internal sealed class RunFolder
 
     /// <summary>
     /// Makes the folder. A folder named outright may be one a run has used, so what a run makes in
-    /// it is cleared: only that, and anything else in it is left alone.
+    /// it is cleared, but only where a <c>run.json</c> shows a run used it: only <c>frames/</c> and
+    /// <c>user-data/</c>, and anything else in it is left alone. Without a <c>run.json</c>, either
+    /// of them that exists and is not empty is refused, since it may be someone else's.
     /// </summary>
     public static RunFolder Create(string? configured, string scenario)
     {
         var folder = new RunFolder(configured is { Length: > 0 } ? configured : NextNumbered(scenario));
+        var used = File.Exists(folder.Log);
         foreach (var made in new[] { folder.Frames, folder.UserData })
         {
             if (Directory.Exists(made))
             {
+                if (!used && Directory.EnumerateFileSystemEntries(made).Any())
+                {
+                    throw new InvalidOperationException(
+                        $"the run folder {folder.Path} has a non-empty '{System.IO.Path.GetFileName(made)}' but no run.json, so no run is known to have used it; not clearing it.");
+                }
+
                 Directory.Delete(made, recursive: true);
             }
 

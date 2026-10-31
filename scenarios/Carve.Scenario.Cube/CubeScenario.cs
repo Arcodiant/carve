@@ -25,6 +25,12 @@ public sealed class CubeScenario : IScenario
     /// <summary>Faces must differ in the green channel by at least this much, in the expected order.</summary>
     private const int MinimumStep = 10;
 
+    /// <summary>
+    /// Fewest non-background pixels a 512 x 512 frame of a mesh may show. Measured: L-block 88,829
+    /// and 94,688, long box 28,563, flipped cube 53,660; this is about half the smallest.
+    /// </summary>
+    private const int MinimumDrawn = 14000;
+
     // The vertices and faces of the define_mesh description's worked example.
     private static readonly double[][] CubeVertices =
         [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
@@ -61,6 +67,8 @@ public sealed class CubeScenario : IScenario
         var lBack = await driver.CaptureAsync("lblock-back", new { view = "back" });
         CheckCorners(driver, lFront);
         CheckCorners(driver, lBack);
+        CheckDrawn(driver, lFront);
+        CheckDrawn(driver, lBack);
         CheckBackground(driver, lFront, NotchFront, "the L-block's notch");
 
         // 4. A long box, off the origin: framing has to find it.
@@ -68,6 +76,7 @@ public sealed class CubeScenario : IScenario
         await DefineAsync(driver, "long box", bVertices, bFaces);
         var box = await driver.CaptureAsync("longbox-front", new { view = "front" });
         CheckCorners(driver, box);
+        CheckDrawn(driver, box);
         CheckEdges(driver, box);
 
         // 5. A cube with one face wound backwards: accepted with a warning, kept as a record of the look.
@@ -81,6 +90,7 @@ public sealed class CubeScenario : IScenario
 
         var flippedFront = await driver.CaptureAsync("cube-flipped-front", new { view = "front" });
         CheckCorners(driver, flippedFront);
+        CheckDrawn(driver, flippedFront);
 
         // 6. A bad index is a tool error, and the mesh before it still renders.
         var bad = await driver.CallAsync("define_mesh", new { vertices = new[] { new[] { 0, 0, 0 }, new[] { 1, 0, 0 }, new[] { 0, 1, 0 } }, faces = new[] { new[] { 0, 1, 9 } } });
@@ -91,6 +101,7 @@ public sealed class CubeScenario : IScenario
 
         var afterError = await driver.CaptureAsync("after-error-front", new { view = "front" });
         driver.AssertBytesEqual("the mesh before a failed define_mesh", flippedFront.Pixels, afterError.Pixels);
+        CheckDrawn(driver, afterError);
     }
 
     private static async Task<JsonElement> DefineAsync(ScenarioDriver driver, string what, double[][] vertices, int[][] faces)
@@ -141,6 +152,30 @@ public sealed class CubeScenario : IScenario
 
     private static bool IsBackground((byte R, byte G, byte B, byte A) p) =>
         p.R is >= 47 and <= 49 && p.G is >= 51 and <= 53 && p.B is >= 55 and <= 57;
+
+    /// <summary>
+    /// A blank frame passes every background check, so a frame must also show the mesh: at least
+    /// <see cref="MinimumDrawn"/> pixels that are not the background.
+    /// </summary>
+    private static void CheckDrawn(ScenarioDriver driver, ScenarioFrame frame)
+    {
+        var drawn = 0;
+        for (var y = 0; y < frame.Height; y++)
+        {
+            for (var x = 0; x < frame.Width; x++)
+            {
+                if (!IsBackground(frame.Pixel(x, y)))
+                {
+                    drawn++;
+                }
+            }
+        }
+
+        if (drawn < MinimumDrawn)
+        {
+            driver.Fail($"{frame.Name}: only {drawn} pixels are not the background, expected at least {MinimumDrawn}");
+        }
+    }
 
     private static void CheckCorners(ScenarioDriver driver, ScenarioFrame frame)
     {

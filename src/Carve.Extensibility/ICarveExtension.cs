@@ -11,7 +11,8 @@ public interface ICarveExtension
     /// Runs before the product registers the engine or its default transport, in list order.
     /// Engine services added here win over the engine's own, since those are first-wins. A
     /// transport added here replaces stdio. Configuration added here sits above the product's
-    /// defaults and below the environment and the command line.
+    /// defaults and below the environment and the command line, which are put back on top after
+    /// each extension's hook, so a later extension reads the person's value, not an earlier default.
     /// </summary>
     void ConfigureHost(CarveHostBuilderContext context);
 

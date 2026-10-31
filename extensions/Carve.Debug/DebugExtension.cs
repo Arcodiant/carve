@@ -52,7 +52,10 @@ public sealed class DebugExtension : ICarveExtension
         var log = new RunLog(folder.Log, name, random.Seed);
         Console.Error.WriteLine($"carve-debug: run folder {folder.Path}");
 
+        // Failing until the scenario concludes passed, so a host that stops first exits non-zero.
+        Environment.ExitCode = 1;
         var lifetime = services.GetRequiredService<IHostApplicationLifetime>();
+        lifetime.ApplicationStopping.Register(() => Conclude(log, "the host stopped before the scenario concluded"));
         _ = Task.Run(() => RunAsync(scenario, folder, log, lifetime));
     }
 
@@ -91,13 +94,27 @@ public sealed class DebugExtension : ICarveExtension
         }
     }
 
+    // The first conclusion stands; a later one (the host stopping under a scenario that then ends) is ignored.
+    private static readonly Lock Concluding = new();
+    private static bool _concluded;
+
     private static void Conclude(RunLog log, string? failure)
     {
-        log.Finish(failure);
-        if (failure is not null)
+        lock (Concluding)
         {
-            Console.Error.WriteLine($"carve-debug: scenario failed: {failure}");
-            Environment.ExitCode = 1;
+            if (_concluded)
+            {
+                return;
+            }
+
+            _concluded = true;
+            log.Finish(failure);
+            if (failure is not null)
+            {
+                Console.Error.WriteLine($"carve-debug: scenario failed: {failure}");
+            }
+
+            Environment.ExitCode = failure is null ? 0 : 1;
         }
     }
 }

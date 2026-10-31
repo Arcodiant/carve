@@ -1,5 +1,6 @@
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -37,6 +38,80 @@ internal static partial class ProductReferenceGuard
             .Where(name => extensions.Contains(name)
                 || Forbidden().IsMatch(name)
                 || (name.StartsWith("Carve.", StringComparison.OrdinalIgnoreCase) && !Allowed.Contains(name)))
+            .ToList();
+    }
+
+    /// <summary>True for a name the product may not carry: an extension, or any Carve assembly not allowed.</summary>
+    private static bool IsForbidden(string name, HashSet<string> extensions) =>
+        extensions.Contains(name)
+        || Forbidden().IsMatch(name)
+        || (name.StartsWith("Carve.", StringComparison.OrdinalIgnoreCase) && !Allowed.Contains(name));
+
+    /// <summary>
+    /// Every project in the <c>ProjectReference</c> closure of the product's project that is
+    /// forbidden, and every value in any of their files that names something forbidden. This is
+    /// what catches an extension reached through Carve.Core.
+    /// </summary>
+    public static IReadOnlyList<string> FindInProjectClosure(string projectPath, IEnumerable<string> extensionAssemblies)
+    {
+        var extensions = new HashSet<string>(extensionAssemblies, StringComparer.OrdinalIgnoreCase);
+        var found = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pending = new Stack<string>([Path.GetFullPath(projectPath)]);
+        var root = pending.Peek();
+        while (pending.Count > 0)
+        {
+            var path = pending.Pop();
+            if (!seen.Add(path))
+            {
+                continue;
+            }
+
+            var name = Path.GetFileNameWithoutExtension(path);
+            if (path != root && IsForbidden(name, extensions))
+            {
+                found.Add(name);
+            }
+
+            if (!File.Exists(path))
+            {
+                continue;
+            }
+
+            var xml = File.ReadAllText(path);
+            found.AddRange(FindInProject(xml).Select(value => $"{name}: {value}"));
+            foreach (var reference in XDocument.Parse(xml).Descendants("ProjectReference").Select(e => e.Attribute("Include")?.Value))
+            {
+                if (reference is not null)
+                {
+                    pending.Push(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, reference.Replace('\\', '/'))));
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>Every library in a built <c>.deps.json</c> that is forbidden.</summary>
+    public static IReadOnlyList<string> FindInDeps(string depsJsonPath, IEnumerable<string> extensionAssemblies)
+    {
+        var extensions = new HashSet<string>(extensionAssemblies, StringComparer.OrdinalIgnoreCase);
+        using var document = JsonDocument.Parse(File.ReadAllText(depsJsonPath));
+
+        return document.RootElement.GetProperty("libraries").EnumerateObject()
+            .Select(library => library.Name.Split('/')[0])
+            .Where(name => IsForbidden(name, extensions))
+            .ToList();
+    }
+
+    /// <summary>Every assembly in a build output folder that is forbidden.</summary>
+    public static IReadOnlyList<string> FindInOutputFolder(string folder, IEnumerable<string> extensionAssemblies)
+    {
+        var extensions = new HashSet<string>(extensionAssemblies, StringComparer.OrdinalIgnoreCase);
+
+        return Directory.EnumerateFiles(folder, "*.dll")
+            .Select(path => Path.GetFileNameWithoutExtension(path)!)
+            .Where(name => IsForbidden(name, extensions))
             .ToList();
     }
 

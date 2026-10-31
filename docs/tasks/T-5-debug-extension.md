@@ -66,11 +66,14 @@ Ran on Opus 5.5 (`claude-opus-5-5`). `verify` passes, and `run-scenario.ps1 tiny
 
 - A scenario's name, which `IScenario` as specified does not carry, is the last dotted part of its assembly name, lower-cased, so `run-scenario.ps1 cube` and `artifacts/scenarios/cube/` agree with no second place to say it.
 - `<run number>` is one above the highest number in the folder, from 1. The relative default is against the working directory. Two runs at once could pick the same number; nothing here runs two.
-- `Carve:Debug:RunFolder` naming a used folder: `frames/` and `user-data/` are cleared, `run.json` replaced, anything else left alone.
+- `Carve:Debug:RunFolder` naming a used folder: `frames/` and `user-data/` are cleared, `run.json` replaced, anything else left alone. **Cleared only if the folder holds a `run.json`** (review RV-1); without one, a `frames/` or `user-data/` that exists and is not empty is refused as a fatal `OnStarted` error, and left as it was. Empty ones are used.
 - `run.json` is one JSON document, rewritten after each entry so a run that dies keeps what it did. It has `scenario`, `seed`, `audio`, `outcome` (`running`, `passed`, `failed`), `failure` and `calls`. No timestamps, so it compares from run to run. **An image in a result is its byte count and SHA-256, not its base64.** A captured one is in `frames/`; a render made with `CallAsync` is kept only as that hash. Full base64 would be a two-line change if the person prefers the log literal.
 - No scenario, or more than one, is a fatal `OnStarted` error, exit 1, with no run folder made.
 - **The script's timeout is my addition**, so an unattended `verify` cannot hang: 300 s, then it stops the process it started, tree included, and exits 124. The spec gives no number; it is a parameter.
-- Any stdout from `carve` makes the script fail, since the milestone's rule is that stdout belongs to MCP and the test only covers the tiny scenario.
+- Any stdout from `carve` makes the script fail, since the milestone's rule is that stdout belongs to MCP. The script copies what it caught to stderr first; the tiny scenario's `stdout` mode and a test hold it to that.
+- **Exit 0 needs a concluded pass** (review RV-1). `OnStarted` sets `Environment.ExitCode = 1`; only the scenario concluding passed sets 0. A host stop first concludes the run as failed (`the host stopped before the scenario concluded`, in `run.json` and on stderr), and the first conclusion stands. Tiny's `stop-host` mode and a test cover it. `IScenario.RunAsync` still takes no token.
+- `run-scenario.ps1` matches the project folder without regard to case, so `cube` does not rest on a case-insensitive filesystem.
+- The product puts the environment and command line back on top after each extension's `ConfigureHost`, so a later extension reads the person's switch (tiny's `configure-pacing` mode and a test).
 
 **SDK.** `ModelContextProtocol` 2.3.0 has no public stream client transport (the planning probe's code is not on this machine, so how it connected was not seen). `PipeClientTransport` is an `IClientTransport` handing the client the SDK's own `StreamServerTransport` on the other ends of the pipes; that class is plain JSON-RPC lines and takes no side. Every call still takes real JSON, schema binding and dispatch.
 

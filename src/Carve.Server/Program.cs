@@ -49,15 +49,19 @@ var mcp = services.AddMcpServer(o =>
 services.PostConfigure<McpServerOptions>(o => o.ToolCollection ??= []);
 
 if (!RunHooks(extensions, nameof(ICarveExtension.ConfigureHost),
-    e => e.ConfigureHost(new CarveHostBuilderContext(services, builder.Configuration, mcp))))
+    e =>
+    {
+        e.ConfigureHost(new CarveHostBuilderContext(services, builder.Configuration, mcp));
+
+        // Back on top after each hook, so a later hook reads the person's switch, not an earlier default.
+        builder.Configuration.Sources.Remove(environment);
+        builder.Configuration.Sources.Remove(commandLine);
+        builder.Configuration.Sources.Add(environment);
+        builder.Configuration.Sources.Add(commandLine);
+    }))
 {
     return 1;
 }
-
-builder.Configuration.Sources.Remove(environment);
-builder.Configuration.Sources.Remove(commandLine);
-builder.Configuration.Sources.Add(environment);
-builder.Configuration.Sources.Add(commandLine);
 
 // After the hooks, so that first-wins engine substitution works.
 services.AddEmpyreanCore();

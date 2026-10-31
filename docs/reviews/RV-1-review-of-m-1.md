@@ -125,37 +125,37 @@ description: >-
 
 `scenarios/Carve.Scenario.Cube/CubeScenario.cs:62-64,70-71,83,92-93`. Correctness; tests cover the Scope. Every pixel check on these frames asserts background. Run in a scratch copy: with the camera turned 1000 units away for the L-block and long box, `run-scenario.ps1 cube` exited 0 and all three frames were the same blank image. Each frame needs a positive check. This is a tightening, so it needs no tolerance decision.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The guard test misses an extension that reaches the product through Carve.Core
 
 `tests/Carve.Server.Tests/ProductReferencesNoExtensionTests.cs:13,21-22`, `tests/Carve.Server.Tests/ProductReferenceGuard.cs:44-51`. Correctness; tests cover the Scope. Run in a scratch copy: a `ProjectReference` to `Carve.Debug` in `Carve.Core.csproj` built, put `Carve.Debug.dll` beside `carve.dll` and in `carve.deps.json`, and all 13 guard tests passed. Walk the `ProjectReference` closure, or check `carve.deps.json` and the output folder.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### A host stop during a scenario exits 0 with the run unfinished
 
 `src/Carve.Server/Program.cs:92-93`, `extensions/Carve.Debug/DebugExtension.cs:56,97-101`, `extensions/Carve.Debug/IScenario.cs:15`. Correctness (T-5: "exiting 0, or 1 on failure"). `RunAsync` is fire-and-forget, and `IScenario.RunAsync` takes no token. A scenario that stops the host then awaits something other than the driver gave script exit 0 with `"outcome": "running"`. An exit of 0 should require a concluded pass.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### During ConfigureHost an earlier extension's default beats the command line
 
 `src/Carve.Server/Program.cs:51-60`, `src/Carve.Extensibility/ICarveExtension.cs:13-14`. Correctness (*Headless runs*). Environment and command line return to the top only after all hooks. With `--Empyrean:Time:PaceToFixedStep=true`, a scenario's `ConfigureHost` read `false`. Restore the two sources after each hook.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The script's stdout check has no test and throws away what it caught
 
 `scripts/run-scenario.ps1:77-80,86`, `tests/Carve.Scenario.Tiny/TinyScenario.cs:35`, `tests/Carve.Server.Tests/DebugExtensionTests.cs:198-228`. Tests cover the Scope. Deleting lines 77-80 leaves every test green, and the failure gives a byte count while the `finally` deletes the text.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### T-5's choices judged on merit: clearing a run folder is the one risk
 
 `extensions/Carve.Debug/RunFolder.cs:34-42`, `RunLog.cs:96-101`, `DebugExtension.cs:59-60`, `scripts/run-scenario.ps1:63-72,77-80`. Design decisions. Hashes in `run.json`, the 300 s timeout with exit 124, and any stdout failing the script are sound. The scenario name is sound, though `run-scenario.ps1 cube` relies on a case-insensitive filesystem. Clearing a reused folder deletes `frames/` and `user-data/` under whatever `Carve:Debug:RunFolder` names, with no sign a run used it: a mistyped `--Carve:Debug:RunFolder=D:\photos` deletes `D:\photos\frames`. Requiring an existing `run.json` first would prevent that.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ## Findings: the whole diff (claude-opus-5-5)
 
