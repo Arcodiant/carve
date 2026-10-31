@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Carve.Server.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+    <PackageReference Include="xunit.v3" Version="1.*" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- Built first and started as real processes, never linked: the tests see what ships. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Server/Carve.Server.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Carve.Server.Tests.Extension/Carve.Server.Tests.Extension.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
