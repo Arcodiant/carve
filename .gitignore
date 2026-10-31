@@ -2,3 +2,5 @@
 # branches — their content belongs to those branches, not to this one.
 branches/
 .cairn/
+# Per-machine Claude permissions.
+.claude/settings.local.json
