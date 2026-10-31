@@ -8,6 +8,13 @@ public readonly record struct MeshTriangle(int A, int B, int C, int Face);
 /// <summary>Ear-clipping triangulation in the plane of a face's Newell normal. A derived view for render and export; never stored.</summary>
 public static class Triangulator
 {
+    /// <summary>
+    /// A corner is flat, and a point is on a line, when the sine of the angle it makes is at most this. It is judged
+    /// against the local edges (or, for a point and a line, the face size), not against the area of the whole face,
+    /// so a face of very many short edges keeps all its vertices.
+    /// </summary>
+    public const double CollinearTolerance = 1e-9;
+
     /// <summary>Triangles of every face, in face order.</summary>
     public static IReadOnlyList<MeshTriangle> Triangulate(PolygonMesh mesh)
     {
@@ -25,6 +32,27 @@ public static class Triangulator
         return tris.Select(t => new MeshTriangle(t.A, t.B, t.C, face)).ToArray();
     }
 
+    /// <summary>The face's vertices in 2D, in the plane of its Newell normal, counter-clockwise about that normal; null when it has no normal.</summary>
+    private static (double X, double Y)[]? Project(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
+    {
+        var normal = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, face));
+        if (normal == (0, 0, 0)) return null;
+
+        // Basis (u, v) with u x v = normal, so a face wound CCW about its normal is CCW in 2D.
+        var helper = Math.Abs(normal.X) < 0.9 ? (1.0, 0.0, 0.0) : (0.0, 1.0, 0.0);
+        var u = PolygonMesh.Unit(Cross3(helper, normal));
+        var v = Cross3(normal, u);
+        var o = verts[face[0]];
+        return face.Select(i =>
+        {
+            double dx = (double)verts[i].X - o.X, dy = (double)verts[i].Y - o.Y, dz = (double)verts[i].Z - o.Z;
+            return (dx * u.X + dy * u.Y + dz * u.Z, dx * v.X + dy * v.Y + dz * v.Z);
+        }).ToArray();
+    }
+
+    private static (double X, double Y, double Z) Cross3((double X, double Y, double Z) a, (double X, double Y, double Z) b)
+        => (a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
+
     internal static bool TryTriangulate(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face, out List<(int A, int B, int C)> triangles)
     {
         triangles = [];
@@ -34,17 +62,9 @@ public static class Triangulator
             return true;
         }
 
-        var normal = PolygonMesh.Normalize(PolygonMesh.NewellVector(verts, face));
-        if (normal == Vector3.Zero) return false;
-
-        // Basis (u, v) with u x v = normal, so a face wound CCW about its normal is CCW in 2D.
-        var helper = MathF.Abs(normal.X) < 0.9f ? Vector3.UnitX : Vector3.UnitY;
-        var u = Vector3.Normalize(Vector3.Cross(helper, normal));
-        var v = Vector3.Cross(normal, u);
-
+        var pts = Project(verts, face);
+        if (pts is null) return false;
         var size = PolygonMesh.FaceSize(verts, face);
-        var eps = 1e-9f * size * size;
-        var pts = face.Select(i => new Vector2(Vector3.Dot(verts[i], u), Vector3.Dot(verts[i], v))).ToArray();
         var remaining = Enumerable.Range(0, face.Count).ToList();
 
         while (remaining.Count > 3)
@@ -55,8 +75,8 @@ public static class Triangulator
                 var ia = remaining[(r + remaining.Count - 1) % remaining.Count];
                 var ib = remaining[r];
                 var ic = remaining[(r + 1) % remaining.Count];
-                if (Cross(pts[ia], pts[ib], pts[ic]) <= eps) continue;
-                if (ContainsOther(pts, remaining, ia, ib, ic, eps)) continue;
+                if (!IsConvex(pts[ia], pts[ib], pts[ic])) continue;
+                if (ContainsOther(pts, remaining, ia, ib, ic, size)) continue;
 
                 triangles.Add((face[ia], face[ib], face[ic]));
                 remaining.RemoveAt(r);
@@ -71,7 +91,7 @@ public static class Triangulator
             {
                 var ia = remaining[(r + remaining.Count - 1) % remaining.Count];
                 var ic = remaining[(r + 1) % remaining.Count];
-                if (MathF.Abs(Cross(pts[ia], pts[remaining[r]], pts[ic])) <= eps) { collinear = r; break; }
+                if (IsFlat(pts[ia], pts[remaining[r]], pts[ic])) { collinear = r; break; }
             }
             if (collinear < 0) return false;
             remaining.RemoveAt(collinear);
@@ -80,28 +100,76 @@ public static class Triangulator
         var a = remaining[0];
         var b = remaining[1];
         var c = remaining[2];
-        if (Cross(pts[a], pts[b], pts[c]) <= eps) return false;
+        if (!IsConvex(pts[a], pts[b], pts[c])) return false;
         triangles.Add((face[a], face[b], face[c]));
         return true;
     }
 
-    private static float Cross(Vector2 a, Vector2 b, Vector2 c)
+    /// <summary>
+    /// The first pair of non-adjacent edges of a face that properly cross, in the plane of its normal, as the
+    /// position of each edge's first vertex (edge k runs from face[k] to face[k+1]); null when none cross.
+    /// Edges that only touch (a vertex on another edge) do not cross.
+    /// </summary>
+    internal static (int First, int Second)? FindCrossing(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
     {
-        var ab = b - a;
-        var ac = c - a;
-        return ab.X * ac.Y - ab.Y * ac.X;
+        if (face.Count < 4) return null;
+        var pts = Project(verts, face);
+        if (pts is null) return null;
+        var size = PolygonMesh.FaceSize(verts, face);
+        var n = pts.Length;
+
+        for (var i = 0; i < n; i++)
+        {
+            var a = pts[i];
+            var b = pts[(i + 1) % n];
+            for (var j = i + 2; j < n; j++)
+            {
+                if (i == 0 && j == n - 1) continue;
+                var c = pts[j];
+                var d = pts[(j + 1) % n];
+                if (Math.Max(a.X, b.X) < Math.Min(c.X, d.X) || Math.Max(c.X, d.X) < Math.Min(a.X, b.X)) continue;
+                if (Math.Max(a.Y, b.Y) < Math.Min(c.Y, d.Y) || Math.Max(c.Y, d.Y) < Math.Min(a.Y, b.Y)) continue;
+                if (Side(c, d, a, size) * Side(c, d, b, size) < 0 && Side(a, b, c, size) * Side(a, b, d, size) < 0)
+                    return (i, j);
+            }
+        }
+        return null;
     }
 
-    private static bool ContainsOther(Vector2[] pts, List<int> remaining, int ia, int ib, int ic, float eps)
+    /// <summary>Which side of the line a-b the point p is on (1 left, -1 right), 0 when it is within the tolerance of the line.</summary>
+    private static int Side((double X, double Y) a, (double X, double Y) b, (double X, double Y) p, double size)
+    {
+        var cross = Cross(a, b, p);
+        return Math.Abs(cross) <= CollinearTolerance * size * Distance(a, b) ? 0 : Math.Sign(cross);
+    }
+
+    private static double Cross((double X, double Y) a, (double X, double Y) b, (double X, double Y) c)
+        => (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+
+    private static double Distance((double X, double Y) a, (double X, double Y) b)
+        => Math.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Y - a.Y) * (b.Y - a.Y));
+
+    /// <summary>A left turn at b that is not flat, judged against the lengths of the two edges.</summary>
+    private static bool IsConvex((double X, double Y) a, (double X, double Y) b, (double X, double Y) c)
+        => Cross(a, b, c) > CollinearTolerance * Distance(a, b) * Distance(b, c);
+
+    private static bool IsFlat((double X, double Y) a, (double X, double Y) b, (double X, double Y) c)
+        => Math.Abs(Cross(a, b, c)) <= CollinearTolerance * Distance(a, b) * Distance(b, c);
+
+    private static bool ContainsOther((double X, double Y)[] pts, List<int> remaining, int ia, int ib, int ic, double size)
     {
         foreach (var i in remaining)
         {
             if (i == ia || i == ib || i == ic) continue;
             var p = pts[i];
             if (p == pts[ia] || p == pts[ib] || p == pts[ic]) continue;
-            if (Cross(pts[ia], pts[ib], p) >= -eps && Cross(pts[ib], pts[ic], p) >= -eps && Cross(pts[ic], pts[ia], p) >= -eps)
+            if (Inside(pts[ia], pts[ib], p, size) && Inside(pts[ib], pts[ic], p, size) && Inside(pts[ic], pts[ia], p, size))
                 return true;
         }
         return false;
     }
+
+    /// <summary>p is left of a-b, or within the tolerance (of the face size) of the line on its right.</summary>
+    private static bool Inside((double X, double Y) a, (double X, double Y) b, (double X, double Y) p, double size)
+        => Cross(a, b, p) >= -CollinearTolerance * size * Distance(a, b);
 }

@@ -77,6 +77,10 @@ public class DefineMeshTests
         Assert.True(IsError(failed));
         Assert.Contains("unchanged", TextOf(failed));
 
+        // The mesh itself, seen through the render caption: still the cube.
+        var render = await carve.CallToolAsync("render", "{}");
+        Assert.Equal("512x512, view front, 8 vertices, 6 faces", TextOf(render, 1));
+
         var quad = await CallAsync(carve, """{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0]],"faces":[[0,1,2,3]]}""");
         Assert.False(IsError(quad), TextOf(quad));
         var body = JsonDocument.Parse(TextOf(quad)).RootElement;
@@ -105,5 +109,91 @@ public class DefineMeshTests
         Assert.Equal(3, vertex.GetProperty("maxItems").GetInt32());
         Assert.Equal("number", vertex.GetProperty("items").GetProperty("type").GetString());
         Assert.Equal("integer", properties.GetProperty("faces").GetProperty("items").GetProperty("items").GetProperty("type").GetString());
+    }
+
+    private const string Tri = """[[0,0,0],[1,0,0],[0,1,0]]""";
+
+    public static TheoryData<string, string[]> BadArguments => new()
+    {
+        { $$"""{"vertices":{{Tri}},"faces":[[0,1.5,2]]}""", ["faces[0][1]"] },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,99999999999,2]]}""", ["faces[0][1]"] },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,null,2]]}""", ["faces[0][1]"] },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,"1",2]]}""", ["faces[0][1]"] },
+        { """{"vertices":[[0,0,0],[1,null,0],[0,1,0]],"faces":[[0,1,2]]}""", ["vertices[1][1]"] },
+        { """{"vertices":[[0,0,0],[1,"x",0],[0,1,0]],"faces":[[0,1,2]]}""", ["vertices[1][1]"] },
+        { $$"""{"vertices":null,"faces":[[0,1,2]]}""", ["vertices"] },
+        { $$"""{"vertices":{{Tri}},"faces":null}""", ["faces"] },
+        { $$"""{"vertices":{{Tri}}}""", ["faces"] },
+        { "{}", ["vertices", "faces"] },
+        { """{"vertices":[],"faces":[[0,1,2]]}""", ["faces[0][0]", "no vertices"] },
+        { """{"vertices":[[0,0,0],[1,0,0],[0,1,0],[1,1,0]],"faces":[[0,1.0,2],[0,1,2.5,3]]}""", ["faces[1][2]"] },
+    };
+
+    [Theory]
+    [MemberData(nameof(BadArguments))]
+    public async Task Bad_arguments_are_a_tool_error_naming_the_element(string arguments, string[] mentions)
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+
+        var result = await CallAsync(carve, arguments);
+
+        Assert.True(IsError(result), result.ToString());
+        var text = TextOf(result);
+        Assert.StartsWith("define_mesh failed with", text);
+        Assert.All(mentions, m => Assert.Contains(m, text));
+    }
+
+    [Fact]
+    public async Task Every_problem_in_the_arguments_comes_back_together()
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+
+        var result = await CallAsync(carve,
+            """{"vertices":[[0,0,0],[1,"x",0],[0,1],[0,1,0]],"faces":[[0,1.5,2],null,[0,1,9],[0,"1",2]]}""");
+
+        var text = TextOf(result);
+        Assert.True(IsError(result));
+        foreach (var element in new[] { "vertices[1][1]", "vertices[2]", "faces[0][1]", "faces[1]", "faces[2][2]", "faces[3][1]" })
+        {
+            Assert.Contains(element, text);
+        }
+        Assert.StartsWith("define_mesh failed with 6 problem(s)", text);
+    }
+
+    [Fact]
+    public async Task A_null_face_is_reported_once()
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+
+        var text = TextOf(await CallAsync(carve, $$"""{"vertices":{{Tri}},"faces":[null]}"""));
+
+        Assert.StartsWith("define_mesh failed with 1 problem(s)", text);
+    }
+
+    [Fact]
+    public async Task An_integral_index_written_with_a_fraction_is_index_1()
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+
+        var result = await CallAsync(carve, $$"""{"vertices":{{Tri}},"faces":[[0,1.0,2]]}""");
+
+        Assert.False(IsError(result), TextOf(result));
+    }
+
+    [Fact]
+    public async Task The_published_input_schema_is_the_typed_one()
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+
+        var schema = (await ToolAsync(carve)).GetProperty("inputSchema").GetRawText();
+
+        Assert.Equal(
+            """{"type":"object","properties":{"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. Unitless; Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.","type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["vertices","faces"]}""",
+            schema);
     }
 }

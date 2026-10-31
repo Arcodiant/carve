@@ -82,22 +82,23 @@ public sealed class MeshReport
                 closed = false;
                 warnings.Add(new MeshWarning(MeshWarningKind.NonManifoldEdge, name, $"edge is shared by {total} faces"));
             }
-            else if (c.Forward == 2 || c.Backward == 2)
-            {
+
+            // Two or more faces running the same way along an edge disagree about which side is outside.
+            if (c.Forward >= 2 || c.Backward >= 2)
                 warnings.Add(new MeshWarning(MeshWarningKind.InconsistentWinding, name, "two faces cross this edge in the same direction"));
-            }
         }
 
         for (var f = 0; f < mesh.Faces.Count; f++)
         {
             var face = mesh.Faces[f];
             if (face.Count <= 3) continue;
-            var normal = mesh.FaceNormal(f);
-            var centroid = Vector3.Zero;
-            foreach (var i in face) centroid += verts[i];
-            centroid /= face.Count;
+            var normal = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, face));
+            var o = verts[face[0]];
+            double cx = 0, cy = 0, cz = 0;
+            foreach (var i in face) { cx += (double)verts[i].X - o.X; cy += (double)verts[i].Y - o.Y; cz += (double)verts[i].Z - o.Z; }
+            cx /= face.Count; cy /= face.Count; cz /= face.Count;
             var limit = PolygonMesh.PlanarityTolerance * PolygonMesh.FaceSize(verts, face);
-            var worst = face.Max(i => MathF.Abs(Vector3.Dot(verts[i] - centroid, normal)));
+            var worst = face.Max(i => Math.Abs(((double)verts[i].X - o.X - cx) * normal.X + ((double)verts[i].Y - o.Y - cy) * normal.Y + ((double)verts[i].Z - o.Z - cz) * normal.Z));
             if (worst > limit)
                 warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", $"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})"));
         }

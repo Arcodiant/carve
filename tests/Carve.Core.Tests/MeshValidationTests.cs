@@ -62,8 +62,11 @@ public class MeshValidationTests
     [Fact]
     public void BowtieFaceThatCannotBeClippedIsAnError()
     {
-        var v = new[] { new Vector3(0, 0, 0), new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector3(0, 1, 0) };
-        Assert.Contains(Errors(v, [[0, 1, 2, 3]]), e => e.Element == "faces[0]");
+        // Not the symmetric bowtie (0,0),(1,1),(1,0),(0,1), whose Newell area is exactly 0 and stops at the zero-area check.
+        var v = new[] { new Vector3(0, 0, 0), new Vector3(2, 2, 0), new Vector3(2, 0, 0), new Vector3(0, 1, 0) };
+        var error = Assert.Single(Errors(v, [[0, 1, 2, 3]]));
+        Assert.Equal("faces[0]", error.Element);
+        Assert.Equal("face cannot be triangulated (self-intersecting or degenerate outline)", error.Message);
     }
 
     [Fact]

@@ -55,14 +55,17 @@ public sealed class PolygonMesh
         var fcs = faces.Select(f => f.ToArray()).ToArray();
         var errors = new List<MeshError>();
 
+        var badVertex = new bool[verts.Length];
         for (var i = 0; i < verts.Length; i++)
         {
             var v = verts[i];
             if (!float.IsFinite(v.X) || !float.IsFinite(v.Y) || !float.IsFinite(v.Z))
+            {
+                badVertex[i] = true;
                 errors.Add(new MeshError($"vertices[{i}]", "coordinate is not finite"));
+            }
         }
 
-        var coordsOk = errors.Count == 0;
         if (fcs.Length == 0)
             errors.Add(new MeshError("faces", "mesh has no faces"));
 
@@ -80,7 +83,7 @@ public sealed class PolygonMesh
             {
                 if (face[k] < 0 || face[k] >= verts.Length)
                 {
-                    errors.Add(new MeshError($"faces[{f}][{k}]", $"index {face[k]} is out of range 0..{verts.Length - 1}"));
+                    errors.Add(new MeshError($"faces[{f}][{k}]", verts.Length == 0 ? $"index {face[k]} is out of range: there are no vertices" : $"index {face[k]} is out of range 0..{verts.Length - 1}"));
                     indicesOk = false;
                 }
             }
@@ -99,7 +102,7 @@ public sealed class PolygonMesh
                     }
                 }
             }
-            if (repeated || !coordsOk) continue;
+            if (repeated || face.Any(i => badVertex[i])) continue;
 
             if (IsZeroArea(verts, face))
             {
@@ -108,7 +111,13 @@ public sealed class PolygonMesh
             }
 
             if (!Triangulator.TryTriangulate(verts, face, out _))
+            {
                 errors.Add(new MeshError($"faces[{f}]", "face cannot be triangulated (self-intersecting or degenerate outline)"));
+                continue;
+            }
+
+            if (Triangulator.FindCrossing(verts, face) is var (first, second))
+                errors.Add(new MeshError($"faces[{f}]", $"face is self-intersecting: the edge from faces[{f}][{first}] crosses the edge from faces[{f}][{second}]"));
         }
 
         return errors.Count > 0
@@ -117,46 +126,60 @@ public sealed class PolygonMesh
     }
 
     /// <summary>Unit normal of a face by Newell's method; outward for a face wound counter-clockwise from outside.</summary>
-    public Vector3 FaceNormal(int face) => Normalize(NewellVector(_vertices, _faces[face]));
-
-    /// <summary>Newell's method on any vertex loop; the result is unnormalised (its length is twice the area).</summary>
-    internal static Vector3 NewellVector(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
+    public Vector3 FaceNormal(int face)
     {
-        var n = Vector3.Zero;
+        var (x, y, z) = Unit(NewellVector(_vertices, _faces[face]));
+        return new Vector3((float)x, (float)y, (float)z);
+    }
+
+    /// <summary>
+    /// Newell's method on any vertex loop, in double and relative to the loop's first vertex so rounding does not
+    /// grow with the distance from the origin and squares do not overflow; the result is unnormalised (its length is twice the area).
+    /// </summary>
+    internal static (double X, double Y, double Z) NewellVector(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
+    {
+        var o = verts[face[0]];
+        double nx = 0, ny = 0, nz = 0;
         for (var i = 0; i < face.Count; i++)
         {
             var a = verts[face[i]];
             var b = verts[face[(i + 1) % face.Count]];
-            n.X += (a.Y - b.Y) * (a.Z + b.Z);
-            n.Y += (a.Z - b.Z) * (a.X + b.X);
-            n.Z += (a.X - b.X) * (a.Y + b.Y);
+            double ax = (double)a.X - o.X, ay = (double)a.Y - o.Y, az = (double)a.Z - o.Z;
+            double bx = (double)b.X - o.X, by = (double)b.Y - o.Y, bz = (double)b.Z - o.Z;
+            nx += (ay - by) * (az + bz);
+            ny += (az - bz) * (ax + bx);
+            nz += (ax - bx) * (ay + by);
         }
-        return n;
+        return (nx, ny, nz);
     }
 
-    internal static Vector3 Normalize(Vector3 v)
+    internal static double Length((double X, double Y, double Z) v) => Math.Sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
+
+    internal static (double X, double Y, double Z) Unit((double X, double Y, double Z) v)
     {
-        var len = v.Length();
-        return len > 0 ? v / len : Vector3.Zero;
+        var len = Length(v);
+        return len > 0 ? (v.X / len, v.Y / len, v.Z / len) : (0, 0, 0);
     }
 
     /// <summary>Bounding-box diagonal of a face's vertices, the "size" tolerances are relative to.</summary>
-    internal static float FaceSize(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
+    internal static double FaceSize(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
     {
-        var min = new Vector3(float.MaxValue);
-        var max = new Vector3(float.MinValue);
+        double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+        double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
         foreach (var i in face)
         {
-            min = Vector3.Min(min, verts[i]);
-            max = Vector3.Max(max, verts[i]);
+            var v = verts[i];
+            minX = Math.Min(minX, v.X); maxX = Math.Max(maxX, v.X);
+            minY = Math.Min(minY, v.Y); maxY = Math.Max(maxY, v.Y);
+            minZ = Math.Min(minZ, v.Z); maxZ = Math.Max(maxZ, v.Z);
         }
-        return (max - min).Length();
+        return Length((maxX - minX, maxY - minY, maxZ - minZ));
     }
 
     private static bool IsZeroArea(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
     {
         var size = FaceSize(verts, face);
-        var area = NewellVector(verts, face).Length() * 0.5f;
+        var area = Length(NewellVector(verts, face)) * 0.5;
         return !(area > ZeroAreaTolerance * size * size);
     }
 }
