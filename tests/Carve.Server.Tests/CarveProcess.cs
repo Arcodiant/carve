@@ -11,9 +11,13 @@ internal static class Paths
 {
     public static string RepoRoot { get; } = FindRepoRoot();
 
-    private static string Configuration => new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
+    public static string Configuration => new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
 
     public static string CarveDll { get; } = Output("src/Carve.Server", "carve.dll");
+
+    public static string DebugExtensionDll { get; } = Output("extensions/Carve.Debug", "Carve.Debug.dll");
+
+    public static string TinyScenarioDll { get; } = Output("tests/Carve.Scenario.Tiny", "Carve.Scenario.Tiny.dll");
 
     public static string TestExtensionDll { get; } =
         Output("tests/Carve.Server.Tests.Extension", "Carve.Server.Tests.Extension.dll");
@@ -41,10 +45,14 @@ internal sealed class CarveProcess : IDisposable
     private readonly List<string> _stdout = [];
     private readonly Task _stdoutPump;
 
-    public CarveProcess(IEnumerable<string> arguments, IReadOnlyDictionary<string, string>? environment = null)
+    public CarveProcess(
+        IEnumerable<string> arguments,
+        IReadOnlyDictionary<string, string>? environment = null,
+        string? workingDirectory = null)
     {
         var start = new ProcessStartInfo("dotnet")
         {
+            WorkingDirectory = workingDirectory ?? string.Empty,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

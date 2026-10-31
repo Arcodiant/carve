@@ -20,6 +20,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Carve.Server/Carve.Server.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../Carve.Server.Tests.Extension/Carve.Server.Tests.Extension.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Carve.Scenario.Tiny/Carve.Scenario.Tiny.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <!-- The pure parts compile the product's file rather than linking the product; the bridge needs the engine's vertex types. -->
