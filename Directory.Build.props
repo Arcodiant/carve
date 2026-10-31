@@ -9,5 +9,8 @@
     <EmpyreanVersion>0.117.0</EmpyreanVersion>
     <ModelContextProtocolVersion>2.3.0</ModelContextProtocolVersion>
     <MicrosoftExtensionsHostingVersion>10.0.13</MicrosoftExtensionsHostingVersion>
+    <!-- What the engine itself depends on: the encoder of engine need 2, and a decoder for the tests. -->
+    <StbImageWriteSharpVersion>1.16.7</StbImageWriteSharpVersion>
+    <StbImageSharpVersion>2.30.15</StbImageSharpVersion>
   </PropertyGroup>
 </Project>
