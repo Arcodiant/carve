@@ -21,4 +21,10 @@
     <ProjectReference Include="../Carve.Server.Tests.Extension/Carve.Server.Tests.Extension.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <!-- ModelStore has no dependencies beyond Core, so its unit test compiles the file rather than linking the product. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
+    <Compile Include="../../src/Carve.Server/ModelStore.cs" Link="ModelStore.cs" />
+  </ItemGroup>
+
 </Project>
