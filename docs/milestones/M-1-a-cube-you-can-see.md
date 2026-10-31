@@ -101,6 +101,10 @@ Task order: T-1 and T-2 side by side; then T-3, T-4, T-5, T-6, T-7 in sequence.
 - `carve-<pid>.log` files in `$env:TEMP` are never cleared.
 - `user-data` in the run folder is consumed by nothing yet.
 - `branches/task/T-1` to `T-7` remain on disk, unregistered from git, because `finish` could not remove a member's own working directory. T-4, T-5, T-6 and T-7 hold artifacts there.
+- From about 1e6 to 3e6 from the origin a mesh still frames but is visibly skewed by rounding, up to about 40 px off centre. `render`'s check reads where corners land, not the shape inside the frame.
+- `render` refuses a mesh it cannot frame. The person chose this over normalising the view and over a range limit, because the agent can already recentre or scale through `define_mesh`. Only cubes were measured at the small end, and only on the RTX 5070 Ti.
+
+**The review.** RV-1 raised 27 findings at the end of a green milestone, including a stale render under overlapping calls, scenario checks that passed on a blank frame, and a guard that missed a reference through `Carve.Core`. So the members' tests and the scenario proved much less than `VERIFY PASS` suggested, and none of this was caught before the milestone's own review. RV-2 raised 12 more, several introduced by the first round's fixes. A fixer also rewrote framing in double beyond what the person had agreed, which changed two frames; the person had it undone.
 
 **For the next plan.**
 
@@ -108,3 +112,6 @@ Task order: T-1 and T-2 side by side; then T-3, T-4, T-5, T-6, T-7 in sequence.
 - Tell members to leave their worktree before `finish`, so it can remove it.
 - State a view as coordinates in the milestone's sketch too, so a sketch and a spec cannot disagree.
 - Have the acceptance run include a deliberate mistake, so correction from error text is exercised by an agent.
+- Require every scenario frame to have a positive pixel check, and require each member to show a new check failing on a broken product, not only passing on a good one.
+- Give `render` chosen views. The Blender MCP's `look` takes up to six named views or any direction, plus a distance, which is the gap the T-7 agent hit.
+- Tell a fixer what it may not change, not only what to fix, and to stop if the agreed result (here, byte-identical frames) is not met.
