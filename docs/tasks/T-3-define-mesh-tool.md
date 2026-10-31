@@ -4,7 +4,7 @@ description: >-
 ---
 # T-3 — define_mesh tool
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -38,3 +38,18 @@ No test scenario: nothing is on screen until T-4; T-6 walks this tool end to end
 - `ModelStore` is written on the MCP thread and read on the frame thread: it publishes immutable values only.
 - Tool text may be sharpened by T-7 after a real agent has used it.
 - Writes down for T-4: `ModelStore`'s version contract.
+
+### As built
+
+Ran on Claude Sonnet 5.5 (`claude-sonnet-5-5`). `define_mesh` is built and tested through the real `carve` process over stdio; nothing is on screen, so no scenario was run.
+
+- `src/Carve.Server/DefineMeshTool.cs`: the tool; `ModelStore.cs`: the store. The tool is **not** found by `WithToolsFromAssembly`: it is built by `DefineMeshTool.Create()` and registered with `mcp.WithTools(...)` in `Program.cs`, because the attribute route cannot put `minItems`/`maxItems: 3` on a vertex in the schema (done through `SchemaCreateOptions.TransformSchemaNode`; the node is matched by shape, since its path is not what one expects). The class takes `ModelStore` in its constructor, resolved from `request.Services` per call: a static method given to `McpServerTool.Create` with `target: null` treats a `ModelStore` parameter as a tool argument. A later tool may still use the attribute route from T-2's notes.
+- Return: `{vertices, faces, edges, closed, bounds:{min,max}, warnings:[strings "element: message"]}`. Failure is `isError: true` with a text listing every problem, one per line, ending with "the current mesh is unchanged". Beyond `PolygonMesh.Create`'s errors the tool reports a vertex that is not exactly 3 numbers (`vertices[i]`) and a null face, since the server does not enforce the schema. Null arguments are excluded by the schema type, so there is no handling of a null `vertices` itself.
+- The description ends with `Worked example (a unit cube): {json}` (`DefineMeshTool.ExampleMarker`, `CubeExample`); a test cuts the example from `tools/list` and calls with it, expecting `closed: true`, no warnings.
+- Tests: `tests/Carve.Server.Tests/DefineMeshTests.cs` (cube round trip from the description, bad index naming `faces[2][2]` among several, short vertex, failed call keeps the mesh then an open quad warns, schema and description phrases) and `ModelStoreTests.cs`. The Server tests do not link the product, so the test project compiles `ModelStore.cs` as a linked file and references Core.
+
+**For T-4, `ModelStore`** (singleton, registered in `Program.cs`): `Current` returns a `ModelSnapshot(PolygonMesh? Mesh, long Version)`, read atomically from any thread (mesh and version are one immutable record, never torn). `Mesh` is null and `Version` 0 until the first success; each successful call does `Replace` and raises `Version` by exactly 1, a failed call changes nothing. The frame thread keeps the last `Version` it built and rebuilds when it differs. The mesh is polygons: triangulate with `Triangulator.Triangulate(mesh)`.
+
+Not checked: concurrent reads while writing beyond the by-construction argument (single reference swap); a coordinate beyond float range (becomes Infinity and is refused by Core as not finite, not tested here).
+
+Two T-2 tests asserted an empty or single-tool `tools/list` (`StdioTests`, `LoaderTests.An_extensions_tool_reaches_tools_list`); they now assert `define_mesh` is listed (and `test_ping` beside it). That is the count following the new tool, not a looser check.

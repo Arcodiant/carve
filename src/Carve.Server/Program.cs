@@ -70,8 +70,10 @@ if (!services.Any(d => d.ServiceType == typeof(ITransport)))
 }
 
 mcp.WithToolsFromAssembly(product);
+mcp.WithTools([DefineMeshTool.Create()]);
 
 services.AddSingleton<EngineStatus>();
+services.AddSingleton<ModelStore>();
 services.AddHostedService<EngineThread>();
 
 using var host = builder.Build();
