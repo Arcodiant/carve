@@ -121,6 +121,17 @@ call.
 **Would change if:** a person watching turns out to matter enough to pay for a frame
 loop and input.
 
+### The renderer lives in the server process
+
+One generic host (`Host.CreateEmptyApplicationBuilder`) owns one container holding both the
+engine and MCP, and the engine runs on a dedicated `frame` thread of its own under Carve's own
+`IHostedService`, since `EmpyreanHost` refuses `IHostedService`. A Vulkan failure is held and
+reported by whatever needs the engine; the process and MCP stay up.
+
+A child process, so a device loss could not take the session down, was the rejected
+alternative: holding the failure in process already keeps the session up, without a second
+process and a protocol between the two.
+
 ## Open questions
 
 - **Tool shape.** One tool per operation, or a few general ones? How are elements
@@ -136,8 +147,6 @@ loop and input.
 - **Render modes.** Which come first, and do any need something Empyrean does not
   have? The first look at its docs did not find a normals or UV debug view; a
   material or shader of Carve's own may do it.
-- **Where the renderer lives.** In the server process, or a child process the server
-  starts, so a device loss cannot take the session down?
 - **Transport.** Stdio only, or also HTTP? How is the server installed for a game's
   Claude session?
 - **Empyrean-specific export.** Scale, axes and naming conventions a game expects,
@@ -149,4 +158,4 @@ loop and input.
 
 | # | What is missing | Priority | Interim |
 |---|---|---|---|
-| — | none recorded yet | | |
+| 1 | A named error when Vulkan cannot start: with no driver, `IGameLoop.Initialise` throws `ArgumentNullException` for `ptr` from inside `Vulkan.Instance.Create` | Low | `EngineThread` words the fault itself, naming Vulkan |
