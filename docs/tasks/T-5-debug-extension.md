@@ -4,7 +4,7 @@ description: >-
 ---
 # T-5 — Debug extension
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
