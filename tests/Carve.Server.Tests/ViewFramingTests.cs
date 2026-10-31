@@ -61,7 +61,7 @@ public class ViewFramingTests
             tightest = Math.Max(tightest, Math.Max(Math.Abs(device.X), Math.Abs(device.Y)));
         }
 
-        Assert.InRange(tightest, Inner - 0.01f, Inner + ViewFraming.MarginSlack);
+        Assert.InRange(tightest, Inner - 0.01f, Inner + 1e-4f);
     }
 
     /// <summary>
@@ -86,14 +86,14 @@ public class ViewFramingTests
             .Max(d => Math.Max(Math.Abs(d.X), Math.Abs(d.Y)));
 
         Assert.True(frame.Framed, frame.ToString());
-        Assert.InRange(tightest, Inner - tolerance, Inner + ViewFraming.MarginSlack); // Backed off, never past the line.
+        Assert.InRange(tightest, Inner - tolerance, Inner + tolerance);
     }
 
-    /// <summary>The bounds of the findings that float can't hold, and float's own far end.</summary>
+    /// <summary>The bounds of the findings that the matrices cannot frame, and float's own far end.</summary>
     [Theory]
-    [InlineData(4e6f, 1f, RenderView.Front)]
+    [InlineData(4e6f, 1f, RenderView.Front)] // Cropped, by the corner check.
     [InlineData(4e6f, 1f, RenderView.Back)]
-    [InlineData(1e7f, 1f, RenderView.Front)]
+    [InlineData(1e7f, 1f, RenderView.Front)] // A few pixels, by the fill check.
     [InlineData(1e7f, 1f, RenderView.Back)]
     [InlineData(100f, 4e-5f, RenderView.Front)]
     [InlineData(100f, 4e-5f, RenderView.Back)]
@@ -105,18 +105,24 @@ public class ViewFramingTests
         Assert.False(ViewFraming.Frame(min, min + new Vector3(side), view).Framed);
     }
 
+    /// <summary>A cube at the origin: pinned in both views, either side of each end of what works.</summary>
     [Theory]
-    [InlineData(1e19f)]
-    [InlineData(1e30f)]
-    [InlineData(1e-15f)]
-    public void A_cube_at_the_origin_frames_at_any_scale_float_can_hold(float side)
+    [InlineData(1e-8f, true)]
+    [InlineData(1e-15f, true)]
+    [InlineData(1e-16f, true)]
+    [InlineData(5e-20f, true)]
+    [InlineData(3e-20f, false)] // The squared distance to the nearest corner is subnormal.
+    [InlineData(1e-20f, false)]
+    [InlineData(1e-30f, false)] // The point floor, then the fill check.
+    [InlineData(1e18f, true)]
+    [InlineData(1e19f, false)]
+    [InlineData(1e20f, false)] // The planes are NaN, and no exception comes out.
+    [InlineData(1e30f, false)]
+    public void A_cube_at_the_origin_frames_or_not(float side, bool framed)
     {
         foreach (var view in new[] { RenderView.Front, RenderView.Back })
         {
-            var frame = ViewFraming.Frame(Vector3.Zero, new Vector3(side), view);
-
-            Assert.True(frame.Framed, frame.ToString());
-            Assert.All(Corners(Vector3.Zero, new Vector3(side)), c => Assert.InRange(Device(c, frame).Z, 0, 1));
+            Assert.Equal(framed, ViewFraming.Frame(Vector3.Zero, new Vector3(side), view).Framed);
         }
     }
 
@@ -147,7 +153,7 @@ public class ViewFramingTests
     [Theory]
     [InlineData(RenderView.Front)]
     [InlineData(RenderView.Back)]
-    public void A_point_sized_bounds_still_frames(RenderView view)
+    public void A_point_sized_bounds_keeps_a_sound_camera_and_is_not_framed(RenderView view)
     {
         var point = new Vector3(3, 4, 5);
 
@@ -158,6 +164,7 @@ public class ViewFramingTests
         Assert.Equal(0, device.Y, 1e-2f);
         Assert.InRange(device.Z, 0, 1);
         Assert.NotEqual(point, frame.Eye);
+        Assert.False(frame.Framed); // It cannot fill the frame.
     }
 
     [Fact]

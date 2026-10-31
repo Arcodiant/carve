@@ -241,30 +241,35 @@ public class RenderTests
     }
 
     /// <summary>
-    /// Each is a correctly framed image or the error, in both views, and the engine runs on: never
-    /// a blank, a crop or a NaN. At the origin a framed cube is the unit cube's image, byte for byte.
+    /// Each case of the findings is pinned, per view, to a framed image or the error, and the engine
+    /// runs on: never a blank, a crop or a NaN. At the origin a framed cube is the unit cube's image,
+    /// byte for byte. Side 5e-20 frames and 3e-20 does not because of the squared-distance guard.
     /// </summary>
     [Theory]
-    [InlineData(1e19, 0.0, true)]
-    [InlineData(1e30, 0.0, true)]
-    [InlineData(1e-15, 0.0, true)]
-    [InlineData(1e-20, 0.0, false)]
-    [InlineData(1e-30, 0.0, false)]
-    [InlineData(5e-20, 0.0, false)]
-    [InlineData(2e-20, 0.0, false)]
-    [InlineData(1e34, 0.0, false)]
-    [InlineData(5e34, 0.0, false)]
-    [InlineData(2e34, 0.0, false)]
-    [InlineData(8e34, 0.0, false)]
-    [InlineData(1e35, 0.0, false)]
-    [InlineData(1e36, 0.0, false)]
-    [InlineData(1e38, 0.0, false)]
-    [InlineData(1.0, 3e6, false)]
-    [InlineData(1.0, 4e6, false)]
-    [InlineData(1.0, 7e6, false)]
-    [InlineData(1.0, 1e7, false)]
-    [InlineData(4e-5, 100.0, false)]
-    public async Task An_extreme_mesh_is_framed_or_refused_and_the_next_render_works(double side, double offset, bool framed)
+    [InlineData(1e-8, 0.0, true, true)]
+    [InlineData(1e-14, 0.0, true, true)]
+    [InlineData(1.2e-15, 0.0, true, true)]
+    [InlineData(1.1e-15, 0.0, true, true)]
+    [InlineData(1e-15, 0.0, true, true)]
+    [InlineData(1e-16, 0.0, true, true)]
+    [InlineData(5e-20, 0.0, true, true)]
+    [InlineData(3e-20, 0.0, false, false)]
+    [InlineData(2e-20, 0.0, false, false)]
+    [InlineData(1e-20, 0.0, false, false)]
+    [InlineData(1e-30, 0.0, false, false)]
+    [InlineData(1e18, 0.0, true, true)]
+    [InlineData(1e19, 0.0, false, false)]
+    [InlineData(1e20, 0.0, false, false)]
+    [InlineData(1e30, 0.0, false, false)]
+    [InlineData(1.0, 1e5, true, true)]
+    [InlineData(1.0, 1e6, true, true)]
+    [InlineData(1.0, 3e6, true, false)]
+    [InlineData(1.0, 4e6, false, false)]
+    [InlineData(1.0, 7e6, false, false)]
+    [InlineData(1.0, 8e6, false, false)]
+    [InlineData(1.0, 1e7, false, false)]
+    [InlineData(4e-5, 100.0, false, false)]
+    public async Task An_extreme_mesh_is_framed_or_refused_and_the_next_render_works(double side, double offset, bool front, bool back)
     {
         using var carve = new CarveProcess([]);
         await carve.InitializeAsync();
@@ -273,13 +278,13 @@ public class RenderTests
 
         Assert.False(IsError(await carve.CallToolAsync("define_mesh", Scaled(side, offset))));
 
-        foreach (var (view, at) in new[] { ("front", 0), ("back", 1) })
+        foreach (var (view, at, framed) in new[] { ("front", 0, front), ("back", 1, back) })
         {
             var result = await RenderAsync(carve, view);
             var outcome = "refused";
+            Assert.Equal(framed, !IsError(result));
             if (IsError(result))
             {
-                Assert.False(framed, TextOf(result));
                 Assert.Matches("^This mesh can't be framed: side [0-9.e+-]+, about [0-9.e+-]+ from the origin\\. Move it nearer the origin or scale it, then call define_mesh again\\.$", TextOf(result));
             }
             else
@@ -296,6 +301,7 @@ public class RenderTests
 
         await carve.CallToolAsync("define_mesh", Cube);
         Assert.Equal(plain[0], Png(await RenderAsync(carve, "front")));
+        Assert.DoesNotContain("fail:", carve.Stderr); // A refusal is an answer, not a fault to log.
     }
 
     /// <summary>

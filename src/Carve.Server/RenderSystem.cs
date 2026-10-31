@@ -51,7 +51,17 @@ internal sealed class RenderSystem(
         _pump.Step();
     }
 
-    public void Report(Exception exception, string message) => log.LogError(exception, "{Message}", message);
+    public void Report(Exception exception, string message)
+    {
+        if (exception is MeshNotFramedException)
+        {
+            // An expected answer to the agent, not a fault.
+            log.LogInformation("{Message}", message);
+            return;
+        }
+
+        log.LogError(exception, "{Message}", message);
+    }
 
     private void BuildScene()
     {

@@ -60,6 +60,8 @@ Ran on Sonnet 5.5 (`claude-sonnet-5-5`).
 
 **Drawn-pixel checks (review RV-1).** The L-block front and back, long box, flipped cube and after-error frames each also need at least 14,000 non-background pixels of 262,144 (measured 88,829 and 94,688, 28,563, 53,660 and 53,660; about half the smallest). With a temporary patch that turned the camera 1000 units aside from the fourth render on, the scenario failed at `lblock-front` (0 drawn) and the patch was reverted. The checks were not each shown to fail on their own frame. The frames stayed byte-identical.
 
+**After RV-2.** With framing back in single precision and the outcome check added, all 8 frames and `run.json` are byte-identical to run 14, the run before that work.
+
 **Two runs.** `run-scenario.ps1 cube` run twice (folders 1 and 2), exit 0 each: all 8 PNGs identical byte for byte (`cmp`), and `run.json` identical. Same machine (RTX 5070 Ti) only.
 
 **Not checked:** other GPUs or machines; the L-block back view by pixels (looked at only); a hang's timeout.
