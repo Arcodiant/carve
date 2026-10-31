@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The milestone's whole path as a scenario: define_mesh and render only, on the debug extension. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Cube</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+</Project>

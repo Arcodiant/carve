@@ -14,4 +14,8 @@ dotnet build $solution -c Debug --nologo
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 dotnet test $solution -c Debug --no-build
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# The cube scenario renders for real, so verify needs a Vulkan device.
+& (Join-Path $PSScriptRoot 'run-scenario.ps1') cube | Out-Null
 exit $LASTEXITCODE
