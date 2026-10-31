@@ -4,7 +4,7 @@ description: >-
 ---
 # T-1 — Polygon mesh kernel
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -38,3 +38,14 @@ Tests in `tests/Carve.Core.Tests`, a new class per concern: every error and warn
 - No file outside `src/Carve.Core` and `tests/Carve.Core.Tests`.
 - Writes down for T-3 and T-4: the public names of `PolygonMesh`, `MeshReport` and `Triangulator`, in the task's closing report.
 - Moderately design-heavy: `MeshReport`'s fields become the tool's return shape. A rule this leaves open (such as what the planarity tolerance means) goes back to the person rather than landing.
+
+### As built
+
+Ran on Claude Sonnet 5.5. All in `src/Carve.Core`, namespace `Carve.Core`; no file outside Core and its tests.
+
+- `PolygonMesh` (sealed, immutable): `Vertices: IReadOnlyList<Vector3>`, `Faces: IReadOnlyList<IReadOnlyList<int>>`, `static MeshResult Create(IEnumerable<Vector3>, IEnumerable<IEnumerable<int>>)`, `Vector3 FaceNormal(int face)` (Newell, unit, outward for CCW-from-outside). Consts `PlanarityTolerance = 1e-4f`, `ZeroAreaTolerance = 1e-9f`.
+- `MeshResult`: `Mesh` (null on failure), `Errors: IReadOnlyList<MeshError>`, `Succeeded`. `MeshError(Element, Message)`, Element like `vertices[3]`, `faces[2]`, `faces[2][1]`. A face the triangulator cannot clip is reported as an error on `faces[i]`.
+- `MeshReport.Create(PolygonMesh)`: `VertexCount`, `FaceCount`, `EdgeCount` (distinct undirected), `Closed` (every edge in exactly two faces), `BoundsMin`/`BoundsMax` (of vertices faces use), `Warnings: IReadOnlyList<MeshWarning>`. `MeshWarning(Kind, Element, Message)`; `MeshWarningKind`: `OpenEdge`, `NonManifoldEdge`, `InconsistentWinding`, `NonPlanarFace`, `UnusedVertex`. Edge elements are named `edges[lo-hi]`.
+- `Triangulator` (static): `Triangulate(PolygonMesh) -> IReadOnlyList<MeshTriangle>`, `TriangulateFace(PolygonMesh, int)`. `MeshTriangle(int A, int B, int C, int Face)` keeps the face's winding and records its source face. Triangles are never stored on the mesh.
+- Planarity meaning (the spec said "relative to the face's size"): a face of 4+ vertices warns when any vertex is further than `1e-4 x` the face's bounding-box diagonal from the plane through its centroid along the Newell normal. Zero area: area below `1e-9 x` diagonal squared. These constants are a reading of the spec, easy to change if the person wants other values.
+- A collinear vertex in a face is tolerated (dropped during clipping, no degenerate triangle).
