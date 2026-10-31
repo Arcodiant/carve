@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/Carve.Core/Carve.Core.csproj" />
+  <Project Path="src/Carve.Server/Carve.Server.csproj" />
+  <Project Path="tests/Carve.Core.Tests/Carve.Core.Tests.csproj" />
+</Solution>

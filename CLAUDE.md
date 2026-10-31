@@ -1,0 +1,169 @@
+# Carve
+
+A 3D modelling tool for Claude agents, served over **MCP**. An agent defines and
+edits meshes by coordinates or with tools (cut, extrude, move a vertex, edge or
+face), looks at the result (screenshots, and render modes such as UVs or
+normals), runs queries ("select all unattached vertices", "select all faces
+above y=10"), and exports models that games on the **Empyrean** engine import as
+content. The concept, decisions and open questions are in **D-1**.
+
+## Planning rules
+
+Every plan, for a milestone or a task, keeps these:
+
+- **Content comes with its mechanic, as a priority.** Content (here: the sample
+  models a tool is shown on, its render-mode looks, its tool descriptions and
+  the worked examples agents learn from) is built in the same milestone and the
+  same task as the mechanic or feature it belongs to, so each milestone's
+  mechanics arrive showing something. Placeholder content may stand in where the
+  real thing is not ready; absent content may not. Content is never a milestone
+  of its own.
+- **A thin slice first.** One small, complete slice of the whole is built end to
+  end first; wider content and secondary systems come after it. No polish-only
+  milestone while the core has a gap.
+- **Every milestone is reachable and adds something.** Its result is reachable
+  from a plain launch, through the product's own interface (MCP tools, called
+  from an ordinary client) and never a debug flag, and adds something that can
+  be used or looked at that could not be before.
+- **Size by feedback.** A task is one to three commits; a milestone roughly four
+  to eight tasks. A point mid-milestone where something could be tried and
+  learned from is a milestone boundary.
+
+## Architecture rules
+
+- **`Carve.Core` never references the engine**, `System.Random` or the wall
+  clock. It owns meshes, edit operations and queries, so all of it is testable
+  with no GPU. `CoreIsEngineFreeTests` enforces the engine half.
+- **`Carve.Server` is presentation and transport**: the MCP surface, rendering,
+  export. If it is deciding what an edit does to a mesh, that belongs in the
+  Core.
+- **Stdout belongs to MCP.** On the stdio transport nothing but protocol goes to
+  stdout; logs go to stderr or the temp folder.
+
+The rest are decided in D-1 as they settle; add them here when they do.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `src/Carve.Core` | Engine-free modelling kernel |
+| `src/Carve.Server` | The shipped product, the `carve` MCP server |
+| `tests/Carve.Core.Tests` | xunit tests of the kernel, incl. the engine-free guard |
+| `scripts/verify.ps1` | Build warnings-as-errors + all tests; cairn's `verify` hook |
+| `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
+| `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
+
+The first milestone adds the extension API, the debug extension and the scenarios
+(see below) and their rows here.
+
+## Build, test and verify
+
+```
+dotnet build Carve.slnx
+dotnet test Carve.slnx
+dotnet run --project src/Carve.Server
+pwsh scripts/verify.ps1
+```
+
+A change is verified when `scripts/verify.ps1` passes and, for anything that can
+be seen, a scenario has been run and its frames looked at. Say which of the two
+you did, and what you did not check.
+
+## Test scenarios
+
+Everything that looks at the running product goes through **one scenario
+harness**, committed in the first milestone and used for every visual check.
+Never write a throwaway capture script or a one-off launcher; extend the harness.
+
+Scenario runs are quiet and repeatable, so a run does not disturb the person at
+the machine and its frames compare from run to run:
+
+- **Audio muted**: the master volume at 0, as an override never saved to the
+  user's settings. Carve makes no sound today; the rule stands for the day it does.
+- **A fixed clock.**
+- **A fixed seed** for every random choice.
+- **A fixed window size** (the render target size, for offscreen renders).
+- **A fresh user-data folder** each run, under the run's own output folder.
+
+## Scenarios are extensions, stacked on a debug extension
+
+Carve is a long-lived process with a host of its own, so it exposes an
+**extension API** and carries no debug capability of its own. Three layers, each
+depending only on the one below:
+
+1. **The product** ships the extension API and loads extensions. It knows nothing
+   of any particular extension.
+2. **The debug extension** is the one place debug hooks live: the fixed clock and
+   seed, the muted-audio override, the fresh user-data folder, scripted input
+   (for Carve, scripted MCP tool calls through the real dispatch), state
+   inspection, and headless running and frame capture. It is built on the public
+   extension API like any other extension.
+3. **Scenarios** are extensions stacked on the debug extension. Each scripts one
+   situation and what is captured from it.
+
+The scenario harness is the shipped product itself, started with the debug
+extension and one scenario stacked on it. **There is no separate scenarios
+executable.**
+
+Scenarios are the API's first and most demanding client, on purpose: they need
+freedoms the product's author might not think to give an extension (how the host
+is composed, how time advances, what input arrives), and building them pressures
+the API into shape. When a scenario needs something the API cannot do, widen the
+API or the debug extension. **Never special-case the product or reach into its
+internals; no internals access is granted to an extension.**
+
+Neither the debug extension nor any scenario ships with the product. A guard test
+committed in the first milestone fails if the product references any extension,
+the debug extension and the scenarios among them, checked both in what its project
+file declares and in what the built product actually references.
+
+The product's own render tool is a product feature, not a debug hook: an agent
+asks for a render through MCP like any other tool. The debug hooks are what makes
+that render repeatable and what drives it unattended.
+
+### Headless runs
+
+The product has no headless or capture flag of its own: no `--headless`, no
+`--capture`, no `if (debug)`. Running without a window is the engine's own
+configuration, found in its packaged docs, and the debug extension turns it on as a
+default, set below the command line rather than forced, so a person can watch any
+scenario in a window by switching it back there. The extension API lets an
+extension add configuration and services before the host is built, since the engine
+reads such a switch once, at build.
+
+## Working rules
+
+- **Ask, don't land.** A rule the spec does not settle, or a change that would
+  loosen a check (a tolerance, a test's target, a baseline), goes back to the
+  person rather than landing.
+- **Keep the evidence.** Review artefacts and raw content are kept in `artifacts/`
+  (ignored), where finishing a task does not delete them. Logs go to the temp
+  folder (`$env:TEMP`), never into the repo.
+- **Stop only your own processes.** An agent stops only processes it started,
+  identified by a command line inside its own worktree, never a test host,
+  `dotnet` or a runtime machine-wide.
+
+## Engine docs: read these, not the engine source
+
+The version-matched Empyrean docs ship inside each package. Find the cache with
+`dotnet nuget locals global-packages --list`, then start at
+`<cache>/arcodiant.empyrean/<version>/docs/AGENTS.md` and each package's own
+`docs/AGENTS.md`, `docs/recipes/` and `docs/api/index.md`.
+
+## Engine versions and engine needs
+
+The engine version is pinned once, in `Directory.Build.props` (`EmpyreanVersion`,
+plus any per-package patch pin with a comment saying why), never as a literal in a
+`.csproj`. The feed is the local BaGet at `http://localhost:5555/v3/index.json`
+(docker-compose at `D:\repos\baget`).
+
+When Carve needs something the engine is missing, record it as an **engine need**:
+add a row to D-1's *Engine needs* table (number, what is missing, priority, the
+interim), and cite the number at the workaround site
+(`// Interim until engine need N: ...`). Carve is not registered as an engine
+request client; registering one is the person's call.
+
+## Work tracking
+
+Run `cairn status` at the start of a session and `cairn next` to pick work. Query
+items with `cairn list` / `cairn show`; never grep `docs/` to find open work.

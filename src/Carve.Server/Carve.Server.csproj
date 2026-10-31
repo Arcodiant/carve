@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The shipped product: the MCP server process. Stdout belongs to the protocol. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Carve.Server</RootNamespace>
+    <AssemblyName>carve</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Carve.Core/Carve.Core.csproj" />
+  </ItemGroup>
+
+</Project>

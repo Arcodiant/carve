@@ -3,7 +3,7 @@ contract: 6
 synced: unset — run `cairn sync` to stamp a date
 major: 0
 publish:
-verify:
+verify: scripts/verify.ps1
 release:
 review:
 unmanaged: []

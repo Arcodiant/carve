@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The modelling kernel: meshes, edit operations, queries. Never references the engine. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>
