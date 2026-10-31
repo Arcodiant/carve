@@ -31,19 +31,19 @@ description: >-
 
 `src/Carve.Server/RenderSystem.cs:52-69`. Correctness; tests cover the Scope. `store.Current` is read once per `Update`, before the drain, and the `while` keeps taking requests of the same view without rechecking it. T-4's Scope promises the version change is handled first. Stale form: with a render queued or in flight, `define_mesh(pyramid)` returns, and the next `render` is taken by the same `while` and draws the old mesh, a success with the old image and counts. Measured on the unmodified product, delay 0-55 ms: 14 of 60 with 1 render in flight, 29 of 60 with 2, 48 of 60 with 5; 20 of 20 in a burst of 30. It needs overlapping calls. Null form: first mesh, view `front`; line 52 reads version 0, then `define_mesh` and `render` complete before line 59, and `_report!` at line 150 throws, giving `The render failed: Object reference not set...`. Reproduced only with a delay inserted (7 of 10 at 45 ms). `Replacing_the_mesh_changes_the_image_on_the_very_next_call` is sequential and cannot catch either form.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The framing floor breaks the 8% margin for a small mesh far from the origin, and for a tiny one
 
 `src/Carve.Server/ViewFraming.cs:41`. Correctness; tests cover the Scope. `Math.Max(1e-6f, largest * 1e-4f)` raises `radius` above the real half-diagonal; the floor exists only to keep the camera apart from a point. Foreground width of a unit cube, 376 px at the origin: side 1 at x=1e5 is 99 px, at (1e6,1e6,1e6) is 10 px; side 1e-7 at origin is 99 px, side 1e-8 is 10 px. No error is given. `ViewFramingTests.Bounds` stops at a box 37 from the origin.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### An exception in ShowMesh ends the engine for good and is reported as a Vulkan problem
 
 `src/Carve.Server/RenderSystem.cs:99`, `src/Carve.Server/EngineThread.cs:72`. Correctness. `Render` catches per request, but `ShowMesh` and `ApplyView` do not. An exception from `resources.CreateMesh` (injected for the test) ends `loop.Run()`; `render` and every later render report `Engine failed (is a Vulkan device available?)` until restart, on a working device. No real input was found that throws; an allocation failure on a very large mesh is the likely trigger, and `define_mesh` has no size limit.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### T-2's As built names EngineStatus members that no longer exist
 

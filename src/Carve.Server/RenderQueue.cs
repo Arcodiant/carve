@@ -24,7 +24,7 @@ internal sealed class RenderRequest(RenderView view)
 /// From the tool to the frame thread. Holds nothing of the engine, so a tool can reach it on a
 /// machine where the engine's services cannot be built.
 /// </summary>
-internal sealed class RenderQueue
+internal class RenderQueue
 {
     private readonly ConcurrentQueue<RenderRequest> _requests = new();
 
@@ -35,7 +35,7 @@ internal sealed class RenderQueue
         return request.Result;
     }
 
-    public bool TryPeek(out RenderRequest? request) => _requests.TryPeek(out request);
+    public virtual bool TryPeek(out RenderRequest? request) => _requests.TryPeek(out request);
 
     public bool TryTake(out RenderRequest? request) => _requests.TryDequeue(out request);
 }

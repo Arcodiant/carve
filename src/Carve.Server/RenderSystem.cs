@@ -1,13 +1,13 @@
 using System.Numerics;
 using Carve.Core;
 using Empyrean;
+using Microsoft.Extensions.Logging;
 
 namespace Carve.Server;
 
 /// <summary>
-/// Holds the scene and serves render requests on the frame thread. A frame reads the lighting and
-/// transforms published earlier in the same loop iteration, so anything that changes the scene
-/// (creating it, a new mesh, a new view) returns from <see cref="Update"/> and renders on a later one.
+/// Holds the scene and does what <see cref="RenderPump"/> decides, on the frame thread. The scene
+/// itself is built here in the first <see cref="Update"/>; a failure to build it is the engine's.
 /// </summary>
 internal sealed class RenderSystem(
     ISceneManager scenes,
@@ -17,7 +17,8 @@ internal sealed class RenderSystem(
     IRenderTargetReadback readback,
     RenderComposition composition,
     RenderQueue queue,
-    ModelStore store) : ISystem
+    ModelStore store,
+    ILogger<RenderSystem> log) : ISystem, IRenderScene
 {
     private const string Scene = "carve";
 
@@ -27,10 +28,8 @@ internal sealed class RenderSystem(
     private Entity _camera;
     private Entity? _meshEntity;
     private Mesh? _mesh;
-    private bool _built;
-    private long _version;
     private MeshReport? _report;
-    private RenderView _view = RenderView.Front;
+    private RenderPump? _pump;
 
     public void Initialise()
     {
@@ -42,33 +41,17 @@ internal sealed class RenderSystem(
 
     public void Update()
     {
-        if (!_built)
+        if (_pump is null)
         {
             BuildScene();
-            _built = true;
+            _pump = new RenderPump(queue, store, this);
             return;
         }
 
-        var current = store.Current;
-        if (current.Version != _version)
-        {
-            ShowMesh(current);
-            return;
-        }
-
-        while (queue.TryPeek(out var next))
-        {
-            if (next!.View != _view)
-            {
-                _view = next.View;
-                ApplyView();
-                return;
-            }
-
-            queue.TryTake(out var request);
-            Render(request!);
-        }
+        _pump.Step();
     }
+
+    public void Report(Exception exception, string message) => log.LogError(exception, "{Message}", message);
 
     private void BuildScene()
     {
@@ -83,7 +66,7 @@ internal sealed class RenderSystem(
         {
             Position = Vector3.Zero,
             Scale = Vector3.One,
-            Orientation = ViewFraming.LightOrientation(_view),
+            Orientation = ViewFraming.LightOrientation(RenderView.Front),
         });
 
         // The near and far here are placeholders: each view sets the whole projection by hand,
@@ -93,15 +76,14 @@ internal sealed class RenderSystem(
         entities.AddComponent(_camera, new RenderTag(RenderComposition.CameraTag));
     }
 
-    private void ShowMesh(ModelSnapshot snapshot)
+    public void ShowMesh(Carve.Core.PolygonMesh mesh)
     {
-        var mesh = snapshot.Mesh!;
+        var report = MeshReport.Create(mesh);
         var next = resources.CreateMesh(MeshBridge.ToMeshData(mesh));
 
         if (_meshEntity is { } entity)
         {
             entities.GetComponent<MeshInstance>(entity).Mesh = next;
-            resources.Destroy(_mesh!);
         }
         else
         {
@@ -122,20 +104,19 @@ internal sealed class RenderSystem(
             _meshEntity = entity;
         }
 
+        // The entity holds the new mesh from here on, so the old handle goes first.
+        var old = _mesh;
         _mesh = next;
-        _report = MeshReport.Create(mesh);
-        _version = snapshot.Version;
-        ApplyView();
+        _report = report;
+        if (old is not null)
+        {
+            resources.Destroy(old);
+        }
     }
 
-    private void ApplyView()
+    public void ApplyView(RenderView view)
     {
-        if (_report is not { } report)
-        {
-            return;
-        }
-
-        var frame = ViewFraming.Frame(report.BoundsMin, report.BoundsMax, _view);
+        var frame = ViewFraming.Frame(_report!.BoundsMin, _report.BoundsMax, view);
 
         Matrix4x4.Invert(frame.View, out var world);
         entities.GetOrAddComponent<WorldTransform>(_camera) = new WorldTransform { Matrix = world };
@@ -143,7 +124,7 @@ internal sealed class RenderSystem(
         entities.GetComponent<Transform3D>(_light).Orientation = frame.LightOrientation;
     }
 
-    private void Render(RenderRequest request)
+    public void Render(RenderRequest request)
     {
         try
         {

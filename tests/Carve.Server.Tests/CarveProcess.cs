@@ -47,6 +47,7 @@ internal sealed class CarveProcess : IDisposable
     private readonly StringBuilder _stderr = new();
     private readonly List<string> _stdout = [];
     private readonly Task _stdoutPump;
+    private readonly SemaphoreSlim _sending = new(1);
     private int _lastId = 1; // InitializeAsync takes 1.
 
     public CarveProcess(
@@ -170,10 +171,19 @@ internal sealed class CarveProcess : IDisposable
         _process.Dispose();
     }
 
+    /// <summary>One line at a time: overlapping calls would otherwise share the writer.</summary>
     private async Task SendAsync(string json)
     {
-        await _process.StandardInput.WriteLineAsync(json);
-        await _process.StandardInput.FlushAsync();
+        await _sending.WaitAsync();
+        try
+        {
+            await _process.StandardInput.WriteLineAsync(json);
+            await _process.StandardInput.FlushAsync();
+        }
+        finally
+        {
+            _sending.Release();
+        }
     }
 
     /// <summary>Waits for the response carrying this id, failing with the stderr so far.</summary>

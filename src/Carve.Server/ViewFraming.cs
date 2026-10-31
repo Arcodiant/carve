@@ -25,6 +25,12 @@ public static class ViewFraming
     /// <summary>The part of the frame left clear on each side, at the tightest edge.</summary>
     public const float Margin = 0.08f;
 
+    /// <summary>Below this a look-at's squared lengths start to underflow, even at the origin.</summary>
+    private const float SmallestRadius = 1e-15f;
+
+    /// <summary>At most the gap between neighbouring floats, as a fraction of their value.</summary>
+    private const float FloatStep = 1.1920929e-7f;
+
     private static readonly Vector3 FrontDirection = Vector3.Normalize(new Vector3(1.6f, 1.2f, 2.2f));
 
     /// <summary>The agreed look in the front view: top bright, +Z middling, +X dark.</summary>
@@ -35,10 +41,16 @@ public static class ViewFraming
         var target = (min + max) * 0.5f;
         var half = (max - min) * 0.5f;
 
-        // A point, or a tiny mesh far from the origin, still needs a camera that is somewhere else.
+        var radius = half.Length();
         var largest = Math.Max(Math.Abs(min.X), Math.Max(Math.Abs(min.Y), Math.Abs(min.Z)));
         largest = Math.Max(largest, Math.Max(Math.Abs(max.X), Math.Max(Math.Abs(max.Y), Math.Abs(max.Z))));
-        var radius = Math.Max(half.Length(), Math.Max(1e-6f, largest * 1e-4f));
+
+        // Degenerate only when floats cannot tell the bounds from a point: then the radius is just
+        // a way to keep the camera somewhere else, and has nothing to do with the mesh's size.
+        if (radius <= Math.Max(SmallestRadius, largest * FloatStep))
+        {
+            radius = Math.Max(1e-6f, largest * 1e-4f);
+        }
 
         var direction = Direction(view);
         var rotation = LookRotation(direction);

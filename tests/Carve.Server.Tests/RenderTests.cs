@@ -16,6 +16,10 @@ public class RenderTests
     private const string Pyramid =
         """{"vertices":[[0,0,0],[2,0,0],[2,0,2],[0,0,2],[1,2,1]],"faces":[[0,1,2,3],[0,4,1],[1,4,2],[2,4,3],[3,4,0]]}""";
 
+    /// <summary>A cube's counts in another shape.</summary>
+    private const string LongBox =
+        """{"vertices":[[0,0,0],[3,0,0],[3,1,0],[0,1,0],[0,0,1],[3,0,1],[3,1,1],[0,1,1]],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
+
     /// <summary>One quad facing -Z: the front view sees only its back.</summary>
     private const string QuadFacingAway =
         """{"vertices":[[0,0,0],[0,1,0],[1,1,0],[1,0,0]],"faces":[[0,1,2,3]]}""";
@@ -160,6 +164,72 @@ public class RenderTests
         Assert.Equal("512x512, view front, 5 vertices, 5 faces", Caption(pyramid));
         Assert.NotEqual(Png(cube), Png(pyramid));
         Decode(Png(pyramid), "pyramid-front");
+    }
+
+    public static TheoryData<string, string> Replacements => new()
+    {
+        { Pyramid, "512x512, view front, 5 vertices, 5 faces" }, // The caption would tell.
+        { LongBox, "512x512, view front, 8 vertices, 6 faces" }, // The same counts: only the image can.
+    };
+
+    /// <summary>
+    /// The burst holds the frame thread inside one drain of the queue: the wait is on its first
+    /// answer, so no delay has to be guessed, and the later calls land while the rest are queued.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Replacements))]
+    public async Task A_render_after_define_mesh_returned_shows_that_mesh_with_renders_overlapping(string mesh, string caption)
+    {
+        const int Burst = 30;
+
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+
+        // Rendered with nothing overlapping, and byte-equal within a process.
+        await carve.CallToolAsync("define_mesh", mesh);
+        var quiet = Png(await RenderAsync(carve));
+
+        for (var round = 0; round < 3; round++)
+        {
+            await carve.CallToolAsync("define_mesh", Cube);
+            Assert.NotEqual(quiet, Png(await RenderAsync(carve)));
+
+            var burst = Enumerable.Range(0, Burst).Select(_ => RenderAsync(carve)).ToArray();
+            await Task.WhenAny(burst);
+
+            Assert.False(IsError(await carve.CallToolAsync("define_mesh", mesh)));
+            var after = await RenderAsync(carve);
+
+            Assert.Equal(caption, Caption(after));
+            Assert.Equal(quiet, Png(after));
+            Assert.All(await Task.WhenAll(burst), r => Assert.False(IsError(r), r.ToString()));
+        }
+    }
+
+    /// <summary>A cube at the origin is 376 wide; the floor used to leave these 10 to 99.</summary>
+    [Theory]
+    [InlineData(1e-8, 0.0, "tiny")]
+    [InlineData(1.0, 1e5, "far-1e5")]
+    [InlineData(1.0, 1e6, "far-1e6")]
+    public async Task A_tiny_or_far_cube_keeps_its_size_in_the_frame(double side, double offset, string name)
+    {
+        double[][] unit = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
+        var vertices = string.Join(",", unit.Select(v =>
+            "[" + string.Join(",", v.Select(c => (c * side + offset).ToString("R", System.Globalization.CultureInfo.InvariantCulture))) + "]"));
+        var mesh = $$"""{"vertices":[{{vertices}}],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
+
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        Assert.False(IsError(await carve.CallToolAsync("define_mesh", mesh)));
+
+        var image = Decode(Png(await RenderAsync(carve)), $"cube-{name}");
+
+        var columns = Enumerable.Range(0, Size)
+            .Where(x => Enumerable.Range(0, Size).Any(y => At(image, (x, y)).G > 60))
+            .ToArray();
+        var width = columns.Length == 0 ? 0 : columns[^1] - columns[0] + 1;
+        File.AppendAllText(Path.Combine(Frames, "samples.txt"), $"{name}: width {width}\n");
+        Assert.InRange(width, 340, 412);
     }
 
     [Fact]

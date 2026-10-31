@@ -33,6 +33,9 @@ public class ViewFramingTests
             data.Add(10, 20, 29, 11, 21, 37, view); // A long box along Z, away from the origin.
             data.Add(0, 0, 0, 1, 1, 0, view); // A flat quad.
             data.Add(0, 0, 0, 3, 0, 2, view); // A flat quad lying down.
+            data.Add(0, 0, 0, 1e-8f, 1e-8f, 1e-8f, view); // Tiny at the origin.
+            data.Add(0, 0, 0, 1e-12f, 1e-12f, 1e-12f, view); // Tinier.
+            data.Add(1000, 0, 0, 1001, 1, 1, view); // Small, far from the origin.
         }
 
         return data;
@@ -58,6 +61,45 @@ public class ViewFramingTests
         }
 
         Assert.InRange(tightest, Inner - 0.01f, Inner + 1e-4f);
+    }
+
+    /// <summary>
+    /// Far enough out that coordinates round to a real part of the side, so the margin can only
+    /// hold as well as that. What this pins is that it is the mesh's margin, not the floor's.
+    /// </summary>
+    [Theory]
+    [InlineData(1e5f, 0, 0, RenderView.Front, 0.03f)]
+    [InlineData(1e5f, 0, 0, RenderView.Back, 0.03f)]
+    [InlineData(1e6f, 0, 0, RenderView.Front, 0.1f)]
+    [InlineData(1e6f, 1e6f, 1e6f, RenderView.Front, 0.1f)]
+    [InlineData(1e6f, 1e6f, 1e6f, RenderView.Back, 0.1f)]
+    public void A_side_one_box_far_out_fills_the_frame_as_far_as_float_allows(
+        float x, float y, float z, RenderView view, float tolerance)
+    {
+        var min = new Vector3(x, y, z);
+        var max = min + Vector3.One;
+        var frame = ViewFraming.Frame(min, max, view);
+
+        var tightest = Corners(min, max)
+            .Select(c => Device(c, frame))
+            .Max(d => Math.Max(Math.Abs(d.X), Math.Abs(d.Y)));
+
+        Assert.InRange(tightest, Inner - tolerance, Inner + tolerance);
+    }
+
+    [Theory]
+    [InlineData(1e6f, 1e6f, 1e6f, RenderView.Front)]
+    [InlineData(1e6f, 1e6f, 1e6f, RenderView.Back)]
+    [InlineData(0, 0, 0, RenderView.Front)]
+    [InlineData(0, 0, 0, RenderView.Back)]
+    public void The_floor_still_separates_the_camera_from_a_point(float x, float y, float z, RenderView view)
+    {
+        var point = new Vector3(x, y, z);
+
+        var frame = ViewFraming.Frame(point, point, view);
+
+        Assert.NotEqual(point, frame.Eye);
+        Assert.True(float.IsFinite(frame.View.M43) && float.IsFinite(frame.Projection.M33), frame.ToString());
     }
 
     [Theory]

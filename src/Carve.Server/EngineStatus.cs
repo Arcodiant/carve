@@ -1,7 +1,7 @@
 namespace Carve.Server;
 
 /// <summary>
-/// Where the engine has got to. A Vulkan failure lands here and nowhere else: the process and MCP
+/// Where the engine has got to. A failure of the engine itself lands here: the process and MCP
 /// stay up, and whatever needs the engine reports <see cref="FaultMessage"/>.
 /// </summary>
 public sealed class EngineStatus
