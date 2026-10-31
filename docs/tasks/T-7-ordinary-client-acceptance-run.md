@@ -4,7 +4,7 @@ description: >-
 ---
 # T-7 — Ordinary client acceptance run
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
