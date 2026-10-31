@@ -136,7 +136,13 @@ process and a protocol between the two.
 
 - **Tool shape.** One tool per operation, or a few general ones? How are elements
   addressed: ids that survive edits, or selections held by the server? How much does
-  one call return?
+  one call return? *M-1 acceptance run (T-7):* with two tools only, `define_mesh` (the whole
+  mesh by coordinates, returning counts, `closed`, bounds and warnings) and `render` (two views
+  and a caption), a fresh agent built a cube and a house with a pitched roof first time, from the
+  descriptions alone and with no error to correct. It used the worked example as the pattern, and
+  trusted `closed: true` to say the winding was right. Still open: what it could not do is look at a
+  face neither view shows (the second roof slope), and with edits that must be a whole-mesh
+  redefinition each time, so addressing elements waits for the first edit tool.
 - **Undo and history.** Does an agent get undo? Is a model's history recorded so the
   person can read how it was made, or replayed to rebuild it?
 - **The Carve file.** Text or binary, geometry or a list of operations? (Text would
@@ -147,8 +153,9 @@ process and a protocol between the two.
 - **Render modes.** Which come first, and do any need something Empyrean does not
   have? The first look at its docs did not find a normals or UV debug view; a
   material or shader of Carve's own may do it.
-- **Transport.** Stdio only, or also HTTP? How is the server installed for a game's
-  Claude session?
+- **Transport.** Stdio for now (decided at T-7; the README's `.mcp.json` entry starts it). HTTP, and
+  how the server is installed for a game's Claude session beyond that entry, stay open until a
+  use needs them.
 - **Empyrean-specific export.** Scale, axes and naming conventions a game expects,
   and whether Carve checks a model against them.
 - **Boolean and heavier operations.** Does "cut" mean a plane cut, a knife path, or
