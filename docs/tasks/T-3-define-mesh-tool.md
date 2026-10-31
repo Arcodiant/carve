@@ -4,7 +4,7 @@ description: >-
 ---
 # T-3 — define_mesh tool
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
