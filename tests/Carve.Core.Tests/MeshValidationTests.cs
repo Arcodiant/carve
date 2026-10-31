@@ -60,13 +60,25 @@ public class MeshValidationTests
         => Assert.Contains(Errors(Tri, []), e => e.Element == "faces");
 
     [Fact]
-    public void BowtieFaceThatCannotBeClippedIsAnError()
+    public void BowtieFaceNamesTheEdgesThatCross()
     {
         // Not the symmetric bowtie (0,0),(1,1),(1,0),(0,1), whose Newell area is exactly 0 and stops at the zero-area check.
         var v = new[] { new Vector3(0, 0, 0), new Vector3(2, 2, 0), new Vector3(2, 0, 0), new Vector3(0, 1, 0) };
         var error = Assert.Single(Errors(v, [[0, 1, 2, 3]]));
         Assert.Equal("faces[0]", error.Element);
-        Assert.Equal("face cannot be triangulated (self-intersecting or degenerate outline)", error.Message);
+        Assert.Equal("face is self-intersecting: the edge from faces[0][0] crosses the edge from faces[0][2]", error.Message);
+    }
+
+    [Theory]
+    [InlineData("[[0,9]]", new[] { "faces[0]", "faces[0][1]" })]
+    [InlineData("[[0,0,9]]", new[] { "faces[0][1]", "faces[0][2]" })]
+    [InlineData("[[0,0,1,9,9]]", new[] { "faces[0][1]", "faces[0][3]", "faces[0][4]" })]
+    [InlineData("[[0,9,1,-1]]", new[] { "faces[0][1]", "faces[0][3]" })]
+    public void OneFaceWithTwoFaultsListsThemAll(string faces, string[] elements)
+    {
+        var f = System.Text.Json.JsonSerializer.Deserialize<int[][]>(faces)!;
+        var errors = Errors(Tri, f);
+        Assert.Equal(elements.Order(), errors.Select(e => e.Element).Distinct().Order());
     }
 
     [Fact]

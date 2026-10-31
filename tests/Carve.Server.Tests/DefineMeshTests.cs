@@ -113,25 +113,33 @@ public class DefineMeshTests
 
     private const string Tri = """[[0,0,0],[1,0,0],[0,1,0]]""";
 
-    public static TheoryData<string, string[]> BadArguments => new()
+    public static TheoryData<string, string[], int> BadArguments => new()
     {
-        { $$"""{"vertices":{{Tri}},"faces":[[0,1.5,2]]}""", ["faces[0][1]"] },
-        { $$"""{"vertices":{{Tri}},"faces":[[0,99999999999,2]]}""", ["faces[0][1]"] },
-        { $$"""{"vertices":{{Tri}},"faces":[[0,null,2]]}""", ["faces[0][1]"] },
-        { $$"""{"vertices":{{Tri}},"faces":[[0,"1",2]]}""", ["faces[0][1]"] },
-        { """{"vertices":[[0,0,0],[1,null,0],[0,1,0]],"faces":[[0,1,2]]}""", ["vertices[1][1]"] },
-        { """{"vertices":[[0,0,0],[1,"x",0],[0,1,0]],"faces":[[0,1,2]]}""", ["vertices[1][1]"] },
-        { $$"""{"vertices":null,"faces":[[0,1,2]]}""", ["vertices"] },
-        { $$"""{"vertices":{{Tri}},"faces":null}""", ["faces"] },
-        { $$"""{"vertices":{{Tri}}}""", ["faces"] },
-        { "{}", ["vertices", "faces"] },
-        { """{"vertices":[],"faces":[[0,1,2]]}""", ["faces[0][0]", "no vertices"] },
-        { """{"vertices":[[0,0,0],[1,0,0],[0,1,0],[1,1,0]],"faces":[[0,1.0,2],[0,1,2.5,3]]}""", ["faces[1][2]"] },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,1.5,2]]}""", ["faces[0][1]"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,99999999999,2]]}""", ["faces[0][1]"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,null,2]]}""", ["faces[0][1]"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,"1",2]]}""", ["faces[0][1]"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,1.00000000000000001,2]]}""", ["faces[0][1]", "1.00000000000000001"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":[[1e-400,1,2]]}""", ["faces[0][0]"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,1.5e-400,2]]}""", ["faces[0][1]"], 1 },
+        { """{"vertices":[[0,0,0],[1,null,0],[0,1,0]],"faces":[[0,1,2]]}""", ["vertices[1][1]"], 1 },
+        { """{"vertices":[[0,0,0],[1,"x",0],[0,1,0]],"faces":[[0,1,2]]}""", ["vertices[1][1]"], 1 },
+        { $$"""{"vertices":null,"faces":[[0,1,2]]}""", ["vertices"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":null}""", ["faces"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":{"a":1} }""", ["faces"], 1 },
+        { $$"""{"vertices":{{Tri}}}""", ["faces"], 1 },
+        { """{"faces":[[0,1,2]]}""", ["vertices"], 1 },
+        { "{}", ["vertices", "faces"], 2 },
+        { """{"vertices":[],"faces":[[0,1,2]]}""", ["faces[0][0]", "no vertices"], 3 },
+        { """{"vertices":[[0,0,0],[1,0,0],[0,1,0],[1,1,0]],"faces":[[0,1.0,2],[0,1,2.5,3]]}""", ["faces[1][2]"], 1 },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,9]]}""", ["faces[0]:", "faces[0][1]"], 2 },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,0,9]]}""", ["faces[0][1]", "faces[0][2]"], 2 },
+        { $$"""{"vertices":{{Tri}},"faces":[[0,0,1.5]]}""", ["faces[0][1]", "faces[0][2]"], 2 },
     };
 
     [Theory]
     [MemberData(nameof(BadArguments))]
-    public async Task Bad_arguments_are_a_tool_error_naming_the_element(string arguments, string[] mentions)
+    public async Task Bad_arguments_are_a_tool_error_naming_the_element(string arguments, string[] mentions, int problems)
     {
         var (carve, _) = await StartAsync();
         using var _ = carve;
@@ -140,8 +148,23 @@ public class DefineMeshTests
 
         Assert.True(IsError(result), result.ToString());
         var text = TextOf(result);
-        Assert.StartsWith("define_mesh failed with", text);
+        Assert.StartsWith($"define_mesh failed with {problems} problem(s)", text);
         Assert.All(mentions, m => Assert.Contains(m, text));
+    }
+
+    [Theory]
+    [InlineData("1.0")]
+    [InlineData("1e0")]
+    [InlineData("10e-1")]
+    [InlineData("0.1e1")]
+    public async Task An_integral_index_written_any_way_is_accepted(string one)
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+
+        var result = await CallAsync(carve, $$"""{"vertices":{{Tri}},"faces":[[0,{{one}},2]]}""");
+
+        Assert.False(IsError(result), TextOf(result));
     }
 
     [Fact]

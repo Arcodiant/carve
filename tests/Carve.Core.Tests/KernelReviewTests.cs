@@ -57,12 +57,71 @@ public class KernelReviewTests
     }
 
     [Fact]
-    public void AnOutlineThatOnlyTouchesItselfIsNotReportedAsCrossing()
+    public void AnOutlineWhoseVertexTouchesAnotherEdgeReachesTheCrossingCheckAndIsAccepted()
     {
-        // A vertex (3,0) on the opposite edge: touching, not crossing. Whatever else is said, it is not a crossing.
-        var v = new Vector3[] { new(0, 0, 0), new(6, 0, 0), new(6, 4, 0), new(4, 4, 0), new(3, 0, 0), new(2, 4, 0), new(0, 4, 0) };
-        var r = Create(v, [[0, 1, 2, 3, 4, 5, 6]]);
-        Assert.DoesNotContain(r.Errors, e => e.Message.Contains("crosses"));
+        // A keyhole: a triangular hole whose apex touches the top edge at (5,10), which is both ends of the pinch
+        // (two vertices at one point). It clips, so it reaches FindCrossing, where touching must not count as
+        // crossing (a `<= 0` there rejects it).
+        var v = new Vector3[] { new(0, 0, 0), new(10, 0, 0), new(10, 10, 0), new(5, 10, 0), new(7, 5, 0), new(3, 5, 0), new(5, 10, 0), new(0, 10, 0) };
+        var face = new[] { 0, 1, 2, 3, 4, 5, 6, 7 };
+        var r = Create(v, [face]);
+        Assert.True(r.Succeeded, string.Join("; ", r.Errors));
+        Assert.Equal(6, Triangulator.Triangulate(r.Mesh!).Count);
+    }
+
+    [Fact]
+    public void AnOutlineThatFoldsBackOnItselfIsRejectedNamingTheFold()
+    {
+        // Edges 0-1 and 1-2 fold back along y=4; vertex 0 used to vanish from the triangles.
+        var v = new Vector3[] { new(2, 4, 0), new(1, 4, 0), new(5, 4, 0), new(1, 0, 0), new(0, 4, 0) };
+        var r = Create(v, [[0, 1, 2, 3, 4]]);
+        var e = Assert.Single(r.Errors);
+        Assert.Equal("faces[0]", e.Element);
+        Assert.Contains("folds back", e.Message);
+        Assert.Contains("faces[0][", e.Message);
+    }
+
+    [Fact]
+    public void NonAdjacentCollinearEdgesThatOverlapAreAFold()
+    {
+        // Edge 0 runs (0,0)-(6,0) and edge 4 runs (4,0)-(2,0): they overlap over x 2..4.
+        var v = new Vector3[] { new(0, 0, 0), new(6, 0, 0), new(6, 3, 0), new(4, 3, 0), new(4, 0, 0), new(2, 0, 0), new(2, 3, 0), new(0, 3, 0) };
+        var r = Create(v, [[0, 1, 2, 3, 4, 5, 6, 7]]);
+        Assert.Contains(r.Errors, e => e.Message.Contains("folds back"));
+    }
+
+    [Fact]
+    public void ACrossingOutlineIsNamedEvenWhenItCannotBeClipped()
+    {
+        var v = new Vector3[] { new(0, 0, 0), new(2, 2, 0), new(2, 0, 0), new(0, 1, 0) };
+        Assert.Contains("crosses", Assert.Single(Create(v, [[0, 1, 2, 3]]).Errors).Message);
+    }
+
+    [Fact]
+    public void EveryAcceptedRandomOutlineUsesEveryVertexExceptStraightThroughOnes()
+    {
+        var rng = new Random(12345);
+        var accepted = 0;
+        for (var round = 0; round < 40000; round++)
+        {
+            var n = rng.Next(4, 9);
+            // Small integer grid so collinear, overlapping and touching edges are common.
+            var v = Enumerable.Range(0, n).Select(_ => new Vector3(rng.Next(0, 5), rng.Next(0, 5), 0)).ToArray();
+            var face = Enumerable.Range(0, n).OrderBy(_ => rng.Next()).ToArray();
+            var r = Create(v, [face]);
+            if (!r.Succeeded) continue;
+            accepted++;
+            var used = Triangulator.Triangulate(r.Mesh!).SelectMany(t => new[] { t.A, t.B, t.C }).ToHashSet();
+            for (var k = 0; k < n; k++)
+            {
+                if (used.Contains(face[k])) continue;
+                var a = v[face[(k + n - 1) % n]]; var b = v[face[k]]; var c = v[face[(k + 1) % n]];
+                var cross = (b.X - a.X) * (c.Y - b.Y) - (b.Y - a.Y) * (c.X - b.X);
+                var dot = (a.X - b.X) * (c.X - b.X) + (a.Y - b.Y) * (c.Y - b.Y);
+                Assert.True(cross == 0 && dot < 0, $"vertex {face[k]} dropped from [{string.Join(",", face)}] over {string.Join(" ", v.Select(p => $"({p.X},{p.Y})"))}");
+            }
+        }
+        Assert.True(accepted > 500, $"only {accepted} outlines were accepted");
     }
 
     [Theory]

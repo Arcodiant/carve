@@ -37,37 +37,37 @@ description: >-
 
 `src/Carve.Core/Triangulator.cs:88-97,125`. Correctness; RV-1's self-intersection and omitted-vertex findings answered only in part. `FindCrossing` skips adjacent edges and ignores overlaps, and the no-ear fallback removes a flat vertex even where the outline turns back 180 degrees. `{"vertices":[[2,4,0],[1,4,0],[5,4,0],[1,0,0],[0,4,0]],"faces":[[0,1,2,3,4]]}`: edges 0-1 and 1-2 fold back along y=4; it is accepted, the triangles are `(1,2,3),(1,3,4)`, and vertex 0 is in none. `MeshReport` still counts it as used.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The clipping error runs first, so a bowtie never gets the named crossing
 
 `src/Carve.Core/PolygonMesh.cs:113-120`, `tests/Carve.Core.Tests/MeshValidationTests.cs:63-70`. Correctness. `FindCrossing` runs only after clipping succeeds, so `(0,0),(2,2),(2,0),(0,1)`, whose edges 0 and 2 cross, gets `face cannot be triangulated (self-intersecting or degenerate outline)`, while the double-wound hexagon gets the message naming both edges. The test pins the vaguer text.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The touching-outline test never reaches FindCrossing
 
 `tests/Carve.Core.Tests/KernelReviewTests.cs:59-66`. Tests cover the Scope. That outline fails clipping, so "crosses" can never appear. Changing both `< 0` tests at `Triangulator.cs:132` to `<= 0` leaves all 51 Core tests green. A keyhole outline reaches the check, is accepted today (8 triangles, 10 of 10 vertices) and has no test.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The error count still reports one missing argument as several problems
 
 `src/Carve.Server/DefineMeshTool.cs:93-114`. Correctness. `ArrayOrError` does not add to `shapeBad`, and `PolygonMesh.Create` runs on the empty lists. `{"vertices":[[0,0,0],[1,0,0],[0,1,0]]}` gives 2 problems, `{}` gives 3, `{"faces":[[0,1,2]]}` gives 4 including false out-of-range lines, `"faces":{}` gives 2. The `BadArguments` rows do not check the count.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### A non-integer index that rounds to a whole double is accepted
 
 `src/Carve.Server/DefineMeshTool.cs:217`. Correctness. `TryGetDouble` rounds before the `d != Math.Floor(d)` check. With 3 vertices, `[[0,1.00000000000000001,2]]` is accepted as index 1, `[[1e-400,1,2]]` as index 0, and `[[0,1.5e-400,2]]` gives `index 0 repeats faces[0][0]`.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### "Lists every problem" is still untrue for one face with two faults
 
 `src/Carve.Core/PolygonMesh.cs:75-79,90`, promise at `src/Carve.Server/DefineMeshTool.cs:31-32`. Correctness. `"faces":[[0,9]]` reports only the length, `[[0,0,9]]` and `[[0,0,1.5]]` only `faces[0][2]`; the hidden problem appears on the next call. The description's list of bad input also omits self-intersection and non-finite coordinates.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ## Findings: render, harness and docs fixes (claude-opus-5-5)
 

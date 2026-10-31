@@ -72,24 +72,22 @@ public sealed class PolygonMesh
         for (var f = 0; f < fcs.Length; f++)
         {
             var face = fcs[f];
+            var faceOk = true;
             if (face.Length < 3)
             {
                 errors.Add(new MeshError($"faces[{f}]", $"face has {face.Length} indices; at least 3 are needed"));
-                continue;
+                faceOk = false;
             }
 
-            var indicesOk = true;
             for (var k = 0; k < face.Length; k++)
             {
                 if (face[k] < 0 || face[k] >= verts.Length)
                 {
                     errors.Add(new MeshError($"faces[{f}][{k}]", verts.Length == 0 ? $"index {face[k]} is out of range: there are no vertices" : $"index {face[k]} is out of range 0..{verts.Length - 1}"));
-                    indicesOk = false;
+                    faceOk = false;
                 }
             }
-            if (!indicesOk) continue;
 
-            var repeated = false;
             for (var k = 0; k < face.Length; k++)
             {
                 for (var j = 0; j < k; j++)
@@ -97,12 +95,12 @@ public sealed class PolygonMesh
                     if (face[j] == face[k])
                     {
                         errors.Add(new MeshError($"faces[{f}][{k}]", $"index {face[k]} repeats faces[{f}][{j}]"));
-                        repeated = true;
+                        faceOk = false;
                         break;
                     }
                 }
             }
-            if (repeated || face.Any(i => badVertex[i])) continue;
+            if (!faceOk || face.Any(i => badVertex[i])) continue;
 
             if (IsZeroArea(verts, face))
             {
@@ -110,14 +108,17 @@ public sealed class PolygonMesh
                 continue;
             }
 
-            if (!Triangulator.TryTriangulate(verts, face, out _))
+            // Crossing and folding first, so an outline that crosses always names its edges.
+            if (Triangulator.FindCrossing(verts, face) is var (first, second, fold))
             {
-                errors.Add(new MeshError($"faces[{f}]", "face cannot be triangulated (self-intersecting or degenerate outline)"));
+                errors.Add(new MeshError($"faces[{f}]", fold
+                    ? $"face folds back on itself: the edge from faces[{f}][{first}] overlaps the edge from faces[{f}][{second}]"
+                    : $"face is self-intersecting: the edge from faces[{f}][{first}] crosses the edge from faces[{f}][{second}]"));
                 continue;
             }
 
-            if (Triangulator.FindCrossing(verts, face) is var (first, second))
-                errors.Add(new MeshError($"faces[{f}]", $"face is self-intersecting: the edge from faces[{f}][{first}] crosses the edge from faces[{f}][{second}]"));
+            if (!Triangulator.TryTriangulate(verts, face, out _))
+                errors.Add(new MeshError($"faces[{f}]", "face cannot be triangulated (degenerate outline)"));
         }
 
         return errors.Count > 0

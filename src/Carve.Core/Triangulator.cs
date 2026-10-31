@@ -91,7 +91,7 @@ public static class Triangulator
             {
                 var ia = remaining[(r + remaining.Count - 1) % remaining.Count];
                 var ic = remaining[(r + 1) % remaining.Count];
-                if (IsFlat(pts[ia], pts[remaining[r]], pts[ic])) { collinear = r; break; }
+                if (IsStraightThrough(pts[ia], pts[remaining[r]], pts[ic])) { collinear = r; break; }
             }
             if (collinear < 0) return false;
             remaining.RemoveAt(collinear);
@@ -106,11 +106,12 @@ public static class Triangulator
     }
 
     /// <summary>
-    /// The first pair of non-adjacent edges of a face that properly cross, in the plane of its normal, as the
-    /// position of each edge's first vertex (edge k runs from face[k] to face[k+1]); null when none cross.
-    /// Edges that only touch (a vertex on another edge) do not cross.
+    /// The first fault of a face's outline in the plane of its normal, as the position of each edge's first vertex
+    /// (edge k runs from face[k] to face[k+1]): two non-adjacent edges that properly cross, else two edges that fold
+    /// back on each other (adjacent edges that turn back 180 degrees, or collinear edges that overlap along a length).
+    /// Edges that only touch (a vertex on another edge) are neither; null when the outline has neither fault.
     /// </summary>
-    internal static (int First, int Second)? FindCrossing(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
+    internal static (int First, int Second, bool Fold)? FindCrossing(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
     {
         if (face.Count < 4) return null;
         var pts = Project(verts, face);
@@ -127,14 +128,44 @@ public static class Triangulator
                 if (i == 0 && j == n - 1) continue;
                 var c = pts[j];
                 var d = pts[(j + 1) % n];
-                if (Math.Max(a.X, b.X) < Math.Min(c.X, d.X) || Math.Max(c.X, d.X) < Math.Min(a.X, b.X)) continue;
-                if (Math.Max(a.Y, b.Y) < Math.Min(c.Y, d.Y) || Math.Max(c.Y, d.Y) < Math.Min(a.Y, b.Y)) continue;
+                if (Disjoint(a, b, c, d)) continue;
                 if (Side(c, d, a, size) * Side(c, d, b, size) < 0 && Side(a, b, c, size) * Side(a, b, d, size) < 0)
-                    return (i, j);
+                    return (i, j, false);
+            }
+        }
+
+        for (var i = 0; i < n; i++)
+        {
+            // Adjacent edges i-1 and i meet at i: a fold when both leave that vertex the same way.
+            if (IsFlat(pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n]) && Dot(pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n]) > 0)
+                return ((i + n - 1) % n, i, true);
+        }
+
+        for (var i = 0; i < n; i++)
+        {
+            var a = pts[i];
+            var b = pts[(i + 1) % n];
+            var length = Distance(a, b);
+            for (var j = i + 2; j < n; j++)
+            {
+                if (i == 0 && j == n - 1) continue;
+                var c = pts[j];
+                var d = pts[(j + 1) % n];
+                if (Disjoint(a, b, c, d)) continue;
+                if (Side(a, b, c, size) != 0 || Side(a, b, d, size) != 0 || length == 0) continue;
+                // Both ends of c-d are on the line a-b: the overlap along it, as a length.
+                var tc = ((c.X - a.X) * (b.X - a.X) + (c.Y - a.Y) * (b.Y - a.Y)) / length;
+                var td = ((d.X - a.X) * (b.X - a.X) + (d.Y - a.Y) * (b.Y - a.Y)) / length;
+                var overlap = Math.Min(length, Math.Max(tc, td)) - Math.Max(0, Math.Min(tc, td));
+                if (overlap > CollinearTolerance * size) return (i, j, true);
             }
         }
         return null;
     }
+
+    private static bool Disjoint((double X, double Y) a, (double X, double Y) b, (double X, double Y) c, (double X, double Y) d)
+        => Math.Max(a.X, b.X) < Math.Min(c.X, d.X) || Math.Max(c.X, d.X) < Math.Min(a.X, b.X)
+        || Math.Max(a.Y, b.Y) < Math.Min(c.Y, d.Y) || Math.Max(c.Y, d.Y) < Math.Min(a.Y, b.Y);
 
     /// <summary>Which side of the line a-b the point p is on (1 left, -1 right), 0 when it is within the tolerance of the line.</summary>
     private static int Side((double X, double Y) a, (double X, double Y) b, (double X, double Y) p, double size)
@@ -155,6 +186,14 @@ public static class Triangulator
 
     private static bool IsFlat((double X, double Y) a, (double X, double Y) b, (double X, double Y) c)
         => Math.Abs(Cross(a, b, c)) <= CollinearTolerance * Distance(a, b) * Distance(b, c);
+
+    /// <summary>A flat corner at b whose neighbours lie on opposite sides of it (not a fold, where they lie on the same side).</summary>
+    private static bool IsStraightThrough((double X, double Y) a, (double X, double Y) b, (double X, double Y) c)
+        => IsFlat(a, b, c) && Dot(a, b, c) < 0;
+
+    /// <summary>Dot product of b-&gt;a and b-&gt;c: positive when the two edges leave b the same way.</summary>
+    private static double Dot((double X, double Y) a, (double X, double Y) b, (double X, double Y) c)
+        => (a.X - b.X) * (c.X - b.X) + (a.Y - b.Y) * (c.Y - b.Y);
 
     private static bool ContainsOther((double X, double Y)[] pts, List<int> remaining, int ia, int ib, int ic, double size)
     {

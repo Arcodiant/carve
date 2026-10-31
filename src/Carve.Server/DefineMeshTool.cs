@@ -29,7 +29,7 @@ public sealed class DefineMeshTool(ModelStore store)
         + "closed is true when every edge is shared by exactly two faces. Warnings (open edges, edges shared by more than two faces, "
         + "inconsistent winding, non-planar faces, unused vertices) mean the mesh was accepted but is probably not what you meant. "
         + "Bad input (a missing or out-of-range index, a face with fewer than 3 vertices, a repeated index, a zero-area face, "
-        + "a vertex without exactly 3 numbers) is a tool error that lists every problem by element, e.g. faces[2][1]. "
+        + "a self-intersecting or folded-back face outline, a non-finite coordinate, a vertex without exactly 3 numbers) is a tool error that lists every problem by element, e.g. faces[2][1]. "
         + ExampleMarker + " " + CubeExample;
 
     private const string VerticesText = "Vertex positions, each exactly three numbers [x, y, z]. Unitless; Y is up.";
@@ -90,7 +90,8 @@ public sealed class DefineMeshTool(ModelStore store)
         var points = new List<Vector3>();
         var indices = new List<int[]>();
 
-        if (ArrayOrError("vertices", vertices ?? default, errors))
+        var verticesOk = ArrayOrError("vertices", vertices ?? default, errors);
+        if (verticesOk)
         {
             var i = 0;
             foreach (var v in vertices!.Value.EnumerateArray())
@@ -100,7 +101,8 @@ public sealed class DefineMeshTool(ModelStore store)
             }
         }
 
-        if (ArrayOrError("faces", faces ?? default, errors))
+        var facesOk = ArrayOrError("faces", faces ?? default, errors);
+        if (facesOk)
         {
             var f = 0;
             foreach (var face in faces!.Value.EnumerateArray())
@@ -111,7 +113,13 @@ public sealed class DefineMeshTool(ModelStore store)
         }
 
         var result = PolygonMesh.Create(points, indices);
-        errors.AddRange(result.Errors.Where(e => !shapeBad.Contains(e.Element)).Select(e => e.ToString()));
+        // A missing or malformed argument is one problem; what Create then says about its empty stand-in is derived
+        // (no faces; indices out of range of no vertices; a vertex nothing can refer to) and is left out.
+        errors.AddRange(result.Errors
+            .Where(e => !shapeBad.Contains(e.Element))
+            .Where(e => facesOk || e.Element.StartsWith("vertices[", StringComparison.Ordinal))
+            .Where(e => verticesOk || (e.Element.StartsWith("faces[", StringComparison.Ordinal) && !e.Message.Contains("out of range", StringComparison.Ordinal)))
+            .Select(e => e.ToString()));
         if (errors.Count > 0)
         {
             return new CallToolResult
@@ -201,21 +209,54 @@ public sealed class DefineMeshTool(ModelStore store)
             {
                 errors.Add($"{element}[{k}]: an index must be a JSON integer within 32-bit range, got {Describe(x)}");
                 shapeBad.Add($"{element}[{k}]");
-                result.Add(-1);
+                result.Add(int.MinValue);
             }
             k++;
         }
         return result.ToArray();
     }
 
-    /// <summary>A JSON integer, including a whole number written with a fraction or exponent such as <c>1.0</c>, that fits an int.</summary>
+    /// <summary>
+    /// A JSON integer that fits an int, judged from the number's own text so that no rounding to a double can make a
+    /// fraction whole: a whole number written with a fraction or exponent (<c>1.0</c>, <c>1e0</c>) is accepted,
+    /// <c>1.00000000000000001</c> and <c>1e-400</c> are not.
+    /// </summary>
     private static bool TryIndex(JsonElement x, out int index)
     {
         index = 0;
         if (x.ValueKind != JsonValueKind.Number) return false;
         if (x.TryGetInt32(out index)) return true;
-        if (!x.TryGetDouble(out var d) || d != Math.Floor(d) || d < int.MinValue || d > int.MaxValue) return false;
-        index = (int)d;
+
+        var text = x.GetRawText();
+        var p = 0;
+        var negative = text[p] == '-';
+        if (negative) p++;
+        var digits = new System.Text.StringBuilder();
+        var scale = 0L; // the value is digits * 10^scale
+        for (; p < text.Length && char.IsAsciiDigit(text[p]); p++) digits.Append(text[p]);
+        if (p < text.Length && text[p] == '.')
+        {
+            for (p++; p < text.Length && char.IsAsciiDigit(text[p]); p++) { digits.Append(text[p]); scale--; }
+        }
+        if (p < text.Length && (text[p] == 'e' || text[p] == 'E'))
+        {
+            var exponent = text[(p + 1)..];
+            var sign = exponent.StartsWith('-') ? -1 : 1;
+            if (!long.TryParse(exponent.TrimStart('+', '-'), NumberStyles.None, CultureInfo.InvariantCulture, out var e)) e = 1_000_000_000;
+            scale += sign * Math.Min(e, 1_000_000_000);
+        }
+
+        var significant = digits.ToString().TrimStart('0');
+        if (significant.Length == 0) return true; // zero, index stays 0
+
+        var trimmed = significant.TrimEnd('0');
+        scale += significant.Length - trimmed.Length;
+        if (scale < 0) return false; // a nonzero fractional part
+        if (trimmed.Length + scale > 10) return false;
+        var value = System.Numerics.BigInteger.Parse(trimmed, CultureInfo.InvariantCulture) * System.Numerics.BigInteger.Pow(10, (int)scale);
+        if (negative) value = -value;
+        if (value < int.MinValue || value > int.MaxValue) return false;
+        index = (int)value;
         return true;
     }
 
