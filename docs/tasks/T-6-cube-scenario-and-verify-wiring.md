@@ -4,7 +4,7 @@ description: >-
 ---
 # T-6 — Cube scenario and verify wiring
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
