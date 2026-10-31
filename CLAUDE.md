@@ -40,6 +40,11 @@ Every plan, for a milestone or a task, keeps these:
 - **Stdout belongs to MCP.** On the stdio transport nothing but protocol goes to
   stdout; logs go to stderr or the temp folder.
 
+- **Renders are Empyrean's**, so a screenshot shows the model as the game would.
+- **The mesh is polygons**, triangulated only on export. Work persists in a native
+  Carve file; `.glb` is what reaches a game.
+- **The product has no window.** Every look is an offscreen render.
+
 The rest are decided in D-1 as they settle; add them here when they do.
 
 ## Layout
@@ -130,6 +135,9 @@ default, set below the command line rather than forced, so a person can watch an
 scenario in a window by switching it back there. The extension API lets an
 extension add configuration and services before the host is built, since the engine
 reads such a switch once, at build.
+
+Carve has no window today (D-1), so this binds the day a window arrives, and the
+extension API is built ready for it.
 
 ## Working rules
 
