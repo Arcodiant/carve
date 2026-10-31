@@ -42,12 +42,7 @@ public sealed class CubeScenario : IScenario
     public async Task RunAsync(ScenarioDriver driver)
     {
         // 1. The cube, both views.
-        var cube = await DefineAsync(driver, "cube", CubeVertices, CubeFaces);
-        if (!cube.GetProperty("closed").GetBoolean() || cube.GetProperty("warnings").GetArrayLength() != 0)
-        {
-            driver.Fail($"cube: expected closed and no warnings, got {cube}");
-        }
-
+        await DefineCleanAsync(driver, "cube", CubeVertices, CubeFaces);
         var cubeFront = await driver.CaptureAsync("cube-front", new { view = "front" });
         var cubeBack = await driver.CaptureAsync("cube-back", new { view = "back" });
         CheckCorners(driver, cubeFront);
@@ -61,12 +56,7 @@ public sealed class CubeScenario : IScenario
 
         // 3. The L-block: two concave hexagon caps and six quad sides.
         var (lVertices, lFaces) = LBlock();
-        var l = await DefineAsync(driver, "L-block", lVertices, lFaces);
-        if (!l.GetProperty("closed").GetBoolean() || l.GetProperty("warnings").GetArrayLength() != 0)
-        {
-            driver.Fail($"L-block: expected closed and no warnings, got {l}");
-        }
-
+        await DefineCleanAsync(driver, "L-block", lVertices, lFaces);
         var lFront = await driver.CaptureAsync("lblock-front", new { view = "front" });
         var lBack = await driver.CaptureAsync("lblock-back", new { view = "back" });
         CheckCorners(driver, lFront);
@@ -113,6 +103,15 @@ public sealed class CubeScenario : IScenario
         }
 
         return JsonDocument.Parse(text).RootElement.Clone();
+    }
+
+    private static async Task DefineCleanAsync(ScenarioDriver driver, string what, double[][] vertices, int[][] faces)
+    {
+        var report = await DefineAsync(driver, what, vertices, faces);
+        if (!report.GetProperty("closed").GetBoolean() || report.GetProperty("warnings").GetArrayLength() != 0)
+        {
+            driver.Fail($"{what}: expected closed and no warnings, got {report}");
+        }
     }
 
     /// <summary>The L of six corners in the XY plane, one thick in Z.</summary>

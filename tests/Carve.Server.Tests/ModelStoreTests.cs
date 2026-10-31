@@ -1,12 +1,13 @@
 using System.Numerics;
 using Carve.Core;
+using Carve.Core.Tests;
 
 namespace Carve.Server.Tests;
 
 public class ModelStoreTests
 {
     private static PolygonMesh Triangle() =>
-        PolygonMesh.Create([Vector3.Zero, Vector3.UnitX, Vector3.UnitY], [[0, 1, 2]]).Mesh!;
+        TestMeshes.Make([Vector3.Zero, Vector3.UnitX, Vector3.UnitY], [[0, 1, 2]]);
 
     [Fact]
     public void Starts_empty_at_version_zero_and_each_replace_adds_one()

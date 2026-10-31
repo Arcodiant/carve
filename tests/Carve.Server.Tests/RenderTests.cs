@@ -20,29 +20,17 @@ public class RenderTests
     private const string QuadFacingAway =
         """{"vertices":[[0,0,0],[0,1,0],[1,1,0],[1,0,0]],"faces":[[0,1,2,3]]}""";
 
-    private static readonly TimeSpan Answer = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan Exit = TimeSpan.FromSeconds(5);
     private static readonly string Frames = Path.Combine(Paths.RepoRoot, "artifacts", "render-tests");
-    private static int _id = 100;
 
-    private static async Task<JsonElement> ToolAsync(CarveProcess carve, string name, string arguments)
-    {
-        var id = Interlocked.Increment(ref _id);
-        await carve.SendAsync($$$"""{"jsonrpc":"2.0","id":{{{id}}},"method":"tools/call","params":{"name":"{{{name}}}","arguments":{{{arguments}}}}}""");
-        return (await carve.ReadResponseAsync(id, Answer)).GetProperty("result");
-    }
+    private static Task<JsonElement> RenderAsync(CarveProcess carve, string? view = null) =>
+        carve.CallToolAsync("render", view is null ? "{}" : $$"""{"view":"{{view}}"}""");
 
-    private static async Task<JsonElement> RenderAsync(CarveProcess carve, string? view = null) =>
-        await ToolAsync(carve, "render", view is null ? "{}" : $$"""{"view":"{{view}}"}""");
-
-    private static bool IsError(JsonElement result) => result.TryGetProperty("isError", out var e) && e.GetBoolean();
-
-    private static string Caption(JsonElement result) => result.GetProperty("content")[1].GetProperty("text").GetString()!;
+    private static string Caption(JsonElement result) => TextOf(result, 1);
 
     private static string ErrorText(JsonElement result)
     {
         Assert.True(IsError(result));
-        return result.GetProperty("content")[0].GetProperty("text").GetString()!;
+        return TextOf(result);
     }
 
     private static byte[] Png(JsonElement result)
@@ -99,8 +87,8 @@ public class RenderTests
         RenderView view, string name, float[] brightest, float[] middle, float[] darkest)
     {
         using var carve = new CarveProcess([]);
-        await carve.InitializeAsync(Answer);
-        Assert.False(IsError(await ToolAsync(carve, "define_mesh", Cube)));
+        await carve.InitializeAsync();
+        Assert.False(IsError(await carve.CallToolAsync("define_mesh", Cube)));
 
         var result = await RenderAsync(carve, name);
 
@@ -124,8 +112,8 @@ public class RenderTests
     public async Task The_default_view_is_front_and_a_repeat_is_the_same_image()
     {
         using var carve = new CarveProcess([]);
-        await carve.InitializeAsync(Answer);
-        await ToolAsync(carve, "define_mesh", Cube);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
 
         var first = await RenderAsync(carve);
         var back = await RenderAsync(carve, "back");
@@ -140,7 +128,7 @@ public class RenderTests
     public async Task Render_before_define_is_a_tool_error_saying_to_call_define_mesh()
     {
         using var carve = new CarveProcess([]);
-        await carve.InitializeAsync(Answer);
+        await carve.InitializeAsync();
 
         Assert.Contains("define_mesh", ErrorText(await RenderAsync(carve)));
     }
@@ -149,8 +137,8 @@ public class RenderTests
     public async Task An_unknown_view_is_a_tool_error_naming_the_views()
     {
         using var carve = new CarveProcess([]);
-        await carve.InitializeAsync(Answer);
-        await ToolAsync(carve, "define_mesh", Cube);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
 
         var text = ErrorText(await RenderAsync(carve, "left"));
 
@@ -162,11 +150,11 @@ public class RenderTests
     public async Task Replacing_the_mesh_changes_the_image_on_the_very_next_call()
     {
         using var carve = new CarveProcess([]);
-        await carve.InitializeAsync(Answer);
-        await ToolAsync(carve, "define_mesh", Cube);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
         var cube = await RenderAsync(carve);
 
-        await ToolAsync(carve, "define_mesh", Pyramid);
+        await carve.CallToolAsync("define_mesh", Pyramid);
         var pyramid = await RenderAsync(carve);
 
         Assert.Equal("512x512, view front, 5 vertices, 5 faces", Caption(pyramid));
@@ -178,8 +166,8 @@ public class RenderTests
     public async Task A_face_turned_away_gives_an_empty_image_and_no_error()
     {
         using var carve = new CarveProcess([]);
-        await carve.InitializeAsync(Answer);
-        await ToolAsync(carve, "define_mesh", QuadFacingAway);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", QuadFacingAway);
 
         var image = Decode(Png(await RenderAsync(carve)), "quad-away");
 
@@ -194,8 +182,8 @@ public class RenderTests
         {
             ["VK_LOADER_DRIVERS_SELECT"] = "nonexistent",
         });
-        await carve.InitializeAsync(Answer);
-        await ToolAsync(carve, "define_mesh", Cube);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
 
         Assert.Contains("Vulkan", ErrorText(await RenderAsync(carve)));
         Assert.Contains("Vulkan", ErrorText(await RenderAsync(carve, "back")));
@@ -208,10 +196,9 @@ public class RenderTests
     public async Task The_tool_lists_its_views_and_says_what_missing_and_empty_mean()
     {
         using var carve = new CarveProcess([]);
-        await carve.InitializeAsync(Answer);
+        await carve.InitializeAsync();
 
-        await carve.SendAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
-        var tools = (await carve.ReadResponseAsync(2, Answer)).GetProperty("result").GetProperty("tools");
+        var tools = await carve.ListToolsAsync();
         var render = tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "render");
 
         var description = render.GetProperty("description").GetString()!;

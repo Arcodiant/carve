@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="Carve.Server.Tests.CarveProcess" Static="true" />
   </ItemGroup>
 
   <!-- Built first and started as real processes, never linked: the tests see what ships. -->
@@ -30,6 +31,7 @@
     <Compile Include="../../src/Carve.Server/ModelStore.cs" Link="ModelStore.cs" />
     <Compile Include="../../src/Carve.Server/MeshBridge.cs" Link="MeshBridge.cs" />
     <Compile Include="../../src/Carve.Server/ViewFraming.cs" Link="ViewFraming.cs" />
+    <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
     <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
   </ItemGroup>
 

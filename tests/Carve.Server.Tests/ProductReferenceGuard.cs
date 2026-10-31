@@ -33,13 +33,20 @@ internal static partial class ProductReferenceGuard
     {
         var extensions = new HashSet<string>(extensionAssemblies, StringComparer.OrdinalIgnoreCase);
 
+        return ReferencesOf(assemblyPath)
+            .Where(name => extensions.Contains(name)
+                || Forbidden().IsMatch(name)
+                || (name.StartsWith("Carve.", StringComparison.OrdinalIgnoreCase) && !Allowed.Contains(name)))
+            .ToList();
+    }
+
+    /// <summary>The names of the assemblies a built assembly references.</summary>
+    public static IReadOnlyList<string> ReferencesOf(string assemblyPath)
+    {
         using var pe = new PEReader(File.OpenRead(assemblyPath));
         var metadata = pe.GetMetadataReader();
         return metadata.AssemblyReferences
             .Select(handle => metadata.GetString(metadata.GetAssemblyReference(handle).Name))
-            .Where(name => extensions.Contains(name)
-                || Forbidden().IsMatch(name)
-                || (name.StartsWith("Carve.", StringComparison.OrdinalIgnoreCase) && !Allowed.Contains(name)))
             .ToList();
     }
 

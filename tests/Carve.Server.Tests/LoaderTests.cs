@@ -2,9 +2,6 @@ namespace Carve.Server.Tests;
 
 public class LoaderTests
 {
-    private static readonly TimeSpan Answer = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan Exit = TimeSpan.FromSeconds(5);
-
     private static string[] Extension(params string[] more) =>
         [$"--Carve:Extensions:0={Paths.TestExtensionDll}", .. more];
 
@@ -13,7 +10,7 @@ public class LoaderTests
     {
         using var carve = new CarveProcess([]);
 
-        await carve.InitializeAsync(Answer);
+        await carve.InitializeAsync();
         carve.CloseStdin();
 
         Assert.Equal(0, await carve.WaitForExitAsync(Exit));
@@ -58,7 +55,7 @@ public class LoaderTests
     {
         using var carve = new CarveProcess(Extension());
 
-        await carve.InitializeAsync(Answer);
+        await carve.InitializeAsync();
         carve.CloseStdin();
 
         Assert.Equal(0, await carve.WaitForExitAsync(Exit));
@@ -73,7 +70,7 @@ public class LoaderTests
     {
         using var carve = new CarveProcess(Extension());
 
-        await carve.InitializeAsync(Answer);
+        await carve.InitializeAsync();
         carve.CloseStdin();
 
         Assert.Equal(0, await carve.WaitForExitAsync(Exit));
@@ -85,13 +82,11 @@ public class LoaderTests
     {
         using var carve = new CarveProcess(Extension("--TestExtension:Mode=tool"));
 
-        await carve.InitializeAsync(Answer);
-        await carve.SendAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
-        var list = await carve.ReadResponseAsync(2, Answer);
+        await carve.InitializeAsync();
+        var tools = await carve.ListToolsAsync();
 
         // Beside the product's own tools, not instead of them.
-        var names = list.GetProperty("result").GetProperty("tools").EnumerateArray()
-            .Select(t => t.GetProperty("name").GetString()).ToArray();
+        var names = tools.EnumerateArray().Select(t => t.GetProperty("name").GetString()).ToArray();
         Assert.Contains("test_ping", names);
         Assert.Contains("define_mesh", names);
     }

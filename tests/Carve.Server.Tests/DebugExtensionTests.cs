@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -232,11 +230,7 @@ public sealed partial class DebugExtensionTests : IDisposable
     [Fact]
     public void The_debug_extension_is_on_the_public_api_alone()
     {
-        using var pe = new PEReader(File.OpenRead(Paths.DebugExtensionDll));
-        var metadata = pe.GetMetadataReader();
-        var references = metadata.AssemblyReferences
-            .Select(handle => metadata.GetString(metadata.GetAssemblyReference(handle).Name))
-            .ToList();
+        var references = ProductReferenceGuard.ReferencesOf(Paths.DebugExtensionDll);
 
         Assert.Contains("Carve.Extensibility", references);
         Assert.DoesNotContain(references, name =>

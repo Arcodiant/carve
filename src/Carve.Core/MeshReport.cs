@@ -40,7 +40,7 @@ public sealed class MeshReport
     /// <summary>True when every edge is shared by exactly two faces (no open and no over-shared edges).</summary>
     public bool Closed { get; }
 
-    /// <summary>Axis-aligned bounds of the vertices the faces use (all vertices if none are used).</summary>
+    /// <summary>Axis-aligned bounds of the vertices the faces use.</summary>
     public Vector3 BoundsMin { get; }
     public Vector3 BoundsMax { get; }
     public IReadOnlyList<MeshWarning> Warnings { get; }

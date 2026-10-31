@@ -54,30 +54,21 @@ public class ProductReferencesNoExtensionTests
     [InlineData("Carve.Scenario.Cube")]
     [InlineData("Carve.SomethingElse")]
     [InlineData("OddlyNamed")]
-    public void The_assembly_check_fails_on_a_bad_reference(string referenced)
+    public void The_assembly_check_fails_on_a_bad_reference(string referenced) =>
+        Assert.Equal([referenced], FindInFixtureReferencing(referenced));
+
+    [Fact]
+    public void The_assembly_check_passes_the_extension_api() =>
+        Assert.Empty(FindInFixtureReferencing("Carve.Extensibility"));
+
+    private static IReadOnlyList<string> FindInFixtureReferencing(string referenced)
     {
         var path = Path.Combine(Path.GetTempPath(), $"carve-guard-fixture-{Guid.NewGuid():N}.dll");
         try
         {
             WriteAssemblyReferencing(path, referenced);
 
-            Assert.Equal([referenced], ProductReferenceGuard.FindInAssembly(path, ["OddlyNamed"]));
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [Fact]
-    public void The_assembly_check_passes_the_extension_api()
-    {
-        var path = Path.Combine(Path.GetTempPath(), $"carve-guard-fixture-{Guid.NewGuid():N}.dll");
-        try
-        {
-            WriteAssemblyReferencing(path, "Carve.Extensibility");
-
-            Assert.Empty(ProductReferenceGuard.FindInAssembly(path, ["OddlyNamed"]));
+            return ProductReferenceGuard.FindInAssembly(path, ["OddlyNamed"]);
         }
         finally
         {

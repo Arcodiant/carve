@@ -1,15 +1,12 @@
 using System.Numerics;
 using Carve.Core;
+using Carve.Core.Tests;
 
 namespace Carve.Server.Tests;
 
 public class MeshBridgeTests
 {
-    private static PolygonMesh Mesh(Vector3[] vertices, int[][] faces) => PolygonMesh.Create(vertices, faces).Mesh!;
-
-    private static readonly PolygonMesh Cube = Mesh(
-        [new(0, 0, 0), new(1, 0, 0), new(1, 1, 0), new(0, 1, 0), new(0, 0, 1), new(1, 0, 1), new(1, 1, 1), new(0, 1, 1)],
-        [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [3, 7, 6, 2], [0, 4, 7, 3], [1, 2, 6, 5]]);
+    private static readonly PolygonMesh Cube = TestMeshes.Cube();
 
     [Fact]
     public void Every_triangle_is_clockwise_from_outside()
@@ -48,7 +45,7 @@ public class MeshBridgeTests
     [Fact]
     public void A_polygon_is_fanned_into_its_triangles()
     {
-        var hexagon = Mesh(
+        var hexagon = TestMeshes.Make(
             [new(2, 0, 0), new(1, 2, 0), new(-1, 2, 0), new(-2, 0, 0), new(-1, -2, 0), new(1, -2, 0)],
             [[0, 1, 2, 3, 4, 5]]);
 

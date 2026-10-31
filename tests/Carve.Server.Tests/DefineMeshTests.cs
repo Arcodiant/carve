@@ -5,32 +5,17 @@ namespace Carve.Server.Tests;
 public class DefineMeshTests
 {
     private const string Marker = "Worked example (a unit cube): ";
-    private static readonly TimeSpan Answer = TimeSpan.FromSeconds(30);
-    private static int _id = 10;
 
-    private static async Task<JsonElement> CallAsync(CarveProcess carve, string arguments)
-    {
-        var id = Interlocked.Increment(ref _id);
-        await carve.SendAsync($$$"""{"jsonrpc":"2.0","id":{{{id}}},"method":"tools/call","params":{"name":"define_mesh","arguments":{{{arguments}}}}}""");
-        return (await carve.ReadResponseAsync(id, Answer)).GetProperty("result");
-    }
+    private static Task<JsonElement> CallAsync(CarveProcess carve, string arguments) =>
+        carve.CallToolAsync("define_mesh", arguments);
 
-    private static string TextOf(JsonElement result) => result.GetProperty("content")[0].GetProperty("text").GetString()!;
-
-    private static bool IsError(JsonElement result) => result.TryGetProperty("isError", out var e) && e.GetBoolean();
-
-    private static async Task<JsonElement> ToolAsync(CarveProcess carve)
-    {
-        var id = Interlocked.Increment(ref _id);
-        await carve.SendAsync($$"""{"jsonrpc":"2.0","id":{{id}},"method":"tools/list"}""");
-        var tools = (await carve.ReadResponseAsync(id, Answer)).GetProperty("result").GetProperty("tools");
-        return tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "define_mesh").Clone();
-    }
+    private static async Task<JsonElement> ToolAsync(CarveProcess carve) =>
+        (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "define_mesh");
 
     private static async Task<(CarveProcess, string Cube)> StartAsync()
     {
         var carve = new CarveProcess([]);
-        await carve.InitializeAsync(Answer);
+        await carve.InitializeAsync();
         var description = (await ToolAsync(carve)).GetProperty("description").GetString()!;
         return (carve, description[(description.IndexOf(Marker, StringComparison.Ordinal) + Marker.Length)..]);
     }

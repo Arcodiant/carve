@@ -40,10 +40,14 @@ internal static class Paths
 /// <summary>The real <c>carve</c>, started by a test and stopped by it, speaking raw JSON-RPC lines.</summary>
 internal sealed class CarveProcess : IDisposable
 {
+    public static readonly TimeSpan Answer = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan Exit = TimeSpan.FromSeconds(5);
+
     private readonly Process _process;
     private readonly StringBuilder _stderr = new();
     private readonly List<string> _stdout = [];
     private readonly Task _stdoutPump;
+    private int _lastId = 1; // InitializeAsync takes 1.
 
     public CarveProcess(
         IEnumerable<string> arguments,
@@ -104,39 +108,36 @@ internal sealed class CarveProcess : IDisposable
         }
     }
 
-    public async Task SendAsync(string json)
-    {
-        await _process.StandardInput.WriteLineAsync(json);
-        await _process.StandardInput.FlushAsync();
-    }
+    public static bool IsError(JsonElement result) => result.TryGetProperty("isError", out var e) && e.GetBoolean();
 
-    /// <summary>Waits for the response carrying this id, failing with the stderr so far.</summary>
-    public async Task<JsonElement> ReadResponseAsync(int id, TimeSpan timeout)
-    {
-        var deadline = Stopwatch.StartNew();
-        while (deadline.Elapsed < timeout)
-        {
-            foreach (var line in StdoutLines)
-            {
-                using var document = JsonDocument.Parse(line);
-                if (document.RootElement.TryGetProperty("id", out var found) && found.GetInt32() == id)
-                {
-                    return document.RootElement.Clone();
-                }
-            }
+    /// <summary>The text of one content block of a tool result.</summary>
+    public static string TextOf(JsonElement result, int block = 0) =>
+        result.GetProperty("content")[block].GetProperty("text").GetString()!;
 
-            await Task.Delay(10);
-        }
-
-        throw new TimeoutException($"No response to {id} after {timeout}. stderr:\n{Stderr}");
-    }
-
-    public async Task<JsonElement> InitializeAsync(TimeSpan timeout)
+    public async Task<JsonElement> InitializeAsync()
     {
         await SendAsync("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"tests","version":"0"}}}""");
-        var response = await ReadResponseAsync(1, timeout);
+        var response = await ReadResponseAsync(1);
         await SendAsync("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
         return response;
+    }
+
+    /// <summary>The <c>tools</c> array of <c>tools/list</c>.</summary>
+    public async Task<JsonElement> ListToolsAsync()
+    {
+        var id = Interlocked.Increment(ref _lastId);
+        await SendAsync($$"""{"jsonrpc":"2.0","id":{{id}},"method":"tools/list"}""");
+        return (await ReadResponseAsync(id)).GetProperty("result").GetProperty("tools");
+    }
+
+    /// <summary>The <c>result</c> of <c>tools/call</c>.</summary>
+    /// <param name="name">The tool.</param>
+    /// <param name="arguments">The arguments, as JSON.</param>
+    public async Task<JsonElement> CallToolAsync(string name, string arguments)
+    {
+        var id = Interlocked.Increment(ref _lastId);
+        await SendAsync($$$"""{"jsonrpc":"2.0","id":{{{id}}},"method":"tools/call","params":{"name":"{{{name}}}","arguments":{{{arguments}}}}}""");
+        return (await ReadResponseAsync(id)).GetProperty("result");
     }
 
     public void CloseStdin() => _process.StandardInput.Close();
@@ -167,6 +168,33 @@ internal sealed class CarveProcess : IDisposable
         }
 
         _process.Dispose();
+    }
+
+    private async Task SendAsync(string json)
+    {
+        await _process.StandardInput.WriteLineAsync(json);
+        await _process.StandardInput.FlushAsync();
+    }
+
+    /// <summary>Waits for the response carrying this id, failing with the stderr so far.</summary>
+    private async Task<JsonElement> ReadResponseAsync(int id)
+    {
+        var deadline = Stopwatch.StartNew();
+        while (deadline.Elapsed < Answer)
+        {
+            foreach (var line in StdoutLines)
+            {
+                using var document = JsonDocument.Parse(line);
+                if (document.RootElement.TryGetProperty("id", out var found) && found.GetInt32() == id)
+                {
+                    return document.RootElement.Clone();
+                }
+            }
+
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException($"No response to {id} after {Answer}. stderr:\n{Stderr}");
     }
 
     private async Task PumpStdoutAsync()

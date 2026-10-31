@@ -32,8 +32,6 @@ public sealed class DefineMeshTool(ModelStore store)
         + "a vertex without exactly 3 numbers) is a tool error that lists every problem by element, e.g. faces[2][1]. "
         + ExampleMarker + " " + CubeExample;
 
-    private static readonly JsonSerializerOptions Json = new() { WriteIndented = false };
-
     /// <summary>
     /// The tool, built by hand rather than found by <c>WithToolsFromAssembly</c> so the schema can say
     /// each vertex has exactly three numbers (the attribute route cannot add minItems/maxItems).
@@ -71,7 +69,7 @@ public sealed class DefineMeshTool(ModelStore store)
         var shapeBad = new HashSet<string>();
         var points = new List<Vector3>();
 
-        for (var i = 0; i < (vertices.Length); i++)
+        for (var i = 0; i < vertices.Length; i++)
         {
             var v = vertices[i];
             if (v is null || v.Length != 3)
@@ -88,7 +86,7 @@ public sealed class DefineMeshTool(ModelStore store)
         }
 
         var indices = new List<int[]>();
-        for (var f = 0; f < (faces.Length); f++)
+        for (var f = 0; f < faces.Length; f++)
         {
             if (faces[f] is null)
             {
@@ -124,7 +122,7 @@ public sealed class DefineMeshTool(ModelStore store)
             bounds = new { min = Array(report.BoundsMin), max = Array(report.BoundsMax) },
             warnings = report.Warnings.Select(w => w.ToString()).ToArray(),
         };
-        return new CallToolResult { Content = [new TextContentBlock { Text = JsonSerializer.Serialize(body, Json) }] };
+        return new CallToolResult { Content = [new TextContentBlock { Text = JsonSerializer.Serialize(body) }] };
     }
 
     private static bool IsType(JsonNode? node, string type) =>

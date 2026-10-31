@@ -12,5 +12,6 @@
     <!-- What the engine itself depends on: the encoder of engine need 2, and a decoder for the tests. -->
     <StbImageWriteSharpVersion>1.16.7</StbImageWriteSharpVersion>
     <StbImageSharpVersion>2.30.15</StbImageSharpVersion>
+    <SystemReflectionMetadataLoadContextVersion>10.0.14</SystemReflectionMetadataLoadContextVersion>
   </PropertyGroup>
 </Project>

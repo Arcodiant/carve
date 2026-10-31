@@ -4,21 +4,16 @@ namespace Carve.Server.Tests;
 
 public class StdioTests
 {
-    private static readonly TimeSpan Answer = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan Exit = TimeSpan.FromSeconds(5);
-
     [Fact]
     public async Task Stdout_carries_only_protocol_and_closing_stdin_exits_zero()
     {
         using var carve = new CarveProcess([]);
 
-        var initialize = await carve.InitializeAsync(Answer);
+        var initialize = await carve.InitializeAsync();
         Assert.Equal("carve", initialize.GetProperty("result").GetProperty("serverInfo").GetProperty("name").GetString());
 
-        await carve.SendAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
-        var list = await carve.ReadResponseAsync(2, Answer);
-        Assert.Contains("define_mesh", list.GetProperty("result").GetProperty("tools").EnumerateArray()
-            .Select(t => t.GetProperty("name").GetString()));
+        var tools = await carve.ListToolsAsync();
+        Assert.Contains("define_mesh", tools.EnumerateArray().Select(t => t.GetProperty("name").GetString()));
 
         carve.CloseStdin();
         Assert.Equal(0, await carve.WaitForExitAsync(Exit));
@@ -39,10 +34,9 @@ public class StdioTests
             ["VK_LOADER_DRIVERS_SELECT"] = "nonexistent",
         });
 
-        await carve.InitializeAsync(Answer);
+        await carve.InitializeAsync();
 
-        await carve.SendAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
-        await carve.ReadResponseAsync(2, Answer);
+        await carve.ListToolsAsync();
 
         carve.CloseStdin();
         Assert.Equal(0, await carve.WaitForExitAsync(Exit));
