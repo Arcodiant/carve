@@ -34,6 +34,14 @@ public sealed class TestExtension : ICarveExtension
             context.Mcp.WithTools([McpServerTool.Create(() => "pong", new() { Name = "test_ping" })]);
         }
 
+        if (_mode == "direct")
+        {
+            Console.Error.WriteLine($"test-extension: hook reads Direct={context.Configuration["TestExtension:Direct"]}");
+            Console.Error.WriteLine($"test-extension: hook reads Person={context.Configuration["TestExtension:Person"]}");
+            context.Configuration["TestExtension:Direct"] = "set";
+            context.Configuration["TestExtension:Person"] = "set";
+        }
+
         if (_mode == "config")
         {
             context.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -66,6 +74,11 @@ public sealed class TestExtension : ICarveExtension
                 Console.Error.WriteLine($"test-extension: {key}={configuration[key]}");
             }
 
+            services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
+        }
+
+        if (_mode == "direct")
+        {
             services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
         }
 

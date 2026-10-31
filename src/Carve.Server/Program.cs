@@ -14,15 +14,13 @@ var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSetti
 
 // Lowest first: the product's defaults, then whatever extensions add, then the environment and
 // the command line, which stay on top so an extension's value is a default and never forced.
-var environment = new EnvironmentVariablesConfigurationSource();
-var commandLine = new CommandLineConfigurationSource { Args = args };
 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
     ["Empyrean:Time:FixedDeltaTime"] = "0.05",
     ["Empyrean:Time:PaceToFixedStep"] = "true",
 });
-builder.Configuration.Sources.Add(environment);
-builder.Configuration.Sources.Add(commandLine);
+builder.Configuration.Sources.Add(new EnvironmentVariablesConfigurationSource());
+builder.Configuration.Sources.Add(new CommandLineConfigurationSource { Args = args });
 
 // Stdout belongs to MCP.
 builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
@@ -53,11 +51,11 @@ if (!RunHooks(extensions, nameof(ICarveExtension.ConfigureHost),
     {
         e.ConfigureHost(new CarveHostBuilderContext(services, builder.Configuration, mcp));
 
-        // Back on top after each hook, so a later hook reads the person's switch, not an earlier default.
-        builder.Configuration.Sources.Remove(environment);
-        builder.Configuration.Sources.Remove(commandLine);
-        builder.Configuration.Sources.Add(environment);
-        builder.Configuration.Sources.Add(commandLine);
+        // Fresh copies on top after each hook, so a later hook reads the person's switch, not an
+        // earlier default. Added, not moved: removing a source rebuilds every provider, and a value
+        // set directly on the configuration lives in those providers.
+        builder.Configuration.Sources.Add(new EnvironmentVariablesConfigurationSource());
+        builder.Configuration.Sources.Add(new CommandLineConfigurationSource { Args = args });
     }))
 {
     return 1;

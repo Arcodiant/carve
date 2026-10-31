@@ -49,6 +49,7 @@ public class ViewFramingTests
         var min = new Vector3(x0, y0, z0);
         var max = new Vector3(x1, y1, z1);
         var frame = ViewFraming.Frame(min, max, view);
+        Assert.True(frame.Framed, frame.ToString());
 
         var tightest = 0f;
         foreach (var corner in Corners(min, max))
@@ -60,7 +61,7 @@ public class ViewFramingTests
             tightest = Math.Max(tightest, Math.Max(Math.Abs(device.X), Math.Abs(device.Y)));
         }
 
-        Assert.InRange(tightest, Inner - 0.01f, Inner + 1e-4f);
+        Assert.InRange(tightest, Inner - 0.01f, Inner + ViewFraming.MarginSlack);
     }
 
     /// <summary>
@@ -84,7 +85,48 @@ public class ViewFramingTests
             .Select(c => Device(c, frame))
             .Max(d => Math.Max(Math.Abs(d.X), Math.Abs(d.Y)));
 
-        Assert.InRange(tightest, Inner - tolerance, Inner + tolerance);
+        Assert.True(frame.Framed, frame.ToString());
+        Assert.InRange(tightest, Inner - tolerance, Inner + ViewFraming.MarginSlack); // Backed off, never past the line.
+    }
+
+    /// <summary>The bounds of the findings that float can't hold, and float's own far end.</summary>
+    [Theory]
+    [InlineData(4e6f, 1f, RenderView.Front)]
+    [InlineData(4e6f, 1f, RenderView.Back)]
+    [InlineData(1e7f, 1f, RenderView.Front)]
+    [InlineData(1e7f, 1f, RenderView.Back)]
+    [InlineData(100f, 4e-5f, RenderView.Front)]
+    [InlineData(100f, 4e-5f, RenderView.Back)]
+    [InlineData(float.MaxValue / 2, float.MaxValue / 2, RenderView.Front)]
+    public void Bounds_rounding_cannot_draw_are_not_framed(float offset, float side, RenderView view)
+    {
+        var min = new Vector3(offset);
+
+        Assert.False(ViewFraming.Frame(min, min + new Vector3(side), view).Framed);
+    }
+
+    [Theory]
+    [InlineData(1e19f)]
+    [InlineData(1e30f)]
+    [InlineData(1e-15f)]
+    public void A_cube_at_the_origin_frames_at_any_scale_float_can_hold(float side)
+    {
+        foreach (var view in new[] { RenderView.Front, RenderView.Back })
+        {
+            var frame = ViewFraming.Frame(Vector3.Zero, new Vector3(side), view);
+
+            Assert.True(frame.Framed, frame.ToString());
+            Assert.All(Corners(Vector3.Zero, new Vector3(side)), c => Assert.InRange(Device(c, frame).Z, 0, 1));
+        }
+    }
+
+    [Fact]
+    public void The_refusal_gives_the_size_and_the_offset_at_any_scale()
+    {
+        Assert.Equal(
+            "This mesh can't be framed: side 1, about 4e+06 from the origin. Move it nearer the origin or scale it, then call define_mesh again.",
+            ViewFraming.Refusal(new Vector3(4e6f, 0, 0), new Vector3(4e6f + 1, 1, 1)));
+        Assert.Contains("side 3e+38, about 2.6e+38 from", ViewFraming.Refusal(new Vector3(0), new Vector3(3e38f, 3e38f, 3e38f)));
     }
 
     [Theory]

@@ -232,6 +232,111 @@ public class RenderTests
         Assert.InRange(width, 340, 412);
     }
 
+    private static string Scaled(double side, double offset)
+    {
+        double[][] unit = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
+        var vertices = string.Join(",", unit.Select(v =>
+            "[" + string.Join(",", v.Select(c => (c * side + offset).ToString("R", System.Globalization.CultureInfo.InvariantCulture))) + "]"));
+        return $$"""{"vertices":[{{vertices}}],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
+    }
+
+    /// <summary>
+    /// Each is a correctly framed image or the error, in both views, and the engine runs on: never
+    /// a blank, a crop or a NaN. At the origin a framed cube is the unit cube's image, byte for byte.
+    /// </summary>
+    [Theory]
+    [InlineData(1e19, 0.0, true)]
+    [InlineData(1e30, 0.0, true)]
+    [InlineData(1e-15, 0.0, true)]
+    [InlineData(1e-20, 0.0, false)]
+    [InlineData(1e-30, 0.0, false)]
+    [InlineData(5e-20, 0.0, false)]
+    [InlineData(2e-20, 0.0, false)]
+    [InlineData(1e34, 0.0, false)]
+    [InlineData(5e34, 0.0, false)]
+    [InlineData(2e34, 0.0, false)]
+    [InlineData(8e34, 0.0, false)]
+    [InlineData(1e35, 0.0, false)]
+    [InlineData(1e36, 0.0, false)]
+    [InlineData(1e38, 0.0, false)]
+    [InlineData(1.0, 3e6, false)]
+    [InlineData(1.0, 4e6, false)]
+    [InlineData(1.0, 7e6, false)]
+    [InlineData(1.0, 1e7, false)]
+    [InlineData(4e-5, 100.0, false)]
+    public async Task An_extreme_mesh_is_framed_or_refused_and_the_next_render_works(double side, double offset, bool framed)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+        var plain = new[] { Png(await RenderAsync(carve, "front")), Png(await RenderAsync(carve, "back")) };
+
+        Assert.False(IsError(await carve.CallToolAsync("define_mesh", Scaled(side, offset))));
+
+        foreach (var (view, at) in new[] { ("front", 0), ("back", 1) })
+        {
+            var result = await RenderAsync(carve, view);
+            var outcome = "refused";
+            if (IsError(result))
+            {
+                Assert.False(framed, TextOf(result));
+                Assert.Matches("^This mesh can't be framed: side [0-9.e+-]+, about [0-9.e+-]+ from the origin\\. Move it nearer the origin or scale it, then call define_mesh again\\.$", TextOf(result));
+            }
+            else
+            {
+                outcome = Checked(result, $"extreme-{side}-{offset}-{view}");
+                if (offset == 0)
+                {
+                    Assert.Equal(plain[at], Png(result));
+                }
+            }
+
+            File.AppendAllText(Path.Combine(Frames, "samples.txt"), $"{side} at {offset}, {view}: {outcome}\n");
+        }
+
+        await carve.CallToolAsync("define_mesh", Cube);
+        Assert.Equal(plain[0], Png(await RenderAsync(carve, "front")));
+    }
+
+    /// <summary>
+    /// The frame thread steps about once per several define_mesh, and a render takes 2 steps, so
+    /// the cap on the calls is a cap in frames, however long each one takes.
+    /// </summary>
+    [Fact]
+    public async Task A_queued_render_answers_during_a_stream_of_define_mesh()
+    {
+        const int MostCalls = 2000;
+
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var render = RenderAsync(carve, "back");
+        var calls = 0;
+        while (!render.IsCompleted)
+        {
+            Assert.True(++calls <= MostCalls, $"no answer in {MostCalls} calls of define_mesh");
+            Assert.False(IsError(await carve.CallToolAsync("define_mesh", Pyramid)));
+        }
+
+        Assert.False(IsError(await render));
+    }
+
+    private static string Checked(JsonElement result, string name)
+    {
+        var image = Decode(Png(result), name);
+        var edges = Enumerable.Range(0, Size).SelectMany(i => new[] { (i, 0), (i, Size - 1), (0, i), (Size - 1, i) });
+        Assert.All(edges, p => AssertBackground(At(image, p)));
+
+        var columns = Enumerable.Range(0, Size)
+            .Where(x => Enumerable.Range(0, Size).Any(y => At(image, (x, y)).G > 60))
+            .ToArray();
+        Assert.NotEmpty(columns);
+        var width = columns[^1] - columns[0] + 1;
+        Assert.InRange(width, 300, 430);
+        return $"framed, width {width}";
+    }
+
     [Fact]
     public async Task A_face_turned_away_gives_an_empty_image_and_no_error()
     {

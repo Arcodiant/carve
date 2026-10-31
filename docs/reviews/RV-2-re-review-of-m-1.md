@@ -87,19 +87,19 @@ description: >-
 
 `src/Carve.Server/RenderPump.cs:41-44`, `src/Carve.Server/RenderTool.cs:54`. Correctness. Every version change ends the `Step` before any request is served. A `render`, then `define_mesh` calls in a loop (470 in 5 s against 20 frames a second): the render was not answered during the 5 s and returned 117 ms after the loop stopped. No bound on the wait, and no test.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### Reordering after each hook throws away a value an extension set directly
 
 `src/Carve.Server/Program.cs:57-60`, `src/Carve.Extensibility/ICarveExtension.cs:13-15`. Correctness. `Sources.Remove` rebuilds every provider, so `context.Configuration["K"] = "v"` is dropped when that hook returns: hook 1 read `set`, hook 2 read empty, while `AddInMemoryCollection` survived. Reproduced in a scratch copy of the sequence.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The CheckDrawn floor passes an L-block with all its side faces missing
 
 `scenarios/Carve.Scenario.Cube/CubeScenario.cs:32`. Tests cover the Scope. One floor of 14,000 is set by the long box (28,563), while the L-block draws 88,829 and 94,688. With `MeshBridge`'s L-block cut to its two caps, frames dropped to 49,732 and 59,798 and the scenario passed. A per-frame floor is a tightening.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ## Summary
 

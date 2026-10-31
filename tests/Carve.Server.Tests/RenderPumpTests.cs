@@ -61,7 +61,7 @@ public class RenderPumpTests
     }
 
     /// <summary>Runs something at the very moment the frame thread looks at the queue.</summary>
-    private sealed class QueueWithAHook : RenderQueue
+    private sealed class QueueWithAHook(ModelStore store) : RenderQueue(store)
     {
         public Action? BeforePeek { get; set; }
 
@@ -75,8 +75,10 @@ public class RenderPumpTests
     }
 
     private readonly ModelStore _store = new();
-    private readonly QueueWithAHook _queue = new();
+    private readonly QueueWithAHook _queue;
     private readonly Scene _scene = new();
+
+    public RenderPumpTests() => _queue = new QueueWithAHook(_store);
 
     private RenderPump Started()
     {
@@ -182,6 +184,62 @@ public class RenderPumpTests
         pump.Step();
         pump.Step();
         Assert.Same(mesh, Assert.Single(_scene.Rendered).Mesh);
+    }
+
+    /// <summary>A new mesh every frame, as a define_mesh loop gives: 2 frames at most per request.</summary>
+    [Theory]
+    [InlineData(RenderView.Front)] // The view already applied.
+    [InlineData(RenderView.Back)]  // A change of view takes a frame of its own.
+    public void A_stream_of_meshes_does_not_starve_a_queued_request(RenderView view)
+    {
+        var pump = Started();
+        _store.Replace(Mesh());
+        var posted = _store.Current.Mesh;
+        _queue.Post(view);
+        pump.Step(); // Shows the mesh it was posted at.
+
+        var frames = 0;
+        while (_scene.Rendered.Count == 0)
+        {
+            Assert.True(++frames <= 2, "not served within 2 frames of a stream");
+            _store.Replace(Mesh());
+            pump.Step();
+        }
+
+        Assert.Same(posted, _scene.Rendered[0].Mesh);
+
+        // Then the newer mesh is picked up, for the next request to show.
+        _store.Replace(Mesh());
+        var newest = _store.Current.Mesh;
+        pump.Step();
+        Assert.Same(newest, _scene.Shown);
+    }
+
+    [Fact]
+    public void A_mesh_that_cannot_be_framed_fails_each_request_with_its_own_words_and_the_next_mesh_works()
+    {
+        const string words = "This mesh can't be framed: side 1, about 4e+06 from the origin.";
+        var pump = Started();
+        _scene.OnView = _ => new MeshNotFramedException(words);
+        _store.Replace(Mesh());
+        pump.Step();
+
+        var first = _queue.Post(RenderView.Front);
+        var second = _queue.Post(RenderView.Back);
+        pump.Step();
+        pump.Step();
+
+        Assert.Equal(words, FailureOf(first));
+        Assert.Equal(words, FailureOf(second));
+        Assert.IsType<MeshNotFramedException>(first.Exception!.GetBaseException());
+
+        _scene.OnView = _ => null;
+        _store.Replace(Mesh());
+        pump.Step();
+        _queue.Post(RenderView.Front);
+        pump.Step();
+        pump.Step();
+        Assert.Single(_scene.Rendered);
     }
 
     [Fact]

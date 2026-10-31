@@ -113,6 +113,29 @@ public class LoaderTests
         Assert.Contains("test-extension: Empyrean:Time:FixedDeltaTime=0.125", carve.Stderr); // Over the product's default.
     }
 
+    /// <summary>The one DLL listed twice: two instances, so two hooks in a row.</summary>
+    [Fact]
+    public async Task A_value_set_directly_survives_to_the_next_hook_and_the_person_still_wins()
+    {
+        using var carve = new CarveProcess([
+            $"--Carve:Extensions:0={Paths.TestExtensionDll}",
+            $"--Carve:Extensions:1={Paths.TestExtensionDll}",
+            "--TestExtension:Mode=direct",
+            "--TestExtension:Person=commandline"]);
+
+        Assert.Equal(0, await carve.WaitForExitAsync(Answer));
+
+        var reads = carve.Stderr.Split('\n').Select(l => l.Trim()).Where(l => l.StartsWith("test-extension: hook reads")).ToArray();
+        Assert.Equal(
+            [
+                "test-extension: hook reads Direct=",
+                "test-extension: hook reads Person=commandline",
+                "test-extension: hook reads Direct=set",
+                "test-extension: hook reads Person=commandline",
+            ],
+            reads);
+    }
+
     [Fact]
     public async Task An_extension_can_fail_the_run_through_the_exit_code()
     {

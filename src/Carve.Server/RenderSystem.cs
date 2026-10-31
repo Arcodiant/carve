@@ -117,9 +117,13 @@ internal sealed class RenderSystem(
     public void ApplyView(RenderView view)
     {
         var frame = ViewFraming.Frame(_report!.BoundsMin, _report.BoundsMax, view);
+        if (!frame.Framed)
+        {
+            // Before anything is set, so nothing bad reaches the engine and later renders go on.
+            throw new MeshNotFramedException(ViewFraming.Refusal(_report.BoundsMin, _report.BoundsMax));
+        }
 
-        Matrix4x4.Invert(frame.View, out var world);
-        entities.GetOrAddComponent<WorldTransform>(_camera) = new WorldTransform { Matrix = world };
+        entities.GetOrAddComponent<WorldTransform>(_camera) = new WorldTransform { Matrix = frame.World };
         entities.GetComponent<Camera>(_camera).ProjectionMatrix = frame.Projection;
         entities.GetComponent<Transform3D>(_light).Orientation = frame.LightOrientation;
     }

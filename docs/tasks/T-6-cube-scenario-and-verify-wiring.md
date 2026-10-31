@@ -48,6 +48,8 @@ Look at every frame, kept in `artifacts/`, and show the person the cube `front`,
 
 ### As built
 
+`CheckDrawn` has one floor per frame (RV-2): L-block back 47,000, long box 14,000, flipped cube 26,000, about half each. The L-block front is 50,000, 56% of its 88,829, because half would pass the L-block cut to its caps (49,732); with that patch the scenario fails.
+
 Ran on Sonnet 5.5 (`claude-sonnet-5-5`).
 
 **Files.** `scenarios/Carve.Scenario.Cube` (`CubeScenario`, `CubeExtension`), added to `Carve.slnx`; `scripts/verify.ps1` runs `run-scenario.ps1 cube` after the tests (comment: needs a Vulkan device); `CLAUDE.md` Layout row added and the "first milestone adds" line removed. `run-scenario.ps1` found the project under `scenarios/` as is.

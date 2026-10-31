@@ -25,11 +25,13 @@ public sealed class CubeScenario : IScenario
     /// <summary>Faces must differ in the green channel by at least this much, in the expected order.</summary>
     private const int MinimumStep = 10;
 
-    /// <summary>
-    /// Fewest non-background pixels a 512 x 512 frame of a mesh may show. Measured: L-block 88,829
-    /// and 94,688, long box 28,563, flipped cube 53,660; this is about half the smallest.
-    /// </summary>
-    private const int MinimumDrawn = 14000;
+    // Fewest non-background pixels each 512 x 512 frame may show, about half its measured count:
+    // L-block back 94,688, long box 28,563, flipped cube 53,660. The L-block front's 88,829 gets 56%,
+    // since an L-block that lost its side faces draws 49,732 there, and half would let that through.
+    private const int LBlockFrontDrawn = 50000;
+    private const int LBlockBackDrawn = 47000;
+    private const int LongBoxDrawn = 14000;
+    private const int FlippedCubeDrawn = 26000;
 
     // The vertices and faces of the define_mesh description's worked example.
     private static readonly double[][] CubeVertices =
@@ -67,8 +69,8 @@ public sealed class CubeScenario : IScenario
         var lBack = await driver.CaptureAsync("lblock-back", new { view = "back" });
         CheckCorners(driver, lFront);
         CheckCorners(driver, lBack);
-        CheckDrawn(driver, lFront);
-        CheckDrawn(driver, lBack);
+        CheckDrawn(driver, lFront, LBlockFrontDrawn);
+        CheckDrawn(driver, lBack, LBlockBackDrawn);
         CheckBackground(driver, lFront, NotchFront, "the L-block's notch");
 
         // 4. A long box, off the origin: framing has to find it.
@@ -76,7 +78,7 @@ public sealed class CubeScenario : IScenario
         await DefineAsync(driver, "long box", bVertices, bFaces);
         var box = await driver.CaptureAsync("longbox-front", new { view = "front" });
         CheckCorners(driver, box);
-        CheckDrawn(driver, box);
+        CheckDrawn(driver, box, LongBoxDrawn);
         CheckEdges(driver, box);
 
         // 5. A cube with one face wound backwards: accepted with a warning, kept as a record of the look.
@@ -90,7 +92,7 @@ public sealed class CubeScenario : IScenario
 
         var flippedFront = await driver.CaptureAsync("cube-flipped-front", new { view = "front" });
         CheckCorners(driver, flippedFront);
-        CheckDrawn(driver, flippedFront);
+        CheckDrawn(driver, flippedFront, FlippedCubeDrawn);
 
         // 6. A bad index is a tool error, and the mesh before it still renders.
         var bad = await driver.CallAsync("define_mesh", new { vertices = new[] { new[] { 0, 0, 0 }, new[] { 1, 0, 0 }, new[] { 0, 1, 0 } }, faces = new[] { new[] { 0, 1, 9 } } });
@@ -101,7 +103,7 @@ public sealed class CubeScenario : IScenario
 
         var afterError = await driver.CaptureAsync("after-error-front", new { view = "front" });
         driver.AssertBytesEqual("the mesh before a failed define_mesh", flippedFront.Pixels, afterError.Pixels);
-        CheckDrawn(driver, afterError);
+        CheckDrawn(driver, afterError, FlippedCubeDrawn);
     }
 
     private static async Task<JsonElement> DefineAsync(ScenarioDriver driver, string what, double[][] vertices, int[][] faces)
@@ -155,9 +157,9 @@ public sealed class CubeScenario : IScenario
 
     /// <summary>
     /// A blank frame passes every background check, so a frame must also show the mesh: at least
-    /// <see cref="MinimumDrawn"/> pixels that are not the background.
+    /// <paramref name="minimum"/> pixels that are not the background.
     /// </summary>
-    private static void CheckDrawn(ScenarioDriver driver, ScenarioFrame frame)
+    private static void CheckDrawn(ScenarioDriver driver, ScenarioFrame frame, int minimum)
     {
         var drawn = 0;
         for (var y = 0; y < frame.Height; y++)
@@ -171,9 +173,9 @@ public sealed class CubeScenario : IScenario
             }
         }
 
-        if (drawn < MinimumDrawn)
+        if (drawn < minimum)
         {
-            driver.Fail($"{frame.Name}: only {drawn} pixels are not the background, expected at least {MinimumDrawn}");
+            driver.Fail($"{frame.Name}: only {drawn} pixels are not the background, expected at least {minimum}");
         }
     }
 

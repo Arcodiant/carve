@@ -21,7 +21,9 @@ internal interface IRenderScene
 /// Decides what the frame thread does next: pure sequencing, so that every interleaving of the
 /// tools with the frame thread can be tested without a device. A frame reads the lighting and
 /// transforms published earlier in the same loop iteration, so a change of the scene ends the
-/// <see cref="Step"/> and the requests waiting on it stay queued for a later one.
+/// <see cref="Step"/> and the requests waiting on it stay queued for a later one. A request needs
+/// the mesh current at its post or a newer one, never the newest, so each step opens by serving a
+/// head the shown mesh satisfies: however fast the store moves, the queue moves too.
 /// </summary>
 internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderScene scene)
 {
@@ -32,13 +34,14 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
 
     public void Step()
     {
-        while (true)
+        for (var opening = true; ; opening = false)
         {
             // The peek comes first. A request posted after define_mesh returned is then only seen
             // with the store already showing that mesh or a newer one, including the very first.
             var waiting = queue.TryPeek(out var next);
             var current = store.Current;
-            if (current.Version != _version)
+            var due = opening && waiting && _version >= next!.PostedVersion;
+            if (current.Version != _version && !due)
             {
                 ShowMesh(current);
                 return;
@@ -110,11 +113,12 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         {
             var fault = ViewFault(e);
             queue.TryTake(out _);
-            next.Fail(new InvalidOperationException(fault));
+            next.Fail(e is MeshNotFramedException ? e : new InvalidOperationException(fault));
             scene.Report(e, fault);
         }
     }
 
-    private string ViewFault(Exception e) =>
-        $"The {_view.ToString().ToLowerInvariant()} view could not be set up: {e.GetBaseException().Message}";
+    private string ViewFault(Exception e) => e is MeshNotFramedException
+        ? e.Message
+        : $"The {_view.ToString().ToLowerInvariant()} view could not be set up: {e.GetBaseException().Message}";
 }
