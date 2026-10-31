@@ -158,4 +158,4 @@ process and a protocol between the two.
 
 | # | What is missing | Priority | Interim |
 |---|---|---|---|
-| — | none recorded yet | | |
+| 1 | A named error when Vulkan cannot start: with no driver, `IGameLoop.Initialise` throws `ArgumentNullException` for `ptr` from inside `Vulkan.Instance.Create` | Low | `EngineThread` words the fault itself, naming Vulkan |
