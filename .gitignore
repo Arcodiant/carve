@@ -1,0 +1,4 @@
+# `branches/` holds worktrees of this same repo checked out to other
+# branches — their content belongs to those branches, not to this one.
+branches/
+.cairn/
