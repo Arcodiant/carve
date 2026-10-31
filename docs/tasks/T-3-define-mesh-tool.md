@@ -51,3 +51,5 @@ Ran on Claude Sonnet 5.5 (`claude-sonnet-5-5`). `define_mesh` is built and teste
 **For T-4, `ModelStore`** (singleton, registered in `Program.cs`): `Current` returns a `ModelSnapshot(PolygonMesh? Mesh, long Version)`, read atomically from any thread (mesh and version are one immutable record, never torn). `Mesh` is null and `Version` 0 until the first success; each successful call does `Replace` and raises `Version` by exactly 1, a failed call changes nothing. The frame thread keeps the last `Version` it built and rebuilds when it differs. The mesh is polygons: triangulate with `Triangulator.Triangulate(mesh)`.
 
 Not checked: concurrent reads while writing beyond the by-construction argument (single reference swap); a coordinate beyond float range (becomes Infinity and is refused by Core as not finite, not tested here).
+
+Two T-2 tests asserted an empty or single-tool `tools/list` (`StdioTests`, `LoaderTests.An_extensions_tool_reaches_tools_list`); they now assert `define_mesh` is listed (and `test_ping` beside it). That is the count following the new tool, not a looser check.
