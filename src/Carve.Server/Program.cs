@@ -74,6 +74,10 @@ mcp.WithTools([DefineMeshTool.Create()]);
 
 services.AddSingleton<EngineStatus>();
 services.AddSingleton<ModelStore>();
+services.AddSingleton<RenderQueue>();
+services.AddSingleton<RenderComposition>();
+services.UseRenderPipeline<RenderComposition>();
+services.AddSystem<RenderSystem>();
 services.AddHostedService<EngineThread>();
 
 using var host = builder.Build();

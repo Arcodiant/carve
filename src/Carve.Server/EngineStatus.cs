@@ -7,6 +7,7 @@ namespace Carve.Server;
 public sealed class EngineStatus
 {
     private readonly TaskCompletionSource _settled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private volatile bool _initialised;
     private volatile bool _stopped;
     private volatile string? _faultMessage;
@@ -27,6 +28,9 @@ public sealed class EngineStatus
     /// </summary>
     public Task WhenSettled => _settled.Task;
 
+    /// <summary>Completes when the frame thread has ended, for whatever reason, and never throws.</summary>
+    public Task WhenStopped => _ended.Task;
+
     internal void SetReady()
     {
         _initialised = true;
@@ -43,5 +47,6 @@ public sealed class EngineStatus
     {
         _stopped = true;
         _settled.TrySetResult();
+        _ended.TrySetResult();
     }
 }
