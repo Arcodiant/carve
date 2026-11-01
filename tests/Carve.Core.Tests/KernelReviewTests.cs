@@ -91,6 +91,58 @@ public class KernelReviewTests
     }
 
     [Fact]
+    public void AHoleBridgedByOneEdgeWalkedBothWaysIsAcceptedAndKeepsEveryVertex()
+    {
+        // The wall with a window of RV-3: edges 4 and 9 are (0,0)-(3,3) and (3,3)-(0,0).
+        var v = new Vector3[] { new(0, 0, 0), new(10, 0, 0), new(10, 10, 0), new(0, 10, 0), new(0, 0, 0), new(3, 3, 0), new(3, 7, 0), new(7, 7, 0), new(7, 3, 0), new(3, 3, 0) };
+        var r = Create(v, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]);
+        Assert.True(r.Succeeded, string.Join("; ", r.Errors));
+
+        var triangles = Triangulator.Triangulate(r.Mesh!);
+        Assert.Equal(8, triangles.Count);
+        Assert.Equal(10, triangles.SelectMany(t => new[] { t.A, t.B, t.C }).Distinct().Count());
+        Assert.Equal(84f, triangles.Sum(t => Vector3.Cross(v[t.B] - v[t.A], v[t.C] - v[t.A]).Z / 2)); // The wall less the window.
+    }
+
+    [Fact]
+    public void EdgesCoincidingInTheSameDirectionAreAFoldNotABridge()
+    {
+        // Edges 0 and 4 are both (0,0)-(4,0), walked the same way.
+        var v = new Vector3[] { new(0, 0, 0), new(4, 0, 0), new(4, 4, 0), new(0, 4, 0), new(0, 0, 0), new(4, 0, 0), new(2, -3, 0) };
+        Assert.Contains(Create(v, [[0, 1, 2, 3, 4, 5, 6]]).Errors, e => e.Message.Contains("folds back"));
+    }
+
+    [Fact]
+    public void AMisOrderedQuadNamesTheCrossingThoughItsSignedAreaCancels()
+    {
+        var v = new Vector3[] { new(0, 0, 0), new(1, 0, 0), new(1, 1, 0), new(0, 1, 0) };
+        var e = Assert.Single(Create(v, [[0, 2, 1, 3]]).Errors);
+        Assert.Equal("faces[0]", e.Element);
+        Assert.Contains("crosses", e.Message);
+    }
+
+    [Fact]
+    public void AMisOrderedQuadOnATiltedPlaneNamesTheCrossingToo()
+    {
+        var v = new Vector3[] { new(0, 0, 0), new(1, 0, 1), new(1, 1, 1), new(0, 1, 0) };
+        Assert.Contains("crosses", Assert.Single(Create(v, [[0, 2, 1, 3]]).Errors).Message);
+    }
+
+    [Fact]
+    public void ACollinearFaceOfFourVerticesStillSaysZeroArea()
+    {
+        var v = new Vector3[] { new(0, 0, 0), new(1, 1, 0), new(2, 2, 0), new(3, 3, 0) };
+        Assert.Contains("zero area", Assert.Single(Create(v, [[0, 1, 2, 3]]).Errors).Message);
+    }
+
+    [Fact]
+    public void AFaceOfCoincidentVerticesStillSaysZeroArea()
+    {
+        var v = new Vector3[] { new(1, 1, 1), new(1, 1, 1), new(1, 1, 1), new(1, 1, 1) };
+        Assert.Contains("zero area", Assert.Single(Create(v, [[0, 1, 2, 3]]).Errors).Message);
+    }
+
+    [Fact]
     public void ACrossingOutlineIsNamedEvenWhenItCannotBeClipped()
     {
         var v = new Vector3[] { new(0, 0, 0), new(2, 2, 0), new(2, 0, 0), new(0, 1, 0) };

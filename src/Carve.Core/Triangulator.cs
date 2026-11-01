@@ -35,7 +35,7 @@ public static class Triangulator
     /// <summary>The face's vertices in 2D, in the plane of its Newell normal, counter-clockwise about that normal; null when it has no normal.</summary>
     private static (double X, double Y)[]? Project(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
     {
-        var normal = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, face));
+        var normal = PlaneNormal(verts, face);
         if (normal == (0, 0, 0)) return null;
 
         // Basis (u, v) with u x v = normal, so a face wound CCW about its normal is CCW in 2D.
@@ -48,6 +48,24 @@ public static class Triangulator
             double dx = (double)verts[i].X - o.X, dy = (double)verts[i].Y - o.Y, dz = (double)verts[i].Z - o.Z;
             return (dx * u.X + dy * u.Y + dz * u.Z, dx * v.X + dy * v.Y + dz * v.Z);
         }).ToArray();
+    }
+
+    /// <summary>
+    /// The unit normal of a face: Newell's, or where the signed area cancels (a bow tie has none) the plane its
+    /// corners span, so a crossing can still be found. Zero when the corners are collinear.
+    /// </summary>
+    private static (double X, double Y, double Z) PlaneNormal(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
+    {
+        var size = PolygonMesh.FaceSize(verts, face);
+        var newell = PolygonMesh.NewellVector(verts, face);
+        if (PolygonMesh.HasArea(newell, size)) return PolygonMesh.Unit(newell);
+
+        var o = verts[face[0]];
+        (double X, double Y, double Z) From(int i) => ((double)verts[i].X - o.X, (double)verts[i].Y - o.Y, (double)verts[i].Z - o.Z);
+
+        var far = From(face.MaxBy(i => PolygonMesh.Length(From(i))));
+        var spanned = face.Select(i => Cross3(far, From(i))).MaxBy(PolygonMesh.Length);
+        return PolygonMesh.HasArea(spanned, size) ? PolygonMesh.Unit(spanned) : (0, 0, 0);
     }
 
     private static (double X, double Y, double Z) Cross3((double X, double Y, double Z) a, (double X, double Y, double Z) b)
@@ -109,7 +127,10 @@ public static class Triangulator
     /// The first fault of a face's outline in the plane of its normal, as the position of each edge's first vertex
     /// (edge k runs from face[k] to face[k+1]): two non-adjacent edges that properly cross, else two edges that fold
     /// back on each other (adjacent edges that turn back 180 degrees, or collinear edges that overlap along a length).
-    /// Edges that only touch (a vertex on another edge) are neither; null when the outline has neither fault.
+    /// Edges that only touch (a vertex on another edge) are neither, and nor is a bridge, the way a hole is written
+    /// in one outline: two edges that are the same two points walked in opposite directions. Each end of a bridge is
+    /// a vertex on both sides, so no vertex lies part way along an edge it turned back over, and none is lost.
+    /// Null when the outline has neither fault.
     /// </summary>
     internal static (int First, int Second, bool Fold)? FindCrossing(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
     {
@@ -153,6 +174,7 @@ public static class Triangulator
                 var d = pts[(j + 1) % n];
                 if (Disjoint(a, b, c, d)) continue;
                 if (Side(a, b, c, size) != 0 || Side(a, b, d, size) != 0 || length == 0) continue;
+                if (Distance(a, d) <= CollinearTolerance * size && Distance(b, c) <= CollinearTolerance * size) continue;
                 // Both ends of c-d are on the line a-b: the overlap along it, as a length.
                 var tc = ((c.X - a.X) * (b.X - a.X) + (c.Y - a.Y) * (b.Y - a.Y)) / length;
                 var td = ((d.X - a.X) * (b.X - a.X) + (d.Y - a.Y) * (b.Y - a.Y)) / length;

@@ -102,18 +102,18 @@ public sealed class PolygonMesh
             }
             if (!faceOk || face.Any(i => badVertex[i])) continue;
 
-            if (IsZeroArea(verts, face))
-            {
-                errors.Add(new MeshError($"faces[{f}]", "face has zero area"));
-                continue;
-            }
-
             // Crossing and folding first, so an outline that crosses always names its edges.
             if (Triangulator.FindCrossing(verts, face) is var (first, second, fold))
             {
                 errors.Add(new MeshError($"faces[{f}]", fold
                     ? $"face folds back on itself: the edge from faces[{f}][{first}] overlaps the edge from faces[{f}][{second}]"
                     : $"face is self-intersecting: the edge from faces[{f}][{first}] crosses the edge from faces[{f}][{second}]"));
+                continue;
+            }
+
+            if (IsZeroArea(verts, face))
+            {
+                errors.Add(new MeshError($"faces[{f}]", "face has zero area"));
                 continue;
             }
 
@@ -177,10 +177,10 @@ public sealed class PolygonMesh
         return Length((maxX - minX, maxY - minY, maxZ - minZ));
     }
 
+    /// <summary>Whether a vector twice an area long, as Newell's is, holds more than a zero area for this size.</summary>
+    internal static bool HasArea((double X, double Y, double Z) doubled, double size)
+        => Length(doubled) * 0.5 > ZeroAreaTolerance * size * size;
+
     private static bool IsZeroArea(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
-    {
-        var size = FaceSize(verts, face);
-        var area = Length(NewellVector(verts, face)) * 0.5;
-        return !(area > ZeroAreaTolerance * size * size);
-    }
+        => !HasArea(NewellVector(verts, face), FaceSize(verts, face));
 }
