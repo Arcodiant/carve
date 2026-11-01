@@ -98,6 +98,8 @@ on export. Operations keep their meaning on a logical face or edge loop.
 **Alternatives:** triangles only, a simpler kernel that loses the logical faces.
 **Would change if:** the structure's cost outweighs its use once cut and extrude
 exist, seen in how agents actually use them.
+**Exceptions:**
+- M-1 — stores plain indexed polygons, and triangulates as a derived view for render, validation and export, never stored; the edge-connected structure is decided in M-2.
 
 ### A Carve file, and .glb export
 
@@ -121,11 +123,28 @@ call.
 **Would change if:** a person watching turns out to matter enough to pay for a frame
 loop and input.
 
+### The renderer lives in the server process
+
+One generic host (`Host.CreateEmptyApplicationBuilder`) owns one container holding both the
+engine and MCP, and the engine runs on a dedicated `frame` thread of its own under Carve's own
+`IHostedService`, since `EmpyreanHost` refuses `IHostedService`. A Vulkan failure is held and
+reported by whatever needs the engine; the process and MCP stay up.
+
+A child process, so a device loss could not take the session down, was the rejected
+alternative: holding the failure in process already keeps the session up, without a second
+process and a protocol between the two.
+
 ## Open questions
 
 - **Tool shape.** One tool per operation, or a few general ones? How are elements
   addressed: ids that survive edits, or selections held by the server? How much does
-  one call return?
+  one call return? *M-1 acceptance run (T-7):* with two tools only, `define_mesh` (the whole
+  mesh by coordinates, returning counts, `closed`, bounds and warnings) and `render` (two views
+  and a caption), a fresh agent built a cube and a house with a pitched roof first time, from the
+  descriptions alone and with no error to correct. It used the worked example as the pattern, and
+  trusted `closed: true` to say the winding was right. Still open: what it could not do is look at a
+  face neither view shows (the second roof slope), and with edits that must be a whole-mesh
+  redefinition each time, so addressing elements waits for the first edit tool.
 - **Undo and history.** Does an agent get undo? Is a model's history recorded so the
   person can read how it was made, or replayed to rebuild it?
 - **The Carve file.** Text or binary, geometry or a list of operations? (Text would
@@ -136,10 +155,9 @@ loop and input.
 - **Render modes.** Which come first, and do any need something Empyrean does not
   have? The first look at its docs did not find a normals or UV debug view; a
   material or shader of Carve's own may do it.
-- **Where the renderer lives.** In the server process, or a child process the server
-  starts, so a device loss cannot take the session down?
-- **Transport.** Stdio only, or also HTTP? How is the server installed for a game's
-  Claude session?
+- **Transport.** Stdio for now (decided at T-7; the README's `.mcp.json` entry starts it). HTTP, and
+  how the server is installed for a game's Claude session beyond that entry, stay open until a
+  use needs them.
 - **Empyrean-specific export.** Scale, axes and naming conventions a game expects,
   and whether Carve checks a model against them.
 - **Boolean and heavier operations.** Does "cut" mean a plane cut, a knife path, or
@@ -149,4 +167,5 @@ loop and input.
 
 | # | What is missing | Priority | Interim |
 |---|---|---|---|
-| — | none recorded yet | | |
+| 1 | A named error when Vulkan cannot start: with no driver, `IGameLoop.Initialise` throws `ArgumentNullException` for `ptr` from inside `Vulkan.Instance.Create` | Low | `EngineThread` words the fault itself, naming Vulkan |
+| 2 | An in-memory PNG encode: `IRenderTargetReadback.WritePngAsync` writes only to a path, and `DecodedImage` has no encoder, while `render` must write nothing to disk | Low | `RenderTool` calls `StbImageWriteSharp` directly on `ToDecodedImage`'s bytes |

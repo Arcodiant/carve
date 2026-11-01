@@ -41,7 +41,7 @@ Every plan, for a milestone or a task, keeps these:
   stdout; logs go to stderr or the temp folder.
 
 - **Renders are Empyrean's**, so a screenshot shows the model as the game would.
-- **The mesh is polygons**, triangulated only on export. Work persists in a native
+- **The mesh is polygons**, triangles are a derived view for render and export, never stored. Work persists in a native
   Carve file; `.glb` is what reaches a game.
 - **The product has no window.** Every look is an offscreen render.
 
@@ -52,14 +52,18 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | Path | What |
 |---|---|
 | `src/Carve.Core` | Engine-free modelling kernel |
+| `src/Carve.Extensibility` | The public extension API: `ICarveExtension`, `CarveHostBuilderContext` |
 | `src/Carve.Server` | The shipped product, the `carve` MCP server |
+| `extensions/Carve.Debug` | The debug extension: in-memory transport, `ScenarioDriver`, fixed clock and seed, run folder. Referenced by nothing in `src/` |
+| `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views |
 | `tests/Carve.Core.Tests` | xunit tests of the kernel, incl. the engine-free guard |
-| `scripts/verify.ps1` | Build warnings-as-errors + all tests; cairn's `verify` hook |
+| `tests/Carve.Server.Tests` | xunit tests that start the real `carve`, incl. the no-extension guard |
+| `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
+| `tests/Carve.Scenario.Tiny` | The scenario the debug extension's tests stack on it |
+| `scripts/verify.ps1` | Build warnings-as-errors + all tests + the cube scenario (needs a Vulkan device); cairn's `verify` hook |
+| `scripts/run-scenario.ps1` | Builds, then runs one scenario on the real `carve`; returns its exit code and run folder |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
-
-The first milestone adds the extension API, the debug extension and the scenarios
-(see below) and their rows here.
 
 ## Build, test and verify
 
@@ -125,6 +129,25 @@ file declares and in what the built product actually references.
 The product's own render tool is a product feature, not a debug hook: an agent
 asks for a render through MCP like any other tool. The debug hooks are what makes
 that render repeatable and what drives it unattended.
+
+### Writing a scenario
+
+One project per scenario, `scenarios/Carve.Scenario.<Name>/Carve.Scenario.<Name>.csproj`,
+with `EnableDynamicLoading` set and project references to `Carve.Debug` and
+`Carve.Extensibility` only. It holds a public `ICarveExtension` whose `ConfigureHost` does
+`context.Services.AddSingleton<IScenario, MyScenario>()`, and the `IScenario`, which may take
+`SeededRandom` or `IConfiguration` in its constructor. Exactly one scenario to a run.
+
+`pwsh scripts/run-scenario.ps1 <name>` runs it: the run folder's path is on stdout and the
+exit code is `carve`'s. `<name>` is the last part of the assembly name, lower-cased, and names
+the folder, `artifacts/scenarios/<name>/<run number>/`, unless `Carve:Debug:RunFolder` says
+otherwise. That folder holds `frames/`, a fresh `user-data/`, and `run.json`, the log of every
+call and result, in which an image is its size and hash.
+
+`ScenarioDriver` is all a scenario has: `ListToolsAsync`, `CallAsync(tool, args)`,
+`CaptureAsync(name, args)`, `AssertBytesEqual(what, expected, actual)`, `Fail(message)`. A tool
+error is a result from `CallAsync` and a failure from `CaptureAsync`. Compare a
+`ScenarioFrame`'s `Pixels`, and sample with `Pixel(x, y)`.
 
 ### Headless runs
 

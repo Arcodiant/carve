@@ -7,5 +7,15 @@
     <LangVersion>latest</LangVersion>
     <!-- The one engine pin. Never a literal in a .csproj. Newest published to the feed at setup. -->
     <EmpyreanVersion>0.117.0</EmpyreanVersion>
+    <ModelContextProtocolVersion>2.3.0</ModelContextProtocolVersion>
+    <MicrosoftExtensionsHostingVersion>10.0.13</MicrosoftExtensionsHostingVersion>
+    <!-- What the engine itself depends on: the encoder of engine need 2, and a decoder for the tests. -->
+    <StbImageWriteSharpVersion>1.16.7</StbImageWriteSharpVersion>
+    <StbImageSharpVersion>2.30.15</StbImageSharpVersion>
+    <SystemReflectionMetadataLoadContextVersion>10.0.14</SystemReflectionMetadataLoadContextVersion>
+    <!-- Test packages, pinned at what resolved at M-1. -->
+    <MicrosoftNETTestSdkVersion>17.14.1</MicrosoftNETTestSdkVersion>
+    <XunitV3Version>1.1.0</XunitV3Version>
+    <XunitRunnerVisualStudioVersion>3.1.5</XunitRunnerVisualStudioVersion>
   </PropertyGroup>
 </Project>

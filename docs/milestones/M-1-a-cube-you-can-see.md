@@ -4,7 +4,7 @@ description: >-
 ---
 # M-1 — A cube you can see
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *An agent connects over MCP, defines a mesh by coordinates and gets a shaded render back*
 
@@ -71,3 +71,47 @@ Task order: T-1 and T-2 side by side; then T-3, T-4, T-5, T-6, T-7 in sequence.
 - [ ] [T-7](../tasks/T-7-ordinary-client-acceptance-run.md) — A fresh agent in an ordinary MCP client builds a shape from the tool descriptions alone, and how to install carve is written down
 
 ## Retrospective
+
+**As planned.** The order held: T-1 and T-2 side by side, then T-3 to T-7 in sequence, with no member failed, no hand-off and no merge conflict that needed the person. The measured facts held: the bridge reverses winding, and frames were byte-identical across two processes (T-6, 8 PNGs and `run.json`). A fresh `claude -p` session on plain `carve` built a cube and a house from the tool descriptions alone in round 1 of 3, with no description changed, and the image reached the model. The person approved T-6's 8 frames with no notes. The tiered models held: Sonnet on T-1, T-3, T-6 and T-7, Opus on T-2, T-4 and T-5, with no rework traced to the cheaper tier.
+
+**Not as planned.**
+
+- T-1 landed its own reading of the planarity tolerance although its Notes sent that question to the person. The person accepted it afterwards (1e-4 of the face's bounding-box diagonal, zero area at 1e-9 of it squared), but the rule was not followed.
+- T-5 likewise landed five harness choices as readings of the spec: `run.json` keeps hashes rather than images, a 300 s script timeout with exit 124, scenario names from the assembly name, a reused run folder is cleared, and any stdout fails the script. They are recorded in T-5's notes and were put to the person only at the end of the milestone.
+- The sketch said `back` is "the same from the opposite corner", while T-4's spec negated the whole eye direction. So `back` looks up from below: it shows the underside at ambient only, and its order is -Z > -X > underside rather than a mirror of `front`. The person kept it as built.
+- `define_mesh` is registered by hand with `WithTools` in `Program.cs`, not found by `WithToolsFromAssembly`, because the attribute route cannot put `minItems`/`maxItems` on a vertex. So a shared list exists after all, which T-2's scope had meant to avoid.
+- `AddMcpServer` runs just before the extension hooks, not after them, because the context hands the hooks an `IMcpServerBuilder`. Engine registrations stay after the hooks, so first-wins substitution still holds.
+- `StbImageWriteSharp` is a new direct product dependency, for engine need 2. Engine need 1 was also added, so "no engine need" from planning did not last.
+- Six frames were planned for T-6; it captures eight.
+
+**Never verified.**
+
+- Any GPU or machine but the RTX 5070 Ti, and any client but `claude -p`.
+- A device lost after startup; only a failed start is proved.
+- The T-7 agent hit no tool error, so correcting an error from its text alone was not exercised by an agent. T-6's scenario proves only that the error comes back.
+- Concurrent read while writing `ModelStore`, beyond the single-reference argument.
+- A hung scenario reaching the script's timeout, and a hang inside `carve`, which has no timeout of its own.
+- Render cost on a very large mesh, and CPU use of the unpaced frame thread.
+- The L-block's `back` by pixels; it was only looked at.
+- A relative path in the `.mcp.json` entry.
+
+**Known and left.**
+
+- Two views cannot show every face: the T-7 agent could not see the second roof slope and leaned on `closed: true`. A third view or a chosen direction is the likely next pressure on tool shape.
+- `carve-<pid>.log` files in `$env:TEMP` are never cleared.
+- `user-data` in the run folder is consumed by nothing yet.
+- `branches/task/T-1` to `T-7` remain on disk, unregistered from git, because `finish` could not remove a member's own working directory. T-4, T-5, T-6 and T-7 hold artifacts there.
+- The view is normalised for drawing, so `render` draws any mesh at any size and place, and the stored mesh is unchanged. Far-out meshes show their float quantisation, as stored. No `define_mesh` warning for extreme bounds was added: it would need a threshold the person has not set. Only cubes and boxes were measured at the extremes, and only on the RTX 5070 Ti.
+- Faces have no holes in M-1: an opening is built from several faces, and holed faces go to M-2 with the edge-connected structure.
+
+**The review.** RV-1 raised 27 findings at the end of a green milestone, including a stale render under overlapping calls, scenario checks that passed on a blank frame, and a guard that missed a reference through `Carve.Core`. So the members' tests and the scenario proved much less than `VERIFY PASS` suggested, and none of this was caught before the milestone's own review. RV-2 raised 12 more, several introduced by the first round's fixes. A fixer also rewrote framing in double beyond what the person had agreed, which changed two frames; the person had it undone.
+
+**For the next plan.**
+
+- Give each member's "goes back to the person" as a named list of open rules and a stop, not a general rule: twice an agent judged a rule small and landed it.
+- Tell members to leave their worktree before `finish`, so it can remove it.
+- State a view as coordinates in the milestone's sketch too, so a sketch and a spec cannot disagree.
+- Have the acceptance run include a deliberate mistake, so correction from error text is exercised by an agent.
+- Require every scenario frame to have a positive pixel check, and require each member to show a new check failing on a broken product, not only passing on a good one.
+- Give `render` chosen views. The Blender MCP's `look` takes up to six named views or any direction, plus a distance, which is the gap the T-7 agent hit.
+- Tell a fixer what it may not change, not only what to fix, and to stop if the agreed result (here, byte-identical frames) is not met.

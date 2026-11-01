@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Carve.Server.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
+    <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
+    <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Carve.Server.Tests.CarveProcess" Static="true" />
+  </ItemGroup>
+
+  <!-- Built first and started as real processes, never linked: the tests see what ships. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Server/Carve.Server.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Carve.Server.Tests.Extension/Carve.Server.Tests.Extension.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Carve.Scenario.Tiny/Carve.Scenario.Tiny.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- The pure parts compile the product's file rather than linking the product; the bridge needs the engine's vertex types. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
+    <Compile Include="../../src/Carve.Server/ModelStore.cs" Link="ModelStore.cs" />
+    <Compile Include="../../src/Carve.Server/MeshBridge.cs" Link="MeshBridge.cs" />
+    <Compile Include="../../src/Carve.Server/ViewFraming.cs" Link="ViewFraming.cs" />
+    <Compile Include="../../src/Carve.Server/RenderQueue.cs" Link="RenderQueue.cs" />
+    <Compile Include="../../src/Carve.Server/RenderPump.cs" Link="RenderPump.cs" />
+    <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
+    <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
+  </ItemGroup>
+
+</Project>

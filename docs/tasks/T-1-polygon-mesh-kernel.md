@@ -4,7 +4,7 @@ description: >-
 ---
 # T-1 — Polygon mesh kernel
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -38,3 +38,15 @@ Tests in `tests/Carve.Core.Tests`, a new class per concern: every error and warn
 - No file outside `src/Carve.Core` and `tests/Carve.Core.Tests`.
 - Writes down for T-3 and T-4: the public names of `PolygonMesh`, `MeshReport` and `Triangulator`, in the task's closing report.
 - Moderately design-heavy: `MeshReport`'s fields become the tool's return shape. A rule this leaves open (such as what the planarity tolerance means) goes back to the person rather than landing.
+
+### As built
+
+Ran on Claude Sonnet 5.5. All in `src/Carve.Core`, namespace `Carve.Core`; no file outside Core and its tests.
+
+- `PolygonMesh` (sealed, immutable): `Vertices: IReadOnlyList<Vector3>`, `Faces: IReadOnlyList<IReadOnlyList<int>>`, `static MeshResult Create(IEnumerable<Vector3>, IEnumerable<IEnumerable<int>>)`, `Vector3 FaceNormal(int face)` (Newell, unit, outward for CCW-from-outside). Consts `PlanarityTolerance = 1e-4f`, `ZeroAreaTolerance = 1e-9f`.
+- `MeshResult`: `Mesh` (null on failure), `Errors: IReadOnlyList<MeshError>`, `Succeeded`. `MeshError(Element, Message)`, Element like `vertices[3]`, `faces[2]`, `faces[2][1]`. A face the triangulator cannot clip is reported as an error on `faces[i]`.
+- `MeshReport.Create(PolygonMesh)`: `VertexCount`, `FaceCount`, `EdgeCount` (distinct undirected), `Closed` (every edge in exactly two faces), `BoundsMin`/`BoundsMax` (of vertices faces use), `Warnings: IReadOnlyList<MeshWarning>`. `MeshWarning(Kind, Element, Message)`; `MeshWarningKind`: `OpenEdge`, `NonManifoldEdge`, `InconsistentWinding`, `NonPlanarFace`, `UnusedVertex`. Edge elements are named `edges[lo-hi]`.
+- `Triangulator` (static): `Triangulate(PolygonMesh) -> IReadOnlyList<MeshTriangle>`, `TriangulateFace(PolygonMesh, int)`. `MeshTriangle(int A, int B, int C, int Face)` keeps the face's winding and records its source face. Triangles are never stored on the mesh.
+- Planarity meaning (the spec said "relative to the face's size"): a face of 4+ vertices warns when any vertex is further than `1e-4 x` the face's bounding-box diagonal from the plane through its centroid along the Newell normal. Zero area: area below `1e-9 x` diagonal squared. These constants are a reading of the spec, easy to change if the person wants other values.
+- A collinear vertex in a face is tolerated (dropped during clipping, no degenerate triangle). Only a straight-through one (neighbours on opposite sides) is dropped; an outline that folds back (adjacent edges turning back 180 degrees, or collinear edges overlapping along a length) is an error on `faces[i]` ("folds back"), and a crossing or fold is checked before clipping so the message names the edges. A vertex merely touching another edge is accepted. `cannot be triangulated (degenerate outline)` is what remains. One face with several faults (length, out-of-range indices, repeats) reports all of them in one call.
+- Review fix (RV-4, on Claude Opus 5.5): a hole is written as a bridge, one edge walked out to an inner loop and back, and the loop must wind opposite to the outline. An accepted face covers each point of its area at most once: after clipping, `Triangulator.CoversTwice` refuses a face two of whose triangles overlap in their interiors, with `PolygonMesh.CoversTwiceMessage` on `faces[i]`: `face covers part of its area twice: its outline overlaps itself`. This is exact, not an area threshold: clipping an ear splits the closed outline into the ear and the rest, so the triangles over a point add up to the outline's winding number there, and every ear turns left, so the winding number is at most 1 everywhere exactly when no two triangles overlap. Overlap is judged by a separating edge, with "on the line" the same as in the crossing check, in double, after a sweep in x. A same-wound window and RV-4's small double-covered outline are refused; the opposite-wound window still gives 8 triangles, 10 of 10 vertices, area 84. Tests: those two, random grid outlines whose accepted ones never wind twice at a 64x64 grid or any triangle's centroid (fails with the check off), and 20,000 random tilted star-shaped (simple, mostly concave) outlines of 4 to 39 vertices, all accepted. Not checked: faces of thousands of vertices for speed beyond the existing 4096-gon test; overlaps thinner than the collinear tolerance pass. Tool text (RV-5): the `define_mesh` description now says faces have no holes and an opening is built from several faces; holed faces are left to M-2. The kernel's bridge handling and the double-cover check stay, undocumented to the agent.

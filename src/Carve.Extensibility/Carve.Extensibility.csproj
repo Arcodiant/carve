@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The public extension API. Abstractions and MCP SDK types only: never the engine, never the product. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Extensibility</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="$(ModelContextProtocolVersion)" />
+  </ItemGroup>
+
+</Project>
