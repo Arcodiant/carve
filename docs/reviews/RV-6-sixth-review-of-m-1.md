@@ -31,13 +31,13 @@ description: >-
 
 `src/Carve.Core/PolygonMesh.cs:39`, surfaced through `src/Carve.Server/DefineMeshTool.cs:119-123`. Tool text consistent with itself. The description says "A face has no holes", but a same-wound bridge gets "face covers part of its area twice: a hole joined by a bridge must wind the opposite way to the outline", which tells the agent how to build the holed face the description disclaims.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### "Holed faces go to M-2" is not recorded in M-2
 
 `docs/milestones/M-1-a-cube-you-can-see.md:105`, `docs/tasks/T-3-define-mesh-tool.md:59`, `docs/tasks/T-1-polygon-mesh-kernel.md:52`. Tracker notes true to the record. All three say holed faces are left to M-2, but `docs/milestones/M-2-shape-it.md` and D-1 do not mention them.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ## Summary
 

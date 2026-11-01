@@ -36,7 +36,7 @@ public sealed class PolygonMesh
 
     /// <summary>The error on a face whose outline winds round some point twice, so its triangles would cover it twice.</summary>
     public const string CoversTwiceMessage =
-        "face covers part of its area twice: a hole joined by a bridge must wind the opposite way to the outline";
+        "face covers part of its area twice: its outline overlaps itself";
 
     private readonly Vector3[] _vertices;
     private readonly int[][] _faces;

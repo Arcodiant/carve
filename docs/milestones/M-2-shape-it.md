@@ -17,6 +17,7 @@ Content: the crate sample built only with these tools, a scenario that shows it,
 ## Open at planning
 
 - The edge-connected structure: half-edge or another, and its rules for non-manifold input.
+- Faces with holes, which M-1 leaves out (an opening in M-1 is built from several faces).
 - How elements are addressed: ids that survive edits, or something else (D-1, *Tool shape*).
 - One tool per operation, or fewer general tools?
 - Does an agent get undo here, or later?
