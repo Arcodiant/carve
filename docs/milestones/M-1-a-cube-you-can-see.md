@@ -101,8 +101,7 @@ Task order: T-1 and T-2 side by side; then T-3, T-4, T-5, T-6, T-7 in sequence.
 - `carve-<pid>.log` files in `$env:TEMP` are never cleared.
 - `user-data` in the run folder is consumed by nothing yet.
 - `branches/task/T-1` to `T-7` remain on disk, unregistered from git, because `finish` could not remove a member's own working directory. T-4, T-5, T-6 and T-7 hold artifacts there.
-- From about 1e6 to 3e6 from the origin a mesh still frames but is visibly skewed by rounding, up to about 40 px off centre. `render`'s check reads where corners land, not the shape inside the frame.
-- `render` refuses a mesh it cannot frame. The person chose this over normalising the view and over a range limit, because the agent can already recentre or scale through `define_mesh`. Only cubes were measured at the small end, and only on the RTX 5070 Ti.
+- The view is normalised for drawing, so `render` draws any mesh at any size and place, and the stored mesh is unchanged. Far-out meshes show their float quantisation, as stored. No `define_mesh` warning for extreme bounds was added: it would need a threshold the person has not set. Only cubes and boxes were measured at the extremes, and only on the RTX 5070 Ti.
 
 **The review.** RV-1 raised 27 findings at the end of a green milestone, including a stale render under overlapping calls, scenario checks that passed on a blank frame, and a guard that missed a reference through `Carve.Core`. So the members' tests and the scenario proved much less than `VERIFY PASS` suggested, and none of this was caught before the milestone's own review. RV-2 raised 12 more, several introduced by the first round's fixes. A fixer also rewrote framing in double beyond what the person had agreed, which changed two frames; the person had it undone.
 
