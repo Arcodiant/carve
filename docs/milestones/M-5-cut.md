@@ -19,6 +19,8 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - What "cut" means (D-1): which of plane, loop and knife matter, and whether boolean subtraction is wanted. A true boolean would need its own milestone.
 - How a knife path is specified by coordinates, with no pointer.
 - What happens to selections and element ids across a cut.
+- Faces with holes, moved here from M-2 (decided at M-2's planning): a face as an outer loop plus inner loops, its `define_mesh` syntax, triangulation and how the edit tools treat it. M-2's edge table leaves room for it.
+- What deleting a face or vertex does to ids, which M-2 promises are never reused.
 
 ## Required tasks
 
