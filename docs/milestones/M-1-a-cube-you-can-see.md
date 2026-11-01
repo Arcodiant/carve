@@ -4,7 +4,7 @@ description: >-
 ---
 # M-1 — A cube you can see
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *An agent connects over MCP, defines a mesh by coordinates and gets a shaded render back*
 
