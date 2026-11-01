@@ -216,33 +216,6 @@ public class RenderPumpTests
     }
 
     [Fact]
-    public void A_mesh_that_cannot_be_framed_fails_each_request_with_its_own_words_and_the_next_mesh_works()
-    {
-        const string words = "This mesh can't be framed: side 1, about 4e+06 from the origin.";
-        var pump = Started();
-        _scene.OnView = _ => new MeshNotFramedException(words);
-        _store.Replace(Mesh());
-        pump.Step();
-
-        var first = _queue.Post(RenderView.Front);
-        var second = _queue.Post(RenderView.Back);
-        pump.Step();
-        pump.Step();
-
-        Assert.Equal(words, FailureOf(first));
-        Assert.Equal(words, FailureOf(second));
-        Assert.IsType<MeshNotFramedException>(first.Exception!.GetBaseException());
-
-        _scene.OnView = _ => null;
-        _store.Replace(Mesh());
-        pump.Step();
-        _queue.Post(RenderView.Front);
-        pump.Step();
-        pump.Step();
-        Assert.Single(_scene.Rendered);
-    }
-
-    [Fact]
     public void A_first_mesh_that_fails_is_a_named_failure_too()
     {
         var pump = new RenderPump(_queue, _store, _scene);

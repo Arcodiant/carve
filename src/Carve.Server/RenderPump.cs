@@ -113,12 +113,11 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         {
             var fault = ViewFault(e);
             queue.TryTake(out _);
-            next.Fail(e is MeshNotFramedException ? e : new InvalidOperationException(fault));
+            next.Fail(new InvalidOperationException(fault));
             scene.Report(e, fault);
         }
     }
 
-    private string ViewFault(Exception e) => e is MeshNotFramedException
-        ? e.Message
-        : $"The {_view.ToString().ToLowerInvariant()} view could not be set up: {e.GetBaseException().Message}";
+    private string ViewFault(Exception e) =>
+        $"The {_view.ToString().ToLowerInvariant()} view could not be set up: {e.GetBaseException().Message}";
 }

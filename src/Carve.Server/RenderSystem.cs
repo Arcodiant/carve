@@ -29,6 +29,7 @@ internal sealed class RenderSystem(
     private Entity? _meshEntity;
     private Mesh? _mesh;
     private MeshReport? _report;
+    private Vector3 _drawnHalf;
     private RenderPump? _pump;
 
     public void Initialise()
@@ -51,17 +52,7 @@ internal sealed class RenderSystem(
         _pump.Step();
     }
 
-    public void Report(Exception exception, string message)
-    {
-        if (exception is MeshNotFramedException)
-        {
-            // An expected answer to the agent, not a fault.
-            log.LogInformation("{Message}", message);
-            return;
-        }
-
-        log.LogError(exception, "{Message}", message);
-    }
+    public void Report(Exception exception, string message) => log.LogError(exception, "{Message}", message);
 
     private void BuildScene()
     {
@@ -89,7 +80,8 @@ internal sealed class RenderSystem(
     public void ShowMesh(Carve.Core.PolygonMesh mesh)
     {
         var report = MeshReport.Create(mesh);
-        var next = resources.CreateMesh(MeshBridge.ToMeshData(mesh));
+        var space = DrawnSpace.Of(report.BoundsMin, report.BoundsMax);
+        var next = resources.CreateMesh(MeshBridge.ToMeshData(mesh, space));
 
         if (_meshEntity is { } entity)
         {
@@ -118,6 +110,7 @@ internal sealed class RenderSystem(
         var old = _mesh;
         _mesh = next;
         _report = report;
+        _drawnHalf = space.Apply(report.BoundsMax);
         if (old is not null)
         {
             resources.Destroy(old);
@@ -126,13 +119,7 @@ internal sealed class RenderSystem(
 
     public void ApplyView(RenderView view)
     {
-        var frame = ViewFraming.Frame(_report!.BoundsMin, _report.BoundsMax, view);
-        if (!frame.Framed)
-        {
-            // Before anything is set, so nothing bad reaches the engine and later renders go on.
-            throw new MeshNotFramedException(ViewFraming.Refusal(_report.BoundsMin, _report.BoundsMax));
-        }
-
+        var frame = ViewFraming.Frame(_drawnHalf, view);
         entities.GetOrAddComponent<WorldTransform>(_camera) = new WorldTransform { Matrix = frame.World };
         entities.GetComponent<Camera>(_camera).ProjectionMatrix = frame.Projection;
         entities.GetComponent<Transform3D>(_light).Orientation = frame.LightOrientation;

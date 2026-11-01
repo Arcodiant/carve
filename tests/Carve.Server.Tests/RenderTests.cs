@@ -24,7 +24,9 @@ public class RenderTests
     private const string QuadFacingAway =
         """{"vertices":[[0,0,0],[0,1,0],[1,1,0],[1,0,0]],"faces":[[0,1,2,3]]}""";
 
-    private static readonly string Frames = Path.Combine(Paths.RepoRoot, "artifacts", "render-tests");
+    /// <summary>Made here, so no test depends on another having written first.</summary>
+    private static readonly string Frames =
+        Directory.CreateDirectory(Path.Combine(Paths.RepoRoot, "artifacts", "render-tests")).FullName;
 
     private static Task<JsonElement> RenderAsync(CarveProcess carve, string? view = null) =>
         carve.CallToolAsync("render", view is null ? "{}" : $$"""{"view":"{{view}}"}""");
@@ -48,7 +50,6 @@ public class RenderTests
 
     private static ImageResult Decode(byte[] png, string keepAs)
     {
-        Directory.CreateDirectory(Frames);
         File.WriteAllBytes(Path.Combine(Frames, keepAs + ".png"), png);
 
         var image = ImageResult.FromMemory(png, ColorComponents.RedGreenBlueAlpha);
@@ -66,17 +67,27 @@ public class RenderTests
     /// <summary>Where a world point lands in the image, for the unit cube's framing.</summary>
     private static (int X, int Y) PixelOf(Vector3 world, RenderView view)
     {
-        var frame = ViewFraming.Frame(Vector3.Zero, Vector3.One, view);
-        var clip = Vector4.Transform(new Vector4(world, 1), frame.View * frame.Projection);
+        var space = DrawnSpace.Of(Vector3.Zero, Vector3.One);
+        var frame = ViewFraming.Frame(space.Apply(Vector3.One), view);
+        var clip = Vector4.Transform(new Vector4(space.Apply(world), 1), frame.View * frame.Projection);
         return ((int)((clip.X / clip.W + 1) / 2 * Size), (int)((1 - clip.Y / clip.W) / 2 * Size));
     }
 
-    private static void AssertBackground((int R, int G, int B) pixel)
+    private static bool IsBackground((int R, int G, int B) pixel) =>
+        pixel.R is >= 47 and <= 49 && pixel.G is >= 51 and <= 53 && pixel.B is >= 55 and <= 57; // Linear (0.03, 0.035, 0.04), sRGB encoded.
+
+    private static void AssertBackground((int R, int G, int B) pixel) => Assert.True(IsBackground(pixel), pixel.ToString());
+
+    /// <summary>The bounding box of the pixels that aren't background, and how many there are.</summary>
+    private static (int Left, int Top, int Right, int Bottom, int Count) Foreground(ImageResult image)
     {
-        // Linear (0.03, 0.035, 0.04), sRGB encoded.
-        Assert.InRange(pixel.R, 47, 49);
-        Assert.InRange(pixel.G, 51, 53);
-        Assert.InRange(pixel.B, 55, 57);
+        var drawn = (
+            from y in Enumerable.Range(0, Size)
+            from x in Enumerable.Range(0, Size)
+            where !IsBackground(At(image, (x, y)))
+            select (x, y)).ToArray();
+        Assert.NotEmpty(drawn);
+        return (drawn.Min(p => p.x), drawn.Min(p => p.y), drawn.Max(p => p.x), drawn.Max(p => p.y), drawn.Length);
     }
 
     public static TheoryData<RenderView, string, float[], float[], float[]> Views => new()
@@ -206,102 +217,85 @@ public class RenderTests
         }
     }
 
-    /// <summary>A cube at the origin is 376 wide; the floor used to leave these 10 to 99.</summary>
-    [Theory]
-    [InlineData(1e-8, 0.0, "tiny")]
-    [InlineData(1.0, 1e5, "far-1e5")]
-    [InlineData(1.0, 1e6, "far-1e6")]
-    public async Task A_tiny_or_far_cube_keeps_its_size_in_the_frame(double side, double offset, string name)
+    private static string Scaled(double side, double x, double y, double z)
     {
+        var at = (double c, double offset) => (c * side + offset).ToString("R", System.Globalization.CultureInfo.InvariantCulture);
         double[][] unit = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
-        var vertices = string.Join(",", unit.Select(v =>
-            "[" + string.Join(",", v.Select(c => (c * side + offset).ToString("R", System.Globalization.CultureInfo.InvariantCulture))) + "]"));
-        var mesh = $$"""{"vertices":[{{vertices}}],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
-
-        using var carve = new CarveProcess([]);
-        await carve.InitializeAsync();
-        Assert.False(IsError(await carve.CallToolAsync("define_mesh", mesh)));
-
-        var image = Decode(Png(await RenderAsync(carve)), $"cube-{name}");
-
-        var columns = Enumerable.Range(0, Size)
-            .Where(x => Enumerable.Range(0, Size).Any(y => At(image, (x, y)).G > 60))
-            .ToArray();
-        var width = columns.Length == 0 ? 0 : columns[^1] - columns[0] + 1;
-        File.AppendAllText(Path.Combine(Frames, "samples.txt"), $"{name}: width {width}\n");
-        Assert.InRange(width, 340, 412);
-    }
-
-    private static string Scaled(double side, double offset)
-    {
-        double[][] unit = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
-        var vertices = string.Join(",", unit.Select(v =>
-            "[" + string.Join(",", v.Select(c => (c * side + offset).ToString("R", System.Globalization.CultureInfo.InvariantCulture))) + "]"));
+        var vertices = string.Join(",", unit.Select(v => $"[{at(v[0], x)},{at(v[1], y)},{at(v[2], z)}]"));
         return $$"""{"vertices":[{{vertices}}],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
     }
 
     /// <summary>
-    /// Each case of the findings is pinned, per view, to a framed image or the error, and the engine
-    /// runs on: never a blank, a crop or a NaN. At the origin a framed cube is the unit cube's image,
-    /// byte for byte. Side 5e-20 frames and 3e-20 does not because of the squared-distance guard.
+    /// Every size and place draws the unit cube's picture, in both views: the bridge normalises what
+    /// is drawn, so nothing is too big, too small or too far. Each of these stores as an exact cube,
+    /// two coordinates to an axis, so the measured difference is none: the same box, the same bytes.
     /// </summary>
     [Theory]
-    [InlineData(1e-8, 0.0, true, true)]
-    [InlineData(1e-14, 0.0, true, true)]
-    [InlineData(1.2e-15, 0.0, true, true)]
-    [InlineData(1.1e-15, 0.0, true, true)]
-    [InlineData(1e-15, 0.0, true, true)]
-    [InlineData(1e-16, 0.0, true, true)]
-    [InlineData(5e-20, 0.0, true, true)]
-    [InlineData(3e-20, 0.0, false, false)]
-    [InlineData(2e-20, 0.0, false, false)]
-    [InlineData(1e-20, 0.0, false, false)]
-    [InlineData(1e-30, 0.0, false, false)]
-    [InlineData(1e18, 0.0, true, true)]
-    [InlineData(1e19, 0.0, false, false)]
-    [InlineData(1e20, 0.0, false, false)]
-    [InlineData(1e30, 0.0, false, false)]
-    [InlineData(1.0, 1e5, true, true)]
-    [InlineData(1.0, 1e6, true, true)]
-    [InlineData(1.0, 3e6, true, false)]
-    [InlineData(1.0, 4e6, false, false)]
-    [InlineData(1.0, 7e6, false, false)]
-    [InlineData(1.0, 8e6, false, false)]
-    [InlineData(1.0, 1e7, false, false)]
-    [InlineData(4e-5, 100.0, false, false)]
-    public async Task An_extreme_mesh_is_framed_or_refused_and_the_next_render_works(double side, double offset, bool front, bool back)
+    [InlineData(1.0, 0.0, 0.0, 0.0)]
+    [InlineData(1e-30, 0.0, 0.0, 0.0)]
+    [InlineData(1e-20, 0.0, 0.0, 0.0)]
+    [InlineData(1e-15, 0.0, 0.0, 0.0)]
+    [InlineData(1e19, 0.0, 0.0, 0.0)]
+    [InlineData(1e30, 0.0, 0.0, 0.0)]
+    [InlineData(1.0, 1e6, 1e6, 1e6)]
+    [InlineData(1.0, 2.5e6, 2.5e6, 2.5e6)]
+    [InlineData(1.0, 4e6, 4e6, 4e6)]
+    [InlineData(1.0, 1e7, 1e7, 1e7)]
+    [InlineData(1.0, -3598575.2, -3598575.2, 3598575.2)]
+    [InlineData(1.0, 0.0, -4e6, 0.0)]
+    [InlineData(1.0, 0.0, 5e6, 5e6)]
+    [InlineData(4e-5, 100.0, 100.0, 100.0)]
+    public async Task A_cube_of_any_size_at_any_place_draws_like_the_unit_cube(double side, double x, double y, double z)
     {
         using var carve = new CarveProcess([]);
         await carve.InitializeAsync();
         await carve.CallToolAsync("define_mesh", Cube);
-        var plain = new[] { Png(await RenderAsync(carve, "front")), Png(await RenderAsync(carve, "back")) };
+        var plain = new[] { "front", "back" }.ToDictionary(v => v, v => RenderAsync(carve, v).Result);
 
-        Assert.False(IsError(await carve.CallToolAsync("define_mesh", Scaled(side, offset))));
+        Assert.False(IsError(await carve.CallToolAsync("define_mesh", Scaled(side, x, y, z))));
 
-        foreach (var (view, at, framed) in new[] { ("front", 0, front), ("back", 1, back) })
+        foreach (var view in plain.Keys)
         {
-            var result = await RenderAsync(carve, view);
-            var outcome = "refused";
-            Assert.Equal(framed, !IsError(result));
-            if (IsError(result))
-            {
-                Assert.Matches("^This mesh can't be framed: side [0-9.e+-]+, about [0-9.e+-]+ from the origin\\. Move it nearer the origin or scale it, then call define_mesh again\\.$", TextOf(result));
-            }
-            else
-            {
-                outcome = Checked(result, $"extreme-{side}-{offset}-{view}");
-                if (offset == 0)
-                {
-                    Assert.Equal(plain[at], Png(result));
-                }
-            }
+            var name = $"any-{side}-{x}-{y}-{z}-{view}";
+            var image = Decode(Png(await RenderAsync(carve, view)), name);
+            var unit = Decode(Png(plain[view]), $"any-unit-{view}");
 
-            File.AppendAllText(Path.Combine(Frames, "samples.txt"), $"{side} at {offset}, {view}: {outcome}\n");
+            var edges = Enumerable.Range(0, Size).SelectMany(i => new[] { (i, 0), (i, Size - 1), (0, i), (Size - 1, i) });
+            Assert.All(edges, p => AssertBackground(At(image, p)));
+
+            var (found, wanted) = (Foreground(image), Foreground(unit));
+            File.AppendAllText(Path.Combine(Frames, "samples.txt"), $"{name}: {found}\n");
+
+            Assert.Equal(wanted, found);
+            Assert.Equal(unit.Data, image.Data);
         }
 
         await carve.CallToolAsync("define_mesh", Cube);
-        Assert.Equal(plain[0], Png(await RenderAsync(carve, "front")));
-        Assert.DoesNotContain("fail:", carve.Stderr); // A refusal is an answer, not a fault to log.
+        Assert.Equal(Png(plain["front"]), Png(await RenderAsync(carve, "front")));
+        Assert.DoesNotContain("fail:", carve.Stderr);
+    }
+
+    /// <summary>
+    /// Where floats are too coarse for the mesh, the picture is the mesh as stored. Side 1.3 at 1e7
+    /// on X stores as side 1 there, so this draws the same 1 by 1.3 by 1.3 box as one at the origin.
+    /// </summary>
+    [Theory]
+    [InlineData("front")]
+    [InlineData("back")]
+    public async Task A_mesh_coarsened_by_float_storage_draws_as_stored_and_is_not_refused(string view)
+    {
+        static string Box(float x, float side) =>
+            $$"""{"vertices":[[{{x}},0,0],[{{x + 1}},0,0],[{{x + 1}},{{side}},0],[{{x}},{{side}},0],[{{x}},0,{{side}}],[{{x + 1}},0,{{side}}],[{{x + 1}},{{side}},{{side}}],[{{x}},{{side}},{{side}}]],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
+
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Scaled(1.3, 1e7, 0, 0));
+        var far = await RenderAsync(carve, view);
+
+        await carve.CallToolAsync("define_mesh", Box(0, 1.3f));
+        var stored = await RenderAsync(carve, view);
+
+        Assert.Equal(Decode(Png(stored), $"coarsened-stored-{view}").Data, Decode(Png(far), $"coarsened-far-{view}").Data);
     }
 
     /// <summary>
@@ -326,21 +320,6 @@ public class RenderTests
         }
 
         Assert.False(IsError(await render));
-    }
-
-    private static string Checked(JsonElement result, string name)
-    {
-        var image = Decode(Png(result), name);
-        var edges = Enumerable.Range(0, Size).SelectMany(i => new[] { (i, 0), (i, Size - 1), (0, i), (Size - 1, i) });
-        Assert.All(edges, p => AssertBackground(At(image, p)));
-
-        var columns = Enumerable.Range(0, Size)
-            .Where(x => Enumerable.Range(0, Size).Any(y => At(image, (x, y)).G > 60))
-            .ToArray();
-        Assert.NotEmpty(columns);
-        var width = columns[^1] - columns[0] + 1;
-        Assert.InRange(width, 300, 430);
-        return $"framed, width {width}";
     }
 
     [Fact]

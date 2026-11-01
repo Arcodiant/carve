@@ -16,7 +16,6 @@ internal static class RenderTool
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
         + "'back' looks from the opposite corner, -X -Y -Z, upward from below, showing its underside, -Z side and -X side. "
         + "The camera frames the whole mesh each time, so a render shows shape, not size. "
-        + "A mesh too big, too small or too far from the origin for that to work gives a tool error with its size and offset instead of an image, for that render only, and nothing else stops working. "
         + "The light turns with the view, and faces turned different ways show as different brightnesses. "
         + "Faces wound the wrong way (clockwise seen from outside) show as MISSING: you see through them to whatever is behind. "
         + "An EMPTY result, an image of only the dark background with no error, means no face points at the camera: "
@@ -60,8 +59,7 @@ internal static class RenderTool
 
         if (!rendering.IsCompletedSuccessfully)
         {
-            var failure = rendering.Exception?.GetBaseException();
-            return Error(failure is MeshNotFramedException ? failure.Message : $"The render failed: {failure?.Message}");
+            return Error($"The render failed: {rendering.Exception?.GetBaseException().Message}");
         }
 
         var frame = rendering.Result;
