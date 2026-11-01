@@ -102,6 +102,7 @@ Task order: T-1 and T-2 side by side; then T-3, T-4, T-5, T-6, T-7 in sequence.
 - `user-data` in the run folder is consumed by nothing yet.
 - `branches/task/T-1` to `T-7` remain on disk, unregistered from git, because `finish` could not remove a member's own working directory. T-4, T-5, T-6 and T-7 hold artifacts there.
 - The view is normalised for drawing, so `render` draws any mesh at any size and place, and the stored mesh is unchanged. Far-out meshes show their float quantisation, as stored. No `define_mesh` warning for extreme bounds was added: it would need a threshold the person has not set. Only cubes and boxes were measured at the extremes, and only on the RTX 5070 Ti.
+- Faces have no holes in M-1: an opening is built from several faces, and holed faces go to M-2 with the edge-connected structure.
 
 **The review.** RV-1 raised 27 findings at the end of a green milestone, including a stale render under overlapping calls, scenario checks that passed on a blank frame, and a guard that missed a reference through `Carve.Core`. So the members' tests and the scenario proved much less than `VERIFY PASS` suggested, and none of this was caught before the milestone's own review. RV-2 raised 12 more, several introduced by the first round's fixes. A fixer also rewrote framing in double beyond what the person had agreed, which changed two frames; the person had it undone.
 

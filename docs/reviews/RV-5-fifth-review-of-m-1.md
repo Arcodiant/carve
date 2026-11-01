@@ -31,7 +31,7 @@ description: >-
 
 `src/Carve.Server/DefineMeshTool.cs:28`. Correctness of the tool's contract. "Walk an edge to an inner loop wound the opposite way, then back along the same edge" reads in an indexed mesh as reusing indices, which the same description lists as an error. A 10x10x1 wall with a 4x4 window: front `[0,1,2,3,0,4,7,6,5,4]` and back `[8,11,10,9,8,12,13,14,15,12]` are refused with `faces[0][4]: index 0 repeats faces[0][0]` and three more. The only accepted form duplicates the bridge-end vertices, and then the solid reports `closed=false` with 12 open-edge warnings, so a correct solid with a holed face can never come out closed.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ## Summary
 

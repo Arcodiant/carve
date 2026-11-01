@@ -55,3 +55,5 @@ Review fix (RV-1): the earlier typed `double[][]`/`int[][]` parameters failed in
 Not checked: concurrent reads while writing beyond the by-construction argument (single reference swap); a coordinate beyond float range (becomes Infinity and is refused by Core as not finite, not tested here).
 
 Two T-2 tests asserted an empty or single-tool `tools/list` (`StdioTests`, `LoaderTests.An_extensions_tool_reaches_tools_list`); they now assert `define_mesh` is listed (and `test_ping` beside it). That is the count following the new tool, not a looser check.
+
+Review fix (RV-5): the description no longer describes holes for agents; it says faces have no holes and an opening is built from several faces, and holed faces are left to M-2. The kernel's bridge handling stays.

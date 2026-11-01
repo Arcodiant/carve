@@ -97,7 +97,7 @@ public class DefineMeshTests
         var tool = await ToolAsync(carve);
 
         var description = tool.GetProperty("description").GetString()!;
-        foreach (var phrase in new[] { "unitless", "Y is up", "counter-clockwise", "any number of sides", "REPLACES" })
+        foreach (var phrase in new[] { "unitless", "Y is up", "counter-clockwise", "any number of sides", "REPLACES", "A face has no holes; build an opening from several faces around it." })
         {
             Assert.Contains(phrase, description);
         }
