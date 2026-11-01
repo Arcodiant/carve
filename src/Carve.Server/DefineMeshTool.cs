@@ -25,6 +25,7 @@ public sealed class DefineMeshTool(ModelStore store)
         + "Coordinates are unitless and Y is up. "
         + "Each face lists vertex indices (0-based) wound counter-clockwise when seen from outside the solid, "
         + "so the face normal points outward. A face may have any number of sides, three or more; it does not need to be a triangle. "
+        + "A face with a hole is one outline: walk an edge to an inner loop wound the opposite way, then back along the same edge. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[]}; the geometry is not echoed back. "
         + "closed is true when every edge is shared by exactly two faces. Warnings (open edges, edges shared by more than two faces, "
         + "inconsistent winding, non-planar faces, unused vertices) mean the mesh was accepted but is probably not what you meant. "

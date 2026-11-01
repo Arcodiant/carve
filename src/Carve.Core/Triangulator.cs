@@ -130,7 +130,8 @@ public static class Triangulator
     /// Edges that only touch (a vertex on another edge) are neither, and nor is a bridge, the way a hole is written
     /// in one outline: two edges that are the same two points walked in opposite directions. Each end of a bridge is
     /// a vertex on both sides, so no vertex lies part way along an edge it turned back over, and none is lost.
-    /// Null when the outline has neither fault.
+    /// Which way the loop past a bridge winds is not judged here: <see cref="CoversTwice"/> refuses the face whose
+    /// hole winds the same way as its outline, after clipping. Null when the outline has neither fault.
     /// </summary>
     internal static (int First, int Second, bool Fold)? FindCrossing(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face)
     {
@@ -183,6 +184,53 @@ public static class Triangulator
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Whether a face's triangles cover some of its area twice. Clipping an ear a-b-c off an outline splits it, as a
+    /// closed path, into the ear and the rest, so at every point the triangles covering it add up to the outline's
+    /// winding number there; and every ear turns left, so each counts +1. The winding number is at most 1
+    /// everywhere, the face a region covered once (a hole joined by a bridge wound opposite to the outline goes to
+    /// 0), exactly when no two triangles overlap in their interiors. Two triangles share no interior when an edge
+    /// of one has all three corners of the other on or right of its line ("on" as in <see cref="FindCrossing"/>),
+    /// so triangles that meet along an edge or at a point are apart.
+    /// </summary>
+    internal static bool CoversTwice(IReadOnlyList<Vector3> verts, IReadOnlyList<int> face, IReadOnlyList<(int A, int B, int C)> triangles)
+    {
+        if (triangles.Count < 2) return false;
+        var pts = Project(verts, face);
+        if (pts is null) return false;
+        var size = PolygonMesh.FaceSize(verts, face);
+        var at = new Dictionary<int, (double X, double Y)>();
+        for (var k = 0; k < face.Count; k++) at[face[k]] = pts[k];
+
+        var tris = triangles
+            .Select(t => (A: at[t.A], B: at[t.B], C: at[t.C]))
+            .Select(t => (t.A, t.B, t.C, MinX: Math.Min(t.A.X, Math.Min(t.B.X, t.C.X)), MaxX: Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))))
+            .OrderBy(t => t.MinX)
+            .ToArray();
+
+        // Sweep along x: only triangles whose x ranges meet can overlap.
+        for (var i = 0; i < tris.Length; i++)
+        {
+            for (var j = i + 1; j < tris.Length && tris[j].MinX <= tris[i].MaxX; j++)
+            {
+                var s = tris[i];
+                var t = tris[j];
+                if (!Apart(s.A, s.B, s.C, t.A, t.B, t.C, size) && !Apart(t.A, t.B, t.C, s.A, s.B, s.C, size)) return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Some edge of the left-turning triangle a-b-c has p, q and r all on or right of its line.</summary>
+    private static bool Apart(
+        (double X, double Y) a, (double X, double Y) b, (double X, double Y) c,
+        (double X, double Y) p, (double X, double Y) q, (double X, double Y) r, double size)
+    {
+        bool Separates((double X, double Y) e0, (double X, double Y) e1)
+            => Side(e0, e1, p, size) <= 0 && Side(e0, e1, q, size) <= 0 && Side(e0, e1, r, size) <= 0;
+        return Separates(a, b) || Separates(b, c) || Separates(c, a);
     }
 
     private static bool Disjoint((double X, double Y) a, (double X, double Y) b, (double X, double Y) c, (double X, double Y) d)

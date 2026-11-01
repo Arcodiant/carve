@@ -105,6 +105,94 @@ public class KernelReviewTests
     }
 
     [Fact]
+    public void AHoleWoundTheSameWayAsItsOutlineIsRefusedAsCoveringTwice()
+    {
+        // RV-4: the RV-3 wall with its window wound counter-clockwise, like the wall: the window would be covered twice.
+        var v = new Vector3[] { new(0, 0, 0), new(10, 0, 0), new(10, 10, 0), new(0, 10, 0), new(0, 0, 0), new(3, 3, 0), new(7, 3, 0), new(7, 7, 0), new(3, 7, 0), new(3, 3, 0) };
+        var e = Assert.Single(Create(v, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]).Errors);
+        Assert.Equal("faces[0]", e.Element);
+        Assert.Equal(PolygonMesh.CoversTwiceMessage, e.Message);
+    }
+
+    [Fact]
+    public void ASmallOutlineThatCoversPartOfItselfTwiceIsRefused()
+    {
+        // RV-4: two left-turning loops joined by the bridge (1,0)-(2,1); the small one lies inside the large one.
+        var v = new Vector3[] { new(1, 0, 0), new(3, 1, 0), new(0, 3, 0), new(1, 0, 0), new(2, 1, 0), new(0, 3, 0), new(1, 1, 0), new(2, 1, 0) };
+        var e = Assert.Single(Create(v, [[0, 1, 2, 3, 4, 5, 6, 7]]).Errors);
+        Assert.Equal("faces[0]", e.Element);
+        Assert.Equal(PolygonMesh.CoversTwiceMessage, e.Message);
+    }
+
+    [Fact]
+    public void NoAcceptedRandomOutlineWindsRoundAnyPointTwice()
+    {
+        // RV-4's form: random outlines on a small grid, so coincident points and bridges are common; wherever an
+        // accepted one is sampled (a fine grid and the centroid of each triangle it is drawn with), it winds at most once.
+        var rng = new Random(4242);
+        var accepted = 0;
+        var grid = new List<(double X, double Y)>();
+        for (var i = 0; i < 64; i++)
+            for (var j = 0; j < 64; j++)
+                grid.Add((0.0071 + i * 4.0 / 64, 0.0133 + j * 4.0 / 64));
+        for (var round = 0; round < 60000; round++)
+        {
+            var n = rng.Next(5, 10);
+            var v = Enumerable.Range(0, n).Select(_ => new Vector3(rng.Next(0, 5), rng.Next(0, 5), 0)).ToArray();
+            var face = Enumerable.Range(0, n).OrderBy(_ => rng.Next()).ToArray();
+            var r = Create(v, [face]);
+            if (!r.Succeeded) continue;
+            accepted++;
+            var points = grid.Concat(Triangulator.Triangulate(r.Mesh!).Select(t =>
+                (X: (double)(v[t.A].X + v[t.B].X + v[t.C].X) / 3, Y: (double)(v[t.A].Y + v[t.B].Y + v[t.C].Y) / 3)));
+            foreach (var p in points)
+            {
+                var w = Math.Abs(Winding(v, face, p));
+                Assert.True(w <= 1, $"winding {w} at ({p.X},{p.Y}) in [{string.Join(",", face)}] over {string.Join(" ", v.Select(q => $"({q.X},{q.Y})"))}");
+            }
+        }
+        Assert.True(accepted > 500, $"only {accepted} outlines were accepted");
+    }
+
+    [Fact]
+    public void RandomSimpleConcaveOutlinesAreAllAccepted()
+    {
+        // Outlines star-shaped about the origin (rising angles no more than 1.9/n of a turn apart, random radii) are
+        // simple and mostly concave; tilted off the axes, so the projection rounds.
+        var rng = new Random(777);
+        var refused = new List<string>();
+        for (var round = 0; round < 20000; round++)
+        {
+            var n = rng.Next(4, 40);
+            var angles = Enumerable.Range(0, n).Select(k => 2 * Math.PI * (k + 0.9 * rng.NextDouble()) / n).ToArray();
+            var tilt = Quaternion.CreateFromYawPitchRoll((float)rng.NextDouble() * 6, (float)rng.NextDouble() * 6, (float)rng.NextDouble() * 6);
+            var v = angles.Select(a =>
+            {
+                var radius = 0.2 + rng.NextDouble();
+                return Vector3.Transform(new Vector3((float)(radius * Math.Cos(a)), (float)(radius * Math.Sin(a)), 0), tilt) + new Vector3(5, -3, 2);
+            }).ToArray();
+            var r = Create(v, [Enumerable.Range(0, n).ToArray()]);
+            if (!r.Succeeded) refused.Add(string.Join("; ", r.Errors));
+        }
+        Assert.Empty(refused);
+    }
+
+    /// <summary>The winding number of a face's outline about p, in the xy-plane.</summary>
+    private static int Winding(Vector3[] v, int[] face, (double X, double Y) p)
+    {
+        var w = 0;
+        for (var k = 0; k < face.Length; k++)
+        {
+            var a = v[face[k]];
+            var b = v[face[(k + 1) % face.Length]];
+            var cross = (b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X);
+            if (a.Y <= p.Y && b.Y > p.Y && cross > 0) w++;
+            else if (a.Y > p.Y && b.Y <= p.Y && cross < 0) w--;
+        }
+        return w;
+    }
+
+    [Fact]
     public void EdgesCoincidingInTheSameDirectionAreAFoldNotABridge()
     {
         // Edges 0 and 4 are both (0,0)-(4,0), walked the same way.

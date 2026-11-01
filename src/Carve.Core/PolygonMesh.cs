@@ -34,6 +34,10 @@ public sealed class PolygonMesh
     /// <summary>A face is zero-area when its area is below this fraction of its bounding-box diagonal squared.</summary>
     public const float ZeroAreaTolerance = 1e-9f;
 
+    /// <summary>The error on a face whose outline winds round some point twice, so its triangles would cover it twice.</summary>
+    public const string CoversTwiceMessage =
+        "face covers part of its area twice: a hole joined by a bridge must wind the opposite way to the outline";
+
     private readonly Vector3[] _vertices;
     private readonly int[][] _faces;
 
@@ -117,8 +121,10 @@ public sealed class PolygonMesh
                 continue;
             }
 
-            if (!Triangulator.TryTriangulate(verts, face, out _))
+            if (!Triangulator.TryTriangulate(verts, face, out var triangles))
                 errors.Add(new MeshError($"faces[{f}]", "face cannot be triangulated (degenerate outline)"));
+            else if (Triangulator.CoversTwice(verts, face, triangles))
+                errors.Add(new MeshError($"faces[{f}]", CoversTwiceMessage));
         }
 
         return errors.Count > 0
