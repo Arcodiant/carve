@@ -2,3 +2,5 @@
 peers:
   cairn:
     remote: https://github.com/Arcodiant/cairn.git
+  waystone:
+    remote: https://github.com/Arcodiant/waystone.git
