@@ -7,6 +7,7 @@ namespace Carve.Server.Tests;
 /// The frame thread's sequencing, with the tools' calls landing at exact points inside a step.
 /// <see cref="RenderTests"/> has the same on the real <c>carve</c>, where only timing places them.
 /// </summary>
+[Trait("Tier", "unit")]
 public class RenderPumpTests
 {
     private static PolygonMesh Mesh() => TestMeshes.Make(TestMeshes.CubeVertices, TestMeshes.CubeFaces);

@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 namespace Carve.Server.Tests;
 
 /// <summary>The real <c>carve</c> with the debug extension and the tiny scenario stacked on it.</summary>
+[Trait("Tier", "regression")]
 public sealed partial class DebugExtensionTests : IDisposable
 {
     private static readonly TimeSpan Run = TimeSpan.FromSeconds(60);

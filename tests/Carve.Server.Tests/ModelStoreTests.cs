@@ -4,6 +4,7 @@ using Carve.Core.Tests;
 
 namespace Carve.Server.Tests;
 
+[Trait("Tier", "unit")]
 public class ModelStoreTests
 {
     private static PolygonMesh Triangle() =>

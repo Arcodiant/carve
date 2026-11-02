@@ -2,6 +2,7 @@ using System.Text.Json;
 
 namespace Carve.Server.Tests;
 
+[Trait("Tier", "regression")]
 public class DefineMeshTests
 {
     private const string Marker = "Worked example (a unit cube): ";

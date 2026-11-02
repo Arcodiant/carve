@@ -3,6 +3,7 @@ using Xunit;
 
 namespace Carve.Core.Tests;
 
+[Trait("Tier", "unit")]
 public class MeshReportTests
 {
     private static MeshReport Report(Vector3[] v, int[][] f) => MeshReport.Create(TestMeshes.Make(v, f));

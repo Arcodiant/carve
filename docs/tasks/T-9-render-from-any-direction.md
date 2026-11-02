@@ -14,6 +14,10 @@ description: >-
 
 **Depends on:** — (none)
 
+**Verify:** server-regression, scenario-cube
+
+**Perf:** skip: Carve declares no heavy suites
+
 ## Goal
 
 An agent can look at the mesh from any side and close up on a detail, and the existing `front` and `back` frames come out byte for byte the same as before.

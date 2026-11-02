@@ -4,6 +4,7 @@ using Carve.Core.Tests;
 
 namespace Carve.Server.Tests;
 
+[Trait("Tier", "unit")]
 public class MeshBridgeTests
 {
     private static readonly PolygonMesh Cube = TestMeshes.Cube();

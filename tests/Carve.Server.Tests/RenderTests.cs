@@ -5,6 +5,7 @@ using StbImageSharp;
 namespace Carve.Server.Tests;
 
 /// <summary>The real <c>carve</c> over stdio; these need a Vulkan device, as verify does (M-1).</summary>
+[Trait("Tier", "regression")]
 public class RenderTests
 {
     private const int Size = 512;

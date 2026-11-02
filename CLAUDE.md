@@ -60,7 +60,8 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `tests/Carve.Server.Tests` | xunit tests that start the real `carve`, incl. the no-extension guard |
 | `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
 | `tests/Carve.Scenario.Tiny` | The scenario the debug extension's tests stack on it |
-| `scripts/verify.ps1` | Build warnings-as-errors + all tests + the cube scenario (needs a Vulkan device); cairn's `verify` hook |
+| `tests.json` | The suites and their tiers, which `cairn <kind> <id> verify` and `cairn test run` work from |
+| `scripts/verify.ps1` | The old whole run: build warnings-as-errors + all tests + the cube scenario (needs a Vulkan device). The gate no longer runs it |
 | `scripts/run-scenario.ps1` | Builds, then runs one scenario on the real `carve`; returns its exit code and run folder |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
@@ -77,10 +78,14 @@ cairn <kind> <id> verify
 A change is verified when `cairn <kind> <id> verify` passes and, for anything
 that can be seen, the frames from that run have been looked at. Do not run the
 scenario again to get them. A queued run's frames come from `cairn test
-artifacts <suite>` (`legacy` until there is a `tests.json`); a run on this
-machine leaves them in `artifacts/scenarios/<name>/`. Run a scenario by hand only
-where no suite covers what changed, and then add a suite. Say which of the two
-you did, and what you did not check.
+artifacts <suite>` (`scenario-cube` for the cube); a run on this machine leaves
+them in `artifacts/scenarios/<name>/`. Run a scenario by hand only where no suite
+covers what changed, and then add a suite. Say which of the two you did, and what
+you did not check.
+
+Every test class carries a `Tier` trait, `unit` or `regression`, by what it does:
+one that starts `carve` or needs a device is `regression`. A new scenario gets a
+`regression` suite in `tests.json`.
 
 ## Test scenarios
 
