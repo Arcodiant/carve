@@ -4,7 +4,7 @@ description: >-
 ---
 # T-14 — Tier the tests and declare suites
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
