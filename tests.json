@@ -30,7 +30,7 @@
         "tests/Carve.Core.Tests/TestMeshes.cs"
       ],
       "resources": "cpu",
-      "est-seconds": 30
+      "est-seconds": 12
     },
     {
       "id": "server-regression",
@@ -47,7 +47,7 @@
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 130
+      "est-seconds": 260
     },
     {
       "id": "scenario-cube",
@@ -67,7 +67,7 @@
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 20
+      "est-seconds": 15
     }
   ],
   "todo": []
