@@ -53,13 +53,13 @@ A method-level `Tier` does not fix it. xunit merges class and method traits, so 
 
 `tests.json:12,25,39` select by `--filter Tier=...`, so a class with no trait is in no suite. The old hook ran it. Nothing catches this: `cairn lint` warns only of a project no suite runs, and only `cairn test discover` reports untraited tests. All 238 are tagged today, so nothing has been dropped yet, but M-2 adds classes straight away: T-8 a new `MeshTopologyTests` (`docs/tasks/T-8-edge-table-and-stable-ids.md`), T-10 one per operation, T-11 the tool tests. None of those Scopes mention the trait, and only `CLAUDE.md:86` carries the rule. A member who forgets it gets a green verify with its new tests never run, and the reviewer's count does not show it. Either make the unit filters catch the untagged (for example `Tier!=regression`), or add the trait to those Scopes and make the check part of the review. Rubric point 1.
 
-**Outcome:** fixed: the unit suites filter on `Tier!=regression`, so an untagged class runs as `unit`; CLAUDE.md says so.
+**Outcome:** fixed
 
 ### 5. T-12's plan does not add the crate project to `Carve.slnx`
 
 `docs/tasks/T-12-crate-scenario.md:51` says `scenario-crate` follows `scenario-cube`, which is `build: solution` and `run-scenario.ps1 ... -NoBuild`. So only projects in `Carve.slnx` get built. The old `verify.ps1` line this replaced went through the script's own build, which needed no solution entry. Neither T-12's Scope nor `CLAUDE.md`'s *Writing a scenario* (line 142) says to add the project, so the suite fails on a missing DLL until someone does. The failure is loud, so this is only a gap in the plan: add it to T-12's Scope or to *Writing a scenario*. Rubric point 1.
 
-**Outcome:** fixed: T-12's Scope and CLAUDE.md's tier rule both say a new scenario joins `Carve.slnx`.
+**Outcome:** fixed
 
 ## Summary
 
