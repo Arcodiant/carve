@@ -9,7 +9,7 @@
       "id": "core-unit",
       "tier": "unit",
       "build": "solution",
-      "run": "dotnet test tests/Carve.Core.Tests/Carve.Core.Tests.csproj -c Debug --no-build --filter Tier=unit",
+      "run": "dotnet test tests/Carve.Core.Tests/Carve.Core.Tests.csproj -c Debug --no-build --filter Tier!=regression",
       "inputs": [
         {
           "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
@@ -22,12 +22,13 @@
       "id": "server-unit",
       "tier": "unit",
       "build": "solution",
-      "run": "dotnet test tests/Carve.Server.Tests/Carve.Server.Tests.csproj -c Debug --no-build --filter Tier=unit",
+      "run": "dotnet test tests/Carve.Server.Tests/Carve.Server.Tests.csproj -c Debug --no-build --filter Tier!=regression",
       "inputs": [
         {
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
-        "tests/Carve.Core.Tests/TestMeshes.cs"
+        "tests/Carve.Core.Tests/TestMeshes.cs",
+        "scenarios/**/*.csproj"
       ],
       "resources": "cpu",
       "est-seconds": 12
@@ -41,7 +42,8 @@
         {
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
-        "tests/Carve.Core.Tests/TestMeshes.cs"
+        "tests/Carve.Core.Tests/TestMeshes.cs",
+        "scripts/run-scenario.ps1"
       ],
       "resources": "gpu",
       "requires": [

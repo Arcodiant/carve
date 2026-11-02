@@ -84,8 +84,9 @@ covers what changed, and then add a suite. Say which of the two you did, and wha
 you did not check.
 
 Every test class carries a `Tier` trait, `unit` or `regression`, by what it does:
-one that starts `carve` or needs a device is `regression`. A new scenario gets a
-`regression` suite in `tests.json`.
+one that starts `carve` or needs a device is `regression`, and `unit` means about
+1 s or less per test. A class with no trait runs as `unit`. A new scenario joins
+`Carve.slnx` and gets a `regression` suite in `tests.json`.
 
 ## Test scenarios
 

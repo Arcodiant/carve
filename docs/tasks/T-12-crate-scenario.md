@@ -48,7 +48,7 @@ Say why each pixel was chosen.
 
 Pick the sample pixels from the first good run, record them as constants with a comment, as `CubeScenario` does, and **show each check failing** on a broken product, such as the bar extrude skipped or the zoom ignored.
 
-**`tests.json`** gains a `scenario-crate` suite, `regression` tier, on the model of `scenario-cube`. Add the `Crate` row to `CLAUDE.md`'s *Layout* table.
+**`Carve.slnx`** lists the new project, and **`tests.json`** gains a `scenario-crate` suite, `regression` tier, on the model of `scenario-cube`. Add the `Crate` row to `CLAUDE.md`'s *Layout* table.
 
 **Second run**: run the scenario twice and compare the two runs' frames byte for byte. Record it in the closing report.
 
