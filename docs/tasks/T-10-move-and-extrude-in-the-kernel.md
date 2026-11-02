@@ -14,6 +14,10 @@ description: >-
 
 **Depends on:** T-8
 
+**Verify:** core-unit
+
+**Perf:** skip: Carve declares no heavy suites
+
 ## Goal
 
 `Carve.Core` has the two edit operations the crate is built with. Each either returns a valid mesh and what it created, or refuses with every problem named, and the mesh it was given is left as it was.

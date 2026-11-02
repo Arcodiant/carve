@@ -3,6 +3,7 @@ using Xunit;
 
 namespace Carve.Core.Tests;
 
+[Trait("Tier", "unit")]
 public class TriangulatorTests
 {
     private static float Area(PolygonMesh mesh, MeshTriangle t)

@@ -2,6 +2,7 @@ using Xunit;
 
 namespace Carve.Core.Tests;
 
+[Trait("Tier", "unit")]
 public class CoreIsEngineFreeTests
 {
     [Fact]

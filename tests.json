@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "always-inputs": [],
+  "builds": {
+    "solution": "dotnet build Carve.slnx -c Debug --nologo"
+  },
+  "suites": [
+    {
+      "id": "core-unit",
+      "tier": "unit",
+      "build": "solution",
+      "run": "dotnet test tests/Carve.Core.Tests/Carve.Core.Tests.csproj -c Debug --no-build --filter Tier!=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
+        }
+      ],
+      "resources": "cpu",
+      "est-seconds": 30
+    },
+    {
+      "id": "server-unit",
+      "tier": "unit",
+      "build": "solution",
+      "run": "dotnet test tests/Carve.Server.Tests/Carve.Server.Tests.csproj -c Debug --no-build --filter Tier!=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
+        },
+        "tests/Carve.Core.Tests/TestMeshes.cs",
+        "scenarios/**/*.csproj"
+      ],
+      "resources": "cpu",
+      "est-seconds": 12
+    },
+    {
+      "id": "server-regression",
+      "tier": "regression",
+      "build": "solution",
+      "run": "dotnet test tests/Carve.Server.Tests/Carve.Server.Tests.csproj -c Debug --no-build --filter Tier=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
+        },
+        "tests/Carve.Core.Tests/TestMeshes.cs",
+        "scripts/run-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 260
+    },
+    {
+      "id": "scenario-cube",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 cube -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Cube/Carve.Scenario.Cube.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "scripts/run-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 15
+    }
+  ],
+  "todo": []
+}

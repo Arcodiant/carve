@@ -2,6 +2,7 @@ using System.Text.Json;
 
 namespace Carve.Server.Tests;
 
+[Trait("Tier", "regression")]
 public class StdioTests
 {
     [Fact]

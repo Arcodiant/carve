@@ -14,6 +14,10 @@ description: >-
 
 **Depends on:** T-10
 
+**Verify:** server-regression, scenario-cube
+
+**Perf:** skip: Carve declares no heavy suites
+
 ## Goal
 
 An agent edits the current mesh through four new MCP tools, `move`, `extrude`, `get_mesh` and `undo`, and learns each from its description and worked example alone.

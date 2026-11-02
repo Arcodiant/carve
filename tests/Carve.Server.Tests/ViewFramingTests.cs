@@ -2,6 +2,7 @@ using System.Numerics;
 
 namespace Carve.Server.Tests;
 
+[Trait("Tier", "unit")]
 public class ViewFramingTests
 {
     /// <summary>The frame's extent in normalised device coordinates once 8% is left on each side.</summary>

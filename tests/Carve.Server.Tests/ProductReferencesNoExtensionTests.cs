@@ -5,6 +5,7 @@ using System.Reflection.PortableExecutable;
 
 namespace Carve.Server.Tests;
 
+[Trait("Tier", "unit")]
 public class ProductReferencesNoExtensionTests
 {
     [Fact]

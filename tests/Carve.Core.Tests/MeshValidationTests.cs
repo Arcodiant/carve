@@ -3,6 +3,7 @@ using Xunit;
 
 namespace Carve.Core.Tests;
 
+[Trait("Tier", "unit")]
 public class MeshValidationTests
 {
     private static readonly Vector3[] Tri = [new(0, 0, 0), new(1, 0, 0), new(0, 1, 0)];

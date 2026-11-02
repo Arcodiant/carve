@@ -1,5 +1,6 @@
 namespace Carve.Server.Tests;
 
+[Trait("Tier", "regression")]
 public class LoaderTests
 {
     private static string[] Extension(params string[] more) =>

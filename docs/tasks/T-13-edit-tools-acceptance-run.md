@@ -14,6 +14,10 @@ description: >-
 
 **Depends on:** T-12
 
+**Verify:** full
+
+**Perf:** skip: Carve declares no heavy suites
+
 ## Goal
 
 An agent that has never seen Carve, in an ordinary MCP client with plain `carve`, builds a crate with the edit tools and corrects a mistake from the error text alone. That proves the milestone from a plain launch.
@@ -41,7 +45,7 @@ An agent that has never seen Carve, in an ordinary MCP client with plain `carve`
 ## Notes
 
 - A real run fills context: this task is the run, its transcripts and text edits, split from the code on purpose. It changes tool description text and docs only. A code defect found here is a bug filed under M-2, not a fix in this task.
-- A description change must keep every worked-example test (T-11) and the scenarios passing. Run `scripts/verify.ps1`.
+- A description change must keep every worked-example test (T-11) and the scenarios passing. Run `cairn task T-13 verify`.
 - **Open rules: stop and ask.** A change to a tool's arguments or behaviour, and any prompt change beyond the planted mistake.
 - The person's look at the frames is in T-12; this one is the agent's.
 - Leave the worktree before `finish`.

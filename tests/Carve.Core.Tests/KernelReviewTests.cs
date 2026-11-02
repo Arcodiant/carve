@@ -4,6 +4,7 @@ using Xunit;
 namespace Carve.Core.Tests;
 
 /// <summary>Regressions from the RV-1 review of the kernel: scale, self-intersection, many-sided faces, per-face guards, winding, immutability.</summary>
+[Trait("Tier", "unit")]
 public class KernelReviewTests
 {
     private static MeshResult Create(Vector3[] v, int[][] f) => PolygonMesh.Create(v, f);

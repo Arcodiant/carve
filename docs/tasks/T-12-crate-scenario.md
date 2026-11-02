@@ -1,6 +1,6 @@
 ---
 description: >-
-  The crate scenario builds a crate from one cube with move and extrude only, and shows it from five views on every verify
+  The crate scenario builds a crate from one cube with move and extrude only, and shows it from five views in its own suite
 ---
 # T-12 — Crate scenario
 
@@ -14,9 +14,13 @@ description: >-
 
 **Depends on:** T-9, T-11
 
+**Verify:** full
+
+**Perf:** skip: Carve declares no heavy suites
+
 ## Goal
 
-The milestone's sample, the crate, is built through the real tools on every verify, and its frames show it from every side and close up.
+The milestone's sample, the crate, is built through the real tools in its own suite, and its frames show it from every side and close up.
 
 ## Scope
 
@@ -44,7 +48,7 @@ Say why each pixel was chosen.
 
 Pick the sample pixels from the first good run, record them as constants with a comment, as `CubeScenario` does, and **show each check failing** on a broken product, such as the bar extrude skipped or the zoom ignored.
 
-**`scripts/verify.ps1`** runs `run-scenario.ps1 crate` after `cube`. Add the `Crate` row to `CLAUDE.md`'s *Layout* table.
+**`Carve.slnx`** lists the new project, and **`tests.json`** gains a `scenario-crate` suite, `regression` tier, on the model of `scenario-cube`. Add the `Crate` row to `CLAUDE.md`'s *Layout* table.
 
 **Second run**: run the scenario twice and compare the two runs' frames byte for byte. Record it in the closing report.
 

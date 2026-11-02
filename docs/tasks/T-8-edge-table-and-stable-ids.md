@@ -14,6 +14,10 @@ description: >-
 
 **Depends on:** — (none)
 
+**Verify:** server-regression
+
+**Perf:** skip: Carve declares no heavy suites
+
 ## Goal
 
 `Carve.Core` knows how a mesh's faces join: every edge, the faces on it and which way each crosses it. It also has a written id contract that the edit operations (T-10) and tools (T-11) build on.
