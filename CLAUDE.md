@@ -71,11 +71,15 @@ The rest are decided in D-1 as they settle; add them here when they do.
 dotnet build Carve.slnx
 dotnet test Carve.slnx
 dotnet run --project src/Carve.Server
-pwsh scripts/verify.ps1
+cairn <kind> <id> verify
 ```
 
-A change is verified when `scripts/verify.ps1` passes and, for anything that can
-be seen, a scenario has been run and its frames looked at. Say which of the two
+A change is verified when `cairn <kind> <id> verify` passes and, for anything
+that can be seen, the frames from that run have been looked at. Do not run the
+scenario again to get them. A queued run's frames come from `cairn test
+artifacts <suite>` (`legacy` until there is a `tests.json`); a run on this
+machine leaves them in `artifacts/scenarios/<name>/`. Run a scenario by hand only
+where no suite covers what changed, and then add a suite. Say which of the two
 you did, and what you did not check.
 
 ## Test scenarios
@@ -141,7 +145,7 @@ with `EnableDynamicLoading` set and project references to `Carve.Debug` and
 `pwsh scripts/run-scenario.ps1 <name>` runs it: the run folder's path is on stdout and the
 exit code is `carve`'s. `<name>` is the last part of the assembly name, lower-cased, and names
 the folder, `artifacts/scenarios/<name>/<run number>/`, unless `Carve:Debug:RunFolder` says
-otherwise. That folder holds `frames/`, a fresh `user-data/`, and `run.json`, the log of every
+otherwise; on a queued run the script sets that to `<name>/` under `CAIRN_ARTIFACTS`. That folder holds `frames/`, a fresh `user-data/`, and `run.json`, the log of every
 call and result, in which an image is its size and hash.
 
 `ScenarioDriver` is all a scenario has: `ListToolsAsync`, `CallAsync(tool, args)`,
@@ -198,3 +202,28 @@ request client; registering one is the person's call.
 
 Run `cairn status` at the start of a session and `cairn next` to pick work. Query
 items with `cairn list` / `cairn show`; never grep `docs/` to find open work.
+
+
+<!-- BEGIN cairn -->
+This project's work-item tracker (tasks, bugs, batches, milestones, design
+docs, changelog) is managed by the **cairn** skill — invoke it for any
+tracker action. It is the single source of truth for the generic
+methodology (layout, id reservation, merge-back protocol, linting); this
+project's own variations on the defaults, if any, are documented below
+this marker.
+
+When work is fanned out to subagents, a member is not `Done` because the
+subagent said so — it is `Done` when `cairn task <id> verify` exits clean.
+Never mark a member `Done`, and never `finish` a container, on a
+self-report alone.
+
+Work landing on `main` needs a current, answered review: `finish` refuses
+without one. See the skill's `references/review.md`.
+
+Tests: check your work with `cairn <kind> <id> verify` or `cairn test run
+<suite>`, which carry a pass forward and take the machine's test slots
+(running here when no runner is up; with no `tests.json`, `verify` runs the
+whole hook once and carries it). Never take a GPU lock or kill test hosts
+by hand. A carried pass is real; use `--fresh` only with a reason you
+state. See the skill's `references/testing.md`.
+<!-- END cairn -->

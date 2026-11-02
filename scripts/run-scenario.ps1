@@ -55,6 +55,11 @@ $arguments = @(
     "--Carve:Extensions:1=$(Get-Output $scenario ($scenarioFile -replace '\.csproj$', '.dll'))"
 ) + $CarveArguments
 
+# A queued run keeps what's in CAIRN_ARTIFACTS, which is what `cairn test artifacts` returns.
+if ($env:CAIRN_ARTIFACTS -and -not ($CarveArguments -match '^--Carve:Debug:RunFolder=')) {
+    $arguments += "--Carve:Debug:RunFolder=$(Join-Path $env:CAIRN_ARTIFACTS $Name.ToLowerInvariant())"
+}
+
 # Start-Process joins its arguments with spaces, so each is quoted here.
 $quoted = $arguments | ForEach-Object { '"' + $_ + '"' }
 
