@@ -98,8 +98,10 @@ on it and which way each crosses it; each vertex's faces; each face's edges in l
 order). Triangles are a derived view for render, validation and export, never
 stored. Operations keep their meaning on a logical face or edge loop. Open,
 non-manifold and mixed-winding meshes stay legal, with warnings. A vertex's and a
-face's id is its position in the mesh's arrays; an edit never renumbers or reuses
-an id, appends new elements at the end, and keeps a reshaped face's id.
+face's id is its position in the mesh's arrays; an edit never renumbers, appends
+new elements at the end, and keeps a reshaped face's id. Along the current chain of
+edits an id is never reused; undo frees the undone step's ids, and the next edit
+gives them out again (qualified after RV-10).
 
 **Alternatives:** a half-edge structure, which makes walking a manifold surface
 cheap but cannot hold the non-manifold and open input Carve accepts without special

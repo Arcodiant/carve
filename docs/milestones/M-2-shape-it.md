@@ -30,7 +30,7 @@ Content: the crate sample built only with these tools, a scenario that shows it,
   - Half-edge was rejected: it needs a manifold mesh or a second representation, and mutable links behind the immutable snapshot.
 - **Holed faces** are not in M-2; they move to M-5.
 - **Addressing.** Stable integer ids.
-  - A vertex's or face's id is its position, as `define_mesh` gives it, and edits never renumber or reuse one. An edge is its vertex pair `[a, b]`.
+  - A vertex's or face's id is its position, as `define_mesh` gives it, and edits never renumber or reuse one (qualified after RV-10: along the current chain of edits; undo frees the undone step's ids). An edge is its vertex pair `[a, b]`.
   - An extruded face keeps its id as the cap; walls and new vertices are appended.
 - **Tools.** One per operation:
   - `move(vertices?, edges?, faces?, by)`;
@@ -120,6 +120,7 @@ caption: 512x512, view front, 72 vertices, 70 faces
   - T-10: it added two refusals, an extrude of no faces and a non-finite distance.
   - T-11: history is the current mesh plus 100 older ones, and undoing the first `define_mesh` is an error rather than a return to empty. `move` also returns `moved`.
   - T-12: the `back` check uses the -X bar's underside, because `back` looks up from below and hides its top.
+  - T-9 captions a `view` with a zoom or target in the view form, e.g. `view back, zoom 2`.
 - **The orchestrator's briefs said to leave the worktree before `finish`**, as every member's Notes did. But `finish`'s verify refuses unless it runs from inside the worktree. T-9 stopped on it and needed a second round trip; T-8 ran it from inside on its own reading.
 - **Worktree folders.** `finish` run from inside its worktree cannot remove the folder.
   - T-8, T-9, T-10 and T-11 deleted theirs by hand, which took T-9's run frames with it.
