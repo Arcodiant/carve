@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 
 namespace Carve.Core;
@@ -34,7 +35,7 @@ public static class MeshEdits
         {
             var v = vertexList[i];
             if (v < 0 || v >= mesh.Vertices.Count)
-                errors.Add(new MeshError($"vertices[{v}]", $"the {Ordinal(i)} listed vertex: there is no vertex {v}: ids run 0..{mesh.Vertices.Count - 1}"));
+                errors.Add(new MeshError(Invariant($"vertices[{v}]"), Invariant($"the {Ordinal(i)} listed vertex: there is no vertex {v}: ids run 0..{mesh.Vertices.Count - 1}")));
             else
                 moved.Add(v);
         }
@@ -43,7 +44,7 @@ public static class MeshEdits
         {
             var (a, b) = edgeList[i];
             if (!mesh.Topology.TryGetEdge(a, b, out var edge))
-                errors.Add(new MeshError($"edges[{Math.Min(a, b)}-{Math.Max(a, b)}]", $"the {Ordinal(i)} listed edge, [{a}, {b}], is not an edge of the mesh"));
+                errors.Add(new MeshError(Invariant($"edges[{Math.Min(a, b)}-{Math.Max(a, b)}]"), Invariant($"the {Ordinal(i)} listed edge, [{a}, {b}], is not an edge of the mesh")));
             else
             {
                 moved.Add(edge.Lo);
@@ -60,11 +61,22 @@ public static class MeshEdits
                 moved.UnionWith(mesh.Faces[f]);
         }
 
-        if (errors.Count > 0)
+        // A bad or missing by is a problem with the whole call, and with it no move is tried. Otherwise the listed ids that
+        // exist are moved, so that what Create would refuse in the result is named beside any unknown id.
+        if (errors.Any(e => e.Element is "by" or "vertices, edges, faces"))
             return EditResult.Refused(errors);
 
-        var result = mesh.Edit(movedVertices: moved.Select(v => KeyValuePair.Create(v, mesh.Vertices[v] + by)));
-        return EditResult.From(result, moved.ToArray(), [], [], []);
+        var positions = moved.Select(v => KeyValuePair.Create(v, mesh.Vertices[v] + by)).ToArray();
+        // by so small against the coordinates that it rounds away changes nothing, like a zero by.
+        if (positions.Length > 0 && positions.All(p => p.Value.Equals(mesh.Vertices[p.Key])))
+            errors.Insert(0, new MeshError("by", "the move is zero: nothing would change"));
+        if (positions.Length == 0 || errors.Any(e => e.Element == "by"))
+            return EditResult.Refused(errors);
+
+        var result = mesh.Edit(movedVertices: positions);
+        return errors.Count == 0
+            ? EditResult.From(result, moved.ToArray(), [], [], [])
+            : EditResult.Refused([.. errors, .. result.Errors]);
     }
 
     /// <summary>
@@ -87,9 +99,12 @@ public static class MeshEdits
         if (!float.IsFinite(inset))
             errors.Add(new MeshError("inset", "the inset is not finite"));
         else if (inset < 0)
-            errors.Add(new MeshError("inset", $"the inset is negative ({inset:G6}); it must be 0 or more"));
+            errors.Add(new MeshError("inset", Invariant($"the inset is negative ({inset:G6}); it must be 0 or more")));
         if (distance == 0 && inset == 0)
             errors.Add(new MeshError("distance, inset", "distance and inset are both zero: nothing would change"));
+        // A bad distance or inset, or no faces, is a problem with the whole call: no face is tried. Otherwise each listed
+        // face that exists is tried, so that a ring or a wall that fails on one face is named beside an unknown id.
+        var argumentsOk = errors.Count == 0;
 
         var firstListed = new Dictionary<int, int>();
         for (var i = 0; i < faceList.Length; i++)
@@ -103,7 +118,6 @@ public static class MeshEdits
                 firstListed[f] = i;
         }
 
-        var argumentsOk = errors.Count == 0;
         // A bad inset or distance is already named; with one, no face's ring is tried.
         var ringsCanBeTried = float.IsFinite(inset) && float.IsFinite(distance) && inset >= 0;
         var addedVertices = new List<Vector3>();
@@ -119,7 +133,7 @@ public static class MeshEdits
 
             if (!TryRing(mesh.Vertices, loop, distance, inset, out var ring, out var why))
             {
-                errors.Add(new MeshError($"faces[{f}]", $"the inset {inset:G6} is too large for this face: {why}"));
+                errors.Add(new MeshError($"faces[{f}]", Invariant($"the inset {inset:G6} is too large for this face: {why}")));
                 continue;
             }
             if (!argumentsOk) continue;
@@ -135,10 +149,12 @@ public static class MeshEdits
             extruded.Add(new ExtrudedFace(f, f, Enumerable.Range(firstWall, n).ToArray(), ids));
         }
 
-        if (errors.Count > 0)
+        if (!argumentsOk || extruded.Count == 0)
             return EditResult.Refused(errors);
 
         var result = mesh.Edit(reshapedFaces: reshaped, addedVertices: addedVertices, addedFaces: addedFaces);
+        if (errors.Count > 0 || !result.Succeeded)
+            return EditResult.Refused([.. errors, .. result.Errors.Select(e => ToSourceFace(mesh, extruded, e, distance, inset))]);
         return EditResult.From(result, [],
             Enumerable.Range(mesh.Vertices.Count, addedVertices.Count).ToArray(),
             Enumerable.Range(mesh.Faces.Count, addedFaces.Count).ToArray(),
@@ -173,6 +189,9 @@ public static class MeshEdits
             var before = inward[(k + n - 1) % n];
             var after = inward[k];
             var denominator = 1 + Dot(before, after);
+            // Defensive, and unreachable today: it needs two adjacent edges running exactly opposite, and Create already
+            // refuses such a face (a fold for 4 or more corners, zero area for a triangle). No test covers it; it is kept
+            // so the mitre below never divides by zero should that validation change.
             if (inset > 0 && denominator <= 0)
             {
                 ring = [];
@@ -212,10 +231,54 @@ public static class MeshEdits
         return true;
     }
 
+    /// <summary>
+    /// Names an error on a wall or ring vertex the extrude appended, which the caller has never seen, by the listed face it
+    /// was made for, and says that the distance (or, with distance 0, the inset) did not suit that face. Any other error
+    /// is returned as it is.
+    /// </summary>
+    private static MeshError ToSourceFace(PolygonMesh mesh, List<ExtrudedFace> extruded, MeshError error, float distance, float inset)
+    {
+        foreach (var x in extruded)
+        {
+            string? what = null;
+            for (var k = 0; k < x.Walls.Count && what is null; k++)
+            {
+                if (error.Element == $"faces[{x.Walls[k]}]")
+                    what = $"its new wall faces[{x.Walls[k]}], over the edge from corner {k} to corner {(k + 1) % x.Walls.Count}";
+            }
+            for (var k = 0; k < x.NewVertices.Count && what is null; k++)
+            {
+                if (error.Element == $"vertices[{x.NewVertices[k]}]")
+                    what = $"its new vertex vertices[{x.NewVertices[k]}], over corner {k}";
+            }
+            if (what is null) continue;
+
+            // The face as it was: its size, the longest side of its bounding box, says whether the step was small or large.
+            var loop = mesh.Faces[x.Face];
+            var min = mesh.Vertices[loop[0]];
+            var max = min;
+            foreach (var v in loop)
+            {
+                min = Vector3.Min(min, mesh.Vertices[v]);
+                max = Vector3.Max(max, mesh.Vertices[v]);
+            }
+            var extent = max - min;
+            var size = MathF.Max(extent.X, MathF.Max(extent.Y, extent.Z));
+            var (name, value) = distance != 0 ? ("distance", distance) : ("inset", inset);
+            var scale = MathF.Abs(value) <= size ? "small" : "large";
+            return new MeshError($"faces[{x.Face}]",
+                Invariant($"the {name} {value:G6} is too {scale} for this face: {what}, is refused: {error.Message}"));
+        }
+        return error;
+    }
+
     private static bool HasFace(PolygonMesh mesh, int f) => f >= 0 && f < mesh.Faces.Count;
 
     private static MeshError UnknownFace(PolygonMesh mesh, int index, int f) =>
-        new($"faces[{f}]", $"the {Ordinal(index)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}");
+        new(Invariant($"faces[{f}]"), Invariant($"the {Ordinal(index)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}"));
+
+    /// <summary>Agent-facing text is the same on every host: numbers (a negative id's sign among them) in the invariant culture.</summary>
+    internal static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 
     private static string Ordinal(int index)
     {
