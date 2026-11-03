@@ -4,7 +4,7 @@ description: >-
 ---
 # T-10 — Move and extrude in the kernel
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
