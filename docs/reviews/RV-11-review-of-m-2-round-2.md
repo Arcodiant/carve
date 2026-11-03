@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-11 — Review of M-2, round 2
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-2
 
@@ -43,7 +43,9 @@ All 23 round-1 outcomes hold, one only in part (the wall-error wording, below). 
 
 **Fix:** for a wall error, compare `|value|` with the length of that wall's own edge, from corner k to corner k+1, rather than the face's bounding box. Keep "large" for a ring-vertex error, since that is a non-finite coordinate. Add a row with a short-edge face like the one above.
 
-**Outcome:** —
+**Outcome:** fixed
+
+A wall error now says small or large by comparing `|distance|` (or the inset, when distance is 0) with that wall's own edge, corner k to corner k+1; a ring-vertex error stays large. `EditRefusalTests.A_wall_over_a_short_edge_says_large_when_the_distance_is_too_large_for_that_edge` (the pentagon above, extruded by 0.5) was shown failing on the old code (95e8fb2, claude-sonnet-5-5).
 
 ## Summary
 
