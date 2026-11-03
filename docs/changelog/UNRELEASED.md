@@ -6,3 +6,4 @@
 - T-9: render takes any direction, a zoom and a target, so an agent can look at a mesh from any side and close up
 - T-12: The crate scenario builds a crate from one cube with move and extrude only, and shows it from five views in its own suite
 - B-1: A render target typed as the mesh bound (1.02) is refused as outside the bounds because the stored float max is 1.0199999 and RenderTool compares the target as a double
+- T-13: A fresh agent builds a crate with the edit tools from their descriptions alone, recovering from a planted mistake
