@@ -33,4 +33,14 @@ Compare the target in the mesh's own precision: convert each target component to
 
 **Open rules: stop and ask.** Any tolerance. Any change to which targets count as inside other than this precision fix. Any change to another frame's bytes.
 
+### As done
+
+Done by Claude Sonnet 5.5 (`claude-sonnet-5-5`). `RenderTool` now converts each target component to `float` before the inclusive bounds test; no tolerance or epsilon. New client test `A_target_on_the_reported_bound_of_a_mesh_inexact_in_float_is_accepted_and_one_beyond_is_refused` (mesh with x = 1.02; target 1.02 accepted, 1.021 refused), shown failing on the old double comparison (`Assert.False` failure) and passing after. The crate scenario's zoom target is back to `[1.02, 0.4, 0.5]`, stand-in comment removed.
+
 ## Verified by
+
+Run on Claude Sonnet 5.5 (`claude-sonnet-5-5`).
+
+- `cairn bug B-1 verify`: server-unit, server-regression, scenario-cube, scenario-crate pass.
+- Crate zoom frame (`crate-dir-2-1-1-zoom3`) differs by hash from the 1.0199 run's frame (the copy in `artifacts/review/T-12/round-1/`, T-12's artifacts folder being gone): 430 of 262144 pixels differ, max channel difference 62. The person approved the new frame via a Waystone review (old and new in `artifacts/review/B-1/round-1/`). The other eight crate frames are identical by hash.
+- Cube: the eight frames of the earlier baseline (`main/artifacts/scenarios/cube/1`) are identical by hash. The four T-9 frames added since have no saved baseline, so they were not compared by hash.
