@@ -18,7 +18,7 @@ description: >-
 
 ## Findings: round-1 fixes, 63c744b..9ef45ea (claude-opus-5-5)
 
-Evidence: `core-unit` 126/126 and `server-unit` 95/95. `server-regression` had 150 passed and 0 failed when the review was written, covering EditToolTests, LoaderTests, DebugExtensionTests, StdioTests, DefineMeshTests and the render caption, bad-camera and B-1 tests; a few slow RenderTests had not finished. The scenarios were not run and no frame was opened. One throwaway probe ran against `Carve.Core.dll`.
+Evidence: `core-unit` 126/126, `server-unit` 95/95 and `server-regression` 162/162 (the full suite, run to completion). The scenarios were not run and no frame was opened. One throwaway probe ran against `Carve.Core.dll`.
 
 All 23 round-1 outcomes hold, one only in part (the wall-error wording, below). Points checked in particular:
 
