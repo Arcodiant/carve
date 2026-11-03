@@ -24,6 +24,8 @@ public sealed class MoveTool(ModelStore store)
         + "created is always empty for a move. "
         + "Bad input (an unknown vertex or face id, a pair that is not an edge, nothing listed, a zero or non-finite by) is a tool error "
         + "that lists every problem by element, e.g. faces[6]; the mesh is left unchanged and nothing is added to undo. "
+        + "So is a move after which a face would cross itself (a bow-tie), which the call checks as a whole, not corner by corner: "
+        + "when reshaping a face by its corners, move whole edges or sets of corners that keep their order around the face, rather than one corner at a time past its neighbour. "
         + "Needs a mesh from define_mesh first. "
         + "Worked example on define_mesh's unit cube, raising the top face (face 3, y = 1) by half a unit:\n"
         + ExampleMarker + """{"faces":[3],"by":[0,0.5,0]}""";
