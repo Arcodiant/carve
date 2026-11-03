@@ -4,7 +4,7 @@ description: >-
 ---
 # T-13 — Edit tools acceptance run
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
@@ -52,7 +52,8 @@ An agent that has never seen Carve, in an ordinary MCP client with plain `carve`
 
 ### As built
 
-Ran on Claude Sonnet 5.5 (`claude-sonnet-5-5`). The `claude -p` sessions ran on Claude Opus 5.5 (`claude-opus-5-5`, from each transcript's init event), with `--strict-mcp-config` and an `.mcp.json` of plain `carve` only (`dotnet run --project` on this worktree), from `%TEMP%\carve-m2-acceptanceound-N\`, outside every Carve `CLAUDE.md`. The prompt was the spec's, word for word. Transcripts, images and summaries are in `artifacts/m2-acceptance/round-N/` (ignored); `summarize.py` there extracts calls and images.
+Ran on Claude Sonnet 5.5 (`claude-sonnet-5-5`). The `claude -p` sessions ran on Claude Opus 5.5 (`claude-opus-5-5`, from each transcript's init event), with `--strict-mcp-config` and an `.mcp.json` of plain `carve` only (`dotnet run --project` on this worktree), from `%TEMP%\carve-m2-acceptance
+ound-N\`, outside every Carve `CLAUDE.md`. The prompt was the spec's, word for word. Transcripts, images and summaries are in `artifacts/m2-acceptance/round-N/` (ignored); `summarize.py` there extracts calls and images.
 
 **Changed: one description, `move`** (text only): bad input now also names a move after which a face would cross itself, checked on the whole call, with the advice to move whole edges or corner sets that keep their order. No arguments or behaviour changed; `cairn task T-13 verify` passes.
 
