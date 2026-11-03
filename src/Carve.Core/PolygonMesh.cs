@@ -34,7 +34,8 @@ public sealed class MeshResult
 /// <para>Across every edit of a mesh, made through <see cref="Edit"/>:</para>
 /// <list type="bullet">
 /// <item>an edit never renumbers: every vertex and face keeps its id;</item>
-/// <item>an id is never reused within a mesh's history;</item>
+/// <item>an id is never reused along the current chain of edits; an edit that is undone frees its ids, and the next
+/// edit gives them out again;</item>
 /// <item>new vertices and faces are added at the end, taking the next ids in order;</item>
 /// <item>a face that is reshaped (its loop replaced) keeps its id.</item>
 /// </list>
@@ -108,7 +109,7 @@ public sealed class PolygonMesh
             {
                 if (face[k] < 0 || face[k] >= verts.Length)
                 {
-                    errors.Add(new MeshError($"faces[{f}][{k}]", verts.Length == 0 ? $"index {face[k]} is out of range: there are no vertices" : $"index {face[k]} is out of range 0..{verts.Length - 1}"));
+                    errors.Add(new MeshError($"faces[{f}][{k}]", verts.Length == 0 ? MeshEdits.Invariant($"index {face[k]} is out of range: there are no vertices") : MeshEdits.Invariant($"index {face[k]} is out of range 0..{verts.Length - 1}")));
                     faceOk = false;
                 }
             }
@@ -119,7 +120,7 @@ public sealed class PolygonMesh
                 {
                     if (face[j] == face[k])
                     {
-                        errors.Add(new MeshError($"faces[{f}][{k}]", $"index {face[k]} repeats faces[{f}][{j}]"));
+                        errors.Add(new MeshError($"faces[{f}][{k}]", MeshEdits.Invariant($"index {face[k]} repeats faces[{f}][{j}]")));
                         faceOk = false;
                         break;
                     }

@@ -89,7 +89,7 @@ public sealed class MeshReport
             var limit = PolygonMesh.PlanarityTolerance * PolygonMesh.FaceSize(verts, face);
             var worst = face.Max(i => Math.Abs(((double)verts[i].X - o.X - cx) * normal.X + ((double)verts[i].Y - o.Y - cy) * normal.Y + ((double)verts[i].Z - o.Z - cz) * normal.Z));
             if (worst > limit)
-                warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", $"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})"));
+                warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", MeshEdits.Invariant($"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})")));
         }
 
         for (var i = 0; i < verts.Count; i++)
