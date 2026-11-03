@@ -23,4 +23,20 @@ public class FaceNormalTests
         Assert.True((ccw.FaceNormal(0) - Vector3.UnitZ).Length() < 1e-6f);
         Assert.True((cw.FaceNormal(0) + Vector3.UnitZ).Length() < 1e-6f);
     }
+
+    [Fact]
+    public void FaceCentreIsTheMeanOfItsVertices()
+    {
+        var cube = TestMeshes.Cube();
+        Assert.Equal(new Vector3(0.5f, 0.5f, 1), cube.FaceCentre(1));
+        Assert.Equal(new Vector3(0, 0.5f, 0.5f), cube.FaceCentre(4));
+
+        // The mean of the corners, not the centroid of the area: the L's centroid is (5/6, 5/6).
+        var l = TestMeshes.Make(TestMeshes.LVertices, [[0, 1, 2, 3, 4, 5]]);
+        Assert.Equal(new Vector3(1, 1, 0), l.FaceCentre(0));
+
+        // Far from the origin, the mean is still exact for a face whose corners are.
+        var far = TestMeshes.Make(TestMeshes.CubeVertices.Select(v => v + new Vector3(1e6f, 0, 0)), TestMeshes.CubeFaces);
+        Assert.Equal(new Vector3(1e6f + 0.5f, 0.5f, 1), far.FaceCentre(1));
+    }
 }

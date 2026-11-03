@@ -90,16 +90,22 @@ process, or its renders do not compare from run to run closely enough for scenar
 
 ### Polygon meshes
 
-**Certainty:** Leaning · **Strictness:** Rule
+**Certainty:** Settled · **Strictness:** Rule
 
-The mesh is polygons: faces of any size in an edge-connected structure, triangulated
-on export. Operations keep their meaning on a logical face or edge loop.
+The mesh is polygons: faces of any size, stored as plain indexed vertex loops, with
+an **edge table** derived from them (`MeshTopology`: each undirected edge, the faces
+on it and which way each crosses it; each vertex's faces; each face's edges in loop
+order). Triangles are a derived view for render, validation and export, never
+stored. Operations keep their meaning on a logical face or edge loop. Open,
+non-manifold and mixed-winding meshes stay legal, with warnings. A vertex's and a
+face's id is its position in the mesh's arrays; an edit never renumbers or reuses
+an id, appends new elements at the end, and keeps a reshaped face's id.
 
-**Alternatives:** triangles only, a simpler kernel that loses the logical faces.
+**Alternatives:** a half-edge structure, which makes walking a manifold surface
+cheap but cannot hold the non-manifold and open input Carve accepts without special
+cases; triangles only, a simpler kernel that loses the logical faces.
 **Would change if:** the structure's cost outweighs its use once cut and extrude
 exist, seen in how agents actually use them.
-**Exceptions:**
-- M-1 — stores plain indexed polygons, and triangulates as a derived view for render, validation and export, never stored; the edge-connected structure is decided in M-2.
 
 ### A Carve file, and .glb export
 
