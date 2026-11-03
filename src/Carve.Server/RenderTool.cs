@@ -10,11 +10,22 @@ using static Carve.Server.MeshToolSupport;
 
 namespace Carve.Server;
 
-[McpServerToolType]
 internal static class RenderTool
 {
+    /// <summary>
+    /// The tool, built here rather than found by <c>WithToolsFromAssembly</c> so that its generated schema can be closed
+    /// (<c>additionalProperties: false</c>). <paramref name="services"/> keeps the injected parameters out of the schema.
+    /// </summary>
+    public static McpServerTool Create(IServiceProvider services)
+    {
+        var tool = McpServerTool.Create(typeof(RenderTool).GetMethod(nameof(Run))!, target: null,
+            new McpServerToolCreateOptions { Services = services });
+        tool.ProtocolTool.InputSchema = Closed(tool.ProtocolTool.InputSchema);
+        return tool;
+    }
+
     private const string Text =
-        "Renders the current mesh, as set by define_mesh, and returns one PNG image of 512x512 pixels followed by one caption line, "
+        "Renders the current mesh, as set by define_mesh and changed by move, extrude or undo, and returns one PNG image of 512x512 pixels followed by one caption line, "
         + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
@@ -32,14 +43,15 @@ internal static class RenderTool
         + "Faces wound the wrong way (clockwise seen from outside) show as MISSING: you see through them to whatever is behind. "
         + "An EMPTY result, an image of only the dark background with no error, means no face points at the camera: "
         + "the faces are wound the wrong way, or the mesh is an open surface seen from behind. "
-        + "Try the other view, or fix the winding and call define_mesh again. "
+        + "Try the other view, or fix the winding and call define_mesh again (move and extrude keep each face's winding, so they cannot fix it). "
         + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a direction of zero or not three finite numbers; "
-        + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds. "
+        + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; an argument render does not take. "
         + "Calling render before define_mesh is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
-        + "define_mesh still works there.";
+        + "define_mesh, move, extrude, get_mesh and undo still work there.";
 
     [McpServerTool(Name = "render"), Description(Text)]
     public static async Task<CallToolResult> Run(
+        RequestContext<CallToolRequestParams> context,
         EngineStatus status,
         ModelStore store,
         RenderQueue queue,
@@ -49,6 +61,11 @@ internal static class RenderTool
         [Description("[x, y, z] in the mesh's coordinates, inside its bounds: the point to look at. Default: the centre.")] double[]? target = null,
         CancellationToken cancellationToken = default)
     {
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target") is { Count: > 0 } unknown)
+        {
+            return Failed("render", unknown);
+        }
+
         if (view is not null && direction is not null)
         {
             return Error("view and direction: give one, not both.");

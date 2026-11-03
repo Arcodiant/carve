@@ -166,6 +166,29 @@ public class EditToolTests
     [InlineData("extrude", """{"faces":[0],"distance":1,"inset":-1}""", "inset")]
     [InlineData("extrude", """{"faces":[0]}""", "distance")]
     [InlineData("extrude", """{"distance":1}""", "faces")]
+    // RV-10: every argument-parsing branch, a list entry named by its place in words, numbers beyond float range.
+    [InlineData("move", """{"faces":3,"by":[0,1,0]}""", "faces: expected an array of integer ids, got 3")]
+    [InlineData("move", """{"faces":[3,"x"],"by":[0,1,0]}""", "faces: the 2nd listed entry: expected an integer id, got a string")]
+    [InlineData("move", """{"faces":[3.5],"by":[0,1,0]}""", "faces: the 1st listed entry: expected an integer id, got 3.5")]
+    [InlineData("move", """{"edges":{"a":1},"by":[0,1,0]}""", "edges: expected an array of [a, b] pairs, got an object")]
+    [InlineData("move", """{"edges":[[0]],"by":[0,1,0]}""", "edges: the 1st listed entry: expected a pair")]
+    [InlineData("move", """{"edges":[[0,1,2]],"by":[0,1,0]}""", "edges: the 1st listed entry: expected a pair")]
+    [InlineData("move", """{"edges":[[0,1],["a",1]],"by":[0,1,0]}""", "edges: the 2nd listed entry: expected a pair")]
+    [InlineData("move", """{"vertices":[0],"by":[0,"up",0]}""", "by[1]: expected a number, got a string")]
+    [InlineData("move", """{"vertices":[0],"by":[1e39,0,0]}""", "by[0]: 1e39 is out of range")]
+    [InlineData("extrude", """{"faces":[0],"distance":"far"}""", "distance: expected a number, got a string")]
+    [InlineData("extrude", """{"faces":[0],"distance":1,"inset":true}""", "inset: expected a number, got a boolean")]
+    [InlineData("extrude", """{"faces":[0],"distance":1e39}""", "distance: 1e39 is out of range")]
+    [InlineData("extrude", """{"faces":[0],"distance":1e400}""", "distance: 1e400 is out of range")]
+    [InlineData("extrude", """{"faces":[0],"distance":0,"inset":0}""", "distance, inset")]
+    // RV-10: a misspelt or unknown argument is a problem, not silently dropped.
+    [InlineData("extrude", """{"faces":[1],"distance":-0.2,"Inset":0.1}""", "Inset: not an argument of extrude; its arguments are faces, distance, inset")]
+    [InlineData("move", """{"face":[3],"by":[0,1,0]}""", "face: not an argument of move; its arguments are vertices, edges, faces, by")]
+    [InlineData("define_mesh", """{"vertices":[[0,0,0],[1,0,0],[0,1,0]],"faces":[[0,1,2]],"name":"tri"}""", "name: not an argument of define_mesh")]
+    // RV-10: refused by the whole-mesh check, after the arguments passed: corner 6 past the far side folds two faces.
+    [InlineData("move", """{"vertices":[6],"by":[-2,0,0]}""", "faces[1]: face is self-intersecting")]
+    // RV-10: a wall the distance breaks is named by the face listed, not by the wall's new id.
+    [InlineData("extrude", """{"faces":[1],"distance":1e-30}""", "faces[1]: the distance 1E-30 is too small for this face: its new wall faces[6]")]
     public async Task A_bad_edit_is_a_tool_error_naming_the_problem_and_changes_nothing(string tool, string arguments, string mention)
     {
         var (carve, _) = await StartAsync();
@@ -189,6 +212,57 @@ public class EditToolTests
         var result = await carve.CallToolAsync("move", """{"vertices":[50],"faces":[60],"by":[1,0,0]}""");
 
         ExpectError(result, "vertices[50]", "faces[60]");
+    }
+
+    [Theory]
+    [InlineData("get_mesh", "get_mesh")]
+    [InlineData("undo", "undo")]
+    [InlineData("render", "render; its arguments are view, direction, zoom, target")]
+    public async Task An_unknown_argument_to_a_reading_tool_is_a_tool_error_and_changes_nothing(string tool, string says)
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+        Ok(await carve.CallToolAsync("move", """{"faces":[3],"by":[0,0.5,0]}"""));
+        var before = await MeshAsync(carve);
+
+        var result = await carve.CallToolAsync(tool, """{"steps":2,"veiw":"back"}""");
+
+        ExpectError(result, $"steps: not an argument of {says}", $"veiw: not an argument of {says}", "2 problem(s)");
+        Assert.Equal(before, await MeshAsync(carve));
+        Assert.Equal("move", Ok(await carve.CallToolAsync("undo", "{}")).GetProperty("undone").GetString());
+    }
+
+    [Fact]
+    public async Task Ids_written_as_whole_numbers_with_a_fraction_or_exponent_are_accepted_as_define_mesh_does()
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+
+        var moved = Ok(await carve.CallToolAsync("move", """{"faces":[3.0],"edges":[[0e0,1.00]],"by":[0,0.5,0]}"""));
+        Assert.Equal([0, 1, 2, 3, 6, 7], moved.GetProperty("moved").EnumerateArray().Select(x => x.GetInt32()));
+        var extruded = Ok(await carve.CallToolAsync("extrude", """{"faces":[1e0],"distance":0.25}"""));
+        Assert.Equal(1, extruded.GetProperty("extruded")[0].GetProperty("face").GetInt32());
+    }
+
+    [Fact]
+    public async Task The_get_mesh_sample_output_matches_the_real_output_on_the_cube()
+    {
+        var (carve, tools) = await StartAsync();
+        using var _ = carve;
+        const string marker = "Output: ";
+        var line = Description(tools, "get_mesh").Split('\n').Single(l => l.StartsWith(marker, StringComparison.Ordinal));
+        var sample = JsonDocument.Parse(line[marker.Length..].Replace(", ...", "", StringComparison.Ordinal)).RootElement;
+        var real = Ok(await carve.CallToolAsync("get_mesh", "{}"));
+
+        static string Raw(JsonElement x) => JsonSerializer.Serialize(x);
+        foreach (var v in sample.GetProperty("vertices").EnumerateArray())
+            Assert.Equal(Raw(v), Raw(real.GetProperty("vertices")[v.GetProperty("id").GetInt32()]));
+        foreach (var f in sample.GetProperty("faces").EnumerateArray())
+            Assert.Equal(Raw(f), Raw(real.GetProperty("faces")[f.GetProperty("id").GetInt32()]));
+        foreach (var e in sample.GetProperty("edges").EnumerateArray())
+            Assert.Contains(Raw(e), real.GetProperty("edges").EnumerateArray().Select(Raw));
+        foreach (var key in new[] { "closed", "bounds", "warnings" })
+            Assert.Equal(Raw(sample.GetProperty(key)), Raw(real.GetProperty(key)));
     }
 
     [Fact]
@@ -256,6 +330,10 @@ public class EditToolTests
             Assert.Equal("object", Tool(tools, name).GetProperty("inputSchema").GetProperty("type").GetString());
         foreach (var name in new[] { "move", "extrude", "get_mesh", "undo" })
             Assert.Contains("Worked example", Description(tools, name));
+        foreach (var name in new[] { "define_mesh", "render", "move", "extrude", "get_mesh", "undo" })
+            Assert.False(Tool(tools, name).GetProperty("inputSchema").GetProperty("additionalProperties").GetBoolean(), name);
+        Assert.Equal(["view", "direction", "zoom", "target"],
+            Tool(tools, "render").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name));
         Assert.Contains("ids are the positions given here", Description(tools, "define_mesh"));
     }
 

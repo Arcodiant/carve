@@ -28,7 +28,7 @@ public sealed class DefineMeshTool(ModelStore store)
         + "closed is true when every edge is shared by exactly two faces. Warnings (open edges, edges shared by more than two faces, "
         + "inconsistent winding, non-planar faces, unused vertices) mean the mesh was accepted but is probably not what you meant. "
         + "Bad input (a missing or out-of-range index, a face with fewer than 3 vertices, a repeated index, a zero-area face, "
-        + "a self-intersecting or folded-back face outline, a non-finite coordinate, a vertex without exactly 3 numbers) is a tool error that lists every problem by element, e.g. faces[2][1]. "
+        + "a self-intersecting or folded-back face outline, a non-finite coordinate, a vertex without exactly 3 numbers, an argument define_mesh does not take) is a tool error that lists every problem by element, e.g. faces[2][1]. "
         + "Vertex and face ids are the positions given here (vertex 0 is the first in vertices, face 0 the first in faces), and move and extrude keep them; get_mesh reads them back and undo steps back. "
         + ExampleMarker + " " + CubeExample;
 
@@ -75,9 +75,9 @@ public sealed class DefineMeshTool(ModelStore store)
         ["required"] = new JsonArray("vertices", "faces"),
     };
 
-    public CallToolResult Run(JsonElement? vertices = null, JsonElement? faces = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? vertices = null, JsonElement? faces = null)
     {
-        var errors = new List<string>();
+        var errors = UnknownArguments("define_mesh", context, "vertices", "faces");
         var shapeBad = new HashSet<string>();
         var points = new List<Vector3>();
         var indices = new List<int[]>();
@@ -189,49 +189,5 @@ public sealed class DefineMeshTool(ModelStore store)
             k++;
         }
         return result.ToArray();
-    }
-
-    /// <summary>
-    /// A JSON integer that fits an int, judged from the number's own text so that no rounding to a double can make a
-    /// fraction whole: a whole number written with a fraction or exponent (<c>1.0</c>, <c>1e0</c>) is accepted,
-    /// <c>1.00000000000000001</c> and <c>1e-400</c> are not.
-    /// </summary>
-    private static bool TryIndex(JsonElement x, out int index)
-    {
-        index = 0;
-        if (x.ValueKind != JsonValueKind.Number) return false;
-        if (x.TryGetInt32(out index)) return true;
-
-        var text = x.GetRawText();
-        var p = 0;
-        var negative = text[p] == '-';
-        if (negative) p++;
-        var digits = new System.Text.StringBuilder();
-        var scale = 0L; // the value is digits * 10^scale
-        for (; p < text.Length && char.IsAsciiDigit(text[p]); p++) digits.Append(text[p]);
-        if (p < text.Length && text[p] == '.')
-        {
-            for (p++; p < text.Length && char.IsAsciiDigit(text[p]); p++) { digits.Append(text[p]); scale--; }
-        }
-        if (p < text.Length && (text[p] == 'e' || text[p] == 'E'))
-        {
-            var exponent = text[(p + 1)..];
-            var sign = exponent.StartsWith('-') ? -1 : 1;
-            if (!long.TryParse(exponent.TrimStart('+', '-'), NumberStyles.None, CultureInfo.InvariantCulture, out var e)) e = 1_000_000_000;
-            scale += sign * Math.Min(e, 1_000_000_000);
-        }
-
-        var significant = digits.ToString().TrimStart('0');
-        if (significant.Length == 0) return true; // zero, index stays 0
-
-        var trimmed = significant.TrimEnd('0');
-        scale += significant.Length - trimmed.Length;
-        if (scale < 0) return false; // a nonzero fractional part
-        if (trimmed.Length + scale > 10) return false;
-        var value = System.Numerics.BigInteger.Parse(trimmed, CultureInfo.InvariantCulture) * System.Numerics.BigInteger.Pow(10, (int)scale);
-        if (negative) value = -value;
-        if (value < int.MinValue || value > int.MaxValue) return false;
-        index = (int)value;
-        return true;
     }
 }

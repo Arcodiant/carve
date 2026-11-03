@@ -7,7 +7,7 @@ namespace Carve.Server;
 public sealed class GetMeshTool(ModelStore store)
 {
     public const string Text =
-        "Reads back the current mesh in full, so you can learn its ids before editing. Takes no arguments. "
+        "Reads back the current mesh in full, so you can learn its ids before editing. Takes no arguments; any argument is a tool error. "
         + "Vertex and face ids are the positions given to define_mesh, kept by every edit; the vertices and faces an extrude adds are appended after them. "
         + "Returns JSON {vertices:[{id, at:[x,y,z]}], faces:[{id, vertices:[ids, counter-clockwise seen from outside], normal:[x,y,z] (unit, outward), centre:[x,y,z] (mean of the corners)}], "
         + "edges:[{vertices:[a,b] (a < b), faces:[ids of the faces using the edge]}], "
@@ -20,8 +20,9 @@ public sealed class GetMeshTool(ModelStore store)
 
     public static McpServerTool Create() => MeshToolSupport.Create<GetMeshTool>("get_mesh", Text, null);
 
-    public CallToolResult Run()
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context)
     {
+        if (UnknownArguments("get_mesh", context) is { Count: > 0 } unknown) return Failed("get_mesh", unknown);
         var mesh = store.Current.Mesh;
         if (mesh is null) return Error("get_mesh: " + NoMesh);
 

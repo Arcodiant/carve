@@ -21,7 +21,7 @@ public sealed class ExtrudeTool(ModelStore store)
         + "All the faces are done in one call; list each at most once. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[new vertex ids],faces:[new face ids]}, "
         + "extruded:[{face, cap, walls:[face ids], vertices:[ring vertex ids]}]}, one extruded entry per listed face in the order listed (cap equals face). "
-        + "Bad input (an unknown face id, a face listed twice, no faces, a negative or non-finite inset, a non-finite distance, an inset too large for the face so it collapses or crosses itself) "
+        + "Bad input (an unknown face id, a face listed twice, no faces, a negative or non-finite inset, a non-finite distance, distance and inset both 0, an argument extrude does not take, an inset too large for the face so it collapses or crosses itself) "
         + "is a tool error that lists every problem by element, e.g. faces[6]; the mesh is left unchanged and nothing is added to undo. "
         + "Needs a mesh from define_mesh first. "
         + "Worked example on define_mesh's unit cube, an inset then a recess of the +Z face (face 1, z = 1); run the two calls in order:\n"
@@ -56,11 +56,13 @@ public sealed class ExtrudeTool(ModelStore store)
         ["required"] = new JsonArray("faces", "distance"),
     });
 
-    public CallToolResult Run(JsonElement? faces = null, JsonElement? distance = null, JsonElement? inset = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context,
+        JsonElement? faces = null, JsonElement? distance = null, JsonElement? inset = null)
     {
-        var errors = new List<string>();
+        var errors = UnknownArguments("extrude", context, "faces", "distance", "inset");
+        var unknown = errors.Count;
         var f = Ids("faces", faces, errors);
-        if (f is null && errors.Count == 0) errors.Add("faces: required but missing");
+        if (f is null && errors.Count == unknown) errors.Add("faces: required but missing");
         var d = Number("distance", distance, errors);
         var i = Number("inset", inset, errors, required: false);
         if (errors.Count > 0) return Failed("extrude", errors);

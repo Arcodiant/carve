@@ -19,7 +19,7 @@ public sealed class MoveTool(ModelStore store)
         + "Moving adds and removes nothing, so the counts stay the same, but moving some corners of a face off its plane gives a non-planar warning. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, moved:[vertex ids moved, ascending]}; "
         + "created is always empty for a move. "
-        + "Bad input (an unknown vertex or face id, a pair that is not an edge, nothing listed, a zero or non-finite by) is a tool error "
+        + "Bad input (an unknown vertex or face id, a pair that is not an edge, nothing listed, a zero or non-finite by, an argument move does not take) is a tool error "
         + "that lists every problem by element, e.g. faces[6]; the mesh is left unchanged and nothing is added to undo. "
         + "So is a move after which a face would cross itself (a bow-tie), which the call checks as a whole, not corner by corner: "
         + "when reshaping a face by its corners, move whole edges or sets of corners that keep their order around the face, rather than one corner at a time past its neighbour. "
@@ -68,9 +68,10 @@ public sealed class MoveTool(ModelStore store)
         ["required"] = new JsonArray("by"),
     });
 
-    public CallToolResult Run(JsonElement? vertices = null, JsonElement? edges = null, JsonElement? faces = null, JsonElement? by = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context,
+        JsonElement? vertices = null, JsonElement? edges = null, JsonElement? faces = null, JsonElement? by = null)
     {
-        var errors = new List<string>();
+        var errors = UnknownArguments("move", context, "vertices", "edges", "faces", "by");
         var v = Ids("vertices", vertices, errors);
         var e = Pairs("edges", edges, errors);
         var f = Ids("faces", faces, errors);

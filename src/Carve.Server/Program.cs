@@ -71,7 +71,7 @@ if (!services.Any(d => d.ServiceType == typeof(ITransport)))
     mcp.WithStdioServerTransport();
 }
 
-mcp.WithToolsFromAssembly(product);
+services.AddSingleton(RenderTool.Create);
 mcp.WithTools([DefineMeshTool.Create(), MoveTool.Create(), ExtrudeTool.Create(), GetMeshTool.Create(), UndoTool.Create()]);
 
 services.AddSingleton<EngineStatus>();
