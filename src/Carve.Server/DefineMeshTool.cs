@@ -1,13 +1,11 @@
-using System.ComponentModel;
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using static Carve.Server.MeshToolSupport;
 
 namespace Carve.Server;
 
@@ -44,15 +42,7 @@ public sealed class DefineMeshTool(ModelStore store)
     /// every problem comes back as one tool error naming the element; the published schema is written out here
     /// and is what a typed <c>double[][]</c>, <c>int[][]</c> signature would have produced.
     /// </summary>
-    public static McpServerTool Create()
-    {
-        var tool = McpServerTool.Create(
-            typeof(DefineMeshTool).GetMethod(nameof(Run))!,
-            request => new DefineMeshTool(request.Services!.GetRequiredService<ModelStore>()),
-            new McpServerToolCreateOptions { Name = "define_mesh", Description = Text });
-        tool.ProtocolTool.InputSchema = JsonSerializer.SerializeToElement(Schema());
-        return tool;
-    }
+    public static McpServerTool Create() => MeshToolSupport.Create<DefineMeshTool>("define_mesh", Text, Schema());
 
     private static JsonObject Schema() => new()
     {
@@ -122,28 +112,11 @@ public sealed class DefineMeshTool(ModelStore store)
             .Where(e => facesOk || e.Element.StartsWith("vertices[", StringComparison.Ordinal))
             .Where(e => verticesOk || (e.Element.StartsWith("faces[", StringComparison.Ordinal) && !e.Message.Contains("out of range", StringComparison.Ordinal)))
             .Select(e => e.ToString()));
-        if (errors.Count > 0)
-        {
-            return new CallToolResult
-            {
-                IsError = true,
-                Content = [new TextContentBlock { Text = $"define_mesh failed with {errors.Count} problem(s); the current mesh is unchanged:\n" + string.Join("\n", errors) }],
-            };
-        }
+        if (errors.Count > 0) return Failed("define_mesh", errors);
 
         var mesh = result.Mesh!;
         store.Replace(mesh);
-        var report = MeshReport.Create(mesh);
-        var body = new
-        {
-            vertices = report.VertexCount,
-            faces = report.FaceCount,
-            edges = report.EdgeCount,
-            closed = report.Closed,
-            bounds = new { min = Array(report.BoundsMin), max = Array(report.BoundsMax) },
-            warnings = report.Warnings.Select(w => w.ToString()).ToArray(),
-        };
-        return new CallToolResult { Content = [new TextContentBlock { Text = JsonSerializer.Serialize(body) }] };
+        return Ok(Report(mesh));
     }
 
     private static bool ArrayOrError(string name, JsonElement value, List<string> errors)
@@ -261,16 +234,4 @@ public sealed class DefineMeshTool(ModelStore store)
         index = (int)value;
         return true;
     }
-
-    private static string Describe(JsonElement x) => x.ValueKind switch
-    {
-        JsonValueKind.Number => x.GetRawText(),
-        JsonValueKind.String => "a string",
-        JsonValueKind.Array => "an array",
-        JsonValueKind.Object => "an object",
-        JsonValueKind.True or JsonValueKind.False => "a boolean",
-        _ => "null",
-    };
-
-    private static float[] Array(Vector3 v) => [v.X, v.Y, v.Z];
 }

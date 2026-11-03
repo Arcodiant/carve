@@ -1,6 +1,6 @@
 using System.Numerics;
 using Xunit;
-using static Carve.Core.Tests.MoveTests;
+using static Carve.Core.Tests.TestMeshes;
 
 namespace Carve.Core.Tests;
 
@@ -8,7 +8,6 @@ namespace Carve.Core.Tests;
 [Trait("Tier", "unit")]
 public class CrateTests
 {
-    private static readonly int[] AllCubeFaces = [0, 1, 2, 3, 4, 5];
 
     /// <summary>The face's highest and lowest edges in Y, as vertex pairs.</summary>
     private static ((int A, int B) Top, (int A, int B) Bottom) TopAndBottom(PolygonMesh mesh, int face)

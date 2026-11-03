@@ -54,8 +54,8 @@ public static class MeshEdits
         for (var i = 0; i < faceList.Length; i++)
         {
             var f = faceList[i];
-            if (f < 0 || f >= mesh.Faces.Count)
-                errors.Add(new MeshError($"faces[{f}]", $"the {Ordinal(i)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}"));
+            if (!HasFace(mesh, f))
+                errors.Add(UnknownFace(mesh, i, f));
             else
                 moved.UnionWith(mesh.Faces[f]);
         }
@@ -95,8 +95,8 @@ public static class MeshEdits
         for (var i = 0; i < faceList.Length; i++)
         {
             var f = faceList[i];
-            if (f < 0 || f >= mesh.Faces.Count)
-                errors.Add(new MeshError($"faces[{f}]", $"the {Ordinal(i)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}"));
+            if (!HasFace(mesh, f))
+                errors.Add(UnknownFace(mesh, i, f));
             else if (firstListed.TryGetValue(f, out var first))
                 errors.Add(new MeshError($"faces[{f}]", $"the {Ordinal(i)} listed face is listed {Ordinal(first)} too: each face is extruded once"));
             else
@@ -104,6 +104,8 @@ public static class MeshEdits
         }
 
         var argumentsOk = errors.Count == 0;
+        // A bad inset or distance is already named; with one, no face's ring is tried.
+        var ringsCanBeTried = float.IsFinite(inset) && float.IsFinite(distance) && inset >= 0;
         var addedVertices = new List<Vector3>();
         var addedFaces = new List<int[]>();
         var reshaped = new List<KeyValuePair<int, IEnumerable<int>>>();
@@ -112,10 +114,9 @@ public static class MeshEdits
         for (var i = 0; i < faceList.Length; i++)
         {
             var f = faceList[i];
-            if (f < 0 || f >= mesh.Faces.Count || firstListed[f] != i) continue;
+            if (!ringsCanBeTried || !HasFace(mesh, f) || firstListed[f] != i) continue;
             var loop = mesh.Faces[f];
 
-            if (!float.IsFinite(inset) || !float.IsFinite(distance) || inset < 0) continue;
             if (!TryRing(mesh.Vertices, loop, distance, inset, out var ring, out var why))
             {
                 errors.Add(new MeshError($"faces[{f}]", $"the inset {inset:G6} is too large for this face: {why}"));
@@ -210,6 +211,11 @@ public static class MeshEdits
         }
         return true;
     }
+
+    private static bool HasFace(PolygonMesh mesh, int f) => f >= 0 && f < mesh.Faces.Count;
+
+    private static MeshError UnknownFace(PolygonMesh mesh, int index, int f) =>
+        new($"faces[{f}]", $"the {Ordinal(index)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}");
 
     private static string Ordinal(int index)
     {

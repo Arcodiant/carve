@@ -31,6 +31,16 @@ internal static class TestMeshes
 
     public static PolygonMesh Cube() => Make(CubeVertices, CubeFaces);
 
+    /// <summary>Every face id of <see cref="Cube"/>.</summary>
+    public static readonly int[] AllCubeFaces = [0, 1, 2, 3, 4, 5];
+
+    /// <summary>The mesh a successful edit made; fails the test, with the edit's errors, otherwise.</summary>
+    public static PolygonMesh Ok(EditResult result)
+    {
+        Assert.True(result.Succeeded, string.Join("; ", result.Errors));
+        return result.Mesh!;
+    }
+
     /// <summary>L-shaped hexagon in the XY plane, area 3, wound counter-clockwise seen from +z.</summary>
     public static readonly Vector3[] LVertices =
     [

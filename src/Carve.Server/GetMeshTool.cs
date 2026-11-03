@@ -6,9 +6,6 @@ namespace Carve.Server;
 
 public sealed class GetMeshTool(ModelStore store)
 {
-    /// <summary>Opens the example call in the description; a test parses from here to the end of the line.</summary>
-    public const string ExampleMarker = "Example: ";
-
     public const string Text =
         "Reads back the current mesh in full, so you can learn its ids before editing. Takes no arguments. "
         + "Vertex and face ids are the positions given to define_mesh, kept by every edit; the vertices and faces an extrude adds are appended after them. "

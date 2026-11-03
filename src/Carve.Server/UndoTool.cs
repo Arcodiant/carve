@@ -6,9 +6,6 @@ namespace Carve.Server;
 
 public sealed class UndoTool(ModelStore store)
 {
-    /// <summary>Opens the example call in the description; a test parses from here to the end of the line.</summary>
-    public const string ExampleMarker = "Example: ";
-
     public const string Text =
         "Steps the model back one change: the last define_mesh, move or extrude is taken back and the mesh before it is current again, with the ids it had. "
         + "Takes no arguments. The last 100 changes can be undone, one call each; there is no redo, and an undo cannot itself be undone. "

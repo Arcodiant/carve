@@ -9,9 +9,6 @@ namespace Carve.Server;
 
 public sealed class ExtrudeTool(ModelStore store)
 {
-    /// <summary>Opens each example call in the description; a test parses from here to the end of the line.</summary>
-    public const string ExampleMarker = "Example: ";
-
     public const string Text =
         "Extrudes faces of the current mesh: each listed face is pushed along its own outward normal by distance, and the gap is closed with walls. "
         + "Ids are the ones get_mesh reports and they never change. "
@@ -68,13 +65,8 @@ public sealed class ExtrudeTool(ModelStore store)
         var i = Number("inset", inset, errors, required: false);
         if (errors.Count > 0) return Failed("extrude", errors);
 
-        var snapshot = store.Edit("extrude", mesh => MeshEdits.Extrude(mesh, f!, d!.Value, i ?? 0), out var result);
-        if (snapshot is null) return Error("extrude: " + NoMesh);
-        if (!result!.Succeeded) return Failed("extrude", result.Errors.Select(x => x.ToString()));
-
-        var body = Report(snapshot.Mesh!);
-        body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
-        body["extruded"] = result.Extruded.Select(x => new { face = x.Face, cap = x.Cap, walls = x.Walls, vertices = x.NewVertices }).ToArray();
-        return Ok(body);
+        return Edit(store, "extrude", mesh => MeshEdits.Extrude(mesh, f!, d!.Value, i ?? 0),
+            (body, result) => body["extruded"] = result.Extruded
+                .Select(x => new { face = x.Face, cap = x.Cap, walls = x.Walls, vertices = x.NewVertices }).ToArray());
     }
 }
