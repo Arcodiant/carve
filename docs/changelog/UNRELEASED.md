@@ -4,3 +4,4 @@
 - T-10: Carve.Core moves vertices, edges and faces and extrudes or insets faces, keeping ids and refusing a bad edit by element
 - T-11: An agent edits the mesh with move and extrude, reads its ids with get_mesh and steps back with undo
 - T-9: render takes any direction, a zoom and a target, so an agent can look at a mesh from any side and close up
+- T-12: The crate scenario builds a crate from one cube with move and extrude only, and shows it from five views in its own suite
