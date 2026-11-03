@@ -4,7 +4,7 @@ description: >-
 ---
 # T-12 — Crate scenario
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
