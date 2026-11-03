@@ -91,6 +91,18 @@ public class EditRefusalTests
         }
     }
 
+    [Theory]
+    [InlineData(1e-25f, 1e-35f, "the distance 1E-35 is too small for this face")]
+    [InlineData(2e19f, 1e30f, "the distance 1E+30 is too large for this face")]
+    public void The_edge_is_measured_in_double_so_extreme_scales_keep_the_word(float scale, float distance, string says)
+    {
+        var square = Make([new(0, 0, 0), new(scale, 0, 0), new(scale, scale, 0), new(0, scale, 0)], [[0, 1, 2, 3]]);
+        var result = MeshEdits.Extrude(square, [0], distance);
+
+        AssertRefused(result);
+        Assert.Contains(result.Errors, e => e.Message.StartsWith(says, StringComparison.Ordinal) && e.Message.Contains("its new wall"));
+    }
+
     [Fact]
     public void A_wall_over_a_short_edge_says_large_when_the_distance_is_too_large_for_that_edge()
     {
