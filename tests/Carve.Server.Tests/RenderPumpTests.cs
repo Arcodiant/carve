@@ -36,8 +36,9 @@ public class RenderPumpTests
             Log.Add("show");
         }
 
-        public void ApplyView(RenderView view)
+        public void ApplyView(CameraSpec camera)
         {
+            var view = ViewOf(camera);
             if (OnView(view) is { } e)
             {
                 Log.Add($"view {view} failed");
@@ -47,9 +48,11 @@ public class RenderPumpTests
             Log.Add($"view {view}");
         }
 
+        private static RenderView ViewOf(CameraSpec camera) => camera.Direction.X > 0 ? RenderView.Front : RenderView.Back;
+
         public void Render(RenderRequest request)
         {
-            Log.Add($"render {request.View}");
+            Log.Add($"render {ViewOf(request.Camera)}");
             Rendered.Add((request, Shown));
             OnRender(request);
         }
@@ -102,7 +105,7 @@ public class RenderPumpTests
         var pump = Started();
         var mesh = Mesh();
         _store.Replace(mesh);
-        _queue.Post(RenderView.Front);
+        _queue.Post(CameraSpec.ForView(RenderView.Front));
 
         pump.Step();
         Assert.Equal(["show", "view Front"], _scene.Log);
@@ -118,14 +121,14 @@ public class RenderPumpTests
         var pump = Started();
         var first = _store.Current.Mesh;
         var replaced = Mesh();
-        _queue.Post(RenderView.Front);
-        _queue.Post(RenderView.Front);
+        _queue.Post(CameraSpec.ForView(RenderView.Front));
+        _queue.Post(CameraSpec.ForView(RenderView.Front));
         _scene.OnRender = _ =>
         {
             // define_mesh then render, landing while the drain is inside its first render.
             _scene.OnRender = _ => { };
             _store.Replace(replaced);
-            _queue.Post(RenderView.Front);
+            _queue.Post(CameraSpec.ForView(RenderView.Front));
         };
 
         pump.Step();
@@ -145,7 +148,7 @@ public class RenderPumpTests
         _queue.BeforePeek = () =>
         {
             _store.Replace(mesh);
-            _queue.Post(RenderView.Front);
+            _queue.Post(CameraSpec.ForView(RenderView.Front));
         };
 
         pump.Step();
@@ -161,7 +164,7 @@ public class RenderPumpTests
         var pump = Started();
         _scene.OnShow = _ => new OutOfMemoryException("no room");
         _store.Replace(Mesh());
-        var waiting = _queue.Post(RenderView.Front);
+        var waiting = _queue.Post(CameraSpec.ForView(RenderView.Front));
 
         pump.Step();
         pump.Step();
@@ -172,7 +175,7 @@ public class RenderPumpTests
         Assert.DoesNotContain("Vulkan", message);
         Assert.Contains(message, _scene.Reported);
 
-        var later = _queue.Post(RenderView.Front);
+        var later = _queue.Post(CameraSpec.ForView(RenderView.Front));
         pump.Step();
         Assert.Equal(message, FailureOf(later));
         Assert.Empty(_scene.Rendered);
@@ -181,7 +184,7 @@ public class RenderPumpTests
         _scene.OnShow = _ => null;
         var mesh = Mesh();
         _store.Replace(mesh);
-        _queue.Post(RenderView.Front);
+        _queue.Post(CameraSpec.ForView(RenderView.Front));
         pump.Step();
         pump.Step();
         Assert.Same(mesh, Assert.Single(_scene.Rendered).Mesh);
@@ -196,7 +199,7 @@ public class RenderPumpTests
         var pump = Started();
         _store.Replace(Mesh());
         var posted = _store.Current.Mesh;
-        _queue.Post(view);
+        _queue.Post(CameraSpec.ForView(view));
         pump.Step(); // Shows the mesh it was posted at.
 
         var frames = 0;
@@ -222,7 +225,7 @@ public class RenderPumpTests
         var pump = new RenderPump(_queue, _store, _scene);
         _scene.OnShow = _ => new InvalidOperationException("no room");
         _store.Replace(Mesh());
-        var waiting = _queue.Post(RenderView.Front);
+        var waiting = _queue.Post(CameraSpec.ForView(RenderView.Front));
 
         pump.Step();
         pump.Step();
@@ -235,7 +238,7 @@ public class RenderPumpTests
     {
         var pump = Started();
         _scene.OnView = _ => new InvalidOperationException("no camera");
-        var failed = _queue.Post(RenderView.Back);
+        var failed = _queue.Post(CameraSpec.ForView(RenderView.Back));
 
         pump.Step();
 
@@ -245,7 +248,7 @@ public class RenderPumpTests
         Assert.DoesNotContain("Vulkan", message);
 
         _scene.OnView = _ => null;
-        var again = _queue.Post(RenderView.Back);
+        var again = _queue.Post(CameraSpec.ForView(RenderView.Back));
         pump.Step();
         Assert.False(again.IsCompleted);
         Assert.Equal("view Back", _scene.Log[^1]);
@@ -264,7 +267,7 @@ public class RenderPumpTests
         Assert.Single(_scene.Reported);
 
         _scene.OnView = _ => null;
-        _queue.Post(RenderView.Front);
+        _queue.Post(CameraSpec.ForView(RenderView.Front));
         pump.Step();
         Assert.Empty(_scene.Rendered);
 

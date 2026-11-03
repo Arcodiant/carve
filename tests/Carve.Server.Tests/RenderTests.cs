@@ -370,6 +370,58 @@ public class RenderTests
 
         var view = render.GetProperty("inputSchema").GetProperty("properties").GetProperty("view");
         Assert.Equal(["front", "back"], view.GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
-        Assert.Equal("front", view.GetProperty("default").GetString());
+        Assert.Contains("direction", description);
+        Assert.Contains("zoom", description);
+        Assert.Contains("target", description);
+    }
+
+    [Theory]
+    [InlineData("""{"view":"front","direction":[1,0,0]}""", "view and direction")]
+    [InlineData("""{"direction":[0,0,0]}""", "direction")]
+    [InlineData("""{"direction":[1,2]}""", "direction")]
+    [InlineData("""{"direction":[1,1e999,0]}""", "direction")]
+    [InlineData("""{"zoom":0.5}""", "zoom")]
+    [InlineData("""{"zoom":9}""", "zoom")]
+    [InlineData("""{"target":[2,0,0]}""", "target")]
+    [InlineData("""{"target":[0,0]}""", "target")]
+    [InlineData("""{"target":[0,0,-0.001]}""", "target")]
+    public async Task A_bad_camera_is_a_tool_error_and_the_mesh_still_renders(string arguments, string mentions)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+        var before = Png(await RenderAsync(carve));
+
+        Assert.Contains(mentions, ErrorText(await carve.CallToolAsync("render", arguments)));
+        Assert.Equal(before, Png(await RenderAsync(carve)));
+    }
+
+    [Fact]
+    public async Task The_caption_echoes_the_direction_and_shows_zoom_and_target_only_when_set()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        Assert.Equal("512x512, direction (2, 1, 1), 8 vertices, 6 faces", Caption(await carve.CallToolAsync("render", """{"direction":[2,1,1]}""")));
+        Assert.Equal(
+            "512x512, direction (2, 1, 1), zoom 3, target (1, 0.5, 0.25), 8 vertices, 6 faces",
+            Caption(await carve.CallToolAsync("render", """{"direction":[2,1,1],"zoom":3,"target":[1,0.5,0.25]}""")));
+        Assert.Equal("512x512, view back, zoom 2, 8 vertices, 6 faces", Caption(await carve.CallToolAsync("render", """{"view":"back","zoom":2}""")));
+        Assert.Equal("512x512, view front, 8 vertices, 6 faces", Caption(await carve.CallToolAsync("render", "{}")));
+    }
+
+    [Fact]
+    public async Task A_direction_along_the_front_view_is_the_front_view_and_zoom_changes_the_image()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var front = Png(await RenderAsync(carve, "front"));
+        var along = Png(await carve.CallToolAsync("render", """{"direction":[1.6,1.2,2.2]}"""));
+        var zoomed = Png(await carve.CallToolAsync("render", """{"zoom":3}"""));
+        Assert.Equal(front, along);
+        Assert.NotEqual(front, zoomed);
     }
 }

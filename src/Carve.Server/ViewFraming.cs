@@ -22,7 +22,19 @@ public sealed record ViewFrame(
     Matrix4x4 Projection,
     Quaternion LightOrientation);
 
-/// <summary>Pure CPU: the camera that frames a <see cref="DrawnSpace"/> box from a view, and the light.</summary>
+/// <summary>
+/// Where to look from: <paramref name="Direction"/> runs from the point looked at toward the eye (any
+/// length, not zero), <paramref name="Zoom"/> is 1 to 8, and <paramref name="Target"/> is the point
+/// looked at, in drawn space once it reaches <see cref="ViewFraming"/> (null: the centre).
+/// </summary>
+public sealed record CameraSpec(Vector3 Direction, float Zoom = 1f, Vector3? Target = null)
+{
+    /// <summary>The M-1 view, as a camera: zoom 1 at the centre. Not normalised, so it normalises as M-1 did.</summary>
+    public static CameraSpec ForView(RenderView view) =>
+        new(view == RenderView.Front ? ViewFraming.FrontDirection : -ViewFraming.FrontDirection);
+}
+
+/// <summary>Pure CPU: the camera that frames a <see cref="DrawnSpace"/> box from a direction, and the light.</summary>
 public static class ViewFraming
 {
     public const float FieldOfViewY = 0.6f;
@@ -30,16 +42,23 @@ public static class ViewFraming
     /// <summary>The part of the frame left clear on each side, at the tightest edge.</summary>
     public const float Margin = 0.08f;
 
-    private static readonly Vector3 FrontDirection = Vector3.Normalize(new Vector3(1.6f, 1.2f, 2.2f));
+    /// <summary>Within this cone of vertical, up is -Z: CreateLookAt returns NaN looking along up.</summary>
+    public static readonly float VerticalCosine = MathF.Cos(MathF.PI / 180f);
+
+    internal static readonly Vector3 FrontDirection = new(1.6f, 1.2f, 2.2f);
 
     /// <summary>The agreed look in the front view: top bright, +Z middling, +X dark.</summary>
     private static readonly Matrix4x4 FrontLight = Matrix4x4.CreateRotationX(-0.9f) * Matrix4x4.CreateRotationY(0.6f);
 
+    public static ViewFrame Frame(Vector3 half, RenderView view) => Frame(half, CameraSpec.ForView(view));
+
     /// <param name="half">The drawn box's largest corner: it is centred on the origin, half-diagonal 1.</param>
-    /// <param name="view">The view.</param>
-    public static ViewFrame Frame(Vector3 half, RenderView view)
+    /// <param name="camera">The direction, zoom and target (in drawn space).</param>
+    public static ViewFrame Frame(Vector3 half, CameraSpec camera)
     {
-        var direction = Direction(view);
+        var direction = Vector3.Normalize(camera.Direction);
+        var target = camera.Target ?? Vector3.Zero;
+        var up = UpFor(direction);
         var rotation = LookRotation(direction);
         var tangent = MathF.Tan(FieldOfViewY * 0.5f) * (1 - 2 * Margin);
 
@@ -52,32 +71,40 @@ public static class ViewFraming
                 (corner & 1) == 0 ? -half.X : half.X,
                 (corner & 2) == 0 ? -half.Y : half.Y,
                 (corner & 4) == 0 ? -half.Z : half.Z);
-            var seen = Vector3.Transform(offset, rotation); // Camera space: looking down -Z.
+            var seen = Vector3.Transform(offset - target, rotation); // Camera space: looking down -Z.
             distance = Math.Max(distance, Math.Max(Math.Abs(seen.X), Math.Abs(seen.Y)) / tangent + seen.Z);
         }
 
-        var eye = direction * distance;
-        var lookAt = Matrix4x4.CreateLookAt(eye, Vector3.Zero, Vector3.UnitY);
+        // Off centre, the eye is that much further out, so it stays outside the bounding sphere.
+        var offCentre = target.Length();
+        var eye = target + direction * (distance + offCentre);
+        var lookAt = Matrix4x4.CreateLookAt(eye, target, up);
         Matrix4x4.Invert(lookAt, out var world);
-        var projection = Matrix4x4.CreatePerspectiveFieldOfView(FieldOfViewY, 1f, (distance - 1) * 0.9f, (distance + 1) * 1.1f);
 
-        return new ViewFrame(eye, world, lookAt, projection, LightOrientation(view));
+        // Zoom divides the tangent of half the field of view; it never moves the eye.
+        var fov = camera.Zoom == 1f ? FieldOfViewY : 2 * MathF.Atan(MathF.Tan(FieldOfViewY * 0.5f) / camera.Zoom);
+        var projection = Matrix4x4.CreatePerspectiveFieldOfView(fov, 1f, (distance - 1) * 0.9f, (distance + offCentre + 1) * 1.1f + offCentre);
+
+        return new ViewFrame(eye, world, lookAt, projection, LightOrientation(direction));
     }
 
     /// <summary>
     /// The light keeps its place relative to the camera: the front light, turned by whatever turns
-    /// the front camera into this view's. A world-fixed light would leave the far faces ambient-only.
+    /// the front camera into this one. A world-fixed light would leave the far faces ambient-only.
     /// </summary>
-    public static Quaternion LightOrientation(RenderView view)
+    public static Quaternion LightOrientation(Vector3 direction)
     {
-        Matrix4x4.Invert(LookRotation(Direction(view)), out var cameraToWorld);
+        Matrix4x4.Invert(LookRotation(Vector3.Normalize(direction)), out var cameraToWorld);
         return Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(
-            FrontLight * LookRotation(Direction(RenderView.Front)) * cameraToWorld));
+            FrontLight * LookRotation(Vector3.Normalize(FrontDirection)) * cameraToWorld));
     }
 
-    private static Vector3 Direction(RenderView view) => view == RenderView.Front ? FrontDirection : -FrontDirection;
+    public static Quaternion LightOrientation(RenderView view) => LightOrientation(CameraSpec.ForView(view).Direction);
+
+    /// <summary>+Y, or -Z when the unit direction is within 1 degree of vertical.</summary>
+    public static Vector3 UpFor(Vector3 direction) => MathF.Abs(direction.Y) > VerticalCosine ? -Vector3.UnitZ : Vector3.UnitY;
 
     /// <summary>World to camera, rotation only.</summary>
     private static Matrix4x4 LookRotation(Vector3 direction) =>
-        Matrix4x4.CreateLookAt(direction, Vector3.Zero, Vector3.UnitY) with { M41 = 0, M42 = 0, M43 = 0 };
+        Matrix4x4.CreateLookAt(direction, Vector3.Zero, UpFor(direction)) with { M41 = 0, M42 = 0, M43 = 0 };
 }

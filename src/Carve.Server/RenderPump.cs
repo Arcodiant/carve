@@ -8,8 +8,8 @@ internal interface IRenderScene
     /// <summary>Puts this mesh in the scene. If it throws, the scene must not count it as shown.</summary>
     void ShowMesh(PolygonMesh mesh);
 
-    /// <summary>Points the camera and the light for this view of the mesh shown.</summary>
-    void ApplyView(RenderView view);
+    /// <summary>Points the camera and the light for this camera of the mesh shown.</summary>
+    void ApplyView(CameraSpec camera);
 
     /// <summary>Draws the mesh shown and answers the request, whatever happens.</summary>
     void Render(RenderRequest request);
@@ -28,7 +28,7 @@ internal interface IRenderScene
 internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderScene scene)
 {
     private long _version;
-    private RenderView _view = RenderView.Front;
+    private CameraSpec _camera = CameraSpec.ForView(RenderView.Front);
     private bool _viewApplied = true;
     private string? _meshFault;
 
@@ -59,7 +59,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
-            if (next!.View != _view || !_viewApplied)
+            if (next!.Camera != _camera || !_viewApplied)
             {
                 ChangeView(next);
                 return;
@@ -89,7 +89,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
 
         try
         {
-            scene.ApplyView(_view);
+            scene.ApplyView(_camera);
             _viewApplied = true;
         }
         catch (Exception e)
@@ -104,9 +104,9 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     {
         try
         {
-            _view = next.View;
+            _camera = next.Camera;
             _viewApplied = false;
-            scene.ApplyView(_view);
+            scene.ApplyView(_camera);
             _viewApplied = true;
         }
         catch (Exception e)
@@ -119,5 +119,10 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     }
 
     private string ViewFault(Exception e) =>
-        $"The {_view.ToString().ToLowerInvariant()} view could not be set up: {e.GetBaseException().Message}";
+        $"The {Name(_camera)} could not be set up: {e.GetBaseException().Message}";
+
+    private static string Name(CameraSpec camera) =>
+        camera == CameraSpec.ForView(RenderView.Front) ? "front view"
+        : camera == CameraSpec.ForView(RenderView.Back) ? "back view"
+        : "camera";
 }
