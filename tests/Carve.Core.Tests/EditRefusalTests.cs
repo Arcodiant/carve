@@ -92,6 +92,18 @@ public class EditRefusalTests
     }
 
     [Fact]
+    public void A_wall_over_a_short_edge_says_large_when_the_distance_is_too_large_for_that_edge()
+    {
+        // The edge from corner 3 to corner 4 is 1e-10 long: a distance of 0.5 is too large for it, whatever the face's size.
+        var pentagon = Make([new(0, 0, 0), new(1, 0, 0), new(1, 1, 0), new(1e-10f, 1, 0), new(0, 1, 0)], [[0, 1, 2, 3, 4]]);
+        var result = MeshEdits.Extrude(pentagon, [0], 0.5f);
+
+        AssertRefused(result);
+        var message = Assert.Single(result.Errors, e => e.Message.Contains("over the edge from corner 3 to corner 4")).Message;
+        Assert.StartsWith("the distance 0.5 is too large for this face", message);
+    }
+
+    [Fact]
     public void An_extrude_names_a_bad_wall_beside_an_unknown_face()
     {
         var result = MeshEdits.Extrude(Quad(), [5, 0], 1e-30f);

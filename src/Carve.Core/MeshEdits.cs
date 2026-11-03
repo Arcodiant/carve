@@ -241,10 +241,14 @@ public static class MeshEdits
         foreach (var x in extruded)
         {
             string? what = null;
+            int? wallEdge = null;
             for (var k = 0; k < x.Walls.Count && what is null; k++)
             {
                 if (error.Element == $"faces[{x.Walls[k]}]")
+                {
+                    wallEdge = k;
                     what = $"its new wall faces[{x.Walls[k]}], over the edge from corner {k} to corner {(k + 1) % x.Walls.Count}";
+                }
             }
             for (var k = 0; k < x.NewVertices.Count && what is null; k++)
             {
@@ -253,19 +257,16 @@ public static class MeshEdits
             }
             if (what is null) continue;
 
-            // The face as it was: its size, the longest side of its bounding box, says whether the step was small or large.
-            var loop = mesh.Faces[x.Face];
-            var min = mesh.Vertices[loop[0]];
-            var max = min;
-            foreach (var v in loop)
-            {
-                min = Vector3.Min(min, mesh.Vertices[v]);
-                max = Vector3.Max(max, mesh.Vertices[v]);
-            }
-            var extent = max - min;
-            var size = MathF.Max(extent.X, MathF.Max(extent.Y, extent.Z));
+            // A wall is a strip one edge long and the step wide, so the step is small or large against that wall's own edge.
+            // A ring vertex is refused for a non-finite coordinate, which is always large.
             var (name, value) = distance != 0 ? ("distance", distance) : ("inset", inset);
-            var scale = MathF.Abs(value) <= size ? "small" : "large";
+            var scale = "large";
+            if (wallEdge is int wall)
+            {
+                var loop = mesh.Faces[x.Face];
+                var edge = mesh.Vertices[loop[(wall + 1) % loop.Count]] - mesh.Vertices[loop[wall]];
+                scale = MathF.Abs(value) <= edge.Length() ? "small" : "large";
+            }
             return new MeshError($"faces[{x.Face}]",
                 Invariant($"the {name} {value:G6} is too {scale} for this face: {what}, is refused: {error.Message}"));
         }
