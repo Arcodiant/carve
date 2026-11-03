@@ -90,16 +90,24 @@ process, or its renders do not compare from run to run closely enough for scenar
 
 ### Polygon meshes
 
-**Certainty:** Leaning · **Strictness:** Rule
+**Certainty:** Settled · **Strictness:** Rule
 
-The mesh is polygons: faces of any size in an edge-connected structure, triangulated
-on export. Operations keep their meaning on a logical face or edge loop.
+The mesh is polygons: faces of any size, stored as plain indexed vertex loops, with
+an **edge table** derived from them (`MeshTopology`: each undirected edge, the faces
+on it and which way each crosses it; each vertex's faces; each face's edges in loop
+order). Triangles are a derived view for render, validation and export, never
+stored. Operations keep their meaning on a logical face or edge loop. Open,
+non-manifold and mixed-winding meshes stay legal, with warnings. A vertex's and a
+face's id is its position in the mesh's arrays; an edit never renumbers, appends
+new elements at the end, and keeps a reshaped face's id. Along the current chain of
+edits an id is never reused; undo frees the undone step's ids, and the next edit
+gives them out again (qualified after RV-10).
 
-**Alternatives:** triangles only, a simpler kernel that loses the logical faces.
+**Alternatives:** a half-edge structure, which makes walking a manifold surface
+cheap but cannot hold the non-manifold and open input Carve accepts without special
+cases; triangles only, a simpler kernel that loses the logical faces.
 **Would change if:** the structure's cost outweighs its use once cut and extrude
 exist, seen in how agents actually use them.
-**Exceptions:**
-- M-1 — stores plain indexed polygons, and triangulates as a derived view for render, validation and export, never stored; the edge-connected structure is decided in M-2.
 
 ### A Carve file, and .glb export
 
@@ -136,17 +144,8 @@ process and a protocol between the two.
 
 ## Open questions
 
-- **Tool shape.** One tool per operation, or a few general ones? How are elements
-  addressed: ids that survive edits, or selections held by the server? How much does
-  one call return? *M-1 acceptance run (T-7):* with two tools only, `define_mesh` (the whole
-  mesh by coordinates, returning counts, `closed`, bounds and warnings) and `render` (two views
-  and a caption), a fresh agent built a cube and a house with a pitched roof first time, from the
-  descriptions alone and with no error to correct. It used the worked example as the pattern, and
-  trusted `closed: true` to say the winding was right. Still open: what it could not do is look at a
-  face neither view shows (the second roof slope), and with edits that must be a whole-mesh
-  redefinition each time, so addressing elements waits for the first edit tool.
-- **Undo and history.** Does an agent get undo? Is a model's history recorded so the
-  person can read how it was made, or replayed to rebuild it?
+- **Tool shape.** *Decided at T-11:* one tool per operation (`define_mesh`, `move`, `extrude`, `get_mesh`, `undo`), not a few general ones. Elements are addressed by ids that survive edits: a vertex or face id is its position in `define_mesh`'s lists, an edge is a vertex pair, and an edit appends new ids at the end and renumbers nothing; the server holds no selections. `get_mesh` is how an agent learns the ids (no ids are drawn on renders). An edit returns the report plus the ids it created, and for `extrude` its cap, walls and ring; `get_mesh` returns the whole mesh, untrimmed. *M-1 acceptance run (T-7):* with two tools only, a fresh agent built a cube and a house from the descriptions alone with no error to correct; it could not look at a face neither view showed, which render-from-any-direction (T-9) answers. *M-2 acceptance run (T-13):* with one tool per operation, three fresh `claude -p` agents (plain `carve`, no docs) each built a closed, warning-free crate in 13 to 20 carve calls from the descriptions alone, with `define_mesh` once, then only `extrude` and `move`, and used `direction`, `zoom` and `target` unaided; none needed `undo` and two never called `get_mesh` (they tracked ids from the `extruded` and `created` fields of each report), so the ids-in-every-report shape was enough. The shape held with one description edit (`move` now warns that a face crossing itself is rejected after the whole call). The planted inset error never fired: all three read the `extrude` description, saw that 0.7 cannot fit a unit face and built a 4-unit cube instead, so the run showed the descriptions prevent that mistake but not that its error text recovers it (that text is exercised by the scenarios, and by round 2's unplanted `move` error, which the agent read and fixed at once). No handle with a gap behind it was made: nothing bridges two faces, so a later tool's gap.
+- **Undo and history.** *Decided at T-11:* an agent gets plain undo for the last 100 steps, in memory, with no redo; `define_mesh` is a step too, and a failed call is not. Every change, an undo included, raises the model's version by one. *Still open:* whether a model's history is recorded so the person can read how it was made, or replayed to rebuild it, and whether any history survives a restart.
 - **The Carve file.** Text or binary, geometry or a list of operations? (Text would
   diff in git; the choice is open.)
 - **Scope of a model.** Which of these does Carve author, and when: UVs and

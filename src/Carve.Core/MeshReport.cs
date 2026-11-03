@@ -48,30 +48,19 @@ public sealed class MeshReport
     public static MeshReport Create(PolygonMesh mesh)
     {
         var verts = mesh.Vertices;
+        var topology = mesh.Topology;
         var warnings = new List<MeshWarning>();
         var used = new bool[verts.Count];
-        // undirected edge (lo, hi) -> faces running lo->hi, faces running hi->lo
-        var edges = new Dictionary<(int, int), (int Forward, int Backward)>();
-
-        for (var f = 0; f < mesh.Faces.Count; f++)
-        {
-            var face = mesh.Faces[f];
-            for (var k = 0; k < face.Count; k++)
-            {
-                var a = face[k];
-                var b = face[(k + 1) % face.Count];
-                used[a] = true;
-                var key = a < b ? (a, b) : (b, a);
-                edges.TryGetValue(key, out var c);
-                edges[key] = a < b ? (c.Forward + 1, c.Backward) : (c.Forward, c.Backward + 1);
-            }
-        }
+        for (var i = 0; i < verts.Count; i++)
+            used[i] = topology.VertexFaces(i).Count > 0;
 
         var closed = true;
-        foreach (var (key, c) in edges.OrderBy(e => e.Key))
+        foreach (var edge in topology.Edges)
         {
-            var name = $"edges[{key.Item1}-{key.Item2}]";
-            var total = c.Forward + c.Backward;
+            var name = edge.Name;
+            var total = edge.Faces.Count;
+            var forward = edge.Faces.Count(u => u.LoToHi);
+            var c = (Forward: forward, Backward: total - forward);
             if (total == 1)
             {
                 closed = false;
@@ -100,7 +89,7 @@ public sealed class MeshReport
             var limit = PolygonMesh.PlanarityTolerance * PolygonMesh.FaceSize(verts, face);
             var worst = face.Max(i => Math.Abs(((double)verts[i].X - o.X - cx) * normal.X + ((double)verts[i].Y - o.Y - cy) * normal.Y + ((double)verts[i].Z - o.Z - cz) * normal.Z));
             if (worst > limit)
-                warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", $"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})"));
+                warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", MeshEdits.Invariant($"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})")));
         }
 
         for (var i = 0; i < verts.Count; i++)
@@ -118,6 +107,6 @@ public sealed class MeshReport
             max = Vector3.Max(max, verts[i]);
         }
 
-        return new MeshReport(verts.Count, mesh.Faces.Count, edges.Count, closed, min, max, warnings);
+        return new MeshReport(verts.Count, mesh.Faces.Count, topology.Edges.Count, closed, min, max, warnings);
     }
 }

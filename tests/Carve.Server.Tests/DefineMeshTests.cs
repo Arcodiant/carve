@@ -217,7 +217,7 @@ public class DefineMeshTests
         var schema = (await ToolAsync(carve)).GetProperty("inputSchema").GetRawText();
 
         Assert.Equal(
-            """{"type":"object","properties":{"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. Unitless; Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.","type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["vertices","faces"]}""",
+            """{"type":"object","properties":{"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. Unitless; Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.","type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["vertices","faces"],"additionalProperties":false}""",
             schema);
     }
 }

@@ -71,6 +71,27 @@
       ],
       "est-seconds": 15
     }
+,
+    {
+      "id": "scenario-crate",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 crate -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Crate/Carve.Scenario.Crate.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "scripts/run-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 15
+    }
   ],
   "todo": []
 }

@@ -4,7 +4,7 @@ description: >-
 ---
 # T-10 — Move and extrude in the kernel
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -76,3 +76,49 @@ No scenario: T-11 puts these on screen through tools, and T-12 films the crate.
 - Files owned: new files in `src/Carve.Core` and `tests/Carve.Core.Tests`. Do not change `MeshTopology`'s public shape without saying so in the closing report.
 - **Design-heavy, and decides what others build on**: `EditResult` is the shape T-11 returns to agents. Put its public names in the closing report.
 - Leave the worktree before `finish`.
+
+### As built
+
+Ran on Claude Opus 5.5 (`claude-opus-5-5`).
+
+**What T-11 builds on** (`src/Carve.Core/MeshEdits.cs`, `EditResult.cs`):
+
+- `MeshEdits.Move(PolygonMesh mesh, IEnumerable<int>? vertices, IEnumerable<(int A, int B)>? edges, IEnumerable<int>? faces, Vector3 by)`.
+- `MeshEdits.Extrude(PolygonMesh mesh, IEnumerable<int> faces, float distance, float inset = 0)`.
+- `EditResult`: `Mesh` (`PolygonMesh?`), `Errors` (`IReadOnlyList<MeshError>`), `Succeeded`, `MovedVertices` (existing ids a move moved, ascending; empty for an extrude), `NewVertices` and `NewFaces` (appended ids, ascending), `Extruded` (`IReadOnlyList<ExtrudedFace>`, one per listed face in the order listed; empty for a move). On a refusal `Mesh` is null and every id list is empty.
+- `ExtrudedFace(int Face, int Cap, IReadOnlyList<int> Walls, IReadOnlyList<int> NewVertices)`: `Cap == Face`; `Walls[k]` is `[old k, old k+1, new k+1, new k]`; `NewVertices[k]` stands over corner `k`.
+- Warnings are not on `EditResult`: take `MeshReport.Create(result.Mesh)`, as `define_mesh` does.
+
+**`MeshTopology`'s public shape is unchanged.** Nothing outside the new files was edited.
+
+**Geometry.** Inset is a pure mitre: corner `k` moves by `inset · (p₁ + p₂) / (1 + p₁·p₂)`, `p` the unit inward perpendiculars (`normal × edge`) of its two edges, then by `distance` along the unit Newell normal, in double relative to the first corner. The too-large check refuses when any offset edge's dot with its original is ≤ 0 (reversed or vanished), when two edges fold back (`1 + p₁·p₂ ≤ 0`), or when `Triangulator.FindCrossing` finds the inset ring crossing itself. No new tolerance was added.
+
+**Readings of the spec.**
+
+- *"Inset only, distance 0, on all six faces: closed, 54 faces"* can't hold: an inset of six quads adds 24 walls, 30 faces. 54 is after the probe's next step (recess all six by −0.08), which is "half of the crate". The test checks both: 32 vertices / 30 faces after the inset, 56 / 54 after the recess, closed with no warnings each time.
+- *Reflex corner beyond the mitre*: not decided. There is no mitre limit, cap or extra refusal; a reflex corner gets the plain mitre, and the collapse/crossing checks are the only refusals. That open rule is still the person's.
+- Error elements stay plain names (`vertices[n]`, `faces[n]`, `edges[lo-hi]`, the lo-hi order whatever order was listed); the argument position starts the message, e.g. `faces[6]: the 2nd listed face: there is no face 6: ids run 0..5`. Argument problems are named by argument: `by`, `inset`, `distance`, `distance, inset`, `faces`, `vertices, edges, faces`.
+- Two refusals not on the list, added as plainly needed: `Extrude` with no faces (`faces`), and a non-finite `distance` (`distance`).
+- Argument errors and too-large insets are all gathered before `Edit`; `Create`'s own refusals come back only when the arguments are clean.
+- The crate test does the −X face (vertex moves) before the +X face (edge moves); the spec gives no order.
+
+**Tests**, all `Tier=unit`: `MoveTests` (14 cases), `ExtrudeTests` (17), `CrateTests` (1). Each was shown failing on a deliberate break of `MeshEdits.cs`, then the code was restored:
+
+| Break | Failed |
+|---|---|
+| walls wound inward | `ExtrudingTheTopByOne`, `RecessingWithAnInset`, `InsetOnlyOnAllSixFacesThenRecessed`, `InsetOnTheConcaveLBlockCap…`, `TheCrate` |
+| edge-reversal inset check removed | `RefusesAnInsetTooLargeForTheFace`, `RefusesAnInsetThatCollapsesTheFaceToAPoint`, `ListsEveryProblem` |
+| self-crossing inset check removed | `RefusesAnInsetThatCrossesItselfOnAConcaveFace` |
+| mitre as a unit bisector | `InsetOnTheConcaveLBlockCap…`, `RecessingWithAnInset`, the three too-large tests |
+| distance along minus the normal | `ExtrudingTheTopByOne`, `RecessingWithAnInset`, `TheCrate` |
+| cap appended as a new face, old face left | `ExtrudingTheTopByOne`, `NewIdsRunFaceByFace…`, `InsetOnly…`, `RecessingWithAnInset`, `TheCrate` |
+| edge moves only its low end | `MovesBothEndsOfAnEdgeInEitherOrder` |
+| face moves only its first corner | `MovesEveryCornerOfAFace`, `MovesTheUnionOnce`, `TheCrate` |
+| unknown vertex / face misnamed or left to `Edit` | `RefusesAnUnknownVertex`, both `RefusesAnUnknownFace`, `MoveTests.ListsEveryProblem` |
+| non-edge named in listed order | `RefusesAPairThatIsNotAnEdge` |
+| zero / non-finite `by`, nothing listed | `RefusesAZeroMove`, `RefusesANonFiniteMove`, `RefusesNothingListed` |
+| duplicate face allowed | `RefusesAFaceListedTwice`, `ExtrudeTests.ListsEveryProblem` |
+| both-zero, negative, non-finite inset, non-finite distance allowed | the matching `Refuses…` test |
+| refusal keeping only its first error | both `ListsEveryProblem` |
+
+`MovingOneTopCornerUpWarnsNonPlanar` checks `MeshReport`'s existing warning and was not given a break of its own.

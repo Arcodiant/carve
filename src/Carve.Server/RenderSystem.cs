@@ -30,6 +30,7 @@ internal sealed class RenderSystem(
     private Mesh? _mesh;
     private MeshReport? _report;
     private Vector3 _drawnHalf;
+    private DrawnSpace _space;
     private RenderPump? _pump;
 
     public void Initialise()
@@ -110,6 +111,7 @@ internal sealed class RenderSystem(
         var old = _mesh;
         _mesh = next;
         _report = report;
+        _space = space;
         _drawnHalf = space.Apply(report.BoundsMax);
         if (old is not null)
         {
@@ -117,9 +119,11 @@ internal sealed class RenderSystem(
         }
     }
 
-    public void ApplyView(RenderView view)
+    public void ApplyView(CameraSpec camera)
     {
-        var frame = ViewFraming.Frame(_drawnHalf, view);
+        // The target is in the mesh's own coordinates; the camera works in drawn space.
+        var drawn = camera.Target is { } target ? camera with { Target = _space.Apply(target) } : camera;
+        var frame = ViewFraming.Frame(_drawnHalf, drawn);
         entities.GetOrAddComponent<WorldTransform>(_camera) = new WorldTransform { Matrix = frame.World };
         entities.GetComponent<Camera>(_camera).ProjectionMatrix = frame.Projection;
         entities.GetComponent<Transform3D>(_light).Orientation = frame.LightOrientation;

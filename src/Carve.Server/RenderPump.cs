@@ -1,3 +1,4 @@
+using System.Numerics;
 using Carve.Core;
 
 namespace Carve.Server;
@@ -8,8 +9,8 @@ internal interface IRenderScene
     /// <summary>Puts this mesh in the scene. If it throws, the scene must not count it as shown.</summary>
     void ShowMesh(PolygonMesh mesh);
 
-    /// <summary>Points the camera and the light for this view of the mesh shown.</summary>
-    void ApplyView(RenderView view);
+    /// <summary>Points the camera and the light for this camera of the mesh shown.</summary>
+    void ApplyView(CameraSpec camera);
 
     /// <summary>Draws the mesh shown and answers the request, whatever happens.</summary>
     void Render(RenderRequest request);
@@ -28,9 +29,10 @@ internal interface IRenderScene
 internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderScene scene)
 {
     private long _version;
-    private RenderView _view = RenderView.Front;
+    private CameraSpec _camera = CameraSpec.ForView(RenderView.Front);
     private bool _viewApplied = true;
     private string? _meshFault;
+    private (Vector3 Min, Vector3 Max)? _shownBounds;
 
     public void Step()
     {
@@ -59,7 +61,17 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
-            if (next!.View != _view || !_viewApplied)
+            // The target was checked at the call against the mesh then current; the mesh shown may be a
+            // newer one, so it is checked again against that mesh, with the same text.
+            if (next!.Camera.Target is { } target && _shownBounds is { } bounds
+                && TargetCheck.Refusal(target, bounds.Min, bounds.Max) is { } refusal)
+            {
+                queue.TryTake(out _);
+                next.Fail(new InvalidOperationException(refusal));
+                continue;
+            }
+
+            if (next!.Camera != _camera || !_viewApplied)
             {
                 ChangeView(next);
                 return;
@@ -77,19 +89,21 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         try
         {
             scene.ShowMesh(snapshot.Mesh!);
+            var report = MeshReport.Create(snapshot.Mesh!);
+            _shownBounds = (report.BoundsMin, report.BoundsMax);
             _meshFault = null;
         }
         catch (Exception e)
         {
             // Until the next mesh, a render is this error, never the last mesh under a new caption.
-            _meshFault = $"The mesh from define_mesh could not be put in the scene: {e.GetBaseException().Message}";
+            _meshFault = $"The current mesh could not be put in the scene: {e.GetBaseException().Message}";
             scene.Report(e, _meshFault);
             return;
         }
 
         try
         {
-            scene.ApplyView(_view);
+            scene.ApplyView(_camera);
             _viewApplied = true;
         }
         catch (Exception e)
@@ -104,9 +118,9 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     {
         try
         {
-            _view = next.View;
+            _camera = next.Camera;
             _viewApplied = false;
-            scene.ApplyView(_view);
+            scene.ApplyView(_camera);
             _viewApplied = true;
         }
         catch (Exception e)
@@ -119,5 +133,10 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     }
 
     private string ViewFault(Exception e) =>
-        $"The {_view.ToString().ToLowerInvariant()} view could not be set up: {e.GetBaseException().Message}";
+        $"The {Name(_camera)} could not be set up: {e.GetBaseException().Message}";
+
+    private static string Name(CameraSpec camera) =>
+        camera == CameraSpec.ForView(RenderView.Front) ? "front view"
+        : camera == CameraSpec.ForView(RenderView.Back) ? "back view"
+        : "camera";
 }

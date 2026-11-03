@@ -1,13 +1,11 @@
-using System.ComponentModel;
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using static Carve.Server.MeshToolSupport;
 
 namespace Carve.Server;
 
@@ -30,7 +28,8 @@ public sealed class DefineMeshTool(ModelStore store)
         + "closed is true when every edge is shared by exactly two faces. Warnings (open edges, edges shared by more than two faces, "
         + "inconsistent winding, non-planar faces, unused vertices) mean the mesh was accepted but is probably not what you meant. "
         + "Bad input (a missing or out-of-range index, a face with fewer than 3 vertices, a repeated index, a zero-area face, "
-        + "a self-intersecting or folded-back face outline, a non-finite coordinate, a vertex without exactly 3 numbers) is a tool error that lists every problem by element, e.g. faces[2][1]. "
+        + "a self-intersecting or folded-back face outline, a non-finite coordinate, a vertex without exactly 3 numbers, an argument define_mesh does not take) is a tool error that lists every problem by element, e.g. faces[2][1]. "
+        + "Vertex and face ids are the positions given here (vertex 0 is the first in vertices, face 0 the first in faces), and move and extrude keep them; get_mesh reads them back and undo steps back. "
         + ExampleMarker + " " + CubeExample;
 
     private const string VerticesText = "Vertex positions, each exactly three numbers [x, y, z]. Unitless; Y is up.";
@@ -43,15 +42,7 @@ public sealed class DefineMeshTool(ModelStore store)
     /// every problem comes back as one tool error naming the element; the published schema is written out here
     /// and is what a typed <c>double[][]</c>, <c>int[][]</c> signature would have produced.
     /// </summary>
-    public static McpServerTool Create()
-    {
-        var tool = McpServerTool.Create(
-            typeof(DefineMeshTool).GetMethod(nameof(Run))!,
-            request => new DefineMeshTool(request.Services!.GetRequiredService<ModelStore>()),
-            new McpServerToolCreateOptions { Name = "define_mesh", Description = Text });
-        tool.ProtocolTool.InputSchema = JsonSerializer.SerializeToElement(Schema());
-        return tool;
-    }
+    public static McpServerTool Create() => MeshToolSupport.Create<DefineMeshTool>("define_mesh", Text, Schema());
 
     private static JsonObject Schema() => new()
     {
@@ -84,9 +75,9 @@ public sealed class DefineMeshTool(ModelStore store)
         ["required"] = new JsonArray("vertices", "faces"),
     };
 
-    public CallToolResult Run(JsonElement? vertices = null, JsonElement? faces = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? vertices = null, JsonElement? faces = null)
     {
-        var errors = new List<string>();
+        var errors = UnknownArguments("define_mesh", context, "vertices", "faces");
         var shapeBad = new HashSet<string>();
         var points = new List<Vector3>();
         var indices = new List<int[]>();
@@ -121,28 +112,11 @@ public sealed class DefineMeshTool(ModelStore store)
             .Where(e => facesOk || e.Element.StartsWith("vertices[", StringComparison.Ordinal))
             .Where(e => verticesOk || (e.Element.StartsWith("faces[", StringComparison.Ordinal) && !e.Message.Contains("out of range", StringComparison.Ordinal)))
             .Select(e => e.ToString()));
-        if (errors.Count > 0)
-        {
-            return new CallToolResult
-            {
-                IsError = true,
-                Content = [new TextContentBlock { Text = $"define_mesh failed with {errors.Count} problem(s); the current mesh is unchanged:\n" + string.Join("\n", errors) }],
-            };
-        }
+        if (errors.Count > 0) return Failed("define_mesh", errors);
 
         var mesh = result.Mesh!;
         store.Replace(mesh);
-        var report = MeshReport.Create(mesh);
-        var body = new
-        {
-            vertices = report.VertexCount,
-            faces = report.FaceCount,
-            edges = report.EdgeCount,
-            closed = report.Closed,
-            bounds = new { min = Array(report.BoundsMin), max = Array(report.BoundsMax) },
-            warnings = report.Warnings.Select(w => w.ToString()).ToArray(),
-        };
-        return new CallToolResult { Content = [new TextContentBlock { Text = JsonSerializer.Serialize(body) }] };
+        return Ok(Report(mesh));
     }
 
     private static bool ArrayOrError(string name, JsonElement value, List<string> errors)
@@ -216,60 +190,4 @@ public sealed class DefineMeshTool(ModelStore store)
         }
         return result.ToArray();
     }
-
-    /// <summary>
-    /// A JSON integer that fits an int, judged from the number's own text so that no rounding to a double can make a
-    /// fraction whole: a whole number written with a fraction or exponent (<c>1.0</c>, <c>1e0</c>) is accepted,
-    /// <c>1.00000000000000001</c> and <c>1e-400</c> are not.
-    /// </summary>
-    private static bool TryIndex(JsonElement x, out int index)
-    {
-        index = 0;
-        if (x.ValueKind != JsonValueKind.Number) return false;
-        if (x.TryGetInt32(out index)) return true;
-
-        var text = x.GetRawText();
-        var p = 0;
-        var negative = text[p] == '-';
-        if (negative) p++;
-        var digits = new System.Text.StringBuilder();
-        var scale = 0L; // the value is digits * 10^scale
-        for (; p < text.Length && char.IsAsciiDigit(text[p]); p++) digits.Append(text[p]);
-        if (p < text.Length && text[p] == '.')
-        {
-            for (p++; p < text.Length && char.IsAsciiDigit(text[p]); p++) { digits.Append(text[p]); scale--; }
-        }
-        if (p < text.Length && (text[p] == 'e' || text[p] == 'E'))
-        {
-            var exponent = text[(p + 1)..];
-            var sign = exponent.StartsWith('-') ? -1 : 1;
-            if (!long.TryParse(exponent.TrimStart('+', '-'), NumberStyles.None, CultureInfo.InvariantCulture, out var e)) e = 1_000_000_000;
-            scale += sign * Math.Min(e, 1_000_000_000);
-        }
-
-        var significant = digits.ToString().TrimStart('0');
-        if (significant.Length == 0) return true; // zero, index stays 0
-
-        var trimmed = significant.TrimEnd('0');
-        scale += significant.Length - trimmed.Length;
-        if (scale < 0) return false; // a nonzero fractional part
-        if (trimmed.Length + scale > 10) return false;
-        var value = System.Numerics.BigInteger.Parse(trimmed, CultureInfo.InvariantCulture) * System.Numerics.BigInteger.Pow(10, (int)scale);
-        if (negative) value = -value;
-        if (value < int.MinValue || value > int.MaxValue) return false;
-        index = (int)value;
-        return true;
-    }
-
-    private static string Describe(JsonElement x) => x.ValueKind switch
-    {
-        JsonValueKind.Number => x.GetRawText(),
-        JsonValueKind.String => "a string",
-        JsonValueKind.Array => "an array",
-        JsonValueKind.Object => "an object",
-        JsonValueKind.True or JsonValueKind.False => "a boolean",
-        _ => "null",
-    };
-
-    private static float[] Array(Vector3 v) => [v.X, v.Y, v.Z];
 }

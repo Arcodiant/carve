@@ -4,7 +4,7 @@ description: >-
 ---
 # T-12 — Crate scenario
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -66,3 +66,16 @@ Pick the sample pixels from the first good run, record them as constants with a 
 - Five frames, plus the undo and error frames: look at them together at the end.
 - Nothing here has sound or motion, so no listening or real-time pass is planned.
 - Leave the worktree before `finish`.
+
+### As built
+
+Ran on Claude Sonnet 5.5 (`claude-sonnet-5-5`).
+
+- `scenarios/Carve.Scenario.Crate` (`CrateScenario.cs`): the 12-call sequence with counts and closed checked after every call (8/6, 8/6, 32/30, 56/54, 60/58 x3, 64/62, 68/66 x3, 72/70), then closed, no warnings and bounds `(-0.02,0,0)` to `(1.02,0.8,1)`. Five frames, `front` again byte-equal, undo (frame differs, bar's sample point shows the panel's shade), the same extrude again (byte-equal to front), and two failing extrudes (inset 0.6 on face 3, unknown face 99; each error names the face) followed by a byte-equal render. Suite `scenario-crate` (regression), `.slnx` entry, `CLAUDE.md` Layout row.
+- Pixel constants and the reason for each are commented in the file. Shades (green): top 216, +Z 190, +X 171, background 53.
+- **Back view**: seen from below, so the -X bar's top is hidden; the check uses the bar's underside (118) against the -X face above it (196).
+- **Zoom target**: the agreed `[1.02, 0.4, 0.5]` is refused by `render` ("outside the mesh's bounds"): the computed max X is the float 1.0199999 and `RenderTool` compares the target as a double. Bug for M-2 (a float cast on the comparison in `RenderTool.cs`). The scenario uses `[1.0199, 0.4, 0.5]`, which the person approved in round 1. When the bug is fixed, the target can go back to 1.02.
+- **Shown failing**: +X bar and -X bar barely standing (front, back checks), zoom ignored (zoom check), front rendered from the back (order check), front zoomed (corner check), head-on top instead of tilted (recess wall check), undo skipped, repeat extrude with another distance, inset 0.6 accepted. The recess-wall check was shown on the head-on view, not on a recess skipped in the mesh; the centre-not-background check was not given its own break.
+- **Second run**: two runs (`artifacts/scenarios/crate/21` and `22`), all 9 frames byte-identical.
+- **Review**: round 1, 8 frames, approved. Front, back and the two tilted views look like the planning previews; the zoom is a different framing from `view-bar-zoom3.png` (the bar fills the frame, the preview showed a corner).
+- Same-machine comparison only; no golden or cross-machine comparison.

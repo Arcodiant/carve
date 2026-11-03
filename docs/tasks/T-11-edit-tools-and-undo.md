@@ -4,7 +4,7 @@ description: >-
 ---
 # T-11 — Edit tools and undo
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -80,3 +80,31 @@ Register the hand-built tools in `Program.cs` beside `define_mesh`.
 - Tool text may be sharpened by T-13 after a real agent has used it.
 - Writes down for T-12: the exact JSON field names of the edit results.
 - Leave the worktree before `finish`.
+
+### As built
+
+Ran on Claude Sonnet 5.5 (`claude-sonnet-5-5`).
+
+**Tools**, all hand-registered in `Program.cs` beside `define_mesh` (`MoveTool`, `ExtrudeTool`, `GetMeshTool`, `UndoTool`; shared plumbing in `MeshToolSupport`). Arguments are bound raw and validated by the tool so every problem comes back in one tool error, `"<tool> failed with N problem(s); the current mesh is unchanged:"` then one line per problem. No mesh yet: `"<tool>: there is no mesh yet; call define_mesh first"`; `undo` with nothing older: `"undo: nothing to undo; there is no older state of the mesh"`.
+
+**JSON field names, for T-12.** Every result carries `define_mesh`'s report: `vertices` (count), `faces` (count), `edges` (count), `closed`, `bounds: {min: [x,y,z], max: [x,y,z]}`, `warnings: [string]`.
+
+- `move({vertices?: [int], edges?: [[a,b]], faces?: [int], by: [dx,dy,dz]})` adds `created: {vertices: [], faces: []}` (always empty) and `moved: [vertex ids, ascending]`.
+- `extrude({faces: [int], distance: number, inset?: number = 0})` adds `created: {vertices: [ids], faces: [ids]}` and `extruded: [{face, cap, walls: [face ids], vertices: [ring vertex ids]}]`, one per listed face in listed order (`cap == face`).
+- `get_mesh()` returns `vertices: [{id, at: [x,y,z]}]`, `faces: [{id, vertices: [ids], normal: [x,y,z], centre: [x,y,z]}]`, `edges: [{vertices: [a,b], faces: [ids]}]` (a < b), plus `closed`, `bounds`, `warnings`. Here `vertices`/`faces`/`edges` are lists, not counts. Not trimmed.
+- `undo()` returns the report and `undone: "<tool name>"` (`define_mesh`, `move` or `extrude`).
+
+**Readings of the spec.**
+
+- *"Last 100 snapshots"* with *"a 101st undo back fails"*: the store keeps the current mesh plus 100 older ones, so exactly 100 undos work and the 101st fails. With a long history the first `define_mesh` falls off the back.
+- Undoing the very first `define_mesh` is the "nothing older" error (the store does not go back to empty).
+- `ModelStore.Replace` stays (as a `define_mesh` push) so `RenderPump`'s contract and its tests are untouched; new members are `Push`, `Edit` (edit-and-push under one lock) and `Undo`.
+- `move` also returns `moved`, an addition beside the spec's fields; no existing field changed.
+- The worked examples are lines starting `Example: ` in each description; `get_mesh`'s trimmed output is a line starting `Output: ` and is not run.
+- The `define_mesh` sentence added: "Vertex and face ids are the positions given here (...), and move and extrude keep them; get_mesh reads them back and undo steps back."
+
+**D-1.** *Tool shape* and *Undo and history* answered; the readable/replayable history is left open.
+
+**Tests.** `EditToolTests` (regression, through the real client): every worked example run on the cube (closed, warning-free), the crate's 12-call sequence (72 vertices, 70 faces, closed, no warnings), 13 error cases each leaving `get_mesh` unchanged and not counting as an undo step, undo restoring the exact `get_mesh` text, 101st undo failing, `tools/list` schemas. `ModelStoreTests` (unit): version rises by 1 on undo, the 100-step window, a failed edit pushes nothing.
+
+Shown failing on a broken product: `UndoDepth = 99` failed `The_hundred_and_first_undo_back_fails`, `Keeps_the_current_mesh_and_the_last_hundred_older_ones` and `Undo_steps_back_to_the_older_mesh_and_raises_the_version_by_one`; undo not raising the version failed the last of those; `get_mesh` with a flipped normal failed `Get_mesh_lists_vertices_faces_and_edges_with_the_report_fields`. Code restored. The other tests had no break of their own.

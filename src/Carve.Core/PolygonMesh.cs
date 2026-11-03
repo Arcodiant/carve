@@ -24,8 +24,22 @@ public sealed class MeshResult
 
 /// <summary>
 /// An immutable polygon mesh in plain indexed storage: vertices, and faces as index lists of 3 or more.
-/// Winding is counter-clockwise seen from outside. Triangles are a derived view (<see cref="Triangulator"/>), never stored.
+/// Winding is counter-clockwise seen from outside. Triangles are a derived view (<see cref="Triangulator"/>), never stored,
+/// and so is the edge table (<see cref="Topology"/>).
 /// </summary>
+/// <remarks>
+/// <para><b>Ids.</b> A vertex's id is its position in <see cref="Vertices"/> and a face's id its position in
+/// <see cref="Faces"/>: the same numbers <c>define_mesh</c> takes and every error and warning names
+/// (<c>vertices[n]</c>, <c>faces[n]</c>). An edge has no id of its own and is named by its two vertex ids.</para>
+/// <para>Across every edit of a mesh, made through <see cref="Edit"/>:</para>
+/// <list type="bullet">
+/// <item>an edit never renumbers: every vertex and face keeps its id;</item>
+/// <item>an id is never reused along the current chain of edits; an edit that is undone frees its ids, and the next
+/// edit gives them out again;</item>
+/// <item>new vertices and faces are added at the end, taking the next ids in order;</item>
+/// <item>a face that is reshaped (its loop replaced) keeps its id.</item>
+/// </list>
+/// </remarks>
 public sealed class PolygonMesh
 {
     /// <summary>A face is non-planar when a vertex lies further from its plane than this fraction of the face's bounding-box diagonal.</summary>
@@ -49,8 +63,16 @@ public sealed class PolygonMesh
         Faces = Array.AsReadOnly(faces.Select(f => (IReadOnlyList<int>)Array.AsReadOnly(f)).ToArray());
     }
 
+    private MeshTopology? _topology;
+
+    /// <summary>The vertices; a vertex's id is its position here.</summary>
     public IReadOnlyList<Vector3> Vertices { get; }
+
+    /// <summary>The faces as vertex-id loops; a face's id is its position here.</summary>
     public IReadOnlyList<IReadOnlyList<int>> Faces { get; }
+
+    /// <summary>The mesh's edge table, built on first use and held by the mesh.</summary>
+    public MeshTopology Topology => LazyInitializer.EnsureInitialized(ref _topology, () => new MeshTopology(this));
 
     /// <summary>Validates and builds a mesh (the inputs are copied), or returns every error found.</summary>
     public static MeshResult Create(IEnumerable<Vector3> vertices, IEnumerable<IEnumerable<int>> faces)
@@ -87,7 +109,7 @@ public sealed class PolygonMesh
             {
                 if (face[k] < 0 || face[k] >= verts.Length)
                 {
-                    errors.Add(new MeshError($"faces[{f}][{k}]", verts.Length == 0 ? $"index {face[k]} is out of range: there are no vertices" : $"index {face[k]} is out of range 0..{verts.Length - 1}"));
+                    errors.Add(new MeshError($"faces[{f}][{k}]", verts.Length == 0 ? MeshEdits.Invariant($"index {face[k]} is out of range: there are no vertices") : MeshEdits.Invariant($"index {face[k]} is out of range 0..{verts.Length - 1}")));
                     faceOk = false;
                 }
             }
@@ -98,7 +120,7 @@ public sealed class PolygonMesh
                 {
                     if (face[j] == face[k])
                     {
-                        errors.Add(new MeshError($"faces[{f}][{k}]", $"index {face[k]} repeats faces[{f}][{j}]"));
+                        errors.Add(new MeshError($"faces[{f}][{k}]", MeshEdits.Invariant($"index {face[k]} repeats faces[{f}][{j}]")));
                         faceOk = false;
                         break;
                     }
@@ -130,6 +152,62 @@ public sealed class PolygonMesh
         return errors.Count > 0
             ? new MeshResult(null, errors)
             : new MeshResult(new PolygonMesh(verts, fcs), errors);
+    }
+
+    /// <summary>
+    /// Builds the mesh an edit makes from this one, by the id contract on <see cref="PolygonMesh"/>, and runs
+    /// <see cref="Create"/>'s validation on the whole result, so a bad result is refused by element exactly as
+    /// <c>define_mesh</c> is. This mesh is not changed.
+    /// </summary>
+    /// <param name="movedVertices">New positions, by vertex id.</param>
+    /// <param name="reshapedFaces">New loops, by face id; the face keeps its id.</param>
+    /// <param name="addedVertices">Vertices appended after the last, taking ids <c>Vertices.Count</c> onward.</param>
+    /// <param name="addedFaces">Faces appended after the last, taking ids <c>Faces.Count</c> onward. Their indices, like
+    /// those in <paramref name="reshapedFaces"/>, are ids in the result, so they may use added vertices.</param>
+    /// <remarks>An id in <paramref name="movedVertices"/> or <paramref name="reshapedFaces"/> that this mesh does not
+    /// have is refused as <c>vertices[n]</c> or <c>faces[n]</c>, beside whatever else is wrong.</remarks>
+    public MeshResult Edit(
+        IEnumerable<KeyValuePair<int, Vector3>>? movedVertices = null,
+        IEnumerable<KeyValuePair<int, IEnumerable<int>>>? reshapedFaces = null,
+        IEnumerable<Vector3>? addedVertices = null,
+        IEnumerable<IEnumerable<int>>? addedFaces = null)
+    {
+        var errors = new List<MeshError>();
+        var verts = (Vector3[])_vertices.Clone();
+        var fcs = (int[][])_faces.Clone();
+
+        foreach (var (id, position) in movedVertices ?? [])
+        {
+            if (id < 0 || id >= verts.Length)
+                errors.Add(new MeshError($"vertices[{id}]", $"there is no vertex {id} to move: ids run 0..{verts.Length - 1}"));
+            else
+                verts[id] = position;
+        }
+
+        foreach (var (id, loop) in reshapedFaces ?? [])
+        {
+            if (id < 0 || id >= fcs.Length)
+                errors.Add(new MeshError($"faces[{id}]", $"there is no face {id} to reshape: ids run 0..{fcs.Length - 1}"));
+            else
+                fcs[id] = loop.ToArray();
+        }
+
+        var result = Create(verts.Concat(addedVertices ?? []), fcs.Concat((addedFaces ?? []).Select(f => f.ToArray())));
+        return errors.Count == 0 ? result : new MeshResult(null, [.. errors, .. result.Errors]);
+    }
+
+    /// <summary>Centre of a face: the mean of its vertices.</summary>
+    public Vector3 FaceCentre(int face)
+    {
+        var loop = _faces[face];
+        var o = _vertices[loop[0]];
+        double x = 0, y = 0, z = 0;
+        foreach (var i in loop)
+        {
+            var v = _vertices[i];
+            x += (double)v.X - o.X; y += (double)v.Y - o.Y; z += (double)v.Z - o.Z;
+        }
+        return new Vector3((float)(o.X + x / loop.Length), (float)(o.Y + y / loop.Length), (float)(o.Z + z / loop.Length));
     }
 
     /// <summary>Unit normal of a face by Newell's method; outward for a face wound counter-clockwise from outside.</summary>
