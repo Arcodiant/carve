@@ -101,12 +101,9 @@ internal static class RenderTool
         if (targetVector is { } t)
         {
             var bounds = MeshReport.Create(mesh);
-            var (min, max) = (bounds.BoundsMin, bounds.BoundsMax);
-            if (t.X < min.X || t.X > max.X || t.Y < min.Y || t.Y > max.Y || t.Z < min.Z || t.Z > max.Z)
+            if (TargetCheck.Refusal(t, bounds.BoundsMin, bounds.BoundsMax) is { } refusal)
             {
-                return Error(
-                    $"target: ({Join(target!)}) is outside the mesh's bounds, "
-                    + $"({Join([min.X, min.Y, min.Z])}) to ({Join([max.X, max.Y, max.Z])}).");
+                return Error(refusal);
             }
         }
 

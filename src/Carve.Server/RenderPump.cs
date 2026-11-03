@@ -1,3 +1,4 @@
+using System.Numerics;
 using Carve.Core;
 
 namespace Carve.Server;
@@ -31,6 +32,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     private CameraSpec _camera = CameraSpec.ForView(RenderView.Front);
     private bool _viewApplied = true;
     private string? _meshFault;
+    private (Vector3 Min, Vector3 Max)? _shownBounds;
 
     public void Step()
     {
@@ -59,6 +61,16 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
+            // The target was checked at the call against the mesh then current; the mesh shown may be a
+            // newer one, so it is checked again against that mesh, with the same text.
+            if (next!.Camera.Target is { } target && _shownBounds is { } bounds
+                && TargetCheck.Refusal(target, bounds.Min, bounds.Max) is { } refusal)
+            {
+                queue.TryTake(out _);
+                next.Fail(new InvalidOperationException(refusal));
+                continue;
+            }
+
             if (next!.Camera != _camera || !_viewApplied)
             {
                 ChangeView(next);
@@ -77,12 +89,14 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         try
         {
             scene.ShowMesh(snapshot.Mesh!);
+            var report = MeshReport.Create(snapshot.Mesh!);
+            _shownBounds = (report.BoundsMin, report.BoundsMax);
             _meshFault = null;
         }
         catch (Exception e)
         {
             // Until the next mesh, a render is this error, never the last mesh under a new caption.
-            _meshFault = $"The mesh from define_mesh could not be put in the scene: {e.GetBaseException().Message}";
+            _meshFault = $"The current mesh could not be put in the scene: {e.GetBaseException().Message}";
             scene.Report(e, _meshFault);
             return;
         }
