@@ -109,10 +109,7 @@ public sealed class CrateScenario : IScenario
         var back = await driver.CaptureAsync("crate-back", new { view = "back" });
         var left = await driver.CaptureAsync("crate-dir-m2.2-1.2-1.6", new { direction = new[] { -2.2, 1.2, 1.6 } });
         var tilted = await driver.CaptureAsync("crate-dir-0.4-2-0.8", new { direction = new[] { 0.4, 2, 0.8 } });
-        // The agreed target is [1.02, 0.4, 0.5], but render refuses it: the crate's computed max X is the float
-        // 1.0199999, and render compares the target as a double (bug filed for M-2). 1.0199 is the nearest
-        // value it accepts; the person is asked to approve it.
-        var zoom = await driver.CaptureAsync("crate-dir-2-1-1-zoom3", new { direction = new[] { 2, 1, 1 }, zoom = 3, target = new[] { 1.0199, 0.4, 0.5 } });
+        var zoom = await driver.CaptureAsync("crate-dir-2-1-1-zoom3", new { direction = new[] { 2, 1, 1 }, zoom = 3, target = new[] { 1.02, 0.4, 0.5 } });
         var frontAgain = await driver.CaptureAsync("crate-front-again", new { view = "front" });
         driver.AssertBytesEqual("crate front, rendered again", front.Pixels, frontAgain.Pixels);
 

@@ -396,6 +396,18 @@ public class RenderTests
         Assert.Equal(before, Png(await RenderAsync(carve)));
     }
 
+    /// <summary>B-1: 1.02 is not exact in float, so the stored bound is 1.0199999 and a double compare refused it.</summary>
+    [Fact]
+    public async Task A_target_on_the_reported_bound_of_a_mesh_inexact_in_float_is_accepted_and_one_beyond_is_refused()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", """{"vertices":[[0,0,0],[1.02,0,0],[1.02,1,0],[0,1,0]],"faces":[[0,1,2,3]]}""");
+
+        Assert.False(IsError(await carve.CallToolAsync("render", """{"direction":[2,1,1],"target":[1.02,0.4,0]}""")));
+        Assert.Contains("target", ErrorText(await carve.CallToolAsync("render", """{"direction":[2,1,1],"target":[1.021,0.4,0]}""")));
+    }
+
     [Fact]
     public async Task The_caption_echoes_the_direction_and_shows_zoom_and_target_only_when_set()
     {
