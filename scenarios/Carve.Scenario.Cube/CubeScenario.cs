@@ -47,6 +47,11 @@ public sealed class CubeScenario : IScenario
     // The L-block's notch corner (1.8, 1.8, 1) in front: its sight line never meets the solid.
     private static readonly (int X, int Y) NotchFront = (321, 185);
 
+    private static readonly (int X, int Y) Centre = (256, 256);
+
+    // In the zoomed frame, between the cube's far top edges (measured from the first run's frame).
+    private static readonly (int X, int Y) ZoomedBackground = (256, 10);
+
     public async Task RunAsync(ScenarioDriver driver)
     {
         // 1. The cube, both views.
@@ -61,6 +66,38 @@ public sealed class CubeScenario : IScenario
         // 2. A repeat of the same view is the same pixels.
         var again = await driver.CaptureAsync("cube-front-again", new { view = "front" });
         driver.AssertBytesEqual("cube front, rendered again", cubeFront.Pixels, again.Pixels);
+
+        // 2b. T-9: the cube from any direction, closer in, and the errors. Each frame is checked for
+        // the number of face shades it shows, a sampled pixel on the cube, and the four corners.
+        var tilted = await driver.CaptureAsync("cube-dir-0.4-2-0.8", new { direction = new[] { 0.4, 2, 0.8 } });
+        CheckCorners(driver, tilted);
+        // Three faces are seen, but the light, turned with this camera, reaches only the top: the +Z and +X
+        // sides are both ambient-only and share one shade, so two shades show.
+        CheckShades(driver, tilted, 2);
+        CheckNotBackground(driver, tilted, Centre, "the centre");
+
+        var fromX = await driver.CaptureAsync("cube-dir-1-0-0", new { direction = new[] { 1, 0, 0 } });
+        CheckCorners(driver, fromX);
+        CheckShades(driver, fromX, 1);
+        CheckNotBackground(driver, fromX, Centre, "the centre");
+
+        var fromBelow = await driver.CaptureAsync("cube-dir-0--1-0", new { direction = new[] { 0, -1, 0 } });
+        CheckCorners(driver, fromBelow);
+        CheckShades(driver, fromBelow, 1);
+        CheckNotBackground(driver, fromBelow, Centre, "the centre");
+
+        var zoomed = await driver.CaptureAsync("cube-zoom3-corner", new { view = "front", zoom = 3, target = new[] { 1, 1, 1 } });
+        CheckShades(driver, zoomed, 3);
+        CheckNotBackground(driver, zoomed, Centre, "the corner (1, 1, 1) at the centre");
+        // Zoomed in, the cube fills the lower corners; only the two at the top are background.
+        CheckBackground(driver, zoomed, (0, 0), "the top left corner");
+        CheckBackground(driver, zoomed, (zoomed.Width - 1, 0), "the top right corner");
+        CheckNotBackground(driver, zoomed, (0, zoomed.Height - 1), "the bottom left corner, filled by the cube");
+        CheckNotBackground(driver, zoomed, (zoomed.Width - 1, zoomed.Height - 1), "the bottom right corner, filled by the cube");
+        CheckBackground(driver, zoomed, ZoomedBackground, "the sky between the cube's top edges");
+
+        await ExpectErrorAsync(driver, "view with direction", new { view = "front", direction = new[] { 1, 0, 0 } });
+        await ExpectErrorAsync(driver, "zoom 9", new { zoom = 9 });
 
         // 3. The L-block: two concave hexagon caps and six quad sides.
         var (lVertices, lFaces) = LBlock();
@@ -150,6 +187,54 @@ public sealed class CubeScenario : IScenario
             [x, y, z + dz], [x + dx, y, z + dz], [x + dx, y + dy, z + dz], [x, y + dy, z + dz],
         ];
         return (vertices, CubeFaces);
+    }
+
+    private static async Task ExpectErrorAsync(ScenarioDriver driver, string what, object arguments)
+    {
+        var result = await driver.CallAsync("render", arguments);
+        if (result.IsError is not true)
+        {
+            driver.Fail($"render with {what} was not a tool error");
+        }
+    }
+
+    private static void CheckNotBackground(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) at, string what)
+    {
+        var p = frame.Pixel(at.X, at.Y);
+        if (IsBackground(p))
+        {
+            driver.Fail($"{frame.Name}: {what} at ({at.X}, {at.Y}) is the background, expected the mesh");
+        }
+    }
+
+    /// <summary>
+    /// The number of face shades: green values at least <see cref="MinimumStep"/> apart and from the
+    /// background, each held by at least 1,500 pixels (a flat face is one value; edges are a few hundred).
+    /// </summary>
+    private static void CheckShades(ScenarioDriver driver, ScenarioFrame frame, int expected)
+    {
+        var counts = new int[256];
+        for (var y = 0; y < frame.Height; y++)
+        {
+            for (var x = 0; x < frame.Width; x++)
+            {
+                counts[frame.Pixel(x, y).G]++;
+            }
+        }
+
+        var shades = new List<int>();
+        for (var g = 0; g < 256; g++)
+        {
+            if (counts[g] >= 1500 && !IsBackground((48, (byte)g, 56, 255)) && shades.All(s => Math.Abs(s - g) >= MinimumStep))
+            {
+                shades.Add(g);
+            }
+        }
+
+        if (shades.Count != expected)
+        {
+            driver.Fail($"{frame.Name}: {shades.Count} face shades ({string.Join(", ", shades)}), expected {expected}");
+        }
     }
 
     private static bool IsBackground((byte R, byte G, byte B, byte A) p) =>
