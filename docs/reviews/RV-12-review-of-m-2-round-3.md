@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-12 — Review of M-2, round 3
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-2
 
@@ -41,7 +41,9 @@ The fix holds for real-scale meshes, checked with a throwaway probe:
 
 Fix: measure the edge in double, as `PolygonMesh` does, and add the 1e-25/1e-35 square as a test row.
 
-**Outcome:** —
+**Outcome:** fixed
+
+The wall's edge length is computed in double from the float corners and compared with `Math.Abs((double)value)`. The theory `The_edge_is_measured_in_double_so_extreme_scales_keep_the_word` (1e-25 square by 1e-35 says small; 2e19 square by 1e30 says large) was shown failing on the old code (c637d21, claude-sonnet-5-5).
 
 ## Summary
 
