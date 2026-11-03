@@ -4,7 +4,7 @@ description: >-
 ---
 # M-2 — Shape it
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *An agent builds a crate with move and extrude tools on a polygon kernel and views it from any angle*
 
