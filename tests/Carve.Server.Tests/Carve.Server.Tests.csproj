@@ -33,6 +33,7 @@
     <Compile Include="../../src/Carve.Server/ViewFraming.cs" Link="ViewFraming.cs" />
     <Compile Include="../../src/Carve.Server/RenderQueue.cs" Link="RenderQueue.cs" />
     <Compile Include="../../src/Carve.Server/RenderPump.cs" Link="RenderPump.cs" />
+    <Compile Include="../../src/Carve.Server/TargetCheck.cs" Link="TargetCheck.cs" />
     <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
     <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
   </ItemGroup>

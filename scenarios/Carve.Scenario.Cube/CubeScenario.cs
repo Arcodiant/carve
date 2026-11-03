@@ -49,6 +49,17 @@ public sealed class CubeScenario : IScenario
 
     private static readonly (int X, int Y) Centre = (256, 256);
 
+    // The L-block from [0, -1, 0], zoom 3 on its corner (0, 0, 0), so the corner is the image centre.
+    // Seen from -Y with -Z up, +X points left and +Z points down, so the block fills only the lower
+    // left quarter. Its silhouette from -Y is a plain 2 x 1 rectangle, which looks the same upside
+    // down or mirrored, so the quarters are what tell the up vector and the sign of the direction:
+    // +Z up would put the block in the upper right, a camera at +Y in the lower right. Each quarter
+    // is sampled a quarter of the image from the centre both ways (measured from the first run).
+    private static readonly (int X, int Y) CornerBlock = (128, 384);
+    private static readonly (int X, int Y) CornerAbove = (128, 128);
+    private static readonly (int X, int Y) CornerRight = (384, 384);
+    private static readonly (int X, int Y) CornerUpperRight = (384, 128);
+
     // In the zoomed frame, between the cube's far top edges (measured from the first run's frame).
     private static readonly (int X, int Y) ZoomedBackground = (256, 10);
 
@@ -109,6 +120,13 @@ public sealed class CubeScenario : IScenario
         CheckDrawn(driver, lFront, LBlockFrontDrawn);
         CheckDrawn(driver, lBack, LBlockBackDrawn);
         CheckBackground(driver, lFront, NotchFront, "the L-block's notch");
+
+        // 3b. T-9: up is -Z. Zoomed on the block's corner, only the lower left quarter is the mesh.
+        var lCorner = await driver.CaptureAsync("lblock-dir-0--1-0-corner", new { direction = new[] { 0, -1, 0 }, zoom = 3, target = new[] { 0, 0, 0 } });
+        CheckNotBackground(driver, lCorner, CornerBlock, "the lower left quarter (the block, with -Z up and +X left)");
+        CheckBackground(driver, lCorner, CornerAbove, "the upper left quarter (above the block's top face)");
+        CheckBackground(driver, lCorner, CornerRight, "the lower right quarter (the block would be there from +Y)");
+        CheckBackground(driver, lCorner, CornerUpperRight, "the upper right quarter (the block would be there with +Z up)");
 
         // 4. A long box, off the origin: framing has to find it.
         var (bVertices, bFaces) = Box(5, 2, -3, 4, 0.5, 0.5);

@@ -52,8 +52,10 @@ public class CameraFramingTests
                 tightest = Math.Max(tightest, Math.Max(Math.Abs(d.X), Math.Abs(d.Y)));
             }
 
-            // A flat quad seen edge-on has nothing to fill the frame with; the others reach the margin.
-            Assert.InRange(tightest, 0, Inner + 1e-4f);
+            // A flat quad seen edge-on has nothing to fill the frame with; the others reach the margin,
+            // so a frame framed too far away fails here as well as one framed too near.
+            var edgeOn = (max - min).Z == 0 && z == 0;
+            Assert.InRange(tightest, edgeOn ? 0 : Inner - 1e-3f, Inner + 1e-4f);
         }
     }
 

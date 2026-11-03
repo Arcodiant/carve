@@ -56,7 +56,7 @@ public sealed class CrateScenario : IScenario
 
     // back, seen from below, so the -X bar's top is hidden: its underside (118, unlit) is the face that shows,
     // against the -X face just above it (196: the panel and the bar's outer face, one shade).
-    private static readonly (int X, int Y) BackBarTop = (370, 238);
+    private static readonly (int X, int Y) BackBarUnderside = (370, 238);
     private static readonly (int X, int Y) BackPanelBehindBar = (370, 190);
 
     // [-2.2, 1.2, 1.6]: the camera on the -X side and above, so the -X bar's top is seen (216) against
@@ -122,7 +122,7 @@ public sealed class CrateScenario : IScenario
 
         CheckOrder(driver, front, [FrontTop, FrontPlusZ, FrontPlusX], "top", "+Z", "+X");
         CheckDiffers(driver, front, FrontBarTop, FrontPanelBehindBar, "the +X bar's top", "the +X panel behind it");
-        CheckDiffers(driver, back, BackBarTop, BackPanelBehindBar, "the -X bar's top", "the -X panel behind it");
+        CheckDiffers(driver, back, BackBarUnderside, BackPanelBehindBar, "the -X bar's underside", "the -X panel behind it");
         CheckDiffers(driver, left, LeftBarTop, LeftPanelBehindBar, "the -X bar's top", "the -X panel behind it");
         CheckDiffers(driver, tilted, TiltedRecessWall, TiltedLidPanel, "the lid's recess wall", "the lid panel");
         CheckNotBackground(driver, zoom, Centre, "the mesh at the centre");
