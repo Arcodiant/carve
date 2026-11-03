@@ -4,7 +4,7 @@ description: >-
 ---
 # T-9 — Render from any direction
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
