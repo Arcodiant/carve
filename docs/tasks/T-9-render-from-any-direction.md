@@ -4,7 +4,7 @@ description: >-
 ---
 # T-9 — Render from any direction
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -75,3 +75,15 @@ Tests in `tests/Carve.Server.Tests`:
 - Writes down for T-12: the caption form and the camera spec type's name.
 - Moderately design-heavy: `render`'s arguments are the public interface agents learn.
 - Leave the worktree before `finish`.
+
+### As built
+
+Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`).
+
+- **Camera spec type, for T-12:** `Carve.Server.CameraSpec(Vector3 Direction, float Zoom = 1, Vector3? Target = null)`. `CameraSpec.ForView(RenderView)` gives the M-1 views (unnormalised direction, so the bytes stay the same). `Target` is in the mesh's own coordinates; `RenderSystem.ApplyView` maps it through `DrawnSpace`. `RenderQueue.Post(CameraSpec)`, `RenderRequest.Camera`, `IRenderScene.ApplyView(CameraSpec)`.
+- **Caption form:** `512x512, view front, V vertices, F faces` for `view` or nothing given; `512x512, direction (2, 1, 1), zoom 3, target (1.02, 0.4, 0.5), V vertices, F faces` with the direction echoed as given and zoom and target only when set. `view` with a zoom or target keeps `view back, zoom 2, ...`. Built by `RenderTool.Caption`.
+- **Tool errors:** view with direction; direction not three finite numbers or zero; zoom outside 1 to 8; target not three finite numbers or outside the bounds (inclusive).
+- **Byte-identical guard:** the eight existing cube frames are byte-identical to the baseline from before the change (md5).
+- **Surprise:** from `[0.4, 2, 0.8]` three faces are seen but the light, turned with the camera, reaches only the top, so the +Z and +X sides share one shade (ambient only). The scenario expects 2 shades there. The light was not changed.
+- **Pixel checks shown failing:** with up kept at +Y the `[0,-1,0]` frame fails (NaN near plane, a render tool error); with zoom ignored the `zoom 3` frame fails on its bottom corners being background.
+- The G: drive was not mounted, so frames were reviewed from the worktree's `artifacts/scenarios/cube/4/frames`; the person approved them.

@@ -7,11 +7,11 @@ namespace Carve.Server;
 internal sealed record RenderedFrame(RenderTargetPixels Pixels, int Vertices, int Faces);
 
 /// <summary>One asked-for render, waiting for the frame thread.</summary>
-internal sealed class RenderRequest(RenderView view, long postedVersion)
+internal sealed class RenderRequest(CameraSpec camera, long postedVersion)
 {
     private readonly TaskCompletionSource<RenderedFrame> _result = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public RenderView View => view;
+    public CameraSpec Camera => camera;
 
     /// <summary>The store's version at the post: the oldest mesh this request may show.</summary>
     public long PostedVersion => postedVersion;
@@ -31,9 +31,9 @@ internal class RenderQueue(ModelStore store)
 {
     private readonly ConcurrentQueue<RenderRequest> _requests = new();
 
-    public Task<RenderedFrame> Post(RenderView view)
+    public Task<RenderedFrame> Post(CameraSpec camera)
     {
-        var request = new RenderRequest(view, store.Current.Version);
+        var request = new RenderRequest(camera, store.Current.Version);
         _requests.Enqueue(request);
         return request.Result;
     }
