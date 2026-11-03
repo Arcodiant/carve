@@ -31,6 +31,7 @@ public sealed class DefineMeshTool(ModelStore store)
         + "inconsistent winding, non-planar faces, unused vertices) mean the mesh was accepted but is probably not what you meant. "
         + "Bad input (a missing or out-of-range index, a face with fewer than 3 vertices, a repeated index, a zero-area face, "
         + "a self-intersecting or folded-back face outline, a non-finite coordinate, a vertex without exactly 3 numbers) is a tool error that lists every problem by element, e.g. faces[2][1]. "
+        + "Vertex and face ids are the positions given here (vertex 0 is the first in vertices, face 0 the first in faces), and move and extrude keep them; get_mesh reads them back and undo steps back. "
         + ExampleMarker + " " + CubeExample;
 
     private const string VerticesText = "Vertex positions, each exactly three numbers [x, y, z]. Unitless; Y is up.";
