@@ -9,9 +9,6 @@ namespace Carve.Server;
 
 public sealed class MoveTool(ModelStore store)
 {
-    /// <summary>Opens each example call in the description; a test parses from here to the end of the line.</summary>
-    public const string ExampleMarker = "Example: ";
-
     public const string Text =
         "Moves parts of the current mesh by an offset. Give any mix of vertices, edges and faces; every vertex they touch moves once, "
         + "even when it is reached twice (a face and one of its edges). "
@@ -80,13 +77,7 @@ public sealed class MoveTool(ModelStore store)
         var offset = Vec3("by", by, errors);
         if (errors.Count > 0) return Failed("move", errors);
 
-        var snapshot = store.Edit("move", mesh => MeshEdits.Move(mesh, v, e, f, offset!.Value), out var result);
-        if (snapshot is null) return Error("move: " + NoMesh);
-        if (!result!.Succeeded) return Failed("move", result.Errors.Select(x => x.ToString()));
-
-        var body = Report(snapshot.Mesh!);
-        body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
-        body["moved"] = result.MovedVertices;
-        return Ok(body);
+        return Edit(store, "move", mesh => MeshEdits.Move(mesh, v, e, f, offset!.Value),
+            (body, result) => body["moved"] = result.MovedVertices);
     }
 }

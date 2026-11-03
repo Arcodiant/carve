@@ -6,6 +6,7 @@ using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using StbImageWriteSharp;
+using static Carve.Server.MeshToolSupport;
 
 namespace Carve.Server;
 
@@ -68,7 +69,7 @@ internal static class RenderTool
 
             directionVector = new Vector3((float)direction[0], (float)direction[1], (float)direction[2]);
             var length = directionVector.Length();
-            if (length == 0 || !float.IsFinite(length) || length < 1e-20f)
+            if (!float.IsFinite(length) || length < 1e-20f)
             {
                 return Error("direction: must not be zero, and must be a usable size.");
             }
@@ -95,25 +96,21 @@ internal static class RenderTool
             return Error("There is no mesh yet: call define_mesh first, then render.");
         }
 
-        if (target is not null)
+        // Taken in the mesh's own precision (float), so a target typed as the reported bound is inside (B-1).
+        Vector3? targetVector = target is null ? null : new Vector3((float)target[0], (float)target[1], (float)target[2]);
+        if (targetVector is { } t)
         {
             var bounds = MeshReport.Create(mesh);
             var (min, max) = (bounds.BoundsMin, bounds.BoundsMax);
-            // Compared in the mesh's own precision (float), so a target typed as the reported bound is inside (B-1).
-            var (tx, ty, tz) = ((float)target[0], (float)target[1], (float)target[2]);
-            if (tx < min.X || tx > max.X || ty < min.Y || ty > max.Y || tz < min.Z || tz > max.Z)
+            if (t.X < min.X || t.X > max.X || t.Y < min.Y || t.Y > max.Y || t.Z < min.Z || t.Z > max.Z)
             {
                 return Error(
-                    $"target: ({Join(target)}) is outside the mesh's bounds, "
+                    $"target: ({Join(target!)}) is outside the mesh's bounds, "
                     + $"({Join([min.X, min.Y, min.Z])}) to ({Join([max.X, max.Y, max.Z])}).");
             }
         }
 
-        var camera = new CameraSpec(
-            directionVector,
-            (float)zoom,
-            target is null ? null : new Vector3((float)target[0], (float)target[1], (float)target[2]));
-        var rendering = queue.Post(camera);
+        var rendering = queue.Post(new CameraSpec(directionVector, (float)zoom, targetVector));
 
         // The frame thread drains the queue; once it has ended, nothing will.
         await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
@@ -182,10 +179,4 @@ internal static class RenderTool
         new ImageWriter().WritePng(image.Pixels, image.Width, image.Height, ColorComponents.RedGreenBlueAlpha, png);
         return png.ToArray();
     }
-
-    private static CallToolResult Error(string message) => new()
-    {
-        IsError = true,
-        Content = [new TextContentBlock { Text = message }],
-    };
 }

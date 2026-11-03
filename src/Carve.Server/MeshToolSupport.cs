@@ -13,6 +13,9 @@ internal static class MeshToolSupport
 {
     public const string NoMesh = "there is no mesh yet; call define_mesh first";
 
+    /// <summary>Opens each example call in a tool's description; a test parses from here to the end of the line.</summary>
+    public const string ExampleMarker = "Example: ";
+
     public static CallToolResult Ok(object body) =>
         new() { Content = [new TextContentBlock { Text = JsonSerializer.Serialize(body) }] };
 
@@ -40,6 +43,23 @@ internal static class MeshToolSupport
             ["bounds"] = new { min = Array(report.BoundsMin), max = Array(report.BoundsMax) },
             ["warnings"] = report.Warnings.Select(w => w.ToString()).ToArray(),
         };
+    }
+
+    /// <summary>
+    /// Runs an edit on the store's mesh and answers as every edit tool does: no mesh, the edit's refusal, or the report
+    /// plus <c>created</c> and whatever <paramref name="addIds"/> adds.
+    /// </summary>
+    public static CallToolResult Edit(ModelStore store, string tool, Func<PolygonMesh, EditResult> edit,
+        Action<Dictionary<string, object>, EditResult> addIds)
+    {
+        var snapshot = store.Edit(tool, edit, out var result);
+        if (snapshot is null) return Error($"{tool}: " + NoMesh);
+        if (!result!.Succeeded) return Failed(tool, result.Errors.Select(x => x.ToString()));
+
+        var body = Report(snapshot.Mesh!);
+        body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
+        addIds(body, result);
+        return Ok(body);
     }
 
     /// <summary>Registers a tool whose arguments are bound raw, with a hand-written schema (or the default one when null).</summary>

@@ -1,6 +1,6 @@
 using System.Numerics;
 using Xunit;
-using static Carve.Core.Tests.MoveTests;
+using static Carve.Core.Tests.TestMeshes;
 
 namespace Carve.Core.Tests;
 
@@ -8,7 +8,6 @@ namespace Carve.Core.Tests;
 public class ExtrudeTests
 {
     private const float Tolerance = 1e-5f;
-    private static readonly int[] AllCubeFaces = [0, 1, 2, 3, 4, 5];
 
     private static void AssertNear(Vector3 expected, Vector3 actual)
         => Assert.True(Vector3.Distance(expected, actual) < Tolerance, $"expected {expected}, got {actual}");

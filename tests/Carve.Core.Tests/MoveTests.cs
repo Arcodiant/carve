@@ -1,5 +1,6 @@
 using System.Numerics;
 using Xunit;
+using static Carve.Core.Tests.TestMeshes;
 
 namespace Carve.Core.Tests;
 
@@ -7,12 +8,6 @@ namespace Carve.Core.Tests;
 public class MoveTests
 {
     private static readonly Vector3 Up = new(0, 0.5f, 0);
-
-    internal static PolygonMesh Ok(EditResult result)
-    {
-        Assert.True(result.Succeeded, string.Join("; ", result.Errors));
-        return result.Mesh!;
-    }
 
     private static void AssertMoved(PolygonMesh before, EditResult result, int[] expected, Vector3 by)
     {
