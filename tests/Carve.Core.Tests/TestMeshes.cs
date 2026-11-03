@@ -36,4 +36,20 @@ internal static class TestMeshes
     [
         new(0, 0, 0), new(2, 0, 0), new(2, 1, 0), new(1, 1, 0), new(1, 2, 0), new(0, 2, 0),
     ];
+
+    /// <summary>
+    /// The L hexagon extruded one along +z, as the cube scenario builds it: vertices 0-5 the z=0 outline, 6-11 the z=1 one;
+    /// face 0 the -z cap, face 1 the +z cap, faces 2-7 the sides, side <c>2 + i</c> running from outline corner i to i + 1.
+    /// </summary>
+    public static PolygonMesh LBlock()
+    {
+        var vertices = LVertices.Concat(LVertices.Select(v => v with { Z = 1 }));
+        var faces = new List<int[]> { new[] { 5, 4, 3, 2, 1, 0 }, new[] { 6, 7, 8, 9, 10, 11 } };
+        for (var i = 0; i < 6; i++)
+        {
+            var j = (i + 1) % 6;
+            faces.Add([i, j, j + 6, i + 6]);
+        }
+        return Make(vertices, faces);
+    }
 }
