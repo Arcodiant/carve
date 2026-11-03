@@ -264,8 +264,11 @@ public static class MeshEdits
             if (wallEdge is int wall)
             {
                 var loop = mesh.Faces[x.Face];
-                var edge = mesh.Vertices[loop[(wall + 1) % loop.Count]] - mesh.Vertices[loop[wall]];
-                scale = MathF.Abs(value) <= edge.Length() ? "small" : "large";
+                var p = mesh.Vertices[loop[wall]];
+                var q = mesh.Vertices[loop[(wall + 1) % loop.Count]];
+                double dx = (double)q.X - p.X, dy = (double)q.Y - p.Y, dz = (double)q.Z - p.Z;
+                var edge = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+                scale = Math.Abs((double)value) <= edge ? "small" : "large";
             }
             return new MeshError($"faces[{x.Face}]",
                 Invariant($"the {name} {value:G6} is too {scale} for this face: {what}, is refused: {error.Message}"));
