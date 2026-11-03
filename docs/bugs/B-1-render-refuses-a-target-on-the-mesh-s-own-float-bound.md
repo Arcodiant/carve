@@ -4,7 +4,7 @@ description: >-
 ---
 # B-1 — render refuses a target on the mesh's own float bound
 
-**Status:** Open
+**Status:** In Progress
 
 **Severity:** Major
 
