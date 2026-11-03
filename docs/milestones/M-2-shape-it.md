@@ -153,6 +153,24 @@ caption: 512x512, view front, 72 vertices, 70 faces
 - `CLAUDE.md` is an input of no suite (a `verify` warning since T-12 edited its Layout table).
 - `carve-<pid>.log` in `$env:TEMP` and T-13's run folders in `%TEMP%\carve-m2-acceptance\` are never cleared.
 
+**The review.**
+
+- **Rounds:** four, RV-10 to RV-13. Round 1 split the diff over four Opus reviewers (Core kernel; edit tools and history; render and scenarios; the whole diff) and raised 23 findings: 1 Major, 11 Minor and 11 Nits.
+- **The Major:** the cube's `[0, -1, 0]` frame was byte-identical to its `[1, 0, 0]` frame, so it proved nothing about the -Z up. A new L-block corner frame now does, shown failing with up swapped; the person approved it.
+- **Fixes in round 1 (two fixers, Opus and Sonnet):**
+  - errors are exhaustive;
+  - culture-invariant numbers;
+  - wall errors named by their source face;
+  - a render target re-checked against the mesh actually shown;
+  - argument-parsing tests.
+- **The person's decisions in review:**
+  - the id rule is qualified to the current chain of edits, and undo frees an undone step's ids;
+  - unknown argument names are tool errors in all six tools;
+  - edit tools accept `3.0` as an id.
+- **Later rounds:** rounds 2 and 3 each found one Nit in the same message, the wall error's "too small"/"too large" (judged against the wrong length, then in float). The person chose a fourth round over leaving it. Round 4 found nothing.
+- **Frames:** every frame stayed byte-identical through the refactor and the fixes, checked by hash against the approved copies, apart from the one new frame.
+- **The review's lesson, as in M-1:** members' `VERIFY PASS` hid checks that could not fail. The Major was a check satisfied by a symmetric frame, and several tests passed on broken code.
+
 **For the next plan.**
 
 - **Plants and acceptance runs:**
@@ -163,4 +181,5 @@ caption: 512x512, view front, 72 vertices, 70 faces
   - Have cairn remove the folder once the shell is out of it, or keep `artifacts/` out of member worktrees entirely: write run frames to the container's worktree from the start.
 - **Reviews:** resolve the review-artefact location per machine before the first review (no G: here).
 - **Checks:** hold members to a break per new check, and ask for the table, not a summary. T-11 and T-12 left checks unbroken.
+- **A check per frame that a wrong camera would fail:** symmetric meshes viewed head-on prove nothing about up or direction.
 - **The light:** decide whether steep directions are worth fixing before M-5's renders lean on them.
