@@ -4,7 +4,7 @@ description: >-
 ---
 # T-8 — Edge table and stable ids
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
