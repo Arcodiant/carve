@@ -142,17 +142,8 @@ process and a protocol between the two.
 
 ## Open questions
 
-- **Tool shape.** One tool per operation, or a few general ones? How are elements
-  addressed: ids that survive edits, or selections held by the server? How much does
-  one call return? *M-1 acceptance run (T-7):* with two tools only, `define_mesh` (the whole
-  mesh by coordinates, returning counts, `closed`, bounds and warnings) and `render` (two views
-  and a caption), a fresh agent built a cube and a house with a pitched roof first time, from the
-  descriptions alone and with no error to correct. It used the worked example as the pattern, and
-  trusted `closed: true` to say the winding was right. Still open: what it could not do is look at a
-  face neither view shows (the second roof slope), and with edits that must be a whole-mesh
-  redefinition each time, so addressing elements waits for the first edit tool.
-- **Undo and history.** Does an agent get undo? Is a model's history recorded so the
-  person can read how it was made, or replayed to rebuild it?
+- **Tool shape.** *Decided at T-11:* one tool per operation (`define_mesh`, `move`, `extrude`, `get_mesh`, `undo`), not a few general ones. Elements are addressed by ids that survive edits: a vertex or face id is its position in `define_mesh`'s lists, an edge is a vertex pair, and an edit appends new ids at the end and renumbers nothing; the server holds no selections. `get_mesh` is how an agent learns the ids (no ids are drawn on renders). An edit returns the report plus the ids it created, and for `extrude` its cap, walls and ring; `get_mesh` returns the whole mesh, untrimmed. *M-1 acceptance run (T-7):* with two tools only, a fresh agent built a cube and a house from the descriptions alone with no error to correct; it could not look at a face neither view showed, which render-from-any-direction (T-9) answers.
+- **Undo and history.** *Decided at T-11:* an agent gets plain undo for the last 100 steps, in memory, with no redo; `define_mesh` is a step too, and a failed call is not. Every change, an undo included, raises the model's version by one. *Still open:* whether a model's history is recorded so the person can read how it was made, or replayed to rebuild it, and whether any history survives a restart.
 - **The Carve file.** Text or binary, geometry or a list of operations? (Text would
   diff in git; the choice is open.)
 - **Scope of a model.** Which of these does Carve author, and when: UVs and
