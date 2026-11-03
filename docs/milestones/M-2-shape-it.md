@@ -87,6 +87,7 @@ caption: 512x512, view front, 72 vertices, 70 faces
 - [ ] [T-10](../tasks/T-10-move-and-extrude-in-the-kernel.md) — Carve.Core moves vertices, edges and faces and extrudes or insets faces, keeping ids and refusing a bad edit by element
 - [ ] [T-11](../tasks/T-11-edit-tools-and-undo.md) — An agent edits the mesh with move and extrude, reads its ids with get_mesh and steps back with undo
 - [ ] [T-12](../tasks/T-12-crate-scenario.md) — The crate scenario builds a crate from one cube with move and extrude only, and shows it from five views in its own suite
+- [ ] [B-1](../bugs/B-1-render-refuses-a-target-on-the-mesh-s-own-float-bound.md) — render refuses a target on the mesh's own float bound (found by T-12; fixed before T-13, the person's call)
 - [ ] [T-13](../tasks/T-13-edit-tools-acceptance-run.md) — A fresh agent builds a crate with the edit tools from their descriptions alone, recovering from a planted mistake
 
 ## Retrospective
