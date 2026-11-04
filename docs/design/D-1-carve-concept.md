@@ -116,8 +116,15 @@ exist, seen in how agents actually use them.
 Work persists in a native Carve file that keeps the mesh as authored. Models reach a
 game as exported `.glb`, which Empyrean's `IModelLoader` loads.
 
+*Decided at M-3 planning (2026-11-04), by the person:*
+
+- **The Carve file** (`.carve`) is versioned JSON holding the geometry: `{"carve": 1, "vertices": [...], "faces": [...]}`. Floats read back bit-exact, ids are kept, and there is no undo history.
+- **Export** is SharpGLTF, with flat Newell normals and every edge hard, and one material `carve` (base colour 0.72/0.72/0.70, metallic 0, roughness 1).
+- **Conventions**: pass-through (1 unit = 1 m, +Y up, +Z front, the origin as authored) with no checks.
+- **The load proof** is a viewer spike that stands in for a game.
+
 **Alternatives:** `.glb` only, which loses the polygons on every save; server memory
-only, which loses unexported work on a restart.
+only, which loses unexported work on a restart. A list of operations as the file was rejected because a change to the kernel could change or break old files.
 **Would change if:** none recorded.
 
 ### No window
@@ -146,8 +153,7 @@ process and a protocol between the two.
 
 - **Tool shape.** *Decided at T-11:* one tool per operation (`define_mesh`, `move`, `extrude`, `get_mesh`, `undo`), not a few general ones. Elements are addressed by ids that survive edits: a vertex or face id is its position in `define_mesh`'s lists, an edge is a vertex pair, and an edit appends new ids at the end and renumbers nothing; the server holds no selections. `get_mesh` is how an agent learns the ids (no ids are drawn on renders). An edit returns the report plus the ids it created, and for `extrude` its cap, walls and ring; `get_mesh` returns the whole mesh, untrimmed. *M-1 acceptance run (T-7):* with two tools only, a fresh agent built a cube and a house from the descriptions alone with no error to correct; it could not look at a face neither view showed, which render-from-any-direction (T-9) answers. *M-2 acceptance run (T-13):* with one tool per operation, three fresh `claude -p` agents (plain `carve`, no docs) each built a closed, warning-free crate in 13 to 20 carve calls from the descriptions alone, with `define_mesh` once, then only `extrude` and `move`, and used `direction`, `zoom` and `target` unaided; none needed `undo` and two never called `get_mesh` (they tracked ids from the `extruded` and `created` fields of each report), so the ids-in-every-report shape was enough. The shape held with one description edit (`move` now warns that a face crossing itself is rejected after the whole call). The planted inset error never fired: all three read the `extrude` description, saw that 0.7 cannot fit a unit face and built a 4-unit cube instead, so the run showed the descriptions prevent that mistake but not that its error text recovers it (that text is exercised by the scenarios, and by round 2's unplanted `move` error, which the agent read and fixed at once). No handle with a gap behind it was made: nothing bridges two faces, so a later tool's gap.
 - **Undo and history.** *Decided at T-11:* an agent gets plain undo for the last 100 steps, in memory, with no redo; `define_mesh` is a step too, and a failed call is not. Every change, an undo included, raises the model's version by one. *Still open:* whether a model's history is recorded so the person can read how it was made, or replayed to rebuild it, and whether any history survives a restart.
-- **The Carve file.** Text or binary, geometry or a list of operations? (Text would
-  diff in git; the choice is open.)
+- **The Carve file.** *Decided at M-3 planning:* JSON text holding the geometry; see *A Carve file, and .glb export*.
 - **Scope of a model.** Which of these does Carve author, and when: UVs and
   unwrapping, materials and textures, smoothing and normals, several parts or a node
   hierarchy, LODs, colliders, rigs and animation?
@@ -157,8 +163,8 @@ process and a protocol between the two.
 - **Transport.** Stdio for now (decided at T-7; the README's `.mcp.json` entry starts it). HTTP, and
   how the server is installed for a game's Claude session beyond that entry, stay open until a
   use needs them.
-- **Empyrean-specific export.** Scale, axes and naming conventions a game expects,
-  and whether Carve checks a model against them.
+- **Empyrean-specific export.** *Decided at M-3 planning:* pass-through scale and axes, the node and mesh named after the file, no checks. Whether a game's conventions ever warrant checks stays open.
+- **Smoothing.** M-3 exports every edge hard. Smoothing control (by angle, or edges marked by a tool) is open for a later milestone.
 - **Boolean and heavier operations.** Does "cut" mean a plane cut, a knife path, or
   boolean subtraction?
 
