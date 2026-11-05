@@ -12,6 +12,8 @@ description: >-
 
 An agent working on one of your Empyrean games makes a prop that game needs, with Carve, from a plain install. What it stumbles on shapes the tools, their descriptions and the worked examples; the milestone ends with the prop in that game.
 
+The prop is made with [M-15](M-15-the-modelling-skill.md)'s modelling skill, so this milestone tests the whole stack, not the raw tools, and comes after M-15 whatever their numbers (decided in discussion, 2026-11-04).
+
 Content: the prop itself, and worked examples drawn from how it was made.
 
 ## Open at planning

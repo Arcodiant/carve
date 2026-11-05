@@ -12,6 +12,8 @@ description: >-
 
 An agent asks precise questions of a mesh and acts on the answers: "select all unattached vertices", "select all faces above y=10". Selections feed the edit tools. It can read stats, check a mesh's validity, and see normals and wireframe renders.
 
+Renders are made for an agent to read: part names and element ids drawn on the image, orthographic views, a contact sheet of several views in one image, and a size option (added in discussion, 2026-11-04).
+
 Content: a deliberately broken sample mesh for the checks to find, and the normals and wireframe looks.
 
 ## Open at planning
@@ -21,6 +23,7 @@ Content: a deliberately broken sample mesh for the checks to find, and the norma
 - Does a render show the selection?
 - Which validity checks matter to an Empyrean import.
 - How the normals and wireframe modes are drawn, and whether that raises an engine need.
+- How labels and a contact sheet are drawn (the engine, or composed after readback), and whether `render` grows arguments or a second tool takes them.
 
 ## Required tasks
 
