@@ -134,3 +134,7 @@ Run on **Claude Opus 5.5** (`claude-opus-5-5`).
 **Frames.** HASHES_PLACEHOLDER
 
 **Not checked.** No `.glb` has been loaded by a running game or rendered through the engine; per the spec that is T-18 and T-19. The regression tests were run only through `verify`, not each against a break.
+
+### Hand-off
+
+Run on Claude Opus 5.5. **Done:** the code and tests, committed and rebased onto `origin/milestone/M-3` (after T-15, with no conflicts); the unit tiers pass (core 131, server 119 before the rebase); the break table above; `### As built`. **Left:** `cairn task T-16 verify` has not completed yet. Every run so far has waited for a GPU slot: first on other Empyrean jobs, now on `verify M-151`, and the credential cannot queue `any-gpu`, so it runs here. Once it passes, fill in **Frames** in As built (the frames before the change, hashed from the carried 9bb593520 artifacts, are in `$TEMP/t16-before.sha`; compare them with `cairn test artifacts scenario-cube` / `scenario-crate`), then run `cairn lint` and `finish`. **Checked:** the readback is bit-exact and in order for the cube, L-block and crate. **Not checked:** the regression tier (`ExportToolTests`) and the frame hashes after the change.
