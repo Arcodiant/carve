@@ -21,8 +21,8 @@ public class CrateTests
         return (level[1], level[0]);
     }
 
-    [Fact]
-    public void TheCrate()
+    /// <summary>The crate: the seed cube and the 11 edits below. <see cref="CarveFileTests"/> round-trips it.</summary>
+    internal static PolygonMesh Build()
     {
         var mesh = TestMeshes.Cube();
         mesh = Ok(MeshEdits.Move(mesh, null, null, [3], new Vector3(0, -0.2f, 0)));
@@ -42,7 +42,13 @@ public class CrateTests
         mesh = Ok(MeshEdits.Move(mesh, null, [top], null, new Vector3(0, -0.17f, 0)));
         mesh = Ok(MeshEdits.Move(mesh, null, [bottom], null, new Vector3(0, 0.17f, 0)));
         mesh = Ok(MeshEdits.Extrude(mesh, [5], 0.1f));
+        return mesh;
+    }
 
+    [Fact]
+    public void TheCrate()
+    {
+        var mesh = Build();
         var report = MeshReport.Create(mesh);
         Assert.Equal(72, report.VertexCount);
         Assert.Equal(70, report.FaceCount);
