@@ -4,7 +4,7 @@ description: >-
 ---
 # T-15 — Carve file in the kernel
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
