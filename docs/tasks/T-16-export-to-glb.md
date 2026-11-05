@@ -85,3 +85,52 @@ An agent calls `export` and gets a self-contained `.glb` of the current mesh tha
 - This task owns, in this wave: `Directory.Build.props`, `Program.cs`'s tool list, `MeshBridge.cs`, the new Core file `FlatShading.cs` and `ToolPaths.cs`. T-15 is in the Core in the same wave, in a different file.
 - No new frames. The export is first seen through the engine in T-18 and T-19.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Run on **Claude Opus 5.5** (`claude-opus-5-5`).
+
+**Files.** `src/Carve.Core/FlatShading.cs` (`FlatShading.Triangles(mesh)` gives `FlatTriangle(A, B, C, Normal, Face)` in `Triangulator` order, model space, Carve's CCW winding, the face's `FaceNormal`); `MeshBridge.ToMeshData` now reads it, keeping `DrawnSpace.Apply` and the (A, C, B) reversal. `src/Carve.Server/GlbExport.cs` (`GlbExport.Write(mesh | triangles, name)` gives the `.glb` bytes), `src/Carve.Server/ToolPaths.cs`, `src/Carve.Server/ExportTool.cs` (the tool and its description), registered last in `Program.cs`'s `WithTools` list. Tests: `tests/Carve.Core.Tests/FlatShadingTests.cs`, `tests/Carve.Server.Tests/GlbExportTests.cs` and `ToolPathsTests.cs` (unit), `ExportToolTests.cs` (regression). The test project compiles `GlbExport.cs` and `ToolPaths.cs` as links, as it does `MeshBridge.cs`.
+
+**For T-17 and T-18.**
+
+- **SharpGLTF pin:** `SharpGLTFVersion` (1.0.7) in `Directory.Build.props`; referenced as `SharpGLTF.Toolkit` by `Carve.Server` and `Carve.Server.Tests` only.
+- **`ToolPaths` API** (`namespace Carve.Server`):
+  - `ToolPath? ToolPaths.Resolve(string tool, string? path, string extension, out string? error, string? baseDirectory = null)`: `extension` with its dot (`".glb"`, `".carve"`); `baseDirectory` null means `Environment.CurrentDirectory` (tests pass a temp folder). Returns `ToolPath(FullPath, FileName)` with `Stem` (file name without extension).
+  - `bool ToolPaths.Write(string tool, ToolPath path, ReadOnlySpan<byte> bytes, out bool replaced, out string? error)`: creates missing folders, writes `.<file>.<pid>.tmp` in the same folder, then `File.Move(..., overwrite: true)`; the temp file is deleted on failure. `open` (T-17) needs only `Resolve`; a read helper is T-17's to add.
+  - Every error is one line, `<tool>: ...`, returned as the tool error as is:
+    - `<tool>: path is empty; give a file path ending in .glb`
+    - `<tool>: path "<path>" holds the character '|', which a file path may not` (or `the control character U+0000`; folder names are checked too, so `*`, `?` and a second `:` are caught)
+    - `<tool>: path "<path>" is not a valid file path: <system message>`
+    - `<tool>: path "<path>" names a folder; give a file path ending in .glb`
+    - `<tool>: path "<path>" ends in ".obj"; <tool> writes .glb files, so the path must end in .glb` (or `has no extension; ...`)
+    - `<tool>: could not write <full path>: <system message>` (or `: it is a folder`)
+  - The "writes" in the extension error is fixed wording; `open` will want "reads" (a parameter T-17 may add).
+- **The export result line**: `exported crate.glb to <full path> (replaced): 140 triangles, 1 material 'carve', size 1.04 x 0.8 x 1 m, bounds (-0.02, 0, 0) to (1.02, 0.8, 1)`. ` (replaced)` appears only when a file was replaced; a new file has no parenthesis. Warnings follow as `; N warning(s): a; b`. Floats are shortest round-trip, invariant.
+- **An `IModelGeometryLoader` without a GPU** (from `GlbExportTests`; the test project needs `Microsoft.Extensions.Hosting` for `AddLogging`/`BuildServiceProvider`):
+
+  ```csharp
+  var services = new ServiceCollection();
+  services.AddLogging();
+  services.AddEmpyreanCore();
+  services.AddEmpyreanGeometry();
+  var parser = services.BuildServiceProvider().GetRequiredService<IModelGeometryLoader>();
+  ParsedModel parsed = parser.Parse(bytes, ModelFormat.Gltf);
+  ```
+
+**What the parse showed.** SharpGLTF 1.0.7 keeps triangle order, so the comparison is **in order**, exact to the bit (positions and normals compared as `SingleToInt32Bits`): Carve's (A, B, C) reads back as (A, C, B), the order `MeshBridge` draws. The parser reports no warnings. The material reads back as base colour (0.72, 0.72, 0.70, 1), `Pbr` true, metallic 0, roughness 1, not double-sided. Two writes are byte-identical for the cube, L-block and crate.
+
+**Each check failing on a broken product** (unit checks, run by hand with the break applied and then reverted; the regression checks were not broken one by one):
+
+| Break | Checks that failed |
+|---|---|
+| No normals written (`VertexPosition` only) | `GlbExportTests`: bit-for-bit readback (cube, L-block, crate), and the one-primitive `POSITION`+`NORMAL` check |
+| Winding reversed (B and C swapped) | bit-for-bit readback, all three meshes |
+| Metallic left at 1 | `One_matte_material_carve`, all three meshes |
+| Triangulation order changed: export writes triangles reversed | bit-for-bit readback, all three meshes |
+| Triangulation order changed: `FlatShading` reverses `Triangulator` order | `FlatShadingTests`, cube and L-block |
+| Path not created (no `Directory.CreateDirectory`) | `ToolPathsTests.A_write_creates_missing_folders_and_says_when_it_replaced_a_file` |
+
+**Frames.** HASHES_PLACEHOLDER
+
+**Not checked.** No `.glb` has been loaded by a running game or rendered through the engine; per the spec that is T-18 and T-19. The regression tests were run only through `verify`, not each against a break.
