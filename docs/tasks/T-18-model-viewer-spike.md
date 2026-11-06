@@ -91,7 +91,7 @@ A small Empyrean app stands in for a game. It mounts a content folder, loads a `
 
 Run on **Claude Opus 5.5** (`claude-opus-5-5`).
 
-**Files.** `spikes/Carve.ModelViewer/`: `Program.cs` (the host and its defaults), `ViewerOptions.cs` (the command line), `ViewFrame.cs` (auto-framing), `ViewerLook.cs` (size, sun, light intensities), `ViewerSystem.cs` (load, pose, capture, `view.json`), `ViewerRun.cs` (exit code). `scripts/run-viewer.ps1`. `tests/Carve.ModelViewer.Tests/`: `CubeFixture.cs`, `ViewerProcess.cs`, `ViewerFrame.cs`, `ViewerCubeTests.cs`. `ProductReferenceGuard` now forbids `Carve.ModelViewer` and `spikes/`, and `server-unit` takes `spikes/**/*.csproj` as an input.
+**Files.** `spikes/Carve.ModelViewer/`: `Program.cs` (the host and its defaults), `ViewerOptions.cs` (the command line), `ViewFrame.cs` (auto-framing), `ViewerLook.cs` (size, sun, light intensities), `ViewerSystem.cs` (load, pose, capture, `view.json`), `ViewerRun.cs` (exit code). `scripts/run-viewer.ps1`. `tests/Carve.ModelViewer.Tests/`: `CubeFixture.cs`, `ViewerProcess.cs`, `FramePixels.cs` (the PNG decode and pixel reads; linked into `tests/Carve.ExportViewer.Tests`), `ViewerFrame.cs`, `ViewerCubeTests.cs`. `ProductReferenceGuard` now forbids `Carve.ModelViewer` and `spikes/`, and `server-unit` takes `spikes/**/*.csproj` as an input.
 
 **How it runs.** `EmpyreanHostBuilder.CreateDefault(...).UseStandardHost(...)` with `VirtualSurface = true`, 512x512 and `AntiAliasing.X4` as code-level defaults, the `StandardHdr` preset, and `IScreenshotService` for the frames. `Empyrean:Time:FrameDeltaTime` is 1/60, inserted as the lowest configuration source. The scene has nothing random, so there is no seed to fix. Only `--Empyrean:...` arguments reach the host.
 

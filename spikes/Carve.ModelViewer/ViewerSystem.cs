@@ -187,6 +187,7 @@ internal sealed class ViewerSystem(
     {
         var mesh = _model!.Mesh;
         var triangles = (mesh.IndexCount > 0 ? mesh.IndexCount : mesh.VertexCount) / 3;
+        // The engine's Material has no name to report: engine need 3 (D-1, Engine needs), so view.json lists none.
         // An empty entry means the submesh takes the base material.
         var materials = _model.SubmeshMaterials is { Length: > 0 } submeshes
             ? submeshes.Select(m => m ?? _model.Material!).ToArray()

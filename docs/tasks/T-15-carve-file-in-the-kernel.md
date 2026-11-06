@@ -198,4 +198,6 @@ The float cases are named by value here. The test run names them by bits:
 - `ACleanMeshReadsBackWithNoWarnings` guards against invented warnings, and no break was tried against it.
 - Parsing a coordinate as `double` and then rounding it to `float` failed no check. The writer's shortest texts never hit a double-rounding case. The reader parses straight to `float` by design, but no test guards that.
 
-**Changed outside `CarveFile.cs`:** `CrateTests` now exposes the crate's construction as `internal static PolygonMesh Build()`, so the round trip uses the same mesh. `TheCrate` checks what it checked before.
+**Changed outside `CarveFile.cs`:** the crate's construction is `TestMeshes.Crate()` (`tests/Carve.Core.Tests/TestMeshes.cs`; first it was `CrateTests.Build()`), so the round trip uses the same mesh. `TheCrate` checks what it checked before.
+
+**A reading (RV-14).** A face index of `1.0` is refused in a file but accepted by `define_mesh`. T-15's refusal list says a face is an array of integers, and `Write` never emits `1.0`, so only a hand-edited file meets it. No change needed.

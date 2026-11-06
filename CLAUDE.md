@@ -64,11 +64,14 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `tests/Carve.Server.Tests` | xunit tests that start the real `carve`, incl. the no-extension guard |
 | `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
 | `tests/Carve.ModelViewer.Tests` | The viewer on its own fixture cube, through `run-viewer.ps1`; suite `viewer-cube` |
+| `tests/Carve.ExportViewer.Tests` | The checks on what the viewer made of the exported crate, the last step of suite `scenario-export`. They read the run folder in `CARVE_EXPORT_RUN` and are skipped when it is unset, so `dotnet test Carve.slnx` passes without it |
 | `tests/Carve.Scenario.Tiny` | The scenario the debug extension's tests stack on it |
 | `tests.json` | The suites and their tiers, which `cairn <kind> <id> verify` and `cairn test run` work from |
 | `scripts/verify.ps1` | The old whole run: build warnings-as-errors + all tests + the cube scenario (needs a Vulkan device). The gate no longer runs it |
 | `scripts/run-scenario.ps1` | Builds, then runs one scenario on the real `carve`; returns its exit code and run folder |
 | `scripts/run-viewer.ps1` | Builds, then runs the viewer on one model; returns its exit code |
+| `scripts/run-export-scenario.ps1` | The export scenario, then the viewer on its content folder, then the checks of `tests/Carve.ExportViewer.Tests` (built first unless `-NoBuild`, each step bounded; a skipped check fails it); the run folder is the last line on stdout |
+| `scripts/bounded-run.ps1` | Dot-sourced by the run scripts: starts `dotnet` with quoted arguments (a trailing backslash survives) and stops it after its time limit, exit code 124 |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
 
@@ -161,7 +164,7 @@ otherwise; on a queued run the script sets that to `<name>/` under `CAIRN_ARTIFA
 call and result, in which an image is its size and hash.
 
 `ScenarioDriver` is all a scenario has: `ListToolsAsync`, `CallAsync(tool, args)`,
-`CaptureAsync(name, args)`, `AssertBytesEqual(what, expected, actual)`, `Fail(message)`. A tool
+`CaptureAsync(name, args)`, `AssertBytesEqual(what, expected, actual)`, `Fail(message)`, and `RunFolder`, the run folder's path, for a scenario that keeps files in it. A tool
 error is a result from `CallAsync` and a failure from `CaptureAsync`. Compare a
 `ScenarioFrame`'s `Pixels`, and sample with `Pixel(x, y)`.
 
