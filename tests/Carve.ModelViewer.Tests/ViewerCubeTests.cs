@@ -93,7 +93,7 @@ public class ViewerCubeTests(CubeRuns runs) : IClassFixture<CubeRuns>
         Assert.Equal(
             ["front.png", "view.json"],
             Directory.GetFiles(runs.FirstRun.Out).Select(Path.GetFileName).Order());
-        Assert.Empty(Directory.GetFileSystemEntries(runs.FirstRun.WorkingFolder));
+        Assert.Empty(runs.FirstRun.LeftInWorkingFolder);
         Assert.Equal(["cube.glb"], Directory.GetFiles(Path.Combine(runs.Content, "models")).Select(Path.GetFileName));
     }
 
