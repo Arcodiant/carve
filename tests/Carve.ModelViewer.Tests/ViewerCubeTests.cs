@@ -54,6 +54,9 @@ public class ViewerCubeTests(CubeRuns runs) : IClassFixture<CubeRuns>
 
     private const int Tolerance = 10;
 
+    /// <summary>A clean cube is exact across a face; this is only room for a different driver.</summary>
+    private const int FlatTolerance = 2;
+
     private static JsonElement ViewJson(ViewerResult run) =>
         JsonDocument.Parse(File.ReadAllText(Path.Combine(run.Out, "view.json"))).RootElement;
 
@@ -153,6 +156,38 @@ public class ViewerCubeTests(CubeRuns runs) : IClassFixture<CubeRuns>
         Assert.True(frame.Project(Top).Y < frame.Project(PlusZ).Y, "the top is not above +Z");
         Assert.True(top.R > plusZ.R, $"top {top} is not brighter than +Z {plusZ}");
         Assert.True(plusZ.R > plusX.R, $"+Z {plusZ} is not brighter than +X {plusX}");
+    }
+
+    /// <summary>
+    /// Flat normals: a tenth in from each corner of a face, well clear of its edges, must be the shade
+    /// of its middle. The middles alone cannot tell, since with no NORMAL in the file the engine makes
+    /// smooth normals, which run from 125 to 211 across a face but average out at the same middle.
+    /// </summary>
+    [Fact]
+    public void Each_face_is_one_flat_shade()
+    {
+        var frame = Frame(runs.FirstRun, "front");
+        float[] near = [0.1f, 0.9f];
+
+        foreach (var (name, corner) in new (string, Func<float, float, Vector3>)[]
+                 {
+                     ("top", (a, b) => new Vector3(a, 1f, b)),
+                     ("+Z", (a, b) => new Vector3(a, b, 1f)),
+                     ("+X", (a, b) => new Vector3(1f, a, b)),
+                 })
+        {
+            var middle = frame.At(corner(0.5f, 0.5f));
+            foreach (var a in near)
+            {
+                foreach (var b in near)
+                {
+                    var seen = frame.At(corner(a, b));
+                    Assert.True(
+                        ViewerFrame.Difference(seen, middle) <= FlatTolerance,
+                        $"the {name} face is {seen} at ({a}, {b}) and {middle} at its middle");
+                }
+            }
+        }
     }
 
     /// <summary>The second agreed view, whose three faces the same sun must also keep apart.</summary>
