@@ -24,3 +24,31 @@ It needs the .NET SDK, the Empyrean package feed (the local feed `empyrean-local
 and a Vulkan device (a GPU with a current driver); there
 is no window, every look is an offscreen render. If no device is found the
 server stays up and the `render` tool says so.
+
+## From an empty file to a game
+
+The same `.mcp.json` entry above is all the setup. The calls, in order, with
+the paths relative to the folder carve was started in (its working directory):
+
+1. `define_mesh` the cube (the example in its description), then edit it with
+   `move` and `extrude`.
+2. `save` with `{"path":"crate.carve"}`. This writes `crate.carve`, the file to
+   keep working in: the polygons and their ids exactly, not the undo history.
+   Missing folders are created, and a file already there is replaced (the result
+   says so).
+3. In a later session, `open` with `{"path":"crate.carve"}`. It replaces the
+   current mesh in one step (one `undo` takes it back), and the ids from before
+   the save still name the same vertices and faces. Carve remembers no current
+   file, so the path is given every time. A path that is not there is an error
+   that names the full path and lists the `.carve` files in that folder.
+4. `export` with `{"path":"C:/path/to/game/Content/models/crate.glb"}`. The
+   `.glb` is only for the game; it keeps triangles, not faces, so edit the
+   `.carve` file and export again.
+5. The game loads it with one line:
+
+   ```csharp
+   models.LoadModel(new ContentPath("models/crate.glb"))
+   ```
+
+The tool descriptions carry the same sequence, so an agent that has only the
+tool list can follow it.

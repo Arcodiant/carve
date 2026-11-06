@@ -22,7 +22,7 @@ public static class ToolPaths
     /// <paramref name="error"/> set, when the path is empty, holds a character not allowed in a path, names a folder or
     /// has another extension.
     /// </summary>
-    public static ToolPath? Resolve(string tool, string? path, string extension, out string? error, string? baseDirectory = null)
+    public static ToolPath? Resolve(string tool, string? path, string extension, out string? error, string? baseDirectory = null, string verb = "writes")
     {
         error = null;
         if (string.IsNullOrWhiteSpace(path))
@@ -63,8 +63,8 @@ public static class ToolPaths
         if (!string.Equals(actual, extension, StringComparison.OrdinalIgnoreCase))
         {
             error = actual.Length == 0
-                ? $"{tool}: path \"{path}\" has no extension; {tool} writes {extension} files, so the path must end in {extension}"
-                : $"{tool}: path \"{path}\" ends in \"{actual}\"; {tool} writes {extension} files, so the path must end in {extension}";
+                ? $"{tool}: path \"{path}\" has no extension; {tool} {verb} {extension} files, so the path must end in {extension}"
+                : $"{tool}: path \"{path}\" ends in \"{actual}\"; {tool} {verb} {extension} files, so the path must end in {extension}";
             return null;
         }
 
