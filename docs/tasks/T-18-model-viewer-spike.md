@@ -130,19 +130,9 @@ Run on **Claude Opus 5.5** (`claude-opus-5-5`).
 
 The rows above ran before the flatness check existed, except "Normals dropped", "Load error" and "Stray file", so those others are not shown against it. Before it landed, the "Wrong content path" and "Framed too tight" breaks would make it fail or not by what they do to `front.png`; that was not run.
 
-### Hand-off
+**Frames and review.** `front.png`, `minus-x.png` and the M-1 cube `front` were opened and looked at; they came from the queued `viewer-cube` run, not a run by hand. The framing is the same as M-1's, the three faces read apart, and `minus-x` has -X on the left and +Z on the right, as the milestone's sketch does. The person approved `front.png` (hash `96c9265cf60f8aad...`) beside the M-1 frame through `mcp__waystone__review`, with no notes. They were told of the two differences from M-1: the background is pure black (0, 0, 0), because `StandardHdr` clears to it, where M-1's is a dark slate; and the light is fixed in the world, on purpose. Both frames are under `D:\Repos\carve\branches\milestone\M-3\artifacts\review\T-18\round-1\`.
 
-Run on **Claude Opus 5.5** (`claude-opus-5-5`). Stopped at the checkpoint: code committed and verified, capture review still to come.
-
-**Done.** The viewer, script, fixture, tests and wiring are committed, and the table above is written.
-
-**Left.**
-
-1. Open `front.png` and `minus-x.png`. **No frame has been opened yet**: every shade above was read as numbers.
-2. Show the person `front.png` beside the M-1 cube `front` (`mcp__waystone__review`, kind `approve`). Their approval is the gate. Both are under `D:\Repos\carve\branches\milestone\M-3\artifacts\review\T-18\round-1\`: `queued\viewer-cube\first\front.png` and `m1-cube-front.png`. If a later commit changes frames, fetch them again; `front.png` should hash `96c9265cf60f8aad...`.
-3. `cairn lint`, then `finish` from inside the worktree.
-
-**For the person to see.** The background is pure black (0, 0, 0), because `StandardHdr` clears to it, where M-1's is a dark slate. It meets "dark", but it differs from the frame beside it. The light also differs from M-1's on purpose, being fixed in the world.
+After the rebase onto T-17, `viewer-cube` carried its pass, so the approved frame was not captured again on the rebased commit.
 
 **Not checked.**
 
