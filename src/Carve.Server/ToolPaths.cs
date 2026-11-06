@@ -100,7 +100,11 @@ public static class ToolPaths
             try
             {
                 using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
                     stream.Write(bytes);
+                    stream.Flush(flushToDisk: true); // on disk before the move, so a crash after it cannot leave the new name empty
+                }
+
                 File.Move(temp, path.FullPath, overwrite: true);
             }
             catch

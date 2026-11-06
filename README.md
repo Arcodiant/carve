@@ -37,7 +37,8 @@ the paths relative to the folder carve was started in (its working directory):
    Missing folders are created, and a file already there is replaced (the result
    says so).
 3. In a later session, `open` with `{"path":"crate.carve"}`. It replaces the
-   current mesh in one step (one `undo` takes it back), and the ids from before
+   current mesh in one step (within a session `undo` takes it back; a first
+   `open` in a process cannot be undone), and the ids from before
    the save still name the same vertices and faces. Carve remembers no current
    file, so the path is given every time. A path that is not there is an error
    that names the full path and lists the `.carve` files in that folder.

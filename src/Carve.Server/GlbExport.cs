@@ -18,7 +18,7 @@ public static class GlbExport
 {
     public const string MaterialName = "carve";
 
-    /// <summary>The colour <c>render</c> draws the surface in (RenderSystem's), so the game sees what Carve shows.</summary>
+    /// <summary>The colour <c>render</c> draws the surface in: <c>RenderSystem</c> takes its surface colour from here, so the game sees what Carve shows.</summary>
     public static readonly Vector4 BaseColor = new(0.72f, 0.72f, 0.70f, 1f);
 
     /// <summary>Set explicitly: glTF's default material is fully metallic.</summary>

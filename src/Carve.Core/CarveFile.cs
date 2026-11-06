@@ -123,15 +123,32 @@ public static class CarveFile
 
         var errors = new List<MeshError>();
         JsonElement? version = null, vertices = null, faces = null;
+        var position = -1;
         foreach (var property in root.EnumerateObject())
         {
-            switch (property.Name)
+            position++;
+
+            // The parser accepts a lone surrogate escape in a key but cannot hand it back as text: that is a refusal
+            // here, named by the key's place in the object, and the file's other problems are still listed.
+            string key;
+            try
+            {
+                key = property.Name;
+            }
+            catch (InvalidOperationException)
+            {
+                errors.Add(new MeshError(Invariant($"keys[{position}]"),
+                    "the key is not valid text: it holds a lone surrogate escape (a \\ud800 to \\udfff with no partner)"));
+                continue;
+            }
+
+            switch (key)
             {
                 case VersionKey: Take(ref version, property); break;
                 case VerticesKey: Take(ref vertices, property); break;
                 case FacesKey: Take(ref faces, property); break;
                 default:
-                    errors.Add(new MeshError(property.Name,
+                    errors.Add(new MeshError(key,
                         $"unknown key: a version {Version} Carve file has only the keys \"{VersionKey}\", \"{VerticesKey}\" and \"{FacesKey}\""));
                     break;
             }

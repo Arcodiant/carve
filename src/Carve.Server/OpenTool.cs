@@ -14,9 +14,9 @@ public sealed class OpenTool(ModelStore store)
 
     public const string Text =
         "Reads a .carve file (written by save) and makes its mesh the current mesh, in one step like define_mesh: it REPLACES the current mesh, "
-        + "it does not add to it, and one undo takes you back to the mesh before. Takes path, the file to read. "
+        + "it does not add to it, and within a session undo takes the open back to the mesh before it. A first open in a process cannot be undone: there is no mesh before it, so undo is then a tool error. Takes path, the file to read. "
         + "The file holds the polygons exactly, with the ids they were saved with: vertex 0 is the file's first vertex and face 0 its first face, "
-        + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so undo cannot go back past the open, "
+        + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so undo goes back no further than the open, "
         + "and carve keeps no current file: give the path to open and to save every time. "
         + "The .carve file is the one to keep working in; the .glb that export writes is only for the game and cannot be opened. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; the path must end in .carve, in any case. "
@@ -73,7 +73,7 @@ public sealed class OpenTool(ModelStore store)
         {
             names = Directory.EnumerateFiles(folder)
                 .Select(f => Path.GetFileName(f)!)
-                .Where(n => n.EndsWith(SaveTool.Extension, StringComparison.OrdinalIgnoreCase) && !n.StartsWith('.'))
+                .Where(n => n.EndsWith(SaveTool.Extension, StringComparison.OrdinalIgnoreCase) )
                 .OrderBy(n => n, StringComparer.Ordinal).ToList();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

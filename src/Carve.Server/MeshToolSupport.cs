@@ -12,7 +12,7 @@ namespace Carve.Server;
 /// <summary>What the mesh tools share: the report and result JSON, tool errors, raw-argument reading and registration.</summary>
 internal static class MeshToolSupport
 {
-    public const string NoMesh = "there is no mesh yet; call define_mesh first";
+    public const string NoMesh = "there is no mesh yet; call define_mesh first, or open to read a saved .carve file";
 
     /// <summary>Opens each example call in a tool's description; a test parses from here to the end of the line.</summary>
     public const string ExampleMarker = "Example: ";

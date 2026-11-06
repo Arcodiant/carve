@@ -22,7 +22,7 @@ public sealed class ExportTool(ModelStore store)
         + "so build the model at the size and place the game wants it. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
         + "an existing file is replaced and the result says (replaced); the path must end in .glb, in any case. "
-        + "Errors, each a tool error that writes nothing: no mesh yet (call define_mesh first); an empty path; a path holding a character a file path may not; "
+        + "Errors, each a tool error that writes nothing: no mesh yet (call define_mesh or open first); an empty path; a path holding a character a file path may not; "
         + "a path naming a folder; any extension but .glb; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
         + "A mesh with warnings still exports, and the result repeats them. export changes nothing: not the mesh, its ids, or what undo steps back to. "

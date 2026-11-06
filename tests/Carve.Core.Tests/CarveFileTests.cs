@@ -250,6 +250,27 @@ public class CarveFileTests
     public void AFaceIndexThatIsNotAnIntegerIsRefused(string face, string element, string expected)
         => Assert.Equal(expected, Refused(CubeWith("    [3, 7, 6, 2],\n", $"    {face},\n"), element));
 
+    [Theory]
+    [InlineData("{\"\\ud800\": 1}", "keys[0]")]
+    [InlineData("{\"carve\": 1, \"vertices\": [], \"faces\": [], \"\\udc00x\": 1}", "keys[3]")]
+    [InlineData("{\"\\udbff\\ud800\": 1}", "keys[0]")]
+    public void ALoneSurrogateEscapeInAKeyIsRefusedByItsPlace(string text, string element)
+    {
+        var result = Read(text);
+
+        Assert.False(result.Succeeded);
+        var error = Assert.Single(result.Errors, e => e.Element == element);
+        Assert.Contains("lone surrogate", error.Message);
+    }
+
+    [Fact]
+    public void AValidSurrogatePairInAKeyIsAnUnknownKeyNotACrash()
+    {
+        var result = Read(CubeText.Replace("  \"carve\": 1,\n", "  \"carve\": 1,\n  \"\\ud83d\\ude00\": 1,\n"));
+
+        Assert.Contains(result.Errors, e => e.Element == "\U0001F600" && e.Message.StartsWith("unknown key"));
+    }
+
     [Fact]
     public void AnUnknownKeyIsRefused()
         => Assert.Equal("unknown key: a version 1 Carve file has only the keys \"carve\", \"vertices\" and \"faces\"",
