@@ -1,0 +1,159 @@
+---
+description: >-
+  How a model holds named meshes, colours, a skeleton, weights and clips, and how it reaches Empyrean as a skinned .glb and a clip library
+---
+# D-6 — Characters: rigging, animation and character export
+
+**Status:** Accepted
+
+**Raised by:** Orcward's request, 2026-11-06: original animated characters for an Empyrean 0.119 game, loaded without conversion. It takes up the rigs and animation, smoothing and colour items in D-1's *Scope of a model*.
+
+**Default firmness:** Leaning · Rule
+
+## Intent
+
+An agent on a game authors an original animated character in Carve: a body and costume pieces on one skeleton, coloured and soft-shaded, with looping clips. The source is a committed text file, and the `.glb` built from it loads in Empyrean with no conversion. Skinning faults are seen in Carve's own renders before export.
+
+Milestones planned against this doc: [M-16](../milestones/M-16-a-character-that-moves.md), [M-17](../milestones/M-17-rig-it-well.md), [M-18](../milestones/M-18-soft-characters.md) and [M-19](../milestones/M-19-a-clip-library-for-a-game.md).
+
+**Out of scope:** animation events (`*.events.json`), humanoid role maps (`*.humanoid.json`), morph targets, IK.
+
+### What the planning probe found
+
+A throwaway probe on 2026-11-06 wrote small `.glb` files with SharpGLTF 1.0.7 and read them with Empyrean 0.119.0's `IModelGeometryLoader`. The bones were given breadth-first on purpose: `Hips, LegL, LegR, FootL, FootR`.
+
+| File | Result |
+|---|---|
+| Two glTF meshes on one skin | **Second mesh dropped.** Only the warning says so: `glTF skinned mesh 'Body' (mesh 0) loads alone; the file's other meshes were dropped: 'Coat' (mesh 1)` |
+| One glTF mesh, two primitives, two materials | Both kept: 2 submeshes, no warnings |
+| Clips only, no skin | `ParseAnimationSet` reorders bones depth-first: `Hips, LegL, FootL, LegR, FootR` |
+| Clips only, a skin and no mesh | Bones in the given order, and SharpGLTF writes it |
+| Armature node above the bones | Not a bone; 5 bones, identity `RootTransform` |
+| A clip keying one bone of five | 5 tracks, so the clip fits the skeleton |
+
+From the docs: `PositionUvNormalSkinnedVertex` has no colour attribute, so `COLOR_0` cannot reach a skinned character, and it packs bone indices one per byte. Every glTF clip import throws on CUBICSPLINE.
+
+Not probed, and left to the tasks that meet them: rotation interpolation between keys (T-33, T-47), drawing a `SkinnedPose` on Carve's headless host (T-47), and byte-identity across processes with skins and animations (T-34).
+
+## Decision
+
+### A model is an ordered list of named meshes
+
+**Certainty:** Leaning · **Strictness:** Rule
+
+`Carve.Core` gains an immutable `Model`: named meshes in the order they were defined, a skeleton or none, and clips. A mesh keeps its own vertex and face ids. The store holds a `Model`, and undo steps over models. A tool names its target with a `mesh` argument, which may be left out when the model has one mesh.
+
+The list is flat. M-9's part tree is the later form of it: a flat list is a tree one level deep, so a named mesh becomes a part.
+
+**Alternatives:** building M-9's part tree first, which delays Orcward behind transforms, instances and levels a character does not use.
+**Would change if:** M-9's planning finds a flat list cannot grow into the tree without breaking `mesh` arguments or the file.
+
+### A skinned export is one glTF mesh
+
+**Certainty:** Settled · **Strictness:** Invariant
+
+Every piece of a skinned model is written into **one** glTF mesh, with one primitive per piece and colour, because Empyrean keeps only the first of several skinned meshes. Each primitive has its own material, named `<mesh>:<group>` or `<mesh>:<rrggbb>`, so a piece's name survives in the file. Primitives follow the model's mesh order, then first use of each colour in face order.
+
+**Enforced by:** T-34's test, which fails on any `ParsedModel.Warnings` entry and counts submeshes against the pieces written.
+**Rejected:** a glTF mesh per piece, which drops every costume piece on load; a model file per piece, which costs the game a second load and a shared pose.
+
+### Colour is a material
+
+**Certainty:** Settled · **Strictness:** Rule
+
+Colour is per face, set directly or through a named face group, and exported as `baseColorFactor` on a material with metallic 0 and roughness 1, as T-16's material is. Values are linear RGB from 0 to 1, as glTF stores them, and materials are opaque. An uncoloured face has Carve's surface colour `(0.72, 0.72, 0.70)`, so existing frames do not change.
+
+**Rejected:** `COLOR_0`, which the engine's skinned vertex cannot carry.
+
+### Bones as given
+
+**Certainty:** Settled · **Strictness:** Invariant
+
+Names and order are exactly the caller's, and parents come before children. Names are unique and non-empty. A rest position and rotation are **local to the parent**, as a glTF node's are; a root bone's are relative to the model. No scale. Over 255 bones is refused.
+
+**Enforced by:** T-31's refusals, and T-34 and T-46's tests comparing the loaded bone list with the given one.
+
+### The rest pose is the bind pose
+
+**Certainty:** Leaning · **Strictness:** Rule
+
+Meshes are authored in the rest pose, in model space. `inverseBindMatrices` are the inverse of each bone's rest world transform, and mesh nodes have identity transforms, since Empyrean ignores a skinned mesh's node transform.
+
+**Alternatives:** a separate bind pose per mesh, which suits imported rigs Carve does not have.
+**Would change if:** an agent needs to change a skeleton's rest pose after weighting and keep the mesh in place.
+
+### Weights
+
+**Certainty:** Leaning · **Strictness:** Rule
+
+A vertex has at most four influences, normalised to sum to 1. An explicit weight beats an automatic one. Supplying more than four keeps the largest four, with ties going to the lower bone index, and the result says so. Weights live per mesh by vertex id. Automatic weights use distance to each bone's segment, from its head to its child's head, and are deterministic.
+
+A vertex with no weight is a warning, in `get_weights` and in `export`'s result. It exports bound fully to the first root bone, because glTF needs weights that sum to 1.
+
+**Alternatives:** refusing export with unweighted vertices; the request asks for warnings, so this follows it.
+**Would change if:** agents ship unweighted vertices because a warning was easy to miss.
+
+### Clips
+
+**Certainty:** Leaning · **Strictness:** Rule
+
+A clip has a name, a duration, a `loop` flag and, per bone, rotation and translation keys in that bone's local space, as absolute values. Each channel is LINEAR or STEP; any other value is refused. Bones with no keys hold rest.
+
+glTF has no clip duration, only the last key. Export therefore keys every animated channel at 0 and at the duration, holding the nearest key where the agent gave none, so the loaded clip's `Duration` is the one asked for.
+
+A looping clip whose channels do not end as they start is a warning, as is a clip whose root bones end somewhere else on the ground plane, since clips are in place.
+
+**Alternatives:** refusing a clip that does not close, which the request does not ask for and which blocks work in progress; keys relative to rest, which reads well for small motions but differs from what glTF stores.
+**Would change if:** agents leave these warnings unfixed and a popping clip reaches a game.
+
+### Two samplers, on purpose
+
+**Certainty:** Leaning · **Strictness:** Rule
+
+Carve's preview poses on the CPU in `Carve.Core` and draws the result as a plain mesh. `render_glb` loads the exported file through the engine's own loader and draws it with GPU skinning. The two share no skinning code, so a frame that matches proves the export and not only a path agreeing with itself.
+
+**Alternatives:** drawing previews through the engine's skinning, which is one path and proves less.
+**Would change if:** matching the engine's interpolation exactly costs more than it proves.
+
+### Export modes
+
+**Certainty:** Settled · **Strictness:** Rule
+
+`export` gets a `mode`: `model` (the default: meshes, and with a skeleton the skin and clips) or `clips` (armature, skin and animations, no mesh). The clips file **keeps `skins[0]`** even with no mesh, because without one the loader reorders bones depth-first, and a clip's tracks then line up with the wrong bones. Bones sit under one unanimated identity node, `Armature`, which is not a bone.
+
+The same model always writes the same bytes. `export` refuses an existing file unless given `overwrite: true`; `save` replaces, since the `.carve` file is the working copy (the person, 2026-11-06).
+
+**Rejected:** a clips file with no skin, for the bone order above.
+
+### Smooth shading is per mesh, with hard edges marked
+
+**Certainty:** Leaning · **Strictness:** Rule
+
+A mesh is `flat` (the default, as M-3 draws it) or `smooth`, with a set of hard edges. Normals are per face corner, averaged across soft edges. One Core function feeds both render and export, so they cannot disagree. This takes smoothing control out of M-14 and is the "edges marked with a tool" answer to its open question.
+
+**Alternatives:** a smoothing angle, which is simpler to call but cannot crease one edge among similar ones.
+**Would change if:** agents mark many edges by hand that an angle would have found; an angle can be added as a way of marking.
+
+### Subdivide is a destructive edit
+
+**Certainty:** Leaning · **Strictness:** Guideline
+
+`subdivide` is Catmull-Clark as one edit, like `extrude`, keeping D-1's id rules: old ids stay, a face keeps its id as its first child, new elements are appended. New vertices take colours, groups and hard edges from their source and blend weights with the same stencil, then cap at four. This meets D-5's *Would change if*: a real game needs soft shapes first.
+
+D-5's modifier question stays open for bevel. A later move to a modifier would change this decision.
+
+**Alternatives:** a subdivision modifier kept in the file, which keeps the base mesh low-poly.
+**Would change if:** agents want to keep editing the coarse cage after subdividing.
+
+### UVs stay possible
+
+**Certainty:** Settled · **Strictness:** Guideline
+
+No UVs yet. Nothing here may stop M-6 adding per-corner UVs: the export's vertex is built in one place, and the file's mesh object takes new keys in a later version. The engine's skinned vertex already has `TexCoord`.
+
+## Open questions
+
+- **How close a loaded frame must be to the preview.** GPU and CPU skinning will not agree bit for bit. T-48 measures the difference and asks the person for the tolerance; no agent sets it.
+- **How `render` frames a moving character.** The working assumption is the rest-pose bounds, so a clip does not swim. T-32 confirms it and T-47 must match it.
+- **Whether Carve's clips should keep a game-side `loop` flag.** glTF has none, so `loop` is only Carve's check. The game sets `Animator.Loop` itself.
+- **Engine need 3**, in D-1: a skinned model of several meshes. If the engine gains it, one mesh stays valid and nothing has to change.
