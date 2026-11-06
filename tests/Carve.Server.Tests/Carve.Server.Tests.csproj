@@ -15,6 +15,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="Carve.Server.Tests.CarveProcess" Static="true" />
+    <Using Include="Carve.Server.Tests.ToolList" Static="true" />
   </ItemGroup>
 
   <!-- Built first and started as real processes, never linked: the tests see what ships. -->

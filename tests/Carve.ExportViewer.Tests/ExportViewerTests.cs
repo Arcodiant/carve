@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using StbImageSharp;
+using Carve.ModelViewer.Tests;
 using Xunit;
 
 namespace Carve.ExportViewer.Tests;
@@ -28,12 +28,8 @@ internal sealed class Frame
 
     public static Frame Load(string path)
     {
-        var image = ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);
-        return new Frame(Path.GetFileName(path), image.Width, image.Height, (x, y) =>
-        {
-            var at = (y * image.Width + x) * 4;
-            return (image.Data[at], image.Data[at + 1], image.Data[at + 2]);
-        });
+        var image = new FramePixels(path);
+        return new Frame(Path.GetFileName(path), image.Width, image.Height, image.Pixel);
     }
 
     /// <summary>The frame as a camera with +X to its left would have drawn it.</summary>
@@ -88,9 +84,6 @@ internal static class Checks
     // minus-x: the lid (207), which an upside-down view would put at the bottom.
     public static readonly (int X, int Y) MinusXTop = (250, 160);
 
-    public static int Gap((int R, int G, int B) a, (int R, int G, int B) b) =>
-        Math.Max(Math.Abs(a.R - b.R), Math.Max(Math.Abs(a.G - b.G), Math.Abs(a.B - b.B)));
-
     private static bool IsBackground((int R, int G, int B) p) => p.R <= 2 && p.G <= 2 && p.B <= 2;
 
     public static List<string> Corners(Frame frame)
@@ -136,7 +129,7 @@ internal static class Checks
             }
         }
 
-        var gap = Gap(frame.Pixel(a.X, a.Y), frame.Pixel(b.X, b.Y));
+        var gap = FramePixels.Difference(frame.Pixel(a.X, a.Y), frame.Pixel(b.X, b.Y));
         if (gap < MinimumStep)
         {
             found.Add($"{frame.Name}: {whatA} and {whatB} differ by {gap}/255, at least {MinimumStep} wanted");
@@ -197,6 +190,8 @@ public sealed class ExportViewerTests
 
     private static string Viewer(string file) => Path.Combine(Run, "viewer", file);
 
+    private static double[] Numbers(JsonElement array) => array.EnumerateArray().Select(v => v.GetDouble()).ToArray();
+
     [Fact]
     public void View_json_matches_what_was_exported()
     {
@@ -210,13 +205,13 @@ public sealed class ExportViewerTests
         var materials = root.GetProperty("materials");
         Assert.Equal(1, materials.GetArrayLength());
         var material = materials[0];
-        Assert.Equal([0.72, 0.72, 0.70, 1], material.GetProperty("baseColor").EnumerateArray().Select(v => v.GetDouble()).ToArray(), new Tolerance());
+        Assert.Equal([0.72, 0.72, 0.70, 1], Numbers(material.GetProperty("baseColor")), new Tolerance());
         Assert.Equal(0, material.GetProperty("metallic").GetDouble());
         Assert.Equal(1, material.GetProperty("roughness").GetDouble());
 
         var bounds = root.GetProperty("bounds");
-        Assert.Equal([-0.02, 0, 0], bounds.GetProperty("min").EnumerateArray().Select(v => v.GetDouble()).ToArray(), new Tolerance());
-        Assert.Equal([1.02, 0.8, 1], bounds.GetProperty("max").EnumerateArray().Select(v => v.GetDouble()).ToArray(), new Tolerance());
+        Assert.Equal([-0.02, 0, 0], Numbers(bounds.GetProperty("min")), new Tolerance());
+        Assert.Equal([1.02, 0.8, 1], Numbers(bounds.GetProperty("max")), new Tolerance());
     }
 
     [Fact]

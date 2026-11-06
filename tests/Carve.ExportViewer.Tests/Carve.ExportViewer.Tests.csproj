@@ -13,4 +13,8 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../Carve.ModelViewer.Tests/FramePixels.cs" Link="FramePixels.cs" />
+  </ItemGroup>
+
 </Project>

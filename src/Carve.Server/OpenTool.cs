@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -11,7 +10,7 @@ namespace Carve.Server;
 public sealed class OpenTool(ModelStore store)
 {
     /// <summary>How many .carve files a missing-file error lists before it counts the rest.</summary>
-    public const int ListLimit = 20;
+    private const int ListLimit = 20;
 
     public const string Text =
         "Reads a .carve file (written by save) and makes its mesh the current mesh, in one step like define_mesh: it REPLACES the current mesh, "
@@ -28,27 +27,13 @@ public sealed class OpenTool(ModelStore store)
         + "a file that cannot be read (access denied, a locked file); a file that is not a Carve file: not JSON (with line and column), an unknown version, "
         + "or a bad vertex or face, each problem listed by element, e.g. faces[3][3]. "
         + "The whole sequence from an empty file to a game is the worked example in save's description.\n"
-        + "Example: " + SaveTool.WorkedOpen;
+        + ExampleMarker + SaveTool.WorkedFile;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<OpenTool>("open", Text, new JsonObject
-    {
-        ["type"] = "object",
-        ["properties"] = new JsonObject
-        {
-            ["path"] = new JsonObject
-            {
-                ["description"] = "The .carve file to read, absolute or relative to carve's working directory.",
-                ["type"] = "string",
-            },
-        },
-        ["required"] = new JsonArray("path"),
-    });
+    public static McpServerTool Create() => MeshToolSupport.Create<OpenTool>("open", Text, PathSchema("The .carve file to read, absolute or relative to carve's working directory."));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null)
     {
-        var errors = UnknownArguments("open", context, "path");
-        var text = PathArgument(path, errors);
-        if (errors.Count > 0) return Failed("open", errors);
+        if (PathArguments("open", context, path, out var text) is { } refused) return refused;
 
         var target = ToolPaths.Resolve("open", text, SaveTool.Extension, out var pathError, verb: "reads");
         if (target is null) return Error(pathError!);
@@ -77,7 +62,7 @@ public sealed class OpenTool(ModelStore store)
     }
 
     /// <summary>The missing-file error: the resolved path and the .carve files that are in its folder.</summary>
-    public static string Missing(ToolPath target)
+    private static string Missing(ToolPath target)
     {
         var folder = Path.GetDirectoryName(target.FullPath)!;
         var head = $"open: no file at {target.FullPath}; ";

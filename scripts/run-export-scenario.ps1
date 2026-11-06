@@ -17,7 +17,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 
-function Write-Err([string]$text) { [Console]::Error.WriteLine($text) }
+. (Join-Path $PSScriptRoot 'bounded-run.ps1')
 
 $extra = @{}
 if ($NoBuild) { $extra.NoBuild = $true }

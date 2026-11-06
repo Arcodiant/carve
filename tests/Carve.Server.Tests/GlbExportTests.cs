@@ -17,7 +17,7 @@ namespace Carve.Server.Tests;
 public class GlbExportTests
 {
     /// <summary>The engine's CPU model parser, built without a GPU or a host.</summary>
-    private static readonly IModelGeometryLoader Parser = BuildParser();
+    internal static readonly IModelGeometryLoader Parser = BuildParser();
 
     private static IModelGeometryLoader BuildParser()
     {
@@ -34,38 +34,11 @@ public class GlbExportTests
     {
         "cube" => TestMeshes.Cube(),
         "lblock" => TestMeshes.LBlock(),
-        "crate" => Crate(),
+        "crate" => TestMeshes.Crate(),
         _ => throw new ArgumentException(name),
     };
 
-    /// <summary>The crate as CrateTests builds it: one cube, moved and extruded.</summary>
-    public static PolygonMesh Crate()
-    {
-        var mesh = TestMeshes.Cube();
-        mesh = TestMeshes.Ok(MeshEdits.Move(mesh, null, null, [3], new Vector3(0, -0.2f, 0)));
-        mesh = TestMeshes.Ok(MeshEdits.Extrude(mesh, TestMeshes.AllCubeFaces, 0, 0.12f));
-        mesh = TestMeshes.Ok(MeshEdits.Extrude(mesh, TestMeshes.AllCubeFaces, -0.08f));
-        mesh = TestMeshes.Ok(MeshEdits.Extrude(mesh, [4], 0, 0.05f));
-        var (top, bottom) = TopAndBottom(mesh, 4);
-        mesh = TestMeshes.Ok(MeshEdits.Move(mesh, [top.A, top.B], null, null, new Vector3(0, -0.17f, 0)));
-        mesh = TestMeshes.Ok(MeshEdits.Move(mesh, [bottom.A, bottom.B], null, null, new Vector3(0, 0.17f, 0)));
-        mesh = TestMeshes.Ok(MeshEdits.Extrude(mesh, [4], 0.1f));
-        mesh = TestMeshes.Ok(MeshEdits.Extrude(mesh, [5], 0, 0.05f));
-        (top, bottom) = TopAndBottom(mesh, 5);
-        mesh = TestMeshes.Ok(MeshEdits.Move(mesh, null, [top], null, new Vector3(0, -0.17f, 0)));
-        mesh = TestMeshes.Ok(MeshEdits.Move(mesh, null, [bottom], null, new Vector3(0, 0.17f, 0)));
-        mesh = TestMeshes.Ok(MeshEdits.Extrude(mesh, [5], 0.1f));
-        return mesh;
-    }
-
-    private static ((int A, int B) Top, (int A, int B) Bottom) TopAndBottom(PolygonMesh mesh, int face)
-    {
-        var loop = mesh.Faces[face];
-        var level = Enumerable.Range(0, loop.Count).Select(k => (A: loop[k], B: loop[(k + 1) % loop.Count]))
-            .Where(e => Math.Abs(mesh.Vertices[e.A].Y - mesh.Vertices[e.B].Y) < 1e-6f)
-            .OrderBy(e => Math.Min(mesh.Vertices[e.A].Y, mesh.Vertices[e.B].Y)).ToArray();
-        return (level[^1], level[0]);
-    }
+    private static byte[] Glb(PolygonMesh mesh, string name) => GlbExport.Write(FlatShading.Triangles(mesh), name);
 
     private static string Bits(Vector3 v) =>
         $"{BitConverter.SingleToInt32Bits(v.X):X8} {BitConverter.SingleToInt32Bits(v.Y):X8} {BitConverter.SingleToInt32Bits(v.Z):X8} ({v.X:R}, {v.Y:R}, {v.Z:R})";
@@ -76,7 +49,7 @@ public class GlbExportTests
     {
         var mesh = Mesh(name);
         var expected = FlatShading.Triangles(mesh);
-        var parsed = Parser.Parse(GlbExport.Write(mesh, name), ModelFormat.Gltf);
+        var parsed = Parser.Parse(Glb(mesh, name), ModelFormat.Gltf);
         var vertices = parsed.MeshData.Vertices;
         var indices = parsed.MeshData.Indices!;
 
@@ -103,7 +76,7 @@ public class GlbExportTests
     [MemberData(nameof(Meshes))]
     public void One_matte_material_carve(string name)
     {
-        var parsed = Parser.Parse(GlbExport.Write(Mesh(name), name), ModelFormat.Gltf);
+        var parsed = Parser.Parse(Glb(Mesh(name), name), ModelFormat.Gltf);
 
         var material = Assert.Single(parsed.SubmeshMaterials)!;
         Assert.Equal(new Vector4(0.72f, 0.72f, 0.70f, 1f), material.BaseColor);
@@ -118,7 +91,7 @@ public class GlbExportTests
     public void Two_exports_of_one_mesh_are_byte_identical(string name)
     {
         var mesh = Mesh(name);
-        Assert.Equal(GlbExport.Write(mesh, name), GlbExport.Write(Mesh(name), name));
+        Assert.Equal(Glb(mesh, name), Glb(Mesh(name), name));
     }
 
     /// <summary>The glTF JSON chunk of a .glb.</summary>
@@ -133,7 +106,7 @@ public class GlbExportTests
     [Fact]
     public void One_scene_node_and_mesh_named_for_the_file_with_one_indexed_primitive_of_position_and_normal()
     {
-        var json = Json(GlbExport.Write(Crate(), "crate"));
+        var json = Json(Glb(TestMeshes.Crate(), "crate"));
 
         Assert.Equal(1, json.GetProperty("scenes").GetArrayLength());
         var node = Assert.Single(json.GetProperty("nodes").EnumerateArray());

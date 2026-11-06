@@ -44,7 +44,8 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
-        "scripts/run-scenario.ps1"
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
       "requires": [
@@ -64,7 +65,8 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
-        "scripts/run-scenario.ps1"
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
       "requires": [
@@ -85,7 +87,8 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
-        "scripts/run-scenario.ps1"
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
       "requires": [
@@ -112,7 +115,9 @@
           "dotnet-closure": "tests/Carve.ExportViewer.Tests/Carve.ExportViewer.Tests.csproj"
         },
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "tests/Carve.ModelViewer.Tests/FramePixels.cs",
         "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
         "scripts/run-viewer.ps1",
         "scripts/run-export-scenario.ps1"
       ],
@@ -131,7 +136,8 @@
         {
           "dotnet-closure": "tests/Carve.ModelViewer.Tests/Carve.ModelViewer.Tests.csproj"
         },
-        "scripts/run-viewer.ps1"
+        "scripts/run-viewer.ps1",
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
       "requires": [

@@ -2,21 +2,11 @@ namespace Carve.Server.Tests;
 
 /// <summary>The path rules export (and save and open) keep, on a temp folder.</summary>
 [Trait("Tier", "unit")]
-public sealed class ToolPathsTests : IDisposable
+public sealed class ToolPathsTests() : TempFolderTests("carve-toolpaths")
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"carve-toolpaths-{Guid.NewGuid():N}");
-
-    public ToolPathsTests() => Directory.CreateDirectory(_root);
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_root, recursive: true); }
-        catch (IOException) { }
-    }
-
     private ToolPath Resolve(string path)
     {
-        var resolved = ToolPaths.Resolve("export", path, ".glb", out var error, _root);
+        var resolved = ToolPaths.Resolve("export", path, ".glb", out var error, Root);
         Assert.True(resolved is not null, error);
         Assert.Null(error);
         return resolved!;
@@ -24,7 +14,7 @@ public sealed class ToolPathsTests : IDisposable
 
     private string Refused(string? path)
     {
-        var resolved = ToolPaths.Resolve("export", path, ".glb", out var error, _root);
+        var resolved = ToolPaths.Resolve("export", path, ".glb", out var error, Root);
         Assert.Null(resolved);
         Assert.NotNull(error);
         Assert.StartsWith("export: ", error);
@@ -36,7 +26,7 @@ public sealed class ToolPathsTests : IDisposable
     public void A_relative_path_resolves_against_the_working_directory()
     {
         var path = Resolve("models/crate.glb");
-        Assert.Equal(Path.Combine(_root, "models", "crate.glb"), path.FullPath);
+        Assert.Equal(Path.Combine(Root, "models", "crate.glb"), path.FullPath);
         Assert.Equal("crate.glb", path.FileName);
         Assert.Equal("crate", path.Stem);
         Assert.True(Path.IsPathFullyQualified(path.FullPath));
@@ -45,7 +35,7 @@ public sealed class ToolPathsTests : IDisposable
     [Fact]
     public void An_absolute_path_is_kept()
     {
-        var absolute = Path.Combine(_root, "elsewhere", "Crate.GLB");
+        var absolute = Path.Combine(Root, "elsewhere", "Crate.GLB");
         Assert.Equal(absolute, Resolve(absolute).FullPath);
     }
 
@@ -103,6 +93,6 @@ public sealed class ToolPathsTests : IDisposable
         }
         Assert.StartsWith($"export: could not write {path.FullPath}: ", error);
         Assert.Equal([9], File.ReadAllBytes(path.FullPath));
-        Assert.Equal(["locked.glb"], Directory.GetFiles(_root).Select(Path.GetFileName));
+        Assert.Equal(["locked.glb"], Directory.GetFiles(Root).Select(Path.GetFileName));
     }
 }

@@ -164,18 +164,22 @@ public static class CarveFile
         return new CarveFileResult(created.Mesh, [], MeshReport.Create(created.Mesh!).Warnings);
     }
 
-    private static Vector3[]? ReadVertices(JsonElement? element, List<MeshError> errors)
+    /// <summary>The value of a key that holds an array, or null with an error when it is missing or something else.</summary>
+    private static JsonElement? ArrayAt(string key, JsonElement? element, List<MeshError> errors)
     {
         if (element is not { } array)
-        {
-            errors.Add(new MeshError(VerticesKey, "missing: the file has no vertices array"));
+            errors.Add(new MeshError(key, $"missing: the file has no {key} array"));
+        else if (array.ValueKind != JsonValueKind.Array)
+            errors.Add(new MeshError(key, $"{key} is {Describe(array)}, not an array"));
+        else
+            return array;
+        return null;
+    }
+
+    private static Vector3[]? ReadVertices(JsonElement? element, List<MeshError> errors)
+    {
+        if (ArrayAt(VerticesKey, element, errors) is not { } array)
             return null;
-        }
-        if (array.ValueKind != JsonValueKind.Array)
-        {
-            errors.Add(new MeshError(VerticesKey, $"vertices is {Describe(array)}, not an array"));
-            return null;
-        }
 
         var result = new Vector3[array.GetArrayLength()];
         var i = 0;
@@ -215,16 +219,8 @@ public static class CarveFile
 
     private static int[][]? ReadFaces(JsonElement? element, List<MeshError> errors)
     {
-        if (element is not { } array)
-        {
-            errors.Add(new MeshError(FacesKey, "missing: the file has no faces array"));
+        if (ArrayAt(FacesKey, element, errors) is not { } array)
             return null;
-        }
-        if (array.ValueKind != JsonValueKind.Array)
-        {
-            errors.Add(new MeshError(FacesKey, $"faces is {Describe(array)}, not an array"));
-            return null;
-        }
 
         var result = new int[array.GetArrayLength()][];
         var f = 0;

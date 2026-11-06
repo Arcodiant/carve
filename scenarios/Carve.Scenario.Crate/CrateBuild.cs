@@ -70,7 +70,11 @@ internal static class CrateBuild
         return report;
     }
 
-    public static async Task<JsonElement> CallJsonAsync(ScenarioDriver driver, string tool, object arguments)
+    public static async Task<JsonElement> CallJsonAsync(ScenarioDriver driver, string tool, object arguments) =>
+        JsonDocument.Parse(await CallTextAsync(driver, tool, arguments)).RootElement.Clone();
+
+    /// <summary>A call that must succeed; its first text block.</summary>
+    public static async Task<string> CallTextAsync(ScenarioDriver driver, string tool, object arguments)
     {
         var result = await driver.CallAsync(tool, arguments);
         var text = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "";
@@ -79,7 +83,7 @@ internal static class CrateBuild
             driver.Fail($"{tool}: {text}");
         }
 
-        return JsonDocument.Parse(text).RootElement.Clone();
+        return text;
     }
 
     public static void CheckCounts(ScenarioDriver driver, string tool, JsonElement report, int vertices, int faces)

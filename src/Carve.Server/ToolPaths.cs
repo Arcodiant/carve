@@ -5,6 +5,9 @@ public sealed record ToolPath(string FullPath, string FileName)
 {
     /// <summary>The file name without its extension (<c>crate.glb</c> gives <c>crate</c>).</summary>
     public string Stem => Path.GetFileNameWithoutExtension(FileName);
+
+    /// <summary>Where a write went, as save's and export's results say it: the name, the absolute path, and whether it replaced a file.</summary>
+    public string Written(bool replaced) => $"{FileName} to {FullPath}{(replaced ? " (replaced)" : "")}";
 }
 
 /// <summary>
@@ -31,40 +34,42 @@ public static class ToolPaths
             return null;
         }
 
+        var head = $"{tool}: path \"{path}\"";
+        string Holds(string bad) => $"{head} holds {bad}, which a file path may not";
+
         string full;
         try
         {
-            if (BadCharacter(path) is { } bad)
+            if (BadPathCharacter(path) is { } bad)
             {
-                error = $"{tool}: path \"{path}\" holds {bad}, which a file path may not";
+                error = Holds(bad);
                 return null;
             }
             full = Path.GetFullPath(path, baseDirectory ?? Environment.CurrentDirectory);
         }
         catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
         {
-            error = $"{tool}: path \"{path}\" is not a valid file path: {e.Message}";
+            error = $"{head} is not a valid file path: {e.Message}";
             return null;
         }
 
         var name = Path.GetFileName(full);
         if (name.Length == 0 || path.EndsWith('/') || path.EndsWith('\\'))
         {
-            error = $"{tool}: path \"{path}\" names a folder; give a file path ending in {extension}";
+            error = $"{head} names a folder; give a file path ending in {extension}";
             return null;
         }
-        if (BadCharacter(full, segments: true) is { } badSegment)
+        if (BadSegmentCharacter(full) is { } badSegment)
         {
-            error = $"{tool}: path \"{path}\" holds {badSegment}, which a file path may not";
+            error = Holds(badSegment);
             return null;
         }
 
         var actual = Path.GetExtension(name);
         if (!string.Equals(actual, extension, StringComparison.OrdinalIgnoreCase))
         {
-            error = actual.Length == 0
-                ? $"{tool}: path \"{path}\" has no extension; {tool} {verb} {extension} files, so the path must end in {extension}"
-                : $"{tool}: path \"{path}\" ends in \"{actual}\"; {tool} {verb} {extension} files, so the path must end in {extension}";
+            var found = actual.Length == 0 ? "has no extension" : $"ends in \"{actual}\"";
+            error = $"{head} {found}; {tool} {verb} {extension} files, so the path must end in {extension}";
             return null;
         }
 
@@ -119,15 +124,15 @@ public static class ToolPaths
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 
-    /// <summary>
-    /// The first character a path may not hold, described, or null. With <paramref name="segments"/> each folder and the
-    /// file name past the root of an absolute path is judged as a file name, so <c>*</c>, <c>?</c> or a second <c>:</c> is
-    /// caught too.
-    /// </summary>
-    private static string? BadCharacter(string path, bool segments = false)
-    {
-        if (!segments) return Describe(path.IndexOfAny(Path.GetInvalidPathChars()), path);
+    /// <summary>The first character a path may not hold, described, or null.</summary>
+    private static string? BadPathCharacter(string path) => Describe(path.IndexOfAny(Path.GetInvalidPathChars()), path);
 
+    /// <summary>
+    /// The same, with each folder and the file name past the root of an absolute path judged as a file name, so <c>*</c>,
+    /// <c>?</c> or a second <c>:</c> is caught too.
+    /// </summary>
+    private static string? BadSegmentCharacter(string path)
+    {
         var rest = path[(Path.GetPathRoot(path)?.Length ?? 0)..];
         var invalid = Path.GetInvalidFileNameChars();
         foreach (var segment in rest.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))

@@ -26,8 +26,6 @@ public static class GlbExport
 
     public const float Roughness = 1f;
 
-    public static byte[] Write(PolygonMesh mesh, string name) => Write(FlatShading.Triangles(mesh), name);
-
     public static byte[] Write(IReadOnlyList<FlatTriangle> triangles, string name)
     {
         var material = new MaterialBuilder(MaterialName)

@@ -94,7 +94,7 @@ An agent keeps its work: `save` writes the current mesh to a `.carve` file, and 
 
 Run on **Claude Sonnet 5.5** (`claude-sonnet-5-5`).
 
-**Files.** `src/Carve.Server/SaveTool.cs`, `src/Carve.Server/OpenTool.cs`, registered after `export` in `Program.cs`. `MeshToolSupport.PathArgument` reads the `path` argument. `ToolPaths.Resolve` gained an optional `verb` (default `"writes"`, `open` passes `"reads"`), the only change to T-16's rules; the default wording is unchanged. `export`'s description gained one sentence pointing to `save`'s worked example. Tests: `tests/Carve.Server.Tests/SaveOpenToolTests.cs` (regression tier, 8 tests). README: section *From an empty file to a game*.
+**Files.** `src/Carve.Server/SaveTool.cs`, `src/Carve.Server/OpenTool.cs`, registered after `export` in `Program.cs`. `MeshToolSupport.PathArguments` reads the `path` argument. `ToolPaths.Resolve` gained an optional `verb` (default `"writes"`, `open` passes `"reads"`), the only change to T-16's rules; the default wording is unchanged. `export`'s description gained one sentence pointing to `save`'s worked example. Tests: `tests/Carve.Server.Tests/SaveOpenToolTests.cs` (regression tier, 8 tests). README: section *From an empty file to a game*.
 
 **Wording T-19 and T-20 rely on** (`{...}` is filled in):
 

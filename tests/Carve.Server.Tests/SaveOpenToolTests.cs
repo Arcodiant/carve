@@ -2,61 +2,13 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Carve.Core.Tests;
-using Empyrean;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Carve.Server.Tests;
 
 /// <summary>save and open through the real server, in a temp working directory.</summary>
 [Trait("Tier", "regression")]
-public sealed class SaveOpenToolTests : IDisposable
+public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"carve-saveopen-{Guid.NewGuid():N}");
-
-    public SaveOpenToolTests() => Directory.CreateDirectory(_root);
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_root, recursive: true); }
-        catch (IOException) { }
-    }
-
-    private async Task<(CarveProcess Carve, JsonElement Tools)> StartAsync(string? mesh = "cube")
-    {
-        var carve = new CarveProcess([], workingDirectory: _root);
-        await carve.InitializeAsync();
-        var tools = await carve.ListToolsAsync();
-        if (mesh is not null) Assert.False(IsError(await carve.CallToolAsync("define_mesh", mesh == "cube" ? Cube(tools) : mesh)));
-        return (carve, tools);
-    }
-
-    private static JsonElement Tool(JsonElement tools, string name) =>
-        tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == name);
-
-    private static string Description(JsonElement tools, string name) => Tool(tools, name).GetProperty("description").GetString()!;
-
-    private static string Cube(JsonElement tools)
-    {
-        const string marker = "Worked example (a unit cube): ";
-        var text = Description(tools, "define_mesh");
-        return text[(text.IndexOf(marker, StringComparison.Ordinal) + marker.Length)..];
-    }
-
-    private static string Example(JsonElement tools, string name, string marker = "Example: ") =>
-        Description(tools, name).Split('\n').First(l => l.StartsWith(marker, StringComparison.Ordinal))[marker.Length..];
-
-    private static string Ok(JsonElement result)
-    {
-        Assert.False(IsError(result), TextOf(result));
-        return TextOf(result);
-    }
-
-    private static string Refused(JsonElement result)
-    {
-        Assert.True(IsError(result), TextOf(result));
-        return TextOf(result);
-    }
-
     private static string LBlockJson()
     {
         var mesh = TestMeshes.LBlock();
@@ -83,7 +35,7 @@ public sealed class SaveOpenToolTests : IDisposable
         var saved = TextOf(await carve.CallToolAsync("get_mesh", "{}"));
 
         var line = Ok(await carve.CallToolAsync("save", """{"path":"out/mesh.carve"}"""));
-        var full = Path.Combine(_root, "out", "mesh.carve");
+        var full = Path.Combine(Root, "out", "mesh.carve");
         var counts = JsonDocument.Parse(saved).RootElement;
         Assert.Equal($"saved mesh.carve to {full}: {counts.GetProperty("vertices").GetArrayLength()} vertices, {counts.GetProperty("faces").GetArrayLength()} faces", line);
         Assert.Equal(saved, TextOf(await carve.CallToolAsync("get_mesh", "{}"))); // save changed nothing
@@ -107,7 +59,7 @@ public sealed class SaveOpenToolTests : IDisposable
         var first = File.ReadAllBytes(full);
         var again = Ok(await carve.CallToolAsync("save", """{"path":"out/MESH.CARVE"}"""));
         Assert.Contains(" (replaced)", again.Replace("MESH.CARVE", "x")); // same file on a case-insensitive disk, else a new one
-        Assert.Equal(first, File.ReadAllBytes(Path.Combine(_root, "out", "MESH.CARVE")));
+        Assert.Equal(first, File.ReadAllBytes(Path.Combine(Root, "out", "MESH.CARVE")));
     }
 
     [Fact]
@@ -137,7 +89,7 @@ public sealed class SaveOpenToolTests : IDisposable
         var (carve, _) = await StartAsync(mesh: null);
         using var _carve = carve;
         Assert.Contains("save: there is no mesh yet; call define_mesh first", Refused(await carve.CallToolAsync("save", """{"path":"a.carve"}""")));
-        Assert.Empty(Directory.GetFileSystemEntries(_root));
+        Assert.Empty(Directory.GetFileSystemEntries(Root));
 
         Ok(await carve.CallToolAsync("define_mesh", """{"vertices":[[0,0,0],[1,0,0],[0,1,0]],"faces":[[0,1,2]]}"""));
         Assert.DoesNotContain("(replaced)", Ok(await carve.CallToolAsync("save", """{"path":"a.carve"}""")));
@@ -156,7 +108,7 @@ public sealed class SaveOpenToolTests : IDisposable
         Assert.Contains("open: path \"a.glb\" ends in \".glb\"; open reads .carve files, so the path must end in .carve",
             Refused(await carve.CallToolAsync("open", """{"path":"a.glb"}""")));
         Assert.Contains("path is empty", Refused(await carve.CallToolAsync("open", """{"path":""}""")));
-        Assert.Equal(["a.carve"], Directory.GetFileSystemEntries(_root).Select(f => Path.GetFileName(f)!).ToArray());
+        Assert.Equal(["a.carve"], Directory.GetFileSystemEntries(Root).Select(f => Path.GetFileName(f)!).ToArray());
     }
 
     [Fact]
@@ -165,7 +117,7 @@ public sealed class SaveOpenToolTests : IDisposable
         var (carve, _) = await StartAsync();
         using var _carve = carve;
         Ok(await carve.CallToolAsync("move", """{"faces":[3],"by":[0,0.5,0]}"""));
-        var folder = Path.Combine(_root, "models");
+        var folder = Path.Combine(Root, "models");
         var before = TextOf(await carve.CallToolAsync("get_mesh", "{}"));
 
         Assert.Equal($"open: no file at {Path.Combine(folder, "crate.carve")}; the folder {folder} does not exist",
@@ -197,22 +149,22 @@ public sealed class SaveOpenToolTests : IDisposable
         Ok(await carve.CallToolAsync("move", """{"faces":[3],"by":[0,0.5,0]}"""));
         var before = TextOf(await carve.CallToolAsync("get_mesh", "{}"));
 
-        File.WriteAllText(Path.Combine(_root, "bad.carve"), "{\n  \"carve\": 1,\n  \"vertices\": [[0, 0, 0],,\n");
+        File.WriteAllText(Path.Combine(Root, "bad.carve"), "{\n  \"carve\": 1,\n  \"vertices\": [[0, 0, 0],,\n");
         var bad = Refused(await carve.CallToolAsync("open", """{"path":"bad.carve"}"""));
         Assert.Contains("file: the text is not JSON: at line 3, column ", bad);
         await NothingChanged(carve, before);
 
-        File.WriteAllText(Path.Combine(_root, "future.carve"), """{"carve": 9, "vertices": [], "faces": []}""");
+        File.WriteAllText(Path.Combine(Root, "future.carve"), """{"carve": 9, "vertices": [], "faces": []}""");
         Assert.Contains("carve: version 9 is not one this build reads; it reads version 1", Refused(await carve.CallToolAsync("open", """{"path":"future.carve"}""")));
         await NothingChanged(carve, before);
 
-        File.WriteAllText(Path.Combine(_root, "face.carve"), """{"carve": 1, "vertices": [[0,0,0],[1,0,0],[0,1,0]], "faces": [[0,1,5]]}""");
+        File.WriteAllText(Path.Combine(Root, "face.carve"), """{"carve": 1, "vertices": [[0,0,0],[1,0,0],[0,1,0]], "faces": [[0,1,5]]}""");
         var face = Refused(await carve.CallToolAsync("open", """{"path":"face.carve"}"""));
         Assert.Contains("faces[0][2]: index 5 is out of range 0..2", face);
         Assert.Contains("the current mesh is unchanged", face);
         await NothingChanged(carve, before);
 
-        Directory.CreateDirectory(Path.Combine(_root, "dir.carve"));
+        Directory.CreateDirectory(Path.Combine(Root, "dir.carve"));
         Assert.Contains("is a folder", Refused(await carve.CallToolAsync("open", """{"path":"dir.carve"}""")));
         await NothingChanged(carve, before);
     }
@@ -241,9 +193,9 @@ public sealed class SaveOpenToolTests : IDisposable
         var steps = Regex.Matches(save, @"^\d\. (?:In a later session, )?(\w+) (\{.*\})$", RegexOptions.Multiline)
             .ToDictionary(m => m.Groups[1].Value, m => m.Groups[2].Value);
         Assert.Equal(["save", "open", "export"], steps.Keys.ToArray());
-        Assert.Equal(steps["open"], Example(tools, "open"));
+        Assert.Equal(steps["open"], Assert.Single(Examples(tools, "open")));
 
-        var game = Path.Combine(_root, "game").Replace('\\', '/');
+        var game = Path.Combine(Root, "game").Replace('\\', '/');
         // 1 and 2: the cube from its description, then an edit.
         Ok(await carve.CallToolAsync("define_mesh", Cube(tools)));
         await Crate(carve);
@@ -253,10 +205,12 @@ public sealed class SaveOpenToolTests : IDisposable
         Ok(await carve.CallToolAsync("open", steps["open"]));
         // 5: export into the game's content folder.
         var line = Ok(await carve.CallToolAsync("export", steps["export"].Replace("<game>", game)));
-        var glb = Path.Combine(_root, "game", "Content", "models", "crate.glb");
+        var glb = Path.Combine(Root, "game", "Content", "models", "crate.glb");
         Assert.StartsWith($"exported crate.glb to {glb.Replace('/', Path.DirectorySeparatorChar)}: ", line);
-        Assert.True(File.Exists(Path.Combine(_root, "crate.carve")));
-        GlbParse.AssertReadsBack(File.ReadAllBytes(glb));
+        Assert.True(File.Exists(Path.Combine(Root, "crate.carve")));
+        var bytes = File.ReadAllBytes(glb);
+        Assert.Equal("glTF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+        Assert.NotNull(GlbExportTests.Parser.Parse(bytes, Empyrean.ModelFormat.Gltf));
     }
 
     [Fact]
@@ -272,26 +226,5 @@ public sealed class SaveOpenToolTests : IDisposable
             Assert.Contains($"unknown: not an argument of {name}", Refused(await carve.CallToolAsync(name, """{"path":"a.carve","unknown":1}""")));
             Assert.Contains("path: required but missing", Refused(await carve.CallToolAsync(name, "{}")));
         }
-    }
-}
-
-/// <summary>Reads a .glb back with the engine's own parser (as <c>GlbExportTests</c> does) and checks it holds triangles.</summary>
-internal static class GlbParse
-{
-    private static readonly IModelGeometryLoader Parser = Build();
-
-    private static IModelGeometryLoader Build()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddEmpyreanCore();
-        services.AddEmpyreanGeometry();
-        return services.BuildServiceProvider().GetRequiredService<IModelGeometryLoader>();
-    }
-
-    public static void AssertReadsBack(byte[] bytes)
-    {
-        Assert.Equal("glTF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
-        Assert.NotNull(Parser.Parse(bytes, ModelFormat.Gltf));
     }
 }

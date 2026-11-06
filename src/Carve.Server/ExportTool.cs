@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -12,9 +11,6 @@ namespace Carve.Server;
 public sealed class ExportTool(ModelStore store)
 {
     public const string Extension = ".glb";
-
-    /// <summary>The worked example's game folder; the regression test runs the example with a temp folder put here.</summary>
-    public const string GamePlaceholder = "<game>";
 
     public const string Text =
         "Writes the current mesh to a .glb file (binary glTF 2.0) that a game on the Empyrean engine loads as it is. Takes path, the file to write. "
@@ -36,30 +32,13 @@ public sealed class ExportTool(ModelStore store)
         + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
         + "Worked example, writing into a game's content folder (put the game's folder for <game>); the game then loads it as "
         + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
-        + ExampleMarker + """{"path":"<game>/Content/models/crate.glb"}""";
+        + ExampleMarker + SaveTool.WorkedExport;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<ExportTool>("export", Text, new JsonObject
-    {
-        ["type"] = "object",
-        ["properties"] = new JsonObject
-        {
-            ["path"] = new JsonObject
-            {
-                ["description"] = "The .glb file to write, absolute or relative to carve's working directory; replaced if it exists.",
-                ["type"] = "string",
-            },
-        },
-        ["required"] = new JsonArray("path"),
-    });
+    public static McpServerTool Create() => MeshToolSupport.Create<ExportTool>("export", Text, PathSchema("The .glb file to write, absolute or relative to carve's working directory; replaced if it exists."));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null)
     {
-        var errors = UnknownArguments("export", context, "path");
-        string? text = null;
-        if (path is null || path.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null) errors.Add("path: required but missing");
-        else if (path.Value.ValueKind != JsonValueKind.String) errors.Add($"path: expected a string, got {Describe(path.Value)}");
-        else text = path.Value.GetString();
-        if (errors.Count > 0) return Failed("export", errors);
+        if (PathArguments("export", context, path, out var text) is { } refused) return refused;
 
         var mesh = store.Current.Mesh;
         if (mesh is null) return Error("export: " + NoMesh);
@@ -71,11 +50,11 @@ public sealed class ExportTool(ModelStore store)
         var bytes = GlbExport.Write(triangles, target.Stem);
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
 
-        return new CallToolResult { Content = [new TextContentBlock { Text = Summary(mesh, target, replaced, triangles.Count) }] };
+        return Line(Summary(mesh, target, replaced, triangles.Count));
     }
 
     /// <summary>The result line; numbers are culture-invariant.</summary>
-    public static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles)
+    private static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles)
     {
         var report = MeshReport.Create(mesh);
         var (min, max) = (report.BoundsMin, report.BoundsMax);
@@ -83,7 +62,7 @@ public sealed class ExportTool(ModelStore store)
         static string Size(float lo, float hi) => N((float)((double)hi - lo));
         static string Point(Vector3 v) => $"({N(v.X)}, {N(v.Y)}, {N(v.Z)})";
 
-        var line = $"exported {target.FileName} to {target.FullPath}{(replaced ? " (replaced)" : "")}: "
+        var line = $"exported {target.Written(replaced)}: "
             + $"{triangles.ToString(CultureInfo.InvariantCulture)} triangles, 1 material '{GlbExport.MaterialName}', "
             + $"size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}";
         if (report.Warnings.Count > 0)

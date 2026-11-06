@@ -65,7 +65,7 @@ public class CarveFileTests
     [Fact]
     public void TheCrateRoundTrips()
     {
-        var crate = CrateTests.Build();
+        var crate = TestMeshes.Crate();
         AssertSame(crate, RoundTrip(crate));
     }
 
@@ -124,7 +124,7 @@ public class CarveFileTests
     [Fact]
     public void WriteIsStable()
     {
-        Assert.Equal(CarveFile.Write(CrateTests.Build()), CarveFile.Write(CrateTests.Build()));
+        Assert.Equal(CarveFile.Write(TestMeshes.Crate()), CarveFile.Write(TestMeshes.Crate()));
         Assert.Equal(CubeText, CarveFile.Write(Cube()));
     }
 

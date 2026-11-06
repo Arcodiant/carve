@@ -23,7 +23,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 
-function Write-Err([string]$text) { [Console]::Error.WriteLine($text) }
+. (Join-Path $PSScriptRoot 'bounded-run.ps1')
 
 $project = Join-Path $root 'spikes/Carve.ModelViewer/Carve.ModelViewer.csproj'
 if (-not $NoBuild) {
@@ -37,32 +37,7 @@ foreach ($view in $Views) {
     $arguments += if ($view.StartsWith('--')) { @($view) } else { @('--view', $view) }
 }
 
-# Start-Process joins its arguments with spaces, so each is quoted here.
-$quoted = $arguments | ForEach-Object { '"' + $_ + '"' }
-
-$stderr = [IO.Path]::GetTempFileName()
-$stdout = [IO.Path]::GetTempFileName()
-try {
-    $viewer = Start-Process dotnet -ArgumentList $quoted -WorkingDirectory (Get-Location).Path -NoNewWindow -PassThru `
-        -RedirectStandardError $stderr -RedirectStandardOutput $stdout
-    $null = $viewer.Handle # Without this the exit code is lost once the process has gone.
-
-    if ($viewer.WaitForExit($TimeoutSeconds * 1000)) {
-        $code = $viewer.ExitCode
-    }
-    else {
-        # Only the process this script started.
-        $viewer.Kill($true)
-        $viewer.WaitForExit()
-        Write-Err "run-viewer: still running after $TimeoutSeconds s; stopped"
-        $code = 124
-    }
-
-    Get-Content $stdout | ForEach-Object { Write-Err $_ }
-    Get-Content $stderr | ForEach-Object { Write-Err $_ }
-}
-finally {
-    Remove-Item $stderr, $stdout -ErrorAction SilentlyContinue
-}
-
-exit $code
+$run = Invoke-BoundedDotnet $arguments (Get-Location).Path $TimeoutSeconds "run-viewer: still running after $TimeoutSeconds s; stopped"
+$run.Stdout | ForEach-Object { Write-Err $_ }
+$run.Stderr | ForEach-Object { Write-Err $_ }
+exit $run.Code

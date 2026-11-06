@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -14,8 +13,7 @@ public sealed class SaveTool(ModelStore store)
     public const string Extension = ".carve";
 
     /// <summary>The worked example's calls; the regression test runs them as written.</summary>
-    public const string WorkedSave = """{"path":"crate.carve"}""";
-    public const string WorkedOpen = """{"path":"crate.carve"}""";
+    public const string WorkedFile = """{"path":"crate.carve"}""";
     public const string WorkedExport = """{"path":"<game>/Content/models/crate.glb"}""";
 
     /// <summary>What save writes for the unit cube (T-15's file).</summary>
@@ -61,29 +59,15 @@ public sealed class SaveTool(ModelStore store)
         + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
         + "1. define_mesh with the cube from its description.\n"
         + "2. Edit it: move and extrude.\n"
-        + "3. save " + WorkedSave + "\n"
-        + "4. In a later session, open " + WorkedOpen + "\n"
+        + "3. save " + WorkedFile + "\n"
+        + "4. In a later session, open " + WorkedFile + "\n"
         + "5. export " + WorkedExport;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SaveTool>("save", Text, new JsonObject
-    {
-        ["type"] = "object",
-        ["properties"] = new JsonObject
-        {
-            ["path"] = new JsonObject
-            {
-                ["description"] = "The .carve file to write, absolute or relative to carve's working directory; replaced if it exists.",
-                ["type"] = "string",
-            },
-        },
-        ["required"] = new JsonArray("path"),
-    });
+    public static McpServerTool Create() => MeshToolSupport.Create<SaveTool>("save", Text, PathSchema("The .carve file to write, absolute or relative to carve's working directory; replaced if it exists."));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null)
     {
-        var errors = UnknownArguments("save", context, "path");
-        var text = PathArgument(path, errors);
-        if (errors.Count > 0) return Failed("save", errors);
+        if (PathArguments("save", context, path, out var text) is { } refused) return refused;
 
         var mesh = store.Current.Mesh;
         if (mesh is null) return Error("save: " + NoMesh);
@@ -96,13 +80,6 @@ public sealed class SaveTool(ModelStore store)
 
         var inv = CultureInfo.InvariantCulture;
         var report = MeshReport.Create(mesh);
-        return new CallToolResult
-        {
-            Content = [new TextContentBlock
-            {
-                Text = $"saved {target.FileName} to {target.FullPath}{(replaced ? " (replaced)" : "")}: "
-                    + $"{report.VertexCount.ToString(inv)} vertices, {report.FaceCount.ToString(inv)} faces",
-            }],
-        };
+        return Line($"saved {target.Written(replaced)}: {report.VertexCount.ToString(inv)} vertices, {report.FaceCount.ToString(inv)} faces");
     }
 }
