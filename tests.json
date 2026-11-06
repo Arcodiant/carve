@@ -94,6 +94,35 @@
       "est-seconds": 15
     },
     {
+      "id": "scenario-export",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-export-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Export/Carve.Scenario.Export.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "spikes/Carve.ModelViewer/Carve.ModelViewer.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.ExportViewer.Tests/Carve.ExportViewer.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scripts/run-scenario.ps1",
+        "scripts/run-viewer.ps1",
+        "scripts/run-export-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 60
+    },
+    {
       "id": "viewer-cube",
       "tier": "regression",
       "build": "solution",

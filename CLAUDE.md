@@ -58,6 +58,7 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `extensions/Carve.Debug` | The debug extension: in-memory transport, `ScenarioDriver`, fixed clock and seed, run folder. Referenced by nothing in `src/` |
 | `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views, and four cube frames by direction and zoom |
 | `scenarios/Carve.Scenario.Crate` | The crate: one cube built into a crate with `move` and `extrude` only, five views, undo and error paths; suite `scenario-crate` |
+| `scenarios/Carve.Scenario.Export` | The crate saved, reopened and exported into a game content folder in the run folder, then shown by the viewer; suite `scenario-export`, run by `scripts/run-export-scenario.ps1` with the checks in `tests/Carve.ExportViewer.Tests` |
 | `spikes/Carve.ModelViewer` | The model viewer, a stand-in for a game: loads a `.glb` through `IModelLoader` and captures fixed views. It is not the scenario harness, and nothing in the product uses it |
 | `tests/Carve.Core.Tests` | xunit tests of the kernel, incl. the engine-free guard |
 | `tests/Carve.Server.Tests` | xunit tests that start the real `carve`, incl. the no-extension guard |
