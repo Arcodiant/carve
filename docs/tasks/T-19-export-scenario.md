@@ -4,7 +4,7 @@ description: >-
 ---
 # T-19 — Export scenario
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
