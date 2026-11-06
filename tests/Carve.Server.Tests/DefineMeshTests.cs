@@ -98,7 +98,7 @@ public class DefineMeshTests
         var tool = await ToolAsync(carve);
 
         var description = tool.GetProperty("description").GetString()!;
-        foreach (var phrase in new[] { "unitless", "Y is up", "counter-clockwise", "any number of sides", "REPLACES", "A face has no holes; build an opening from several faces around it." })
+        foreach (var phrase in new[] { "1 unit = 1 m", "Y is up", "counter-clockwise", "any number of sides", "REPLACES", "A face has no holes; build an opening from several faces around it." })
         {
             Assert.Contains(phrase, description);
         }
@@ -217,7 +217,7 @@ public class DefineMeshTests
         var schema = (await ToolAsync(carve)).GetProperty("inputSchema").GetRawText();
 
         Assert.Equal(
-            """{"type":"object","properties":{"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. Unitless; Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.","type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["vertices","faces"],"additionalProperties":false}""",
+            """{"type":"object","properties":{"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.","type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["vertices","faces"],"additionalProperties":false}""",
             schema);
     }
 }
