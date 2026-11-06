@@ -309,3 +309,25 @@ Fixed in 5b269a0.
 ## Summary
 
 Three reviewers, in parallel, split by risk: the kernel, file format and tools; the viewer, scenarios and checks; and one pass over the whole diff for what falls between them. The diff is about 50 files, after a rebase onto origin/main and a refactor pass (d014eae). Nobody ran a GPU suite for this review or opened an image. There are two reports of one Major (a solution-wide test run fails); the rest are Minor or Nit.
+
+
+### The fixes proved (after 78d73ed)
+
+On a clean tree, `dotnet test Carve.slnx` with `CARVE_EXPORT_RUN` unset passed (Core 183, ModelViewer 15, Server 302, ExportViewer 4 skipped, 0 failed), and `pwsh scripts/verify.ps1` exited 0 (the same totals, 0 warnings, the cube scenario run). Each check below was then made to fail on a real break, one at a time, and the break reverted; the tree ended clean. No check had to be changed.
+
+| Check | The break | Result |
+|---|---|---|
+| `CrateBuild.CheckFront` on the export frames | the product's front camera mirrored in X (`ViewFraming`) | the export scenario failed: `front: +Z (53) should be at least 10 brighter than +X (187)` |
+| `FlatPlusZPanel` samples | sample x = 110 moved to x = 90, on the recess wall | `the +Z panel is not one flat shade: 170, ...` |
+| the surrogate refusal | the try/catch in `CarveFile` replaced by `property.Name` | 3 Core theory cases and the `open` server test failed |
+| `open`'s locked-file test | the `catch` around `File.ReadAllText` removed | `A_file_that_cannot_be_opened_changes_nothing` failed (`An error occurred invoking 'open'`) |
+| the dot-file listing test | `&& !n.StartsWith('.')` put back in the listing | `A_missing_file_names_the_path_and_lists_the_carve_files_beside_it` failed |
+| the cube-text test | one digit of `SaveTool.CubeFile` changed | `The_descriptions_worked_example_runs_as_written_...` failed |
+| the default-view test | `DefaultView` set to the minus-x direction | `With_no_view_given_the_default_is_the_front_view` failed |
+| the backslash viewer test | the backslash doubling removed from `bounded-run.ps1` | `A_folder_argument_ending_in_a_backslash_reaches_the_viewer_whole` failed |
+| the second-run clearing | the clearing loop removed from `ExportScenario`; two runs into one named folder | the first run passed, the second failed: `did not expect 'replaced'`; with the clearing both pass |
+| the step-3 timeout | `-ChecksTimeoutSeconds 1` | exit 124, `the checks are still running after 1 s; stopped` |
+| skipped-check detection | `$env:CARVE_EXPORT_RUN = $folder` left out of step 3 | exit 1, `no check passed; they may have been skipped` (all four skipped); with one test marked skipped, exit 1, `a check was skipped` |
+| the project-file check | a `Compile Include` of `src/Carve.Core/Mesh.cs` linked into `spikes/Carve.ModelViewer` | `The_viewer_references_no_Carve_code` failed |
+
+The five `FrontPlusZPanel` samples (x = 110, 150, 190, 230, 250 at y = 300) were cast as rays from the saved view's eye through the pixel: each passes the +Z frame's opening (x 0.26 to 0.84, y 0.35 to 0.53 at z = 1) and meets the panel at z = 0.92 (x 0.17 to 0.79), so all five are on the panel. Reading the row, the panel starts at x = 101, and the frame faces beyond x = 260 are not sampled. Not checked: the bar-top, recess-wall and minus-x samples by ray, and an up-flipped camera (only the mirrored one).
