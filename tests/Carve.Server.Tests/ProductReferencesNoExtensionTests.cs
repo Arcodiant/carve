@@ -17,6 +17,15 @@ public class ProductReferencesNoExtensionTests
     }
 
     [Fact]
+    public void The_guard_fails_on_a_reference_to_the_model_viewer()
+    {
+        var project = """<Project><ItemGroup><ProjectReference Include="../../spikes/Carve.ModelViewer/Carve.ModelViewer.csproj" /></ItemGroup></Project>""";
+
+        Assert.NotEmpty(ProductReferenceGuard.FindInProject(project));
+        Assert.Contains("Carve.ModelViewer", ProductReferenceGuard.ExtensionProjects(Paths.RepoRoot));
+    }
+
+    [Fact]
     public void The_built_product_references_no_extension()
     {
         var found = ProductReferenceGuard.FindInAssembly(

@@ -28,7 +28,8 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
-        "scenarios/**/*.csproj"
+        "scenarios/**/*.csproj",
+        "spikes/**/*.csproj"
       ],
       "resources": "cpu",
       "est-seconds": 12
@@ -91,6 +92,23 @@
         "vulkan"
       ],
       "est-seconds": 15
+    },
+    {
+      "id": "viewer-cube",
+      "tier": "regression",
+      "build": "solution",
+      "run": "dotnet test tests/Carve.ModelViewer.Tests/Carve.ModelViewer.Tests.csproj -c Debug --no-build",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Carve.ModelViewer.Tests/Carve.ModelViewer.Tests.csproj"
+        },
+        "scripts/run-viewer.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
     }
   ],
   "todo": []
