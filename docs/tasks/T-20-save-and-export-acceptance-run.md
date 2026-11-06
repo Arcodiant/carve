@@ -4,7 +4,7 @@ description: >-
 ---
 # T-20 — Save and export acceptance run
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
