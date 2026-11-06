@@ -18,6 +18,8 @@ Plans against [D-5](../design/D-5-bevel-and-the-modifier-question.md).
 
 **Depends on:** M-3 (export normals: it exports every edge hard and leaves smoothing to a later milestone) and M-5 (cuts, which bevel builds on).
 
+**Changed 2026-11-06.** Hard and smooth edges and `subdivide` arrive earlier, in [M-18](M-18-soft-characters.md). This milestone keeps bevel, and solidify and array as D-5 decides.
+
 ## Open at planning
 
 - Whether bevel is a destructive edit or a modifier kept in the file (D-5).

@@ -12,7 +12,7 @@ description: >-
 
 **Batch:** — (standalone)
 
-**Depends on:** — (none)
+**Depends on:** T-21
 
 **Verify:** server-regression, scenario-cube, scenario-crate
 
@@ -37,11 +37,11 @@ An agent calls `export` and gets a self-contained `.glb` of the current mesh tha
 
 - A relative path resolves against carve's working directory, and every result gives the absolute path.
 - Missing parent folders are created.
-- An existing file is replaced, and the result says `replaced`.
+- An existing file: the caller decides. `save` replaces it. `export` refuses it with a tool error naming the path and `overwrite`, unless given `overwrite: true`. Whenever a file is replaced, the result says `replaced` (the person, 2026-11-06, for Orcward; this replaces the M-3 planning rule).
 - The extension is checked: here `.glb`, case-insensitive. Any other is a tool error naming the extension wanted.
 - An empty path, or one with invalid characters, is a tool error. An I/O failure (access denied, a locked file) is a tool error that names the path and the system's message, and leaves no partial file: write to a temporary file in the same folder, then move it into place.
 
-**The tool `export(path)`**, registered in `Program.cs`'s `WithTools` list, closed schema like the others:
+**The tool `export(path, overwrite)`**, `overwrite` optional and false by default,, registered in `Program.cs`'s `WithTools` list, closed schema like the others:
 
 - Before `define_mesh` it is a tool error saying so. A mesh with warnings exports, and the warnings are repeated in the result.
 - The result is one text line, for example: `exported crate.glb to D:\game\Content\models\crate.glb (replaced): 140 triangles, 1 material 'carve', size 1.04 x 0.8 x 1 m, bounds (-0.02, 0, 0) to (1.02, 0.8, 1)`. Numbers are culture-invariant, as elsewhere. Use the real triangle count, and say "1 unit = 1 m" in the description, not in every result.
@@ -55,7 +55,7 @@ An agent calls `export` and gets a self-contained `.glb` of the current mesh tha
   - every triangle's three positions and normals equal to `FlatShading`'s, bit for bit, with the engine's winding flip (the parser makes triangles clockwise). Compare in order if SharpGLTF keeps triangle order, otherwise as a multiset, and say which;
   - one submesh material: base colour `(0.72, 0.72, 0.70, 1)`, `Pbr` true, metallic 0, roughness 1;
   - two exports of one mesh are byte-identical.
-- `ToolPaths` tests, `unit`: relative and absolute paths, a created folder, `replaced`, a wrong extension, an empty path.
+- `ToolPaths` tests, `unit`: relative and absolute paths, a created folder, a refusal with the file left unchanged, `replaced` with `overwrite`, a wrong extension, an empty path.
 - `tests/Carve.Server.Tests/EditToolTests.cs` or a new `ExportToolTests.cs`, `regression` tier (it starts `carve`):
   - export through the real tool;
   - export before `define_mesh`;

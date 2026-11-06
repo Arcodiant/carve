@@ -54,7 +54,7 @@ Agents that have never seen Carve, in an ordinary MCP client with plain `carve`,
 
 How many calls each session took, and whether it used `undo` or `render`, are recorded, not judged.
 
-**Rounds.** Wherever an agent hesitates, guesses wrong or misuses a tool (above all the paths, `replaced`, and where the `.glb` goes), sharpen that tool's description and repeat both sessions fresh. **At most three rounds.** If it still fails, stop and report.
+**Rounds.** Wherever an agent hesitates, guesses wrong or misuses a tool (above all the paths, `replaced`, `overwrite`, and where the `.glb` goes), sharpen that tool's description and repeat both sessions fresh. **At most three rounds.** If it still fails, stop and report.
 
 **Afterwards:**
 

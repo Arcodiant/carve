@@ -33,7 +33,7 @@ Content: a deliberately broken sample mesh for the checks to find, and the norma
 
 The decisions:
 
-- **The engine pin** moves to 0.119.0 as M-4's first task (T-21), not a bug and not inside M-3. Every other task depends on it.
+- **The engine pin** moves to 0.119.0 in T-21, on which every task here depends. *Changed by the person, 2026-11-06:* T-21 now lands alone before M-3, so it is no longer a member here.
 - **Query form** (recommended): one `select(kind, where)` tool with a small expression string: `kind` is `vertices`, `edges` or `faces`; `where` is comparisons on `x`, `y`, `z` (the vertex, the edge's midpoint or the face's centre), `min.*`, `max.*`, `normal.*`, `id`, `faces`, `edges`, `a`, `b`, `length`, `vertices`, `area`, and the flags `unattached`, `boundary`, `open`, `manifold`, `nonmanifold`, `non_planar`, joined by `and`, `or`, `not` and parentheses, with `all` and `none`. Comparisons are in float (B-1's lesson). A parse error names the character and lists what was expected. The grammar is T-22's.
 - **Selections** (recommended): returned as id lists in the edit tools' own shape (`vertices`, `edges` as `[a, b]` pairs, `faces`), with `count` and `of`; the server holds no selection (T-11's decision stands). A render shows a selection through a `highlight` argument of the same shape.
 - **Render shape** (recommended): `render` grows, no second tool. New arguments, each defaulting to today's render: `mode` (`shaded`, `wireframe`, `normals`), `labels` (`none`, `faces`, `vertices`, `both`), `size` (256, 512, 1024), `projection` (`perspective`, `orthographic`), `highlight`, and `views` (2 to 6 camera specs tiled into one image, exclusive with the single-view arguments) with `columns` (1 to 3). `view` gains the six axis names `+x`, `-x`, `+y`, `-y`, `+z`, `-z`.
@@ -109,7 +109,7 @@ cube, six axis views, orthographic, size 256: 770 x 514
 
 **Order.**
 
-1. **Wave 1:** T-21 (the engine pin), alone.
+1. **Wave 1:** T-21 (the engine pin), already landed ahead of M-3.
 2. **Wave 2:** T-22 (`select`), T-23 (`check` and the shed) and T-24 (sizes, orthographic, axis views, the `RenderSpec` record) side by side. T-22 and T-23 each add one line to `Program.cs`'s tool list; whoever lands second keeps both. T-24 owns every render file and the cube scenario.
 3. **Wave 3:** T-25 (wireframe, normals, highlight) on T-24, then T-26 (labels, sheets) on T-25: the three render tasks share files, so they run in sequence while wave 2's other tasks finish. Each carries its own frames into the existing scenarios.
 4. **Wave 4:** T-27 (the shed scenario and its suite) on T-22, T-23 and T-26.
@@ -133,9 +133,10 @@ Eight tasks, at the top of the planning rule's range: the sheet, labels, sizes a
 
 Nothing in M-4 has sound or motion, so there is no listening or real-time pass.
 
+**Added 2026-11-06.** M-16 to M-19 run before this milestone, for Orcward (the person). T-24 and T-25 will rebase onto the `render` arguments those milestones add.
+
 ## Required tasks
 
-- [ ] [T-21](../tasks/T-21-engine-pin-to-0-119-0.md) — The engine pin moves to 0.119.0, the newest on the feed, with every existing frame byte-identical
 - [ ] [T-22](../tasks/T-22-select-tool-and-query-language.md) — An agent selects vertices, edges or faces with select and a small where-expression, and gets ids the edit tools take
 - [ ] [T-23](../tasks/T-23-health-check-and-the-leaky-shed.md) — An agent checks a mesh with check (inside-out shells, coincident vertices, duplicate faces, shell count, stats and scale notes), shown on the leaky shed sample
 - [ ] [T-24](../tasks/T-24-render-sizes-orthographic-and-axis-views.md) — render takes a size of 256, 512 or 1024, an orthographic projection and the six axis views, with the 512 frames unchanged

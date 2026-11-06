@@ -31,4 +31,5 @@ Of the finishing edits, bevel is first, with control over hard and smooth edges 
 
 - **Destructive or modifier.** A destructive edit keeps D-1's one-representation kernel and stable ids simple. A modifier stays editable and keeps the base mesh low-poly for LODs ([D-2](D-2-part-tree-and-hierarchical-modelling.md)). Decided at M-14's planning.
 - Which of subdivide, solidify and array follow, and when.
-- Smoothing control: by angle, by edges marked with a tool, or both. M-3 exports every edge hard.
+- Smoothing control: *moved to [D-6](D-6-characters-rigging-animation-and-character-export.md).* Edges are marked with a tool (M-18); by angle may follow.
+- Subdivide: *D-6 makes it a destructive edit in M-18,* because Orcward's soft characters met this doc's *Would change if*. Bevel still comes first among the hard-surface edits.

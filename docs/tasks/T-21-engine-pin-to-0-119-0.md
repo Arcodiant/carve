@@ -1,6 +1,6 @@
 ---
 description: >-
-  The engine pin moves to 0.119.0, the newest on the feed, with every existing frame byte-identical
+  The engine pin moves to 0.119.0, the version Orcward's game uses, with every existing frame byte-identical
 ---
 # T-21 — Engine pin to 0.119.0
 
@@ -8,7 +8,7 @@ description: >-
 
 **Pri:** P1
 
-**Milestone:** M-4
+**Milestone:** — (off-milestone)
 
 **Batch:** — (standalone)
 
@@ -28,7 +28,7 @@ description: >-
 
 **Change:**
 
-- `Directory.Build.props`: `EmpyreanVersion` to `0.119.0`, and its comment to say it is the newest on the feed at M-4. No other pin moves.
+- `Directory.Build.props`: `EmpyreanVersion` to `0.119.0`, and its comment to say it is the version Orcward's game uses, not the newest on the feed (0.120.1 reached the feed by 2026-11-06). No other pin moves.
 - Read the engine changelog from 0.117.0 to 0.119.0 (`<cache>/arcodiant.empyrean.graphics/0.119.0/docs/CHANGELOG.md`, and the core package's) and list in the closing report every entry that could touch Carve. Known from planning: `RenderStageScope` (Carve composes engine stages only, so nothing to declare); "on an sRGB output the built-in tonemap no longer encodes" (Carve has no tonemap and encodes in `ToDecodedImage`, so nothing to change); `TextureFormat.Bgra8Srgb` added (a `switch` over `TextureFormat` with no default gains a case: check Carve has none). Anything the build or the tests show is reported, not quietly fixed, unless it is the one-line kind.
 - `dotnet restore` and `dotnet build Carve.slnx` with no override pass, warnings as errors.
 
@@ -38,7 +38,8 @@ description: >-
 
 ## Notes
 
-- **Decided by the person at planning:** the bump is M-4's first task, not a bug and not part of M-3; every other M-4 task depends on it.
+- **Decided by the person, 2026-11-06:** the bump lands alone on `main` first, ahead of M-3, because M-3 does not restore as pinned and Orcward's work needs it. This replaces the M-4 planning decision. T-16 and M-4's tasks depend on it.
+- **Stay on 0.119.0.** Do not move to 0.120.1: Orcward's game is on 0.119.
 - **Open rules: stop and ask.** Any pin but `EmpyreanVersion`. Any frame that differs from the before frames. Any code change beyond what the compiler or a test demands from the version move, and any such change that is more than a line or two.
 - **A fixer may not change** the light, the framing, the background, the image size or `DrawnSpace` to make a frame match.
 - Not in scope: the published `carve.exe` install under `C:\tools\carve` (the person re-publishes it); the M-3 branch, which rebases onto this when it lands.

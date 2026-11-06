@@ -46,7 +46,7 @@ The decisions:
 - **Paths**:
   - a relative path resolves against carve's working directory, and every result gives the absolute path;
   - folders are created;
-  - an existing file is replaced, and the result says `replaced`;
+  - an existing file is replaced by `save`, and refused by `export` unless given `overwrite: true`; the result says `replaced` (changed by the person, 2026-11-06, for Orcward);
   - `.carve` and `.glb` are checked;
   - a missing file's error lists the `.carve` files in that folder;
   - carve keeps no current file.
@@ -101,6 +101,8 @@ T-19 and T-20 are runs, split from the code on purpose. The crate exported and s
 - a final `get_mesh` asked for in the prompt.
 
 Nothing in M-3 has sound or motion, so there is no listening or real-time pass.
+
+**Added 2026-11-06.** T-21 lands on `main` first and this branch rebases onto it, because M-3 does not restore as pinned. [M-16](M-16-a-character-that-moves.md) follows this milestone.
 
 ## Required tasks
 

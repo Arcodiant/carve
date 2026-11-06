@@ -156,4 +156,4 @@ No UVs yet. Nothing here may stop M-6 adding per-corner UVs: the export's vertex
 - **How close a loaded frame must be to the preview.** GPU and CPU skinning will not agree bit for bit. T-48 measures the difference and asks the person for the tolerance; no agent sets it.
 - **How `render` frames a moving character.** The working assumption is the rest-pose bounds, so a clip does not swim. T-32 confirms it and T-47 must match it.
 - **Whether Carve's clips should keep a game-side `loop` flag.** glTF has none, so `loop` is only Carve's check. The game sets `Animator.Loop` itself.
-- **Engine need 3**, in D-1: a skinned model of several meshes. If the engine gains it, one mesh stays valid and nothing has to change.
+- **Engine need 4**, in D-1: a skinned model of several meshes. If the engine gains it, one mesh stays valid and nothing has to change.

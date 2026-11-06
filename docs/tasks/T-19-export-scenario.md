@@ -31,7 +31,7 @@ The milestone's sample is proved end to end in one suite. Through the real tools
 3. `define_mesh` the example cube, then `open` `work/crate.carve`. The report matches the crate's (closed, no warnings), and `get_mesh` equals the one before the save, field for field. Capture `front` again; it is **byte-identical** to step 1's.
 4. `undo` returns the cube (`open` is one step). `open` again.
 5. `save` to the same path again; the result says `replaced`. The file's bytes are identical to step 2's.
-6. `export` to `game/Content/models/crate.glb`. The result names the path, the triangle count, 1 material `carve`, and size `1.04 x 0.8 x 1 m`. Export again to the same path: `replaced`, and the bytes are identical.
+6. `export` to `game/Content/models/crate.glb`. The result names the path, the triangle count, 1 material `carve`, and size `1.04 x 0.8 x 1 m`. Export again to the same path: a tool error naming `overwrite`, with the file unchanged. Export with `overwrite: true`: `replaced`, and the bytes are identical.
 7. **Error paths**, each a tool error after which the next `front` render is byte-identical to the last:
    - `open` `work/crates.carve`: the error names the path and lists `crate.carve`;
    - `save` to `work/crate.glb`: wrong extension;

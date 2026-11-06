@@ -18,6 +18,8 @@ Plans against [D-2](../design/D-2-part-tree-and-hierarchical-modelling.md).
 
 **Depends on:** M-3 (the Carve file and the export, which this extends). Plan it before M-10's primitives become parts, and before M-11, M-12, M-13 and M-15, which assume parts.
 
+**Changed 2026-11-06.** [M-16](M-16-a-character-that-moves.md) adds a flat list of named meshes and a `mesh` argument (D-6). Parts grow from that: a named mesh becomes a part. Whether a tool's `mesh` argument becomes `part` is for this planning.
+
 ## Open at planning
 
 - How the part tree extends M-3's version 1 Carve file (`{"carve": 1, "vertices", "faces"}`): a version 2 with a `parts` key, or a file per part (D-2).

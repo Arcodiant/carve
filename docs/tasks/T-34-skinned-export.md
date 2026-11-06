@@ -35,7 +35,7 @@ description: >-
 ## Notes
 
 - Run on the stronger model: the file layout is what the game depends on.
-- Records **engine need 3**: cite it at the merge, `// Interim until engine need 3: ...`.
+- Records **engine need 4**: cite it at the merge, `// Interim until engine need 4: ...`.
 - **Carried from the M-1 to M-4 plans:** the byte-identical guard on every existing frame, by hash before and after; a positive pixel check on every new frame, and one a mirrored or flipped camera would fail; each new check shown failing, as a table.
 - **Open rules: stop and ask.** Anything D-6 does not settle, any loosened check, and any change to a D-6 decision.
 - Run `finish` from inside the worktree and leave the folder.

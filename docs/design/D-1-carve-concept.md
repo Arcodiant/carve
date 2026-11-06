@@ -123,6 +123,8 @@ game as exported `.glb`, which Empyrean's `IModelLoader` loads.
 - **Conventions**: pass-through (1 unit = 1 m, +Y up, +Z front, the origin as authored) with no checks.
 - **The load proof** is a viewer spike that stands in for a game.
 
+*Extended by [D-6](D-6-characters-rigging-animation-and-character-export.md), 2026-11-06:* the file also holds several meshes, colours, a skeleton, weights and clips; export adds colour materials, smooth normals and skins. `export` refuses to overwrite without `overwrite: true`.
+
 **Alternatives:** `.glb` only, which loses the polygons on every save; server memory
 only, which loses unexported work on a restart. A list of operations as the file was rejected because a change to the kernel could change or break old files.
 **Would change if:** none recorded.
@@ -156,7 +158,7 @@ process and a protocol between the two.
 - **The Carve file.** *Decided at M-3 planning:* JSON text holding the geometry; see *A Carve file, and .glb export*.
 - **Scope of a model.** Which of these does Carve author, and when: UVs and
   unwrapping, materials and textures, smoothing and normals, several parts or a node
-  hierarchy, LODs, colliders, rigs and animation?
+  hierarchy, LODs, colliders, rigs and animation? *Rigs, animation, colour and smoothing are decided in D-6.*
 - **Render modes.** Which come first, and do any need something Empyrean does not
   have? The first look at its docs did not find a normals or UV debug view; a
   material or shader of Carve's own may do it.
@@ -164,7 +166,7 @@ process and a protocol between the two.
   how the server is installed for a game's Claude session beyond that entry, stay open until a
   use needs them.
 - **Empyrean-specific export.** *Decided at M-3 planning:* pass-through scale and axes, the node and mesh named after the file, no checks. Whether a game's conventions ever warrant checks stays open.
-- **Smoothing.** M-3 exports every edge hard. Smoothing control (by angle, or edges marked by a tool) is open for a later milestone.
+- **Smoothing.** *Decided in D-6:* M-3 exports every edge hard; M-18 adds smooth meshes with hard edges marked by a tool.
 - **Boolean and heavier operations.** Does "cut" mean a plane cut, a knife path, or
   boolean subtraction?
 
@@ -175,3 +177,4 @@ process and a protocol between the two.
 | 1 | A named error when Vulkan cannot start: with no driver, `IGameLoop.Initialise` throws `ArgumentNullException` for `ptr` from inside `Vulkan.Instance.Create` | Low | `EngineThread` words the fault itself, naming Vulkan |
 | 2 | An in-memory PNG encode: `IRenderTargetReadback.WritePngAsync` writes only to a path, and `DecodedImage` has no encoder, while `render` must write nothing to disk | Low | `RenderTool` calls `StbImageWriteSharp` directly on `ToDecodedImage`'s bytes |
 | 3 | A material name: the engine's `Material` carries none, so a loaded `.glb`'s material `carve` cannot be read back by name | Low | The viewer's `view.json` lists each material's colour, metallic and roughness, and no name |
+| 4 | A skinned model of several meshes: a skinned file loads only its first skinned mesh and drops the rest with a warning | Low | D-6: every piece is written as a primitive of one glTF mesh |
