@@ -3,7 +3,7 @@ using System.Diagnostics;
 namespace Carve.ModelViewer.Tests;
 
 /// <summary>What one run of <c>run-viewer.ps1</c> left.</summary>
-internal sealed record ViewerResult(int ExitCode, string Output, string Out, string WorkingFolder);
+internal sealed record ViewerResult(int ExitCode, string Output, string Out, string[] LeftInWorkingFolder);
 
 /// <summary>Runs the viewer as T-19's suite will: through the script, built already.</summary>
 internal static class ViewerProcess
@@ -35,7 +35,9 @@ internal static class ViewerProcess
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
-        return new ViewerResult(process.ExitCode, stdout.Result + stderr.Result, output, working);
+        var left = Directory.GetFileSystemEntries(working);
+        Directory.Delete(working, recursive: true);
+        return new ViewerResult(process.ExitCode, stdout.Result + stderr.Result, output, left);
     }
 
     private static string FindRepoRoot()
