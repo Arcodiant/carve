@@ -58,13 +58,16 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `extensions/Carve.Debug` | The debug extension: in-memory transport, `ScenarioDriver`, fixed clock and seed, run folder. Referenced by nothing in `src/` |
 | `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views, and four cube frames by direction and zoom |
 | `scenarios/Carve.Scenario.Crate` | The crate: one cube built into a crate with `move` and `extrude` only, five views, undo and error paths; suite `scenario-crate` |
+| `spikes/Carve.ModelViewer` | The model viewer, a stand-in for a game: loads a `.glb` through `IModelLoader` and captures fixed views. It is not the scenario harness, and nothing in the product uses it |
 | `tests/Carve.Core.Tests` | xunit tests of the kernel, incl. the engine-free guard |
 | `tests/Carve.Server.Tests` | xunit tests that start the real `carve`, incl. the no-extension guard |
 | `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
+| `tests/Carve.ModelViewer.Tests` | The viewer on its own fixture cube, through `run-viewer.ps1`; suite `viewer-cube` |
 | `tests/Carve.Scenario.Tiny` | The scenario the debug extension's tests stack on it |
 | `tests.json` | The suites and their tiers, which `cairn <kind> <id> verify` and `cairn test run` work from |
 | `scripts/verify.ps1` | The old whole run: build warnings-as-errors + all tests + the cube scenario (needs a Vulkan device). The gate no longer runs it |
 | `scripts/run-scenario.ps1` | Builds, then runs one scenario on the real `carve`; returns its exit code and run folder |
+| `scripts/run-viewer.ps1` | Builds, then runs the viewer on one model; returns its exit code |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
 
