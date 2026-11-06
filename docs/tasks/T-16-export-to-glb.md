@@ -120,7 +120,7 @@ Run on **Claude Opus 5.5** (`claude-opus-5-5`).
 
 **What the parse showed.** SharpGLTF 1.0.7 keeps triangle order, so the comparison is **in order**, exact to the bit (positions and normals compared as `SingleToInt32Bits`): Carve's (A, B, C) reads back as (A, C, B), the order `MeshBridge` draws. The parser reports no warnings. The material reads back as base colour (0.72, 0.72, 0.70, 1), `Pbr` true, metallic 0, roughness 1, not double-sided. Two writes are byte-identical for the cube, L-block and crate.
 
-**Each check failing on a broken product** (unit checks, run by hand with the break applied and then reverted; the regression checks were not broken one by one):
+**Each check failing on a broken product** (unit checks, run by hand with the break applied and then reverted):
 
 | Break | Checks that failed |
 |---|---|
@@ -131,10 +131,19 @@ Run on **Claude Opus 5.5** (`claude-opus-5-5`).
 | Triangulation order changed: `FlatShading` reverses `Triangulator` order | `FlatShadingTests`, cube and L-block |
 | Path not created (no `Directory.CreateDirectory`) | `ToolPathsTests.A_write_creates_missing_folders_and_says_when_it_replaced_a_file` |
 
-**Frames.** HASHES_PLACEHOLDER
+**The regression checks failing on a broken product** (`ExportToolTests`, through the real `carve`, each break applied and reverted):
 
-**Not checked.** No `.glb` has been loaded by a running game or rendered through the engine; per the spec that is T-18 and T-19. The regression tests were run only through `verify`, not each against a break.
+| Break | Checks that failed |
+|---|---|
+| The no-mesh error says something else | `Export_before_define_mesh_is_an_error_saying_so` |
+| Warnings not repeated | `A_mesh_with_warnings_exports_and_the_result_repeats_them` |
+| Extension not checked | `A_wrong_extension_or_an_empty_path_is_an_error_and_writes_nothing` |
+| `export` pushes an undo step | `Export_writes_the_cube_resolving_a_relative_path_and_says_when_it_replaced` |
+| The result never says `replaced` | `Export_writes_the_cube_resolving_a_relative_path_and_says_when_it_replaced` |
+| The worked example writes `.obj` | `The_descriptions_worked_example_runs_as_written_into_a_game_folder` |
+| `export` not registered | all six, including `Tools_list_lists_export_with_a_closed_schema` |
 
-### Hand-off
+**Two checks were wrong on their first real run**, and the product was right, so the tests changed, not the code. A lone triangle has three open edges, so three warnings, where the test said one; it now asserts `; 3 warning(s): ` and the message. The first `define_mesh` cannot be undone (`Undo_can_take_back_define_mesh_but_not_the_first_one`), where the test expected it to be; it now exports after a `move`, then `undo` must take back `move` and the next `undo` must find nothing, which is stricter than what it replaced.
+**Frames.** No existing frame changed. All 22 frames hash the same before and after (SHA-256 of each PNG): 13 of `scenario-cube` and 9 of `scenario-crate`, compared file by file with no differences. **Before:** the artifacts of 9bb593520, which has no `FlatShading` and the old `MeshBridge`. That commit is not an ancestor of this branch; its source differs from T-16's start (93f4bc8) only in `CarveFile.cs`, which rendering does not use. **After:** queued runs at ffcfa79, which has the `MeshBridge` rewrite; `run` logs of both jobs name that commit's work folder, so the crate's carried pass is not the old job. Later commits touch only tests and this file. The frames were compared by hash and not opened, since none changed.
 
-Run on Claude Opus 5.5. **Done:** the code and tests, committed and rebased onto `origin/milestone/M-3` (after T-15, with no conflicts); the unit tiers pass (core 131, server 119 before the rebase); the break table above; `### As built`. **Left:** `cairn task T-16 verify` has not completed yet. Every run so far has waited for a GPU slot: first on other Empyrean jobs, now on `verify M-151`, and the credential cannot queue `any-gpu`, so it runs here. Once it passes, fill in **Frames** in As built (the frames before the change, hashed from the carried 9bb593520 artifacts, are in `$TEMP/t16-before.sha`; compare them with `cairn test artifacts scenario-cube` / `scenario-crate`), then run `cairn lint` and `finish`. **Second run (Claude Opus 5.5, after the credential fix):** the earlier verify was stopped; a fresh `cairn task T-16 verify` (HEAD up to date with `origin/milestone/M-3` at b3fa6a3) still said `couldn't queue scenario-cube / scenario-crate / server-regression (this credential has no access to queue any-gpu)`, then `running here` and `waits for a gpu slot (in use: scenario: verify M-151 in M-151)`. It was stopped there, untouched otherwise, and reported to the orchestrator. **Checked:** the readback is bit-exact and in order for the cube, L-block and crate. **Not checked:** the regression tier (`ExportToolTests`) and the frame hashes after the change.
+**Not checked.** No `.glb` has been loaded by a running game or rendered through the engine; per the spec that is T-18 and T-19.
