@@ -10,8 +10,13 @@ function Write-Err([string]$text) { [Console]::Error.WriteLine($text) }
     it wrote: Stdout and Stderr as lines, and StdoutBytes. The caller decides where those go.
 #>
 function Invoke-BoundedDotnet([string[]]$Arguments, [string]$WorkingDirectory, [int]$TimeoutSeconds, [string]$OnTimeout) {
-    # Start-Process joins its arguments with spaces, so each is quoted here.
-    $quoted = $Arguments | ForEach-Object { '"' + $_ + '"' }
+    # Start-Process joins its arguments with spaces, so each is quoted here, the way the Windows command line parses
+    # them: a quote inside is escaped, and the backslashes before it or before the closing quote are doubled, so a
+    # value that ends in one (a folder from tab completion) reaches the program whole.
+    $quoted = $Arguments | ForEach-Object {
+        $inner = ($_ -replace '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1'
+        '"' + $inner + '"'
+    }
 
     $stderr = [IO.Path]::GetTempFileName()
     $stdout = [IO.Path]::GetTempFileName()

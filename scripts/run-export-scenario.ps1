@@ -4,13 +4,14 @@
 .DESCRIPTION
     Runs scenario Carve.Scenario.Export (the crate saved, reopened and exported into the run folder's
     game/Content/models), then run-viewer.ps1 on that content folder with the two agreed views, its output under the
-    run folder's viewer/, then the xunit checks in tests/Carve.ExportViewer.Tests on the run folder. It fails if any
-    step does. The run folder's path is the last thing on stdout; everything else goes to stderr.
+    run folder's viewer/, then the xunit checks in tests/Carve.ExportViewer.Tests on the run folder (built first unless -NoBuild, and stopped
+    after -ChecksTimeoutSeconds with exit 124, as the other steps are). It fails if any step does, or a check is skipped. The run folder's path is the last thing on stdout; everything else goes to stderr.
 #>
 [CmdletBinding()]
 param(
     [string]$Configuration = 'Debug',
     [switch]$NoBuild,
+    [int]$ChecksTimeoutSeconds = 180,
     [string[]]$CarveArguments = @()
 )
 
@@ -42,11 +43,29 @@ if ($code -ne 0) {
     exit $code
 }
 
-# 3. The checks on the viewer's output.
-$env:CARVE_EXPORT_RUN = $folder
+# 3. The checks on the viewer's output, built first unless -NoBuild (the solution build of the suite has built them),
+#    and bounded like the other two steps. They are skipped when CARVE_EXPORT_RUN is unset, so a skipped check here
+#    is a failure: this run exists to make them run.
 $tests = Join-Path $root 'tests/Carve.ExportViewer.Tests/Carve.ExportViewer.Tests.csproj'
-dotnet test $tests -c $Configuration --no-build --nologo 2>&1 | ForEach-Object { Write-Err $_ }
-$code = $LASTEXITCODE
+if (-not $NoBuild) {
+    dotnet build $tests -c $Configuration --nologo -v q 2>&1 | ForEach-Object { Write-Err $_ }
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
+$env:CARVE_EXPORT_RUN = $folder
+$checks = Invoke-BoundedDotnet @('test', $tests, '-c', $Configuration, '--no-build', '--nologo') $root $ChecksTimeoutSeconds `
+    "run-export-scenario: the checks are still running after $ChecksTimeoutSeconds s; stopped"
+$checks.Stdout | ForEach-Object { Write-Err $_ }
+$checks.Stderr | ForEach-Object { Write-Err $_ }
+$code = $checks.Code
+if ($code -eq 0 -and ($checks.Stdout -join "`n") -notmatch 'Passed:\s+[1-9]') {
+    Write-Err 'run-export-scenario: no check passed; they may have been skipped'
+    $code = 1
+}
+elseif ($code -eq 0 -and ($checks.Stdout -join "`n") -match 'Skipped:\s+[1-9]') {
+    Write-Err 'run-export-scenario: a check was skipped'
+    $code = 1
+}
 
 Write-Output $folder
 if ($code -ne 0) { Write-Err "run-export-scenario: the viewer's checks failed ($code)" }

@@ -125,7 +125,7 @@ internal static partial class ProductReferenceGuard
             .ToList();
     }
 
-    /// <summary>The assembly names of whatever now lives under extensions/ and scenarios/.</summary>
+    /// <summary>The assembly names of whatever now lives under extensions/, scenarios/ and spikes/.</summary>
     public static IEnumerable<string> ExtensionProjects(string repoRoot) =>
         new[] { "extensions", "scenarios", "spikes" }
             .Select(folder => Path.Combine(repoRoot, folder))

@@ -163,4 +163,69 @@ internal static class CrateBuild
             }
         }
     }
+
+    /// <summary>Faces must differ in the green channel by at least this much (10/255, as in M-1).</summary>
+    public const int MinimumStep = 10;
+
+    // front: the top, +Z and +X frame faces in M-1's order (brightest first), each in the middle of its
+    // 0.12 frame band: the top frame's left band, the +Z frame's left band, the +X frame's near band.
+    // Then the +X bar's top face (216, lit like the lid) and the +X panel above it (171, the recess floor
+    // facing +X): they differ only because the bar stands there.
+    public static readonly (int X, int Y) FrontTop = (78, 155);
+    public static readonly (int X, int Y) FrontPlusZ = (71, 300);
+    public static readonly (int X, int Y) FrontPlusX = (307, 300);
+    public static readonly (int X, int Y) FrontBarTop = (350, 288);
+    public static readonly (int X, int Y) FrontPanelBehindBar = (350, 240);
+
+    /// <summary>
+    /// What every native front frame of the crate must show: the corners are background, the centre is the mesh, the
+    /// top, +Z and +X frame faces are in order (brightest first) at their points, and the +X bar's top differs from the
+    /// panel behind it. A mirrored camera puts +X where +Z is, and an up-flipped one the lid at the bottom, so either fails.
+    /// </summary>
+    public static void CheckFront(ScenarioDriver driver, ScenarioFrame frame)
+    {
+        CheckCorners(driver, frame);
+        CheckNotBackground(driver, frame, (256, 256), "the centre");
+        CheckOrder(driver, frame, [FrontTop, FrontPlusZ, FrontPlusX], "top", "+Z", "+X");
+        CheckDiffers(driver, frame, FrontBarTop, FrontPanelBehindBar, "the +X bar's top", "the +X panel behind it");
+    }
+
+    public static void CheckNotBackground(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) at, string what)
+    {
+        if (IsBackground(frame.Pixel(at.X, at.Y)))
+        {
+            driver.Fail($"{frame.Name}: {what} at ({at.X}, {at.Y}) is the background, expected the mesh");
+        }
+    }
+
+
+    /// <summary>Two sampled pixels, both on the mesh, whose green values differ by at least <see cref="MinimumStep"/>.</summary>
+    public static void CheckDiffers(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) a, (int X, int Y) b, string whatA, string whatB)
+    {
+        CheckNotBackground(driver, frame, a, whatA);
+        CheckNotBackground(driver, frame, b, whatB);
+        var (ga, gb) = (frame.Pixel(a.X, a.Y).G, frame.Pixel(b.X, b.Y).G);
+        if (Math.Abs(ga - gb) < MinimumStep)
+        {
+            driver.Fail($"{frame.Name}: {whatA} at ({a.X}, {a.Y}) is {ga} and {whatB} at ({b.X}, {b.Y}) is {gb}; they should differ by at least {MinimumStep}");
+        }
+    }
+
+    /// <summary>Three faces, brightest first, each at least <see cref="MinimumStep"/> above the next.</summary>
+    public static void CheckOrder(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y)[] at, params string[] faces)
+    {
+        var g = at.Select(a => (int)frame.Pixel(a.X, a.Y).G).ToArray();
+        for (var i = 0; i < 2; i++)
+        {
+            if (g[i] < g[i + 1] + MinimumStep)
+            {
+                driver.Fail($"{frame.Name}: {faces[i]} ({g[i]}) should be at least {MinimumStep} brighter than {faces[i + 1]} ({g[i + 1]})");
+            }
+        }
+
+        if (g[2] < 53 + MinimumStep)
+        {
+            driver.Fail($"{frame.Name}: {faces[2]} ({g[2]}) should be at least {MinimumStep} above the background");
+        }
+    }
 }

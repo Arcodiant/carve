@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
+using System.Xml.Linq;
 
 namespace Carve.Server.Tests;
 
@@ -146,6 +147,43 @@ public class ProductReferencesNoExtensionTests
             """;
 
         Assert.Empty(ProductReferenceGuard.FindInProject(project));
+    }
+
+    [Fact]
+    public void The_viewer_references_no_Carve_code() =>
+        Assert.Empty(CarveCodeIn(XDocument.Load(Path.Combine(Paths.RepoRoot, "spikes/Carve.ModelViewer/Carve.ModelViewer.csproj"))));
+
+    [Fact]
+    public void The_viewer_check_fails_on_a_project_reference() =>
+        Assert.NotEmpty(CarveCodeIn(XDocument.Parse(
+            "<Project><ItemGroup><ProjectReference Include=\"../../src/Carve.Core/Carve.Core.csproj\" /></ItemGroup></Project>")));
+
+    [Theory]
+    [InlineData("../../src/Carve.Core/Mesh.cs")]
+    [InlineData(@"..\..\src\Carve.Server\*.cs")]
+    [InlineData("../../extensions/Carve.Debug/RunFolder.cs")]
+    public void The_viewer_check_fails_on_a_linked_Carve_source_file(string include) =>
+        Assert.NotEmpty(CarveCodeIn(XDocument.Parse(
+            $"<Project><ItemGroup><Compile Include=\"{include}\" Link=\"x.cs\" /></ItemGroup></Project>")));
+
+    [Fact]
+    public void The_viewer_check_passes_a_file_of_its_own() =>
+        Assert.Empty(CarveCodeIn(XDocument.Parse("<Project><ItemGroup><Compile Include=\"Own/Thing.cs\" /></ItemGroup></Project>")));
+
+    /// <summary>What a project file brings in of Carve: a project reference, or a source file linked from src/, extensions/ or scenarios/.</summary>
+    private static List<string> CarveCodeIn(XDocument project)
+    {
+        var found = project.Descendants("ProjectReference").Select(r => "ProjectReference " + r.Attribute("Include")?.Value).ToList();
+        foreach (var compile in project.Descendants("Compile"))
+        {
+            var include = (compile.Attribute("Include")?.Value ?? compile.Attribute("Update")?.Value ?? "").Replace('\\', '/');
+            if (new[] { "src/Carve.", "extensions/Carve.", "scenarios/Carve." }.Any(include.Contains))
+            {
+                found.Add("Compile " + include);
+            }
+        }
+
+        return found;
     }
 
     [Theory]

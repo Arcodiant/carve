@@ -1,6 +1,5 @@
 using System.Numerics;
 using System.Text.Json;
-using System.Xml.Linq;
 using Xunit;
 
 namespace Carve.ModelViewer.Tests;
@@ -252,10 +251,22 @@ public class ViewerCubeTests(CubeRuns runs) : IClassFixture<CubeRuns>
     }
 
     [Fact]
-    public void The_viewer_references_no_Carve_project()
+    public void With_no_view_given_the_default_is_the_front_view()
     {
-        var project = XDocument.Load(Path.Combine(ViewerProcess.RepoRoot, "spikes/Carve.ModelViewer/Carve.ModelViewer.csproj"));
+        var run = ViewerProcess.Run(runs.Content, "models/cube.glb", runs.Scratch("default-view"));
 
-        Assert.Empty(project.Descendants("ProjectReference"));
+        Assert.True(run.ExitCode == 0, run.Output);
+        Assert.Equal(ViewJson(runs.FirstRun).GetProperty("views").GetRawText(), ViewJson(run).GetProperty("views").GetRawText());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(runs.FirstRun.Out, "front.png")), File.ReadAllBytes(Path.Combine(run.Out, "front.png")));
+    }
+
+    [Fact]
+    public void A_folder_argument_ending_in_a_backslash_reaches_the_viewer_whole()
+    {
+        // What tab completion gives: both folders end in a backslash, which must not escape the closing quote.
+        var run = ViewerProcess.Run(runs.Content + Path.DirectorySeparatorChar, "models/cube.glb", runs.Scratch("slash") + Path.DirectorySeparatorChar, CubeRuns.Front);
+
+        Assert.True(run.ExitCode == 0, run.Output);
+        Assert.True(File.Exists(Path.Combine(runs.Scratch("slash"), "front.png")), run.Output);
     }
 }

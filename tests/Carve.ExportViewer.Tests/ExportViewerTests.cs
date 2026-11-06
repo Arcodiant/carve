@@ -70,8 +70,10 @@ internal static class Checks
     public static readonly (int X, int Y) FrontBarTop = (350, 290);
     public static readonly (int X, int Y) FrontPanelBehindBar = (350, 240);
 
-    // front: five points across the +Z panel, which is one flat face (191), so smooth normals would show.
-    public static readonly (int X, int Y)[] FrontPlusZPanel = [(110, 300), (150, 300), (200, 300), (250, 300), (285, 300)];
+    // front: five points across the +Z panel, which is one flat face (191), so smooth normals would show. All five
+    // are on the panel itself (face 1 at z = 0.92), none on the +Z frame: 110 and 250 are known to be on it, and
+    // the panel is convex, so the points between them are too.
+    public static readonly (int X, int Y)[] FrontPlusZPanel = [(110, 300), (150, 300), (190, 300), (230, 300), (250, 300)];
 
     // minus-x: the -X panel (125) on the left and the +Z face (191) on the right: a mirrored view swaps them.
     public static readonly (int X, int Y) MinusXPanel = (150, 250);
@@ -185,8 +187,21 @@ internal static class Checks
 [Trait("Tier", "regression")]
 public sealed class ExportViewerTests
 {
-    private static readonly string Run = Environment.GetEnvironmentVariable("CARVE_EXPORT_RUN")
-        ?? throw new InvalidOperationException("CARVE_EXPORT_RUN is not set; run this through scripts/run-export-scenario.ps1");
+    private static readonly string? RunFolder = Environment.GetEnvironmentVariable("CARVE_EXPORT_RUN");
+
+    /// <summary>
+    /// The run folder these checks read. With <c>CARVE_EXPORT_RUN</c> unset (a whole-solution run, which has no run
+    /// to look at) the test is skipped; with it set the test runs and can fail. <c>scripts/run-export-scenario.ps1</c>
+    /// sets it and fails if any check was skipped.
+    /// </summary>
+    private static string Run
+    {
+        get
+        {
+            Assert.SkipUnless(RunFolder is { Length: > 0 }, "CARVE_EXPORT_RUN is not set; these checks run through scripts/run-export-scenario.ps1");
+            return RunFolder!;
+        }
+    }
 
     private static string Viewer(string file) => Path.Combine(Run, "viewer", file);
 

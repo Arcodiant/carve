@@ -33,10 +33,23 @@ public sealed class ExportScenario : IScenario
         var carvePath = Path.Combine(work, "crate.carve");
         var glbPath = Path.Combine(models, "crate.glb");
 
+        // A named run folder may hold an earlier run's files, and save would then say 'replaced' on a sound product:
+        // what this run owns is cleared first (frames/ and user-data/ are the debug extension's, already fresh).
+        foreach (var owned in new[] { work, Path.Combine(driver.RunFolder, "game"), Path.Combine(driver.RunFolder, "viewer") })
+        {
+            if (Directory.Exists(owned))
+            {
+                Directory.Delete(owned, recursive: true);
+            }
+        }
+
+        File.Delete(Path.Combine(driver.RunFolder, ResultFile));
+
         // 1. The crate, counts checked after every call, and its native front.
         await CrateBuild.BuildAsync(driver);
         var meshBefore = await CrateBuild.CallTextAsync(driver, "get_mesh", new { });
         var front = await driver.CaptureAsync("front", new { view = "front" });
+        CrateBuild.CheckFront(driver, front);
 
         // 2. save: the path, 72 vertices and 70 faces; a new file.
         var saved = await CrateBuild.CallTextAsync(driver, "save", new { path = carvePath });
@@ -60,6 +73,7 @@ public sealed class ExportScenario : IScenario
         }
 
         var reopened = await driver.CaptureAsync("front-reopened", new { view = "front" });
+        CrateBuild.CheckFront(driver, reopened);
         AssertSameFrame(driver, "front, after save and open", front, reopened);
 
         // 4. open is one undo step and gives the cube back; open again.
@@ -113,6 +127,7 @@ public sealed class ExportScenario : IScenario
     {
         await CrateBuild.ExpectToolErrorAsync(driver, tool, arguments, mentions);
         var frame = await driver.CaptureAsync("front-" + name, new { view = "front" });
+        CrateBuild.CheckFront(driver, frame);
         AssertSameFrame(driver, $"front, {name}", last, frame);
         return frame;
     }
