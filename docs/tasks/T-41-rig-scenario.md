@@ -26,6 +26,7 @@ Skinning faults are proved visible before export.
 
 - **`scenarios/Carve.Scenario.Rig`**, suite `scenario-rig`, on the gardener with planted faults: an unweighted patch, a hat vertex on the wrong arm, a bone out of place.
 - Each fault is found through `get_weights` or a frame with `bones` or `weights`, then fixed through the tools, and the frame re-checked.
+- `export` is refused while the unweighted patch remains, and succeeds once it is fixed.
 - Frames are kept and looked at, with a pixel check for each fault before and after.
 
 ## Notes

@@ -16,7 +16,7 @@ Content: the gardener soft, with a creased hat brim, flat beside smooth.
 
 Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-export.md), from Orcward's request of 2026-11-06. This takes hard edges and subdivide out of [M-14](M-14-bevel-and-finish.md).
 
-**Depends on:** M-16.
+**Depends on:** M-16. It runs before M-17, because Orcward's first character goes to a look review.
 
 **Order.** T-42, T-43, T-44 in sequence. Stronger model on T-43, Sonnet on the rest.
 

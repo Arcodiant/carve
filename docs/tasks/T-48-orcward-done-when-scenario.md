@@ -12,7 +12,7 @@ description: >-
 
 **Batch:** — (standalone)
 
-**Depends on:** T-45, T-46, T-47
+**Depends on:** T-45, T-47, T-50
 
 **Verify:** full
 
@@ -28,9 +28,10 @@ Every line of Orcward's *Done when* passes in one suite.
   1. export in both modes, with no warnings;
   2. `IModelGeometryLoader.Load` gives the expected bone count and clip names;
   3. `LoadAnimationSet` reads the clips-only file with the same bones and clips;
-  4. `render_glb` and `render` frames compared at the rest pose, and at several times of each clip, including times between keys.
-- **The comparison:** measure the real difference first, as a table of per-pixel error by frame. **Then stop and ask the person for the tolerance.** Pick nothing yourself.
-- **Show it failing:** a swapped bone order, wrong inverse binds, a dropped piece, reversed winding.
+  4. a piece file from T-50 loads with the same bones and inverse binds;
+  5. `render_glb` and `render` frames compared at the rest pose, and at several times of each clip, including times between keys.
+- **The comparison:** start from D-6's rule, Orcward's: a pixel differs past 8 of 255 in R, G or B, and a frame fails past 0.5 % of its pixels. Give a table of measured differences by frame. If a good frame fails, stop and ask the person. Do not loosen it yourself.
+- **Show it failing:** a swapped bone order, wrong inverse binds, a dropped piece, reversed winding, and **one small limb twisted**, such as a hand. If the small twist passes the rule, stop and ask: D-6 says it must fail, and a whole-frame count may be too coarse.
 
 ## Notes
 

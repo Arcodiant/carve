@@ -12,7 +12,7 @@ description: >-
 
 **Batch:** — (standalone)
 
-**Depends on:** T-34, T-35
+**Depends on:** T-34, T-35, T-46
 
 **Verify:** full
 
@@ -24,9 +24,9 @@ The thin slice is proved end to end through the real tools, on a character someo
 
 ## Scope
 
-- **The test character** (`samples/gardener.carve`, built as code in the scenario too, and kept equal by a test): an original small round gardener. Two meshes, `Body` and `Hat`, four or more colours, about ten bones, deliberately asymmetric (a watering can in one hand) so a mirrored frame fails. Clips `Idle` and `Walk`, both looping and in place.
-- **`scenarios/Carve.Scenario.Character`**, suite `scenario-character`: build it through the tools; capture rest, a pose, and each clip at three times; `save`, reopen, compare field for field; `export`; export again without `overwrite` (a tool error) and with it (identical bytes).
-- **Load check:** a `regression` test reads the exported file through `IModelGeometryLoader.Load` from a content folder and asserts bone count, bone order and clip names.
+- **The test character** (`samples/gardener.carve`, built as code in the scenario too, and kept equal by a test): an original small round gardener. Two meshes, `Body` and `Hat`, four or more colours, bones named by the engine's Synty preset as Orcward's are (about 22), deliberately asymmetric (a watering can in one hand) so a mirrored frame fails. Clips `Idle` and `Walk`, both looping and in place.
+- **`scenarios/Carve.Scenario.Character`**, suite `scenario-character`: build it through the tools; capture rest, a pose, and each clip at three times; `save`, reopen, compare field for field; `export`; export again without `overwrite` (a tool error) and with it (identical bytes); export in `clips` mode; export with a vertex unweighted (a tool error, then `allow_unweighted`).
+- **Load check:** a `regression` test reads the exported file through `IModelGeometryLoader.Load` from a content folder and asserts bone count, bone order and clip names, that `HumanoidRoleMap.Synty` resolves on it with no sidecar, and that the T-46 clips file loads beside it.
 - **Look at the frames** and say what was seen.
 
 ## Notes

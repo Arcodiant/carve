@@ -25,7 +25,7 @@ An agent weights vertices by hand and sees the model bend, so skinning can be ju
 ## Scope
 
 - **Core:** per-mesh vertex weights, as D-6's *Weights* says; `Pose` (per-bone local rotation and translation, rest where not given); and linear blend skinning to posed positions and normals, in double, narrowed once.
-- **Tool:** `set_weights(mesh, vertices, weights)`, with weights by bone name. The result says if influences were capped.
+- **Tool:** `set_weights(mesh, vertices | group, weights)`, with weights by bone name, so a hat is all `Head` in one call. The result says if influences were capped, and how many vertices are still unweighted.
 - **Render:** a `pose` argument, drawn as a plain CPU-posed mesh through `MeshBridge`. Framing: confirm D-6's working assumption of rest-pose bounds, and record the outcome in D-6.
 - **Sample:** two boxes on a two-bone chain, bent at the joint.
 - **Tests:** `unit` for skinning against hand-worked values, the rest pose returning rest positions exactly, and normalisation; a frame of the bent chain whose pixels a flipped bend would fail.

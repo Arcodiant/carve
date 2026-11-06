@@ -20,14 +20,13 @@ description: >-
 
 ## Goal
 
-An agent corrects a rig by group and reads what it has, with gaps reported rather than found in the game.
+An agent reads what a rig has, by vertex or by bone, with gaps reported rather than found in the game.
 
 ## Scope
 
-- **`set_weights`** takes `group` as well as `vertices`, so a hat is all `Head` in one call.
 - **`get_weights(mesh, vertices? | bone?)`:** per-vertex influences by bone name, or every vertex a bone moves, plus a summary and warnings.
 - **Warnings:** unweighted vertices, listed by id with a count; a bone no vertex follows, as a note.
-- **Tests:** `unit` for group override after `weigh`, read-back equal to what was set, and warnings; `regression` for the worked examples as written.
+- **Tests:** `unit` for a `set_weights` group override after `weigh`, read-back equal to what was set, and warnings; `regression` for the worked examples as written.
 
 ## Notes
 

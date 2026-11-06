@@ -26,8 +26,8 @@ Agents who have never seen Carve author an animated character from the tool desc
 
 - **The run**, as T-20's: scratch folder, plain `carve`, fresh `claude -p` sessions with `--strict-mcp-config`, no Carve docs.
 - **Session 1:** build an original character of two meshes, coloured, soft, rigged, with two looping clips, and save it. Check it with renders.
-- **Session 2, a later process:** open it, change a clip, and export both files into a game's content folder. A planted mistake: the prompt names a bone that does not exist.
-- **Pass means:** recovery from the error text alone; both files load through `Load` and `LoadAnimationSet`; `render_glb` shows the same character; no unweighted vertices at the end.
+- **Session 2, a later process:** open it, change a clip, and export the model, the clips and the hat as a piece into a game's content folder. A planted mistake: the prompt names a bone that does not exist.
+- **Pass means:** recovery from the error text alone; all three files load through `Load` or `LoadAnimationSet`; `render_glb` shows the same character; no unweighted vertices at the end.
 - **Rounds:** sharpen descriptions wherever an agent stumbles, at most three rounds. If it still fails, stop and report.
 - Keep transcripts, files and frames under `artifacts/m19-acceptance/`.
 

@@ -30,6 +30,7 @@ A throwaway probe on 2026-11-06 wrote small `.glb` files with SharpGLTF 1.0.7 an
 | Clips only, a skin and no mesh | Bones in the given order, and SharpGLTF writes it |
 | Armature node above the bones | Not a bone; 5 bones, identity `RootTransform` |
 | A clip keying one bone of five | 5 tracks, so the clip fits the skeleton |
+| A piece: the whole skin, one bone weighted, no animations | All 5 bones in order, no clips, no warnings |
 
 From the docs: `PositionUvNormalSkinnedVertex` has no colour attribute, so `COLOR_0` cannot reach a skinned character, and it packs bone indices one per byte. Every glTF clip import throws on CUBICSPLINE.
 
@@ -61,7 +62,7 @@ Every piece of a skinned model is written into **one** glTF mesh, with one primi
 
 **Certainty:** Settled · **Strictness:** Rule
 
-Colour is per face, set directly or through a named face group, and exported as `baseColorFactor` on a material with metallic 0 and roughness 1, as T-16's material is. Values are linear RGB from 0 to 1, as glTF stores them, and materials are opaque. An uncoloured face has Carve's surface colour `(0.72, 0.72, 0.70)`, so existing frames do not change.
+Colour is per face, set directly or through a named face group, and exported as `baseColorFactor` on a material with metallic 0 and roughness 1, as T-16's material is. Colours are given and saved as sRGB hex, `#RRGGBB`, the form Orcward's data uses, and converted to linear for render and `baseColorFactor`. Materials are opaque. A per-material metallic and roughness override, for armour, comes later in M-7; matte stays the default. An uncoloured face has Carve's surface colour `(0.72, 0.72, 0.70)`, so existing frames do not change.
 
 **Rejected:** `COLOR_0`, which the engine's skinned vertex cannot carry.
 
@@ -88,10 +89,10 @@ Meshes are authored in the rest pose, in model space. `inverseBindMatrices` are 
 
 A vertex has at most four influences, normalised to sum to 1. An explicit weight beats an automatic one. Supplying more than four keeps the largest four, with ties going to the lower bone index, and the result says so. Weights live per mesh by vertex id. Automatic weights use distance to each bone's segment, from its head to its child's head, and are deterministic.
 
-A vertex with no weight is a warning, in `get_weights` and in `export`'s result. It exports bound fully to the first root bone, because glTF needs weights that sum to 1.
+A vertex with no weight is a warning while editing, and **`export` refuses** it, listing the vertices (Orcward, 2026-11-06, changing the request). `allow_unweighted: true` is the override for work in progress: those vertices are bound to the first root bone, because glTF needs weights that sum to 1, and the result says so.
 
-**Alternatives:** refusing export with unweighted vertices; the request asks for warnings, so this follows it.
-**Would change if:** agents ship unweighted vertices because a warning was easy to miss.
+**Alternatives:** warning at export and binding to the root, which was the request's first form and lets a fault reach the game.
+**Would change if:** the refusal gets in the way of a normal authoring flow.
 
 ### Clips
 
@@ -119,11 +120,44 @@ Carve's preview poses on the CPU in `Carve.Core` and draws the result as a plain
 
 **Certainty:** Settled · **Strictness:** Rule
 
-`export` gets a `mode`: `model` (the default: meshes, and with a skeleton the skin and clips) or `clips` (armature, skin and animations, no mesh). The clips file **keeps `skins[0]`** even with no mesh, because without one the loader reorders bones depth-first, and a clip's tracks then line up with the wrong bones. Bones sit under one unanimated identity node, `Armature`, which is not a bone.
+`export` gets a `mode`: `model` (the default: meshes, and with a skeleton the skin and clips), `clips` (armature, skin and animations, no mesh) or `piece` (the meshes named in `meshes`, with the skin and no animations). The clips file **keeps `skins[0]`** even with no mesh, because without one the loader reorders bones depth-first, and a clip's tracks then line up with the wrong bones. Bones sit under one unanimated identity node, `Armature`, which is not a bone.
 
 The same model always writes the same bytes. `export` refuses an existing file unless given `overwrite: true`; `save` replaces, since the `.carve` file is the working copy (the person, 2026-11-06).
 
 **Rejected:** a clips file with no skin, for the bone order above.
+
+### Pieces share the body's palette
+
+**Certainty:** Settled · **Strictness:** Invariant
+
+Orcward swaps costumes at runtime by loading pieces as separate files and sharing one `SkinnedPose.Palette`, with the body as the driver. That palette is positional and its length must match, and nothing throws if it does not. So a piece file always carries **every** bone of the skeleton, in the same order, with the same inverse binds, even bones no vertex of the piece follows. A piece has no clips. The `model` export stays the merged whole, which is enough for the first character.
+
+**Enforced by:** T-50's test comparing bone lists and inverse binds across the model and piece files.
+**Rejected:** trimming a piece's skeleton to the bones it uses, which misaligns the palette silently.
+
+### Carve does not assume a humanoid
+
+**Certainty:** Settled · **Strictness:** Rule
+
+Bone names, order and shape are the caller's. Nothing in Carve requires a humanoid or a preset: Orcward's dragon has its own rig and clips. Orcward names humanoid bones by the engine's Synty preset and writes any `*.humanoid.json` itself. Carve writes no sidecars.
+
+### Warnings for a game's limits
+
+**Certainty:** Leaning · **Strictness:** Guideline
+
+`export` warns, and never refuses, on Orcward's starting numbers: above 5,000 triangles for the whole character, above 8 colours or submeshes, and a height outside 1.4 to 2.4 m. Height is the rest bounds of all meshes, and applies only to a skeleton holding every bone the Synty preset requires, so a dragon on its own rig is not warned. The numbers are constants, to be revisited once several characters are on screen.
+
+**Alternatives:** an argument saying a model is humanoid, which is one more thing to remember; warning every model, which is noise on a dragon.
+**Would change if:** a game uses other bone names or wants its own limits, which would make these per-model settings.
+
+### A loaded frame against the preview
+
+**Certainty:** Leaning · **Strictness:** Rule
+
+T-48 starts from Orcward's rule: a pixel differs when R, G or B differs by more than 8 of 255, and a frame fails past 0.5 % of its pixels. It is loosened only on differences measured at T-48, and only by the person. A wrong bone, a twisted limb or a broken silhouette must always fail; shading noise need not.
+
+**Alternatives:** counting only pixels on the character. A 512 x 512 frame allows about 1,300 differing pixels, which may be enough to hide a small limb. T-48 shows whether it is.
+**Would change if:** a small twisted limb passes the whole-frame rule.
 
 ### Smooth shading is per mesh, with hard edges marked
 
@@ -153,7 +187,6 @@ No UVs yet. Nothing here may stop M-6 adding per-corner UVs: the export's vertex
 
 ## Open questions
 
-- **How close a loaded frame must be to the preview.** GPU and CPU skinning will not agree bit for bit. T-48 measures the difference and asks the person for the tolerance; no agent sets it.
 - **How `render` frames a moving character.** The working assumption is the rest-pose bounds, so a clip does not swim. T-32 confirms it and T-47 must match it.
 - **Whether Carve's clips should keep a game-side `loop` flag.** glTF has none, so `loop` is only Carve's check. The game sets `Animator.Loop` itself.
 - **Engine need 4**, in D-1: a skinned model of several meshes. If the engine gains it, one mesh stays valid and nothing has to change.

@@ -16,7 +16,7 @@ Content: the gardener, an original small character with a hat and a watering can
 
 Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-export.md), from Orcward's request of 2026-11-06.
 
-**Depends on:** T-21 and M-3. It runs ahead of M-4 (the person, 2026-11-06).
+**Depends on:** T-21 and M-3. It runs ahead of M-4 (the person, 2026-11-06). Then M-18, M-17 and M-19, in Orcward's order: the first character goes to a look review, so soft shading comes before automatic weights.
 
 **Order.**
 
@@ -27,7 +27,10 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 | 3 | T-32 | Sonnet |
 | 4 | T-33 | stronger: the sampler must match the engine |
 | 5 | T-34, T-35 | stronger: the file layouts are public |
-| 6 | T-36 | Sonnet |
+| 6 | T-46 | Sonnet |
+| 7 | T-36 | Sonnet |
+
+Nine tasks, one past the usual range: T-46's clip file joined so this milestone proves retargeting in the game, as Orcward wants. A skinned, faceted, hand-weighted character is enough for Orcward's first use.
 
 There is no fresh-agent acceptance run here: the first is T-49, once the tools are complete.
 
@@ -40,6 +43,7 @@ There is no fresh-agent acceptance run here: the first is T-49, once the tools a
 - [ ] [T-33](../tasks/T-33-clips-and-the-sampler.md) — An agent defines named clips of rotation and translation keys and renders any clip at any time
 - [ ] [T-34](../tasks/T-34-skinned-export.md) — export writes a skinned .glb with one mesh, a primitive per piece and colour, skins[0] and the clips, byte-identical run to run, which Empyrean's loader reads
 - [ ] [T-35](../tasks/T-35-carve-file-version-2.md) — The whole model saves to and reloads from the Carve file, and version 1 files still open
+- [ ] [T-46](../tasks/T-46-clips-only-export.md) — export in clips mode writes an armature, skin and animations with no mesh, which LoadAnimationSet reads with the same bones and clips
 - [ ] [T-36](../tasks/T-36-character-scenario.md) — A scenario builds the small test character through the real tools, poses it, saves, reopens and exports it, in its own suite
 
 ## Retrospective

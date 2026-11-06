@@ -39,7 +39,7 @@ description: >-
 ## Notes
 
 - **Decided by the person, 2026-11-06:** the bump lands alone on `main` first, ahead of M-3, because M-3 does not restore as pinned and Orcward's work needs it. This replaces the M-4 planning decision. T-16 and M-4's tasks depend on it.
-- **Stay on 0.119.0.** Do not move to 0.120.1: Orcward's game is on 0.119.
+- **Stay on 0.119.0.** Do not move to 0.120.1: Orcward confirmed it tests against 0.119.0 and needs nothing from 0.120.
 - **Open rules: stop and ask.** Any pin but `EmpyreanVersion`. Any frame that differs from the before frames. Any code change beyond what the compiler or a test demands from the version move, and any such change that is more than a line or two.
 - **A fixer may not change** the light, the framing, the background, the image size or `DrawnSpace` to make a frame match.
 - Not in scope: the published `carve.exe` install under `C:\tools\carve` (the person re-publishes it); the M-3 branch, which rebases onto this when it lands.

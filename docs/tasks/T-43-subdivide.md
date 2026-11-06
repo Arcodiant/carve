@@ -25,7 +25,7 @@ Extruded blocks become soft shapes in one call.
 ## Scope
 
 - **Core:** Catmull-Clark in `MeshEdits`, as D-6's *Subdivide is a destructive edit* says. Hard edges stay creased. Open edges follow the boundary rule. Colours, groups, hard edges and weights carry through; weights use the same stencil, capped at four.
-- **Tool:** `subdivide(mesh, levels)`, with `levels` 1 to 3. The result gives counts and warns past a stated face count.
+- **Tool:** `subdivide(mesh, levels)`, with `levels` 1 to 3. The result gives counts and warns past the 5,000-triangle budget (T-34's constant).
 - **Tests:** `unit` for cube counts, a limit surface check, id rules, weights summing to 1, and determinism; undo in one step; a frame before and after.
 
 ## Notes

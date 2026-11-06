@@ -25,11 +25,11 @@ A character is not grey: an agent colours faces and named face groups, and sees 
 ## Scope
 
 - **Core:** per-face colour and named face groups on a model mesh, as D-6's *Colour is a material* says. Colours and groups follow a face through `extrude`: walls and caps take the source face's.
-- **Tools:** `define_group(mesh, name, faces)` and `set_colour(mesh, faces | group, colour)`, with `colour` as linear `[r, g, b]` from 0 to 1. `get_mesh` reports both.
+- **Tools:** `define_group(mesh, name, faces)` and `set_colour(mesh, faces | group, colour)`, with `colour` as sRGB hex, `#RRGGBB`, kept as given and converted to linear for drawing and export. `get_mesh` reports both.
 - **Render:** a submesh and material per colour. An uncoloured model draws exactly as it does today.
 - **Export:** a material per colour with metallic 0 and roughness 1, on T-16's static path.
 - **Sample:** the crate with coloured frame and panels, in `scenario-crate`, added as new frames beside the old ones.
-- **Tests:** `unit` for colour through `extrude` and undo; `Parse` of the export for base colours by submesh; a pixel check of each colour in a frame.
+- **Tests:** `unit` for colour through `extrude` and undo, the sRGB to linear conversion against known values, and a malformed hex refused; `Parse` of the export for base colours by submesh; a pixel check of each colour in a frame.
 
 ## Notes
 

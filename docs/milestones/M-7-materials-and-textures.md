@@ -14,7 +14,7 @@ An agent assigns materials per face, with colours and textures, renders the text
 
 Content: a textured sample model imported into a game, and the textures it needs.
 
-**Changed 2026-11-06.** Per-face colour as materials arrives earlier, in [M-16](M-16-a-character-that-moves.md). This milestone keeps textures and any wider material fields.
+**Changed 2026-11-06.** Per-face colour as materials arrives earlier, in [M-16](M-16-a-character-that-moves.md). This milestone keeps textures and any wider material fields, including the per-material metallic and roughness override Orcward wants for armour.
 
 ## Open at planning
 

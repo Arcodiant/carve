@@ -16,7 +16,7 @@ Content: the bones overlay, the weights look, and the gardener with planted faul
 
 Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-export.md), from Orcward's request of 2026-11-06.
 
-**Depends on:** M-16. M-17 and M-18 touch different code and may run side by side, but both change `render`.
+**Depends on:** M-18, in Orcward's order: one shared rig means few bodies to weight at first.
 
 **Order.** T-37 then T-38, beside T-39 then T-40; T-41 last. Stronger model on T-37, Sonnet on the rest.
 
