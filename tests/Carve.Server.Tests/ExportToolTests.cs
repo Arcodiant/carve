@@ -67,9 +67,17 @@ public sealed class ExportToolTests : IDisposable
         var second = Ok(await carve.CallToolAsync("export", """{"path":"out/CUBE.GLB"}"""));
         Assert.StartsWith($"exported CUBE.GLB to {Path.Combine(_root, "out", "CUBE.GLB")} (replaced): 12 triangles", second);
 
-        // export changes nothing: the mesh is the same, and undo still steps back over define_mesh.
+        // export changes nothing: the mesh is the same, and it is not a step on the undo stack.
         Assert.Equal(before, TextOf(await carve.CallToolAsync("get_mesh", "{}")));
-        Assert.Contains("\"undone\":\"define_mesh\"", TextOf(await carve.CallToolAsync("undo", "{}")));
+        Assert.False(IsError(await carve.CallToolAsync("move", """{"faces":[3],"by":[0,0.5,0]}""")));
+        var moved = TextOf(await carve.CallToolAsync("get_mesh", "{}"));
+        Ok(await carve.CallToolAsync("export", """{"path":"out/moved.glb"}"""));
+        Assert.Equal(moved, TextOf(await carve.CallToolAsync("get_mesh", "{}")));
+
+        // undo goes straight back over the move, then finds only the first define_mesh, which it cannot take back.
+        Assert.Contains("\"undone\":\"move\"", TextOf(await carve.CallToolAsync("undo", "{}")));
+        Assert.Equal(before, TextOf(await carve.CallToolAsync("get_mesh", "{}")));
+        Assert.Contains("nothing to undo", Refused(await carve.CallToolAsync("undo", "{}")));
     }
 
     [Fact]
@@ -102,7 +110,9 @@ public sealed class ExportToolTests : IDisposable
 
         var line = Ok(await carve.CallToolAsync("export", """{"path":"open.glb"}"""));
         Assert.Contains(": 1 triangles, 1 material 'carve'", line);
-        Assert.Contains("1 warning(s): ", line);
+        // One lone triangle has three open edges, and each is its own warning.
+        Assert.Contains("; 3 warning(s): ", line);
+        Assert.Contains("edge belongs to only one face", line);
         Assert.True(File.Exists(Path.Combine(_root, "open.glb")));
     }
 
