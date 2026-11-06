@@ -29,6 +29,15 @@ internal static class MeshToolSupport
         return Error($"{tool} failed with {list.Count} problem(s); the current mesh is unchanged:\n" + string.Join("\n", list));
     }
 
+    /// <summary>The <c>path</c> argument of a file tool: its text, or a problem added to <paramref name="errors"/>.</summary>
+    public static string? PathArgument(JsonElement? path, List<string> errors)
+    {
+        if (path is null || path.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null) errors.Add("path: required but missing");
+        else if (path.Value.ValueKind != JsonValueKind.String) errors.Add($"path: expected a string, got {Describe(path.Value)}");
+        else return path.Value.GetString();
+        return null;
+    }
+
     public static float[] Array(Vector3 v) => [v.X, v.Y, v.Z];
 
     /// <summary>The report fields every tool returns: vertices, faces, edges, closed, bounds, warnings.</summary>

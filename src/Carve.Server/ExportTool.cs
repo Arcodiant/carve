@@ -33,6 +33,7 @@ public sealed class ExportTool(ModelStore store)
         + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve', size <x> x <y> x <z> m, "
         + "bounds (<min x, y, z>) to (<max x, y, z>), then any warnings. "
         + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
+        + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
         + "Worked example, writing into a game's content folder (put the game's folder for <game>); the game then loads it as "
         + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
         + ExampleMarker + """{"path":"<game>/Content/models/crate.glb"}""";
