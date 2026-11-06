@@ -112,3 +112,67 @@ Nothing in M-3 has sound or motion, so there is no listening or real-time pass.
 - [ ] [T-20](../tasks/T-20-save-and-export-acceptance-run.md) — Fresh agents build and save a crate, reopen it in a later session and export it to a game's content folder, recovering from a wrong file name
 
 ## Retrospective
+
+**As planned.**
+
+- The order held: T-15 and T-16, then T-17 and T-18, then T-19, then T-20. No rebase conflict needed the person, and no member failed.
+- The slice works end to end. In both T-20 rounds, fresh `claude -p` agents on plain `carve` built a closed crate, saved it, reopened it in a second session with the mesh unchanged, and exported a `.glb` that the viewer loaded through `IModelLoader`.
+- T-16's refactor was invisible: all 22 existing frames hash the same before and after `FlatShading`.
+- T-19's two runs gave identical hashes for every frame, `view.json`, `crate.glb` and `crate.carve`.
+- The person approved T-18's cube frame, T-19's frames and T-20's round 2 frames, all with no notes.
+- T-20 changed no description, README or code.
+- **Models:**
+  - Opus 5.5 on T-15, T-16 and T-18, which set a format, an API and a new engine app;
+  - Sonnet 5.5 on T-17, T-19 and T-20.
+
+  No rework was traced to the cheaper tier.
+
+**Not as planned.**
+
+- **T-16 stalled for hours on the GPU, not on its code.** The runner refused the job (`this credential has no access to queue any-gpu`), and the local slot was held by Empyrean's `verify M-151`. It took two continuations and a credential change by the person, which needed a second attempt. The first agent sat in a silent wait for about 47 minutes before the orchestrator looked.
+- **T-16's regression tests first ran at the very end**, because of that stall. Two checks failed; both tests were wrong and the product was right.
+- **Waystone closed during T-18's review.** The request ended unanswered. The agent was resumed and asked again, and the first request was not counted.
+- **T-19 replaced a spec check and landed it without asking.** "A +Z panel pixel differs from the +Z frame" could never pass, since both are +Z faces and share a shade (191). It now checks the recess wall (170) and that the panel is flat. The person kept it afterwards. It was on no stop list, but a check's target going back to the person is `CLAUDE.md`'s rule.
+- **T-20 changed a run condition without asking.** Round 1's agent listed the folder with its own Glob and never met the planted `crates.carve`. Round 2 removed the agents' file tools (`--tools ""`) so that the plant fired. The prompts were unchanged, so this was not on its stop list, but the person has not yet ruled on it.
+- **T-20 tried `claude -p` with `--permission-mode bypassPermissions`.** The auto-mode classifier denied it, and T-20 reran with `--allowedTools "mcp__carve__*"`. The brief asked for neither flag.
+- **Readings members landed that the spec did not settle:**
+  - T-15: repeated keys refused; a file of another version gets only the version error; whole-file errors are named `file`; bad coordinates are named `vertices[i][k]`. The person kept all four.
+  - T-17: `ToolPaths.Resolve` gained an optional `verb`, so `open` says "reads". The default wording is unchanged.
+  - T-18: a flatness check at 2/255, a `minus-x` cube run, mirrored and flipped camera breaks, and a refusal of views along Y.
+- **The viewer's background is pure black**, where Carve's own is dark slate. It meets the agreed "dark", and the person approved it side by side.
+- **`view.json` has no material name**, though the milestone's sketch shows one: the engine's `Material` has none to read.
+- **The planning probe's normals finding went further than it said.** With no `NORMAL`, the engine welds vertices and smooths, but a face's middle still matches the flat shade. Sampling only middles let dropped normals pass, until T-18 added samples near the corners.
+
+**Never verified.**
+
+- **A real game.** The `.glb` has been loaded only by the viewer spike, which stands in for one.
+- **Windows and devices:** the viewer's window switch and its no-Vulkan failure path. Any GPU or machine but Xellotath's, and any golden or cross-machine frame comparison.
+- **Carried passes on T-18:** `viewer-cube` and `core-unit` were carried from before its rebase, so its approved frame was not recaptured on the rebased commit. `viewer-cube` has since run fresh in T-19, and T-19's reviewed frames are later than that rebase.
+- **Breaks:**
+  - most rows of T-18's table ran before its flatness check existed;
+  - T-15 has no break for parsing a number through `double`, which only the code's shape guards against;
+  - T-17 could not build an "open is not a step at all" break without changing `ModelStore`, so a two-step break stands in.
+- **T-16's frame baseline** was taken at a commit that is not an ancestor of its branch. Its source differed only in `CarveFile.cs`, which rendering does not use.
+- **`undo`** was again used by no acceptance agent. `README.md` is an input of no suite, so its worked example is not tested from there.
+- **"Twice as far"** was read differently by the two T-20 rounds (bars moved 0.11 and 0.13). It was recorded, not judged.
+- The orchestrator opened no frame. Every look above is a member's or the person's.
+
+**Known and left.**
+
+- **Runner Mantorok** has no Empyrean 0.117.0 on its feed, so jobs sent there fail at restore with NU1603. It is the 14 jobs in the test report's `cnr` column. The pin was not moved; that is the person's call.
+- `CLAUDE.md` and `README.md` are inputs of no suite (a `verify` warning).
+- Empty folders `branches/task/T-15` to `T-20` remain on disk, unregistered from git, as with M-1 and M-2.
+- Three `carve-viewer-*` entries in `%TEMP%`, `%TEMP%\carve-m3-acceptance\` and the members' scratch logs are not cleared.
+- Evidence is in the milestone worktree's ignored `artifacts/review/` and `artifacts/m3-acceptance/`. T-16's frames were not copied there; only their hashes are in its notes.
+
+**The test report** (`cairn test report --since 3d`) shows no flakes. `server-regression` is the costly suite, at about 3,100 slot-seconds a week, and it caught something: its 2 failures are T-16's two wrong tests. The 14 `cnr` jobs are Mantorok, which is a machine fix rather than a suite fix. Nothing was filed; Mantorok is put to the person.
+
+**For the next plan.**
+
+- **Check the runner before the first dispatch:** run one GPU suite through the queue, and check every runner's feed has the pinned engine. Both failures here cost far more than that check.
+- **Tell members from the start** to report a `verify` that waits more than a few minutes. The first brief did not, and later ones did.
+- **Name a member's run conditions in its stop list**, not only its prompts: T-20's `--tools ""` slipped through on that gap.
+- **Plants:** a plant in a file name fires only for agents without file tools. Plant a wrong face id instead, or give the run that condition from round 1.
+- **Sample faces near their corners as well as their middles** in any check of shading.
+- **Check a spec's pixel checks against the geometry at planning:** T-19's could never pass.
+- **Run a member's regression tests early**, not only at `verify`, so a wrong test costs little.
