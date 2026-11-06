@@ -5,3 +5,4 @@
 - T-17: An agent saves its mesh to a .carve file and opens it again in a later session, with a worked example from an empty file to a game's content folder
 - T-18: A headless viewer spike loads a .glb from a content folder through IModelLoader, as a game does, and captures it from fixed views
 - T-19: The export scenario saves, reopens and exports the crate into a game content folder, and the viewer shows it in its own suite
+- T-20: Fresh agents build and save a crate, reopen it in a later session and export it to a game's content folder, recovering from a wrong file name
