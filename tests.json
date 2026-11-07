@@ -99,6 +99,28 @@
       "est-seconds": 15
     },
     {
+      "id": "scenario-shed",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 shed -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "samples/leaky-shed.carve",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
+    },
+    {
       "id": "scenario-export",
       "tier": "regression",
       "build": "solution",
