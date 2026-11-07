@@ -82,7 +82,7 @@ An agent asks "all faces above y = 10" or "all unattached vertices" with one cal
 
 ### As built
 
-Implemented on Opus 5.5 (model id `claude-opus-5-5`). `src/Carve.Core/MeshQuery.cs`, `src/Carve.Server/SelectTool.cs`, one entry in `Program.cs`'s `WithTools`; 161 tests in `MeshQueryTests`, 44 in `SelectToolTests`. `move`, `extrude`, `MeshReport.cs`, `MeshToolSupport.cs` and `TestMeshes.cs` are untouched.
+Implemented on Opus 5.5 (model id `claude-opus-5-5`). `src/Carve.Core/MeshQuery.cs`, `src/Carve.Server/SelectTool.cs`, one entry in `Program.cs`'s `WithTools`; 161 tests in `MeshQueryTests`, 44 in `SelectToolTests`. `move`, `extrude`, `MeshReport.cs`, `MeshToolSupport.cs` and `TestMeshes.cs` are untouched. M-4's refactor pass moved `SelectTool`'s required-string reader into `MeshToolSupport.RequiredString`, which `PathArguments` now uses too; the error texts are unchanged.
 
 **For T-27 and T-28: the interface.** The grammar and the property table are the Scope's, with nothing added. The result is `{"kind":K,K:[...],"count":n,"of":m}`, key order as written, `K` being `vertices`, `edges` or `faces`; edges are `[lo, hi]` by lo then hi. A refused call's text is `select failed with N problem(s); the current mesh is unchanged:` then one problem per line; no mesh is `select: there is no mesh yet; call define_mesh first, or open to read a saved .carve file`.
 

@@ -54,11 +54,26 @@ internal static class MeshToolSupport
     public static CallToolResult? PathArguments(string tool, RequestContext<CallToolRequestParams> context, JsonElement? path, out string? text)
     {
         var errors = UnknownArguments(tool, context, "path");
-        text = null;
-        if (Absent(path)) errors.Add("path: required but missing");
-        else if (path!.Value.ValueKind != JsonValueKind.String) errors.Add($"path: expected a string, got {Describe(path.Value)}");
-        else text = path.Value.GetString();
+        text = RequiredString("path", path, errors);
         return errors.Count > 0 ? Failed(tool, errors) : null;
+    }
+
+    /// <summary>A required string argument; null, with the problem added to <paramref name="errors"/>, when it is missing or not a string.</summary>
+    public static string? RequiredString(string name, JsonElement? value, List<string> errors)
+    {
+        if (Absent(value))
+        {
+            errors.Add($"{name}: required but missing");
+            return null;
+        }
+
+        if (value!.Value.ValueKind != JsonValueKind.String)
+        {
+            errors.Add($"{name}: expected a string, got {Describe(value.Value)}");
+            return null;
+        }
+
+        return value.Value.GetString();
     }
 
     public static float[] Array(Vector3 v) => [v.X, v.Y, v.Z];

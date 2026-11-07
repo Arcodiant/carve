@@ -294,10 +294,10 @@ internal static class RenderTool
     private sealed record Tile(string? View, double[]? Direction, double Zoom, double[]? Target)
     {
         /// <summary>Taken in the mesh's own precision (float), so a target typed as the reported bound is inside (B-1).</summary>
-        public Vector3? TargetVector => Target is null ? null : new Vector3((float)Target[0], (float)Target[1], (float)Target[2]);
+        public Vector3? TargetVector => Target is null ? null : Vector(Target);
 
         public CameraSpec Camera => new(
-            Direction is { } d ? new Vector3((float)d[0], (float)d[1], (float)d[2]) : ViewFraming.NamedViews[View ?? "front"],
+            Direction is { } d ? Vector(d) : ViewFraming.NamedViews[View ?? "front"],
             (float)Zoom,
             TargetVector);
 
@@ -333,7 +333,7 @@ internal static class RenderTool
                 return "direction: must be three finite numbers [x, y, z].";
             }
 
-            var length = new Vector3((float)direction[0], (float)direction[1], (float)direction[2]).Length();
+            var length = Vector(direction).Length();
             if (!float.IsFinite(length) || length < 1e-20f)
             {
                 return "direction: must not be zero, and must be a usable size.";
@@ -467,9 +467,7 @@ internal static class RenderTool
 
         AddLookParts(parts, projection, look, labels, highlight);
         AddZoomAndTarget(parts, zoom, target);
-        parts.Add($"{frame.Vertices} vertices");
-        parts.Add($"{frame.Faces} faces");
-        return string.Join(", ", parts);
+        return WithCounts(parts, frame);
     }
 
     /// <summary>
@@ -481,6 +479,12 @@ internal static class RenderTool
         var parts = new List<string> { $"{columns}x{SheetComposer.Rows(tiles.Count, columns)} tiles of {frame.Pixels.Width}x{frame.Pixels.Height}" };
         AddLookParts(parts, projection, look, labels, highlight);
         parts.Add($"views {string.Join(", ", tiles.Select(t => t.Caption))}");
+        return WithCounts(parts, frame);
+    }
+
+    /// <summary>The caption's parts closed by the counts, joined.</summary>
+    private static string WithCounts(List<string> parts, RenderedFrame frame)
+    {
         parts.Add($"{frame.Vertices} vertices");
         parts.Add($"{frame.Faces} faces");
         return string.Join(", ", parts);
@@ -525,11 +529,12 @@ internal static class RenderTool
     /// <summary>The lists of a <c>highlight</c> as given, so that an error can name an entry by its place; empty when absent.</summary>
     private static (List<int> Vertices, List<(int A, int B)> Edges, List<int> Faces) HighlightLists(JsonElement? highlight, List<string> errors)
     {
-        if (highlight is not { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) } value)
+        if (Absent(highlight))
         {
             return ([], [], []);
         }
 
+        var value = highlight!.Value;
         if (value.ValueKind != JsonValueKind.Object)
         {
             errors.Add($"highlight: expected an object with any of vertices, edges and faces, got {Describe(value)}");
@@ -542,10 +547,10 @@ internal static class RenderTool
 
     private static bool Finite3(double[] v) => v.Length == 3 && v.All(double.IsFinite);
 
-    private static string Join(IEnumerable<double> v) =>
-        string.Join(", ", v.Select(x => x.ToString("G", CultureInfo.InvariantCulture)));
+    /// <summary>Three numbers as given, narrowed to the mesh's own precision.</summary>
+    private static Vector3 Vector(double[] v) => new((float)v[0], (float)v[1], (float)v[2]);
 
-    private static string Join(IEnumerable<float> v) =>
+    private static string Join(IEnumerable<double> v) =>
         string.Join(", ", v.Select(x => x.ToString("G", CultureInfo.InvariantCulture)));
 
     // Interim until engine need 2: the engine encodes a PNG only into a file (WritePngAsync), so this
