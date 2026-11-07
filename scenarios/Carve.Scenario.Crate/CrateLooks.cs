@@ -16,10 +16,10 @@ internal static class CrateLooks
 {
     private const int Size = 512;
 
-    private static readonly Vector3 CrateMin = new(-0.02f, 0, 0);
-    private static readonly Vector3 CrateMax = new(1.02f, 0.8f, 1);
-    private static readonly Vector3 Front = new(1.6f, 1.2f, 2.2f);
-    private static readonly Vector3 Tilted = new(0.4f, 2, 0.8f);
+    internal static readonly Vector3 CrateMin = new(-0.02f, 0, 0);
+    internal static readonly Vector3 CrateMax = new(1.02f, 0.8f, 1);
+    internal static readonly Vector3 Front = new(1.6f, 1.2f, 2.2f);
+    internal static readonly Vector3 Tilted = new(0.4f, 2, 0.8f);
 
     // Linear values as the task gives them, and how each looks in a frame.
     private static readonly (int R, int G, int B) Fill = Srgb(0.09, 0.095, 0.10);
@@ -51,7 +51,7 @@ internal static class CrateLooks
     /// <summary>The flat colours are within this of the sRGB value; a line pixel partly covers its neighbours.</summary>
     private const int Exact = 2;
 
-    private sealed record Shape(Vector3[] Vertices, int[][] Faces)
+    internal sealed record Shape(Vector3[] Vertices, int[][] Faces)
     {
         public Vector3 Centre(int face) => Faces[face].Aggregate(Vector3.Zero, (sum, v) => sum + Vertices[v]) / Faces[face].Length;
 
@@ -61,10 +61,12 @@ internal static class CrateLooks
 
         public int Find(Func<Vector3, bool> every) => Enumerable.Range(0, Faces.Length).Single(f => Faces[f].All(v => every(Vertices[v])));
 
+        public int Vertex(Func<Vector3, bool> at) => Enumerable.Range(0, Vertices.Length).Single(v => at(Vertices[v]));
+
         public int[] FindAll(Func<Vector3, bool> every) => Enumerable.Range(0, Faces.Length).Where(f => Faces[f].All(v => every(Vertices[v]))).ToArray();
     }
 
-    public static async Task RunAsync(ScenarioDriver driver, ScenarioFrame shadedFront)
+    public static async Task RunAsync(ScenarioDriver driver, ScenarioFrame shadedFront, ScenarioFrame shadedTilted)
     {
         var crate = await ReadAsync(driver);
         var frontPixel = Perspective(CrateMin, CrateMax, Front, Size);
@@ -176,6 +178,9 @@ internal static class CrateLooks
         var shadedAgain = await driver.CaptureAsync("crate-front-after-looks", new { view = "front" });
         driver.AssertBytesEqual("crate front, after the looks and their errors", shadedFront.Pixels, shadedAgain.Pixels);
 
+        // ---- labels and sheets, while the mesh is still the crate ----
+        await CrateLabels.RunAsync(driver, crate, shadedFront, shadedTilted);
+
         // ---- the cube, normals, back ----
         await DefineAsync(driver);
         var cube = await ReadAsync(driver);
@@ -209,7 +214,7 @@ internal static class CrateLooks
         return (Encode(r), Encode(g), Encode(b));
     }
 
-    private static void CheckCaption(ScenarioDriver driver, ScenarioFrame frame, string expected)
+    internal static void CheckCaption(ScenarioDriver driver, ScenarioFrame frame, string expected)
     {
         if (frame.Caption != expected)
         {

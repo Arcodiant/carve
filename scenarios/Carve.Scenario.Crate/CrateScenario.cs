@@ -109,6 +109,6 @@ public sealed class CrateScenario : IScenario
         driver.AssertBytesEqual("crate front, after two failed extrudes", redone.Pixels, afterErrors.Pixels);
 
         // 5. The looks, last, so that every frame above stays as it was; the cube's frame closes the run.
-        await CrateLooks.RunAsync(driver, front);
+        await CrateLooks.RunAsync(driver, front, tilted);
     }
 }

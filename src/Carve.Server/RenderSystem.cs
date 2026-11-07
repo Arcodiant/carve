@@ -15,6 +15,7 @@ internal sealed class RenderSystem(
     IGraphicsResourceManager resources,
     IOffscreenRenderer renderer,
     IRenderTargetReadback readback,
+    IImmediateSurfaceRegistry surfaces,
     RenderComposition composition,
     RenderQueue queue,
     ModelStore store,
@@ -37,6 +38,8 @@ internal sealed class RenderSystem(
     private MeshReport? _report;
     private Vector3 _drawnHalf;
     private DrawnSpace _space;
+    private ViewFrame? _frame;
+    private bool _composed;
     private RenderPump? _pump;
 
     public void Initialise()
@@ -205,6 +208,7 @@ internal sealed class RenderSystem(
         var camera = spec.Camera;
         var drawn = camera.Target is { } target ? camera with { Target = _space.Apply(target) } : camera;
         var frame = ViewFraming.Frame(_drawnHalf, drawn, spec.Projection);
+        _frame = frame;
         foreach (var entity in _cameras)
         {
             entities.GetOrAddComponent<WorldTransform>(entity) = new WorldTransform { Matrix = frame.World };
@@ -214,6 +218,48 @@ internal sealed class RenderSystem(
         entities.GetComponent<Transform3D>(_light).Orientation = frame.LightOrientation;
     }
 
+    /// <summary>Queues what this frame writes on the image, for the next <c>RenderFrame</c> to draw and drain; a plain render queues nothing.</summary>
+    private void DrawOverlay(RenderSpec spec)
+    {
+        if (spec.Labels == LabelSet.None && spec.TileCaption is null)
+        {
+            return;
+        }
+
+        // A tagged surface exists once the host has composed, which a headless host does on its first
+        // frame. Only an overlay needs it, so a render with none never draws an extra frame.
+        if (!_composed)
+        {
+            renderer.RenderFrame();
+            _composed = true;
+        }
+
+        var surface = surfaces.Get(RenderComposition.LabelTag(spec.Size));
+        Vector2 Measure(string text) => surface.Text.MeasureText(text, 1);
+
+        var labels = LabelLayout.Plan(_shown!, _space, _frame!, spec.Camera.Direction, spec.Projection, spec.Labels, spec.Size, Measure);
+        foreach (var label in labels)
+        {
+            Draw(surface, label);
+        }
+
+        if (spec.TileCaption is { } caption)
+        {
+            Draw(surface, LabelLayout.Caption(caption, Measure));
+        }
+    }
+
+    private static void Draw(IImmediateSurface surface, OverlayLabel label)
+    {
+        if (label.Dot is { } dot)
+        {
+            surface.Primitives.DrawCircle(dot, LabelLayout.DotRadius, LabelLayout.TextColour);
+        }
+
+        surface.Primitives.DrawRect(label.Backing, LabelLayout.BackingColour);
+        surface.Text.DrawText(label.Text, label.TextAt, LabelLayout.TextColour);
+    }
+
     public void Render(RenderRequest request)
     {
         try
@@ -221,9 +267,12 @@ internal sealed class RenderSystem(
             var vertices = _report!.VertexCount;
             var faces = _report.FaceCount;
 
+            DrawOverlay(request.Spec);
+
             // Complete by the time RenderFrame returns; the continuation runs on the thread pool.
             var read = readback.ReadAsync(composition.Target(request.Spec.Size));
             renderer.RenderFrame();
+            _composed = true;
             _ = read.ContinueWith(
                 task =>
                 {
