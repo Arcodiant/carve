@@ -146,3 +146,92 @@ Nothing in M-4 has sound or motion, so there is no listening or real-time pass.
 - [ ] [T-28](../tasks/T-28-ask-the-mesh-acceptance-run.md) — Fresh agents open the leaky shed, find its faults with check and select, act on a selection and read labelled renders, recovering from a wrong edge
 
 ## Retrospective
+
+**As planned.**
+
+- The order held: T-22, T-23 and T-24 side by side, then T-25, T-26, T-27 and T-28 in sequence. T-22's one rebase conflict (`Program.cs`'s tool list, against T-23) was resolved by the member as planned. No member needed a hand-off, and none failed `verify`.
+- Checking the runner before the first dispatch, as M-3's retrospective asked, worked: `scenario-cube` passed through the queue on Mantorok in 8 s, and the feed had 0.119.0. Jobs then ran on both Mantorok and Xellotath with no restore failure.
+- The engine held. T-25's probe found that the unlit path applies per-vertex colours and that line lists draw headless; T-26's found that the tagged immediate surface draws text into the resolved target. No engine need was recorded (D-1's *Render modes* says so).
+- Every existing frame stayed byte-identical by hash through every render member: 22 at T-24, 29 at T-25, 35 at T-26, 53 at T-27 (cube and crate).
+- T-27's two clean runs gave identical hashes for all 10 shed frames, and the queued `verify` run matched them.
+- The person approved T-24's, T-25's, T-26's and T-27's frames, and T-28's round 2 sheet and back view.
+- The milestone's `verify` passes every check but `review` (7/7 members merged, 8 suites).
+- **Models:**
+  - Opus 5.5 on T-22, T-23, T-24, T-25, and T-26 (moved from Sonnet, below);
+  - Sonnet 5.5 on T-27 and T-28.
+
+  No rework was traced to the cheaper tier. T-27's stops were all spec faults, each found from the geometry before any code.
+
+**Not as planned.**
+
+- **The order went against the person's earlier ruling.** The milestone and M-16 both recorded (2026-11-06) that M-16 to M-19 run ahead of M-4. They were still Planned; M-4 was started on the person's request of 2026-11-07, flagged in the opening table but not asked. So T-24 and T-25 rebased onto no character `render` arguments, and M-16 to M-19 will rebase onto M-4's.
+- **The spec could not be met as written in eleven places.** Each was put to the person and ruled on 2026-11-07, all on the recommended option:
+  - T-23: the duplicated door is also found by non-manifold and winding warnings on its four edges (`MeshReport` may not change, and any layout of a joined duplicate trips them). The shed is 4 x 3.9 x 3, not 3.5, so the chimney clears the ridge for T-27's `min.y >= 3.6`.
+  - T-24: the L-block `-y` check could not pass (that L lies in XY); a second L in XZ was added.
+  - T-25: the specified 1.004 wireframe scale pushed concave edges into the wall. Edges are lifted 0.004 along their faces' mean normal instead, and the milestone's Wireframe line was corrected.
+  - T-26: the six-tile sheet is 772 x 514, not 770. The side label's 60/255 could not pass on the unlit +Z frame. The bar check in the `+x`/`+y` tiles could not pass and became tile-equals-its-render. Long captions are cut at the tile edge.
+  - T-27:
+    - `faces where normal.y > 0.5` also returns the inside-out chimney's underside (14), and both are asserted.
+    - The flipped -X wall is drawn and labelled from `front`, seen from inside through the roof gap, and culled only in the `-x` tile.
+    - The remaining roof slope is back-facing from `front`, so the normals frame asserts the visible faces.
+    - The select steps use `y` (there is no `centre`), with the operator error at character 3.
+    - The door in the `+z` tile is the wall's shade, so the tile asserts wall shade there plus the chimney and the gap.
+  - M-3's rule "check a spec's pixel checks against the geometry at planning" was not applied at M-4's planning, and almost every one of these was a hand calculation away.
+- **T-26 moved from Sonnet to Opus.** Its probe failed on the first try through a misread doc (a headless host composes on the first `RenderFrame()`), not an engine fault. The plan's rule ("Sonnet if the probe passes on the first try") was followed literally. The Sonnet agent's 20 calls were spent; its probe finding was handed on.
+- **T-28's acceptance criterion was amended.** The agents in rounds 1 and 2 read the `move` error correctly (3 and 9 are not an edge) and declined to guess another edge, asking instead. Round 3's description told agents to substitute the best-fitting edge, and that agent avoided the plant altogether. The person ruled round 2 the accepted round, counting an understood error and a refusal to guess as recovery, and had round 3's sentence reverted. B-2 (`move`'s error should point to `select`) is filed outside M-4.
+- **T-28's run conditions** needed `--mcp-config .mcp.json` beside `--strict-mcp-config`, and the prompt on stdin (the variadic `--allowedTools` swallowed it). The person accepted both, and they are in T-28's Scope as the run conditions for acceptance runs.
+- **Readings members landed that the spec did not settle** (none was on a stop list):
+  - T-22:
+    - a nesting limit of 200 (a deep `(` run would overflow the stack and end the server);
+    - six added error wordings;
+    - a literal beyond float range is refused, and one too small narrows to 0;
+    - `QueryResult.ErrorsFor(kind)`;
+    - a flag error points at the flag;
+    - `kind` is exact-case, and `y==1andx<2` does not parse.
+  - T-24: the spec's "zoom 3 shrinks the projected size" contradicts its own "`zoom` divides `h`". The member tested the latter, and the person's reply did not address it.
+  - T-24 added two corner frames, since a cube head-on and the hexagon frame cannot show a mirror.
+  - T-25:
+    - mode and highlight come before zoom and target in the caption;
+    - unknown keys in `highlight` are ignored, so a typo (`face`) highlights nothing;
+    - "the lid's recessed panel faces" includes its four walls.
+  - T-23: `samples/.gitattributes` pins LF, and "on the bounds" counts as inside.
+  - T-25 and T-26 made `MeshEdits.UnknownElements` and `MeshToolSupport.Ordinal`/`Absent` public, outside their owned files.
+- **Evidence lost.** T-27 kept its review frames and `breaks.log` in its own worktree's `artifacts/`, which `finish` emptied, not in the milestone's as its brief said. Only its As built tables and the frame hashes in its notes remain.
+- **A stale guard.** A guard early in T-26 compared stale frames, because `cairn test artifacts` returns the last queued job, not a local run. T-26 redid it on the right runs.
+
+**Never verified.**
+
+- **Checks seen to fail only behind another:**
+  - T-24: `CheckMarginSquare` and the 330/120 degree samples.
+  - T-25: the corner checks and later samples per face.
+  - T-26: the checks listed in its As built.
+  - T-27: the stray-vertex absence, door-equals-wall shade, gutters, captions, `-x` culled-wall pixels and the orange eave pixel. T-27's `move` error check looks only for the digits 3 and 9.
+- **Not run under breaks:** the regression tests (T-24, T-25) and the hash guard (T-26). No mirrored or flipped camera was run against the product in T-27; it was only reasoned from the ray test.
+- **Sizes and looks:**
+  - No look was rendered at 1024. Looks were checked at 512 perspective only, plus one 256 orthographic caption test.
+  - `highlight` on vertices and edges, and on a sheet's pixels, is untested, and no scenario frame shows a labelled sheet.
+  - No acceptance agent used `highlight` or `undo`.
+- **Acceptance:** the reverted `move` text matches round 2 as run, but no fresh session ran on it after the revert. B-2's effect is untried.
+- **T-22:** "select leaves the version unchanged" rests on undo through the client and a source check, not on the version. Its nesting-limit break did not separate a crash from a message mismatch.
+- **The installed carve:** `C:\tools\carve` is the 2026-11-05 snapshot, with no `select`, `check` or new `render` arguments, until it is re-published after the merge to `main`.
+- **Machines:** any GPU but the two RTX 5070 machines (Mantorok, Xellotath), and any cross-machine frame comparison.
+- The orchestrator opened no frame. Every look above is a member's or the person's.
+
+**Known and left.**
+
+- B-2: `move`'s non-edge error does not point to `select`.
+- `CLAUDE.md`, `README.md` and `samples/.gitattributes` are inputs of no suite (a `verify` warning).
+- Empty folders `branches/task/T-22` to `T-28` remain on disk, unregistered from git.
+- `%TEMP%\carve-m4-acceptance\` (three rounds and a Release publish of `carve`) and the members' scratch files in `%TEMP%` are not cleared.
+- Evidence is in the milestone worktree's ignored `artifacts/review/` (T-22, T-24, T-25, T-26, T-28) and `artifacts/m4-acceptance/round-1` to `round-3`.
+
+**The test report** (`cairn test report --since 1d`) shows no flakes. `server-regression` is the costly suite, at about 36,000 slot-seconds a week over the window, with 1 failure and 1 unique catch. 27 jobs across the suites are `cnr` (never ran). Their cause was not looked into; members' deliberate breaks, one of which did not compile, are the likely source. Nothing was filed.
+
+**For the next plan.**
+
+- **Work every pixel check and every query against the geometry at planning**, by hand or with a throwaway Core test on the sample. Eleven spec faults here cost a stop each, and T-27 alone stopped three times.
+- **Say what a failure is** in a rule like "the cheaper model if the probe passes on the first try". Here a misread doc counted and cost a dispatch.
+- **Give each member's evidence folder in its brief as the milestone's absolute path, and check it after `finish`.** T-27 lost its evidence though the brief said where.
+- **Acceptance plants:** an agent that meets a wrong id asks rather than guesses, and a description that tells it to guess makes it avoid the plant. Judge recovery by the error being understood, or plant something the agent can fix without guessing the person's intent.
+- **Ask before running against a recorded ordering ruling.** M-16 to M-19's order was flagged, not asked.
+- Re-publish `C:\tools\carve` after `main` moves.
