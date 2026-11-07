@@ -367,6 +367,17 @@ public class RenderTests
         Assert.Contains("back", description);
         Assert.Contains("MISSING", description);
         Assert.Contains("EMPTY", description);
+        Assert.Contains("'labels'", description);
+        Assert.Contains("Only what faces the camera is labelled", description);
+        Assert.Contains("name an edge by its two vertex ids", description);
+        Assert.Contains("a label may sit on a face hidden", description);
+        Assert.Contains("'views'", description);
+        Assert.Contains("'columns'", description);
+        Assert.Contains("the six axis views, orthographic, at 256", description);
+        Assert.Contains("'3x2 tiles of 256x256, orthographic, views +x, -x, +y, -y, +z, -z, 8 vertices, 6 faces'", description);
+        Assert.Contains("fewer than 2 views or more than 6", description);
+        Assert.Contains("columns outside 1 to 3", description);
+        Assert.Contains("views together with view, direction, zoom or target", description);
 
         var view = render.GetProperty("inputSchema").GetProperty("properties").GetProperty("view");
         Assert.Equal(["front", "back", "+x", "-x", "+y", "-y", "+z", "-z"], view.GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
@@ -664,5 +675,166 @@ public class RenderTests
         Assert.Equal(["shaded", "wireframe", "normals"], schema.GetProperty("mode").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
         Assert.Equal("object", schema.GetProperty("highlight").GetProperty("type").GetString());
         Assert.Equal(["vertices", "edges", "faces"], schema.GetProperty("highlight").GetProperty("properties").EnumerateObject().Select(p => p.Name));
+    }
+
+    [Theory]
+    [InlineData("""{"labels":"edges"}""", "labels: 'edges' is not a label set; use 'none', 'faces', 'vertices' or 'both'.")]
+    [InlineData("""{"views":["+x"]}""", "views: 1 given; a sheet takes 2 to 6.")]
+    [InlineData("""{"views":[]}""", "views: 0 given; a sheet takes 2 to 6.")]
+    [InlineData("""{"views":["+x","-x","+y","-y","+z","-z","front"]}""", "views: 7 given; a sheet takes 2 to 6.")]
+    [InlineData("""{"views":"+x"}""", "views: expected a list of 2 to 6 views, got")]
+    [InlineData("""{"views":["+x",3]}""", "views: the 2nd listed entry: expected a view name or an object with 'view' or 'direction' and optional 'zoom' and 'target', got 3")]
+    [InlineData("""{"views":["+x","top"]}""", "views: the 2nd listed entry: view: 'top' is not a view")]
+    [InlineData("""{"views":["+x",{"zoom":2}]}""", "views: the 2nd listed entry: expected a view name or an object with 'view' or 'direction' and optional 'zoom' and 'target', got neither")]
+    [InlineData("""{"views":["+x",{"view":"+y","roll":1}]}""", "views: the 2nd listed entry: expected a view name or an object with 'view' or 'direction' and optional 'zoom' and 'target', got 'roll'")]
+    [InlineData("""{"views":["+x",{"view":"+y","direction":[1,0,0]}]}""", "views: the 2nd listed entry: view and direction: give one, not both.")]
+    [InlineData("""{"views":["+x","-x",{"view":"+y","zoom":9}]}""", "views: the 3rd listed entry: zoom: 9 is outside 1 to 8.")]
+    [InlineData("""{"views":["+x","-x",{"view":"+y","zoom":"far"}]}""", "views: the 3rd listed entry: zoom: expected a number")]
+    [InlineData("""{"views":[{"view":"+y","target":[5,0,0]},"-x"]}""", "views: the 1st listed entry: target")]
+    [InlineData("""{"views":[{"view":"+y","target":[0,0]},"-x"]}""", "views: the 1st listed entry: target: must be three finite numbers [x, y, z].")]
+    [InlineData("""{"views":[{"direction":[0,0,0]},"-x"]}""", "views: the 1st listed entry: direction: must not be zero")]
+    [InlineData("""{"views":[{"direction":"up"},"-x"]}""", "views: the 1st listed entry: direction: must be three finite numbers [x, y, z].")]
+    [InlineData("""{"views":["+x","-x"],"columns":4}""", "columns: 4 is outside 1 to 3.")]
+    [InlineData("""{"views":["+x","-x"],"columns":0}""", "columns: 0 is outside 1 to 3.")]
+    [InlineData("""{"views":["+x","-x"],"columns":1.5}""", "columns: 1.5 is outside 1 to 3.")]
+    [InlineData("""{"views":["+x","-x"],"view":"front"}""", "views: not with view, direction, zoom or target")]
+    [InlineData("""{"views":["+x","-x"],"direction":[1,0,0]}""", "views: not with view, direction, zoom or target")]
+    [InlineData("""{"views":["+x","-x"],"zoom":1}""", "views: not with view, direction, zoom or target")]
+    [InlineData("""{"views":["+x","-x"],"target":[0,0,0]}""", "views: not with view, direction, zoom or target")]
+    public async Task Bad_labels_and_views_are_tool_errors(string arguments, string says)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        Assert.Contains(says, ErrorText(await carve.CallToolAsync("render", arguments)));
+    }
+
+    [Fact]
+    public async Task The_captions_of_labels_and_sheets()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        foreach (var (arguments, caption) in new[]
+        {
+            ("""{"labels":"none"}""", "512x512, view front, 8 vertices, 6 faces"),
+            ("""{"labels":"both"}""", "512x512, view front, labels both, 8 vertices, 6 faces"),
+            ("""{"labels":"faces","mode":"wireframe","projection":"orthographic","highlight":{"faces":[1]},"zoom":2,"size":256}""", "256x256, view front, orthographic, wireframe, labels faces, highlight 1 face, zoom 2, 8 vertices, 6 faces"),
+            ("""{"views":["+x","-x","+y","-y","+z","-z"],"projection":"orthographic","size":256}""", "3x2 tiles of 256x256, orthographic, views +x, -x, +y, -y, +z, -z, 8 vertices, 6 faces"),
+            ("""{"views":["front","+x","-x","+y","-y","+z"],"projection":"orthographic","size":256}""", "3x2 tiles of 256x256, orthographic, views front, +x, -x, +y, -y, +z, 8 vertices, 6 faces"),
+            ("""{"views":["front",{"direction":[2,1,1]}],"columns":1,"mode":"wireframe","labels":"faces","size":256,"highlight":{"faces":[1]}}""", "1x2 tiles of 256x256, wireframe, labels faces, highlight 1 face, views front, (2, 1, 1), 8 vertices, 6 faces"),
+            ("""{"views":["front",{"direction":[2,1,1],"zoom":2,"target":[1,0.5,0.5]},{"view":"+x","zoom":3}],"columns":2,"size":256}""", "2x2 tiles of 256x256, views front, (2, 1, 1), zoom 2, target (1, 0.5, 0.5), +x, zoom 3, 8 vertices, 6 faces"),
+        })
+        {
+            Assert.Equal(caption, Caption(await carve.CallToolAsync("render", arguments)));
+        }
+    }
+
+    [Theory]
+    [InlineData("""{"views":["+x","-x","+y","-y","+z","-z"],"size":256}""", 772, 514)]
+    [InlineData("""{"views":["+x","-x","+y","-y"],"size":256,"columns":2}""", 514, 514)]
+    [InlineData("""{"views":["+x","-x"],"size":256}""", 514, 256)]
+    [InlineData("""{"views":["+x","-x"],"size":256,"columns":3}""", 772, 256)]
+    [InlineData("""{"views":["+x","-x","+y"],"size":256,"columns":1}""", 256, 772)]
+    [InlineData("""{"views":["+x","-x"],"size":512,"columns":1}""", 512, 1026)]
+    [InlineData("""{"views":["+x","-x"],"size":1024}""", 2050, 1024)]
+    public async Task A_sheet_is_the_size_its_tiles_make(string arguments, int width, int height)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var image = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", arguments)), ColorComponents.RedGreenBlueAlpha);
+
+        Assert.Equal((width, height), (image.Width, image.Height));
+    }
+
+    [Fact]
+    public async Task Labels_none_is_the_same_render_as_no_labels()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var without = Png(await carve.CallToolAsync("render", """{"size":256}"""));
+        var none = Png(await carve.CallToolAsync("render", """{"size":256,"labels":"none"}"""));
+
+        Assert.Equal(without, none);
+    }
+
+    /// <summary>The first frame of all, labelled: the surface does not exist until a frame has been drawn.</summary>
+    [Fact]
+    public async Task A_first_render_with_labels_draws_them_and_what_follows_is_unmarked()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var labelled = Png(await carve.CallToolAsync("render", """{"labels":"both","size":256}"""));
+        var plain = Png(await carve.CallToolAsync("render", """{"size":256}"""));
+        var again = Png(await carve.CallToolAsync("render", """{"labels":"both","size":256}"""));
+
+        Assert.NotEqual(plain, labelled);
+        Assert.Equal(labelled, again);
+
+        using var fresh = new CarveProcess([]);
+        await fresh.InitializeAsync();
+        await fresh.CallToolAsync("define_mesh", Cube);
+        Assert.Equal(plain, Png(await fresh.CallToolAsync("render", """{"size":256}""")));
+    }
+
+    /// <summary>A sheet's first tile, likewise: its caption needs the surface too.</summary>
+    [Fact]
+    public async Task A_first_render_may_be_a_sheet()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var image = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", """{"views":["+x","-x"],"size":256}""")), ColorComponents.RedGreenBlueAlpha);
+
+        var caption = Enumerable.Range(0, 16 * 16).Select(k => image.Data[(((4 + k / 16) * image.Width) + 4 + k % 16) * 4]);
+        Assert.Contains(caption, red => red >= 250);
+    }
+
+    /// <summary>Labels and the mode reach every tile: each tile differs from the same tile without them, away from its caption.</summary>
+    [Theory]
+    [InlineData("labels", "faces")]
+    [InlineData("mode", "wireframe")]
+    public async Task What_applies_to_a_sheet_applies_to_every_tile(string argument, string value)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var plain = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", """{"views":["front","back"],"size":256}""")), ColorComponents.RedGreenBlueAlpha);
+        var asked = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", $$"""{"views":["front","back"],"size":256,"{{argument}}":"{{value}}"}""")), ColorComponents.RedGreenBlueAlpha);
+
+        foreach (var left in new[] { 0, 258 })
+        {
+            var differ = 0;
+            for (var y = 30; y < 256; y++)
+            for (var x = left; x < left + 256; x++)
+            {
+                var at = (y * plain.Width + x) * 4;
+                differ += plain.Data[at + 1] != asked.Data[at + 1] ? 1 : 0;
+            }
+
+            Assert.True(differ > 100, $"the tile at {left} differs in {differ} pixels");
+        }
+    }
+
+    [Fact]
+    public async Task A_single_render_has_no_tile_caption()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var image = Decode(Png(await carve.CallToolAsync("render", """{"view":"+x","size":256}""")), "single-no-caption", 256);
+
+        AssertBackground(At(image, (6, 8)));
     }
 }

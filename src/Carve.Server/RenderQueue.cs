@@ -15,12 +15,16 @@ internal sealed record RenderSpec(
     CameraSpec Camera,
     Projection Projection = Projection.Perspective,
     int Size = RenderSpec.DefaultSize,
-    Look Mode = Look.Shaded)
+    Look Mode = Look.Shaded,
+    LabelSet Labels = LabelSet.None)
 {
     public const int DefaultSize = 512;
 
     /// <summary>What to pick out. Compared by value, so an equal highlight is not a change of view.</summary>
     public Highlight Highlight { get; init; } = Highlight.None;
+
+    /// <summary>A sheet tile's caption, written on the image; a single render has none.</summary>
+    public string? TileCaption { get; init; }
 }
 
 /// <summary>One asked-for render, waiting for the frame thread.</summary>

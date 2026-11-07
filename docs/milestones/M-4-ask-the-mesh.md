@@ -86,7 +86,7 @@ cube, front, shaded, labels both              the leaky shed, front, labels face
 +----------------------------+                +----------------------------+
 512x512, view front, labels both, 8 vertices, 6 faces  512x512, view front, labels faces, V vertices, F faces
 
-cube, six axis views, orthographic, size 256: 770 x 514
+cube, six axis views, orthographic, size 256: 772 x 514
 +-------------+-------------+-------------+
 |front        |+x           |-x           |
 |             |             |             |

@@ -146,14 +146,14 @@ internal static class MeshToolSupport
         _ => "null",
     };
 
-    private static string Ordinal(int index)
+    public static string Ordinal(int index)
     {
         var n = index + 1;
         var suffix = (n % 100) is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
         return string.Create(CultureInfo.InvariantCulture, $"{n}{suffix}");
     }
 
-    private static bool Absent(JsonElement? v) => v is null || v.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null;
+    public static bool Absent(JsonElement? v) => v is null || v.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null;
 
     /// <summary>An optional list of integer ids; null when absent.</summary>
     public static List<int>? Ids(string name, JsonElement? value, List<string> errors)
