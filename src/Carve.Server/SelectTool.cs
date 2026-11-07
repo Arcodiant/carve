@@ -13,7 +13,7 @@ public sealed class SelectTool(ModelStore store)
         "Asks which vertices, edges or faces of the current mesh match an expression, and returns their ids in the shape the edit tools take. "
         + "It changes nothing: the mesh and undo stay as they were, and the server keeps no selection, so pass the ids on yourself. "
         + "kind is vertices, edges or faces. where is the expression. Both are required.\n"
-        + "The grammar (keywords and names in any case, whitespace free):\n"
+        + "The grammar (keywords and names in any case, whitespace free, though two words still need a break: y==1and x<2 reads, y==1andx<2 does not):\n"
         + "expr := or\n"
         + "or := and ( 'or' and )*\n"
         + "and := not ( 'and' not )*\n"
