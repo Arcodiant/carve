@@ -4,7 +4,7 @@ description: >-
 ---
 # T-28 — Ask-the-mesh acceptance run
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
