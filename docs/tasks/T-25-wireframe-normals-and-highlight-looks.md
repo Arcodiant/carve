@@ -4,7 +4,7 @@ description: >-
 ---
 # T-25 — Wireframe, normals and highlight looks
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
