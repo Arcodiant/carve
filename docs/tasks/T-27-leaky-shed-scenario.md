@@ -56,6 +56,8 @@ Pick sample pixels from the first good run, record them as constants with a comm
 
 ## Notes
 
+- **Ruled by the person, 2026-11-07, on what T-23 found.** The shed is 4 x 3.9 x 3 m, not 3.5: the chimney sits at y 3.6 to 3.9, clear of the 3.5 ridge, so `faces where min.y >= 3.6` stands. `faces where normal.y > 0.5` returns faces 11 and 14, not the slope alone: the inside-out chimney's underside points up, and that is a true finding, so assert both and say why. The door's four edges carry non-manifold and winding warnings as well as `duplicate-face`, so the winding edges are the flipped wall's four and the door's four; T-23's `### As built` names them.
+- **Open from T-23, not ruled.** `front`'s eye is on the +X side, so the flipped -X wall is seen from inside, where its reversed loop faces the camera: by the winding it is drawn, not culled, though nothing has rendered it. This scope's `shed-front-labels-faces` and `shed-front-normals` checks expect it missing. Check them against the geometry first; if they cannot pass, stop and ask.
 - **Decided by the person at planning (2026-11-05):** the leaky shed is the sample; its fault list (T-23); the looks (T-25), labels and sheet (T-26) it is shown in.
 - **Decided at planning on the planner's recommendation:** the step list and the frames above; the shed is opened from the committed sample through `open`, so M-3's `open` is exercised on a file an agent will meet.
 - **Open rules: stop and ask.** Any change to the shed, a tool's behaviour or a look to make a step pass. Any tolerance looser than 10/255 (normals colours ±2). Any golden or cross-machine comparison. A planted fault not found, or found twice: report, do not patch the shed.
