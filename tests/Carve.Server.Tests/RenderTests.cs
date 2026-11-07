@@ -801,16 +801,16 @@ public class RenderTests
 
     /// <summary>Labels and the mode reach every tile: each tile differs from the same tile without them, away from its caption.</summary>
     [Theory]
-    [InlineData(""""labels":"faces"""")]
-    [InlineData(""""mode":"wireframe"""")]
-    public async Task What_applies_to_a_sheet_applies_to_every_tile(string extra)
+    [InlineData("labels", "faces")]
+    [InlineData("mode", "wireframe")]
+    public async Task What_applies_to_a_sheet_applies_to_every_tile(string argument, string value)
     {
         using var carve = new CarveProcess([]);
         await carve.InitializeAsync();
         await carve.CallToolAsync("define_mesh", Cube);
 
         var plain = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", """{"views":["front","back"],"size":256}""")), ColorComponents.RedGreenBlueAlpha);
-        var asked = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", $$"""{"views":["front","back"],"size":256,{{extra}}}""")), ColorComponents.RedGreenBlueAlpha);
+        var asked = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", $$"""{"views":["front","back"],"size":256,"{{argument}}":"{{value}}"}""")), ColorComponents.RedGreenBlueAlpha);
 
         foreach (var left in new[] { 0, 258 })
         {
