@@ -24,7 +24,7 @@ A fresh agent with plain `carve` and no Carve docs finds what is wrong with a me
 
 ## Scope
 
-**The run**, in a scratch folder `%TEMP%\carve-m4-acceptance\round-N\`, outside every Carve `CLAUDE.md`, holding an `.mcp.json` of plain `carve` only (the README's entry) and a copy of `samples/leaky-shed.carve`. One fresh `claude -p` session with `--strict-mcp-config`, no Carve docs, started in that folder, on a fresh carve process. The prompt:
+**The run**, in a scratch folder `%TEMP%\carve-m4-acceptance\round-N\`, outside every Carve `CLAUDE.md`, holding an `.mcp.json` of plain `carve` only (the README's entry) and a copy of `samples/leaky-shed.carve`. One fresh `claude -p` session with `--strict-mcp-config` and `--mcp-config .mcp.json` (strict mode ignores a discovered `.mcp.json`), `--allowedTools "mcp__carve__*"`, no other flag, the exact prompt on stdin (a trailing prompt argument is swallowed by the variadic `--allowedTools`), no Carve docs, started in that folder, on a fresh carve process. These are the run conditions for acceptance runs (accepted by the person, 2026-11-07). The prompt:
 
 > *With the carve tools, open leaky-shed.carve from this folder. It is a small shed that was modelled badly. Run its health check and list every fault you find with the element ids. Then find every open edge with a selection; one open edge runs between vertices 3 and 9, so start by moving that edge up by 0.1. Next move the detached chimney up by 0.5, selecting it by a query rather than typing its ids. Look at the shed with the ids drawn on it from at least two views, including a contact sheet of the six axis views, and tell me which wall is flipped. Finish with check and get_mesh.*
 
@@ -32,7 +32,7 @@ A fresh agent with plain `carve` and no Carve docs finds what is wrong with a me
 
 **Pass means:**
 
-- the agent recovers from the `move` error using the error text alone, and moves a real open edge;
+- the agent recovers from the `move` error using the error text alone: it reads the error, understands that the pair is not an edge, and either moves a real open edge or declines to guess which edge was meant and says so (the person's ruling of 2026-11-07: declining counts);
 - the chimney is moved through a `select` whose result feeds the `move` (the transcript shows both calls with the same ids);
 - `render` is called with `labels` and with `views` of the six axis views;
 - the agent names the -X wall as the flipped one (from `check`'s winding warnings, the normals look or a missing wall in a render; record which);
@@ -62,6 +62,7 @@ How many calls it took, which modes and sizes it chose, and whether it used `und
 - Sonnet is enough.
 - Nothing has sound or motion, so there is no listening or real-time pass.
 - Run `finish` from inside the worktree and leave the folder.
+- **The person's rulings of 2026-11-07, after three rounds:** (1) round 2 is the acceptance round: its agent understood the `move` error from the text alone, and declining to guess the person's meaning counts as recovery (the first pass criterion is amended above); round 3's `move` sentence is reverted and round 2's text put back exactly as it ran; round 3 stays recorded as run, not accepted. (2) The run conditions above (`--mcp-config .mcp.json`, the prompt on stdin) are accepted. (3) A bug is filed outside M-4 for `move`'s non-edge error not pointing to `select`; not fixed here.
 
 ### As built
 
@@ -75,7 +76,9 @@ Written by an agent running on **Sonnet 5.5** (claude-sonnet-5-5). The sessions 
 
 Only `src/Carve.Server/MoveTool.cs` changed (the `Text` sentence about edge pairs); the same fact is stated nowhere else in tool text (`render`'s says only that a bad highlight pair is listed as `move` does).
 
-**Round 3 against the pass list.**
+**Accepted: round 2** (the person's ruling, see Notes). Round 2 against the pass list: recovery as amended (error read, understood, no guess made, said so); chimney by `select faces where min.y > 3.55` giving 12-17, then `move faces [12..17]` with the same ids; `render` with `labels faces` and the six `views`, mode normals; -X wall (face 2) named flipped from `check`'s winding warnings and the missing wall in the -x tile; final `check` the same four problems and 22 warnings, only the size note differing (4 x 3.9 x 3 m to 4 x 4.4 x 3 m); final `get_mesh` kept. Round 2's `move` text is the one now in the code: round 3's was reverted after the ruling.
+
+**Round 3 against the pass list (run, not accepted).**
 - Recover from the `move` error by the error text alone: **not met as written.** The error was seen in rounds 1 and 2 and was understood both times (it names `edges[3-9]` and "is not an edge of the mesh") but led to a question to the person, not a retry. In round 3 the agent never sent the wrong pair, so there was no error to recover from; it moved a real open edge, [8,9], and told the person. This is the planted mistake working in substance but not the literal pass condition. The person should rule on it; the milestone has used its three rounds.
 - Chimney through `select` feeding `move`: met. `select faces where min.y >= 3.6` gave 12-17, `move faces [12..17] by [0,0.5,0]`. (Rounds 1, 2 selected by `vertices where y > 3.55` and `faces where min.y > 3.55`; always a query.)
 - `render` with `labels` and six `views`: met (`views` six axes, orthographic, size 256, labels faces, mode normals), plus a back view and a front view with labels `both`.
@@ -91,4 +94,4 @@ Only `src/Carve.Server/MoveTool.cs` changed (the `Text` sentence about edge pair
 - Agents load tools with ToolSearch first; the descriptions are read there in full.
 - Tool call counts per round, 12, 11, 12, all close to the minimum for the prompt; no wasted retries.
 - The shed's flipped wall was found by every round from `check` alone.
-- Not done because the rounds ran out: D-1 updates, the README section *Asking the mesh*, and the person's review of the final frames (copied to `artifacts/review/T-28/`). They wait for the person's ruling on the recovery criterion.
+- Done after the ruling: D-1 updates, the README section *Asking the mesh*, and the person's review of round 2's sheet and back view (`artifacts/review/T-28/round-2/`; approved 2026-11-07), B-2 filed off-milestone for the move error. They were done after the ruling (below).
