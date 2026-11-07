@@ -41,7 +41,7 @@ The milestone's content is seen end to end through the real tools: the leaky she
    - `shed-front-wireframe`: view front, wireframe: the fill at a wall centre, an edge pixel on the ridge, the missing roof slope shows the far wall's edges through the gap;
    - `shed-front-normals`: view front, normals: the remaining roof slope's pixel is sRGB of `((n + 1) / 2)` for its normal ±2; the flipped wall is missing (the pixel behind it is seen);
    - `shed-open-edges`: view front, shaded, `highlight` with the open-edge selection from step 3: an orange pixel on an eave edge, a grey pixel on the lid of a closed wall;
-   - `shed-axes-sheet`: the six axis views, orthographic, 256, labels none: 770 x 514, gutters, the `+z` tile shows the door (a pixel check on the door's position in that tile), the `-x` tile shows the flipped wall as missing;
+   - `shed-axes-sheet`: the six axis views, orthographic, 256, labels none: 772 x 514, gutters, the `+z` tile shows the door (a pixel check on the door's position in that tile), the `-x` tile shows the flipped wall as missing;
    - `shed-1024-labels-both`: view `[1.6, 1.2, 2.2]`... use `front` at 1024, labels both: the stray vertex at (6, 0, 0) is labelled (it is a vertex on no face, so it is **not** labelled under the front-facing rule; check that it is absent and say so in the description if the rule surprises);
    - `shed-front-after-move`: shaded, after step 4: the chimney's pixel has moved up (a pixel that was chimney is now sky, one above it is now chimney).
 6. **Error path**: `move` with `edges: [[3, 9]]` (not an edge) is a tool error naming the pair; the next `shed-front` capture is byte-identical to the one after step 4.
