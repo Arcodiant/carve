@@ -91,7 +91,7 @@ Built on Sonnet 5.5 (`claude-sonnet-5-5`). No product code changed: `scenarios/C
 | shed-1024-labels-both | `774224f00daebca471d7760fedf2b6da` |
 | shed-front-after-move, shed-front-after-error | `9a02b6a700d44b8ad5d83d639306655d` |
 
-**Second run.** Runs 13 and 14 of the suite's script: all 10 frames equal by hash (`diff` of the two md5 lists empty). A queued `verify` run is a third.
+**Second run.** Runs 13 and 14 of the suite's script: all 10 frames equal by hash (`diff` of the two md5 lists empty). The queued `verify` run's frames (`cairn test artifacts scenario-shed`, a job of this member's own) are equal to them by hash.
 
 **Byte-identical guard.** No product code changed. The cube (20) and crate (33 in this count, 53 frames in all) scenarios were run in this worktree and their frames compared by name with T-26's `verify.md5` (`artifacts/review/T-26/verify/`): all 53 equal (`artifacts/review/T-27/baseline/now.md5`).
 
@@ -106,6 +106,6 @@ Built on Sonnet 5.5 (`claude-sonnet-5-5`). No product code changed: `scenarios/C
 | the sheet's tiles in reverse order | `shed-axes-sheet`: 170, from the `+z` tile's first sample |
 | `open` dropping the last face | `open: faces` 17, `open: warnings`, and 16 more (a first form of the scenario crashed on a missing face id; mended, so all are reported) |
 
-**Not checked, or not seen to fail on its own:** a mirrored or a flipped camera (not broken in the product; the checks are projected from the mesh, but none was run broken); the stray vertex's absence at 1024, the door's shade equal to the wall's, the gutter pixels, the captions (all pass, none run under a break; the sheet break stops at the tile checks only in that it reports every failure, so the gutters and caption passed under it); the `-x` tile's culled-wall pixels under a break; the `move` error text (names 3 and 9, which is weak: the single digits are in much text); `shed-open-edges`' orange eave pixel under a break. No `verify` of the whole project was run before this section; see below for its output.
+**Not checked, or not seen to fail on its own:** a mirrored or a flipped camera (not broken in the product; the checks are projected from the mesh, but none was run broken); the stray vertex's absence at 1024, the door's shade equal to the wall's, the gutter pixels, the captions (all pass, none run under a break; the sheet break stops at the tile checks only in that it reports every failure, so the gutters and caption passed under it); the `-x` tile's culled-wall pixels under a break; the `move` error text (names 3 and 9, which is weak: the single digits are in much text); `shed-open-edges`' orange eave pixel under a break.
 
 **Readings, for the person.** `faces where y > 10` and `y >> 10` replace the spec's `centre.y` (ruled). The labels frames compare the backing at the corner of each label's padding, not its centre, so a letter at the centre cannot hide it. The after-move frame is reframed by the product (the bounds grew to y 4.4), so "a pixel that was chimney is now sky" is asserted at the pixels the new camera shows as sky or chimney, found by the ray test, with the old frame as the other side.
