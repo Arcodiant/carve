@@ -33,7 +33,9 @@ Repeated from RV-14 ("open's description contradicts itself on undo"), answered 
 
 It is still false within a process, and it still contradicts line 17 of the same text ("within a session undo takes the open back to the mesh before it"). `open` calls `store.Push` (`OpenTool.cs:58`), which adds to the history and clears nothing, and `ModelStore.Undo` then steps past it (`src/Carve.Server/ModelStore.cs:62-71`). `ExportScenario.cs:80-86` and `SaveOpenToolTests.cs:54` both undo an `open` back to the earlier mesh. `UndoTool.cs:16` and D-1 have it right. Rubric 1.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in 9b43de4.
 
 ### "A first open in a process cannot be undone" is false after a define_mesh (Minor)
 
@@ -41,7 +43,9 @@ New wording from the fix, in `src/Carve.Server/OpenTool.cs:17` and `README.md:40
 
 `UndoTool.cs:16` and D-1's *Undo and history* say it correctly ("the first mesh a process has"). The rule is right in the fresh-process case the finding was about, but no test calls `undo` straight after `open` in a new process: `A_later_session_opens_what_an_earlier_process_saved` stops at the `move`, so the newly documented tool error has no check of its own. Rubric 1.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in 9b43de4.
 
 ### The fixes left member notes stale (Nit)
 
@@ -52,7 +56,9 @@ The same kind as RV-14's "`### As built` notes went stale in the refactor", this
 - T-15's As built table of every error (from `docs/tasks/T-15-carve-file-in-the-kernel.md:134`) has no row for the new `keys[n]` element. That name is a reading the spec did not settle, and the retrospective's T-15 readings (`docs/milestones/M-3-first-model-in-a-game.md:140`) list neither it nor the `1.0` reading. RV-14's finding named the retrospective as well as As built, and the answer recorded As built only.
 - `docs/tasks/T-19-export-scenario.md:99` lists `CrateBuild`'s members without `CheckFront`, and `:119` lists what the scenario asserts without any pixel check on its frames, the fix to a Minor.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in 9b43de4.
 
 ### The retrospective blames the refactor pass for a gap T-19 made (Nit)
 
@@ -60,25 +66,33 @@ The same kind as RV-14's "`### As built` notes went stale in the refactor", this
 
 Also, RV-14's answer to "The guard's summary leaves out `spikes/`" (`docs/reviews/RV-14-review-of-m-3.md:202`) cites 8c9ff6e, which does not touch that file; only 5b269a0 does.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in 9b43de4.
 
 ### A failed build of the checks leaves no run folder on stdout (Nit)
 
 New in 5b269a0. `scripts/run-export-scenario.ps1:52` is `if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`, with no `Write-Output $folder` and no message of the script's own. Every other failure path prints the folder, and the script's help (`:8`) and `CLAUDE.md:73` say it is the last thing on stdout. By then the scenario and viewer have run and their output exists. Only a run by hand reaches this line, since the suite passes `-NoBuild`. Rubric 1.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in 9b43de4.
 
 ### The engine need 3 citation is not in the rule's form (Nit)
 
 `spikes/Carve.ModelViewer/ViewerSystem.cs:190` cites the need, as RV-14 asked, but as "The engine's Material has no name to report: engine need 3". `CLAUDE.md:213` gives the form `// Interim until engine need N: ...`, and both other sites use it (`src/Carve.Server/EngineThread.cs:70`, `src/Carve.Server/RenderTool.cs:187`). A search for that form misses this one. Rubric 5.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in 9b43de4.
 
 ### The viewer's Carve-code check misses a wider glob (Nit)
 
 `tests/Carve.Server.Tests/ProductReferencesNoExtensionTests.cs:180` matches the literal text `src/Carve.`, `extensions/Carve.` or `scenarios/Carve.`. That catches the link RV-14 described, but `<Compile Include="../../src/**/*.cs" />` holds none of the three, so it would pass while bringing in all of Carve. A `<Reference>` to a built Carve assembly is not looked at either. T-18 says "No Carve code". Rubric 2.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in 9b43de4.
 
 ## Summary
 
