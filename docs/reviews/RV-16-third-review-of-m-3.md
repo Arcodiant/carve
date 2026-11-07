@@ -33,7 +33,9 @@ The same fault as RV-15's "'A first open in a process cannot be undone' is false
 
 RV-15 cited this sentence as having it right. The sentence before it does state the rule, and "so" ties the case to it, which makes this less misleading than the sentence in `open`, but read alone it is the claim RV-15 rated Minor. The condition wanted is that the open is the process's first mesh, which is how `OpenTool.cs:17` puts it. Rubric 1.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in d845d12.
 
 ### "The one exception" leaves out the 100-step limit (Nit)
 
@@ -41,7 +43,9 @@ RV-15 cited this sentence as having it right. The sentence before it does state 
 
 `UndoTool.cs:12` ("The last 100 changes can be undone") and D-1:155 are right and do not say "only", so the two statements that claim to be exhaustive are the ones that are not. It takes more than 100 steps after the open to reach it. Rubric 1.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Fixed in d845d12.
 
 ### The viewer's Carve-code check still misses two common forms (Nit)
 
@@ -52,7 +56,7 @@ Follows RV-15's "The viewer's Carve-code check misses a wider glob". The forms t
 
 Each was added as a case to the existing theories in a scratch copy and failed with `Assert.NotEmpty() Failure: Collection was empty`. The real `Carve.ModelViewer.csproj` has none of these; it holds one `PackageReference`. Rubric 2.
 
-**Outcome:** —
+**Outcome:** skipped: the person decided not to widen the guard further: the real viewer project holds one PackageReference and neither form, and the check would otherwise keep growing against forms nobody uses.
 
 ## Summary
 
