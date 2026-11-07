@@ -9,8 +9,8 @@ internal interface IRenderScene
     /// <summary>Puts this mesh in the scene. If it throws, the scene must not count it as shown.</summary>
     void ShowMesh(PolygonMesh mesh);
 
-    /// <summary>Points the camera and the light for this camera of the mesh shown.</summary>
-    void ApplyView(CameraSpec camera);
+    /// <summary>Points the cameras and the light for this spec of the mesh shown.</summary>
+    void ApplyView(RenderSpec spec);
 
     /// <summary>Draws the mesh shown and answers the request, whatever happens.</summary>
     void Render(RenderRequest request);
@@ -29,7 +29,7 @@ internal interface IRenderScene
 internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderScene scene)
 {
     private long _version;
-    private CameraSpec _camera = CameraSpec.ForView(RenderView.Front);
+    private RenderSpec _spec = new(CameraSpec.ForView(RenderView.Front));
     private bool _viewApplied = true;
     private string? _meshFault;
     private (Vector3 Min, Vector3 Max)? _shownBounds;
@@ -63,7 +63,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
 
             // The target was checked at the call against the mesh then current; the mesh shown may be a
             // newer one, so it is checked again against that mesh, with the same text.
-            if (next!.Camera.Target is { } target && _shownBounds is { } bounds
+            if (next!.Spec.Camera.Target is { } target && _shownBounds is { } bounds
                 && TargetCheck.Refusal(target, bounds.Min, bounds.Max) is { } refusal)
             {
                 queue.TryTake(out _);
@@ -71,7 +71,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
-            if (next!.Camera != _camera || !_viewApplied)
+            if (next!.Spec != _spec || !_viewApplied)
             {
                 ChangeView(next);
                 return;
@@ -103,7 +103,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
 
         try
         {
-            scene.ApplyView(_camera);
+            scene.ApplyView(_spec);
             _viewApplied = true;
         }
         catch (Exception e)
@@ -118,9 +118,9 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     {
         try
         {
-            _camera = next.Camera;
+            _spec = next.Spec;
             _viewApplied = false;
-            scene.ApplyView(_camera);
+            scene.ApplyView(_spec);
             _viewApplied = true;
         }
         catch (Exception e)
@@ -133,7 +133,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     }
 
     private string ViewFault(Exception e) =>
-        $"The {Name(_camera)} could not be set up: {e.GetBaseException().Message}";
+        $"The {Name(_spec.Camera)} could not be set up: {e.GetBaseException().Message}";
 
     private static string Name(CameraSpec camera) =>
         camera == CameraSpec.ForView(RenderView.Front) ? "front view"

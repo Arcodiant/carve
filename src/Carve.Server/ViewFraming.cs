@@ -9,6 +9,13 @@ public enum RenderView
     Back,
 }
 
+/// <summary>How the camera projects: a game's view, or parallel lines that stay parallel.</summary>
+public enum Projection
+{
+    Perspective,
+    Orthographic,
+}
+
 /// <summary>Where the camera and the light go for one view of the drawn box.</summary>
 /// <param name="Eye">The camera's position.</param>
 /// <param name="World">Camera to world, for the camera's <c>WorldTransform</c>.</param>
@@ -47,6 +54,19 @@ public static class ViewFraming
 
     internal static readonly Vector3 FrontDirection = new(1.6f, 1.2f, 2.2f);
 
+    /// <summary>The names <c>view</c> takes, each with its direction: the two corners, then head-on along each axis.</summary>
+    public static readonly IReadOnlyDictionary<string, Vector3> NamedViews = new Dictionary<string, Vector3>
+    {
+        ["front"] = FrontDirection,
+        ["back"] = -FrontDirection,
+        ["+x"] = Vector3.UnitX,
+        ["-x"] = -Vector3.UnitX,
+        ["+y"] = Vector3.UnitY,
+        ["-y"] = -Vector3.UnitY,
+        ["+z"] = Vector3.UnitZ,
+        ["-z"] = -Vector3.UnitZ,
+    };
+
     /// <summary>The agreed look in the front view: top bright, +Z middling, +X dark.</summary>
     private static readonly Matrix4x4 FrontLight = Matrix4x4.CreateRotationX(-0.9f) * Matrix4x4.CreateRotationY(0.6f);
 
@@ -54,7 +74,11 @@ public static class ViewFraming
 
     /// <param name="half">The drawn box's largest corner: it is centred on the origin, half-diagonal 1.</param>
     /// <param name="camera">The direction, zoom and target (in drawn space).</param>
-    public static ViewFrame Frame(Vector3 half, CameraSpec camera)
+    /// <param name="projection">
+    /// Orthographic keeps the perspective eye, so near and far stay positive, and takes the smallest
+    /// half-height that holds every corner inside the margin; zoom divides that half-height.
+    /// </param>
+    public static ViewFrame Frame(Vector3 half, CameraSpec camera, Projection projection = Projection.Perspective)
     {
         var direction = Vector3.Normalize(camera.Direction);
         var target = camera.Target ?? Vector3.Zero;
@@ -65,6 +89,7 @@ public static class ViewFraming
         // The nearest distance at which each corner is inside the margin. The eye stays outside the
         // bounding sphere, so the near plane is positive whatever the shape.
         var distance = 1.2f;
+        var reach = 0f;
         for (var corner = 0; corner < 8; corner++)
         {
             var offset = new Vector3(
@@ -73,6 +98,7 @@ public static class ViewFraming
                 (corner & 4) == 0 ? -half.Z : half.Z);
             var seen = Vector3.Transform(offset - target, rotation); // Camera space: looking down -Z.
             distance = Math.Max(distance, Math.Max(Math.Abs(seen.X), Math.Abs(seen.Y)) / tangent + seen.Z);
+            reach = Math.Max(reach, Math.Max(Math.Abs(seen.X), Math.Abs(seen.Y)));
         }
 
         // Off centre, the eye is that much further out, so it stays outside the bounding sphere.
@@ -81,11 +107,22 @@ public static class ViewFraming
         var lookAt = Matrix4x4.CreateLookAt(eye, target, up);
         Matrix4x4.Invert(lookAt, out var world);
 
-        // Zoom divides the tangent of half the field of view; it never moves the eye.
-        var fov = camera.Zoom == 1f ? FieldOfViewY : 2 * MathF.Atan(MathF.Tan(FieldOfViewY * 0.5f) / camera.Zoom);
-        var projection = Matrix4x4.CreatePerspectiveFieldOfView(fov, 1f, (distance - 1) * 0.9f, (distance + offCentre + 1) * 1.1f + offCentre);
+        var near = (distance - 1) * 0.9f;
+        var far = (distance + offCentre + 1) * 1.1f + offCentre;
+        Matrix4x4 matrix;
+        if (projection == Projection.Orthographic)
+        {
+            var height = reach / (1 - 2 * Margin) / camera.Zoom;
+            matrix = Matrix4x4.CreateOrthographic(2 * height, 2 * height, near, far);
+        }
+        else
+        {
+            // Zoom divides the tangent of half the field of view; it never moves the eye.
+            var fov = camera.Zoom == 1f ? FieldOfViewY : 2 * MathF.Atan(MathF.Tan(FieldOfViewY * 0.5f) / camera.Zoom);
+            matrix = Matrix4x4.CreatePerspectiveFieldOfView(fov, 1f, near, far);
+        }
 
-        return new ViewFrame(eye, world, lookAt, projection, LightOrientation(direction));
+        return new ViewFrame(eye, world, lookAt, matrix, LightOrientation(direction));
     }
 
     /// <summary>
