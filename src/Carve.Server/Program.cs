@@ -72,7 +72,7 @@ if (!services.Any(d => d.ServiceType == typeof(ITransport)))
 }
 
 services.AddSingleton(RenderTool.Create);
-mcp.WithTools([DefineMeshTool.Create(), MoveTool.Create(), ExtrudeTool.Create(), GetMeshTool.Create(), UndoTool.Create()]);
+mcp.WithTools([DefineMeshTool.Create(), MoveTool.Create(), ExtrudeTool.Create(), GetMeshTool.Create(), UndoTool.Create(), ExportTool.Create(), SaveTool.Create(), OpenTool.Create()]);
 
 services.AddSingleton<EngineStatus>();
 services.AddSingleton<ModelStore>();

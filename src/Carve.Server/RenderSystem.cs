@@ -22,7 +22,8 @@ internal sealed class RenderSystem(
 {
     private const string Scene = "carve";
 
-    private static readonly Vector4 Surface = new(0.72f, 0.72f, 0.70f, 1f);
+    /// <summary>The colour of the model's surface: the one value, <see cref="GlbExport.BaseColor"/>, so the game sees what render shows.</summary>
+    private static readonly Vector4 Surface = GlbExport.BaseColor;
 
     private Entity _light;
     private Entity _camera;

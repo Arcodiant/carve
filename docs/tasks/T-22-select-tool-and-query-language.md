@@ -66,7 +66,7 @@ An agent asks "all faces above y = 10" or "all unattached vertices" with one cal
 
 **Tests:**
 
-- `tests/Carve.Core.Tests/MeshQueryTests.cs`, `unit`: every production, precedence (`a or b and c`, `not a and b`), parentheses, keywords in upper case, every error with its character position, every property and flag of every kind on the cube, the L-block, the crate (`CrateTests.Build()`) and an open box; float comparison (`y == 1.02` on a `1.02f` vertex matches; `y == 1.0199999` does not); `all`, `none`; the result lists are ascending.
+- `tests/Carve.Core.Tests/MeshQueryTests.cs`, `unit`: every production, precedence (`a or b and c`, `not a and b`), parentheses, keywords in upper case, every error with its character position, every property and flag of every kind on the cube, the L-block, the crate (`TestMeshes.Crate()`) and an open box; float comparison (`y == 1.02` on a `1.02f` vertex matches; `y == 1.0199999` does not); `all`, `none`; the result lists are ascending.
 - `tests/Carve.Server.Tests/SelectToolTests.cs`, `regression` (starts `carve`): the worked examples run as written and give the written results; every tool error above; the select-then-move chain through the client, where `move`'s `moved` equals the selection; `tools/list` lists `select` with a closed schema; `select` leaves the version and the undo stack unchanged.
 - **Show each new check failing** on a broken product, as a table: precedence swapped, `not` dropped, comparison in double, edges unordered, a flag accepted in a comparison, `of` counting the wrong kind.
 

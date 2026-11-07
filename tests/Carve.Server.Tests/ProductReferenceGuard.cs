@@ -16,7 +16,7 @@ internal static partial class ProductReferenceGuard
         "Carve.Extensibility",
     };
 
-    [GeneratedRegex(@"Carve\.Debug|Carve\.Scenario|(^|[\\/])(extensions|scenarios)[\\/]", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"Carve\.Debug|Carve\.Scenario|Carve\.ModelViewer|(^|[\\/])(extensions|scenarios|spikes)[\\/]", RegexOptions.IgnoreCase)]
     private static partial Regex Forbidden();
 
     /// <summary>Every attribute or text value in the project that names something forbidden.</summary>
@@ -29,7 +29,7 @@ internal static partial class ProductReferenceGuard
 
     /// <summary>Every referenced assembly that is an extension, or any Carve assembly not allowed.</summary>
     /// <param name="assemblyPath">The built assembly.</param>
-    /// <param name="extensionAssemblies">Names of projects under extensions/ and scenarios/.</param>
+    /// <param name="extensionAssemblies">Names of projects under extensions/, scenarios/ and spikes/.</param>
     public static IReadOnlyList<string> FindInAssembly(string assemblyPath, IEnumerable<string> extensionAssemblies)
     {
         var extensions = new HashSet<string>(extensionAssemblies, StringComparer.OrdinalIgnoreCase);
@@ -125,9 +125,9 @@ internal static partial class ProductReferenceGuard
             .ToList();
     }
 
-    /// <summary>The assembly names of whatever now lives under extensions/ and scenarios/.</summary>
+    /// <summary>The assembly names of whatever now lives under extensions/, scenarios/ and spikes/.</summary>
     public static IEnumerable<string> ExtensionProjects(string repoRoot) =>
-        new[] { "extensions", "scenarios" }
+        new[] { "extensions", "scenarios", "spikes" }
             .Select(folder => Path.Combine(repoRoot, folder))
             .Where(Directory.Exists)
             .SelectMany(folder => Directory.EnumerateFiles(folder, "*.csproj", SearchOption.AllDirectories))

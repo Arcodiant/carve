@@ -28,7 +28,8 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
-        "scenarios/**/*.csproj"
+        "scenarios/**/*.csproj",
+        "spikes/**/*.csproj"
       ],
       "resources": "cpu",
       "est-seconds": 12
@@ -43,7 +44,8 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
-        "scripts/run-scenario.ps1"
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
       "requires": [
@@ -63,7 +65,8 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
-        "scripts/run-scenario.ps1"
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
       "requires": [
@@ -84,13 +87,63 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
-        "scripts/run-scenario.ps1"
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
       "requires": [
         "vulkan"
       ],
       "est-seconds": 15
+    },
+    {
+      "id": "scenario-export",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-export-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Export/Carve.Scenario.Export.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "spikes/Carve.ModelViewer/Carve.ModelViewer.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.ExportViewer.Tests/Carve.ExportViewer.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "tests/Carve.ModelViewer.Tests/FramePixels.cs",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-viewer.ps1",
+        "scripts/run-export-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 60
+    },
+    {
+      "id": "viewer-cube",
+      "tier": "regression",
+      "build": "solution",
+      "run": "dotnet test tests/Carve.ModelViewer.Tests/Carve.ModelViewer.Tests.csproj -c Debug --no-build",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Carve.ModelViewer.Tests/Carve.ModelViewer.Tests.csproj"
+        },
+        "scripts/run-viewer.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
     }
   ],
   "todo": []

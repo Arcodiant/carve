@@ -4,7 +4,7 @@ description: >-
 ---
 # T-20 — Save and export acceptance run
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -74,3 +74,32 @@ How many calls each session took, and whether it used `undo` or `render`, are re
 - The prompts ask for a final `get_mesh` (M-2's retrospective), so there is a mesh to compare.
 - Nothing has sound or motion, so there is no listening or real-time pass.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Run on **Claude Sonnet 5.5** (`claude-sonnet-5-5`). The `claude -p` sessions ran on Claude Opus 5.5 (`claude-opus-5-5`, from each transcript's init event), with `--strict-mcp-config`, an `.mcp.json` of plain `carve` only (`dotnet run --project` on this worktree) and `--allowedTools "mcp__carve__*"`, from `%TEMP%\carve-m3-acceptance\round-N\` (an empty `game/Content/models/`). Prompts word for word as in the spec. Transcripts, final `get_mesh` results, `crate.carve` after each session, the `.glb` and viewer output (`front`, `minus-x`, `view.json`) are in `D:\Repos\carve\branches\milestone\M-3\artifacts\m3-acceptance\round-N\`; `run-round.sh`, `summarize.py`, `meshcmp.py` are beside them.
+
+**No description, README or code changed.** Only D-1's *Tool shape* question was updated with the run.
+
+| | Round 1 | Round 2 |
+|---|---|---|
+| Run condition | agent has its usual file tools | agent has only the carve tools (`--tools ""`) |
+| Session 1 carve calls | 19 (1 define_mesh, 9 extrude/move edits, 5 renders, 2 get_mesh, 1 save) | 23 (1 define_mesh, 7 extrude, 4 move, 7 render, 3 get_mesh, 1 save) |
+| Session 2 carve calls | 9 | 12 |
+| `undo` | no | no |
+| Planted `crates.carve` | not hit: listed the folder with its own Glob first, then opened `crate.carve` | hit: `open` error `no file at ...crates.carve; the .carve files in ... (1) are: crate.carve`; next call opened `crate.carve` |
+| Session 2 mesh after `open` == session 1 final `get_mesh` | yes (identical text) | yes (identical text) |
+| Edit after `open`, saved | yes: two `move` calls, `save` ... `(replaced)` | yes |
+| `.glb` | `game/Content/models/crate.glb`, 172 triangles | same place, 236 triangles |
+| Viewer | exit 0, frames show a crate | exit 0, frames show a crate (approved by the person) |
+| Final `get_mesh` | 88 v / 86 f, closed, no warnings, bounds x -0.66..0.66 | 120 v / 118 f, closed, no warnings, bounds x -0.71..0.71 |
+
+Round 2 was added because round 1 did not exercise the plant. The change is the run condition only (the agent's built-in file tools removed, which is how an MCP-only client looks); no prompt changed. Both rounds pass; round 1 passes except the plant, which round 2 covers. Paths: round 1 session 2 used absolute paths, round 2 relative ones (`crate.carve`, `game/Content/models/crate.glb`); both worked. No misuse of `replaced` or where the `.glb` goes. Round 1 session 2 read `.mcp.json` (odd, harmless). Each session pays a `ToolSearch` call that is not counted above.
+
+**Hesitations.** None that pointed at a description, so none was sharpened. "Twice as far" was read differently in each round (bars moved by 0.11 and 0.13 on a 0.05 to 0.08 stand-out); recorded, not judged.
+
+**Review.** The person approved (no notes) round 2's viewer `front` and `minus-x` through `mcp__waystone__review`.
+
+**For the retrospective.** The planted mistake only fires when the agent has no file tools; agents with them look first (as in M-2). The plant is cheap to keep but a poor test of the error text for such agents, and the error text is already covered by T-17's tests. Agents never needed `undo` and called `get_mesh` several times when asked to finish with it. Handles are still solid bars (no bridge tool).
+
+**Not checked.** The `.glb` was loaded only by the Carve viewer, not a real game. No window run. A third round was not needed.

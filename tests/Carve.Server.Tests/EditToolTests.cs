@@ -15,23 +15,6 @@ public class EditToolTests
         return (carve, tools);
     }
 
-    private static JsonElement Tool(JsonElement tools, string name) =>
-        tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == name);
-
-    private static string Description(JsonElement tools, string name) => Tool(tools, name).GetProperty("description").GetString()!;
-
-    /// <summary>The cube, parsed out of define_mesh's own description.</summary>
-    private static string Cube(JsonElement tools)
-    {
-        const string marker = "Worked example (a unit cube): ";
-        var text = Description(tools, "define_mesh");
-        return text[(text.IndexOf(marker, StringComparison.Ordinal) + marker.Length)..];
-    }
-
-    /// <summary>The example calls in a description, in order: the rest of each line that starts with "Example: ".</summary>
-    private static string[] Examples(JsonElement tools, string name) =>
-        Description(tools, name).Split('\n').Where(l => l.StartsWith("Example: ", StringComparison.Ordinal)).Select(l => l["Example: ".Length..]).ToArray();
-
     private static JsonElement Ok(JsonElement result)
     {
         Assert.False(CarveProcess.IsError(result), CarveProcess.TextOf(result));

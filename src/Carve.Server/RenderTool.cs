@@ -25,7 +25,7 @@ internal static class RenderTool
     }
 
     private const string Text =
-        "Renders the current mesh, as set by define_mesh and changed by move, extrude or undo, and returns one PNG image of 512x512 pixels followed by one caption line, "
+        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo, and returns one PNG image of 512x512 pixels followed by one caption line, "
         + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
@@ -46,8 +46,8 @@ internal static class RenderTool
         + "Try the other view, or fix the winding and call define_mesh again (move and extrude keep each face's winding, so they cannot fix it). "
         + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a direction of zero or not three finite numbers; "
         + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; an argument render does not take. "
-        + "Calling render before define_mesh is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
-        + "define_mesh, move, extrude, get_mesh and undo still work there.";
+        + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
+        + "define_mesh, open, move, extrude, get_mesh and undo still work there.";
 
     [McpServerTool(Name = "render"), Description(Text)]
     public static async Task<CallToolResult> Run(
@@ -110,7 +110,7 @@ internal static class RenderTool
 
         if (store.Current.Mesh is not { } mesh)
         {
-            return Error("There is no mesh yet: call define_mesh first, then render.");
+            return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
         }
 
         // Taken in the mesh's own precision (float), so a target typed as the reported bound is inside (B-1).

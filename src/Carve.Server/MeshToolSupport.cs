@@ -12,13 +12,16 @@ namespace Carve.Server;
 /// <summary>What the mesh tools share: the report and result JSON, tool errors, raw-argument reading and registration.</summary>
 internal static class MeshToolSupport
 {
-    public const string NoMesh = "there is no mesh yet; call define_mesh first";
+    public const string NoMesh = "there is no mesh yet; call define_mesh first, or open to read a saved .carve file";
 
     /// <summary>Opens each example call in a tool's description; a test parses from here to the end of the line.</summary>
     public const string ExampleMarker = "Example: ";
 
-    public static CallToolResult Ok(object body) =>
-        new() { Content = [new TextContentBlock { Text = JsonSerializer.Serialize(body) }] };
+    /// <summary>A result that is one block of plain text.</summary>
+    public static CallToolResult Line(string text) =>
+        new() { Content = [new TextContentBlock { Text = text }] };
+
+    public static CallToolResult Ok(object body) => Line(JsonSerializer.Serialize(body));
 
     public static CallToolResult Error(string text) =>
         new() { IsError = true, Content = [new TextContentBlock { Text = text }] };
@@ -27,6 +30,35 @@ internal static class MeshToolSupport
     {
         var list = problems.ToList();
         return Error($"{tool} failed with {list.Count} problem(s); the current mesh is unchanged:\n" + string.Join("\n", list));
+    }
+
+    /// <summary>The input schema of a file tool: <c>path</c>, required, and nothing else.</summary>
+    public static JsonObject PathSchema(string description) => new()
+    {
+        ["type"] = "object",
+        ["properties"] = new JsonObject
+        {
+            ["path"] = new JsonObject
+            {
+                ["description"] = description,
+                ["type"] = "string",
+            },
+        },
+        ["required"] = new JsonArray("path"),
+    };
+
+    /// <summary>
+    /// Reads a file tool's arguments, whose one argument is <c>path</c>: null with <paramref name="text"/> set, or the
+    /// failed result naming every problem (an unknown argument, a missing or non-string path).
+    /// </summary>
+    public static CallToolResult? PathArguments(string tool, RequestContext<CallToolRequestParams> context, JsonElement? path, out string? text)
+    {
+        var errors = UnknownArguments(tool, context, "path");
+        text = null;
+        if (Absent(path)) errors.Add("path: required but missing");
+        else if (path!.Value.ValueKind != JsonValueKind.String) errors.Add($"path: expected a string, got {Describe(path.Value)}");
+        else text = path.Value.GetString();
+        return errors.Count > 0 ? Failed(tool, errors) : null;
     }
 
     public static float[] Array(Vector3 v) => [v.X, v.Y, v.Z];

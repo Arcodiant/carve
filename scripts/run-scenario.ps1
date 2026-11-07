@@ -19,7 +19,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 
-function Write-Err([string]$text) { [Console]::Error.WriteLine($text) }
+. (Join-Path $PSScriptRoot 'bounded-run.ps1')
 
 # Matched without regard to case, so it does not rest on a case-insensitive filesystem.
 $scenario = @('scenarios', 'tests') |
@@ -60,41 +60,17 @@ if ($env:CAIRN_ARTIFACTS -and -not ($CarveArguments -match '^--Carve:Debug:RunFo
     $arguments += "--Carve:Debug:RunFolder=$(Join-Path $env:CAIRN_ARTIFACTS $Name.ToLowerInvariant())"
 }
 
-# Start-Process joins its arguments with spaces, so each is quoted here.
-$quoted = $arguments | ForEach-Object { '"' + $_ + '"' }
+$run = Invoke-BoundedDotnet $arguments $root $TimeoutSeconds "run-scenario: $Name still running after $TimeoutSeconds s; stopped"
+$code = $run.Code
+$run.Stderr | ForEach-Object { Write-Err $_ }
 
-$stderr = [IO.Path]::GetTempFileName()
-$stdout = [IO.Path]::GetTempFileName()
-try {
-    $carve = Start-Process dotnet -ArgumentList $quoted -WorkingDirectory $root -NoNewWindow -PassThru `
-        -RedirectStandardError $stderr -RedirectStandardOutput $stdout
-    $null = $carve.Handle # Without this the exit code is lost once the process has gone.
-
-    if ($carve.WaitForExit($TimeoutSeconds * 1000)) {
-        $code = $carve.ExitCode
-    }
-    else {
-        # Only the process this script started.
-        $carve.Kill($true)
-        $carve.WaitForExit()
-        Write-Err "run-scenario: $Name still running after $TimeoutSeconds s; stopped"
-        $code = 124
-    }
-
-    $lines = @(Get-Content $stderr)
-    $lines | ForEach-Object { Write-Err $_ }
-
-    if ((Get-Item $stdout).Length -ne 0) {
-        Write-Err "run-scenario: carve wrote $((Get-Item $stdout).Length) bytes to stdout, which belongs to MCP; it wrote:"
-        Get-Content $stdout | ForEach-Object { Write-Err "  $_" }
-        if ($code -eq 0) { $code = 1 }
-    }
-
-    $folder = $lines | ForEach-Object { if ($_ -match '^carve-debug: run folder (.+)$') { $Matches[1] } } | Select-Object -First 1
-    if ($folder) { Write-Output $folder }
+if ($run.StdoutBytes -ne 0) {
+    Write-Err "run-scenario: carve wrote $($run.StdoutBytes) bytes to stdout, which belongs to MCP; it wrote:"
+    $run.Stdout | ForEach-Object { Write-Err "  $_" }
+    if ($code -eq 0) { $code = 1 }
 }
-finally {
-    Remove-Item $stderr, $stdout -ErrorAction SilentlyContinue
-}
+
+$folder = $run.Stderr | ForEach-Object { if ($_ -match '^carve-debug: run folder (.+)$') { $Matches[1] } } | Select-Object -First 1
+if ($folder) { Write-Output $folder }
 
 exit $code

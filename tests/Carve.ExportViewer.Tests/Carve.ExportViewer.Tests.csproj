@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The check step of suite scenario-export: reads what the viewer made of the exported crate. Run by scripts/run-export-scenario.ps1. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.ExportViewer.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
+    <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+    <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../Carve.ModelViewer.Tests/FramePixels.cs" Link="FramePixels.cs" />
+  </ItemGroup>
+
+</Project>

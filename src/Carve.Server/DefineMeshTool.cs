@@ -20,7 +20,7 @@ public sealed class DefineMeshTool(ModelStore store)
     private const string Text =
         "Defines the model: one polygon mesh, given by vertex coordinates and faces that index them. "
         + "A call REPLACES the current mesh entirely; there is only one mesh, and a call that fails leaves it unchanged. "
-        + "Coordinates are unitless and Y is up. "
+        + "Coordinates are in metres (1 unit = 1 m, as export writes them) and Y is up. "
         + "Each face lists vertex indices (0-based) wound counter-clockwise when seen from outside the solid, "
         + "so the face normal points outward. A face may have any number of sides, three or more; it does not need to be a triangle. "
         + "A face has no holes; build an opening from several faces around it. "
@@ -32,7 +32,7 @@ public sealed class DefineMeshTool(ModelStore store)
         + "Vertex and face ids are the positions given here (vertex 0 is the first in vertices, face 0 the first in faces), and move and extrude keep them; get_mesh reads them back and undo steps back. "
         + ExampleMarker + " " + CubeExample;
 
-    private const string VerticesText = "Vertex positions, each exactly three numbers [x, y, z]. Unitless; Y is up.";
+    private const string VerticesText = "Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.";
     private const string FacesText = "Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.";
 
     /// <summary>
