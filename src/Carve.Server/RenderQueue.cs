@@ -14,9 +14,13 @@ internal sealed record RenderedFrame(RenderTargetPixels Pixels, int Vertices, in
 internal sealed record RenderSpec(
     CameraSpec Camera,
     Projection Projection = Projection.Perspective,
-    int Size = RenderSpec.DefaultSize)
+    int Size = RenderSpec.DefaultSize,
+    Look Mode = Look.Shaded)
 {
     public const int DefaultSize = 512;
+
+    /// <summary>What to pick out. Compared by value, so an equal highlight is not a change of view.</summary>
+    public Highlight Highlight { get; init; } = Highlight.None;
 }
 
 /// <summary>One asked-for render, waiting for the frame thread.</summary>

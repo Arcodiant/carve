@@ -107,5 +107,8 @@ public sealed class CrateScenario : IScenario
         await ExpectToolErrorAsync(driver, "extrude", new { faces = new[] { 99 }, distance = 0.1 }, "99");
         var afterErrors = await driver.CaptureAsync("crate-front-after-errors", new { view = "front" });
         driver.AssertBytesEqual("crate front, after two failed extrudes", redone.Pixels, afterErrors.Pixels);
+
+        // 5. The looks, last, so that every frame above stays as it was; the cube's frame closes the run.
+        await CrateLooks.RunAsync(driver, front);
     }
 }
