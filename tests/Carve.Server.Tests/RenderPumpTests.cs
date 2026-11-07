@@ -301,6 +301,53 @@ public class RenderPumpTests
     }
 
     [Fact]
+    public void A_change_of_mode_alone_is_a_scene_change_drawn_on_a_later_step()
+    {
+        var pump = Started();
+        var front = new RenderSpec(CameraSpec.ForView(RenderView.Front));
+        var wireframe = front with { Mode = Look.Wireframe };
+        _queue.Post(front);
+        pump.Step();
+        _queue.Post(wireframe);
+
+        pump.Step();
+        Assert.Equal(["render Front", $"view {wireframe}"], _scene.Log);
+        pump.Step();
+        Assert.Equal(["render Front", $"view {wireframe}", $"render {wireframe}"], _scene.Log);
+    }
+
+    [Fact]
+    public void A_change_of_highlight_alone_is_a_scene_change_and_an_equal_one_is_not()
+    {
+        var pump = Started();
+        var front = new RenderSpec(CameraSpec.ForView(RenderView.Front));
+        var picked = front with { Highlight = Highlight.Of([], [], [1, 2]) };
+        var same = front with { Highlight = Highlight.Of([], [], [2, 1]) };
+        _queue.Post(front);
+        pump.Step();
+        _queue.Post(picked);
+
+        pump.Step();
+        Assert.Equal(["render Front", $"view {picked}"], _scene.Log);
+        pump.Step();
+        _queue.Post(same);
+        pump.Step();
+        Assert.Equal(["render Front", $"view {picked}", $"render {picked}", $"render {same}"], _scene.Log);
+    }
+
+    [Fact]
+    public void A_highlight_the_shown_mesh_lacks_is_refused_as_at_the_call()
+    {
+        var pump = Started();
+
+        var rendering = _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)) { Highlight = Highlight.Of([], [], [99]) });
+        pump.Step();
+
+        Assert.Contains("faces[99]", FailureOf(rendering));
+        Assert.Empty(_scene.Log);
+    }
+
+    [Fact]
     public void A_change_of_size_alone_changes_the_view()
     {
         var pump = Started();

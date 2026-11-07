@@ -34,6 +34,7 @@
     <Compile Include="../../src/Carve.Server/ViewFraming.cs" Link="ViewFraming.cs" />
     <Compile Include="../../src/Carve.Server/RenderQueue.cs" Link="RenderQueue.cs" />
     <Compile Include="../../src/Carve.Server/RenderPump.cs" Link="RenderPump.cs" />
+    <Compile Include="../../src/Carve.Server/LookMeshes.cs" Link="LookMeshes.cs" />
     <Compile Include="../../src/Carve.Server/TargetCheck.cs" Link="TargetCheck.cs" />
     <Compile Include="../../src/Carve.Server/GlbExport.cs" Link="GlbExport.cs" />
     <Compile Include="../../src/Carve.Server/ToolPaths.cs" Link="ToolPaths.cs" />

@@ -9,7 +9,7 @@ internal interface IRenderScene
     /// <summary>Puts this mesh in the scene. If it throws, the scene must not count it as shown.</summary>
     void ShowMesh(PolygonMesh mesh);
 
-    /// <summary>Points the cameras and the light for this spec of the mesh shown.</summary>
+    /// <summary>Points the cameras and the light for this spec of the mesh shown, and draws its look if that changed.</summary>
     void ApplyView(RenderSpec spec);
 
     /// <summary>Draws the mesh shown and answers the request, whatever happens.</summary>
@@ -33,6 +33,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     private bool _viewApplied = true;
     private string? _meshFault;
     private (Vector3 Min, Vector3 Max)? _shownBounds;
+    private PolygonMesh? _shown;
 
     public void Step()
     {
@@ -71,7 +72,15 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
-            if (next!.Spec != _spec || !_viewApplied)
+            // The same for a highlight: its ids were checked against the mesh of the call.
+            if (_shown is { } shown && next.Spec.Highlight.Unknown(shown) is { Count: > 0 } unknown)
+            {
+                queue.TryTake(out _);
+                next.Fail(new InvalidOperationException(string.Join("; ", unknown)));
+                continue;
+            }
+
+            if (next.Spec != _spec || !_viewApplied)
             {
                 ChangeView(next);
                 return;
@@ -91,6 +100,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             scene.ShowMesh(snapshot.Mesh!);
             var report = MeshReport.Create(snapshot.Mesh!);
             _shownBounds = (report.BoundsMin, report.BoundsMax);
+            _shown = snapshot.Mesh;
             _meshFault = null;
         }
         catch (Exception e)

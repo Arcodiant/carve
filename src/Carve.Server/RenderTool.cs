@@ -2,6 +2,8 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Numerics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -20,8 +22,36 @@ internal static class RenderTool
     {
         var tool = McpServerTool.Create(typeof(RenderTool).GetMethod(nameof(Run))!, target: null,
             new McpServerToolCreateOptions { Services = services });
-        tool.ProtocolTool.InputSchema = Closed(tool.ProtocolTool.InputSchema);
+        var schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!;
+        schema["properties"]!["highlight"] = HighlightSchema();
+        tool.ProtocolTool.InputSchema = Closed(JsonSerializer.SerializeToElement(schema));
         return tool;
+    }
+
+    private static JsonObject HighlightSchema()
+    {
+        static JsonObject Ints() => new() { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "integer" } };
+        return new JsonObject
+        {
+            ["description"] = "What to show in orange, in the shape select returns and move takes; each list optional.",
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["vertices"] = Ints(),
+                ["edges"] = new JsonObject
+                {
+                    ["type"] = "array",
+                    ["items"] = new JsonObject
+                    {
+                        ["type"] = "array",
+                        ["items"] = new JsonObject { ["type"] = "integer" },
+                        ["minItems"] = 2,
+                        ["maxItems"] = 2,
+                    },
+                },
+                ["faces"] = Ints(),
+            },
+        };
     }
 
     private const string Text =
@@ -47,13 +77,25 @@ internal static class RenderTool
         + "The caption says so after the view: '512x512, view +x, orthographic, 8 vertices, 6 faces'. "
         + "'size' is the image's width and height: 256 for a quick look or a sheet tile, 512 (the default), 1024 for a dense mesh with labels. "
         + "The caption opens with it: '256x256, view front, 8 vertices, 6 faces'. "
+        + "'mode' is the look: 'shaded' (the default), 'wireframe' or 'normals'. Neither of the last two depends on the light. "
+        + "'wireframe' draws every edge in light grey over faces filled near black: use it to count and place edges and see the face loops. It is hidden-line, not see-through: "
+        + "an edge behind a face is hidden, so look from another side to see it. "
+        + "'normals' colours each face by the way it faces and stands a light grey spike on its centre along its normal: use it to find a face pointing the wrong way, or a non-planar face, whose spike is off. "
+        + "The colour code, as linear red, green, blue, is (normal + 1) / 2: +X (1, 0.5, 0.5) pink, -X (0, 0.5, 0.5) teal, +Y (0.5, 1, 0.5) green, -Y (0.5, 0, 0.5) purple, +Z (0.5, 0.5, 1) blue, -Z (0.5, 0.5, 0) olive; "
+        + "a face reversed shows the opposite colour. A face wound the wrong way is still culled as in shaded, so from outside it shows as MISSING, and its opposite colour is seen from inside, through the gap. "
+        + "The caption says the mode after the projection: '512x512, view front, wireframe, 72 vertices, 70 faces'. "
+        + "'highlight' shows what a select picked, before you edit it: {\"vertices\":[ids],\"edges\":[[a,b]],\"faces\":[ids]}, each list optional, the shape select returns and move takes. The server holds no selection, so pass the ids each time. "
+        + "All of it is orange: a highlighted face is shaded orange (an orange fill in wireframe; in normals it keeps its normal colour and the edges of its loop turn orange), an edge is an orange line, a vertex a small orange star. "
+        + "Faces hide them as they hide anything, so a highlight on the far side needs another view. "
+        + "The caption counts it after the mode: '512x512, view front, wireframe, highlight 2 faces, 72 vertices, 70 faces', or 'highlight 3 faces, 2 edges, 1 vertex'. "
         + "The light turns with the view, and faces turned different ways show as different brightnesses. "
         + "Faces wound the wrong way (clockwise seen from outside) show as MISSING: you see through them to whatever is behind. "
         + "An EMPTY result, an image of only the dark background with no error, means no face points at the camera: "
         + "the faces are wound the wrong way, or the mesh is an open surface seen from behind. "
         + "Try the other view, or fix the winding and call define_mesh again (move and extrude keep each face's winding, so they cannot fix it). "
         + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a view that is not one of the eight names; a direction of zero or not three finite numbers; "
-        + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; an argument render does not take. "
+        + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; a mode other than 'shaded', 'wireframe' or 'normals'; a highlight that is not an object, or whose lists are not lists of ids and [a, b] pairs; "
+        + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; an argument render does not take. "
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
         + "define_mesh, open, move, extrude, get_mesh and undo still work there.";
 
@@ -69,9 +111,11 @@ internal static class RenderTool
         [Description("[x, y, z] in the mesh's coordinates, inside its bounds: the point to look at. Default: the centre.")] double[]? target = null,
         [Description("'perspective' (the default), what a game shows, or 'orthographic': parallel edges stay parallel, true proportions."), AllowedValues("perspective", "orthographic")] string? projection = null,
         [Description("The image's width and height: 256, 512 (the default) or 1024."), AllowedValues(256, 512, 1024)] double size = RenderSpec.DefaultSize,
+        [Description("The look: 'shaded' (the default), 'wireframe' (every visible edge over a flat fill) or 'normals' (faces coloured by facing, with spikes)."), AllowedValues("shaded", "wireframe", "normals")] string? mode = null,
+        JsonElement? highlight = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -122,7 +166,20 @@ internal static class RenderTool
             return Error($"size: {Join([size])} is not a size; use 256, 512 or 1024");
         }
 
+        if (mode is not (null or "shaded" or "wireframe" or "normals"))
+        {
+            return Error($"mode: '{mode}' is not a mode; use 'shaded', 'wireframe' or 'normals'.");
+        }
+
+        var problems = new List<string>();
+        var listed = HighlightLists(highlight, problems);
+        if (problems.Count > 0)
+        {
+            return Failed("render", problems);
+        }
+
         var projected = projection == "orthographic" ? Projection.Orthographic : Projection.Perspective;
+        var look = mode switch { "wireframe" => Look.Wireframe, "normals" => Look.Normals, _ => Look.Shaded };
 
         await status.WhenSettled.WaitAsync(cancellationToken);
         if (status.FaultMessage is { } fault)
@@ -146,7 +203,13 @@ internal static class RenderTool
             }
         }
 
-        var rendering = queue.Post(new RenderSpec(new CameraSpec(directionVector, (float)zoom, targetVector), projected, (int)size));
+        if (MeshEdits.UnknownElements(mesh, listed.Vertices, listed.Edges, listed.Faces) is { Count: > 0 } missing)
+        {
+            return Failed("render", missing.Select(e => e.ToString()));
+        }
+
+        var picked = Highlight.Of(listed.Vertices, listed.Edges, listed.Faces);
+        var rendering = queue.Post(new RenderSpec(new CameraSpec(directionVector, (float)zoom, targetVector), projected, (int)size, look) { Highlight = picked });
 
         // The frame thread drains the queue; once it has ended, nothing will.
         await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
@@ -166,17 +229,17 @@ internal static class RenderTool
             Content =
             [
                 ImageContentBlock.FromBytes(EncodePng(frame), "image/png"),
-                new TextContentBlock { Text = Caption(frame, view, direction, projected, zoom, target) },
+                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, picked, zoom, target) },
             ],
         };
     }
 
     /// <summary>
     /// The size; <c>view front</c> for a view or <c>direction (x, y, z)</c> as given for a direction; then
-    /// each thing asked for beyond the default, only where set: the projection, zoom, target. The counts
-    /// close it, so a part added here goes before them.
+    /// each thing asked for beyond the default, only where set: the projection, the mode, the highlight,
+    /// zoom, target. The counts close it, so a part added here goes before them.
     /// </summary>
-    internal static string Caption(RenderedFrame frame, string? view, double[]? direction, Projection projection, double zoom, double[]? target)
+    internal static string Caption(RenderedFrame frame, string? view, double[]? direction, Projection projection, Look look, Highlight highlight, double zoom, double[]? target)
     {
         var parts = new List<string>
         {
@@ -187,6 +250,16 @@ internal static class RenderTool
         if (projection == Projection.Orthographic)
         {
             parts.Add("orthographic");
+        }
+
+        if (look != Look.Shaded)
+        {
+            parts.Add(look == Look.Wireframe ? "wireframe" : "normals");
+        }
+
+        if (!highlight.IsEmpty)
+        {
+            parts.Add($"highlight {highlight.Counts()}");
         }
 
         if (zoom != 1)
@@ -202,6 +275,24 @@ internal static class RenderTool
         parts.Add($"{frame.Vertices} vertices");
         parts.Add($"{frame.Faces} faces");
         return string.Join(", ", parts);
+    }
+
+    /// <summary>The lists of a <c>highlight</c> as given, so that an error can name an entry by its place; empty when absent.</summary>
+    private static (List<int> Vertices, List<(int A, int B)> Edges, List<int> Faces) HighlightLists(JsonElement? highlight, List<string> errors)
+    {
+        if (highlight is not { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) } value)
+        {
+            return ([], [], []);
+        }
+
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            errors.Add($"highlight: expected an object with any of vertices, edges and faces, got {Describe(value)}");
+            return ([], [], []);
+        }
+
+        JsonElement? Part(string name) => value.TryGetProperty(name, out var part) ? part : null;
+        return (Ids("vertices", Part("vertices"), errors) ?? [], Pairs("edges", Part("edges"), errors) ?? [], Ids("faces", Part("faces"), errors) ?? []);
     }
 
     private static bool Finite3(double[] v) => v.Length == 3 && v.All(double.IsFinite);
