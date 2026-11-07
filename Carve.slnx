@@ -3,6 +3,7 @@
   <Project Path="scenarios/Carve.Scenario.Cube/Carve.Scenario.Cube.csproj" />
   <Project Path="scenarios/Carve.Scenario.Crate/Carve.Scenario.Crate.csproj" />
   <Project Path="scenarios/Carve.Scenario.Export/Carve.Scenario.Export.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj" />
   <Project Path="spikes/Carve.ModelViewer/Carve.ModelViewer.csproj" />
   <Project Path="src/Carve.Core/Carve.Core.csproj" />
   <Project Path="src/Carve.Extensibility/Carve.Extensibility.csproj" />
