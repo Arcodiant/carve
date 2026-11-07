@@ -4,7 +4,7 @@ description: >-
 ---
 # T-26 — Labels and contact sheets
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
