@@ -160,8 +160,8 @@ Lines are one pixel wide and split their coverage on a slope, so `CheckLineAlong
 **Not checked:**
 
 - The regression tests were not run under the breaks; the scenario and the unit tests were. So the caption and error tests in `RenderTests` were not themselves seen to fail, though the scenario's caption and error checks were.
-- These were not each seen to fail on their own, being behind another check in the frame or stopped by one first: the corner checks of the new frames, the `+Z` frame's fill in `crate-wireframe-front`, the "panel" `Fill` samples beyond the first, and the `A_look_follows_the_mesh_through_an_edit` regression test.
-- `highlight` was exercised from a literal of `select`'s shape, not from `select` itself: T-22 had not landed.
+- These were not each seen to fail on their own, being behind another check in the frame or stopped by one first: the corner checks of the new frames, each face's samples after the one that failed, and the `A_look_follows_the_mesh_through_an_edit` regression test.
+- T-22 landed during this member, and the rebase brought it in. `A_select_result_is_a_highlight_as_it_stands` passes a real `select` result to `render`, for faces only; `select`'s vertex and edge results were not put through.
 - A highlight refused by the pump is tested with a fake scene only.
-- Sizes 256 and 1024 and orthographic were exercised by the regression tests' captions in these looks; no pixel check of a look was made at those sizes.
+- **The Goal's "any of the three sizes":** every pixel check of a look is at 512, perspective. One caption test renders a look at 256, orthographic; no look was rendered at 1024.
 - `scenario-export` and `viewer-cube` are not this member's suites, and their frames were not compared.

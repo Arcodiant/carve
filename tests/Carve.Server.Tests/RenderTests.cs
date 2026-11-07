@@ -607,7 +607,8 @@ public class RenderTests
         await carve.InitializeAsync();
         await carve.CallToolAsync("define_mesh", Cube);
 
-        var result = await carve.CallToolAsync("render", """{"highlight":{"kind":"faces","faces":[3],"count":1,"of":6}}""");
+        var picked = TextOf(await carve.CallToolAsync("select", """{"kind":"faces","where":"normal.y > 0.9"}"""));
+        var result = await carve.CallToolAsync("render", $$"""{"highlight":{{picked}}}""");
 
         Assert.Equal("512x512, view front, highlight 1 face, 8 vertices, 6 faces", Caption(result));
     }
