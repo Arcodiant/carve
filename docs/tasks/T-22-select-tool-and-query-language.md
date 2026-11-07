@@ -4,7 +4,7 @@ description: >-
 ---
 # T-22 — Select tool and query language
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
