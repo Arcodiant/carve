@@ -4,7 +4,7 @@ description: >-
 ---
 # M-3 — First model in a game
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *An agent saves its work to a Carve file and exports a .glb that loads through Empyrean*
 
