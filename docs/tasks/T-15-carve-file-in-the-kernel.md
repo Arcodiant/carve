@@ -147,6 +147,7 @@ Run on **Claude Opus 5.5** (`claude-opus-5-5`).
 | `faces[f][k]` | `index is {7.5 / a string / 4294967298 / …}, not an integer vertex id`. Any value outside `int` is refused here. |
 | `{key}` | `unknown key: a version 1 Carve file has only the keys "carve", "vertices" and "faces"` |
 | `{key}` | `key appears more than once`. This one is not in the Scope's list: a repeated key is refused rather than one copy silently winning. |
+| `keys[n]` | `the key is not valid text: it holds a lone surrogate escape (a \ud800 to \udfff with no partner)`. `n` is the key's zero-based position among the object's keys, since its text cannot be named. This element name is a reading the spec did not settle. |
 | any | Every `PolygonMesh.Create` error, passed through unchanged (`faces[3][3]: index 8 is out of range 0..7`, `faces: mesh has no faces`, …). Its element names are already the file's paths. |
 
 Values in messages are as written in the file (`GetRawText`). Strings, arrays and objects are named by kind. Every structural error is collected (`EveryErrorIsNamed`), and `Create` is reached only when there are none.

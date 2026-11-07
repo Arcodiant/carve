@@ -89,6 +89,25 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
     }
 
     [Fact]
+    public async Task Undo_straight_after_the_first_open_of_a_fresh_process_is_a_tool_error_and_the_mesh_stays()
+    {
+        var (first, _) = await StartAsync();
+        using (first)
+        {
+            await ExtrudeAndRaise(first);
+            Ok(await first.CallToolAsync("save", """{"path":"crate.carve"}"""));
+        }
+
+        var (second, _) = await StartAsync(mesh: null);
+        using var _second = second;
+        Ok(await second.CallToolAsync("open", """{"path":"crate.carve"}"""));
+        var opened = TextOf(await second.CallToolAsync("get_mesh", "{}"));
+
+        Assert.Contains("nothing to undo", Refused(await second.CallToolAsync("undo", "{}")));
+        Assert.Equal(opened, TextOf(await second.CallToolAsync("get_mesh", "{}")));
+    }
+
+    [Fact]
     public async Task Save_before_define_mesh_a_replaced_file_and_a_wrong_extension()
     {
         var (carve, _) = await StartAsync(mesh: null);

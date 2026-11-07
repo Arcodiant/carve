@@ -162,22 +162,51 @@ public class ProductReferencesNoExtensionTests
     [InlineData("../../src/Carve.Core/Mesh.cs")]
     [InlineData(@"..\..\src\Carve.Server\*.cs")]
     [InlineData("../../extensions/Carve.Debug/RunFolder.cs")]
+    [InlineData("../../src/**/*.cs")]
+    [InlineData(@"..\..\**\*.cs")]
+    [InlineData("../../*/Carve.Core/Mesh.cs")]
     public void The_viewer_check_fails_on_a_linked_Carve_source_file(string include) =>
         Assert.NotEmpty(CarveCodeIn(XDocument.Parse(
             $"<Project><ItemGroup><Compile Include=\"{include}\" Link=\"x.cs\" /></ItemGroup></Project>")));
 
+    [Theory]
+    [InlineData("""<Reference Include="Carve.Core"><HintPath>../../src/Carve.Core/bin/Debug/net10.0/Carve.Core.dll</HintPath></Reference>""")]
+    [InlineData("""<Reference Include="Carve.Server, Version=1.0.0.0" />""")]
+    [InlineData("""<Reference Include="Core"><HintPath>..\lib\Carve.Core.dll</HintPath></Reference>""")]
+    public void The_viewer_check_fails_on_a_reference_to_a_Carve_assembly(string reference) =>
+        Assert.NotEmpty(CarveCodeIn(XDocument.Parse($"<Project><ItemGroup>{reference}</ItemGroup></Project>")));
+
     [Fact]
     public void The_viewer_check_passes_a_file_of_its_own() =>
-        Assert.Empty(CarveCodeIn(XDocument.Parse("<Project><ItemGroup><Compile Include=\"Own/Thing.cs\" /></ItemGroup></Project>")));
+        Assert.Empty(CarveCodeIn(XDocument.Parse("<Project><ItemGroup><Compile Include=\"Own/Thing.cs\" /><Compile Include=\"**/*.cs\" /><Reference Include=\"System.Xml\" /></ItemGroup></Project>")));
 
-    /// <summary>What a project file brings in of Carve: a project reference, or a source file linked from src/, extensions/ or scenarios/.</summary>
+    /// <summary>
+    /// What a project file brings in of Carve: a project reference, a reference to a built Carve assembly,
+    /// or a source file linked from outside its own folder that is under src/, extensions/ or scenarios/,
+    /// is a Carve.* path, or is a wildcard that reaches up from the project and so may take in all of Carve.
+    /// </summary>
     private static List<string> CarveCodeIn(XDocument project)
     {
         var found = project.Descendants("ProjectReference").Select(r => "ProjectReference " + r.Attribute("Include")?.Value).ToList();
+        foreach (var reference in project.Descendants("Reference"))
+        {
+            var named = reference.Attribute("Include")?.Value ?? reference.Attribute("Update")?.Value ?? "";
+            var hint = reference.Element("HintPath")?.Value ?? "";
+            if (IsCarveAssembly(named) || IsCarveAssembly(Path.GetFileName(hint.Replace('\\', '/'))))
+            {
+                found.Add("Reference " + named + " " + hint);
+            }
+        }
+
         foreach (var compile in project.Descendants("Compile"))
         {
             var include = (compile.Attribute("Include")?.Value ?? compile.Attribute("Update")?.Value ?? "").Replace('\\', '/');
-            if (new[] { "src/Carve.", "extensions/Carve.", "scenarios/Carve." }.Any(include.Contains))
+            var segments = include.Split('/');
+            var reachesUp = segments.Contains("..");
+            var below = segments.SkipWhile(x => x == "..").ToArray();
+            var carve = segments.Any(x => x.StartsWith("Carve.", StringComparison.OrdinalIgnoreCase))
+                || (reachesUp && below.Length > 0 && (new[] { "src", "extensions", "scenarios" }.Contains(below[0]) || below[0].Contains('*')));
+            if (carve)
             {
                 found.Add("Compile " + include);
             }
@@ -185,6 +214,8 @@ public class ProductReferencesNoExtensionTests
 
         return found;
     }
+
+    private static bool IsCarveAssembly(string name) => name.StartsWith("Carve.", StringComparison.OrdinalIgnoreCase);
 
     [Theory]
     [InlineData("Carve.Debug")]

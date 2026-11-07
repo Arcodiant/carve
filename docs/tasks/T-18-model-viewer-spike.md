@@ -123,7 +123,7 @@ Run on **Claude Opus 5.5** (`claude-opus-5-5`).
 | Load error leaves out the file | `A_missing_model_fails_naming_the_file`, `A_corrupt_glb_fails_naming_the_file` |
 | Exit code always 0 | `A_missing_model...`, `A_corrupt_glb...` |
 | A vertical view accepted | `A_view_that_breaks_the_agreed_look_is_refused` |
-| Viewer references `Carve.Core` | `The_viewer_references_no_Carve_project` |
+| Viewer references `Carve.Core` | `The_viewer_references_no_Carve_code` (in `ProductReferencesNoExtensionTests`) |
 | Product references the viewer (`Carve.Server.csproj`) | `The_product_project_references_no_extension`, `The_product_reaches_no_extension_through_its_project_references` |
 
 `Each_face_is_one_flat_shade` is beyond the spec's list, and so is the `minus-x` run. The first table run showed dropped normals failing nothing: the frame changed in 107,665 pixels, but the sampled face middles did not. The flatness check closes that, and its 2/255 is tighter than the 10/255 rule, since a clean cube has a spread of 0.

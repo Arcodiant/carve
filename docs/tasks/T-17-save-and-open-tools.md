@@ -99,7 +99,7 @@ Run on **Claude Sonnet 5.5** (`claude-sonnet-5-5`).
 **Wording T-19 and T-20 rely on** (`{...}` is filled in):
 
 - `save` result: `saved crate.carve to {full path}{ (replaced)}: {n} vertices, {n} faces`.
-- `save` before a mesh: `save: there is no mesh yet; call define_mesh first`.
+- `save` before a mesh: `save: there is no mesh yet; call define_mesh first, or open to read a saved .carve file`.
 - `open` result: define_mesh's JSON report with `"path":"{full path}"` as its first key.
 - `open` extension error: `open: path "a.glb" ends in ".glb"; open reads .carve files, so the path must end in .carve`.
 - `open` missing file, three forms, each starting `open: no file at {full path}; `:

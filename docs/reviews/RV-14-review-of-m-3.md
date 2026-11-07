@@ -199,7 +199,7 @@ Fixed in 5b269a0.
 
 **Outcome:** fixed
 
-Fixed in 8c9ff6e, 5b269a0.
+Fixed in 5b269a0.
 
 ### `The_viewer_references_no_Carve_project` looks only at `ProjectReference` (Nit)
 

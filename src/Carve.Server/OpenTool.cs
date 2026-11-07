@@ -14,9 +14,9 @@ public sealed class OpenTool(ModelStore store)
 
     public const string Text =
         "Reads a .carve file (written by save) and makes its mesh the current mesh, in one step like define_mesh: it REPLACES the current mesh, "
-        + "it does not add to it, and within a session undo takes the open back to the mesh before it. A first open in a process cannot be undone: there is no mesh before it, so undo is then a tool error. Takes path, the file to read. "
+        + "it does not add to it, and open is a step like any other, so undo takes it back to the mesh before it. The one exception is the first mesh a process has, which cannot be undone whichever tool made it: a fresh process whose first mesh is this open cannot undo it (undo is then a tool error and the mesh stays), while a process that had a mesh before the open can. Takes path, the file to read. "
         + "The file holds the polygons exactly, with the ids they were saved with: vertex 0 is the file's first vertex and face 0 its first face, "
-        + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so undo goes back no further than the open, "
+        + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so the file brings no older states with it, "
         + "and carve keeps no current file: give the path to open and to save every time. "
         + "The .carve file is the one to keep working in; the .glb that export writes is only for the game and cannot be opened. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; the path must end in .carve, in any case. "

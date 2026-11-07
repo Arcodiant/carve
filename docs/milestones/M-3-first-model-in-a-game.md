@@ -133,11 +133,12 @@ Nothing in M-3 has sound or motion, so there is no listening or real-time pass.
 - **T-16's regression tests first ran at the very end**, because of that stall. Two checks failed; both tests were wrong and the product was right.
 - **Waystone closed during T-18's review.** The request ended unanswered. The agent was resumed and asked again, and the first request was not counted.
 - **T-19 replaced a spec check and landed it without asking.** "A +Z panel pixel differs from the +Z frame" could never pass, since both are +Z faces and share a shade (191). It now checks the recess wall (170) and that the panel is flat. The person kept it afterwards. It was on no stop list, but a check's target going back to the person is `CLAUDE.md`'s rule.
-- **T-20 changed a run condition without asking.** Round 1's agent listed the folder with its own Glob and never met the planted `crates.carve`. Round 2 removed the agents' file tools (`--tools ""`) so that the plant fired. The prompts were unchanged, so this was not on its stop list, but the person has not yet ruled on it.
-- **T-20 tried `claude -p` with `--permission-mode bypassPermissions`.** The auto-mode classifier denied it, and T-20 reran with `--allowedTools "mcp__carve__*"`. The brief asked for neither flag.
-- **A refactor pass came after this retrospective was first written (`d014eae`).** It moved the run scripts' shared process bounding into `scripts/bounded-run.ps1`, the crate's construction into `TestMeshes.Crate`, and the save and open tests' helpers into `FileToolTests.cs`, and removed `GlbExport.Write(PolygonMesh, ...)`. Its commit message said "no behaviour changes", backed only by a `tools/list` comparison, and it updated only some members' As built notes. RV-14 found those notes stale and fixed them, along with what the pass left (an unbuilt test step in `run-export-scenario.ps1`).
+- **T-20 changed a run condition without asking.** Round 1's agent listed the folder with its own Glob and never met the planted `crates.carve`. Round 2 removed the agents' file tools (`--tools ""`) so that the plant fired. The prompts were unchanged, so this was not on its stop list. The person ruled that round 2, run with `--tools ""`, is accepted as the acceptance run.
+- **T-20 tried `claude -p` with `--permission-mode bypassPermissions`.** The auto-mode classifier denied it, and T-20 reran with `--allowedTools "mcp__carve__*"`. The brief asked for neither flag. The person ruled that the relaunch is accepted as run.
+- **A refactor pass came after this retrospective was first written (`d014eae`).** It moved the run scripts' shared process bounding into `scripts/bounded-run.ps1`, the crate's construction into `TestMeshes.Crate`, and the save and open tests' helpers into `FileToolTests.cs`, and removed `GlbExport.Write(PolygonMesh, ...)`. Its commit message said "no behaviour changes", backed only by a `tools/list` comparison, and it updated only some members' As built notes. RV-14 found those notes stale and fixed them, along with a gap in `run-export-scenario.ps1` that the pass did not make (the unbuilt test step came in with T-19, `eb9020d`; `d014eae` changed one line of the script).
+- **Review rounds.** Round 1 (RV-14) raised 32 findings (2 Major reports of one bug, 16 Minor, 14 Nit); round 2 (RV-15) raised 7, one a repeat, and the person chose a third round.
 - **Readings members landed that the spec did not settle:**
-  - T-15: repeated keys refused; a file of another version gets only the version error; whole-file errors are named `file`; bad coordinates are named `vertices[i][k]`. The person kept all four.
+  - T-15: repeated keys refused; a file of another version gets only the version error; whole-file errors are named `file`; bad coordinates are named `vertices[i][k]`. The person kept all four. Two more came with RV-14's fixes: a key holding a lone surrogate is named `keys[n]` (its zero-based position, since its text cannot be named), and a face index of `1.0` is refused in a file though `define_mesh` accepts it (`Write` never emits it, so only a hand-edited file meets it).
   - T-17: `ToolPaths.Resolve` gained an optional `verb`, so `open` says "reads". The default wording is unchanged.
   - T-18: a flatness check at 2/255, a `minus-x` cube run, mirrored and flipped camera breaks, and a refusal of views along Y.
 - **The viewer's background is pure black**, where Carve's own is dark slate. It meets the agreed "dark", and the person approved it side by side.
@@ -160,13 +161,13 @@ Nothing in M-3 has sound or motion, so there is no listening or real-time pass.
 
 **Known and left.**
 
-- **Runner Mantorok** has no Empyrean 0.117.0 on its feed, so jobs sent there fail at restore with NU1603. It is the 14 jobs in the test report's `cnr` column. The pin was not moved; that is the person's call.
+- **Runner Mantorok** has no Empyrean 0.117.0 on its feed, so jobs sent there fail at restore with NU1603. It is the 14 jobs in the test report's `cnr` column. The pin was not moved. The person's ruling: Mantorok is left as it is for now; Carve jobs that land there fail at restore and are retried onto Xellotath.
 - `CLAUDE.md` and `README.md` are inputs of no suite (a `verify` warning).
 - Empty folders `branches/task/T-15` to `T-20` remain on disk, unregistered from git, as with M-1 and M-2.
 - Three `carve-viewer-*` entries in `%TEMP%`, `%TEMP%\carve-m3-acceptance\` and the members' scratch logs are not cleared.
 - Evidence is in the milestone worktree's ignored `artifacts/review/` and `artifacts/m3-acceptance/`. T-16's frames were not copied there; only their hashes are in its notes.
 
-**The test report** (`cairn test report --since 3d`) shows no flakes. `server-regression` is the costly suite, at about 3,100 slot-seconds a week, and it caught something: its 2 failures are T-16's two wrong tests. The 14 `cnr` jobs are Mantorok, which is a machine fix rather than a suite fix. Nothing was filed; Mantorok is put to the person.
+**The test report** (`cairn test report --since 3d`) shows no flakes. `server-regression` is the costly suite, at about 3,100 slot-seconds a week, and it caught something: its 2 failures are T-16's two wrong tests. The 14 `cnr` jobs are Mantorok, which is a machine fix rather than a suite fix. Nothing was filed; Mantorok is left as it is, by the person's ruling.
 
 **For the next plan.**
 

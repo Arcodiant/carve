@@ -49,7 +49,12 @@ if ($code -ne 0) {
 $tests = Join-Path $root 'tests/Carve.ExportViewer.Tests/Carve.ExportViewer.Tests.csproj'
 if (-not $NoBuild) {
     dotnet build $tests -c $Configuration --nologo -v q 2>&1 | ForEach-Object { Write-Err $_ }
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($LASTEXITCODE -ne 0) {
+        $code = $LASTEXITCODE
+        Write-Err "run-export-scenario: building the checks failed ($code)"
+        Write-Output $folder
+        exit $code
+    }
 }
 
 $env:CARVE_EXPORT_RUN = $folder
