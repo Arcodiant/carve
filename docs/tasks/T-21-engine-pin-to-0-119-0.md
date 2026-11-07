@@ -59,7 +59,7 @@ description: >-
 | `cairn-held/` to `verify-cube/`, `verify-crate/` | 0.117.0, then 0.119.0 | Xellotath, both | 22 of 22 byte-identical |
 | `old-export/` to `verify-export/`: 5 scenario frames, 2 viewer frames, `crate.glb` | 0.117.0, then 0.119.0 | Xellotath, both | 8 of 8 byte-identical |
 
-The held frames are not literally from before 0.119.0 reached this machine: they are the newest jobs cairn returns, `J-20261107-010158-36fdf8` (cube) and `J-20261107-005943-8bbd21` (crate), at `3137c72`. They do show 0.117.0: that commit pins it, the job's restore passed with 0 warnings (a floated version is `NU1603`, an error), and an ad-hoc job (`J-20261107-161620-c47ad1`) listed 0.117.0 in Xellotath's package cache. That is inference from those three facts: the job kept no `deps.json`. No pair differed, so nothing went to the person. The export comparison is beyond the Scope, which names only cube and crate; the Goal says every frame, so it was run (`J-20261107-161733-59da19`, the export script at `3137c72`, against verify's `J-20261107-161032-8b869b`).
+The held frames are not literally from before 0.119.0 reached this machine: they are the newest jobs cairn returns, `J-20261107-010158-36fdf8` (cube) and `J-20261107-005943-8bbd21` (crate), at `3137c72`. They do show 0.117.0: that commit pins it, the job's restore passed with 0 warnings (a floated version is `NU1603`, an error), and an ad-hoc job (`J-20261107-161620-c47ad1`) listed 0.117.0 in Xellotath's package cache (`arcodiant.empyrean.graphics` only; the clean restore covers the other packages). That is inference from those three facts: the job kept no `deps.json`. No pair differed, so nothing went to the person. The export comparison is beyond the Scope, which names only cube and crate; the Goal says every frame, so it was run (`J-20261107-161733-59da19`, the export script at `3137c72`, against verify's `J-20261107-161032-8b869b`).
 
 | Frame | md5 (before = after = held) |
 |---|---|
@@ -85,8 +85,10 @@ The held frames are not literally from before 0.119.0 reached this machine: they
 - `RenderStageScope`, `IRenderStage.Scope`, the `PerFrame` throw (0.117.1, logged under 0.119.0): Carve declares no stage of its own; `RenderComposition` composes engine stages.
 - `RenderView`, `RenderPipeline.Execute`'s `view` argument, `LastFrame*` summed over views: Carve does not call `Execute`; one view, as before.
 - On an sRGB output the tonemap no longer encodes: `RenderComposition` has no tonemap and renders to `Rgba16Float`, encoded in `ToDecodedImage`. The viewer does use `RenderPipelinePresets.StandardHdr`; its frames did not change.
-- `TextureFormat.Bgra8Srgb`: Carve has no `switch` over `TextureFormat`; it names three members in `RenderComposition`.
+- `TextureFormat.Bgra8Srgb`: Carve has no `switch` over `TextureFormat`; `RenderComposition` uses two members, `Rgba16Float` and `Depth32Float`.
 - `ISwapchainManager.TryAcquireNextImage`, `IFrameStateManager.BeginViewFrame`, `IViewTargetProvider`: Carve implements none.
+- `Arcodiant.Vulkan` 0.1.2-alpha.0.40 to .41, required by 0.119.0: transitive, Carve pins nothing of it; `project.assets.json` resolves .41 and the frames did not change.
+- Virtual-surface images gain `TransferDestination` usage: the viewer sets `VirtualSurface = true`; its frames did not change (`old-export/` to `verify-export/`).
 - `IFrameTiming`, `IFrameClock` and the XR packages: no custom clock, no XR.
 - A blank `Empyrean:Game:UserPathsRoot` now means unset: Carve does not set it.
 - `UseGlfwHost` throws with `UseXrHost`: the viewer does not call `UseXrHost`.
@@ -94,4 +96,4 @@ The held frames are not literally from before 0.119.0 reached this machine: they
 
 **Decisions the Scope left open:** the export comparison above, added because the Goal is wider than the Scope's list. The before and after runs were by hand, as the Scope asks, with `-CarveArguments --Carve:Debug:RunFolder=...`, since an override build is outside any suite.
 
-**Not verified:** no frame was opened: all matched by hash, so this says only that nothing changed, not that the frames look right. `viewer-cube`'s frames were not compared across versions; it passed its own checks on 0.119.0. `run.json` was kept but not compared. The published `carve.exe` under `C:\tools\carve` is out of scope and untouched.
+**Not verified:** no frame was opened: all matched by hash, so this says only that nothing changed, not that the frames look right. `viewer-cube`'s frames were not compared across versions; it passed its own checks on 0.119.0. `run.json` is byte-identical for cube and crate across `before/`, `after/` and `cairn-held/`. The published `carve.exe` under `C:\tools\carve` is out of scope and untouched.
