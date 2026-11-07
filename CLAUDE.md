@@ -72,6 +72,7 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `scripts/run-viewer.ps1` | Builds, then runs the viewer on one model; returns its exit code |
 | `scripts/run-export-scenario.ps1` | The export scenario, then the viewer on its content folder, then the checks of `tests/Carve.ExportViewer.Tests` (built first unless `-NoBuild`, each step bounded; a skipped check fails it); the run folder is the last line on stdout |
 | `scripts/bounded-run.ps1` | Dot-sourced by the run scripts: starts `dotnet` with quoted arguments (a trailing backslash survives) and stops it after its time limit, exit code 124 |
+| `samples/` | Sample models, written by `CarveFile.Write`: `leaky-shed.carve`, the broken shed `check` is shown on, kept equal to `TestMeshes.LeakyShed()` by a test |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
 
