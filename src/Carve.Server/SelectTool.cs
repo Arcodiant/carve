@@ -42,7 +42,7 @@ public sealed class SelectTool(ModelStore store)
         + "Ids never change, so a selection stays valid until an edit removes or reshapes what it names (and undo frees the ids its step created). "
         + "A selection is the answer at the time of the call: after an edit, ask again rather than assume the same elements still match.\n"
         + "Tool errors leave the mesh unchanged and list every problem that can be found: no mesh yet (call define_mesh or open first); "
-        + "an unknown kind (use vertices, edges or faces); a missing or non-string kind or where; an argument select does not take; and these, each prefixed where: \n"
+        + "an unknown kind (use vertices, edges or faces); a missing or non-string kind or where; an argument select does not take; and these, each after the prefix where and a colon:\n"
         + "where is empty\n"
         + "at character 11: '>>' is not an operator; use <, <=, ==, !=, >= or >\n"
         + "at character 1: 'centre' is not a property of faces; faces have id, x, y, z, min, max, normal, vertices, area, non_planar, open (naming the kind asked for, and that kind's list)\n"
