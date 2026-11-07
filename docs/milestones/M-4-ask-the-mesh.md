@@ -4,7 +4,7 @@ description: >-
 ---
 # M-4 — Ask the mesh
 
-**Status:** Planned
+**Status:** Active
 
 **One-liner:** *An agent queries and selects elements, checks a mesh's health and reads normals and wireframe renders*
 
