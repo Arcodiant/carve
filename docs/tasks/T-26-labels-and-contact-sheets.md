@@ -115,7 +115,7 @@ An agent reads element ids straight off the image and sees several views of a me
 
 **Byte-identical guard: no frame differs.** Baseline taken `--fresh` before any code change: 35 frames, T-25's 29 and its six new frames, all equal to T-25's tables, which stand unchanged. After the change cube 20 of 20 and crate 15 of 15 are identical by hash, on `verify`'s frames (`artifacts/review/T-26/baseline/baseline.md5`, `verify/verify.md5`). The overlay stage with nothing queued changes no byte; that was first checked on its own, before any label was drawn.
 
-**New frames.** The five that show something new were opened together (`artifacts/review/T-26/round-1/`), by me and by the person, and equal `verify`'s by hash. The 13 reference frames were not opened; `CheckTile` compares six of them and three of the 256 ones with the sheets pixel for pixel.
+**New frames.** The five that show something new were opened together (`artifacts/review/T-26/round-1/`), by me and by the person, and equal `verify`'s by hash. The 13 reference frames were not opened; `CheckTile` compares six of them and four of the 256 ones with the sheets pixel for pixel.
 
 | Frame | md5 |
 |---|---|
