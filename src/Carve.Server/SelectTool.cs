@@ -100,7 +100,7 @@ public sealed class SelectTool(ModelStore store)
     {
         var errors = UnknownArguments("select", context, "kind", "where");
         var elements = Kind(kind, errors);
-        var query = StringArgument("where", where, errors) is { } text ? MeshQuery.Parse(text) : null;
+        var query = RequiredString("where", where, errors) is { } text ? MeshQuery.Parse(text) : null;
         if (query is not null)
         {
             var problems = elements is { } known ? query.ErrorsFor(known) : query.Errors;
@@ -129,24 +129,9 @@ public sealed class SelectTool(ModelStore store)
         _ => "faces",
     };
 
-    private static string? StringArgument(string name, JsonElement? value, List<string> errors)
-    {
-        if (value is null || value.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
-        {
-            errors.Add($"{name}: required but missing");
-            return null;
-        }
-        if (value.Value.ValueKind != JsonValueKind.String)
-        {
-            errors.Add($"{name}: expected a string, got {Describe(value.Value)}");
-            return null;
-        }
-        return value.Value.GetString();
-    }
-
     private static ElementKind? Kind(JsonElement? value, List<string> errors)
     {
-        var text = StringArgument("kind", value, errors);
+        var text = RequiredString("kind", value, errors);
         switch (text)
         {
             case null: return null;

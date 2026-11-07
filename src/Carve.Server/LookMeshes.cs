@@ -133,7 +133,7 @@ public static class LookMeshes
     public static Rgba8 NormalColour(Vector3 normal) => Rgba8.FromVector((normal + Vector3.One) / 2);
 
     /// <summary>One colour per vertex of <see cref="MeshBridge"/>'s triangles, each its face's.</summary>
-    public static Rgba8[] FaceColours(PolygonMesh mesh, Func<int, Rgba8> colour)
+    private static Rgba8[] FaceColours(PolygonMesh mesh, Func<int, Rgba8> colour)
     {
         var triangles = FlatShading.Triangles(mesh);
         var colours = new Rgba8[triangles.Count * 3];

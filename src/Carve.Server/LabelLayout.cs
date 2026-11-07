@@ -28,15 +28,15 @@ public readonly record struct OverlayLabel(string Text, Vector2 TextAt, ScreenRe
 public static class LabelLayout
 {
     /// <summary>The backing's margin round the text.</summary>
-    public const int Padding = 2;
+    private const int Padding = 2;
 
     public const float DotRadius = 3;
 
     /// <summary>Where a tile's caption text starts.</summary>
-    public static readonly Vector2 CaptionAt = new(4, 4);
+    private static readonly Vector2 CaptionAt = new(4, 4);
 
     /// <summary>A vertex's id, from its dot.</summary>
-    public static readonly Vector2 VertexOffset = new(5, -18);
+    private static readonly Vector2 VertexOffset = new(5, -18);
 
     public static readonly Vector4 TextColour = new(1, 1, 1, 1);
 

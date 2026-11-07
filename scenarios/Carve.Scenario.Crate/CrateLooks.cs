@@ -207,12 +207,11 @@ internal static class CrateLooks
     }
 
     /// <summary>How a linear colour reads in a frame, each channel 0 to 255.</summary>
-    private static (int R, int G, int B) Srgb(double r, double g, double b)
-    {
-        static int Encode(double c) =>
-            (int)Math.Round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.Pow(c, 1 / 2.4) - 0.055));
-        return (Encode(r), Encode(g), Encode(b));
-    }
+    private static (int R, int G, int B) Srgb(double r, double g, double b) => (Encode(r), Encode(g), Encode(b));
+
+    /// <summary>One linear channel as a frame shows it, 0 to 255.</summary>
+    internal static int Encode(double c) =>
+        (int)Math.Round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.Pow(c, 1 / 2.4) - 0.055));
 
     internal static void CheckCaption(ScenarioDriver driver, ScenarioFrame frame, string expected)
     {

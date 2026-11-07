@@ -252,8 +252,7 @@ internal static class CrateLabels
     private static int Backed(int shade)
     {
         var c = shade / 255.0;
-        var linear = (c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4)) * 0.4;
-        return (int)Math.Round(255 * (linear <= 0.0031308 ? 12.92 * linear : 1.055 * Math.Pow(linear, 1 / 2.4) - 0.055));
+        return Encode((c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4)) * 0.4);
     }
 
     private static void CheckUnmarked(ScenarioDriver driver, ScenarioFrame labelled, ScenarioFrame plain, (int X, int Y) at, string what)
