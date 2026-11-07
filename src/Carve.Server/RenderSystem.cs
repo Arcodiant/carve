@@ -26,7 +26,7 @@ internal sealed class RenderSystem(
     private static readonly Vector4 Surface = GlbExport.BaseColor;
 
     private Entity _light;
-    private Entity _camera;
+    private readonly List<Entity> _cameras = [];
     private Entity? _meshEntity;
     private Mesh? _mesh;
     private MeshReport? _report;
@@ -74,9 +74,13 @@ internal sealed class RenderSystem(
 
         // The near and far here are placeholders: each view sets the whole projection by hand,
         // because the headless host does not apply a camera's projection.
-        _camera = scenes.CreateEntity(Scene);
-        entities.AddCamera3D(_camera, ViewFraming.FieldOfViewY, 0.1f, 100f);
-        entities.AddComponent(_camera, new RenderTag(RenderComposition.CameraTag));
+        foreach (var size in RenderComposition.Sizes)
+        {
+            var camera = scenes.CreateEntity(Scene);
+            entities.AddCamera3D(camera, ViewFraming.FieldOfViewY, 0.1f, 100f);
+            entities.AddComponent(camera, new RenderTag(RenderComposition.CameraTag(size)));
+            _cameras.Add(camera);
+        }
     }
 
     public void ShowMesh(Carve.Core.PolygonMesh mesh)
@@ -120,13 +124,18 @@ internal sealed class RenderSystem(
         }
     }
 
-    public void ApplyView(CameraSpec camera)
+    public void ApplyView(RenderSpec spec)
     {
         // The target is in the mesh's own coordinates; the camera works in drawn space.
+        var camera = spec.Camera;
         var drawn = camera.Target is { } target ? camera with { Target = _space.Apply(target) } : camera;
-        var frame = ViewFraming.Frame(_drawnHalf, drawn);
-        entities.GetOrAddComponent<WorldTransform>(_camera) = new WorldTransform { Matrix = frame.World };
-        entities.GetComponent<Camera>(_camera).ProjectionMatrix = frame.Projection;
+        var frame = ViewFraming.Frame(_drawnHalf, drawn, spec.Projection);
+        foreach (var entity in _cameras)
+        {
+            entities.GetOrAddComponent<WorldTransform>(entity) = new WorldTransform { Matrix = frame.World };
+            entities.GetComponent<Camera>(entity).ProjectionMatrix = frame.Projection;
+        }
+
         entities.GetComponent<Transform3D>(_light).Orientation = frame.LightOrientation;
     }
 
@@ -138,7 +147,7 @@ internal sealed class RenderSystem(
             var faces = _report.FaceCount;
 
             // Complete by the time RenderFrame returns; the continuation runs on the thread pool.
-            var read = readback.ReadAsync(composition.Target);
+            var read = readback.ReadAsync(composition.Target(request.Spec.Size));
             renderer.RenderFrame();
             _ = read.ContinueWith(
                 task =>

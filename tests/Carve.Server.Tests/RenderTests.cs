@@ -49,13 +49,13 @@ public class RenderTests
         return Convert.FromBase64String(image.GetProperty("data").GetString()!);
     }
 
-    private static ImageResult Decode(byte[] png, string keepAs)
+    private static ImageResult Decode(byte[] png, string keepAs, int size = Size)
     {
         File.WriteAllBytes(Path.Combine(Frames, keepAs + ".png"), png);
 
         var image = ImageResult.FromMemory(png, ColorComponents.RedGreenBlueAlpha);
-        Assert.Equal(Size, image.Width);
-        Assert.Equal(Size, image.Height);
+        Assert.Equal(size, image.Width);
+        Assert.Equal(size, image.Height);
         return image;
     }
 
@@ -369,7 +369,7 @@ public class RenderTests
         Assert.Contains("EMPTY", description);
 
         var view = render.GetProperty("inputSchema").GetProperty("properties").GetProperty("view");
-        Assert.Equal(["front", "back"], view.GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        Assert.Equal(["front", "back", "+x", "-x", "+y", "-y", "+z", "-z"], view.GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
         Assert.Contains("direction", description);
         Assert.Contains("zoom", description);
         Assert.Contains("target", description);
@@ -385,6 +385,12 @@ public class RenderTests
     [InlineData("""{"target":[2,0,0]}""", "target")]
     [InlineData("""{"target":[0,0]}""", "target")]
     [InlineData("""{"target":[0,0,-0.001]}""", "target")]
+    [InlineData("""{"view":"top"}""", "view: 'top' is not a view; use 'front', 'back', '+x', '-x', '+y', '-y', '+z' or '-z'.")]
+    [InlineData("""{"view":"+w"}""", "view: '+w' is not a view")]
+    [InlineData("""{"projection":"iso"}""", "projection: 'iso' is not a projection; use 'perspective' or 'orthographic'.")]
+    [InlineData("""{"size":300}""", "size: 300 is not a size; use 256, 512 or 1024")]
+    [InlineData("""{"size":2048}""", "size: 2048 is not a size; use 256, 512 or 1024")]
+    [InlineData("""{"size":512.5}""", "size: 512.5 is not a size; use 256, 512 or 1024")]
     public async Task A_bad_camera_is_a_tool_error_and_the_mesh_still_renders(string arguments, string mentions)
     {
         using var carve = new CarveProcess([]);
@@ -421,6 +427,101 @@ public class RenderTests
             Caption(await carve.CallToolAsync("render", """{"direction":[2,1,1],"zoom":3,"target":[1,0.5,0.25]}""")));
         Assert.Equal("512x512, view back, zoom 2, 8 vertices, 6 faces", Caption(await carve.CallToolAsync("render", """{"view":"back","zoom":2}""")));
         Assert.Equal("512x512, view front, 8 vertices, 6 faces", Caption(await carve.CallToolAsync("render", "{}")));
+    }
+
+    [Fact]
+    public async Task The_caption_opens_with_the_size_and_says_orthographic_after_the_view()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        foreach (var (arguments, caption) in new[]
+        {
+            ("""{"size":256}""", "256x256, view front, 8 vertices, 6 faces"),
+            ("""{"size":512}""", "512x512, view front, 8 vertices, 6 faces"),
+            ("""{"size":1024,"view":"back"}""", "1024x1024, view back, 8 vertices, 6 faces"),
+            ("""{"view":"+x"}""", "512x512, view +x, 8 vertices, 6 faces"),
+            ("""{"view":"-y","projection":"perspective"}""", "512x512, view -y, 8 vertices, 6 faces"),
+            ("""{"view":"+x","projection":"orthographic"}""", "512x512, view +x, orthographic, 8 vertices, 6 faces"),
+            ("""{"direction":[2,1,1],"projection":"orthographic"}""", "512x512, direction (2, 1, 1), orthographic, 8 vertices, 6 faces"),
+            ("""{"size":256,"view":"-z","projection":"orthographic","zoom":2,"target":[1,0.5,0.25]}""", "256x256, view -z, orthographic, zoom 2, target (1, 0.5, 0.25), 8 vertices, 6 faces"),
+        })
+        {
+            Assert.Equal(caption, Caption(await carve.CallToolAsync("render", arguments)));
+        }
+    }
+
+    [Theory]
+    [InlineData(256)]
+    [InlineData(512)]
+    [InlineData(1024)]
+    public async Task The_image_is_the_size_asked_for_and_shows_the_mesh(int size)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var image = Decode(Png(await carve.CallToolAsync("render", $$"""{"size":{{size}}}""")), $"cube-size-{size}", size);
+
+        AssertBackground(At(image, (2, 2)));
+        Assert.NotEqual(At(image, (2, 2)), At(image, (size / 2, size / 2)));
+    }
+
+    [Theory]
+    [InlineData("front", "perspective")]
+    [InlineData("back", "perspective")]
+    [InlineData("+x", "perspective")]
+    [InlineData("-x", "perspective")]
+    [InlineData("+y", "perspective")]
+    [InlineData("-y", "perspective")]
+    [InlineData("+z", "perspective")]
+    [InlineData("-z", "perspective")]
+    [InlineData("+y", "orthographic")]
+    [InlineData("-y", "orthographic")]
+    public async Task Every_named_view_renders_the_mesh(string view, string projection)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var image = Decode(Png(await carve.CallToolAsync("render", $$"""{"view":"{{view}}","projection":"{{projection}}"}""")), $"cube-view-{view}-{projection}");
+
+        AssertBackground(At(image, (2, 2)));
+        Assert.NotEqual(At(image, (2, 2)), At(image, (Size / 2, Size / 2)));
+    }
+
+    [Theory]
+    [InlineData("+x", "[1,0,0]")]
+    [InlineData("-y", "[0,-1,0]")]
+    public async Task An_axis_name_is_that_direction(string view, string direction)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", """{"vertices":[[0,0,0],[2,0,0],[2,0,3],[0,0,3],[1,2,1]],"faces":[[0,1,2,3],[0,4,1],[1,4,2],[2,4,3],[3,4,0]]}""");
+
+        Assert.Equal(
+            Png(await carve.CallToolAsync("render", $$"""{"direction":{{direction}}}""")),
+            Png(await RenderAsync(carve, view)));
+    }
+
+    [Fact]
+    public async Task The_description_says_what_the_new_arguments_do()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        var description = (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "render")
+            .GetProperty("description").GetString()!;
+
+        foreach (var words in new[]
+        {
+            "'+x'", "'-x'", "'+y'", "'-y'", "'+z'", "'-z'", "'projection'", "keeps parallel edges parallel", "what a game shows",
+            "reading dimensions", "'size'", "a sheet tile", "dense mesh", "not one of the eight names", "a size other than",
+            "a projection other than", "'front' (the default) looks from",
+        })
+        {
+            Assert.Contains(words, description);
+        }
     }
 
     [Fact]

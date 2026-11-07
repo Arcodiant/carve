@@ -25,11 +25,14 @@ internal static class RenderTool
     }
 
     private const string Text =
-        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo, and returns one PNG image of 512x512 pixels followed by one caption line, "
+        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo, and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
         + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
         + "'back' looks from the opposite corner, -X -Y -Z, upward from below, showing its underside, -Z side and -X side. "
+        + "Six more view names look head-on along an axis, as that direction would: '+x' shows the +X side, +Z on the left; '-x' the -X side, +Z on the right; "
+        + "'+z' the +Z side, +X on the right; '-z' the -Z side, +X on the left; all four with +Y up. "
+        + "'+y' looks down on the top, +X on the right; '-y' looks up at the underside, +X on the left; both with -Z up. "
         + "Or give 'direction' instead of 'view': [x, y, z], pointing from the point looked at toward the eye, in the mesh's own axes, any length. "
         + "Up on the image is +Y, or -Z when the direction is within 1 degree of straight up or down. "
         + "Examples: [1,0,0] looks from +X, [-1,0,0] from -X, [0,1,0] from above, down at the mesh, [0,-1,0] from below, [0,0,1] from +Z, [0,0,-1] from -Z. "
@@ -39,13 +42,18 @@ internal static class RenderTool
         + "The camera frames the whole mesh each time, so a render shows shape, not size; zoom in on a target to see a detail. "
         + "The caption then reads e.g. '512x512, direction (2, 1, 1), zoom 3, target (1.02, 0.4, 0.5), 72 vertices, 70 faces', "
         + "with zoom and target only when you set them. "
+        + "'projection' is 'perspective' (the default, what a game shows) or 'orthographic', which keeps parallel edges parallel and shows true proportions: "
+        + "the one for reading dimensions and for a sheet of axis views. It frames the mesh by the same margin; zoom and target work the same. "
+        + "The caption says so after the view: '512x512, view +x, orthographic, 8 vertices, 6 faces'. "
+        + "'size' is the image's width and height: 256 for a quick look or a sheet tile, 512 (the default), 1024 for a dense mesh with labels. "
+        + "The caption opens with it: '256x256, view front, 8 vertices, 6 faces'. "
         + "The light turns with the view, and faces turned different ways show as different brightnesses. "
         + "Faces wound the wrong way (clockwise seen from outside) show as MISSING: you see through them to whatever is behind. "
         + "An EMPTY result, an image of only the dark background with no error, means no face points at the camera: "
         + "the faces are wound the wrong way, or the mesh is an open surface seen from behind. "
         + "Try the other view, or fix the winding and call define_mesh again (move and extrude keep each face's winding, so they cannot fix it). "
-        + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a direction of zero or not three finite numbers; "
-        + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; an argument render does not take. "
+        + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a view that is not one of the eight names; a direction of zero or not three finite numbers; "
+        + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; an argument render does not take. "
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
         + "define_mesh, open, move, extrude, get_mesh and undo still work there.";
 
@@ -55,13 +63,15 @@ internal static class RenderTool
         EngineStatus status,
         ModelStore store,
         RenderQueue queue,
-        [Description("Which corner to look from: 'front' (the default when no direction is given) or 'back'. Not with direction."), AllowedValues("front", "back")] string? view = null,
+        [Description("Where to look from: the corner 'front' (the default when no direction is given) or 'back', or head-on along an axis: '+x', '-x', '+y', '-y', '+z', '-z'. Not with direction."), AllowedValues("front", "back", "+x", "-x", "+y", "-y", "+z", "-z")] string? view = null,
         [Description("[x, y, z]: from the point looked at toward the eye. Up is +Y, or -Z within 1 degree of vertical. Not with view.")] double[]? direction = null,
         [Description("1 to 8: how far to zoom in about the target. The default 1 frames the whole mesh.")] double zoom = 1,
         [Description("[x, y, z] in the mesh's coordinates, inside its bounds: the point to look at. Default: the centre.")] double[]? target = null,
+        [Description("'perspective' (the default), what a game shows, or 'orthographic': parallel edges stay parallel, true proportions."), AllowedValues("perspective", "orthographic")] string? projection = null,
+        [Description("The image's width and height: 256, 512 (the default) or 1024."), AllowedValues(256, 512, 1024)] double size = RenderSpec.DefaultSize,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -71,12 +81,12 @@ internal static class RenderTool
             return Error("view and direction: give one, not both.");
         }
 
-        if (view is not (null or "front" or "back"))
+        if (view is not null && !ViewFraming.NamedViews.ContainsKey(view))
         {
-            return Error($"view: '{view}' is not a view; use 'front' or 'back'.");
+            return Error($"view: '{view}' is not a view; use 'front', 'back', '+x', '-x', '+y', '-y', '+z' or '-z'.");
         }
 
-        Vector3 directionVector = CameraSpec.ForView(view == "back" ? RenderView.Back : RenderView.Front).Direction;
+        Vector3 directionVector = ViewFraming.NamedViews[view ?? "front"];
         if (direction is not null)
         {
             if (!Finite3(direction))
@@ -102,6 +112,18 @@ internal static class RenderTool
             return Error("target: must be three finite numbers [x, y, z].");
         }
 
+        if (projection is not (null or "perspective" or "orthographic"))
+        {
+            return Error($"projection: '{projection}' is not a projection; use 'perspective' or 'orthographic'.");
+        }
+
+        if (!RenderComposition.Sizes.Any(s => s == size))
+        {
+            return Error($"size: {Join([size])} is not a size; use 256, 512 or 1024");
+        }
+
+        var projected = projection == "orthographic" ? Projection.Orthographic : Projection.Perspective;
+
         await status.WhenSettled.WaitAsync(cancellationToken);
         if (status.FaultMessage is { } fault)
         {
@@ -124,7 +146,7 @@ internal static class RenderTool
             }
         }
 
-        var rendering = queue.Post(new CameraSpec(directionVector, (float)zoom, targetVector));
+        var rendering = queue.Post(new RenderSpec(new CameraSpec(directionVector, (float)zoom, targetVector), projected, (int)size));
 
         // The frame thread drains the queue; once it has ended, nothing will.
         await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
@@ -144,22 +166,28 @@ internal static class RenderTool
             Content =
             [
                 ImageContentBlock.FromBytes(EncodePng(frame), "image/png"),
-                new TextContentBlock { Text = Caption(frame, view, direction, zoom, target) },
+                new TextContentBlock { Text = Caption(frame, view, direction, projected, zoom, target) },
             ],
         };
     }
 
     /// <summary>
-    /// <c>view front</c> for a view; <c>direction (x, y, z)</c> as given for a direction; then zoom and
-    /// target only where set, then the counts.
+    /// The size; <c>view front</c> for a view or <c>direction (x, y, z)</c> as given for a direction; then
+    /// each thing asked for beyond the default, only where set: the projection, zoom, target. The counts
+    /// close it, so a part added here goes before them.
     /// </summary>
-    internal static string Caption(RenderedFrame frame, string? view, double[]? direction, double zoom, double[]? target)
+    internal static string Caption(RenderedFrame frame, string? view, double[]? direction, Projection projection, double zoom, double[]? target)
     {
         var parts = new List<string>
         {
             $"{frame.Pixels.Width}x{frame.Pixels.Height}",
             direction is null ? $"view {view ?? "front"}" : $"direction ({Join(direction)})",
         };
+
+        if (projection == Projection.Orthographic)
+        {
+            parts.Add("orthographic");
+        }
 
         if (zoom != 1)
         {

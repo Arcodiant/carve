@@ -56,7 +56,7 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `src/Carve.Extensibility` | The public extension API: `ICarveExtension`, `CarveHostBuilderContext` |
 | `src/Carve.Server` | The shipped product, the `carve` MCP server |
 | `extensions/Carve.Debug` | The debug extension: in-memory transport, `ScenarioDriver`, fixed clock and seed, run folder. Referenced by nothing in `src/` |
-| `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views, and four cube frames by direction and zoom |
+| `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views, four cube frames by direction and zoom, and the sizes, orthographic and axis-view frames |
 | `scenarios/Carve.Scenario.Crate` | The crate: one cube built into a crate with `move` and `extrude` only, five views, undo and error paths; suite `scenario-crate` |
 | `scenarios/Carve.Scenario.Export` | The crate saved, reopened and exported into a game content folder in the run folder, then shown by the viewer; suite `scenario-export`, run by `scripts/run-export-scenario.ps1` with the checks in `tests/Carve.ExportViewer.Tests` |
 | `spikes/Carve.ModelViewer` | The model viewer, a stand-in for a game: loads a `.glb` through `IModelLoader` and captures fixed views. It is not the scenario harness, and nothing in the product uses it |
