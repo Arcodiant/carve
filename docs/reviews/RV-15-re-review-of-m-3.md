@@ -112,3 +112,14 @@ Checked all 32 answers of RV-14 against `git diff ff57cdd..HEAD`, which I read w
 Note for whoever runs from this worktree: `dotnet test --no-build` on `tests/Carve.Core.Tests` fails 3 surrogate cases, because that `bin/` still holds a `Carve.Core.dll` built during RV-14's break run (18:37:46, before the source was restored at 18:37:53). It is a stale binary and not a defect; the suites build first.
 
 **Not checked.** No GPU suite was run and no image was opened, so the following rest on RV-14's table and the carried passes in `cairn milestone M-3 verify`: `CheckFront` on real frames, the viewer tests including the default-view and backslash ones, the step-3 timeout and skip detection, the second run into a named folder, and every regression test in `Carve.Server.Tests`. `CheckFront`'s claim that an up-flipped camera fails was never tried, here or in RV-14. T-16's actual verify output is recorded nowhere in the repo, so that clause of the answer is confirmed from the rule in `gate.py` and not from the output, and I did not run `cairn task T-16 verify`. The solution-wide `dotnet test Carve.slnx` and `verify.ps1` were not re-run. The flush before the move has no test and cannot have one short of a power loss; it was read only.
+
+**Fixes of round 2: checks and breaks.** Each new or changed check was shown failing on a break, and the break was reverted.
+
+| Check | Break | Result |
+|---|---|---|
+| `Undo_straight_after_the_first_open_of_a_fresh_process_is_a_tool_error_and_the_mesh_stays` (new) | `ModelStore.Undo` guard `_history.Count < 2` changed to `< 1` | fails ("An error occurred invoking 'undo'" instead of "nothing to undo"); passes restored |
+| `The_viewer_check_fails_on_a_linked_Carve_source_file`, new cases `../../src/**/*.cs` and `..\..\**\*.cs` (and `../../*/Carve.Core/Mesh.cs`) | wider-glob clause removed from `CarveCodeIn` | the first two fail (the third is also caught by the `Carve.` segment rule); pass restored |
+| `The_viewer_check_fails_on_a_reference_to_a_Carve_assembly` (new, 3 cases) | `<Reference>` loop disabled in `CarveCodeIn` | all 3 fail; pass restored |
+| `The_viewer_check_passes_a_file_of_its_own` (widened with an own `**/*.cs` and `System.Xml`) | none needed: it is the guard against false positives | passes |
+
+Not checked by a break: the `run-export-scenario.ps1` failed-build path (it prints the folder; only a hand run reaches it, and it was read, not run), and the wording and stale-note fixes, which are text.
