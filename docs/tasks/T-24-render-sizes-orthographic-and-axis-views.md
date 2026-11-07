@@ -4,7 +4,7 @@ description: >-
 ---
 # T-24 — Render sizes, orthographic and axis views
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
