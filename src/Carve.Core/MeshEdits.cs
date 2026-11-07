@@ -31,35 +31,19 @@ public static class MeshEdits
         else if (by == Vector3.Zero)
             errors.Add(new MeshError("by", "the move is zero: nothing would change"));
 
-        for (var i = 0; i < vertexList.Length; i++)
+        errors.AddRange(UnknownElements(mesh, vertexList, edgeList, faceList));
+        moved.UnionWith(vertexList.Where(v => v >= 0 && v < mesh.Vertices.Count));
+        foreach (var (a, b) in edgeList)
         {
-            var v = vertexList[i];
-            if (v < 0 || v >= mesh.Vertices.Count)
-                errors.Add(new MeshError(Invariant($"vertices[{v}]"), Invariant($"the {Ordinal(i)} listed vertex: there is no vertex {v}: ids run 0..{mesh.Vertices.Count - 1}")));
-            else
-                moved.Add(v);
-        }
-
-        for (var i = 0; i < edgeList.Length; i++)
-        {
-            var (a, b) = edgeList[i];
-            if (!mesh.Topology.TryGetEdge(a, b, out var edge))
-                errors.Add(new MeshError(Invariant($"edges[{Math.Min(a, b)}-{Math.Max(a, b)}]"), Invariant($"the {Ordinal(i)} listed edge, [{a}, {b}], is not an edge of the mesh")));
-            else
+            if (mesh.Topology.TryGetEdge(a, b, out var edge))
             {
                 moved.Add(edge.Lo);
                 moved.Add(edge.Hi);
             }
         }
 
-        for (var i = 0; i < faceList.Length; i++)
-        {
-            var f = faceList[i];
-            if (!HasFace(mesh, f))
-                errors.Add(UnknownFace(mesh, i, f));
-            else
-                moved.UnionWith(mesh.Faces[f]);
-        }
+        foreach (var f in faceList.Where(f => HasFace(mesh, f)))
+            moved.UnionWith(mesh.Faces[f]);
 
         // A bad or missing by is a problem with the whole call, and with it no move is tried. Otherwise the listed ids that
         // exist are moved, so that what Create would refuse in the result is named beside any unknown id.
@@ -274,6 +258,32 @@ public static class MeshEdits
                 Invariant($"the {name} {value:G6} is too {scale} for this face: {what}, is refused: {error.Message}"));
         }
         return error;
+    }
+
+    /// <summary>Each listed element the mesh does not have, named by element and by its place in its list: what <c>move</c> and <c>render</c>'s highlight refuse.</summary>
+    public static List<MeshError> UnknownElements(
+        PolygonMesh mesh, IReadOnlyCollection<int> vertices, IReadOnlyCollection<(int A, int B)> edges, IReadOnlyCollection<int> faces)
+    {
+        var errors = new List<MeshError>();
+        foreach (var (v, i) in vertices.Select((v, i) => (v, i)))
+        {
+            if (v < 0 || v >= mesh.Vertices.Count)
+                errors.Add(new MeshError(Invariant($"vertices[{v}]"), Invariant($"the {Ordinal(i)} listed vertex: there is no vertex {v}: ids run 0..{mesh.Vertices.Count - 1}")));
+        }
+
+        foreach (var ((a, b), i) in edges.Select((e, i) => (e, i)))
+        {
+            if (!mesh.Topology.TryGetEdge(a, b, out _))
+                errors.Add(new MeshError(Invariant($"edges[{Math.Min(a, b)}-{Math.Max(a, b)}]"), Invariant($"the {Ordinal(i)} listed edge, [{a}, {b}], is not an edge of the mesh")));
+        }
+
+        foreach (var (f, i) in faces.Select((f, i) => (f, i)))
+        {
+            if (!HasFace(mesh, f))
+                errors.Add(UnknownFace(mesh, i, f));
+        }
+
+        return errors;
     }
 
     private static bool HasFace(PolygonMesh mesh, int f) => f >= 0 && f < mesh.Faces.Count;

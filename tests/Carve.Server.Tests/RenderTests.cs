@@ -391,6 +391,7 @@ public class RenderTests
     [InlineData("""{"size":300}""", "size: 300 is not a size; use 256, 512 or 1024")]
     [InlineData("""{"size":2048}""", "size: 2048 is not a size; use 256, 512 or 1024")]
     [InlineData("""{"size":512.5}""", "size: 512.5 is not a size; use 256, 512 or 1024")]
+    [InlineData("""{"mode":"xray"}""", "mode: 'xray' is not a mode; use 'shaded', 'wireframe' or 'normals'.")]
     public async Task A_bad_camera_is_a_tool_error_and_the_mesh_still_renders(string arguments, string mentions)
     {
         using var carve = new CarveProcess([]);
@@ -536,5 +537,131 @@ public class RenderTests
         var zoomed = Png(await carve.CallToolAsync("render", """{"zoom":3}"""));
         Assert.Equal(front, along);
         Assert.NotEqual(front, zoomed);
+    }
+
+    [Theory]
+    [InlineData("""{"highlight":3}""", "highlight: expected an object with any of vertices, edges and faces, got 3")]
+    [InlineData("""{"highlight":[1]}""", "highlight: expected an object with any of vertices, edges and faces, got")]
+    [InlineData("""{"highlight":{"faces":"top"}}""", "faces: expected an array of integer ids")]
+    [InlineData("""{"highlight":{"edges":[1]}}""", "edges: the 1st listed entry: expected a pair [a, b]")]
+    [InlineData("""{"highlight":{"faces":[0,99]}}""", "faces[99]: the 2nd listed face: there is no face 99: ids run 0..5")]
+    [InlineData("""{"highlight":{"vertices":[8]}}""", "vertices[8]: the 1st listed vertex: there is no vertex 8: ids run 0..7")]
+    [InlineData("""{"highlight":{"edges":[[0,6]]}}""", "edges[0-6]: the 1st listed edge, [0, 6], is not an edge of the mesh")]
+    public async Task A_bad_highlight_is_a_tool_error_and_the_mesh_is_untouched(string arguments, string expected)
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var text = ErrorText(await carve.CallToolAsync("render", arguments));
+
+        Assert.StartsWith("render failed with 1 problem(s); the current mesh is unchanged:", text);
+        Assert.Contains(expected, text);
+        Assert.Equal("512x512, view front, 8 vertices, 6 faces", Caption(await RenderAsync(carve)));
+    }
+
+    [Fact]
+    public async Task Every_problem_of_a_highlight_is_listed()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var text = ErrorText(await carve.CallToolAsync("render", """{"highlight":{"vertices":[9],"edges":[[0,6]],"faces":[7]}}"""));
+
+        Assert.StartsWith("render failed with 3 problem(s)", text);
+        Assert.Contains("vertices[9]", text);
+        Assert.Contains("edges[0-6]", text);
+        Assert.Contains("faces[7]", text);
+    }
+
+    [Fact]
+    public async Task The_caption_says_the_mode_and_the_highlight()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        foreach (var (arguments, caption) in new[]
+        {
+            ("""{"mode":"shaded"}""", "512x512, view front, 8 vertices, 6 faces"),
+            ("""{"mode":"wireframe"}""", "512x512, view front, wireframe, 8 vertices, 6 faces"),
+            ("""{"mode":"normals","view":"back"}""", "512x512, view back, normals, 8 vertices, 6 faces"),
+            ("""{"highlight":{}}""", "512x512, view front, 8 vertices, 6 faces"),
+            ("""{"highlight":{"faces":[3]}}""", "512x512, view front, highlight 1 face, 8 vertices, 6 faces"),
+            ("""{"highlight":{"edges":[[0,1],[1,0]]}}""", "512x512, view front, highlight 1 edge, 8 vertices, 6 faces"),
+            ("""{"highlight":{"vertices":[6]}}""", "512x512, view front, highlight 1 vertex, 8 vertices, 6 faces"),
+            ("""{"mode":"wireframe","highlight":{"faces":[1,2,3],"edges":[[0,1],[1,2]],"vertices":[6]}}""", "512x512, view front, wireframe, highlight 3 faces, 2 edges, 1 vertex, 8 vertices, 6 faces"),
+            ("""{"highlight":{"faces":[3,5],"vertices":[6,7]}}""", "512x512, view front, highlight 2 faces, 2 vertices, 8 vertices, 6 faces"),
+            ("""{"size":256,"view":"+x","projection":"orthographic","mode":"normals","highlight":{"faces":[5]},"zoom":2,"target":[1,0.5,0.25]}""", "256x256, view +x, orthographic, normals, highlight 1 face, zoom 2, target (1, 0.5, 0.25), 8 vertices, 6 faces"),
+        })
+        {
+            Assert.Equal(caption, Caption(await carve.CallToolAsync("render", arguments)));
+        }
+    }
+
+    [Fact]
+    public async Task A_select_result_is_a_highlight_as_it_stands()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+
+        var result = await carve.CallToolAsync("render", """{"highlight":{"kind":"faces","faces":[3],"count":1,"of":6}}""");
+
+        Assert.Equal("512x512, view front, highlight 1 face, 8 vertices, 6 faces", Caption(result));
+    }
+
+    [Fact]
+    public async Task Shaded_with_an_empty_highlight_is_the_frame_of_no_arguments_even_after_the_other_looks()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+        var plain = Png(await RenderAsync(carve));
+
+        Assert.Equal(plain, Png(await carve.CallToolAsync("render", """{"mode":"shaded","highlight":{}}""")));
+        Assert.Equal(plain, Png(await carve.CallToolAsync("render", """{"mode":"shaded","highlight":{"vertices":[],"edges":[],"faces":[]}}""")));
+
+        var wire = Png(await carve.CallToolAsync("render", """{"mode":"wireframe","highlight":{"faces":[3],"edges":[[0,1]],"vertices":[6]}}"""));
+        Assert.NotEqual(plain, wire);
+        var normals = Png(await carve.CallToolAsync("render", """{"mode":"normals"}"""));
+        Assert.NotEqual(plain, normals);
+
+        Assert.Equal(plain, Png(await carve.CallToolAsync("render", """{"mode":"shaded"}""")));
+    }
+
+    [Fact]
+    public async Task A_look_follows_the_mesh_through_an_edit()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        await carve.CallToolAsync("define_mesh", Cube);
+        var before = Png(await carve.CallToolAsync("render", """{"mode":"wireframe"}"""));
+
+        await carve.CallToolAsync("move", """{"vertices":[6],"by":[0.3,0.3,0.3]}""");
+
+        Assert.NotEqual(before, Png(await carve.CallToolAsync("render", """{"mode":"wireframe"}""")));
+    }
+
+    [Fact]
+    public async Task The_tool_describes_its_looks()
+    {
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+
+        var tools = await carve.ListToolsAsync();
+        var render = tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "render");
+
+        var description = render.GetProperty("description").GetString()!;
+        foreach (var part in new[] { "wireframe", "normals", "highlight", "hidden-line", "(normal + 1) / 2", "spike", "a mode other than", "a highlight that is not an object" })
+        {
+            Assert.Contains(part, description);
+        }
+
+        var schema = render.GetProperty("inputSchema").GetProperty("properties");
+        Assert.Equal(["shaded", "wireframe", "normals"], schema.GetProperty("mode").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        Assert.Equal("object", schema.GetProperty("highlight").GetProperty("type").GetString());
+        Assert.Equal(["vertices", "edges", "faces"], schema.GetProperty("highlight").GetProperty("properties").EnumerateObject().Select(p => p.Name));
     }
 }
