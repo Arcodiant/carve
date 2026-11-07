@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The leaky shed: samples/leaky-shed.carve opened, every planted fault found with check and select, a selection moved, and the shed shown in every look. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Shed</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="../../samples/leaky-shed.carve" Link="leaky-shed.carve" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
