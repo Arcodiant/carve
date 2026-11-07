@@ -6,3 +6,4 @@
 - T-25: render draws a hidden-line wireframe, a normals look of coloured faces and spikes, and highlights selected elements
 - T-26: render draws face and vertex ids on the image and tiles up to six captioned views into one contact sheet
 - T-27: The shed scenario finds every planted fault with check and select, moves a selection and shows the shed in every look, in its own suite
+- T-28: Fresh agents open the leaky shed, find its faults with check and select, act on a selection and read labelled renders, recovering from a wrong edge
