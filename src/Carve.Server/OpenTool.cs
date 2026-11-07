@@ -14,7 +14,7 @@ public sealed class OpenTool(ModelStore store)
 
     public const string Text =
         "Reads a .carve file (written by save) and makes its mesh the current mesh, in one step like define_mesh: it REPLACES the current mesh, "
-        + "it does not add to it, and open is a step like any other, so undo takes it back to the mesh before it. The one exception is the first mesh a process has, which cannot be undone whichever tool made it: a fresh process whose first mesh is this open cannot undo it (undo is then a tool error and the mesh stays), while a process that had a mesh before the open can. Takes path, the file to read. "
+        + "it does not add to it, and open is a step like any other, so undo takes it back to the mesh before it. The first mesh a process has cannot be undone, whichever tool made it, so undo straight after an open that gave the process its first mesh is a tool error (the mesh stays), while a process that had a mesh before the open can undo it; and only the last 100 changes are kept, so once 100 changes have followed an open, the open itself can no longer be undone. Takes path, the file to read. "
         + "The file holds the polygons exactly, with the ids they were saved with: vertex 0 is the file's first vertex and face 0 its first face, "
         + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so the file brings no older states with it, "
         + "and carve keeps no current file: give the path to open and to save every time. "

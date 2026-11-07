@@ -13,7 +13,7 @@ public sealed class UndoTool(ModelStore store)
         + "A call that failed was never recorded, so it is not a step. "
         + "Returns the same JSON as define_mesh for the mesh now current ({vertices, faces, edges, closed, bounds:{min,max}, warnings:[]}) "
         + "plus undone, the name of the tool whose change was taken back, e.g. \"extrude\". "
-        + "open is a step like define_mesh: within a session undo takes it back to the mesh before it (undone is \"open\"). The first mesh a process has, whether from define_mesh or from open, has nothing before it, so undo straight after a first open in a new process is a tool error. "
+        + "open is a step like define_mesh: undo takes it back to the mesh before it (undone is \"open\"). The first mesh a process has, whether from define_mesh or from open, has nothing before it, so undo straight after an open that gave the process its first mesh is a tool error, while after an open in a process that had a mesh before, undo works. Past 100 changes the oldest drop off and undo stops at whatever is then the oldest. "
         + "When there is nothing older to go back to it is a tool error saying so. "
         + "Worked example, straight after an extrude (returns undone \"extrude\"):\n"
         + ExampleMarker + "{}";
