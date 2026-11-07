@@ -13,7 +13,8 @@
       "inputs": [
         {
           "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
-        }
+        },
+        "samples/leaky-shed.carve"
       ],
       "resources": "cpu",
       "est-seconds": 30
@@ -44,6 +45,7 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
+        "samples/leaky-shed.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],
