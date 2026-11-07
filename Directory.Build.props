@@ -5,8 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <LangVersion>latest</LangVersion>
-    <!-- The one engine pin. Never a literal in a .csproj. Newest published to the feed at setup. -->
-    <EmpyreanVersion>0.117.0</EmpyreanVersion>
+    <!-- The one engine pin. Never a literal in a .csproj. The version Orcward's game uses, not the newest on the feed. -->
+    <EmpyreanVersion>0.119.0</EmpyreanVersion>
     <ModelContextProtocolVersion>2.3.0</ModelContextProtocolVersion>
     <MicrosoftExtensionsHostingVersion>10.0.13</MicrosoftExtensionsHostingVersion>
     <!-- What the engine itself depends on: the encoder of engine need 2, and a decoder for the tests. -->
