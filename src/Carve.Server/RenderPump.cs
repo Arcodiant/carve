@@ -87,6 +87,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             }
 
             queue.TryTake(out _);
+            next.ServedVersion = _version;
             scene.Render(next);
         }
     }

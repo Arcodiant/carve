@@ -19,7 +19,7 @@ internal sealed class RenderSystem(
     RenderComposition composition,
     RenderQueue queue,
     ModelStore store,
-    ILogger<RenderSystem> log) : ISystem, IRenderScene
+    ILogger<RenderSystem> log) : ISystem, IRenderScene, LookHolder<Mesh>.IParts
 {
     private const string Scene = "carve";
 
@@ -29,18 +29,18 @@ internal sealed class RenderSystem(
     private Entity _light;
     private readonly List<Entity> _cameras = [];
     private Entity? _meshEntity;
-    private Mesh? _mesh;
-    private readonly LineSlot _edgeLines = new();
-    private readonly LineSlot _orangeLines = new();
-    private Carve.Core.PolygonMesh? _shown;
-    private Look _look;
-    private Highlight _highlight = Highlight.None;
+    private Material? _nextMaterial;
+    private Entity? _edgeLines;
+    private Entity? _orangeLines;
+    private LookHolder<Mesh>? _looks;
     private MeshReport? _report;
     private Vector3 _drawnHalf;
     private DrawnSpace _space;
     private ViewFrame? _frame;
     private bool _composed;
     private RenderPump? _pump;
+
+    private LookHolder<Mesh> Looks => _looks ??= new LookHolder<Mesh>(this);
 
     public void Initialise()
     {
@@ -95,47 +95,44 @@ internal sealed class RenderSystem(
     {
         var report = MeshReport.Create(mesh);
         var space = DrawnSpace.Of(report.BoundsMin, report.BoundsMax);
-        PutLook(mesh, space, _look, _highlight);
-        _shown = mesh;
+        Looks.Show(mesh, space);
         _report = report;
         _space = space;
         _drawnHalf = space.Apply(report.BoundsMax);
     }
 
-    /// <summary>
-    /// Draws a mesh in a look. The new meshes are made first, so a failure leaves the scene as it was,
-    /// and each old handle goes once its entity holds the new one.
-    /// </summary>
-    private void PutLook(Carve.Core.PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight)
+    public IReadOnlyList<Func<Mesh?>> Make(Carve.Core.PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight)
     {
         var scene = LookMeshes.Compose(mesh, space, look, highlight);
         var data = MeshBridge.ToMeshData(mesh, space);
-        var next = scene.VertexColours is { } colours ? resources.CreateMesh(data, colours) : resources.CreateMesh(data);
-        var material = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
-        var edges = scene.EdgeLines is { } edgeLines ? resources.CreateMesh(edgeLines) : null;
-        var orange = scene.OrangeLines is { } orangeLines ? resources.CreateMesh(orangeLines) : null;
+        // The fill's material, put on its entity by Install with the meshes made here.
+        _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
+        return
+        [
+            () => scene.VertexColours is { } colours ? resources.CreateMesh(data, colours) : resources.CreateMesh(data),
+            () => scene.EdgeLines is { } edgeLines ? resources.CreateMesh(edgeLines) : null,
+            () => scene.OrangeLines is { } orangeLines ? resources.CreateMesh(orangeLines) : null,
+        ];
+    }
 
+    public void Install(Mesh fill, Mesh? edges, Mesh? orange)
+    {
         if (_meshEntity is { } entity)
         {
             ref var instance = ref entities.GetComponent<MeshInstance>(entity);
-            instance.Mesh = next;
-            instance.Material = material;
+            instance.Mesh = fill;
+            instance.Material = _nextMaterial!;
         }
         else
         {
-            _meshEntity = AddInstance(next, material);
+            _meshEntity = AddInstance(fill, _nextMaterial!);
         }
 
-        var old = _mesh;
-        _mesh = next;
-        if (old is not null)
-        {
-            resources.Destroy(old);
-        }
-
-        Swap(_edgeLines, edges, LookMeshes.Edge);
-        Swap(_orangeLines, orange, LookMeshes.Orange);
+        _edgeLines = Swap(_edgeLines, edges, LookMeshes.Edge);
+        _orangeLines = Swap(_orangeLines, orange, LookMeshes.Orange);
     }
+
+    public void Destroy(Mesh mesh) => resources.Destroy(mesh);
 
     private Entity AddInstance(Mesh mesh, Material material, bool castsShadow = true)
     {
@@ -157,52 +154,31 @@ internal sealed class RenderSystem(
         return entity;
     }
 
-    /// <summary>Puts the next lines in a slot; the entity is in the scene only while the look has such lines.</summary>
-    private void Swap(LineSlot slot, Mesh? next, Vector4 colour)
+    /// <summary>Puts the next lines on a slot's entity; the entity is in the scene only while the look has such lines.</summary>
+    private Entity? Swap(Entity? slot, Mesh? next, Vector4 colour)
     {
-        var old = slot.Mesh;
-        slot.Mesh = next;
         if (next is null)
         {
-            if (slot.Entity is { } gone)
+            if (slot is { } gone)
             {
                 entities.DestroyEntity(gone);
-                slot.Entity = null;
             }
+
+            return null;
         }
-        else if (slot.Entity is { } entity)
+
+        if (slot is { } entity)
         {
             entities.GetComponent<MeshInstance>(entity).Mesh = next;
-        }
-        else
-        {
-            slot.Entity = AddInstance(next, Material.SolidColor(colour), castsShadow: false);
+            return entity;
         }
 
-        if (old is not null)
-        {
-            resources.Destroy(old);
-        }
-    }
-
-    /// <summary>The lines of a look in one colour.</summary>
-    private sealed class LineSlot
-    {
-        public Entity? Entity { get; set; }
-
-        public Mesh? Mesh { get; set; }
+        return AddInstance(next, Material.SolidColor(colour), castsShadow: false);
     }
 
     public void ApplyView(RenderSpec spec)
     {
-        // A camera change alone rebuilds nothing.
-        if (_shown is { } shown && (spec.Mode != _look || spec.Highlight != _highlight))
-        {
-            PutLook(shown, _space, spec.Mode, spec.Highlight);
-        }
-
-        _look = spec.Mode;
-        _highlight = spec.Highlight;
+        Looks.Apply(spec.Mode, spec.Highlight, _space);
 
         // The target is in the mesh's own coordinates; the camera works in drawn space.
         var camera = spec.Camera;
@@ -237,7 +213,7 @@ internal sealed class RenderSystem(
         var surface = surfaces.Get(RenderComposition.LabelTag(spec.Size));
         Vector2 Measure(string text) => surface.Text.MeasureText(text, 1);
 
-        var labels = LabelLayout.Plan(_shown!, _space, _frame!, spec.Camera.Direction, spec.Projection, spec.Labels, spec.Size, Measure);
+        var labels = LabelLayout.Plan(Looks.Shown!, _space, _frame!, spec.Camera.Direction, spec.Projection, spec.Labels, spec.Size, Measure);
         foreach (var label in labels)
         {
             Draw(surface, label);
@@ -266,6 +242,7 @@ internal sealed class RenderSystem(
         {
             var vertices = _report!.VertexCount;
             var faces = _report.FaceCount;
+            var version = request.ServedVersion;
 
             DrawOverlay(request.Spec);
 
@@ -278,7 +255,7 @@ internal sealed class RenderSystem(
                 {
                     if (task.IsCompletedSuccessfully)
                     {
-                        request.Complete(new RenderedFrame(task.Result, vertices, faces));
+                        request.Complete(new RenderedFrame(task.Result, vertices, faces) { Version = version });
                     }
                     else
                     {
