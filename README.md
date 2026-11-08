@@ -52,3 +52,14 @@ the paths relative to the folder carve was started in (its working directory):
 
 The tool descriptions carry the same sequence, so an agent that has only the
 tool list can follow it.
+
+## Asking the mesh
+
+An agent can question a mesh instead of reading every id out of `get_mesh`.
+
+- `check` (no arguments) lists what is wrong: inside-out shells, coincident or unused vertices, duplicate faces, open edges (holes), flipped or non-manifold edges, bent faces, each with the element ids.
+- `select` takes a `kind` (`vertices`, `edges` or `faces`) and a `where`, and returns the ids. `where` is comparisons on a property (`y > 3.55`, `min.y >= 3.6`, `length < 0.2`) or a flag (`open`, `unattached`, `non_planar`), joined by `and`, `or`, `not` and brackets; `all` and `none` also work. For example `edges` where `open`, or `faces` where `normal.y > 0.9`.
+- The server keeps no selection: pass the ids of a `select` result to `move` or `extrude` yourself, and ask again after an edit.
+- `render` with `labels` (`vertices`, `faces`, `both`) draws the ids on the image, and `highlight` marks named elements. With `views` (a list of the axis views `+x`, `-x`, `+y`, `-y`, `+z`, `-z`, or `front`, `back` and the rest) it returns one contact sheet, e.g. `{"views":["+x","-x","+y","-y","+z","-z"],"labels":"faces","mode":"normals"}`. `mode` also takes `wireframe`.
+
+`samples/leaky-shed.carve` is a broken shed to try them on.

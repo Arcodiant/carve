@@ -31,6 +31,94 @@ internal static class TestMeshes
 
     public static PolygonMesh Cube() => Make(CubeVertices, CubeFaces);
 
+    /// <summary>
+    /// The leaky shed: a gabled house with every fault once, for check and select to find. samples/leaky-shed.carve is
+    /// this mesh, kept equal by a test. T-27 and T-28 build on these ids; T-23's As built lists them.
+    /// Vertices 3 and 9 are not an edge: T-28's planted mistake.
+    /// </summary>
+    public static PolygonMesh LeakyShed()
+    {
+        Vector3[] vertices =
+        [
+            new(0, 0, 0), new(4, 0, 0), new(4, 0, 3), new(0, 0, 3), // 0-3 floor corners
+            new(0, 2.55f, 0), // 4 lifted eave corner: the -Z wall's corner raised 0.05, which bends faces[11], the slope using it, out of plane
+            new(4, 2.5f, 0), new(4, 2.5f, 3), new(0, 2.5f, 3), // 5-7 the other wall tops
+            new(0, 3.5f, 1.5f), new(4, 3.5f, 1.5f), // 8-9 ridge
+            new(4, 2.5f, 0), new(4, 2.5f, 3), // 10-11 unmerged seam: copies of 5 and 6, the two coincident-vertices problems
+            new(2.5f, 0, 3), new(3.5f, 0, 3), new(3.5f, 2, 3), new(2.5f, 2, 3), // 12-15 door, off centre
+            new(1, 3.6f, 1.3f), new(1.4f, 3.6f, 1.3f), new(1.4f, 3.9f, 1.3f), new(1, 3.9f, 1.3f), // 16-23 chimney, 0.1 above the ridge
+            new(1, 3.6f, 1.7f), new(1.4f, 3.6f, 1.7f), new(1.4f, 3.9f, 1.7f), new(1, 3.9f, 1.7f),
+            new(6, 0, 0), // 24 stray vertex: no face uses it
+        ];
+
+        int[][] house =
+        [
+            [0, 1, 2, 13, 12, 3], // 0 floor, its +Z side running along the door's foot
+            [0, 4, 5, 1], // 1 -Z wall
+            [4, 7, 3, 0], // 2 flipped wall: the -X wall's loop reversed, so edges 0-3, 0-4, 3-7 and 4-7 are crossed twice the same way
+            [1, 5, 6, 2], // 3 +X wall, on the originals 5 and 6
+            [3, 12, 15, 7], [15, 14, 6, 7], [13, 2, 6, 14], // 4-6 the +Z wall around the door
+            [12, 13, 14, 15], // 7 door
+            [12, 13, 14, 15], // 8 duplicated door: duplicate-face, and edges 12-13, 12-15, 13-14, 14-15 non-manifold and crossed twice the same way
+            [4, 7, 8], // 9 -X gable
+            [11, 10, 9], // 10 +X gable, on the copies 10 and 11, so edges 5-6 and 10-11 are the seam, open on both sides
+            [4, 8, 9, 10], // 11 -Z roof slope, on the copy 10, so edges 4-5 and 4-10 are the seam along the eave
+            // Missing roof face: no +Z slope, so edges 8-9 (ridge), 6-7 (eave), 7-8 and 9-11 (rakes) are open.
+        ];
+
+        // Inside-out chimney: faces 12-17, a closed box and a shell of its own with every loop reversed.
+        return Make(vertices, house.Concat(CubeFaces.Select(f => f.Reverse().Select(i => i + 16).ToArray())));
+    }
+
+    /// <summary>What check finds in <see cref="LeakyShed"/>, as (check, element, message).</summary>
+    public static readonly (string Check, string Element, string Message)[] LeakyShedProblems =
+    [
+        ("inside-out", "shells[1]", "closed shell of 6 faces (faces 12 to 17) is inside-out: its faces are wound clockwise seen from outside, so a game culls them and sees nothing"),
+        ("coincident-vertices", "vertices[10]", "vertex is at the same position as vertices[5]"),
+        ("coincident-vertices", "vertices[11]", "vertex is at the same position as vertices[6]"),
+        ("duplicate-face", "faces[8]", "face has the same vertices as faces[7]"),
+    ];
+
+    private const string OpenEdge = "edge belongs to only one face";
+    private const string SameWay = "two faces cross this edge in the same direction";
+    private const string SharedByThree = "edge is shared by 3 faces";
+
+    /// <summary>The warnings of <see cref="LeakyShed"/> as a client reads them, in <see cref="MeshReport"/>'s order: edges, faces, vertices.</summary>
+    public static readonly string[] LeakyShedWarnings =
+    [
+        $"edges[0-3]: {SameWay}",
+        $"edges[0-4]: {SameWay}",
+        $"edges[3-7]: {SameWay}",
+        $"edges[4-5]: {OpenEdge}",
+        $"edges[4-7]: {SameWay}",
+        $"edges[4-10]: {OpenEdge}",
+        $"edges[5-6]: {OpenEdge}",
+        $"edges[6-7]: {OpenEdge}",
+        $"edges[7-8]: {OpenEdge}",
+        $"edges[8-9]: {OpenEdge}",
+        $"edges[9-11]: {OpenEdge}",
+        $"edges[10-11]: {OpenEdge}",
+        $"edges[12-13]: {SharedByThree}",
+        $"edges[12-13]: {SameWay}",
+        $"edges[12-15]: {SharedByThree}",
+        $"edges[12-15]: {SameWay}",
+        $"edges[13-14]: {SharedByThree}",
+        $"edges[13-14]: {SameWay}",
+        $"edges[14-15]: {SharedByThree}",
+        $"edges[14-15]: {SameWay}",
+        "faces[11]: face is not planar: a vertex is 0.0105 off its plane (limit 0.000439)",
+        "vertices[24]: no face uses this vertex",
+    ];
+
+    /// <summary>The notes of <see cref="LeakyShed"/>.</summary>
+    public static readonly string[] LeakyShedNotes =
+    [
+        "size 4 x 3.9 x 3 m",
+        "base at y = 0",
+        "origin inside the bounds",
+        "2 separate shells; a model is usually one",
+    ];
+
     /// <summary>Every face id of <see cref="Cube"/>.</summary>
     public static readonly int[] AllCubeFaces = [0, 1, 2, 3, 4, 5];
 

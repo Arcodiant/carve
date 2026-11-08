@@ -56,8 +56,9 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `src/Carve.Extensibility` | The public extension API: `ICarveExtension`, `CarveHostBuilderContext` |
 | `src/Carve.Server` | The shipped product, the `carve` MCP server |
 | `extensions/Carve.Debug` | The debug extension: in-memory transport, `ScenarioDriver`, fixed clock and seed, run folder. Referenced by nothing in `src/` |
-| `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views, and four cube frames by direction and zoom |
-| `scenarios/Carve.Scenario.Crate` | The crate: one cube built into a crate with `move` and `extrude` only, five views, undo and error paths; suite `scenario-crate` |
+| `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views, four cube frames by direction and zoom, and the sizes, orthographic and axis-view frames |
+| `scenarios/Carve.Scenario.Crate` | The crate: one cube built into a crate with `move` and `extrude` only, five views, undo and error paths, then the wireframe, normals and highlight frames (`CrateLooks.cs`, projecting points with `CameraPixels.cs`) and the labelled frames and contact sheets (`CrateLabels.cs`); suite `scenario-crate` |
+| `scenarios/Carve.Scenario.Shed` | The leaky shed: `samples/leaky-shed.carve` opened, `check` and `select` finding every planted fault, a selection moved, and the shed in every look, size and an axes sheet; each pixel is worked from the mesh by a ray test (`ShedGeometry.cs`); suite `scenario-shed` |
 | `scenarios/Carve.Scenario.Export` | The crate saved, reopened and exported into a game content folder in the run folder, then shown by the viewer; suite `scenario-export`, run by `scripts/run-export-scenario.ps1` with the checks in `tests/Carve.ExportViewer.Tests` |
 | `spikes/Carve.ModelViewer` | The model viewer, a stand-in for a game: loads a `.glb` through `IModelLoader` and captures fixed views. It is not the scenario harness, and nothing in the product uses it |
 | `tests/Carve.Core.Tests` | xunit tests of the kernel, incl. the engine-free guard |
@@ -72,6 +73,7 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `scripts/run-viewer.ps1` | Builds, then runs the viewer on one model; returns its exit code |
 | `scripts/run-export-scenario.ps1` | The export scenario, then the viewer on its content folder, then the checks of `tests/Carve.ExportViewer.Tests` (built first unless `-NoBuild`, each step bounded; a skipped check fails it); the run folder is the last line on stdout |
 | `scripts/bounded-run.ps1` | Dot-sourced by the run scripts: starts `dotnet` with quoted arguments (a trailing backslash survives) and stops it after its time limit, exit code 124 |
+| `samples/` | Sample models, written by `CarveFile.Write`: `leaky-shed.carve`, the broken shed `check` is shown on, kept equal to `TestMeshes.LeakyShed()` by a test |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
 

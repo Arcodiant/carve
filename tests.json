@@ -13,7 +13,8 @@
       "inputs": [
         {
           "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
-        }
+        },
+        "samples/leaky-shed.carve"
       ],
       "resources": "cpu",
       "est-seconds": 30
@@ -44,6 +45,7 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
+        "samples/leaky-shed.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],
@@ -95,6 +97,28 @@
         "vulkan"
       ],
       "est-seconds": 15
+    },
+    {
+      "id": "scenario-shed",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 shed -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "samples/leaky-shed.carve",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
     },
     {
       "id": "scenario-export",

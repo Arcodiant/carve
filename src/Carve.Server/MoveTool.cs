@@ -13,7 +13,7 @@ public sealed class MoveTool(ModelStore store)
         "Moves parts of the current mesh by an offset. Give any mix of vertices, edges and faces; every vertex they touch moves once, "
         + "even when it is reached twice (a face and one of its edges). "
         + "Ids are the ones get_mesh reports, and they never change: vertices and faces are integers, positions in define_mesh's lists; "
-        + "an edge is a [a, b] pair of vertex ids (either order) and must be an edge of the mesh. "
+        + "an edge is a [a, b] pair of vertex ids (either order) and must be an edge of the mesh. A pair that is not an edge of the mesh is refused, and the error names the pair. select with kind edges lists the real edges. "
         + "by is exactly three numbers [dx, dy, dz], in the same coordinates as define_mesh (1 unit = 1 m), Y up; a positive dy moves up. "
         + "At least one of vertices, edges, faces is required, and by must not be zero. "
         + "Moving adds and removes nothing, so the counts stay the same, but moving some corners of a face off its plane gives a non-planar warning. "
