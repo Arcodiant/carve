@@ -4,7 +4,7 @@ description: >-
 ---
 # T-30 — Face colours and groups
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
