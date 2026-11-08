@@ -38,23 +38,30 @@ internal static class ShedLooks
         Corners(wire);
         // A line is drawn over the fill, so samples within 4 pixels of any edge are left out.
         var lines = shed.Faces.SelectMany(loop => loop.Select((v, k) => (camera.Project(shed.Vertices[v]), camera.Project(shed.Vertices[loop[(k + 1) % loop.Length]])))).ToArray();
-        var wireTested = Samples(wire, camera, shed, (0, 0), 512, _ => Fill, background: false, "wireframe fill", lines);
+        var wireTested = Samples(wire, camera, shed, (0, 0), 512, _ => Fill, background: true, "wireframe", lines);
         if (wireTested < 20)
         {
-            Note($"{wire.Name}: only {wireTested} samples were surely a face");
+            Note($"{wire.Name}: only {wireTested} samples were surely a face or the background");
+        }
+
+        // The wireframe's faces are culled as the shaded ones are, so through the remaining -Z slope, seen from inside, the sky shows.
+        var wireBehindSlope = BehindSlope(wire, camera, shed, lines, "the culled -Z roof slope, in the wireframe, so what is behind it");
+        if (wireBehindSlope == 0)
+        {
+            Note($"{wire.Name}: no sample of the culled slope showed what is behind it");
         }
 
         // The ridge, along the far edge of the gap, and the far wall's top edge seen through the gap.
         Line(wire, camera.Project(new Vector3(0.5f, 3.5f, 1.5f)), camera.Project(new Vector3(3.5f, 3.5f, 1.5f)), Edge, "the ridge");
         LineStandsOff(wire, camera, new Vector3(0, 3.5f, 1.5f), new Vector3(4, 3.5f, 1.5f), "the ridge");
-        Line(wire, camera.Project(new Vector3(0, 2.53f, 0.5f)), camera.Project(new Vector3(0, 2.51f, 2.0f)), Edge, "the flipped -X wall's top edge, through the gap");
+        var (v4, v7) = (shed.Vertices[4], shed.Vertices[7]);
+        Line(wire, camera.Project(Vector3.Lerp(v4, v7, 1 / 6f)), camera.Project(Vector3.Lerp(v4, v7, 2 / 3f)), Edge, "the flipped -X wall's top edge 4-7, through the gap");
 
         // ---- normals ----
         var normals = await driver.CaptureAsync("shed-front-normals", new { view = "front", mode = "normals" });
         Caption(normals, $"512x512, view front, normals, {Counts}");
         Corners(normals);
         var seenFaces = new HashSet<int>();
-        var behindSlope = 0;
         var tested = Samples(normals, camera, shed, (0, 0), 512, f => { seenFaces.Add(f); return NormalColour(shed.Normal(f)); }, background: true, "normals", spikes);
         if (tested < 20)
         {
@@ -74,16 +81,7 @@ internal static class ShedLooks
             Note($"{normals.Name}: no sample showed the +Z wall");
         }
 
-        foreach (var point in shed.Samples(11))
-        {
-            var (x, y) = camera.Pixel(point);
-            if (camera.Seen(shed, x, y) == -1 && !spikes.Any(s => DistanceToSegment(new Vector2(x + 0.5f, y + 0.5f), s.Item1, s.Item2) < 4))
-            {
-                behindSlope++;
-                Background(normals, (x, y), "the culled -Z roof slope, so what is behind it");
-            }
-        }
-
+        var behindSlope = BehindSlope(normals, camera, shed, spikes, "the culled -Z roof slope, so what is behind it");
         if (behindSlope == 0)
         {
             Note($"{normals.Name}: no sample of the culled slope showed what is behind it");
@@ -94,6 +92,12 @@ internal static class ShedLooks
         Caption(picked, $"512x512, view front, highlight 8 edges, {Counts}");
         Corners(picked);
         Line(picked, camera.Project(new Vector3(1, 2.5f, 3)), camera.Project(new Vector3(3, 2.5f, 3)), Orange, "the eave edge 6-7");
+
+        // Closed edges facing the eye, not asked for, are not orange: the +Z wall's corner 2-6 (kept clear of 6, where
+        // open edges meet) and the base edge 1-2 under the +X wall.
+        var (v1, v2, v6) = (shed.Vertices[1], shed.Vertices[2], shed.Vertices[6]);
+        NotLine(picked, camera.Project(Vector3.Lerp(v2, v6, 0.1f)), camera.Project(Vector3.Lerp(v2, v6, 0.75f)), Orange, "the closed corner edge 2-6");
+        NotLine(picked, camera.Project(Vector3.Lerp(v1, v2, 0.2f)), camera.Project(Vector3.Lerp(v1, v2, 0.8f)), Orange, "the closed base edge 1-2");
         foreach (var face in new[] { 3, 4 })
         foreach (var point in shed.Samples(face))
         {
@@ -112,11 +116,14 @@ internal static class ShedLooks
         await SheetAsync(driver, shed);
 
         // ---- 1024, labels both ----
+        var camera1024 = new Camera(Min, Max, new Vector3(1.6f, 1.2f, 2.2f), 1024);
         var plain1024 = await driver.CaptureAsync("shed-front-1024", new { view = "front", size = 1024 });
+        Caption(plain1024, $"1024x1024, view front, {Counts}");
+        ShedScenario.ShadedFrame(plain1024, camera1024, shed);
         var both = await driver.CaptureAsync("shed-1024-labels-both", new { view = "front", labels = "both", size = 1024 });
         Caption(both, $"1024x1024, view front, labels both, {Counts}");
         Corners(both);
-        Labels(both, plain1024, new Camera(Min, Max, new Vector3(1.6f, 1.2f, 2.2f), 1024), shed, faces: true, vertices: true);
+        Labels(both, plain1024, camera1024, shed, faces: true, vertices: true);
     }
 
     /// <summary>
@@ -188,6 +195,13 @@ internal static class ShedLooks
         {
             if (x < 4 || y < 4 || x >= labelled.Width - 4 || y >= labelled.Height - 4 || Covered(x, y, ""))
             {
+                if (name.StartsWith("the stray vertex", StringComparison.Ordinal))
+                {
+                    // No frame of this run holds (6, 0, 0): render frames the faces' bounds, 0 to 4, so the vertex is off
+                    // every image, and so would its label be. Said in the run's log, not counted as a pass or a failure.
+                    Console.Error.WriteLine($"shed: not covered: {labelled.Name}: {name} at ({x}, {y}) is off the image or under a label, so whether it is labelled is not checked");
+                }
+
                 continue;
             }
 
@@ -196,6 +210,23 @@ internal static class ShedLooks
                 Note($"{labelled.Name}: {name} at ({x}, {y}) is {labelled.Pixel(x, y)}, without labels {plain.Pixel(x, y)}: there should be no label there");
             }
         }
+    }
+
+    /// <summary>The remaining -Z slope, face 11, faces away from the eye: where nothing else is in front of its samples, the background, clear of <paramref name="lines"/>.</summary>
+    private static int BehindSlope(ScenarioFrame frame, Camera camera, Shape shed, (Vector2 From, Vector2 To)[] lines, string what)
+    {
+        var count = 0;
+        foreach (var point in shed.Samples(11))
+        {
+            var (x, y) = camera.Pixel(point);
+            if (camera.Seen(shed, x, y) == -1 && !lines.Any(s => DistanceToSegment(new Vector2(x + 0.5f, y + 0.5f), s.From, s.To) < 4))
+            {
+                count++;
+                Background(frame, (x, y), what);
+            }
+        }
+
+        return count;
     }
 
     private static async Task SheetAsync(ScenarioDriver driver, Shape shed)

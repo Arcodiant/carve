@@ -138,6 +138,8 @@ Lines are one pixel wide and split their coverage on a slope, so `CheckLineAlong
 | spikes not drawn | `crate-normals`: the spike of the lid's +Z band |
 | highlight on every face, shaded | `crate-highlight-front`: the frame's \|R - B\| |
 | highlight on every face, wireframe | `crate-highlight-wireframe-front`: an unhighlighted face is orange |
+| every edge drawn orange when a highlight names edges (RV-20) | `crate-highlight-front`: the unselected top-front edge is orange |
+| the same, in wireframe only, the plain edge lines left out (RV-20) | `crate-highlight-wireframe-front`: the unselected top-front edge is orange |
 | highlighted edges not drawn | `crate-highlight-front`: the bar's top edge |
 | the same, in wireframe only | `crate-highlight-wireframe-front`: the bar's top edge |
 | stars not drawn | `crate-highlight-front`: the star's +X arm |

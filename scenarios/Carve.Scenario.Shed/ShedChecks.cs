@@ -146,6 +146,25 @@ internal static class Checks
     /// </summary>
     public static void Line(ScenarioFrame frame, Vector2 from, Vector2 to, Rgb colour, string what)
     {
+        var best = Closest(frame, from, to, colour);
+        if (best.Off > 10)
+        {
+            Note($"{frame.Name}: {what}, {from} to {to}: the closest pixel to {colour} is {best.P} at ({best.X}, {best.Y})");
+        }
+    }
+
+    /// <summary>The opposite of <see cref="Line"/>: no pixel touching the projected stretch is within 10/255 of <paramref name="colour"/>.</summary>
+    public static void NotLine(ScenarioFrame frame, Vector2 from, Vector2 to, Rgb colour, string what)
+    {
+        var best = Closest(frame, from, to, colour);
+        if (best.Off <= 10)
+        {
+            Note($"{frame.Name}: {what}, {from} to {to}: the pixel at ({best.X}, {best.Y}) is {best.P}, within 10 of {colour}: it should not be drawn in that colour");
+        }
+    }
+
+    private static (int Off, int X, int Y, (byte R, byte G, byte B, byte A) P) Closest(ScenarioFrame frame, Vector2 from, Vector2 to, Rgb colour)
+    {
         const int Steps = 16;
         var best = (Off: int.MaxValue, X: 0, Y: 0, P: default((byte R, byte G, byte B, byte A)));
         for (var step = 0; step <= Steps; step++)
@@ -164,13 +183,14 @@ internal static class Checks
             }
         }
 
-        if (best.Off > 10)
-        {
-            Note($"{frame.Name}: {what}, {from} to {to}: the closest pixel to {colour} is {best.P} at ({best.X}, {best.Y})");
-        }
+        return best;
     }
 
-    /// <summary>Of a face's samples, those whose pixel the camera surely shows as a face or the background: tried against <paramref name="expect"/>.</summary>
+    /// <summary>
+    /// Of a face's samples, those whose pixel the camera surely shows as a face or the background: tried against
+    /// <paramref name="expectFace"/>, and the background ones against the background when <paramref name="background"/>.
+    /// Returns how many were checked; a sample nothing is asked of is not counted.
+    /// </summary>
     public static int Samples(ScenarioFrame frame, Camera camera, Shape shape, (int X, int Y) origin, int size, Func<int, Rgb?> expectFace, bool background, string what, IEnumerable<(Vector2 From, Vector2 To)>? avoid = null)
     {
         var avoided = avoid?.ToArray() ?? [];
@@ -190,11 +210,15 @@ internal static class Checks
                 continue;
             }
 
-            tested++;
             var at = (origin.X + x, origin.Y + y);
             if (seen == -1)
             {
-                if (background && !IsBackground(frame.Pixel(at.Item1, at.Item2)))
+                if (!background)
+                {
+                    continue;
+                }
+
+                if (!IsBackground(frame.Pixel(at.Item1, at.Item2)))
                 {
                     Note($"{frame.Name}: {what}: face {face} at {point} (pixel {at}) should show the background, is {frame.Pixel(at.Item1, at.Item2)}");
                 }
@@ -211,6 +235,8 @@ internal static class Checks
             {
                 NotBackground(frame, at, $"{what}: face {face}'s sample {point} seen as face {seen}");
             }
+
+            tested++;
         }
 
         return tested;
