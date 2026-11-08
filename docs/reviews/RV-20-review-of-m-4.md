@@ -12,7 +12,7 @@ description: >-
 
 **Previous:** —
 
-**Diff:** 87b3375d9e5a3b9cd80c3f731944f7c8eb2f45cc against origin/main (at 293f028)
+**Diff:** 87b3375d9e5a3b9cd80c3f731944f7c8eb2f45cc against origin/main
 
 **Reviewer:** four reviewers, each claude-opus-5-5
 
@@ -31,31 +31,41 @@ description: >-
 
 The Scope says the signed volume is "taken relative to the shell's first vertex", and the only test that claims to cover it is `Volume_does_not_depend_on_where_the_shell_is` (tests/Carve.Core.Tests/MeshHealthTests.cs:56-61). That test uses the unit cube moved by (-100, -200, -300). Every coordinate is a whole number, so every product is exact in double. A version that measures from the world origin, dropping the `- o` in `From` at MeshHealth.cs:131, also gives exactly 1; a throwaway build gave `1` both ways. A mesh that would catch it is a 0.1-unit cube at (1000.3, 2000.7, -3000.1): measured from the world origin its volume is 0.0010004878567997366, and from its first vertex 0.0010004878640756942. No other test fails without this Scope point.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): added the 0.1-unit cube at (1000.3, 2000.7, -3000.1), asserting 0.0010004878640756942; fails with the `- o` dropped.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): added the 0.1-unit cube at (1000.3, 2000.7, -3000.1), asserting 0.0010004878640756942; fails with the `- o` dropped.
 
 ### `inside-out` is decided by the sign of rounding noise on a flat closed shell (Minor)
 
 MeshHealth.cs:64 reports `inside-out` whenever `SignedVolume < 0`, with nothing relative to the shell's size. A two-sided flat sheet passes `PolygonMesh.Create` and gets no warnings; its signed volume should be 0, but in practice it is a tiny number of either sign. Example: four points on the plane z = 0.37x - 0.61y + 0.3, scaled by 1.37 and offset by (13.1, -7.3, 3.3), with a quad `[0,1,2,3]` on top and triangles `[0,3,2]`, `[0,2,1]` underneath. Its signed volume is -2.27e-7, and `check` reports `closed shell of 3 faces ... is inside-out: ... a game culls them and sees nothing`, which is wrong: the sheet is visible from both sides. The same sheet at other offsets came out at +1.1e-8, +6.2e-7 and +2.1e-6, and none of those was reported. A doubled face with the same vertices gives exactly 0, so only a sheet whose two sides are triangulated differently is hit. Any fix needs a threshold, which is a tolerance and goes to the person (T-23 Notes: "Any tolerance anywhere" is stop-and-ask).
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): the person ruled (2026-11-07) a relative threshold: inside-out only below -1e-6 x (the shell's bounds diagonal)^3. Tests: the flat sheet at five offsets including the reviewer's, its volume shown negative there, and a 1 mm reversed cube 1 km out still inside-out; the shed's chimney still found. T-23's Scope and Notes and `check`'s description state the rule.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): the person ruled (2026-11-07) a relative threshold: inside-out only below -1e-6 x (the shell's bounds diagonal)^3. Tests: the flat sheet at five offsets including the reviewer's, its volume shown negative there, and a 1 mm reversed cube 1 km out still inside-out; the shed's chimney still found. T-23's Scope and Notes and `check`'s description state the rule.
 
 ### A missing `)` is not reported when another error falls at the same character (Minor)
 
 `Parser.Fail` (MeshQuery.cs:475) drops a new problem if the last one recorded has the same position, whatever its message. The intent is to skip the same error seen again on the way out of a rule, but it also drops a different error. `(y > 1 and x <` reports only `at character 15: expected a number`, and `(not` reports only `at character 5: expected a property, a flag, all, none, not or '('`; in both, the `expected ')'` at the same character is lost (checked in a throwaway build). A where cut off inside a bracket is a likely agent mistake, and it now takes two calls to learn both problems, against the Scope's "Every structural error that can be found is listed". Dropping a repeat only when the message also matches would fix it. No test covers two errors at one position.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): a repeat is dropped only when its message also matches; both cases are tests. The top-level connective check is skipped when that token already failed at the same character, so `)` keeps its single pinned error.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): a repeat is dropped only when its message also matches; both cases are tests. The top-level connective check is skipped when that token already failed at the same character, so `)` keeps its single pinned error.
 
 ### `coincident-vertices` misses -0 against 0, while `select` treats them as equal (Minor)
 
 MeshHealth.cs:162 compares positions by their raw bits, so `-0f` and `0f` count as different positions. `define_mesh` keeps a JSON `-0` as `-0f` (no normalisation anywhere in Core). So the cube plus a vertex at `[-0, 0, 0]` gives no `coincident-vertices` problem in `check`, yet `select vertices where x == 0 and y == 0 and z == 0` returns `[0, 8]` (checked). The two tools disagree about the same pair, and a game would see the two vertices at one point. The Scope says "bit-equal on all three", so this follows the letter of the spec; the description says "at exactly the same position", and that is what the person should rule on.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): the person ruled (2026-11-07) positions equal as floats, so -0 equals 0, with no tolerance. T-23's Scope says "equal as floats"; `check`'s text says -0 and 0 are the same. Test added.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): the person ruled (2026-11-07) positions equal as floats, so -0 equals 0, with no tolerance. T-23's Scope says "equal as floats"; `check`'s text says -0 and 0 are the same. Test added.
 
 ### "is a number" error names the property without the axis the agent typed (Nit)
 
 MeshQuery.cs:161 builds the message from `use.TypedName` only. `normal.y` on its own gives `'normal' is a number; compare it with ...`, and `min.x` gives `'min' is a number`. The agent typed `normal.y`, and the axis error at line 153 does quote `'normal.w'` in full. MeshQueryTests.cs:463 pins the shortened wording.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): the message quotes the typed name, `'normal.y' is a number`; pin updated.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): the message quotes the typed name, `'normal.y' is a number`; pin updated.
 
 ## Findings: T-24, T-25 and T-26, the render pipeline (claude-opus-5-5)
 
@@ -63,19 +73,25 @@ MeshQuery.cs:161 builds the message from `use.TypedName` only. `normal.y` on its
 
 `RenderTests.A_look_follows_the_mesh_through_an_edit` (tests/Carve.Server.Tests/RenderTests.cs:647) renders `mode: wireframe`, moves vertex 6, renders `mode: wireframe` again, and asserts only that the two PNGs differ; moving the vertex changes the image whatever look is drawn. Break: `RenderSystem.ShowMesh` (src/Carve.Server/RenderSystem.cs:94-103) calls `PutLook(mesh, space, Look.Shaded, Highlight.None)` instead of `_look, _highlight`. After the move the pump sees the request's spec equal to `_spec`, so it does not call `ApplyView` again (RenderPump.cs:378); the second render is shaded under a caption that says `wireframe`, and the test still passes because shaded differs from the earlier wireframe. A stale line mesh that is never rebuilt also passes, because the fill moved. No scenario checks a look after an edit either: the crate's look frames come before any edit, and the shed renders only shaded after its `move` (ShedScenario.cs:89). T-25's As built already says this test "was not seen to fail". So "the look meshes are rebuilt when the mesh … changes" has no check that proves it. A useful test would compare the post-edit wireframe with the wireframe of the moved mesh rendered in a fresh process, or check that it differs from the post-edit shaded frame.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): the test renders wireframe with a highlight, moves the vertex and renders again: the result must differ from the post-edit shaded frame and equal, byte for byte, a fresh process rendering the moved cube. `LookHolderTests` adds a unit check. Fails under the `Look.Shaded, Highlight.None` break.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): the test renders wireframe with a highlight, moves the vertex and renders again: the result must differ from the post-edit shaded frame and equal, byte for byte, a fresh process rendering the moved cube. `LookHolderTests` adds a unit check. Fails under the `Look.Shaded, Highlight.None` break.
 
 ### A contact sheet can show two different meshes in one image (Minor)
 
 `RenderTool.Run` posts every tile as its own request with the same `PostedVersion` (RenderTool.cs:248-251). The pump serves "the mesh current at its post or a newer one" per request; on any step after the first served request, a store change makes it call `ShowMesh` and return (RenderPump.cs:341-346), so later tiles show the newer mesh. Failing case: `render {"views":["+x","-x","+y","-y","+z","-z"]}` and a `move` as parallel tool calls, or a `move` from another client: tiles 1-2 show the mesh before the move and tiles 3-6 after it, in one PNG. The sheet caption takes its counts from `frames[^1]` only (RenderTool.cs:276), so nothing tells the agent the tiles disagree, against the description's "one call shows a mesh all round". No test posts a sheet with an edit racing it.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): each request is stamped with the mesh version it drew (`ServedVersion`, `RenderedFrame.Version`); `SheetVersions.OnOneMesh` draws the sheet again when tiles disagree and gives a tool error after three tries. A racing real-carve test was not written (it would pass by timing luck); `RenderPumpTests` places the edit between two tiles and `SheetOnOneMeshTests` checks the retry and the error. The description says every tile shows one mesh version.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): each request is stamped with the mesh version it drew (`ServedVersion`, `RenderedFrame.Version`); `SheetVersions.OnOneMesh` draws the sheet again when tiles disagree and gives a tool error after three tries. A racing real-carve test was not written (it would pass by timing luck); `RenderPumpTests` places the edit between two tiles and `SheetOnOneMeshTests` checks the retry and the error. The description says every tile shows one mesh version.
 
 ### `views` with an explicit `null` single-view argument is refused (Minor)
 
 The exclusion check is `given?.ContainsKey(name)` (RenderTool.cs:169). It ignores the value, while everywhere else in the tool a JSON `null` means absent (`Absent`, used for `views`, `highlight` and the keys of a `views` entry). `{"views":["+x","-x"],"view":null}` gives "views: not with view, direction, zoom or target". The published schema advertises `"default": null` for `view`, `direction` and `target` and `"default": 1` for `zoom` (checked with `tools/list`), so a client that sends nulls or fills in schema defaults cannot ask for a sheet at all. The refusal should go by `!Absent(value)`; for `zoom`, refuse only a value other than 1, or say in the text that zoom 1 is refused too.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): `views` is refused only beside a non-null `view`, `direction` or `target`, or a `zoom` other than 1; a four-case theory shows nulls and `zoom: 1` make a sheet.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): `views` is refused only beside a non-null `view`, `direction` or `target`, or a `zoom` other than 1; a four-case theory shows nulls and `zoom: 1` make a sheet.
 
 ### Several Scope points have no test that would fail without them (Minor)
 
@@ -84,19 +100,25 @@ The exclusion check is `given?.ContainsKey(name)` (RenderTool.cs:169). It ignore
 - T-26 "`highlight` applies to every tile": `What_applies_to_a_sheet_applies_to_every_tile` covers `labels` and `mode` only; only the caption shows `highlight` on a sheet.
 - T-25 Goal "at any of the three sizes": no look and no label is pixel-checked at 256 or 1024, apart from the crate's 1024 labels frame; nothing would fail if the look meshes reached only the 512 camera's stage.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): look sequencing moved into `LookHolder<TMesh>` (frames unchanged), with unit tests for "a camera change alone rebuilds nothing" and "old handles destroyed once after the swap"; the every-tile test gains `highlight`; regression `The_looks_are_drawn_at_every_size` covers 256, 512 and 1024. Each fails under its break.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): look sequencing moved into `LookHolder<TMesh>` (frames unchanged), with unit tests for "a camera change alone rebuilds nothing" and "old handles destroyed once after the swap"; the every-tile test gains `highlight`; regression `The_looks_are_drawn_at_every_size` covers 256, 512 and 1024. Each fails under its break.
 
 ### `PutLook` leaks the meshes it has already made when a later `CreateMesh` throws (Minor)
 
 `PutLook` (RenderSystem.cs:109-116) creates `next`, then `edges`, then `orange` before swapping anything in. Its doc comment says "a failure leaves the scene as it was", which holds for the scene, but if `CreateMesh(edgeLines)` or `CreateMesh(orangeLines)` throws, `next` (and `edges`) are never destroyed. The pump retries on the next request with the same spec (`_viewApplied` false) and leaks again on each retry. Narrow, since it needs a failing `CreateMesh`, but the comment claims the opposite.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): a failed `CreateMesh` destroys what was made and rethrows; unit test for a failure at the second and third part.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): a failed `CreateMesh` destroys what was made and rethrows; unit test for a failure at the second and third part.
 
 ### The `columns` error calls 1.5 "outside 1 to 3" (Nit)
 
 At RenderTool.cs:174-176, a non-integer `columns` such as `1.5` gets "columns: 1.5 is outside 1 to 3.", which is false. `RenderTests` (line 699) pins this text. "is not 1, 2 or 3" would be accurate.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): "columns: 1.5 is not 1, 2 or 3."; pins and the description's error list updated.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): "columns: 1.5 is not 1, 2 or 3."; pins and the description's error list updated.
 
 ## Findings: the scenarios and frame checks, T-24 to T-27 (claude-opus-5-5)
 
@@ -104,7 +126,9 @@ At RenderTool.cs:174-176, a non-integer `columns` such as `1.5` gets "columns: 1
 
 The frame is there to show which edges are open. Its only positive check is `Line` on edge 6-7 (`scenarios/Carve.Scenario.Shed/ShedLooks.cs:96`), which passes if a single pixel within the 3x3 band along the segment is within 10 of orange. Its only negative check (`ShedLooks.cs:97-108`) looks at sample points inside faces 3 and 4, kept clear of every edge. Nothing checks that an edge outside the selection is not orange, so a `highlight` that ignores its `edges` list and draws every edge orange passes, and so does one that draws all of the mesh's open edges whatever was passed. The crate has the same gap: `crate-highlight-front` and `crate-highlight-wireframe-front` (`scenarios/Carve.Scenario.Crate/CrateLooks.cs:189-223`) check the bar's selected edge and an unhighlighted face's fill, but no unselected edge. The fix is a `Line` check that is not orange on a closed edge facing the camera, for example the +Z wall's corner 2-6 or the base edge 0-1.
 
-**Outcome:** fixed (scenario fixer, Opus 5.5, a2a1240): `NotLine` on closed edges 2-6 and 1-2 in `shed-open-edges`; `CheckNotLineAlong` on the unselected top-front edge in `crate-highlight-front` and `crate-highlight-wireframe-front`. Shown failing under an every-edge-orange break.
+**Outcome:** fixed
+
+*Fix* (scenario fixer, Opus 5.5, a2a1240): `NotLine` on closed edges 2-6 and 1-2 in `shed-open-edges`; `CheckNotLineAlong` on the unselected top-front edge in `crate-highlight-front` and `crate-highlight-wireframe-front`. Shown failing under an every-edge-orange break.
 
 ### The stray vertex's "not labelled" check never runs (Minor)
 
@@ -116,31 +140,41 @@ Vertex 24 is at (6, 0, 0). The product frames the face bounds, 0 to 4, so throug
 
 `ShedLooks.cs:115` captures `shed-front-1024` and uses it only as the baseline for the labels: no `Caption`, no `Corners`, no `ShadedFrame`. Every check in `shed-1024-labels-both` (`ShedLooks.cs:116-119`) is relative to that frame (white in each label box, backing against the plain pixel, unmarked pixels equal to plain). So a 1024 render that draws no shed, or draws it with a broken camera while `LabelLayout`'s projection is right, passes both frames. `cube-front-1024` does check 1024 shading, but these two frames break the rule that every frame has a positive pixel check. The fix is `ShadedFrame(plain1024, new Camera(..., 1024), shed)` plus a caption check.
 
-**Outcome:** fixed (scenario fixer, Opus 5.5, a2a1240): caption and `ShadedFrame` with the 1024 camera on `shed-front-1024`; shown failing with the 1024 camera moved.
+**Outcome:** fixed
+
+*Fix* (scenario fixer, Opus 5.5, a2a1240): caption and `ShadedFrame` with the 1024 camera on `shed-front-1024`; shown failing with the 1024 camera moved.
 
 ### The wireframe never checks the background, and its sample-count guard counts samples it does not check (Minor)
 
 `Samples(wire, ..., _ => Fill, background: false, ...)` (`ShedLooks.cs:41`) checks fill only where the ray test sees a face. For `seen == -1` it checks nothing but still counts the sample in `tested++` (`scenarios/Carve.Scenario.Shed/ShedChecks.cs:193-201`), so the `wireTested < 20` guard can be met by background samples alone. T-25 says the wireframe's faces are "drawn as today's triangles", that is, culled as in shaded. A wireframe that stopped culling would fill the inside of the remaining slope (face 11) where the sky should show through the gap; the shed would pass, and so would the closed crate, which cannot show a cull. Normals has the matching `behindSlope` check (`ShedLooks.cs:77-90`); the wireframe has none.
 
-**Outcome:** fixed (scenario fixer, Opus 5.5, a2a1240): the wireframe samples the background, only checked samples count toward the guard, and `BehindSlope` (shared with normals) checks behind face 11; shown failing under `CullMode.None`.
+**Outcome:** fixed
+
+*Fix* (scenario fixer, Opus 5.5, a2a1240): the wireframe samples the background, only checked samples count toward the guard, and `BehindSlope` (shared with normals) checks behind face 11; shown failing under `CullMode.None`.
 
 ### The expected pixels come from the product's own `get_mesh`, never from the sample file (Minor)
 
 `Shape.ReadAsync` (`scenarios/Carve.Scenario.Shed/ShedGeometry.cs:235`, called at `ShedScenario.cs:47`) builds the ray test's mesh from `get_mesh`, so the expected and the actual frames both follow whatever `open` loaded. `check`'s counts, area, bounds and warnings constrain that only in part: an `open` fault that shifts the chimney in z (same area, bounds and topology) is drawn, read back and expected in the same place. Only the hard-coded `+z`-tile points and the hand-placed lines would notice, and the `+z` tile is blind to z. The sample already sits beside the assembly, so parse it and compare it with `get_mesh` vertex for vertex, or build `Shape` from the file.
 
-**Outcome:** fixed (scenario fixer, Opus 5.5, a2a1240): `Shape.Parse` reads the sample beside the assembly and compares it with `get_mesh` vertex for vertex (1e-5) and face for face; shown failing with the chimney shifted in z.
+**Outcome:** fixed
+
+*Fix* (scenario fixer, Opus 5.5, a2a1240): `Shape.Parse` reads the sample beside the assembly and compares it with `get_mesh` vertex for vertex (1e-5) and face for face; shown failing with the chimney shifted in z.
 
 ### The `move` error check accepts almost any error (Minor)
 
 `ShedScenario.cs:97` requires only the substrings "3" and "9". The product's text is `the first listed edge, [3, 9], is not an edge of the mesh` (`src/Carve.Core/MeshEdits.cs:277`). An error for a different reason (a bad `by`, an unknown argument) that happens to contain both digits would pass, and the spec asks for "a tool error naming the pair". Assert `[3, 9]` and `is not an edge` instead. The retrospective lists this as weak; it is still open.
 
-**Outcome:** fixed (scenario fixer, Opus 5.5, a2a1240): asserts `[3, 9]` and `is not an edge`; shown failing under a reworded error.
+**Outcome:** fixed
+
+*Fix* (scenario fixer, Opus 5.5, a2a1240): asserts `[3, 9]` and `is not an edge`; shown failing under a reworded error.
 
 ### The wireframe check's points for the far wall's top edge are off the edge (Nit)
 
 `ShedLooks.cs:50` uses (0, 2.53, 0.5) to (0, 2.51, 2.0), but edge 4-7 runs from (0, 2.55, 0) to (0, 2.5, 3), so at those z values it is at y 2.542 and 2.517. That is under a pixel at 512, and the 3x3 band absorbs it. Taking the endpoints from `shed.Vertices[4]` and `[7]` would say what is meant.
 
-**Outcome:** fixed (scenario fixer, Opus 5.5, a2a1240): edge 4-7's points are taken from `shed.Vertices[4]` and `[7]`.
+**Outcome:** fixed
+
+*Fix* (scenario fixer, Opus 5.5, a2a1240): edge 4-7's points are taken from `shed.Vertices[4]` and `[7]`.
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -148,31 +182,41 @@ Vertex 24 is at (6, 0, 0). The product frames the face bounds, 0 to 4, so throug
 
 `src/Carve.Server/MoveTool.cs:16` now says that when a pair is rejected, or the agent is not sure of one, it should "take real edges from select (kind edges, with a where such as open) and move those, instead of stopping to ask." The person's ruling of 2026-11-07 says otherwise in three places: T-28's Notes and amended pass criterion, the milestone Retrospective ("an agent that meets a wrong id asks rather than guesses … Judge recovery by the error being understood"), and D-1's *Tool shape* M-4 text ("the lever is the error text (B-2)"). All three count declining to guess as correct, while the tool text, which D-1 treats as the interface, tells the agent to do the opposite. "Move those" also reads literally as "move what select returned": on the shed, `select {"kind":"edges","where":"open"}` returns all eight open edges (4-5, 4-10, 5-6, 6-7, 7-8, 8-9, 9-11, 10-11 per T-23's table), so an agent that follows the sentence with its example `where` raises the whole eave, rakes and seam by the offset meant for one edge. Round 3 showed agents act on a sentence of this kind. The person restored round 2's text exactly, so this needs their ruling, not a silent edit.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): the person ruled (2026-11-07) facts only: "A pair that is not an edge of the mesh is refused, and the error names the pair. select with kind edges lists the real edges." Recorded in T-28's Notes and D-1's *Tool shape*.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): the person ruled (2026-11-07) facts only: "A pair that is not an edge of the mesh is refused, and the error names the pair. select with kind edges lists the real edges." Recorded in T-28's Notes and D-1's *Tool shape*.
 
 ### `render` silently ignores a misspelt `highlight` key and a `columns` given without `views`, though the rest of the interface refuses unknown input (Minor)
 
 `RenderTool.cs:544-545` reads only `vertices`, `edges` and `faces` from `highlight` and drops any other key, and `RenderTool.cs:174-177` range-checks `columns` and then ignores it when there is no `views`. So `{"highlight":{"face":[3]}}` returns a plain render with no error (the only sign is a caption with no `highlight` part), and `{"columns":2}` with a single view does nothing. The same tool refuses a misspelt key elsewhere (`{"views":[{"view":"+x","zom":2},"front"]}` is a tool error, `RenderTool.cs:405-411`), and `MeshToolSupport.UnknownArguments` gives the reason: "so that a misspelt name is a tool error rather than an argument silently dropped". Both readings are recorded in T-25's and T-26's As built, but the description (`RenderTool.cs:119`, `:127`, and the error list at `:136-139`) does not say either input is ignored. Ignoring extra keys is needed so a whole `select` result works as a highlight; the description should say only those three keys are read, or `highlight` could refuse keys other than those three plus `kind`, `count` and `of`.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): behaviour kept; `render`'s description says only `vertices`, `edges` and `faces` are read from `highlight` (any other key ignored, so a whole `select` result works) and that `columns` applies only with `views`.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): behaviour kept; `render`'s description says only `vertices`, `edges` and `faces` are read from `highlight` (any other key ignored, so a whole `select` result works) and that `columns` applies only with `views`.
 
 ### Two of `render`'s description sentences are stale after M-4 (Minor)
 
 `RenderTool.cs:140-141`: "A machine with no working Vulkan device gives a tool error naming Vulkan; define_mesh, open, move, extrude, get_mesh and undo still work there." This leaves out the two new engine-free tools, `select` and `check` (and `save` and `export`, already missing); an agent on a machine with no device can conclude it cannot ask the mesh anything. `RenderTool.cs:92`, a sentence M-4 rewrote: "Nothing is drawn but the mesh, and the labels and tile captions you ask for." M-4 also draws the normals look's spikes, the wireframe's edge lines, and the highlight's orange lines and stars, which later paragraphs of the same description say.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): the no-Vulkan list names every engine-free tool, and "Nothing is drawn but the mesh" names the look's lines and spikes and the highlight's marks.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): the no-Vulkan list names every engine-free tool, and "Nothing is drawn but the mesh" names the look's lines and spikes and the highlight's marks.
 
 ### A `highlight` type error is named as if it were a top-level argument (Nit)
 
 `RenderTool.cs:545` passes the bare list names to `Ids` and `Pairs`, so `{"highlight":{"faces":"top"}}` fails with `faces: expected an array of integer ids` (pinned at `RenderTests.cs:556`), and `render` has no `faces` argument. The top-level shape error does say `highlight:`, so the list errors would be clearer as `highlight.faces: …`.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): errors read `highlight.vertices`, `highlight.edges`, `highlight.faces`; pins updated.
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): errors read `highlight.vertices`, `highlight.edges`, `highlight.faces`; pins updated.
 
 ### D-1 and the README carry small stale or partial statements after M-4 (Nit)
 
 `docs/design/D-1-carve-concept.md:158`, *Tool shape*: "`get_mesh` is how an agent learns the ids (no ids are drawn on renders)"; the M-4 sentence appended to the same bullet does not correct this, and `render` now has `labels` and `select` returns ids. D-1's new *Queries and selections* line says an answer "stays good until an edit removes or reshapes what it names", but no edit removes anything (`check`: "There is no delete yet"), and it leaves out `select`'s own caveat that undo frees the ids its step created. README *Asking the mesh* (`README.md:60`): the list of what `check` reports leaves out open edges (holes), the shed's most numerous warning and what T-28's prompt asks for next.
 
-**Outcome:** fixed (product fixer, Opus 5.5, e335a94/41b21fa): D-1 *Tool shape* and *Queries and selections* corrected; the same sentence in `select`'s description, its pin and T-22's Scope reworded to match; README `check` lists open edges (holes).
+**Outcome:** fixed
+
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): D-1 *Tool shape* and *Queries and selections* corrected; the same sentence in `select`'s description, its pin and T-22's Scope reworded to match; README `check` lists open edges (holes).
 
 ## Summary
 
