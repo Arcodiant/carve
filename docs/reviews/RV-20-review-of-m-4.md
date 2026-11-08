@@ -49,7 +49,7 @@ MeshHealth.cs:64 reports `inside-out` whenever `SignedVolume < 0`, with nothing 
 
 **Outcome:** fixed
 
-*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): a repeat is dropped only when its message also matches; both cases are tests. The top-level connective check is skipped when that token already failed at the same character, so `)` keeps its single pinned error.
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): a repeat is dropped only when its message also matches; both cases are tests. Shown failing under a repeat dropped on position alone (the fixer's break table). The top-level connective check is skipped when that token already failed at the same character, so `)` keeps its single pinned error.
 
 ### `coincident-vertices` misses -0 against 0, while `select` treats them as equal (Minor)
 
@@ -57,7 +57,7 @@ MeshHealth.cs:162 compares positions by their raw bits, so `-0f` and `0f` count 
 
 **Outcome:** fixed
 
-*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): the person ruled (2026-11-07) positions equal as floats, so -0 equals 0, with no tolerance. T-23's Scope says "equal as floats"; `check`'s text says -0 and 0 are the same. Test added.
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): the person ruled (2026-11-07) positions equal as floats, so -0 equals 0, with no tolerance. T-23's Scope says "equal as floats"; `check`'s text says -0 and 0 are the same. Test added. Shown failing under positions compared by raw bits, without `+ 0f` (the fixer's break table).
 
 ### "is a number" error names the property without the axis the agent typed (Nit)
 
@@ -91,7 +91,7 @@ The exclusion check is `given?.ContainsKey(name)` (RenderTool.cs:169). It ignore
 
 **Outcome:** fixed
 
-*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): `views` is refused only beside a non-null `view`, `direction` or `target`, or a `zoom` other than 1; a four-case theory shows nulls and `zoom: 1` make a sheet.
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): `views` is refused only beside a non-null `view`, `direction` or `target`, or a `zoom` other than 1; a four-case theory shows nulls and `zoom: 1` make a sheet. Shown failing under the refusal by key presence (the fixer's break table).
 
 ### Several Scope points have no test that would fail without them (Minor)
 
@@ -110,7 +110,7 @@ The exclusion check is `given?.ContainsKey(name)` (RenderTool.cs:169). It ignore
 
 **Outcome:** fixed
 
-*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): a failed `CreateMesh` destroys what was made and rethrows; unit test for a failure at the second and third part.
+*Fix* (product fixer, Opus 5.5, e335a94/41b21fa): a failed `CreateMesh` destroys what was made and rethrows; unit test for a failure at the second and third part. Shown failing under no destroy in the catch (the fixer's break table).
 
 ### The `columns` error calls 1.5 "outside 1 to 3" (Nit)
 

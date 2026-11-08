@@ -209,7 +209,7 @@ Nothing in M-4 has sound or motion, so there is no listening or real-time pass.
 - **The stray vertex's "not labelled" check cannot run:** no labelled frame holds (6, 0, 0). Since RV-20 the scenario logs it as not covered, rather than passing it silently.
 - **Not run under breaks:** the regression tests (T-24, T-25) and the hash guard (T-26). No mirrored or flipped camera was run against the product in T-27; it was only reasoned from the ray test.
 - **Sizes and looks:**
-  - Since RV-20, `The_looks_are_drawn_at_every_size` checks the looks' edge and highlight pixels at 256, 512 and 1024; the scenario frames' looks are still at 512 perspective only.
+  - Since RV-20, `The_looks_are_drawn_at_every_size` renders the wireframe with one highlighted edge at 256, 512 and 1024 and checks its edge and orange pixels. The normals look is never rendered at 1024 nor pixel-checked at 256, and the scenario frames' looks are still at 512 perspective only.
   - `highlight` on vertices, and on a sheet's pixels beyond the every-tile test RV-20 added, is untested, and no scenario frame shows a labelled sheet.
   - No acceptance agent used `highlight` or `undo`.
 - **Acceptance:** `move`'s text is now the facts-only sentence the person ruled in RV-20, not round 2's as run, and no fresh session has run on it. B-2's effect is untried.
