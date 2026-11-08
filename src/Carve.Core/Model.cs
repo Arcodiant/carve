@@ -99,6 +99,22 @@ public sealed class Model
     /// in definition order, each mesh's ids offset past the ones before. A model of one mesh gives that mesh itself, so
     /// it draws exactly as before; an empty model gives null.
     /// </summary>
+    /// <summary>
+    /// Where the mesh named <paramref name="name"/> starts in <see cref="Combined"/>: the vertices and faces of the
+    /// meshes before it. Null when there is no such mesh.
+    /// </summary>
+    public (int Vertices, int Faces)? OffsetOf(string name)
+    {
+        int vertices = 0, faces = 0;
+        foreach (var (each, mesh) in _meshes)
+        {
+            if (each == name) return (vertices, faces);
+            vertices += mesh.Vertices.Count;
+            faces += mesh.Faces.Count;
+        }
+        return null;
+    }
+
     public PolygonMesh? Combined => _meshes.Length switch
     {
         0 => null,

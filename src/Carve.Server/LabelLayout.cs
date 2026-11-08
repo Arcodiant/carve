@@ -22,6 +22,12 @@ public enum LabelSet
 public readonly record struct OverlayLabel(string Text, Vector2 TextAt, ScreenRect Backing, Vector2? Dot = null);
 
 /// <summary>
+/// One mesh's run of ids within the drawn model: labels are written for it alone, each id counted from its start,
+/// so an id on the image is the one the mesh's own tools take.
+/// </summary>
+public readonly record struct ElementWindow(int FirstVertex, int FirstFace, int FaceCount);
+
+/// <summary>
 /// Pure CPU: what the overlay of one frame says and where. Text is placed on whole pixels, so the 8x16
 /// bitmap stays crisp; a dot stays where its vertex projects, since it is anti-aliased.
 /// </summary>
@@ -56,7 +62,8 @@ public static class LabelLayout
         Projection projection,
         LabelSet labels,
         int size,
-        Func<string, Vector2> measure)
+        Func<string, Vector2> measure,
+        ElementWindow? window = null)
     {
         var plan = new List<OverlayLabel>();
         if (labels == LabelSet.None)
@@ -66,14 +73,15 @@ public static class LabelLayout
 
         Vector2 Pixel(Vector3 point) => ScreenProjection.ToPixel(space.Apply(point), frame.View, frame.Projection, size);
 
-        var facing = Enumerable.Range(0, mesh.Faces.Count).Where(f =>
+        var faces = window is { } w ? Enumerable.Range(w.FirstFace, w.FaceCount) : Enumerable.Range(0, mesh.Faces.Count);
+        var facing = faces.Where(f =>
             Vector3.Dot(mesh.FaceNormal(f), projection == Projection.Orthographic ? direction : frame.Eye - space.Apply(mesh.FaceCentre(f))) > 0).ToList();
 
         if (labels is LabelSet.Faces or LabelSet.Both)
         {
             foreach (var face in facing)
             {
-                var text = face.ToString(CultureInfo.InvariantCulture);
+                var text = (face - (window?.FirstFace ?? 0)).ToString(CultureInfo.InvariantCulture);
                 var extent = measure(text);
                 var label = At(text, Whole(Pixel(mesh.FaceCentre(face)) - extent / 2), extent);
                 if (OnImage(label.Backing, size))
@@ -87,7 +95,7 @@ public static class LabelLayout
         {
             foreach (var vertex in facing.SelectMany(f => mesh.Faces[f]).Distinct().Order())
             {
-                var text = vertex.ToString(CultureInfo.InvariantCulture);
+                var text = (vertex - (window?.FirstVertex ?? 0)).ToString(CultureInfo.InvariantCulture);
                 var dot = Pixel(mesh.Vertices[vertex]);
                 var label = At(text, Whole(dot + VertexOffset), measure(text)) with { Dot = dot };
 

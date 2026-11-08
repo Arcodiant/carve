@@ -18,6 +18,7 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         var at = text.IndexOf("Worked example (two meshes):", StringComparison.Ordinal);
         Assert.True(at >= 0, "define_mesh's description has no two-mesh worked example");
         return text[at..].Split('\n').Skip(1)
+            .TakeWhile(line => line.Length > 2 && char.IsDigit(line[0]) && line[1] == '.')
             .Select(line => line.Split(' ', 3))
             .Select(p => (p[1], p[2].Split(" (", 2)[0]))
             .ToArray();
@@ -104,7 +105,7 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     }
 
     [Fact]
-    public async Task Export_and_render_labels_refuse_a_model_of_several_meshes_saying_so()
+    public async Task Export_refuses_several_meshes_and_render_labels_and_highlight_need_mesh_among_several()
     {
         var (carve, _) = await StartWithCrateAndLidAsync(Root);
         using var __ = carve;
@@ -113,6 +114,14 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         Assert.False(File.Exists(Path.Combine(Root, "crate.glb")));
         Assert.Contains(Names, Refused(await carve.CallToolAsync("render", """{"labels":"faces"}""")));
         Assert.Contains(Names, Refused(await carve.CallToolAsync("render", """{"highlight":{"faces":[0]}}""")));
+        Assert.Contains("no mesh named 'hat'; the model's meshes are " + Names,
+            Refused(await carve.CallToolAsync("render", """{"mesh":"hat"}""")));
+        Assert.Contains("mesh: expected a string", Refused(await carve.CallToolAsync("render", """{"mesh":3}""")));
+        // Ids are the named mesh's own: the lid has 6 faces, so face 6 is not one of them though the drawn whole has 12.
+        Assert.Contains("faces[6]: the 1st listed face: there is no face 6: ids run 0..5", Refused(await carve.CallToolAsync("render", """{"mesh":"lid","highlight":{"faces":[6]}}""")));
+
+        Assert.False(IsError(await carve.CallToolAsync("render", "{}")));
+        Assert.False(IsError(await carve.CallToolAsync("render", """{"mesh":"lid","labels":"both","highlight":{"faces":[5]}}""")));
     }
 
     [Fact]
@@ -219,6 +228,64 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         Assert.False(IsBackground(image, PixelOf(new Vector3(0.5f, 0.5f, 1))), "the cube's front face is missing");
         Assert.False(IsBackground(image, PixelOf(new Vector3(2.5f, 1.5f, 1))), "the tall box's upper front face is missing");
         Assert.True(IsBackground(image, PixelOf(new Vector3(0.5f, 1.6f, 1))), "something is drawn above the cube");
-        Assert.True(IsBackground(image, PixelOf(new Vector3(1.5f, 0.5f, 1))), "something is drawn between the boxes");
+        Assert.True(IsBackground(image, PixelOf(new Vector3(1.9f, 0.5f, 1))), "something is drawn between the boxes");
+    }
+
+    private static bool IsOrange(ImageResult image, (int X, int Y) p)
+    {
+        var at = (p.Y * image.Width + p.X) * 4;
+        return image.Data[at] > 150 && image.Data[at] > image.Data[at + 1] + 40 && image.Data[at + 2] < 90;
+    }
+
+    /// <summary>Whether two frames differ anywhere within 12 pixels of <paramref name="p"/>.</summary>
+    private static bool DiffersNear(ImageResult a, ImageResult b, (int X, int Y) p)
+    {
+        for (var y = p.Y - 12; y <= p.Y + 12; y++)
+        {
+            for (var x = p.X - 12; x <= p.X + 12; x++)
+            {
+                var at = (y * a.Width + x) * 4;
+                if (a.Data[at] != b.Data[at] || a.Data[at + 1] != b.Data[at + 1] || a.Data[at + 2] != b.Data[at + 2])
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    [Fact]
+    public async Task Render_labels_and_highlights_the_named_mesh_alone_by_its_own_ids()
+    {
+        byte[] plain, highlighted, labelled, whole;
+        using (var carve = new CarveProcess([]))
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", Left));
+            Ok(await carve.CallToolAsync("define_mesh", Right));
+            plain = Png(await carve.CallToolAsync("render", """{"view":"front"}"""));
+            highlighted = Png(await carve.CallToolAsync("render", """{"view":"front","mesh":"right","highlight":{"faces":[1]}}"""));
+            labelled = Png(await carve.CallToolAsync("render", """{"view":"front","mesh":"right","labels":"faces"}"""));
+        }
+        using (var carve = new CarveProcess([]))
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", Both));
+            whole = Png(await carve.CallToolAsync("render", """{"view":"front","highlight":{"faces":[7]}}"""));
+        }
+        File.WriteAllBytes(Path.Combine(Frames, "two-meshes-highlight.png"), highlighted);
+        File.WriteAllBytes(Path.Combine(Frames, "two-meshes-labels.png"), labelled);
+
+        // The tall box's face 1 is face 7 of the same boxes as one mesh.
+        Assert.Equal(whole, highlighted);
+        var lit = ImageResult.FromMemory(highlighted, ColorComponents.RedGreenBlueAlpha);
+        Assert.True(IsOrange(lit, PixelOf(new Vector3(2.5f, 1.5f, 1))), "the tall box's front face is not orange");
+        Assert.False(IsOrange(lit, PixelOf(new Vector3(0.5f, 0.5f, 1))), "the cube's front face is orange");
+
+        // The tall box's front face carries its label; the cube's, whose id 1 is the same number, carries none.
+        var bare = ImageResult.FromMemory(plain, ColorComponents.RedGreenBlueAlpha);
+        var marked = ImageResult.FromMemory(labelled, ColorComponents.RedGreenBlueAlpha);
+        Assert.True(DiffersNear(bare, marked, PixelOf(new Vector3(2.5f, 1, 1))), "the tall box's front face has no label");
+        Assert.False(DiffersNear(bare, marked, PixelOf(new Vector3(0.5f, 0.5f, 1))), "the cube's front face has a label");
     }
 }

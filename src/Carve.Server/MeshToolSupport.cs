@@ -124,9 +124,13 @@ internal static class MeshToolSupport
     /// The mesh a reading tool is aimed at in the current model, or the tool error to return: no mesh yet, or a name
     /// that picks none (an unknown name, or none given while there are several).
     /// </summary>
-    public static PolygonMesh? Target(ModelStore store, string tool, string? name, out CallToolResult? error)
+    public static PolygonMesh? Target(ModelStore store, string tool, string? name, out CallToolResult? error) =>
+        Target(store.Current, tool, name, out error);
+
+    /// <summary>As <see cref="Target(ModelStore, string, string?, out CallToolResult?)"/>, in a snapshot already read.</summary>
+    public static PolygonMesh? Target(ModelSnapshot current, string tool, string? name, out CallToolResult? error)
     {
-        var target = store.Current.Model.Target(name, out var problem);
+        var target = current.Model.Target(name, out var problem);
         error = problem is not null ? Failed(tool, [problem])
             : target is null ? Error($"{tool}: " + NoMesh)
             : null;

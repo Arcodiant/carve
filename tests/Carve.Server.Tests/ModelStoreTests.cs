@@ -82,11 +82,11 @@ public class ModelStoreTests
         store.Define("lid", lid, "define_mesh");
         Assert.Equal(["crate", "lid"], store.Current.Model.Names);
 
-        var moved = store.Edit("move", "lid", m => MeshEdits.Move(m, [0], null, null, Vector3.UnitX), out var result, out var problem);
+        var moved = store.Edit("move", "lid", m => MeshEdits.Move(m, [0], null, null, Vector3.UnitZ), out var result, out var problem);
         Assert.Null(problem);
         Assert.True(result!.Succeeded);
         Assert.Same(crate, moved!.Model.Find("crate"));
-        Assert.Equal(Vector3.UnitX, moved.Model.Find("lid")!.Vertices[0]);
+        Assert.Equal(Vector3.UnitZ, moved.Model.Find("lid")!.Vertices[0]);
 
         Assert.Equal("move", store.Undo()!.Undone);
         Assert.Same(lid, store.Current.Model.Find("lid"));

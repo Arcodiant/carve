@@ -140,7 +140,7 @@ public class SelectToolTests
     [InlineData("""{"kind":"faces","where":null}""", "where: required but missing")]
     [InlineData("""{"kind":"faces","where":5}""", "where: expected a string, got 5")]
     [InlineData("""{"kind":"faces","where":["all"]}""", "where: expected a string, got an array")]
-    [InlineData("""{"kind":"faces","where":"all","limit":3}""", "limit: not an argument of select; its arguments are kind, where")]
+    [InlineData("""{"kind":"faces","where":"all","limit":3}""", "limit: not an argument of select; its arguments are kind, where, mesh")]
     [InlineData("""{"kind":"faces","where":""}""", "where: where is empty")]
     [InlineData("""{"kind":"faces","where":"  "}""", "where: where is empty")]
     [InlineData("""{"kind":"faces","where":"y>1 and z >> 2"}""", "where: at character 11: '>>' is not an operator; use <, <=, ==, !=, >= or >")]
@@ -176,7 +176,7 @@ public class SelectToolTests
 
         Assert.Equal(
             "select failed with 3 problem(s); the current mesh is unchanged:\n"
-            + "limit: not an argument of select; its arguments are kind, where\n"
+            + "limit: not an argument of select; its arguments are kind, where, mesh\n"
             + "kind: 'bones' is not a kind; use vertices, edges or faces\n"
             + "where: at character 3: '>>' is not an operator; use <, <=, ==, !=, >= or >",
             await RefusedAsync(carve, """{"kind":"bones","where":"y >> 1","limit":3}"""));
@@ -208,7 +208,7 @@ public class SelectToolTests
         var schema = ToolList.Tool(tools, "select").GetProperty("inputSchema");
 
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal(["kind", "where"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal(["kind", "where", "mesh"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
         Assert.Equal(["kind", "where"], schema.GetProperty("required").EnumerateArray().Select(p => p.GetString()!).ToArray());
         Assert.Equal(["vertices", "edges", "faces"], schema.GetProperty("properties").GetProperty("kind").GetProperty("enum").EnumerateArray().Select(p => p.GetString()!).ToArray());
     }

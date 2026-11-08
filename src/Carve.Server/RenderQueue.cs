@@ -29,6 +29,9 @@ internal sealed record RenderSpec(
 
     /// <summary>A sheet tile's caption, written on the image; a single render has none.</summary>
     public string? TileCaption { get; init; }
+
+    /// <summary>The one mesh labels are written for, in a model of several; null labels the whole drawn mesh.</summary>
+    public ElementWindow? LabelWindow { get; init; }
 }
 
 /// <summary>One asked-for render, waiting for the frame thread.</summary>

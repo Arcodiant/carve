@@ -109,7 +109,7 @@ public sealed class SelectTool(ModelStore store)
         }
         if (errors.Count > 0) return Failed("select", errors);
 
-        if (Target(store, "select", meshName, out var error) is not { } target) return error!;
+        if (Target(store.Current, "select", meshName, out var error) is not { } target) return error!;
 
         var selection = MeshQuery.Select(target, elements!.Value, query!.Expression!);
         var name = Name(selection.Kind);
