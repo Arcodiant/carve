@@ -35,3 +35,13 @@ An agent defines a skeleton exactly as its game needs it and reads it back uncha
 - **Carried from the M-1 to M-4 plans:** the byte-identical guard on every existing frame, by hash before and after; a positive pixel check on every new frame, and one a mirrored or flipped camera would fail; each new check shown failing, as a table.
 - **Open rules: stop and ask.** Anything D-6 does not settle, any loosened check, and any change to a D-6 decision.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+One agent, on Sonnet 5.5.
+
+- **Core:** `Skeleton` (`src/Carve.Core/Skeleton.cs`) built by `Skeleton.Create(BoneSpec[])`, which returns the skeleton or every problem as `bones[i]: ...`: none or over 255 bones, empty or duplicate name, unknown parent, parent at or after the child, non-finite position or rotation, rotation not unit. `Model.Skeleton` (null until defined) is kept by `With`; `WithSkeleton` replaces it.
+- **Store:** `ModelStore.DefineSkeleton` is one undo step. It is the seam for T-32/T-33: the weights-and-clips rule (names and order unchanged, via `Skeleton.SameNamesAs`) goes there under the lock. No stub tool.
+- **Tools:** `define_skeleton(bones)` and `get_skeleton` (`SkeletonTools.cs`), with a three-bone worked example (head rests at y = 1.7). `get_skeleton` adds `restWorldPosition` to each bone.
+- **Reading the spec left open (needs a ruling):** D-6 gives no tolerance for a non-unit rotation. `Skeleton.UnitTolerance` = 1e-3 on the quaternion's length is a placeholder. Also: `position` and `rotation` are required per bone; `parent` may be null or left out. A skeleton is not saved by `save`/`open` (not in scope). Defining a skeleton in an empty model has no earlier state, so `undo` straight after it says nothing to undo, as for a first mesh.
+- **Checked:** `core-unit` passes; 7 product breaks each fail the Core tests (`artifacts/review/T-31/break-table.txt` in M-16). No frame added; no render or export code touched.
