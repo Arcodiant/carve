@@ -95,11 +95,6 @@ public sealed class Model
     public string ListNames() => string.Join(", ", _meshes.Select(m => $"'{m.Name}'"));
 
     /// <summary>
-    /// Every mesh as one, for drawing them together and taking bounds over all of them: the meshes' vertices and faces
-    /// in definition order, each mesh's ids offset past the ones before. A model of one mesh gives that mesh itself, so
-    /// it draws exactly as before; an empty model gives null.
-    /// </summary>
-    /// <summary>
     /// Where the mesh named <paramref name="name"/> starts in <see cref="Combined"/>: the vertices and faces of the
     /// meshes before it. Null when there is no such mesh.
     /// </summary>
@@ -115,6 +110,11 @@ public sealed class Model
         return null;
     }
 
+    /// <summary>
+    /// Every mesh as one, for drawing them together and taking bounds over all of them: the meshes' vertices and faces
+    /// in definition order, each mesh's ids offset past the ones before. A model of one mesh gives that mesh itself, so
+    /// it draws exactly as before; an empty model gives null.
+    /// </summary>
     public PolygonMesh? Combined => _meshes.Length switch
     {
         0 => null,
