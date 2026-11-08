@@ -61,7 +61,7 @@ public sealed class MeshHealth
         var problems = new List<HealthProblem>();
         for (var k = 0; k < shells.Count; k++)
         {
-            if (shells[k].SignedVolume < 0)
+            if (IsInsideOut(mesh, shells[k]))
                 problems.Add(new HealthProblem("inside-out", $"shells[{k}]", MeshEdits.Invariant(
                     $"closed shell of {shells[k].Faces.Count} faces ({DescribeFaces(shells[k].Faces)}) is inside-out: its faces are wound clockwise seen from outside, so a game culls them and sees nothing")));
         }
@@ -123,6 +123,23 @@ public sealed class MeshHealth
             .ToList();
     }
 
+    /// <summary>
+    /// Inside-out only past rounding noise: the signed volume below <see cref="InsideOutFraction"/> times the cube of the
+    /// diagonal of the shell's bounds, so a flat two-sided sheet, whose volume is a tiny number of either sign, is not.
+    /// </summary>
+    private static bool IsInsideOut(PolygonMesh mesh, MeshShell shell)
+    {
+        if (shell.SignedVolume is not { } volume || volume >= 0) return false;
+        var used = shell.Faces.SelectMany(f => mesh.Faces[f]).Select(i => mesh.Vertices[i]).ToList();
+        var min = used.Aggregate(Vector3.Min);
+        var max = used.Aggregate(Vector3.Max);
+        var diagonal = Math.Sqrt(Math.Pow((double)max.X - min.X, 2) + Math.Pow((double)max.Y - min.Y, 2) + Math.Pow((double)max.Z - min.Z, 2));
+        return volume < -InsideOutFraction * diagonal * diagonal * diagonal;
+    }
+
+    /// <summary>The person's ruling of 2026-11-07 (T-23): a shell is inside-out below -1e-6 x (its bounds' diagonal)^3.</summary>
+    private const double InsideOutFraction = 1e-6;
+
     /// <summary>The sum over a shell's triangles of <c>dot(a, cross(b, c)) / 6</c>, in double, relative to the shell's first vertex.</summary>
     private static double SignedVolume(PolygonMesh mesh, IReadOnlyList<int> faces, ILookup<int, MeshTriangle> byFace)
     {
@@ -152,14 +169,19 @@ public sealed class MeshHealth
             : $"faces {listed}";
     }
 
-    /// <summary>Exact: the three floats bit for bit, with no tolerance. A later duplicate names the first vertex at that position.</summary>
+    /// <summary>
+    /// Exact: the three floats equal as floats, with no tolerance, so -0 is 0 as it is for <c>select</c> (the person's ruling of
+    /// 2026-11-07, T-23). A later duplicate names the first vertex at that position.
+    /// </summary>
     private static void AddCoincidentVertices(PolygonMesh mesh, List<HealthProblem> problems)
     {
         var first = new Dictionary<(int, int, int), int>();
+        // Adding +0 turns -0 into 0 and changes no other float, so equal floats have equal bits.
+        static int Bits(float f) => BitConverter.SingleToInt32Bits(f + 0f);
         for (var j = 0; j < mesh.Vertices.Count; j++)
         {
             var v = mesh.Vertices[j];
-            var key = (BitConverter.SingleToInt32Bits(v.X), BitConverter.SingleToInt32Bits(v.Y), BitConverter.SingleToInt32Bits(v.Z));
+            var key = (Bits(v.X), Bits(v.Y), Bits(v.Z));
             if (first.TryGetValue(key, out var i))
                 problems.Add(new HealthProblem("coincident-vertices", $"vertices[{j}]", $"vertex is at the same position as vertices[{i}]"));
             else

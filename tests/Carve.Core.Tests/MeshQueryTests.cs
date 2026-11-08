@@ -460,7 +460,7 @@ public class MeshQueryTests
     [InlineData(Edges, "manifold == 1", "at character 1: a flag cannot be compared with a number")]
     [InlineData(Vertices, "unattached != 0", "at character 1: a flag cannot be compared with a number")]
     [InlineData(Faces, "area", "at character 1: 'area' is a number; compare it with " + Operators)]
-    [InlineData(Faces, "normal.y", "at character 1: 'normal' is a number; compare it with " + Operators)]
+    [InlineData(Faces, "normal.y", "at character 1: 'normal.y' is a number; compare it with " + Operators)]
     [InlineData(Vertices, "all and y", "at character 9: 'y' is a number; compare it with " + Operators)]
     // What a comparison's right side cannot be.
     [InlineData(Faces, "y > z", "at character 5: expected a number")]
@@ -516,6 +516,14 @@ public class MeshQueryTests
             $"where: at character {At("and (")}: expected a number",
             $"where: at character {where.Length + 1}: expected ')'",
         ], Errors(Faces, where));
+    }
+
+    [Theory]
+    [InlineData("(y > 1 and x <", 15, "expected a number")]
+    [InlineData("(not", 5, "expected a property, a flag, all, none, not or '('")]
+    public void A_missing_bracket_is_listed_after_another_error_at_the_same_character(string where, int at, string first)
+    {
+        Assert.Equal([$"where: at character {at}: {first}", $"where: at character {at}: expected ')'"], Errors(Faces, where));
     }
 
     [Fact]
