@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-21 — Re-review of M-4
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-4
 
@@ -12,7 +12,7 @@ description: >-
 
 **Previous:** RV-20
 
-**Diff:** —
+**Diff:** 7f2fc3b31f0c7b67145ef21b7c4fe59610159c26 against origin/main
 
 **Reviewer:** claude-opus-5-5
 
@@ -31,19 +31,25 @@ description: >-
 
 The fixes changed what is tested but not the lists that say what is not. `docs/milestones/M-4-ask-the-mesh.md` is not in `git diff 52dbb20..HEAD` at all, so its *Never verified* list now says five false things. Line 208: "T-27's `move` error check looks only for the digits 3 and 9" (it now asserts `[3, 9]` and `is not an edge`, ShedScenario.cs:98). Line 208 also files the stray vertex under "seen to fail only behind another", though RV-20 showed it cannot fail and T-27's As built now says "not covered". Line 211: "No look was rendered at 1024" (`RenderTests.The_looks_are_drawn_at_every_size` renders one at 256, 512 and 1024). Line 212: "`highlight` ... on a sheet's pixels, is untested" (`What_applies_to_a_sheet_applies_to_every_tile` now has a `highlight` case). Line 214: "the reverted `move` text matches round 2 as run" (the text in MoveTool.cs:16 is now the facts-only sentence of the ruling, and no session has run on it either). In the same way, `docs/tasks/T-25-wireframe-normals-and-highlight-looks.md:165` still says `A_look_follows_the_mesh_through_an_edit` was "not seen to fail", while RV-20's answer says the rewritten test fails under the `Look.Shaded, Highlight.None` break. That leaves the record of what M-4 left unproven out of date.
 
-**Outcome:** —
+**Outcome:** fixed
+
+*Fix* (orchestrator, f3c583f): the milestone's *Never verified* list and T-25's As built line updated for the move error check, the stray vertex (now its own line: cannot run, logged as not covered), the looks at every size, highlight on a sheet, and the facts-only `move` text; a short account of the review added to the retrospective.
 
 ### `render`'s description does not say that a sheet the mesh keeps changing under ends in a tool error (Nit)
 
 `RenderTool.cs:127` says only "if an edit lands while the tiles are drawn, the sheet is drawn again". After three tries `SheetVersions.cs:23` returns the tool error "The mesh changed while the sheet was drawn, on each of 3 tries ...", and T-26's As built ("up to three tries, then a tool error") says so too. Neither the sentence nor the description's list of tool errors (`RenderTool.cs:136-141`) mentions it. An agent whose sheet races a second client's edits gets an error the interface text does not say can happen. A clause like "up to three times, then a tool error" would fix it.
 
-**Outcome:** —
+**Outcome:** fixed
+
+*Fix* (Sonnet 5.5, 9968ee3): `render`'s description says the sheet is drawn again up to 3 tries, then a tool error, and the error list quotes `SheetVersions`' message verbatim. README, D-1, T-26 and the tests were checked; T-26's As built already said so, and no test pins the sentence.
 
 ### Two places still say a negative volume means inside-out, against the threshold ruling (Nit)
 
 The ruling made `inside-out` apply only below -1e-6 x (bounds diagonal)^3. T-23's Scope and Notes, `check`'s description and `MeshHealth.IsInsideOut` all carry it. But the `MeshShell` doc comment at `src/Carve.Core/MeshHealth.cs:11` still says "<paramref name="SignedVolume"/> ... negative means inside-out", and the M-4 plan's *Health check* bullet (`docs/milestones/M-4-ask-the-mesh.md:44`) still defines `inside-out` as "a closed, consistently wound shell with negative signed volume", with no amendment marker like the one T-23's Scope has. RV-20's own flat sheet is a counter-example: `SignedVolume` -2.27e-7, and it is not inside-out.
 
-**Outcome:** —
+**Outcome:** fixed
+
+*Fix* (Sonnet 5.5, 9968ee3 for `MeshHealth.cs:11`; f3c583f for the milestone's plan bullet, with an amendment marker): both state the threshold ruled in RV-20.
 
 ## Summary
 
