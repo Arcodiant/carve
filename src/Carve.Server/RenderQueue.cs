@@ -4,7 +4,11 @@ using Empyrean;
 namespace Carve.Server;
 
 /// <summary>What one render produced: the pixels, and the counts of the mesh they show.</summary>
-internal sealed record RenderedFrame(RenderTargetPixels Pixels, int Vertices, int Faces);
+internal sealed record RenderedFrame(RenderTargetPixels Pixels, int Vertices, int Faces)
+{
+    /// <summary>The store's version of the mesh drawn, so a sheet can tell whether its tiles agree.</summary>
+    public long Version { get; init; }
+}
 
 /// <summary>
 /// All one render asks for. The pump compares it whole, so a change in any field, a field added here
@@ -36,6 +40,9 @@ internal sealed class RenderRequest(RenderSpec spec, long postedVersion)
 
     /// <summary>The store's version at the post: the oldest mesh this request may show.</summary>
     public long PostedVersion => postedVersion;
+
+    /// <summary>The version of the mesh the frame thread drew it on, set as it is served.</summary>
+    public long ServedVersion { get; set; }
 
     public Task<RenderedFrame> Result => _result.Task;
 

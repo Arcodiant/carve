@@ -89,7 +89,7 @@ internal static class RenderTool
     private const string Text =
         "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo, and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
         + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
-        + "No file is written. Nothing is drawn but the mesh, and the labels and tile captions you ask for: no grid or axes, a dark background, about 8% margin around the mesh. "
+        + "No file is written. Nothing is drawn but the mesh, and the look's lines and spikes, the highlight's orange lines and stars, and the labels and tile captions you ask for: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
         + "'back' looks from the opposite corner, -X -Y -Z, upward from below, showing its underside, -Z side and -X side. "
         + "Six more view names look head-on along an axis, as that direction would: '+x' shows the +X side, +Z on the left; '-x' the -X side, +Z on the right; "
@@ -116,7 +116,7 @@ internal static class RenderTool
         + "The colour code, as linear red, green, blue, is (normal + 1) / 2: +X (1, 0.5, 0.5) pink, -X (0, 0.5, 0.5) teal, +Y (0.5, 1, 0.5) green, -Y (0.5, 0, 0.5) purple, +Z (0.5, 0.5, 1) blue, -Z (0.5, 0.5, 0) olive; "
         + "a face reversed shows the opposite colour. A face wound the wrong way is still culled as in shaded, so from outside it shows as MISSING, and its opposite colour is seen from inside, through the gap. "
         + "The caption says the mode after the projection: '512x512, view front, wireframe, 72 vertices, 70 faces'. "
-        + "'highlight' shows what a select picked, before you edit it: {\"vertices\":[ids],\"edges\":[[a,b]],\"faces\":[ids]}, each list optional, the shape select returns and move takes. The server holds no selection, so pass the ids each time. "
+        + "'highlight' shows what a select picked, before you edit it: {\"vertices\":[ids],\"edges\":[[a,b]],\"faces\":[ids]}, each list optional, the shape select returns and move takes. Only those three keys are read, so a whole select result works as a highlight and any other key, a misspelt one too, is ignored: check the caption's highlight counts. The server holds no selection, so pass the ids each time. "
         + "All of it is orange: a highlighted face is shaded orange (an orange fill in wireframe; in normals it keeps its normal colour and the edges of its loop turn orange), an edge is an orange line, a vertex a small orange star. "
         + "Faces hide them as they hide anything, so a highlight on the far side needs another view. "
         + "The caption counts it after the mode: '512x512, view front, wireframe, highlight 2 faces, 72 vertices, 70 faces', or 'highlight 3 faces, 2 edges, 1 vertex'. "
@@ -124,7 +124,7 @@ internal static class RenderTool
         + "Only what faces the camera is labelled: a face turned away has no label, and a vertex has one when it is on a face turned toward you. Nearer geometry is not considered, so on a concave mesh a label may sit on a face hidden behind another; look from another side to be sure. Edges have no labels: name an edge by its two vertex ids. "
         + "Labels crowd on a dense mesh: use size 1024, or zoom in on a target. The caption says so after the mode: '512x512, view front, labels both, 8 vertices, 6 faces'. "
         + "'views' asks for a contact sheet instead of one view: one image of 2 to 6 tiles, so one call shows a mesh all round. Each entry is a view name, or an object with 'view' or 'direction' and optional 'zoom' and 'target', e.g. [\"front\", \"+x\", {\"direction\": [2, 1, 1], \"zoom\": 2, \"target\": [1, 0.4, 0.5]}]. "
-        + "'views' replaces 'view', 'direction', 'zoom' and 'target'; 'mode', 'labels', 'size', 'projection' and 'highlight' apply to every tile. 'columns' (1 to 3, default the number of views, at most 3) sets the tiles to a row, filled in the order given; a tile left over is background. "
+        + "'views' replaces 'view', 'direction', 'zoom' and 'target'; 'mode', 'labels', 'size', 'projection' and 'highlight' apply to every tile. 'columns' (1 to 3, default the number of views, at most 3) sets the tiles to a row, filled in the order given; a tile left over is background. 'columns' applies only with 'views': a single render ignores it. Every tile of a sheet shows the same version of the mesh: if an edit lands while the tiles are drawn, the sheet is drawn again. "
         + "Each tile is a full render at 'size', captioned in its top left corner with its view name or direction as you gave it, then any zoom and target, cut off at the tile's edge if longer. Tiles are 2 pixels apart, so a sheet is columns x size + (columns - 1) x 2 wide and rows x size + (rows - 1) x 2 high. "
         + "The quick all-round look is the six axis views, orthographic, at 256: {\"views\": [\"+x\", \"-x\", \"+y\", \"-y\", \"+z\", \"-z\"], \"projection\": \"orthographic\", \"size\": 256}, captioned '3x2 tiles of 256x256, orthographic, views +x, -x, +y, -y, +z, -z, 8 vertices, 6 faces'. "
         + "A sheet's caption gives columns by rows, the tile size, the parts a single caption has, and every tile's caption: '2x2 tiles of 512x512, wireframe, labels faces, views front, (2, 1, 1), +x, -z, 72 vertices, 70 faces'. "
@@ -136,9 +136,9 @@ internal static class RenderTool
         + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a view that is not one of the eight names; a direction of zero or not three finite numbers; "
         + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; a mode other than 'shaded', 'wireframe' or 'normals'; a highlight that is not an object, or whose lists are not lists of ids and [a, b] pairs; "
         + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; labels other than 'none', 'faces', 'vertices' or 'both'; "
-        + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns outside 1 to 3; an argument render does not take. "
+        + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns other than 1, 2 or 3; an argument render does not take. "
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
-        + "define_mesh, open, move, extrude, get_mesh and undo still work there.";
+        + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select and check still work there.";
 
     [McpServerTool(Name = "render"), Description(Text)]
     public static async Task<CallToolResult> Run(
@@ -166,14 +166,18 @@ internal static class RenderTool
 
         var sheet = !Absent(views);
         var given = context.Params?.Arguments;
-        if (sheet && new[] { "view", "direction", "zoom", "target" }.Any(name => given?.ContainsKey(name) == true))
+        // A null, or zoom at its default of 1, is absent, so a client that sends nulls or fills in the schema's defaults can ask for a sheet.
+        bool Given(string name) =>
+            given is not null && given.TryGetValue(name, out var value) && !Absent(value)
+            && !(name == "zoom" && value.ValueKind == JsonValueKind.Number && value.GetDouble() == 1);
+        if (sheet && new[] { "view", "direction", "zoom", "target" }.Any(Given))
         {
             return Error("views: not with view, direction, zoom or target; give those in each entry instead.");
         }
 
         if (columns is { } asked && asked is not (1 or 2 or 3))
         {
-            return Error($"columns: {Join([asked])} is outside 1 to 3.");
+            return Error($"columns: {Join([asked])} is not 1, 2 or 3.");
         }
 
         if (!sheet && CameraRefusal(view, direction, zoom, target) is { } refused)
@@ -245,24 +249,28 @@ internal static class RenderTool
         }
 
         var picked = Highlight.Of(listed.Vertices, listed.Edges, listed.Faces);
-        var posted = tiles
-            .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Highlight = picked, TileCaption = sheet ? tile.Caption : null }))
-            .ToList();
-        var rendering = Task.WhenAll(posted);
-
-        // The frame thread drains the queue; once it has ended, nothing will.
-        await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
-        if (!rendering.IsCompleted)
+        async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
-            return Error(status.FaultMessage ?? "The engine has stopped, so nothing can be rendered.");
+            var rendering = Task.WhenAll(tiles
+                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Highlight = picked, TileCaption = sheet ? tile.Caption : null })));
+
+            // The frame thread drains the queue; once it has ended, nothing will.
+            await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
+            if (!rendering.IsCompleted)
+            {
+                return (null, status.FaultMessage ?? "The engine has stopped, so nothing can be rendered.");
+            }
+
+            return rendering.IsCompletedSuccessfully
+                ? (rendering.Result, null)
+                : (null, $"The render failed: {rendering.Exception?.GetBaseException().Message}");
         }
 
-        if (!rendering.IsCompletedSuccessfully)
+        var (rendered, failure) = await SheetVersions.OnOneMesh(RenderTiles, f => f.Version, SheetAttempts);
+        if (rendered is not { } frames)
         {
-            return Error($"The render failed: {rendering.Exception?.GetBaseException().Message}");
+            return Error(failure!);
         }
-
-        var frames = rendering.Result;
         if (sheet)
         {
             var across = (int)(columns ?? Math.Min(3, tiles.Count));
@@ -289,6 +297,9 @@ internal static class RenderTool
             ],
         };
     }
+
+    /// <summary>How many times a sheet is drawn before an edit racing every try is reported.</summary>
+    private const int SheetAttempts = 3;
 
     /// <summary>One camera of a render, as given: the whole of a single render, or an entry of <c>views</c>.</summary>
     private sealed record Tile(string? View, double[]? Direction, double Zoom, double[]? Target)
@@ -542,7 +553,7 @@ internal static class RenderTool
         }
 
         JsonElement? Part(string name) => value.TryGetProperty(name, out var part) ? part : null;
-        return (Ids("vertices", Part("vertices"), errors) ?? [], Pairs("edges", Part("edges"), errors) ?? [], Ids("faces", Part("faces"), errors) ?? []);
+        return (Ids("highlight.vertices", Part("vertices"), errors) ?? [], Pairs("highlight.edges", Part("edges"), errors) ?? [], Ids("highlight.faces", Part("faces"), errors) ?? []);
     }
 
     private static bool Finite3(double[] v) => v.Length == 3 && v.All(double.IsFinite);

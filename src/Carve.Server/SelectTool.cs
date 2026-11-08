@@ -39,7 +39,7 @@ public sealed class SelectTool(ModelStore store)
         + "Returns JSON {kind, vertices|edges|faces, count, of}: the list is named for the kind, ids ascending; edges are [lo, hi] pairs ordered by lo, then hi; "
         + "count is the list's length and of is how many elements of that kind the mesh has. A query matching nothing is a success with count 0, not an error.\n"
         + "The lists are exactly what the edit tools take: move takes vertices, edges and faces, and extrude takes faces. "
-        + "Ids never change, so a selection stays valid until an edit removes or reshapes what it names (and undo frees the ids its step created). "
+        + "Ids never change and no edit removes anything yet, so a selection names the same elements after an edit, though a move can change what the where would pick now; undo frees the ids its step created. "
         + "A selection is the answer at the time of the call: after an edit, ask again rather than assume the same elements still match.\n"
         + "Tool errors leave the mesh unchanged and list every problem that can be found: no mesh yet (call define_mesh or open first); "
         + "an unknown kind (use vertices, edges or faces); a missing or non-string kind or where; an argument select does not take; and these, each after the prefix where and a colon:\n"

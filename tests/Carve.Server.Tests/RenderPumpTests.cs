@@ -123,6 +123,31 @@ public class RenderPumpTests
     }
 
     [Fact]
+    public void Each_request_carries_the_version_it_was_drawn_on_so_a_sheet_split_by_an_edit_shows()
+    {
+        var pump = Started();
+        var before = _store.Current.Version;
+        var first = _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)));
+        var second = _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)));
+        _scene.OnRender = request =>
+        {
+            // A move landing between two tiles of one sheet.
+            _scene.OnRender = r => r.Complete(null!);
+            request.Complete(null!);
+            _store.Replace(Mesh());
+        };
+
+        pump.Step();
+        pump.Step();
+        pump.Step();
+
+        Assert.Equal(2, _scene.Rendered.Count);
+        Assert.Equal(before, _scene.Rendered[0].Request.ServedVersion);
+        Assert.Equal(_store.Current.Version, _scene.Rendered[1].Request.ServedVersion);
+        Assert.NotEqual(_scene.Rendered[0].Request.ServedVersion, _scene.Rendered[1].Request.ServedVersion);
+    }
+
+    [Fact]
     public void The_store_is_rechecked_before_every_request_of_one_drain()
     {
         var pump = Started();
