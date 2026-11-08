@@ -160,6 +160,10 @@ internal static class CrateLooks
         var (barFar, barNear) = (Vector3.Lerp(barOuter[0], barOuter[1], 0.3f), Vector3.Lerp(barOuter[0], barOuter[1], 0.7f));
         CheckLineAlong(driver, picked, frontPixel(barFar), frontPixel(barNear), Orange, "the +X bar's outer top edge");
 
+        // An edge facing the eye that is not asked for is not orange: the frame's top-front edge at (x, 0.8, 1).
+        var (frontFrom, frontTo) = (new Vector3(0.2f, 0.8f, 1), new Vector3(0.8f, 0.8f, 1));
+        CheckNotLineAlong(driver, picked, frontPixel(frontFrom), frontPixel(frontTo), Orange, "the unselected top-front edge");
+
         // The star's arm along +X stands clear of the mesh, over the bar's own end: half way out.
         var armLength = 0.02f * (CrateMax - CrateMin).Length() / 2;
         CheckLineAlong(driver, picked, frontPixel(corner + Vector3.UnitX * armLength * 0.3f), frontPixel(corner + Vector3.UnitX * armLength * 0.9f), Orange, "the star's +X arm");
@@ -171,6 +175,7 @@ internal static class CrateLooks
         CheckPoints(driver, pickedWire, frontPixel, PanelSeenFromFront, Orange, "the lid panel");
         CheckFace(driver, pickedWire, frontPixel, crate, plusZBand, Fill, "an unhighlighted face");
         CheckLineAlong(driver, pickedWire, frontPixel(barFar), frontPixel(barNear), Orange, "the +X bar's outer top edge");
+        CheckNotLineAlong(driver, pickedWire, frontPixel(frontFrom), frontPixel(frontTo), Orange, "the unselected top-front edge");
 
         // ---- errors, and the shaded frame back as it was ----
         await ExpectToolErrorAsync(driver, "render", new { mode = "xray" }, "mode", "xray");
@@ -250,6 +255,25 @@ internal static class CrateLooks
     /// </summary>
     private static void CheckLineAlong(ScenarioDriver driver, ScenarioFrame frame, Vector2 from, Vector2 to, (int R, int G, int B) colour, string what)
     {
+        var best = Closest(frame, from, to, colour);
+        if (best.Off > 10)
+        {
+            driver.Fail($"{frame.Name}: {what}, {from} to {to}: the closest pixel to {colour} is {best.P} at ({best.X}, {best.Y})");
+        }
+    }
+
+    /// <summary>The opposite of <see cref="CheckLineAlong"/>: no pixel touching the stretch is within 10/255 of <paramref name="colour"/>.</summary>
+    private static void CheckNotLineAlong(ScenarioDriver driver, ScenarioFrame frame, Vector2 from, Vector2 to, (int R, int G, int B) colour, string what)
+    {
+        var best = Closest(frame, from, to, colour);
+        if (best.Off <= 10)
+        {
+            driver.Fail($"{frame.Name}: {what}, {from} to {to}: the pixel at ({best.X}, {best.Y}) is {best.P}, within 10 of {colour}: it should not be drawn in that colour");
+        }
+    }
+
+    private static (int Off, int X, int Y, (byte R, byte G, byte B, byte A) P) Closest(ScenarioFrame frame, Vector2 from, Vector2 to, (int R, int G, int B) colour)
+    {
         const int Steps = 16;
         var best = (Off: int.MaxValue, X: 0, Y: 0, P: default((byte R, byte G, byte B, byte A)));
         for (var step = 0; step <= Steps; step++)
@@ -267,10 +291,7 @@ internal static class CrateLooks
             }
         }
 
-        if (best.Off > 10)
-        {
-            driver.Fail($"{frame.Name}: {what}, {from} to {to}: the closest pixel to {colour} is {best.P} at ({best.X}, {best.Y})");
-        }
+        return best;
     }
 
     private static void CheckLine(ScenarioDriver driver, ScenarioFrame frame, Vector2 point, (int R, int G, int B) colour, string what) =>

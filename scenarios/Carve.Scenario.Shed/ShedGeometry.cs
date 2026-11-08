@@ -69,6 +69,17 @@ internal sealed record Shape(Vector3[] Vertices, int[][] Faces)
         return u >= 0 && v >= 0 && u + v <= 1 && t > 0 ? t : null;
     }
 
+    /// <summary>A <c>.carve</c> file as the scenario reads it, apart from the product: <c>vertices</c> as <c>[x, y, z]</c>, <c>faces</c> as id loops.</summary>
+    public static Shape Parse(string text)
+    {
+        using var file = JsonDocument.Parse(text);
+        var vertices = file.RootElement.GetProperty("vertices").EnumerateArray()
+            .Select(v => new Vector3(v[0].GetSingle(), v[1].GetSingle(), v[2].GetSingle())).ToArray();
+        var faces = file.RootElement.GetProperty("faces").EnumerateArray()
+            .Select(f => f.EnumerateArray().Select(x => x.GetInt32()).ToArray()).ToArray();
+        return new Shape(vertices, faces);
+    }
+
     public static async Task<Shape> ReadAsync(ScenarioDriver driver)
     {
         var mesh = JsonDocument.Parse(await Checks.CallTextAsync(driver, "get_mesh", new { })).RootElement;

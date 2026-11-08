@@ -106,6 +106,27 @@ Built on Sonnet 5.5 (`claude-sonnet-5-5`). No product code changed: `scenarios/C
 | the sheet's tiles in reverse order | `shed-axes-sheet`: 170, from the `+z` tile's first sample |
 | `open` dropping the last face | `open: faces` 17, `open: warnings`, and 16 more (a first form of the scenario crashed on a missing face id; mended, so all are reported) |
 
-**Not checked, or not seen to fail on its own:** a mirrored or a flipped camera (not broken in the product; the checks are projected from the mesh, but none was run broken); the stray vertex's absence at 1024, the door's shade equal to the wall's, the gutter pixels, the captions (all pass, none run under a break; the sheet break stops at the tile checks only in that it reports every failure, so the gutters and caption passed under it); the `-x` tile's culled-wall pixels under a break; the `move` error text (names 3 and 9, which is weak: the single digits are in much text); `shed-open-edges`' orange eave pixel under a break.
+**Not checked, or not seen to fail on its own:** a mirrored or a flipped camera (not broken in the product; the checks are projected from the mesh, but none was run broken); the door's shade equal to the wall's, the gutter pixels, the captions (all pass, none run under a break; the sheet break stops at the tile checks only in that it reports every failure, so the gutters and caption passed under it); the `-x` tile's culled-wall pixels under a break; `shed-open-edges`' orange eave pixel under a break. The stray vertex's absence is **not covered**: no frame holds (6, 0, 0) (render frames the faces' bounds, 0 to 4; at 1024 the vertex projects to about (1093, 828)), so the run says so in its log (`shed: not covered: ...`) instead of skipping it silently, and a product that labelled it would pass.
+
+**RV-20 fixes** (on Opus 5.5, `claude-opus-5-5`; scenarios only, no frame and no product code changed, every tolerance as it was):
+
+- `shed-open-edges` asserts that two closed edges facing the eye are not orange (no pixel of the band within 10 of it): the +Z wall's corner 2-6 (from 0.1 to 0.75 of the way, clear of vertex 6 where open edges meet) and the base edge 1-2.
+- `shed-front-1024` has its caption and `ShadedFrame` checked through the 1024 camera, so `shed-1024-labels-both`, whose checks are relative to it, has a positive base.
+- The wireframe checks the background where the ray test sees none, and asserts the background behind the culled slope (face 11) as normals does (`BehindSlope`, shared by both). `Samples` counts only the samples it checked, so the `< 20` guard means what it says.
+- After `open`, the sample beside the assembly is parsed by the scenario (`Shape.Parse`) and compared with `get_mesh` vertex for vertex (within 1e-5) and face for face: the ray test's mesh is then the file's, not only whatever `open` made of it.
+- The `move` error must name `[3, 9]` and say `is not an edge`.
+- The wireframe's 4-7 line takes its ends from `shed.Vertices[4]` and `[7]` (at 1/6 and 2/3, the z of the old points).
+
+Each new check under a break (throwaway edits to `src/`, reverted; run by `cairn test run --fresh scenario-shed`, all shed breaks in one run since the shed reports every failure):
+
+| The break | The check that failed |
+|---|---|
+| `OrangeLines` draws every edge of the mesh when a highlight names any edge | `shed-open-edges`: the closed corner edge 2-6 and the closed base edge 1-2 (no other check of the frame failed) |
+| the wireframe's mesh drawn with `CullMode.None` | `shed-front-wireframe`: 22 background samples, 6 of them behind the slope (face 11). The ridge's `LineStandsOff` and the 4-7 line failed too, so this break was not invisible before, as the review supposed |
+| at size 1024, the camera moved 1000 back along its own axis (labels still placed from the true frame) | `shed-front-1024`: 133 shaded samples are the background. `shed-1024-labels-both` passed under it, as the review said |
+| `CarveFile.Read` adding 0.1 to z for y >= 3.6 (the chimney moved in z) | `get_mesh` against the sample: vertices 16 to 23 |
+| the move error reading `the first listed edge joins 3 and 9, which share no face` | `move`: the error should name `[3, 9]`, and `is not an edge` |
+
+Frames: the 10 shed and 33 crate frames of a fresh run after the change are equal by SHA-256 to a fresh run before it.
 
 **Readings, for the person.** `faces where y > 10` and `y >> 10` replace the spec's `centre.y` (ruled). The labels frames compare the backing at the corner of each label's padding, not its centre, so a letter at the centre cannot hide it. The after-move frame is reframed by the product (the bounds grew to y 4.4), so "a pixel that was chimney is now sky" is asserted at the pixels the new camera shows as sky or chimney, found by the ray test, with the old frame as the other side.

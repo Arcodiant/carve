@@ -45,6 +45,7 @@ public sealed class ShedScenario : IScenario
         Equal("open: closed", false, opened.GetProperty("closed").GetBoolean());
         SameList("open: warnings", ShedFacts.OpenWarnings, opened.GetProperty("warnings").EnumerateArray().Select(w => w.GetString() ?? ""));
         var shed = await Shape.ReadAsync(driver);
+        SameAsFile(Shape.Parse(File.ReadAllText(path)), shed);
         var camera = new Camera(Min, Max, Front, 512);
         var shaded = await driver.CaptureAsync("shed-front", new { view = "front" });
         Caption(shaded, "512x512, view front, 25 vertices, 18 faces");
@@ -94,13 +95,38 @@ public sealed class ShedScenario : IScenario
         ChimneyRose(shaded, camera, shed, movedFrame, movedCamera, movedShed);
 
         // 6. Error path: a pair that is not an edge, and the next render is the one before.
-        await ExpectToolErrorAsync(driver, "move", new { edges = new[] { new[] { 3, 9 } }, by = new[] { 0.0, 0.5, 0.0 } }, "3", "9");
+        await ExpectToolErrorAsync(driver, "move", new { edges = new[] { new[] { 3, 9 } }, by = new[] { 0.0, 0.5, 0.0 } }, "[3, 9]", "is not an edge");
         var afterError = await driver.CaptureAsync("shed-front-after-error", new { view = "front" });
         driver.AssertBytesEqual("shed-front after the failed move, and after the move", movedFrame.Pixels, afterError.Pixels);
 
         if (Failures.Count > 0)
         {
             driver.Fail($"{Failures.Count} check(s) failed:\n" + string.Join("\n", Failures.Select(f => "  " + f)));
+        }
+    }
+
+    /// <summary>
+    /// What get_mesh gives after open is the sample file itself, vertex for vertex and face for face, so the frames'
+    /// expected pixels, worked from get_mesh, are the file's and not whatever open made of it.
+    /// </summary>
+    private static void SameAsFile(Shape file, Shape mesh)
+    {
+        Equal("get_mesh against the sample: vertices", file.Vertices.Length, mesh.Vertices.Length);
+        Equal("get_mesh against the sample: faces", file.Faces.Length, mesh.Faces.Length);
+        for (var v = 0; v < Math.Min(file.Vertices.Length, mesh.Vertices.Length); v++)
+        {
+            if (Vector3.Distance(file.Vertices[v], mesh.Vertices[v]) > 1e-5f)
+            {
+                Note($"get_mesh: vertex {v} is at {mesh.Vertices[v]}, the sample has it at {file.Vertices[v]}");
+            }
+        }
+
+        for (var f = 0; f < Math.Min(file.Faces.Length, mesh.Faces.Length); f++)
+        {
+            if (!file.Faces[f].SequenceEqual(mesh.Faces[f]))
+            {
+                Note($"get_mesh: face {f} is [{string.Join(", ", mesh.Faces[f])}], the sample has [{string.Join(", ", file.Faces[f])}]");
+            }
         }
     }
 
