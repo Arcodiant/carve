@@ -18,8 +18,10 @@ public sealed class DefineMeshTool(ModelStore store)
         """{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
 
     private const string Text =
-        "Defines the model: one polygon mesh, given by vertex coordinates and faces that index them. "
-        + "A call REPLACES the current mesh entirely; there is only one mesh, and a call that fails leaves it unchanged. "
+        "Defines one mesh of the model: a polygon mesh, given by vertex coordinates and faces that index them, under a name (name, default \"mesh\"). "
+        + "A model holds named meshes in the order they were first defined. A call with a name the model already has REPLACES that mesh entirely; a new name ADDS a mesh. "
+        + "Either is one step for undo, and a call that fails leaves the model unchanged. "
+        + "The other tools take mesh, the name of the mesh to work on, which may be left out while the model has one mesh; render draws every mesh together. "
         + "Coordinates are in metres (1 unit = 1 m, as export writes them) and Y is up. "
         + "Each face lists vertex indices (0-based) wound counter-clockwise when seen from outside the solid, "
         + "so the face normal points outward. A face may have any number of sides, three or more; it does not need to be a triangle. "
@@ -30,7 +32,25 @@ public sealed class DefineMeshTool(ModelStore store)
         + "Bad input (a missing or out-of-range index, a face with fewer than 3 vertices, a repeated index, a zero-area face, "
         + "a self-intersecting or folded-back face outline, a non-finite coordinate, a vertex without exactly 3 numbers, an argument define_mesh does not take) is a tool error that lists every problem by element, e.g. faces[2][1]. "
         + "Vertex and face ids are the positions given here (vertex 0 is the first in vertices, face 0 the first in faces), and move and extrude keep them; get_mesh reads them back and undo steps back. "
+        + TwoMeshMarker + " a 1 m crate called crate and a lid called lid on top of it, then the lid raised by 0.1 m; each line is a call:\n"
+        + "1. define_mesh " + CrateExample + "\n"
+        + "2. define_mesh " + LidExample + "\n"
+        + "3. move " + LidMove + " (the lid alone moves; leaving mesh out here is a tool error that lists 'crate', 'lid')\n"
         + ExampleMarker + " " + CubeExample;
+
+    /// <summary>Opens the two-mesh worked example; a test parses the calls after it.</summary>
+    public const string TwoMeshMarker = "Worked example (two meshes):";
+
+    public const string CrateExample =
+        """{"name":"crate","vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
+
+    public const string LidExample =
+        """{"name":"lid","vertices":[[-0.1,1,-0.1],[1.1,1,-0.1],[1.1,1.1,-0.1],[-0.1,1.1,-0.1],[-0.1,1,1.1],[1.1,1,1.1],[1.1,1.1,1.1],[-0.1,1.1,1.1]],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
+
+    public const string LidMove = """{"mesh":"lid","faces":[0,1,2,3,4,5],"by":[0,0.1,0]}""";
+
+    private const string NameText =
+        "The name of the mesh, non-empty; left out, it is mesh. An existing name replaces that mesh in its place; a new one adds a mesh after the others.";
 
     private const string VerticesText = "Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.";
     private const string FacesText = "Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.";
@@ -49,6 +69,11 @@ public sealed class DefineMeshTool(ModelStore store)
         ["type"] = "object",
         ["properties"] = new JsonObject
         {
+            ["name"] = new JsonObject
+            {
+                ["description"] = NameText,
+                ["type"] = "string",
+            },
             ["vertices"] = new JsonObject
             {
                 ["description"] = VerticesText,
@@ -75,9 +100,10 @@ public sealed class DefineMeshTool(ModelStore store)
         ["required"] = new JsonArray("vertices", "faces"),
     };
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? vertices = null, JsonElement? faces = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? vertices = null, JsonElement? faces = null, JsonElement? name = null)
     {
-        var errors = UnknownArguments("define_mesh", context, "vertices", "faces");
+        var errors = UnknownArguments("define_mesh", context, "name", "vertices", "faces");
+        var meshName = DefinedName(name, errors);
         var shapeBad = new HashSet<string>();
         var points = new List<Vector3>();
         var indices = new List<int[]>();
@@ -115,8 +141,26 @@ public sealed class DefineMeshTool(ModelStore store)
         if (errors.Count > 0) return Failed("define_mesh", errors);
 
         var mesh = result.Mesh!;
-        store.Replace(mesh);
+        store.Define(meshName!, mesh, "define_mesh");
         return Ok(Report(mesh));
+    }
+
+    /// <summary>The name argument: the default when absent; null, with the problem added, when it is not a non-empty string.</summary>
+    private static string? DefinedName(JsonElement? value, List<string> errors)
+    {
+        if (Absent(value)) return Model.DefaultName;
+        if (value!.Value.ValueKind != JsonValueKind.String)
+        {
+            errors.Add($"name: expected a string, got {Describe(value.Value)}");
+            return null;
+        }
+        var text = value.Value.GetString()!;
+        if (Model.NameProblem(text) is { } problem)
+        {
+            errors.Add($"name: {problem}");
+            return null;
+        }
+        return text;
     }
 
     private static bool ArrayOrError(string name, JsonElement value, List<string> errors)

@@ -213,7 +213,7 @@ internal sealed class RenderSystem(
         var surface = surfaces.Get(RenderComposition.LabelTag(spec.Size));
         Vector2 Measure(string text) => surface.Text.MeasureText(text, 1);
 
-        var labels = LabelLayout.Plan(Looks.Shown!, _space, _frame!, spec.Camera.Direction, spec.Projection, spec.Labels, spec.Size, Measure);
+        var labels = LabelLayout.Plan(Looks.Shown!, _space, _frame!, spec.Camera.Direction, spec.Projection, spec.Labels, spec.Size, Measure, spec.LabelWindow);
         foreach (var label in labels)
         {
             Draw(surface, label);

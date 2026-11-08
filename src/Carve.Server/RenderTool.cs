@@ -25,6 +25,7 @@ internal static class RenderTool
         var schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!;
         schema["properties"]!["highlight"] = HighlightSchema();
         schema["properties"]!["views"] = ViewsSchema();
+        WithMesh(schema.AsObject(), MeshArgumentText);
         schema["properties"]!["columns"] = new JsonObject
         {
             ["description"] = "With views: tiles to a row, 1 to 3. Default: the number of views, at most 3.",
@@ -87,7 +88,7 @@ internal static class RenderTool
     }
 
     private const string Text =
-        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo, and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
+        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
         + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh, and the look's lines and spikes, the highlight's orange lines and stars, and the labels and tile captions you ask for: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
@@ -140,6 +141,12 @@ internal static class RenderTool
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
         + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select and check still work there.";
 
+    /// <summary>The text of render's <c>mesh</c>: it aims labels and highlight, never what is drawn.</summary>
+    private const string MeshArgumentText =
+        "The mesh labels and highlight apply to, as named to define_mesh; ids are that mesh's own, as its edit tools take them. "
+        + "Every mesh is drawn either way. May be left out when the model has one mesh, or when neither labels nor highlight is asked for; "
+        + "left out while there are several and they are asked for, the call is a tool error that lists the names.";
+
     [McpServerTool(Name = "render"), Description(Text)]
     public static async Task<CallToolResult> Run(
         RequestContext<CallToolRequestParams> context,
@@ -157,9 +164,10 @@ internal static class RenderTool
         [Description("Element ids to write on the image: 'none' (the default), 'faces', 'vertices' or 'both'. Only what faces the camera."), AllowedValues("none", "faces", "vertices", "both")] string? labels = null,
         JsonElement? views = null,
         double? columns = null,
+        JsonElement? mesh = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -213,6 +221,7 @@ internal static class RenderTool
         }
 
         var problems = new List<string>();
+        var meshName = MeshName(mesh, problems);
         var listed = HighlightLists(highlight, problems);
         if (problems.Count > 0)
         {
@@ -229,12 +238,34 @@ internal static class RenderTool
             return Error(fault);
         }
 
-        if (store.Current.Mesh is not { } mesh)
+        var current = store.Current;
+        if (current.Mesh is not { } drawn)
         {
             return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
         }
 
-        var bounds = MeshReport.Create(mesh);
+        // Every mesh is drawn, as one. Labels and highlight name ids within one mesh, so with several they are aimed
+        // by mesh, as the edit tools are; the ids are moved past the meshes before it in the drawn whole.
+        var wantsIds = labelled != LabelSet.None || listed.Vertices.Count > 0 || listed.Edges.Count > 0 || listed.Faces.Count > 0;
+        var idsIn = drawn;
+        ElementWindow? window = null;
+        (int Vertices, int Faces) offset = (0, 0);
+        if (meshName is not null || (wantsIds && current.Model.Meshes.Count > 1))
+        {
+            if (current.Model.Target(meshName, out var aimed) is not { } named)
+            {
+                return Failed("render", [meshName is null ? aimed + "; labels and highlight name ids within one mesh" : aimed!]);
+            }
+
+            if (current.Model.Meshes.Count > 1)
+            {
+                idsIn = named.Mesh;
+                offset = current.Model.OffsetOf(named.Name)!.Value;
+                window = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
+            }
+        }
+
+        var bounds = MeshReport.Create(drawn);
         for (var k = 0; k < tiles.Count; k++)
         {
             if (tiles[k].TargetVector is { } t && TargetCheck.Refusal(t, bounds.BoundsMin, bounds.BoundsMax) is { } refusal)
@@ -243,16 +274,19 @@ internal static class RenderTool
             }
         }
 
-        if (MeshEdits.UnknownElements(mesh, listed.Vertices, listed.Edges, listed.Faces) is { Count: > 0 } missing)
+        if (MeshEdits.UnknownElements(idsIn, listed.Vertices, listed.Edges, listed.Faces) is { Count: > 0 } missing)
         {
             return Failed("render", missing.Select(e => e.ToString()));
         }
 
-        var picked = Highlight.Of(listed.Vertices, listed.Edges, listed.Faces);
+        var picked = Highlight.Of(
+            listed.Vertices.Select(v => v + offset.Vertices),
+            listed.Edges.Select(e => (e.A + offset.Vertices, e.B + offset.Vertices)),
+            listed.Faces.Select(f => f + offset.Faces));
         async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
             var rendering = Task.WhenAll(tiles
-                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Highlight = picked, TileCaption = sheet ? tile.Caption : null })));
+                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window })));
 
             // The frame thread drains the queue; once it has ended, nothing will.
             await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);

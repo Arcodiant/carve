@@ -12,8 +12,13 @@ public sealed class OpenTool(ModelStore store)
     /// <summary>How many .carve files a missing-file error lists before it counts the rest.</summary>
     private const int ListLimit = 20;
 
+    private const string OpenMeshText =
+        "The name the file's mesh takes in the model: it replaces the mesh of that name, or is added when the name is new. "
+        + "May be left out when the model has no mesh (the mesh is named mesh) or one (that one is replaced, keeping its name); "
+        + "left out while it has several, the call is a tool error that lists the names.";
+
     public const string Text =
-        "Reads a .carve file (written by save) and makes its mesh the current mesh, in one step like define_mesh: it REPLACES the current mesh, "
+        "Reads a .carve file (written by save) and makes its mesh the current mesh, in one step like define_mesh: it REPLACES the current mesh (given mesh, the mesh of that name, adding one when the name is new), "
         + "it does not add to it, and open is a step like any other, so undo takes it back to the mesh before it. The first mesh a process has cannot be undone, whichever tool made it, so undo straight after an open that gave the process its first mesh is a tool error (the mesh stays), while a process that had a mesh before the open can undo it; and only the last 100 changes are kept, so once 100 changes have followed an open, the open itself can no longer be undone. Takes path, the file to read. "
         + "The file holds the polygons exactly, with the ids they were saved with: vertex 0 is the file's first vertex and face 0 its first face, "
         + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so the file brings no older states with it, "
@@ -29,11 +34,12 @@ public sealed class OpenTool(ModelStore store)
         + "The whole sequence from an empty file to a game is the worked example in save's description.\n"
         + ExampleMarker + SaveTool.WorkedFile;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<OpenTool>("open", Text, PathSchema("The .carve file to read, absolute or relative to carve's working directory."));
+    public static McpServerTool Create() => MeshToolSupport.Create<OpenTool>("open", Text, WithMesh(PathSchema("The .carve file to read, absolute or relative to carve's working directory."), OpenMeshText));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null)
     {
-        if (PathArguments("open", context, path, out var text) is { } refused) return refused;
+        if (PathAndMeshArguments("open", context, path, mesh, out var text, out var name) is { } refused) return refused;
+        if (name is null && store.Current.Model.Target(null, out var ambiguous) is null && ambiguous is not null) return Failed("open", [ambiguous]);
 
         var target = ToolPaths.Resolve("open", text, SaveTool.Extension, out var pathError, verb: "reads");
         if (target is null) return Error(pathError!);
@@ -55,7 +61,7 @@ public sealed class OpenTool(ModelStore store)
             return Error($"open failed with {problems.Count} problem(s) in {target.FullPath}; the current mesh is unchanged:\n" + string.Join("\n", problems));
         }
 
-        store.Push(read.Mesh!, "open");
+        if (store.DefineTarget(name, read.Mesh!, "open", out var problem) is null) return Failed("open", [problem!]);
         var body = new Dictionary<string, object> { ["path"] = target.FullPath };
         foreach (var (key, value) in Report(read.Mesh!)) body[key] = value;
         return Ok(body);

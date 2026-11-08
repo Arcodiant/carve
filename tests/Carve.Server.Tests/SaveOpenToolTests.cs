@@ -267,7 +267,7 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
         {
             var schema = Tool(tools, name).GetProperty("inputSchema");
             Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-            Assert.Equal(["path"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
+            Assert.Equal(["path", "mesh"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
             Assert.Contains($"unknown: not an argument of {name}", Refused(await carve.CallToolAsync(name, """{"path":"a.carve","unknown":1}""")));
             Assert.Contains("path: required but missing", Refused(await carve.CallToolAsync(name, "{}")));
         }
