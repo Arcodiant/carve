@@ -158,7 +158,8 @@ public static class MeshQuery
             }
             else if (table.Numbers.ContainsKey(use.Key) && !use.Compared)
             {
-                problems.Add(new Problem(use.Position, $"'{use.TypedName}' is a number; compare it with {Operators}"));
+                var typed = use.Axis is null ? use.TypedName : $"{use.TypedName}.{use.TypedAxis}";
+                problems.Add(new Problem(use.Position, $"'{typed}' is a number; compare it with {Operators}"));
             }
         }
         return problems;
@@ -469,10 +470,13 @@ public static class MeshQuery
             if (Peek.Kind != TokenKind.End) _next++;
         }
 
-        /// <summary>Notes a problem. A second one at the same place is the first one seen again on the way out of a rule.</summary>
+        /// <summary>
+        /// Notes a problem. The same one again at the same place is the first one seen on the way out of a rule; a
+        /// different one there, such as a missing ')' after a missing number, is listed too.
+        /// </summary>
         private void Fail(int position, string message)
         {
-            if (_stopped || (_problems.Count > 0 && _problems[^1].Position == position)) return;
+            if (_stopped || (_problems.Count > 0 && _problems[^1].Position == position && _problems[^1].Message == message)) return;
             _problems.Add(new Problem(position, message));
         }
 
@@ -481,7 +485,9 @@ public static class MeshQuery
             var root = ParseOr();
             while (Peek.Kind != TokenKind.End)
             {
-                Fail(Peek.Position, "expected 'and', 'or' or the end of the expression");
+                // A token that already failed where an atom was expected, such as a stray ')', is not reported twice.
+                if (_problems.Count == 0 || _problems[^1].Position != Peek.Position)
+                    Fail(Peek.Position, "expected 'and', 'or' or the end of the expression");
                 while (Peek.Kind is not (TokenKind.End or TokenKind.Word or TokenKind.Open)) Advance();
                 if (Peek.Kind != TokenKind.End) ParseOr();
             }

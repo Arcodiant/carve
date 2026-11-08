@@ -61,6 +61,58 @@ public class MeshHealthTests
     }
 
     [Fact]
+    public void Volume_is_taken_from_the_shells_first_vertex_so_an_off_integer_cube_far_out_keeps_its_digits()
+    {
+        // RV-20: whole-number coordinates are exact either way, so this cube is 0.1 across and off the grid. Measured
+        // from the world origin its volume is 0.0010004878567997366; from its first vertex, 0.0010004878640756942.
+        var far = TestMeshes.Make(TestMeshes.CubeVertices.Select(v => v * 0.1f + new Vector3(1000.3f, 2000.7f, -3000.1f)), TestMeshes.CubeFaces);
+
+        Assert.Equal(0.0010004878640756942, MeshHealth.Create(far).Stats.Volume);
+    }
+
+    /// <summary>
+    /// RV-20's two-sided flat sheet: four points on the plane z = 0.37x - 0.61y + 0.3, scaled by 1.37 and moved, a quad on
+    /// top and two triangles underneath, so its two sides are triangulated differently and its volume is rounding noise.
+    /// </summary>
+    private static PolygonMesh FlatSheet(Vector3 offset)
+    {
+        static Vector3 On(float x, float y) => new Vector3(x, y, 0.37f * x - 0.61f * y + 0.3f) * 1.37f;
+        return TestMeshes.Make(
+            new[] { On(0, 0), On(1, 0), On(1, 1), On(0, 1) }.Select(v => v + offset),
+            [[0, 1, 2, 3], [0, 3, 2], [0, 2, 1]]);
+    }
+
+    [Theory]
+    [InlineData(13.1f, -7.3f, 3.3f)]
+    [InlineData(0f, 0f, 0f)]
+    [InlineData(-5.7f, 2.9f, 11.3f)]
+    [InlineData(101.3f, 47.9f, -63.1f)]
+    [InlineData(-1000.3f, 2000.7f, 3000.1f)]
+    public void A_flat_two_sided_sheet_is_not_inside_out_whatever_the_sign_of_its_rounding(float x, float y, float z)
+    {
+        var health = MeshHealth.Create(FlatSheet(new Vector3(x, y, z)));
+
+        var shell = Assert.Single(health.Shells);
+        Assert.True(shell.Closed && shell.ConsistentWinding);
+        Assert.DoesNotContain(health.Problems, p => p.Check == "inside-out");
+    }
+
+    [Fact]
+    public void The_flat_sheet_at_the_reviewers_offset_has_a_negative_volume_so_the_threshold_is_what_passes_it()
+    {
+        Assert.True(MeshHealth.Create(FlatSheet(new Vector3(13.1f, -7.3f, 3.3f))).Shells[0].SignedVolume < 0);
+    }
+
+    [Fact]
+    public void A_small_inside_out_cube_far_out_is_still_inside_out()
+    {
+        // 1 mm across and 1 km out: the threshold goes by the shell's own size, not its distance.
+        var tiny = TestMeshes.Make(TestMeshes.CubeVertices.Select(v => v * 0.001f + new Vector3(1000, 0, 0)), Reversed);
+
+        Assert.Equal("inside-out", Assert.Single(MeshHealth.Create(tiny).Problems).Check);
+    }
+
+    [Fact]
     public void Two_cubes_apart_are_two_shells_and_a_note()
     {
         var health = MeshHealth.Create(TwoCubes(new Vector3(3, 0, 0)));
@@ -139,6 +191,15 @@ public class MeshHealthTests
         var health = MeshHealth.Create(TestMeshes.Make(TestMeshes.CubeVertices.Append(next), TestMeshes.CubeFaces));
 
         Assert.Empty(health.Problems);
+    }
+
+    [Fact]
+    public void Minus_zero_and_zero_are_the_same_position()
+    {
+        // The person's ruling of 2026-11-07: positions compare as floats, as select's == does, so -0 is 0.
+        var health = MeshHealth.Create(TestMeshes.Make(TestMeshes.CubeVertices.Append(new Vector3(-0f, 0f, -0f)), TestMeshes.CubeFaces));
+
+        Assert.Equal([new HealthProblem("coincident-vertices", "vertices[8]", "vertex is at the same position as vertices[0]")], health.Problems);
     }
 
     [Theory]
