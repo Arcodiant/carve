@@ -30,6 +30,7 @@ internal sealed class RenderSystem(
     private readonly List<Entity> _cameras = [];
     private Entity? _meshEntity;
     private Material? _nextMaterial;
+    private Material[]? _nextSubmeshMaterials;
     private Entity? _edgeLines;
     private Entity? _orangeLines;
     private LookHolder<Mesh>? _looks;
@@ -104,9 +105,22 @@ internal sealed class RenderSystem(
     public IReadOnlyList<Func<Mesh?>> Make(Carve.Core.PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight)
     {
         var scene = LookMeshes.Compose(mesh, space, look, highlight);
-        var data = MeshBridge.ToMeshData(mesh, space);
-        // The fill's material, put on its entity by Install with the meshes made here.
+        // The fill's material, put on its entity by Install with the meshes made here. A mesh with coloured faces drawn
+        // in the shaded look is a submesh and a material per colour (D-6); anything else is the one mesh it always was.
         _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
+        _nextSubmeshMaterials = null;
+        MeshData<PositionUvNormalVertex> data;
+        if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 })
+        {
+            data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours);
+            _nextSubmeshMaterials = colours
+                .Select(c => Material.LitMesh(c is null ? Surface : FaceStyle.ToLinear(c))).ToArray();
+        }
+        else
+        {
+            data = MeshBridge.ToMeshData(mesh, space);
+        }
+
         return
         [
             () => scene.VertexColours is { } colours ? resources.CreateMesh(data, colours) : resources.CreateMesh(data),
@@ -122,10 +136,12 @@ internal sealed class RenderSystem(
             ref var instance = ref entities.GetComponent<MeshInstance>(entity);
             instance.Mesh = fill;
             instance.Material = _nextMaterial!;
+            instance.SubmeshMaterials = _nextSubmeshMaterials!;
         }
         else
         {
             _meshEntity = AddInstance(fill, _nextMaterial!);
+            entities.GetComponent<MeshInstance>(_meshEntity.Value).SubmeshMaterials = _nextSubmeshMaterials!;
         }
 
         _edgeLines = Swap(_edgeLines, edges, LookMeshes.Edge);

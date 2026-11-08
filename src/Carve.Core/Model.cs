@@ -126,14 +126,17 @@ public sealed class Model
     {
         var vertices = new List<System.Numerics.Vector3>();
         var faces = new List<int[]>();
+        var colours = new List<KeyValuePair<int, string>>();
         foreach (var (_, mesh) in _meshes)
         {
             var offset = vertices.Count;
+            if (mesh.Style is { } style) colours.AddRange(style.ColoursOffset(faces.Count));
             vertices.AddRange(mesh.Vertices);
             faces.AddRange(mesh.Faces.Select(f => f.Select(v => v + offset).ToArray()));
         }
         var result = PolygonMesh.Create(vertices, faces);
-        return result.Mesh ?? throw new InvalidOperationException(
+        var combined = result.Mesh ?? throw new InvalidOperationException(
             "meshes that are each valid did not combine: " + string.Join("; ", result.Errors));
+        return colours.Count == 0 ? combined : combined.WithStyle(FaceStyle.OfColours(colours));
     }
 }
