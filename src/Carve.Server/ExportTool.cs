@@ -40,7 +40,13 @@ public sealed class ExportTool(ModelStore store)
     {
         if (PathArguments("export", context, path, out var text) is { } refused) return refused;
 
-        var mesh = store.Current.Mesh;
+        var model = store.Current.Model;
+        if (model.Meshes.Count > 1)
+        {
+            return Error($"export: the model has {model.Meshes.Count} meshes ({model.ListNames()}), and export writes a model of one mesh for now; save each mesh to its own .carve file, or define the model as one mesh, to export it");
+        }
+
+        var mesh = model.Combined;
         if (mesh is null) return Error("export: " + NoMesh);
 
         var target = ToolPaths.Resolve("export", text, Extension, out var pathError);

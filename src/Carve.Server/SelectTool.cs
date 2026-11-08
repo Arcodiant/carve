@@ -57,7 +57,7 @@ public sealed class SelectTool(ModelStore store)
         + "at character 7: expected 'and', 'or' or the end of the expression\n"
         + "at character 201: nested too deeply; 'not' and '(' go 200 levels deep at most\n"
         + "Character positions count from 1 and point at the thing at fault: the name, the axis letter, the operator, or where a token was expected (one past the end when the text stops short).\n"
-        + "Needs a mesh, from define_mesh or open, first. Worked examples on define_mesh's unit cube.\n"
+        + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to search. Worked examples on define_mesh's unit cube.\n"
         + "The top face:\n"
         + ExampleMarker + """{"kind":"faces","where":"normal.y > 0.9"}""" + "\n"
         + ResultMarker + """{"kind":"faces","faces":[3],"count":1,"of":6}""" + "\n"
@@ -76,7 +76,7 @@ public sealed class SelectTool(ModelStore store)
     /// <summary>Starts the line after an example that says what the call returns; the tests read these lines.</summary>
     public const string ResultMarker = "Result: ";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SelectTool>("select", Text, new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<SelectTool>("select", Text, WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -94,11 +94,12 @@ public sealed class SelectTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("kind", "where"),
-    });
+    }));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? kind = null, JsonElement? where = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? kind = null, JsonElement? where = null, JsonElement? mesh = null)
     {
-        var errors = UnknownArguments("select", context, "kind", "where");
+        var errors = UnknownArguments("select", context, "kind", "where", "mesh");
+        var meshName = MeshName(mesh, errors);
         var elements = Kind(kind, errors);
         var query = RequiredString("where", where, errors) is { } text ? MeshQuery.Parse(text) : null;
         if (query is not null)
@@ -108,10 +109,9 @@ public sealed class SelectTool(ModelStore store)
         }
         if (errors.Count > 0) return Failed("select", errors);
 
-        var mesh = store.Current.Mesh;
-        if (mesh is null) return Error("select: " + NoMesh);
+        if (Target(store, "select", meshName, out var error) is not { } target) return error!;
 
-        var selection = MeshQuery.Select(mesh, elements!.Value, query!.Expression!);
+        var selection = MeshQuery.Select(target, elements!.Value, query!.Expression!);
         var name = Name(selection.Kind);
         return Ok(new Dictionary<string, object>
         {

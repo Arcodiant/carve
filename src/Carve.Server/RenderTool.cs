@@ -87,7 +87,7 @@ internal static class RenderTool
     }
 
     private const string Text =
-        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo, and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
+        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight need a model of one mesh for now), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
         + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh, and the look's lines and spikes, the highlight's orange lines and stars, and the labels and tile captions you ask for: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
@@ -232,6 +232,13 @@ internal static class RenderTool
         if (store.Current.Mesh is not { } mesh)
         {
             return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
+        }
+
+        // Every mesh is drawn, as one; ids belong to one mesh, so labels and highlights wait for a way to name it.
+        if (store.Current.Model is { Meshes.Count: > 1 } model
+            && (labelled != LabelSet.None || listed.Vertices is { Count: > 0 } || listed.Edges is { Count: > 0 } || listed.Faces is { Count: > 0 }))
+        {
+            return Error($"render: labels and highlight name ids within one mesh, so they need a model of one mesh for now; this model has {model.Meshes.Count} meshes ({model.ListNames()}). Render without them to see every mesh together.");
         }
 
         var bounds = MeshReport.Create(mesh);

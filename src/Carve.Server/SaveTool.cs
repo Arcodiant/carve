@@ -44,7 +44,7 @@ public sealed class SaveTool(ModelStore store)
         "}\n";
 
     public const string Text =
-        "Writes the current mesh to a .carve file, so the work outlives this session; open reads it back, in this carve process or a later one. Takes path, the file to write. "
+        "Writes the current mesh to a .carve file, so the work outlives this session; open reads it back, in this carve process or a later one. Takes path, the file to write, and mesh, the mesh to write, which may be left out when the model has one; a .carve file holds one mesh for now, so with several, save one at a time by name. "
         + "The .carve file is the one to keep working in: it holds the polygons exactly, every vertex and face in its id order and every coordinate to the bit, so after open the ids you used before still name the same vertices and faces. "
         + "It does not hold the undo history (open starts from the file as one step), a current file name (carve remembers none: give the path every time) or any render setting. "
         + "The .glb that export writes is only for the game, and has no faces to edit. "
@@ -65,23 +65,22 @@ public sealed class SaveTool(ModelStore store)
         + "4. In a later session, open " + WorkedFile + "\n"
         + "5. export " + WorkedExport;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SaveTool>("save", Text, PathSchema("The .carve file to write, absolute or relative to carve's working directory; replaced if it exists."));
+    public static McpServerTool Create() => MeshToolSupport.Create<SaveTool>("save", Text, WithMesh(PathSchema("The .carve file to write, absolute or relative to carve's working directory; replaced if it exists."), MeshText + " A .carve file holds one mesh for now, so with several meshes, name the one to save."));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null)
     {
-        if (PathArguments("save", context, path, out var text) is { } refused) return refused;
+        if (PathAndMeshArguments("save", context, path, mesh, out var text, out var name) is { } refused) return refused;
 
-        var mesh = store.Current.Mesh;
-        if (mesh is null) return Error("save: " + NoMesh);
+        if (Target(store, "save", name, out var error) is not { } saved) return error!;
 
         var target = ToolPaths.Resolve("save", text, Extension, out var pathError);
         if (target is null) return Error(pathError!);
 
-        var bytes = new UTF8Encoding(false).GetBytes(CarveFile.Write(mesh));
+        var bytes = new UTF8Encoding(false).GetBytes(CarveFile.Write(saved));
         if (!ToolPaths.Write("save", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
 
         var inv = CultureInfo.InvariantCulture;
-        var report = MeshReport.Create(mesh);
+        var report = MeshReport.Create(saved);
         return Line($"saved {target.Written(replaced)}: {report.VertexCount.ToString(inv)} vertices, {report.FaceCount.ToString(inv)} faces");
     }
 }

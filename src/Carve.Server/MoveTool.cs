@@ -23,11 +23,11 @@ public sealed class MoveTool(ModelStore store)
         + "that lists every problem by element, e.g. faces[6]; the mesh is left unchanged and nothing is added to undo. "
         + "So is a move after which a face would cross itself (a bow-tie), which the call checks as a whole, not corner by corner: "
         + "when reshaping a face by its corners, move whole edges or sets of corners that keep their order around the face, rather than one corner at a time past its neighbour. "
-        + "Needs a mesh, from define_mesh or open, first. "
+        + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to move. "
         + "Worked example on define_mesh's unit cube, raising the top face (face 3, y = 1) by half a unit:\n"
         + ExampleMarker + """{"faces":[3],"by":[0,0.5,0]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<MoveTool>("move", Text, new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<MoveTool>("move", Text, WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -66,19 +66,20 @@ public sealed class MoveTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("by"),
-    });
+    }));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? vertices = null, JsonElement? edges = null, JsonElement? faces = null, JsonElement? by = null)
+        JsonElement? vertices = null, JsonElement? edges = null, JsonElement? faces = null, JsonElement? by = null, JsonElement? mesh = null)
     {
-        var errors = UnknownArguments("move", context, "vertices", "edges", "faces", "by");
+        var errors = UnknownArguments("move", context, "vertices", "edges", "faces", "by", "mesh");
+        var name = MeshName(mesh, errors);
         var v = Ids("vertices", vertices, errors);
         var e = Pairs("edges", edges, errors);
         var f = Ids("faces", faces, errors);
         var offset = Vec3("by", by, errors);
         if (errors.Count > 0) return Failed("move", errors);
 
-        return Edit(store, "move", mesh => MeshEdits.Move(mesh, v, e, f, offset!.Value),
+        return Edit(store, "move", name, mesh => MeshEdits.Move(mesh, v, e, f, offset!.Value),
             (body, result) => body["moved"] = result.MovedVertices);
     }
 }
