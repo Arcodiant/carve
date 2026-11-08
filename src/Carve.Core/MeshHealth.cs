@@ -8,7 +8,7 @@ public sealed record HealthProblem(string Check, string Element, string Message)
 /// <summary>
 /// A connected component of faces joined by shared edges. <paramref name="Faces"/> ascend.
 /// <paramref name="Closed"/>: every edge of the shell has exactly two faces. <paramref name="ConsistentWinding"/>: no edge is
-/// crossed twice the same way. <paramref name="SignedVolume"/> is null unless both hold; negative means inside-out.
+/// crossed twice the same way. <paramref name="SignedVolume"/> is null unless both hold; it is inside-out only below -1e-6 x the shell's bounding-box diagonal cubed (see <see cref="MeshHealth"/>), so a flat sheet's rounding-noise volume of either sign is not.
 /// </summary>
 public sealed record MeshShell(IReadOnlyList<int> Faces, bool Closed, bool ConsistentWinding, double? SignedVolume);
 
