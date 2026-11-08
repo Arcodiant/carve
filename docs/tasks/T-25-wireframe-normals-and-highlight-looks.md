@@ -162,7 +162,7 @@ Lines are one pixel wide and split their coverage on a slope, so `CheckLineAlong
 **Not checked:**
 
 - The regression tests were not run under the breaks; the scenario and the unit tests were. So the caption and error tests in `RenderTests` were not themselves seen to fail, though the scenario's caption and error checks were.
-- These were not each seen to fail on their own, being behind another check in the frame or stopped by one first: the corner checks of the new frames, each face's samples after the one that failed, and the `A_look_follows_the_mesh_through_an_edit` regression test.
+- These were not each seen to fail on their own, being behind another check in the frame or stopped by one first: the corner checks of the new frames, and each face's samples after the one that failed. (`A_look_follows_the_mesh_through_an_edit` was rewritten in RV-20 and is now shown failing under its break.)
 - T-22 landed during this member, and the rebase brought it in. `A_select_result_is_a_highlight_as_it_stands` passes a real `select` result to `render`, for faces only; `select`'s vertex and edge results were not put through.
 - A highlight refused by the pump is tested with a fake scene only.
 - **The Goal's "any of the three sizes":** every pixel check of a look in the scenarios is at 512, perspective. *Since RV-20,* `RenderTests.The_looks_are_drawn_at_every_size` counts the wireframe's light grey edges and an orange highlighted edge at 256, 512 and 1024, and `A_look_follows_the_mesh_through_an_edit` compares the post-edit wireframe with a fresh process's render of the moved cube and with the post-edit shaded frame.
