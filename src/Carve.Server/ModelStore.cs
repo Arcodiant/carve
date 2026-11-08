@@ -121,6 +121,19 @@ public sealed class ModelStore
         }
     }
 
+    /// <summary>
+    /// Sets the skeleton as the result of <paramref name="tool"/>, one step for undo. The seam for T-32 and T-33: once a
+    /// model has weights or clips, a skeleton whose bone names or order differ (<see cref="Skeleton.SameNamesAs"/>) is
+    /// refused here, under the lock. Until they exist there is nothing to refuse.
+    /// </summary>
+    public ModelSnapshot DefineSkeleton(Skeleton skeleton, string tool)
+    {
+        lock (_write)
+        {
+            return PushLocked(_current.Model.WithSkeleton(skeleton), tool);
+        }
+    }
+
     /// <summary>Steps back one change, or null when there is nothing older.</summary>
     public UndoResult? Undo()
     {
