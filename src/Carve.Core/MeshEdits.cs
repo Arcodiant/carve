@@ -59,7 +59,7 @@ public static class MeshEdits
 
         var result = mesh.Edit(movedVertices: positions);
         return errors.Count == 0
-            ? EditResult.From(result, moved.ToArray(), [], [], [])
+            ? EditResult.From(mesh, result, moved.ToArray(), [], [], [])
             : EditResult.Refused([.. errors, .. result.Errors]);
     }
 
@@ -139,7 +139,7 @@ public static class MeshEdits
         var result = mesh.Edit(reshapedFaces: reshaped, addedVertices: addedVertices, addedFaces: addedFaces);
         if (errors.Count > 0 || !result.Succeeded)
             return EditResult.Refused([.. errors, .. result.Errors.Select(e => ToSourceFace(mesh, extruded, e, distance, inset))]);
-        return EditResult.From(result, [],
+        return EditResult.From(mesh, result, [],
             Enumerable.Range(mesh.Vertices.Count, addedVertices.Count).ToArray(),
             Enumerable.Range(mesh.Faces.Count, addedFaces.Count).ToArray(),
             extruded);

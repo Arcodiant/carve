@@ -55,15 +55,22 @@ public sealed class PolygonMesh
     private readonly Vector3[] _vertices;
     private readonly int[][] _faces;
 
-    private PolygonMesh(Vector3[] vertices, int[][] faces)
+    private PolygonMesh(Vector3[] vertices, int[][] faces, FaceStyle? style = null)
     {
         _vertices = vertices;
         _faces = faces;
+        Style = style is { IsEmpty: false } ? style : null;
         Vertices = Array.AsReadOnly(vertices);
         Faces = Array.AsReadOnly(faces.Select(f => (IReadOnlyList<int>)Array.AsReadOnly(f)).ToArray());
     }
 
     private MeshTopology? _topology;
+
+    /// <summary>The faces' colours and named groups (D-6, Colour is a material); null when the mesh has neither.</summary>
+    public FaceStyle? Style { get; }
+
+    /// <summary>This mesh, its geometry shared, with <paramref name="style"/> in place of its own (null or empty for none).</summary>
+    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style);
 
     /// <summary>The vertices; a vertex's id is its position here.</summary>
     public IReadOnlyList<Vector3> Vertices { get; }

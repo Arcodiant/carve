@@ -12,7 +12,8 @@ public sealed class GetMeshTool(ModelStore store)
         + "Vertex and face ids are the positions given to define_mesh, kept by every edit; the vertices and faces an extrude adds are appended after them. "
         + "Returns JSON {vertices:[{id, at:[x,y,z]}], faces:[{id, vertices:[ids, counter-clockwise seen from outside], normal:[x,y,z] (unit, outward), centre:[x,y,z] (mean of the corners)}], "
         + "edges:[{vertices:[a,b] (a < b), faces:[ids of the faces using the edge]}], "
-        + "closed, bounds:{min,max}, warnings:[]}. Here vertices, faces and edges are lists, where define_mesh and the edits return their counts. "
+        + "closed, bounds:{min,max}, warnings:[], "
+        + "colours:[{colour:\"#RRGGBB\" as given to set_colour, faces:[ids]}] (the coloured faces only), groups:[{name, faces:[ids]}] (from define_group)}. Here vertices, faces and edges are lists, where define_mesh and the edits return their counts. "
         + "Coordinates are in metres (1 unit = 1 m), Y up. The output is the whole mesh, never trimmed, so it grows with the mesh. "
         + "With no mesh yet it is a tool error saying to call define_mesh or open. "
         + "Worked example on define_mesh's unit cube; the output is shown trimmed, where ... stands for more entries:\n"
@@ -40,6 +41,11 @@ public sealed class GetMeshTool(ModelStore store)
             }).ToArray(),
             ["edges"] = target.Topology.Edges.Select(e => new { vertices = new[] { e.Lo, e.Hi }, faces = e.Faces.Select(u => u.Face).ToArray() }).ToArray(),
         };
+        var style = target.Style;
+        body["colours"] = (style?.Colours ?? new Dictionary<int, string>())
+            .GroupBy(c => c.Value)
+            .Select(g => new { colour = g.Key, faces = g.Select(c => c.Key).ToArray() }).ToArray();
+        body["groups"] = (style?.Groups ?? []).Select(g => new { name = g.Name, faces = g.Faces }).ToArray();
         foreach (var (k, v) in Report(target))
         {
             if (k is "vertices" or "faces" or "edges") continue;
