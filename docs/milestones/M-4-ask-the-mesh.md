@@ -41,7 +41,7 @@ The decisions:
 - **Normals** (recommended): each face unlit in the colour `(normal + 1) / 2` (so +Y is light green, +X pinkish red, +Z light blue, a reversed face the opposite colour), plus a spike from each face's centre along its normal, 0.1 of the drawn half-diagonal long. A face wound the wrong way is culled, as in shaded.
 - **Highlight** (planner's choice on the agreed shape): orange, linear `(1, 0.55, 0.1)`: faces tinted after lighting (an orange fill in wireframe, orange loop edges in normals), edges as orange lines, vertices as small orange stars of half-length 0.02.
 - **Labels** (recommended): faces and vertices only, front-facing only (a vertex when it is on a front-facing face); edges are named by their vertex ids. White 8x16 text on a black backing at 0.6 alpha, a 3 px dot per vertex. A label may sit on a face hidden by nearer geometry; the description says so.
-- **Health check** (recommended): a `check` tool with today's five warnings passed through plus `inside-out` (a closed, consistently wound shell with negative signed volume), `coincident-vertices` (exact float equality, no tolerance), `duplicate-face` (same vertex set), the shell count, notes (size in metres, base on y = 0, origin inside the bounds, more than one shell) and stats (triangles, area, volume when closed). T-junctions and face-face intersection are left for later.
+- **Health check** (recommended): a `check` tool with today's five warnings passed through plus `inside-out` (a closed, consistently wound shell with negative signed volume; *amended by the person, 2026-11-07, in RV-20:* below -1e-6 x the shell's bounds diagonal cubed, so a flat two-sided sheet is not reported), `coincident-vertices` (exact float equality, no tolerance), `duplicate-face` (same vertex set), the shell count, notes (size in metres, base on y = 0, origin inside the bounds, more than one shell) and stats (triangles, area, volume when closed). T-junctions and face-face intersection are left for later.
 - **Contact sheet** (recommended): up to 3 columns, rows as needed, the tile's caption top-left in white on a backing, a 2 px background gutter, empty tiles background; the engine draws every caption and the server only tiles pixels.
 - **Sizes** (recommended): 256, 512 or 1024, each its own set of render targets in the one composition, drawn by a camera tagged for it, so the 512 frames do not change.
 - **The broken sample** (recommended): the leaky shed, one gabled house about 4 x 3.5 x 3 m with every fault once: a missing roof slope, a flipped wall, a lifted eave corner, a stray vertex, an unmerged seam, a duplicated door face, and a detached, inside-out chimney. Committed as `samples/leaky-shed.carve` and as code in the Core tests, kept equal by a test.
@@ -205,13 +205,14 @@ Nothing in M-4 has sound or motion, so there is no listening or real-time pass.
   - T-24: `CheckMarginSquare` and the 330/120 degree samples.
   - T-25: the corner checks and later samples per face.
   - T-26: the checks listed in its As built.
-  - T-27: the stray-vertex absence, door-equals-wall shade, gutters, captions, `-x` culled-wall pixels and the orange eave pixel. T-27's `move` error check looks only for the digits 3 and 9.
+  - T-27: door-equals-wall shade, gutters, captions, `-x` culled-wall pixels and the orange eave pixel.
+- **The stray vertex's "not labelled" check cannot run:** no labelled frame holds (6, 0, 0). Since RV-20 the scenario logs it as not covered, rather than passing it silently.
 - **Not run under breaks:** the regression tests (T-24, T-25) and the hash guard (T-26). No mirrored or flipped camera was run against the product in T-27; it was only reasoned from the ray test.
 - **Sizes and looks:**
-  - No look was rendered at 1024. Looks were checked at 512 perspective only, plus one 256 orthographic caption test.
-  - `highlight` on vertices and edges, and on a sheet's pixels, is untested, and no scenario frame shows a labelled sheet.
+  - Since RV-20, `The_looks_are_drawn_at_every_size` checks the looks' edge and highlight pixels at 256, 512 and 1024; the scenario frames' looks are still at 512 perspective only.
+  - `highlight` on vertices, and on a sheet's pixels beyond the every-tile test RV-20 added, is untested, and no scenario frame shows a labelled sheet.
   - No acceptance agent used `highlight` or `undo`.
-- **Acceptance:** the reverted `move` text matches round 2 as run, but no fresh session ran on it after the revert. B-2's effect is untried.
+- **Acceptance:** `move`'s text is now the facts-only sentence the person ruled in RV-20, not round 2's as run, and no fresh session has run on it. B-2's effect is untried.
 - **T-22:** "select leaves the version unchanged" rests on undo through the client and a source check, not on the version. Its nesting-limit break did not separate a crash from a message mismatch.
 - **The installed carve:** `C:\tools\carve` is the 2026-11-05 snapshot, with no `select`, `check` or new `render` arguments, until it is re-published after the merge to `main`.
 - **Machines:** any GPU but the two RTX 5070 machines (Mantorok, Xellotath), and any cross-machine frame comparison.
@@ -235,3 +236,5 @@ Nothing in M-4 has sound or motion, so there is no listening or real-time pass.
 - **Acceptance plants:** an agent that meets a wrong id asks rather than guesses, and a description that tells it to guess makes it avoid the plant. Judge recovery by the error being understood, or plant something the agent can fix without guessing the person's intent.
 - **Ask before running against a recorded ordering ruling.** M-16 to M-19's order was flagged, not asked.
 - Re-publish `C:\tools\carve` after `main` moves.
+
+**The review.** Round 1 (RV-20) split the diff over four Opus 5.5 reviewers (the query language and health check; the render pipeline; the scenario frame checks; the whole diff) and raised 23 findings: 3 Major, 15 Minor, 5 Nit. The Majors: `move`'s restored round-2 text told agents to move what `select` returns instead of asking, against the person's ruling; `shed-open-edges` would pass with every edge orange; and the look-after-an-edit test could not fail. The person ruled three (`move`'s text states facts only; `inside-out` below -1e-6 x the bounds diagonal cubed; -0 equals 0). Two Opus fixers, one on the product and docs and one on the scenarios in its own worktree, fixed 22 and skipped 1 (the stray vertex), each new check shown failing, with all 63 frames byte-identical. Round 2 (RV-21, one Opus reviewer) found every answer holds and no new defect, and raised 3 findings about text the fixes left stale. As in M-1 to M-3, members' `VERIFY PASS` hid checks that could not fail.
