@@ -27,7 +27,14 @@ public sealed class ExportToolTests() : FileToolTests("carve-export")
         var bytes = File.ReadAllBytes(full);
         Assert.Equal("glTF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
 
-        var second = Line(await carve.CallToolAsync("export", """{"path":"out/CUBE.GLB"}"""));
+        var refused = await carve.CallToolAsync("export", """{"path":"out/cube.glb"}""");
+        Assert.True(IsError(refused), TextOf(refused));
+        Assert.Contains($"{full} already exists", TextOf(refused));
+        Assert.Contains("overwrite: true", TextOf(refused));
+        Assert.Equal(bytes, File.ReadAllBytes(full));
+        Assert.Contains("overwrite: expected true or false", TextOf(await carve.CallToolAsync("export", """{"path":"out/cube.glb","overwrite":"yes"}""")));
+
+        var second = Line(await carve.CallToolAsync("export", """{"path":"out/CUBE.GLB","overwrite":true}"""));
         Assert.StartsWith($"exported CUBE.GLB to {Path.Combine(Root, "out", "CUBE.GLB")} (replaced): 12 triangles", second);
 
         // export changes nothing: the mesh is the same, and it is not a step on the undo stack.
@@ -102,7 +109,7 @@ public sealed class ExportToolTests() : FileToolTests("carve-export")
         using var _carve = carve;
         var schema = Tool(tools, "export").GetProperty("inputSchema");
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal(["path", "allow_unweighted", "mode"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
-        Assert.Contains("unknown: not an argument of export; its arguments are path, allow_unweighted, mode", Refused(await carve.CallToolAsync("export", """{"path":"a.glb","unknown":1}""")));
+        Assert.Equal(["path", "allow_unweighted", "mode", "overwrite"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Contains("unknown: not an argument of export; its arguments are path, allow_unweighted, mode, overwrite", Refused(await carve.CallToolAsync("export", """{"path":"a.glb","unknown":1}""")));
     }
 }

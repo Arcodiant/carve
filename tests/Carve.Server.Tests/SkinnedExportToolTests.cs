@@ -60,7 +60,7 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
         Assert.Contains("mesh 'upper' vertices 3, 6", TextOf(refused));
         Assert.Equal("before", File.ReadAllText(path));
 
-        var allowed = await carve.CallToolAsync("export", """{"path":"chain.glb","allow_unweighted":true}""");
+        var allowed = await carve.CallToolAsync("export", """{"path":"chain.glb","allow_unweighted":true,"overwrite":true}""");
         Assert.False(IsError(allowed), TextOf(allowed));
         Assert.Contains("2 vertices with no weight were bound to the first root bone 'base'", TextOf(allowed));
         var parsed = GlbExportTests.Parser.Parse(File.ReadAllBytes(path), Empyrean.ModelFormat.Gltf);
@@ -91,9 +91,21 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
         Assert.Equal(model.Skin!.Skeleton.Bones, set.Skeleton.Bones);
         Assert.Equal("glTF contains no meshes.", Assert.ThrowsAny<Exception>(() => GlbExportTests.Parser.Parse(bytes, Empyrean.ModelFormat.Gltf)).Message);
 
-        // An existing file is replaced, as for the model mode; a bad mode is refused.
-        Assert.Contains("(replaced)", TextOf(await carve.CallToolAsync("export", """{"path":"clips.glb","mode":"clips"}""")));
+        // An existing file is refused without overwrite, in clips mode too, and replaced with it, to the same bytes; a bad mode is refused.
+        var again = await carve.CallToolAsync("export", """{"path":"clips.glb","mode":"clips"}""");
+        Assert.True(IsError(again), TextOf(again));
+        Assert.Contains(clipsPath, TextOf(again));
+        Assert.Contains("overwrite", TextOf(again));
         Assert.Equal(bytes, File.ReadAllBytes(clipsPath));
+        var modelBytes = File.ReadAllBytes(modelPath);
+        var modelAgain = await carve.CallToolAsync("export", """{"path":"chain.glb"}""");
+        Assert.True(IsError(modelAgain), TextOf(modelAgain));
+        Assert.Contains("overwrite", TextOf(modelAgain));
+        Assert.Equal(modelBytes, File.ReadAllBytes(modelPath));
+        Assert.Contains("(replaced)", TextOf(await carve.CallToolAsync("export", """{"path":"clips.glb","mode":"clips","overwrite":true}""")));
+        Assert.Equal(bytes, File.ReadAllBytes(clipsPath));
+        Assert.Contains("(replaced)", TextOf(await carve.CallToolAsync("export", """{"path":"chain.glb","overwrite":true}""")));
+        Assert.Equal(modelBytes, File.ReadAllBytes(modelPath));
         Assert.Contains("mode: expected", TextOf(await carve.CallToolAsync("export", """{"path":"x.glb","mode":"piece"}""")));
 
         // No clips: refused, nothing written.

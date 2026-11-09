@@ -80,9 +80,11 @@ public static class ToolPaths
     /// Writes <paramref name="bytes"/> to the path: missing parent folders are created, an existing file is replaced
     /// (<paramref name="replaced"/> says so), and the bytes go to a temporary file in the same folder that is then moved
     /// into place, so a failure leaves the old file, or none, and never a partial one. False, with
-    /// <paramref name="error"/> naming the path and the system's message, on an I/O failure.
+    /// <paramref name="error"/> naming the path and the system's message, on an I/O failure. With
+    /// <paramref name="overwrite"/> false an existing file is refused, naming the path and <c>overwrite</c>, and left
+    /// byte for byte as it was.
     /// </summary>
-    public static bool Write(string tool, ToolPath path, ReadOnlySpan<byte> bytes, out bool replaced, out string? error)
+    public static bool Write(string tool, ToolPath path, ReadOnlySpan<byte> bytes, out bool replaced, out string? error, bool overwrite = true)
     {
         replaced = false;
         error = null;
@@ -95,8 +97,14 @@ public static class ToolPaths
                 error = $"{tool}: could not write {path.FullPath}: it is a folder";
                 return false;
             }
-            Directory.CreateDirectory(folder);
             replaced = File.Exists(path.FullPath);
+            if (replaced && !overwrite)
+            {
+                replaced = false;
+                error = $"{tool}: {path.FullPath} already exists; pass overwrite: true to replace it. Nothing was written.";
+                return false;
+            }
+            Directory.CreateDirectory(folder);
             try
             {
                 using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
