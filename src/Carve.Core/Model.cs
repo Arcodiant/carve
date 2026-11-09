@@ -6,7 +6,7 @@ public sealed record NamedMesh(string Name, PolygonMesh Mesh);
 /// <summary>
 /// What a model is (D-6): named meshes in the order they were first defined. Immutable: every change returns a new
 /// model. Names are non-empty and unique; a mesh keeps its own vertex and face ids. It may have a Skeleton, kept by every
-/// change to the meshes. Clips arrive in a later task.
+/// change to the meshes, and named clips (D-6, clips), kept likewise; no two clips share a name.
 /// </summary>
 public sealed class Model
 {
@@ -14,17 +14,50 @@ public sealed class Model
     public const string DefaultName = "mesh";
 
     /// <summary>The model with no meshes.</summary>
-    public static readonly Model Empty = new([], null);
+    public static readonly Model Empty = new([], null, []);
 
     private readonly NamedMesh[] _meshes;
     private PolygonMesh? _combined;
 
-    private Model(NamedMesh[] meshes, Skeleton? skeleton)
+    private readonly Clip[] _clips;
+
+    private Model(NamedMesh[] meshes, Skeleton? skeleton, Clip[] clips)
     {
         _meshes = meshes;
         Skeleton = skeleton;
+        _clips = clips;
         Meshes = Array.AsReadOnly(meshes);
+        Clips = Array.AsReadOnly(clips);
     }
+
+    /// <summary>The clips in the order they were first defined.</summary>
+    public IReadOnlyList<Clip> Clips { get; }
+
+    /// <summary>The clip called <paramref name="name"/>, or null.</summary>
+    public Clip? FindClip(string name) => System.Array.Find(_clips, c => c.Name == name);
+
+    /// <summary>The model with <paramref name="clip"/>: it replaces the clip of that name in its place, or is added after the others.</summary>
+    public Model WithClip(Clip clip)
+    {
+        ArgumentNullException.ThrowIfNull(clip);
+        var at = System.Array.FindIndex(_clips, c => c.Name == clip.Name);
+        var next = at >= 0 ? (Clip[])_clips.Clone() : [.. _clips, null!];
+        next[at >= 0 ? at : next.Length - 1] = clip;
+        return new Model(_meshes, Skeleton, next);
+    }
+
+    /// <summary>The model with <paramref name="clips"/> in place of its clips.</summary>
+    /// <exception cref="ArgumentException">Two clips share a name.</exception>
+    public Model WithClips(IReadOnlyList<Clip> clips)
+    {
+        ArgumentNullException.ThrowIfNull(clips);
+        if (clips.GroupBy(c => c.Name).FirstOrDefault(g => g.Count() > 1) is { } twice)
+            throw new ArgumentException($"two clips are named '{twice.Key}'; clip names must be unique", nameof(clips));
+        return new Model(_meshes, Skeleton, [.. clips]);
+    }
+
+    /// <summary>The model without the clip called <paramref name="name"/> (unchanged when there is none).</summary>
+    public Model WithoutClip(string name) => new(_meshes, Skeleton, System.Array.FindAll(_clips, c => c.Name != name));
 
     /// <summary>The meshes in definition order.</summary>
     public IReadOnlyList<NamedMesh> Meshes { get; }
@@ -36,7 +69,7 @@ public sealed class Model
     public Model WithSkeleton(Skeleton skeleton)
     {
         ArgumentNullException.ThrowIfNull(skeleton);
-        return new Model(_meshes, skeleton);
+        return new Model(_meshes, skeleton, _clips);
     }
 
     /// <summary>The names in definition order.</summary>
@@ -63,7 +96,7 @@ public sealed class Model
         var at = System.Array.FindIndex(_meshes, m => m.Name == name);
         var next = at >= 0 ? (NamedMesh[])_meshes.Clone() : [.. _meshes, null!];
         next[at >= 0 ? at : next.Length - 1] = new NamedMesh(name, mesh);
-        return new Model(next, Skeleton);
+        return new Model(next, Skeleton, _clips);
     }
 
     /// <summary>Why <paramref name="name"/> cannot name a mesh, or null when it can.</summary>
