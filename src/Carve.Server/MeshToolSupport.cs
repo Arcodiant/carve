@@ -48,17 +48,6 @@ internal static class MeshToolSupport
     };
 
     /// <summary>
-    /// Reads a file tool's arguments, whose one argument is <c>path</c>: null with <paramref name="text"/> set, or the
-    /// failed result naming every problem (an unknown argument, a missing or non-string path).
-    /// </summary>
-    public static CallToolResult? PathArguments(string tool, RequestContext<CallToolRequestParams> context, JsonElement? path, out string? text)
-    {
-        var errors = UnknownArguments(tool, context, "path");
-        text = RequiredString("path", path, errors);
-        return errors.Count > 0 ? Failed(tool, errors) : null;
-    }
-
-    /// <summary>
     /// Reads the arguments of a file tool aimed at one mesh, <c>path</c> and the optional <c>mesh</c>: null with
     /// <paramref name="text"/> and <paramref name="meshName"/> set, or the failed result naming every problem.
     /// </summary>
@@ -231,6 +220,32 @@ internal static class MeshToolSupport
     }
 
     public static bool Absent(JsonElement? v) => v is null || v.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null;
+
+    /// <summary>An optional boolean: false when absent; any other kind is a problem added to <paramref name="errors"/>.</summary>
+    public static bool OptionalBool(string name, JsonElement? value, List<string> errors)
+    {
+        if (Absent(value)) return false;
+        if (value!.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) return value.Value.GetBoolean();
+        errors.Add($"{name}: expected true or false, got {Describe(value.Value)}");
+        return false;
+    }
+
+    /// <summary>An optional string: null when absent; any other kind is a problem added to <paramref name="errors"/>.</summary>
+    public static string? OptionalString(string name, JsonElement? value, List<string> errors)
+    {
+        if (Absent(value)) return null;
+        if (value!.Value.ValueKind == JsonValueKind.String) return value.Value.GetString();
+        errors.Add($"{name}: expected a string, got {Describe(value.Value)}");
+        return null;
+    }
+
+    /// <summary>Whether a JSON value is a number that is finite as a float.</summary>
+    public static bool IsFinite(JsonElement n) => n.ValueKind == JsonValueKind.Number && float.IsFinite((float)n.GetDouble());
+
+    /// <summary>The <c>group</c> problem when a mesh with <paramref name="style"/> has no face group named <paramref name="name"/>.</summary>
+    public static string NoGroup(FaceStyle? style, string name) => style is null || style.Groups.Count == 0
+        ? $"group: no group named '{name}'; the mesh has no groups yet, define one with define_group"
+        : $"group: no group named '{name}'; the mesh's groups are {style.GroupNames}";
 
     /// <summary>An optional list of integer ids; null when absent.</summary>
     public static List<int>? Ids(string name, JsonElement? value, List<string> errors)

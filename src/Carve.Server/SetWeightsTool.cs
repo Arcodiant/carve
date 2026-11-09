@@ -55,12 +55,7 @@ public sealed class SetWeightsTool(ModelStore store)
         var meshName = MeshName(mesh, errors);
         var before = errors.Count;
         var ids = Ids("vertices", vertices, errors);
-        string? groupName = null;
-        if (!Absent(group))
-        {
-            if (group!.Value.ValueKind != JsonValueKind.String) errors.Add($"group: expected a string, got {Describe(group.Value)}");
-            else groupName = group.Value.GetString();
-        }
+        var groupName = OptionalString("group", group, errors);
         if (ids is not null && groupName is not null) errors.Add("vertices, group: give vertices or group, not both");
         else if (ids is null && groupName is null && errors.Count == before) errors.Add("vertices, group: give one of vertices or group");
         else if (ids is { Count: 0 }) errors.Add("vertices: nothing to weight: list at least one vertex");
@@ -91,9 +86,7 @@ public sealed class SetWeightsTool(ModelStore store)
             var faces = m.Style?.FacesOf(groupName!);
             if (faces is null)
             {
-                problems.Add(m.Style is null || m.Style.Groups.Count == 0
-                    ? $"group: no group named '{groupName}'; the mesh has no groups yet, define one with define_group"
-                    : $"group: no group named '{groupName}'; the mesh's groups are {m.Style.GroupNames}");
+                problems.Add(NoGroup(m.Style, groupName!));
                 return (null, problems);
             }
             return (faces.SelectMany(f => m.Faces[f]).Distinct().Order().ToArray(), problems);

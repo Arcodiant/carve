@@ -169,10 +169,10 @@ public sealed class Model
             var missing = used.Where(b => !to.ContainsKey(b)).ToArray();
             if (missing.Length > 0)
             {
-                var lacking = string.Join(", ", missing.Select(b => $"'{b}'"));
+                var lacking = NameList.Quoted(missing);
                 problem = Skeleton is null
                     ? $"mesh: the file's mesh '{name}' has weights on the bones {lacking}, and the model has no skeleton; open the whole file, or define_skeleton with those bones first"
-                    : $"mesh: the file's mesh '{name}' has weights on bones the model's skeleton does not have: {lacking}; the model's bones are {string.Join(", ", Skeleton.Names.Select(n => $"'{n}'"))}";
+                    : $"mesh: the file's mesh '{name}' has weights on bones the model's skeleton does not have: {lacking}; the model's bones are {NameList.Quoted(Skeleton.Names)}";
                 return null;
             }
             mesh = mesh.WithWeights(VertexWeights.Of(weights.Vertices.Select(v => KeyValuePair.Create(v,
@@ -218,7 +218,7 @@ public sealed class Model
     }
 
     /// <summary>The names, quoted and comma-separated, in definition order.</summary>
-    public string ListNames() => string.Join(", ", _meshes.Select(m => $"'{m.Name}'"));
+    public string ListNames() => NameList.Quoted(_meshes.Select(m => m.Name));
 
     /// <summary>
     /// Where the mesh named <paramref name="name"/> starts in <see cref="Combined"/>: the vertices and faces of the

@@ -130,7 +130,7 @@ public sealed class Clip
             var at = $"channels.{spec.Bone}";
             if (!skeleton.Names.Contains(spec.Bone))
             {
-                errors.Add(new MeshError(at, $"no bone named '{spec.Bone}'; the bones are {string.Join(", ", skeleton.Names.Select(n => $"'{n}'"))}"));
+                errors.Add(new MeshError(at, $"no bone named '{spec.Bone}'; the bones are {NameList.Quoted(skeleton.Names)}"));
                 continue;
             }
             if (!seen.Add(spec.Bone))
