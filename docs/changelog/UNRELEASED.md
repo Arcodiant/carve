@@ -9,3 +9,4 @@
 - T-35: The whole model saves to and reloads from the Carve file, and version 1 files still open
 - T-46: export in clips mode writes an armature, skin and animations with no mesh, which LoadAnimationSet reads with the same bones and clips
 - T-52: Export refuses an existing file without overwrite
+- T-36: A scenario builds the small test character through the real tools, poses it, saves, reopens and exports it, in its own suite
