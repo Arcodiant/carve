@@ -13,14 +13,14 @@ public sealed class OpenTool(ModelStore store)
     private const int ListLimit = 20;
 
     private const string OpenMeshText =
-        "The one mesh to take from the file, by its name there (a version 1 file's single mesh is taken whatever the name, and placed under it): it replaces the model's mesh of that name, or is added when the name is new, and the rest of the model stays. "
+        "The one mesh to take from the file, by its name there (a version 1 file's single mesh is taken whatever the name, and placed under it, so long as it is a name define_mesh takes: not empty and with no ':'): it replaces the model's mesh of that name, or is added when the name is new, and the rest of the model stays. "
         + "Left out, the whole model is replaced by the file's.";
 
     public const string Text =
         "Reads a .carve file (written by save). With mesh left out it REPLACES THE WHOLE MODEL with the file's: its meshes, colours, groups, weights, skeleton and clips, and nothing of the model before is kept. "
         + "With mesh, it takes only that mesh from the file (with its colours, groups and weights) and puts it in the model, replacing the mesh of that name or adding it; the model's skeleton and clips stay, "
         + "and the mesh's weights are matched to the model's skeleton by bone name, so it is refused when they name a bone the model's skeleton does not have. "
-        + "A version 1 file (one mesh, from before skeletons) opens as one mesh named mesh, or, with mesh given, as that one mesh under the name given, whatever it is. "
+        + "A version 1 file (one mesh, from before skeletons) opens as one mesh named mesh, or, with mesh given, as that one mesh under the name given, any name define_mesh takes (not empty, no ':'). "
         + "Either way open is one step like any other, so undo takes it back to the model before it. The first change a process has cannot be undone, whichever tool made it, so undo straight after an open that gave the process its first model is a tool error (the model stays), while a process that had a mesh before the open can undo it; and only the last 100 changes are kept, so once 100 changes have followed an open, the open itself can no longer be undone. Takes path, the file to read. "
         + "The file holds the polygons exactly, with the ids they were saved with: vertex 0 is the file's first vertex and face 0 its first face, "
         + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so the file brings no older states with it, "
@@ -34,7 +34,7 @@ public sealed class OpenTool(ModelStore store)
         + "(at most 20, sorted, and a count of the rest), or says there are none or that the folder does not exist, so correct the path from that list; "
         + "a file that cannot be read (access denied, a locked file); a file that is not a Carve file: not JSON (with line and column), an unknown version, "
         + "a file with no meshes and no skeleton, or anything the tools themselves would refuse (a bad vertex or face, colour, group, bone, weight or clip), each problem listed by where it is, e.g. meshes[0].faces[3][3]; "
-        + "with mesh, a name a version 2 file has no mesh of (the file's meshes are listed), or weights on bones the model's skeleton lacks (they are listed). "
+        + "with mesh, a name that is empty or holds ':' (\"mesh: a mesh name must not contain ':' ...\"); a name a version 2 file has no mesh of (the file's meshes are listed), or weights on bones the model's skeleton lacks (they are listed). "
         + "The whole sequence from an empty file to a game is the worked example in save's description.\n"
         + ExampleMarker + SaveTool.WorkedFile;
 

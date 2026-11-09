@@ -5,7 +5,7 @@ public sealed record NamedMesh(string Name, PolygonMesh Mesh);
 
 /// <summary>
 /// What a model is (D-6): named meshes in the order they were first defined. Immutable: every change returns a new
-/// model. Names are non-empty and unique; a mesh keeps its own vertex and face ids. It may have a Skeleton, kept by every
+/// model. Names are non-empty, hold no ':' and are unique; a mesh keeps its own vertex and face ids. It may have a Skeleton, kept by every
 /// change to the meshes, and named clips (D-6, clips), kept likewise; no two clips share a name.
 /// </summary>
 public sealed class Model
@@ -101,7 +101,7 @@ public sealed class Model
 
     /// <summary>
     /// A whole model from its parts, as the Carve file reads one, or every problem found, each named by where it is
-    /// (<c>meshes[1].name</c>, <c>clips[0].name</c>): a mesh name that is empty or given twice, a mesh with weights while
+    /// (<c>meshes[1].name</c>, <c>clips[0].name</c>): a mesh name that is empty, holds ':' or is given twice, a mesh with weights while
     /// there is no skeleton or on a bone the skeleton does not have, or two clips of one name. The meshes, skeleton and
     /// clips must each already be valid on their own (made by <see cref="PolygonMesh.Create"/>, <see cref="Skeleton.Create"/>
     /// and <see cref="Clip.Create"/>).
