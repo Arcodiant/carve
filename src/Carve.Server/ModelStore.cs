@@ -122,15 +122,71 @@ public sealed class ModelStore
     }
 
     /// <summary>
-    /// Sets the skeleton as the result of <paramref name="tool"/>, one step for undo. The seam for T-32 and T-33: once a
-    /// model has weights or clips, a skeleton whose bone names or order differ (<see cref="Skeleton.SameNamesAs"/>) is
-    /// refused here, under the lock. Until they exist there is nothing to refuse.
+    /// Sets the skeleton as the result of <paramref name="tool"/>, one step for undo. Once a mesh has weights, a skeleton
+    /// whose bone names or order differ (<see cref="Skeleton.SameNamesAs"/>) is refused under the lock: null, nothing
+    /// pushed, <paramref name="refusal"/> says why. (Clips, in T-33, join the rule here.)
     /// </summary>
-    public ModelSnapshot DefineSkeleton(Skeleton skeleton, string tool)
+    public ModelSnapshot? DefineSkeleton(Skeleton skeleton, string tool, out string? refusal)
     {
         lock (_write)
         {
-            return PushLocked(_current.Model.WithSkeleton(skeleton), tool);
+            refusal = null;
+            var model = _current.Model;
+            var weighted = model.Meshes.Where(m => m.Mesh.Weights is not null).Select(m => m.Name).ToArray();
+            if (weighted.Length > 0 && !skeleton.SameNamesAs(model.Skeleton))
+            {
+                refusal = $"bones: the model has weights ({string.Join(", ", weighted.Select(n => $"'{n}'"))}), which depend on the bones' names and order, "
+                    + $"so the skeleton must keep them: {string.Join(", ", model.Skeleton!.Names)}. Change only the rest transforms, or define the meshes again to drop their weights";
+                return null;
+            }
+            return PushLocked(model.WithSkeleton(skeleton), tool);
+        }
+    }
+
+    /// <summary>
+    /// Gives the vertices <paramref name="vertices"/> of the mesh <paramref name="name"/> picks the influences <paramref name="influences"/>
+    /// (a bone's name to its weight), under the lock, as one step. <paramref name="change"/> says how many vertices lost an influence to
+    /// the cap and how many are still unweighted. Null, pushing nothing, when the model is empty, the name picks no mesh, or the call is
+    /// refused (<paramref name="problems"/> says why).
+    /// </summary>
+    public ModelSnapshot? SetWeights(string tool, string? name, Func<PolygonMesh, (IReadOnlyList<int>? Ids, List<string> Problems)> vertices,
+        IReadOnlyDictionary<string, double> influences, out WeightsChange? change, out List<string> problems)
+    {
+        lock (_write)
+        {
+            change = null;
+            problems = [];
+            var model = _current.Model;
+            var target = model.Target(name, out var problem);
+            if (problem is not null) problems.Add(problem);
+            if (target is null) return null;
+            if (model.Skeleton is not { } skeleton)
+            {
+                problems.Add("weights: the model has no skeleton yet; call define_skeleton first");
+                return null;
+            }
+
+            var raw = new Dictionary<int, double>();
+            var names = skeleton.Names.ToList();
+            foreach (var (bone, weight) in influences)
+            {
+                var at = names.IndexOf(bone);
+                if (at < 0) problems.Add($"weights.{bone}: no bone named '{bone}'; the bones are {string.Join(", ", names.Select(n => $"'{n}'"))}");
+                else if (!double.IsFinite(weight) || weight < 0) problems.Add($"weights.{bone}: {weight} is not a weight; weights are 0 or more");
+                else if (weight > 0) raw[at] = weight;
+            }
+            if (influences.Count == 0) problems.Add("weights: give at least one bone and its weight");
+            else if (raw.Count == 0 && problems.Count == 0) problems.Add("weights: every weight is 0; at least one must be above 0");
+            var (ids, idProblems) = vertices(target.Mesh);
+            problems.AddRange(idProblems);
+            if (problems.Count > 0 || ids is null) return null;
+
+            var normal = VertexWeights.Normalise(raw, out var capped);
+            var weights = (target.Mesh.Weights ?? VertexWeights.None).With(ids, normal);
+            var mesh = target.Mesh.WithWeights(weights);
+            change = new WeightsChange(target.Name, ids.Distinct().Count(), capped ? ids.Distinct().Count() : 0,
+                mesh.Vertices.Count - weights.Count, normal);
+            return PushLocked(model.With(target.Name, mesh), tool);
         }
     }
 
@@ -157,3 +213,6 @@ public sealed class ModelStore
         return next;
     }
 }
+
+/// <summary>What a <c>set_weights</c> did: the mesh, how many vertices were set, how many of those had influences dropped by the cap of four, how many vertices of the mesh are still unweighted, and the normalised influences given.</summary>
+public sealed record WeightsChange(string Mesh, int Set, int Capped, int Unweighted, IReadOnlyList<Influence> Influences);

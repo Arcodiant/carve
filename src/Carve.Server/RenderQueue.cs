@@ -27,6 +27,9 @@ internal sealed record RenderSpec(
     /// <summary>What to pick out. Compared by value, so an equal highlight is not a change of view.</summary>
     public Highlight Highlight { get; init; } = Highlight.None;
 
+    /// <summary>The pose to draw the model in; null is the rest pose. Compared by value.</summary>
+    public Carve.Core.Pose? Pose { get; init; }
+
     /// <summary>A sheet tile's caption, written on the image; a single render has none.</summary>
     public string? TileCaption { get; init; }
 

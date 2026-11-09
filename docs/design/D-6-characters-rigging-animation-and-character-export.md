@@ -187,6 +187,6 @@ No UVs yet. Nothing here may stop M-6 adding per-corner UVs: the export's vertex
 
 ## Open questions
 
-- **How `render` frames a moving character.** The working assumption is the rest-pose bounds, so a clip does not swim. T-32 confirms it and T-47 must match it.
+- **How `render` frames a moving character.** The working assumption is the rest-pose bounds, so a clip does not swim. T-32 confirmed it on the two-box chain (`chain-bent-z`, scenario-crate): `render` with a `pose` frames on the rest bounds, and a quarter turn at the joint, which swings a 1 m box about the middle of the model, keeps every corner of the posed model inside the image (the check projects all eight). A fixed frame is also why a pose can leave it: a bend about a joint at the end of the model's extent (a root turned a quarter about a foot, say) carries geometry beyond the rest bounds and is cut off. That follows from the decision, and is the price of a frame that holds still, not a reason to change it; T-47 must match it.
 - **Whether Carve's clips should keep a game-side `loop` flag.** glTF has none, so `loop` is only Carve's check. The game sets `Animator.Loop` itself.
 - **Engine need 4**, in D-1: a skinned model of several meshes. If the engine gains it, one mesh stays valid and nothing has to change.

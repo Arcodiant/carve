@@ -25,6 +25,7 @@ internal static class RenderTool
         var schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!;
         schema["properties"]!["highlight"] = HighlightSchema();
         schema["properties"]!["views"] = ViewsSchema();
+        schema["properties"]!["pose"] = PoseSchema();
         WithMesh(schema.AsObject(), MeshArgumentText);
         schema["properties"]!["columns"] = new JsonObject
         {
@@ -33,6 +34,64 @@ internal static class RenderTool
         };
         tool.ProtocolTool.InputSchema = Closed(JsonSerializer.SerializeToElement(schema));
         return tool;
+    }
+
+    private static JsonObject PoseSchema() => new()
+    {
+        ["description"] = "Draws the model posed: an object of bone name to {rotation: [x, y, z, w] unit quaternion, translation: [x, y, z]}, both local to the parent and absolute, each optional (a bone or part left out rests). Needs a skeleton and weights (set_weights). Framing stays on the rest pose.",
+        ["type"] = "object",
+        ["additionalProperties"] = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["rotation"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "number" }, ["minItems"] = 4, ["maxItems"] = 4 },
+                ["translation"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "number" }, ["minItems"] = 3, ["maxItems"] = 3 },
+            },
+        },
+    };
+
+    /// <summary>The pose argument: null when absent, else a pose; problems are added to <paramref name="errors"/>.</summary>
+    private static Pose? ReadPose(JsonElement? pose, List<string> errors)
+    {
+        if (Absent(pose)) return null;
+        if (pose!.Value.ValueKind != JsonValueKind.Object)
+        {
+            errors.Add($"pose: expected an object of bone name to {{rotation, translation}}, got {Describe(pose.Value)}");
+            return null;
+        }
+        var bones = new Dictionary<string, (Quaternion?, Vector3?)>();
+        var before = errors.Count;
+        foreach (var b in pose.Value.EnumerateObject())
+        {
+            var at = $"pose.{b.Name}";
+            if (b.Value.ValueKind != JsonValueKind.Object) { errors.Add($"{at}: expected an object {{rotation, translation}}, got {Describe(b.Value)}"); continue; }
+            Quaternion? rotation = null;
+            Vector3? translation = null;
+            foreach (var f in b.Value.EnumerateObject())
+            {
+                if (f.Name is not ("rotation" or "translation")) { errors.Add($"{at}.{f.Name}: not a field of a pose bone; its fields are rotation, translation"); continue; }
+                var want = f.Name == "rotation" ? 4 : 3;
+                var values = new List<float>();
+                var ok = f.Value.ValueKind == JsonValueKind.Array && f.Value.GetArrayLength() == want;
+                if (ok)
+                    foreach (var n in f.Value.EnumerateArray())
+                    {
+                        if (n.ValueKind != JsonValueKind.Number || !float.IsFinite((float)n.GetDouble())) { ok = false; break; }
+                        values.Add((float)n.GetDouble());
+                    }
+                if (!ok) { errors.Add($"{at}.{f.Name}: expected {want} finite numbers"); continue; }
+                if (want == 4)
+                {
+                    var q = new Quaternion(values[0], values[1], values[2], values[3]);
+                    if (MathF.Abs(q.Length() - 1) > Skeleton.UnitTolerance) errors.Add($"{at}.rotation: not a unit quaternion: its length is {q.Length():G6}, and it must be 1 (within {Skeleton.UnitTolerance})");
+                    else rotation = q;
+                }
+                else translation = new Vector3(values[0], values[1], values[2]);
+            }
+            bones[b.Name] = (rotation, translation);
+        }
+        return errors.Count > before ? null : new Pose(bones);
     }
 
     private static JsonObject HighlightSchema()
@@ -138,6 +197,7 @@ internal static class RenderTool
         + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; a mode other than 'shaded', 'wireframe' or 'normals'; a highlight that is not an object, or whose lists are not lists of ids and [a, b] pairs; "
         + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; labels other than 'none', 'faces', 'vertices' or 'both'; "
         + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns other than 1, 2 or 3; an argument render does not take; a sheet whose tiles would show different meshes, because the mesh changed while it was drawn on each of 3 tries (\"The mesh changed while the sheet was drawn, on each of 3 tries, so its tiles would show different meshes; call render again once the edits have settled.\"). "
+        + "'pose' draws the model posed by its skeleton: an object of bone name to {rotation: [x, y, z, w], translation: [x, y, z]}, each part optional and absolute (local to the parent, replacing the rest value; a bone or part left out rests), skinned by the weights set_weights gave. A vertex with no weight stays where it is. The camera frames the REST pose, so the frame does not move between poses and a pose that swings far can leave it. Errors: a bone the skeleton lacks, a rotation that is not a unit quaternion, no skeleton. "
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
         + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select and check still work there.";
 
@@ -165,9 +225,10 @@ internal static class RenderTool
         JsonElement? views = null,
         double? columns = null,
         JsonElement? mesh = null,
+        JsonElement? pose = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -222,6 +283,7 @@ internal static class RenderTool
 
         var problems = new List<string>();
         var meshName = MeshName(mesh, problems);
+        var posed = ReadPose(pose, problems);
         var listed = HighlightLists(highlight, problems);
         if (problems.Count > 0)
         {
@@ -242,6 +304,13 @@ internal static class RenderTool
         if (current.Mesh is not { } drawn)
         {
             return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
+        }
+
+        if (posed is not null)
+        {
+            if (current.Model.Skeleton is not { } rig) return Failed("render", ["pose: the model has no skeleton; call define_skeleton first"]);
+            if (Skinning.Unknown(rig, posed).ToArray() is { Length: > 0 } stray)
+                return Failed("render", [$"pose: no bone named {string.Join(", ", stray.Select(n => $"'{n}'"))}; the bones are {string.Join(", ", rig.Names.Select(n => $"'{n}'"))}"]);
         }
 
         // Every mesh is drawn, as one. Labels and highlight name ids within one mesh, so with several they are aimed
@@ -286,7 +355,7 @@ internal static class RenderTool
         async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
             var rendering = Task.WhenAll(tiles
-                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window })));
+                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window })));
 
             // The frame thread drains the queue; once it has ended, nothing will.
             await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
