@@ -37,4 +37,15 @@ public class ClipLibraryFileTests
         Assert.False(read.Succeeded);
         Assert.Equal("meshes: the file has no meshes and no skeleton; a Carve file holds at least one mesh, or a skeleton (a clip library)", Assert.Single(read.Errors).ToString());
     }
+
+    /// <summary>RV-25 R6: open with mesh on a clip library says the file has no meshes rather than listing none.</summary>
+    [Fact]
+    public void Taking_a_mesh_from_a_clip_library_says_it_has_no_meshes()
+    {
+        Assert.Null(Model.Of("Body", Polygons()).WithMeshFrom(Library(), "Body", out var problem));
+        Assert.Equal("mesh: the file has no mesh named 'Body'; it has no meshes (a clip library)", problem);
+    }
+
+    private static PolygonMesh Polygons() =>
+        PolygonMesh.Create([Vector3.Zero, Vector3.UnitX, Vector3.UnitY], [[0, 1, 2]]).Mesh!;
 }

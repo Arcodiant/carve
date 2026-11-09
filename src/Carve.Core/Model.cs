@@ -157,7 +157,9 @@ public sealed class Model
         var found = System.Array.Find(source._meshes, m => m.Name == name);
         if (found is null)
         {
-            problem = $"mesh: the file has no mesh named '{name}'; its meshes are {source.ListNames()}";
+            problem = source._meshes.Length == 0
+                ? $"mesh: the file has no mesh named '{name}'; it has no meshes (a clip library)"
+                : $"mesh: the file has no mesh named '{name}'; its meshes are {source.ListNames()}";
             return null;
         }
         var mesh = found.Mesh;
