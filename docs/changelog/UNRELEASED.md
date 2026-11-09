@@ -6,3 +6,4 @@
 - T-32: An agent sets per-vertex weights and renders the model in a given pose, skinned by Carve.Core
 - T-33: An agent defines named clips of rotation and translation keys and renders any clip at any time
 - T-34: export writes a skinned .glb with one mesh, a primitive per piece and colour, skins[0] and the clips, byte-identical run to run, which Empyrean's loader reads
+- T-35: The whole model saves to and reloads from the Carve file, and version 1 files still open
