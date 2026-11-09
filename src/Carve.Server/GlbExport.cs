@@ -36,7 +36,15 @@ public static class GlbExport
             .Select(c => (c is null ? MaterialName : $"{MaterialName} {c}", c)).ToList();
     }
 
-    private static string? ColourOf(PolygonMesh? mesh, int face) => mesh?.Style?.ColourOf(face)?.ToUpperInvariant();
+    /// <summary>A face's colour as an upper-case hex, or null for an uncoloured face or no mesh.</summary>
+    internal static string? ColourOf(PolygonMesh? mesh, int face) => mesh?.Style?.ColourOf(face)?.ToUpperInvariant();
+
+    /// <summary>The opaque matte material of one colour (D-6): metallic 0, roughness 1, single-sided; no colour is the default grey.</summary>
+    internal static MaterialBuilder Material(string name, string? colour) => new MaterialBuilder(name)
+        .WithMetallicRoughnessShader()
+        .WithBaseColor(colour is null ? BaseColor : FaceStyle.ToLinear(colour))
+        .WithMetallicRoughness(Metallic, Roughness)
+        .WithDoubleSide(false);
 
     /// <summary>One opaque matte material per colour, metallic 0 and roughness 1, its base colour the linear form of the sRGB hex (D-6).</summary>
     public static byte[] Write(IReadOnlyList<FlatTriangle> triangles, string name) => Write(null, triangles, name);
@@ -47,14 +55,7 @@ public static class GlbExport
         var mesh2 = new MeshBuilder<VertexPositionNormal>(name);
         var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexEmpty>>();
         foreach (var (materialName, colour) in Materials(mesh, triangles))
-        {
-            var material = new MaterialBuilder(materialName)
-                .WithMetallicRoughnessShader()
-                .WithBaseColor(colour is null ? BaseColor : FaceStyle.ToLinear(colour))
-                .WithMetallicRoughness(Metallic, Roughness)
-                .WithDoubleSide(false);
-            primitives[materialName] = mesh2.UsePrimitive(material);
-        }
+            primitives[materialName] = mesh2.UsePrimitive(Material(materialName, colour));
 
         foreach (var t in triangles)
         {

@@ -27,11 +27,7 @@ public static class ClipsExport
     {
         var skeleton = model.Skeleton ?? throw new ArgumentException("the model has no skeleton", nameof(model));
         if (model.Clips.Count == 0) throw new ArgumentException("the model has no clips", nameof(model));
-        var root = ModelRoot.CreateModel();
-        var scene = root.UseScene(0);
-        root.DefaultScene = scene;
-        var joints = GlbRig.WriteArmature(scene, skeleton);
-        GlbRig.WriteSkin(root, name, skeleton, joints);
+        var (root, _, joints, _) = GlbRig.Start(name, skeleton);
         GlbRig.WriteClips(root, skeleton, joints, model.Clips);
         return root.WriteGLB().ToArray();
     }
