@@ -22,7 +22,8 @@ public sealed record SkinnedGlb(
 /// uncoloured faces counting as one colour. Each primitive is indexed triangles of <c>POSITION</c>, <c>NORMAL</c>
 /// (flat, the face's own), <c>JOINTS_0</c> and <c>WEIGHTS_0</c>, positions the rest pose in model space, and has a
 /// material of its own: <c>&lt;mesh&gt;</c> for uncoloured faces, <c>&lt;mesh&gt;:&lt;group&gt;</c> when a face group
-/// holds exactly the primitive's faces (the first such group), else <c>&lt;mesh&gt;:&lt;rrggbb&gt;</c>; each opaque,
+/// holds exactly the primitive's faces (the first such group), else <c>&lt;mesh&gt;:&lt;rrggbb&gt;</c>, which a
+/// primitive also takes when its group's name is another primitive's <c>&lt;rrggbb&gt;</c>, so no two share a name; each opaque,
 /// metallic 0, roughness 1, base colour as the static export's. Then one animation per clip (<see cref="GlbRig.WriteClips"/>).
 /// The same model always writes the same bytes.
 /// </summary>
