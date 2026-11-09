@@ -98,7 +98,9 @@ public sealed class ExportScenario : IScenario
         var glbBytes = await File.ReadAllBytesAsync(glbPath);
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, ResultFile), exported);
 
-        var exportedAgain = await CrateBuild.CallTextAsync(driver, "export", new { path = glbPath });
+        await CrateBuild.ExpectToolErrorAsync(driver, "export", new { path = glbPath }, "already exists", "overwrite");
+        driver.AssertBytesEqual("crate.glb, refused a second export", glbBytes, await File.ReadAllBytesAsync(glbPath));
+        var exportedAgain = await CrateBuild.CallTextAsync(driver, "export", new { path = glbPath, overwrite = true });
         Expect(driver, "export (again)", exportedAgain, "crate.glb", "140 triangles", "(replaced)");
         driver.AssertBytesEqual("crate.glb, exported again", glbBytes, await File.ReadAllBytesAsync(glbPath));
 

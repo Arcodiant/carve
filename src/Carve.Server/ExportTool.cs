@@ -14,7 +14,7 @@ public sealed class ExportTool(ModelStore store)
     public const string Extension = ".glb";
 
     public const string Text =
-        "Writes the current mesh to a .glb file (binary glTF 2.0) that a game on the Empyrean engine loads as it is. Takes path, the file to write. "
+        "Writes the current mesh to a .glb file (binary glTF 2.0) that a game on the Empyrean engine loads as it is. Takes path, the file to write, and overwrite (default false), which must be true to replace a file that is already there, in either mode. "
         + "What is written: one mesh on one node, both named after the file name without its extension (crate.glb gives crate), the node's transform the identity; "
         + "the triangles render draws, with flat normals: each face keeps its own normal, so every edge is hard; "
         + "one matte grey material named 'carve' (base colour 0.72, 0.72, 0.70, metallic 0, roughness 1, single-sided), and for faces coloured with set_colour one more opaque matte material per colour, named 'carve #RRGGBB', its baseColorFactor the linear form of the colour (metallic 0, roughness 1), a primitive for each; "
@@ -22,8 +22,8 @@ public sealed class ExportTool(ModelStore store)
         + "Axes and units are the mesh's own: +Y up, +Z front, 1 unit = 1 m, the origin where you authored it. Nothing is scaled, turned, recentred or converted, "
         + "so build the model at the size and place the game wants it. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
-        + "an existing file is replaced and the result says (replaced); the path must end in .glb, in any case. "
-        + "Errors, each a tool error that writes nothing: no mesh yet (call define_mesh or open first); an empty path; a path holding a character a file path may not; "
+        + "an existing file is refused unless overwrite: true is given, and then it is replaced and the result says (replaced); the path must end in .glb, in any case. "
+        + "Errors, each a tool error that writes nothing: an existing file without overwrite: true (the error names the path and overwrite, and the file is unchanged); no mesh yet (call define_mesh or open first); an empty path; a path holding a character a file path may not; "
         + "a path naming a folder; any extension but .glb; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
         + "A model of several meshes and no skeleton is written as one mesh, every mesh merged in order, as above. "
@@ -49,7 +49,7 @@ public sealed class ExportTool(ModelStore store)
 
     public static McpServerTool Create()
     {
-        var schema = PathSchema("The .glb file to write, absolute or relative to carve's working directory; replaced if it exists.");
+        var schema = PathSchema("The .glb file to write, absolute or relative to carve's working directory; an existing file is an error unless overwrite is true.");
         schema["properties"]!.AsObject()["allow_unweighted"] = new JsonObject
         {
             ["description"] = "With a skeleton: export even when some vertices have no weight, binding them wholly to the first root bone, for work in progress. Default false.",
@@ -61,18 +61,29 @@ public sealed class ExportTool(ModelStore store)
             ["type"] = "string",
             ["enum"] = new JsonArray("model", "clips"),
         };
+        schema["properties"]!.AsObject()["overwrite"] = new JsonObject
+        {
+            ["description"] = "Replace the file if it already exists. Default false: an existing file is a tool error and is left unchanged.",
+            ["type"] = "boolean",
+        };
         return MeshToolSupport.Create<ExportTool>("export", Text, schema);
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? mode = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? mode = null, JsonElement? overwrite = null)
     {
-        var errors = UnknownArguments("export", context, "path", "allow_unweighted", "mode");
+        var errors = UnknownArguments("export", context, "path", "allow_unweighted", "mode", "overwrite");
         var text = RequiredString("path", path, errors);
         var allowUnweighted = false;
         if (!Absent(allow_unweighted))
         {
             if (allow_unweighted!.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) allowUnweighted = allow_unweighted.Value.GetBoolean();
             else errors.Add($"allow_unweighted: expected true or false, got {Describe(allow_unweighted.Value)}");
+        }
+        var replace = false;
+        if (!Absent(overwrite))
+        {
+            if (overwrite!.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) replace = overwrite.Value.GetBoolean();
+            else errors.Add($"overwrite: expected true or false, got {Describe(overwrite.Value)}");
         }
         var clips = false;
         if (!Absent(mode))
@@ -90,22 +101,22 @@ public sealed class ExportTool(ModelStore store)
         var target = ToolPaths.Resolve("export", text, Extension, out var pathError);
         if (target is null) return Error(pathError!);
 
-        if (clips) return Clips(model, target);
-        if (model.Skeleton is not null) return Skinned(model, target, allowUnweighted);
+        if (clips) return Clips(model, target, replace);
+        if (model.Skeleton is not null) return Skinned(model, target, allowUnweighted, replace);
 
         var triangles = FlatShading.Triangles(mesh);
         var bytes = GlbExport.Write(mesh, triangles, target.Stem);
-        if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
+        if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, replace)) return Error(writeError!);
 
         return Line(Summary(mesh, target, replaced, triangles.Count));
     }
 
     /// <summary>Clips mode: the armature, skin and animations with no mesh, or a refusal that writes nothing.</summary>
-    private static CallToolResult Clips(Model model, ToolPath target)
+    private static CallToolResult Clips(Model model, ToolPath target, bool overwrite)
     {
         if (ClipsExport.Refusal(model) is { } refusal) return Error($"export: mode clips: {refusal}. Nothing was written.");
         var bytes = ClipsExport.Write(model, target.Stem);
-        if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
+        if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
         var skeleton = model.Skeleton!;
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
@@ -115,7 +126,7 @@ public sealed class ExportTool(ModelStore store)
     }
 
     /// <summary>A model with a skeleton: the skinned file, or a refusal listing unweighted vertices that writes nothing.</summary>
-    private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted)
+    private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted, bool overwrite)
     {
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
         var unweighted = SkinnedExport.Unweighted(model);
@@ -127,7 +138,7 @@ public sealed class ExportTool(ModelStore store)
         }
 
         var glb = SkinnedExport.Write(model, target.Stem);
-        if (!ToolPaths.Write("export", target, glb.Bytes, out var replaced, out var writeError)) return Error(writeError!);
+        if (!ToolPaths.Write("export", target, glb.Bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
         var skeleton = model.Skeleton!;
         static string List(IEnumerable<string> names) => string.Join(", ", names.Select(n => $"'{n}'"));
