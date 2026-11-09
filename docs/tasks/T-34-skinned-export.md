@@ -4,7 +4,7 @@ description: >-
 ---
 # T-34 — Skinned export
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
