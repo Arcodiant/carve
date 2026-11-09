@@ -67,14 +67,16 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
 | `tests/Carve.ModelViewer.Tests` | The viewer on its own fixture cube, through `run-viewer.ps1`; suite `viewer-cube` |
 | `tests/Carve.ExportViewer.Tests` | The checks on what the viewer made of the exported crate, the last step of suite `scenario-export`. They read the run folder in `CARVE_EXPORT_RUN` and are skipped when it is unset, so `dotnet test Carve.slnx` passes without it |
+| `tests/Carve.CharacterLoad.Tests` | The checks on the character scenario's run folder, the last step of suite `scenario-character`: the content folder read through `IModelGeometryLoader.Load`, `HumanoidRoleMap.Synty`, and `samples/gardener.carve` compared by content. They read the run folder in `CARVE_CHARACTER_RUN` and are skipped when it is unset, so `dotnet test Carve.slnx` passes without it |
 | `tests/Carve.Scenario.Tiny` | The scenario the debug extension's tests stack on it |
 | `tests.json` | The suites and their tiers, which `cairn <kind> <id> verify` and `cairn test run` work from |
 | `scripts/verify.ps1` | The old whole run: build warnings-as-errors + all tests + the cube scenario (needs a Vulkan device). The gate no longer runs it |
 | `scripts/run-scenario.ps1` | Builds, then runs one scenario on the real `carve`; returns its exit code and run folder |
 | `scripts/run-viewer.ps1` | Builds, then runs the viewer on one model; returns its exit code |
 | `scripts/run-export-scenario.ps1` | The export scenario, then the viewer on its content folder, then the checks of `tests/Carve.ExportViewer.Tests` (built first unless `-NoBuild`, each step bounded; a skipped check fails it); the run folder is the last line on stdout |
+| `scripts/run-character-scenario.ps1` | The character scenario, then the checks of `tests/Carve.CharacterLoad.Tests` on its run folder (built first unless `-NoBuild`, the checks stopped after `-ChecksTimeoutSeconds`; a skipped check fails it); the run folder is the last line on stdout |
 | `scripts/bounded-run.ps1` | Dot-sourced by the run scripts: starts `dotnet` with quoted arguments (a trailing backslash survives) and stops it after its time limit, exit code 124 |
-| `samples/` | Sample models, written by `CarveFile.Write`: `leaky-shed.carve`, the broken shed `check` is shown on, kept equal to `TestMeshes.LeakyShed()` by a test |
+| `samples/` | Sample models, written by `CarveFile.Write`: `leaky-shed.carve`, the broken shed `check` is shown on, a version 2 file kept equal to `TestMeshes.LeakyShed()` by content (read, not compared by bytes) by `MeshHealthTests`, with its version 1 copy kept as a fixture in `tests/Carve.Core.Tests/Fixtures/leaky-shed-v1.carve` that reads to the same model; and `gardener.carve`, the character, kept equal by content to the one scenario-character builds through the tools by `tests/Carve.CharacterLoad.Tests` |
 | `docs/` | cairn tracker (tasks, bugs, milestones, design docs, changelog) |
 | `artifacts/` | Ignored: captures, review artefacts and raw content, kept across tasks |
 
