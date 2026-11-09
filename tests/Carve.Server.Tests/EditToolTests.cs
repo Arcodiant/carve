@@ -165,8 +165,8 @@ public class EditToolTests
     [InlineData("extrude", """{"faces":[0],"distance":1e400}""", "distance: 1e400 is out of range")]
     [InlineData("extrude", """{"faces":[0],"distance":0,"inset":0}""", "distance, inset")]
     // RV-10: a misspelt or unknown argument is a problem, not silently dropped.
-    [InlineData("extrude", """{"faces":[1],"distance":-0.2,"Inset":0.1}""", "Inset: not an argument of extrude; its arguments are faces, distance, inset")]
-    [InlineData("move", """{"face":[3],"by":[0,1,0]}""", "face: not an argument of move; its arguments are vertices, edges, faces, by")]
+    [InlineData("extrude", """{"faces":[1],"distance":-0.2,"Inset":0.1}""", "Inset: not an argument of extrude; its arguments are faces, distance, inset, mesh")]
+    [InlineData("move", """{"face":[3],"by":[0,1,0]}""", "face: not an argument of move; its arguments are vertices, edges, faces, by, mesh")]
     [InlineData("define_mesh", """{"vertices":[[0,0,0],[1,0,0],[0,1,0]],"faces":[[0,1,2]],"title":"tri"}""", "title: not an argument of define_mesh")]
     // RV-10: refused by the whole-mesh check, after the arguments passed: corner 6 past the far side folds two faces.
     [InlineData("move", """{"vertices":[6],"by":[-2,0,0]}""", "faces[1]: face is self-intersecting")]
