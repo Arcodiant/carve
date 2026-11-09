@@ -181,9 +181,14 @@ public sealed class Model
         return With(name, mesh);
     }
 
-    /// <summary>Why <paramref name="name"/> cannot name a mesh, or null when it can.</summary>
+    /// <summary>
+    /// Why <paramref name="name"/> cannot name a mesh, or null when it can: it must not be empty, and must not hold a
+    /// colon, so that <c>&lt;mesh&gt;:</c> is an unambiguous prefix of a skinned export's material names.
+    /// </summary>
     public static string? NameProblem(string? name) =>
-        string.IsNullOrEmpty(name) ? "a mesh name must not be empty" : null;
+        string.IsNullOrEmpty(name) ? "a mesh name must not be empty"
+        : name.Contains(':') ? "a mesh name must not contain ':' (a skinned export names materials <mesh>:<group>)"
+        : null;
 
     /// <summary>
     /// The mesh a tool is aimed at: the one named, or the only one when <paramref name="name"/> is null. Null with

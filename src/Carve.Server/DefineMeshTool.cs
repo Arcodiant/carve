@@ -50,7 +50,7 @@ public sealed class DefineMeshTool(ModelStore store)
     public const string LidMove = """{"mesh":"lid","faces":[0,1,2,3,4,5],"by":[0,0.1,0]}""";
 
     private const string NameText =
-        "The name of the mesh, non-empty; left out, it is mesh. An existing name replaces that mesh in its place; a new one adds a mesh after the others.";
+        "The name of the mesh, non-empty and without a colon (a skinned export names materials mesh:group, so such a name is refused); left out, it is mesh. An existing name replaces that mesh in its place; a new one adds a mesh after the others.";
 
     private const string VerticesText = "Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.";
     private const string FacesText = "Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.";

@@ -132,6 +132,20 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     }
 
     [Fact]
+    public async Task A_mesh_name_with_a_colon_is_refused_by_define_mesh_and_the_tools_that_name_a_mesh()
+    {
+        // RV-24 B4: '<mesh>:' prefixes a skinned export's material names.
+        var (carve, _) = await StartWithCrateAndLidAsync();
+        using var __ = carve;
+        const string colon = "a mesh name must not contain ':' (a skinned export names materials <mesh>:<group>)";
+
+        Assert.Contains("name: " + colon,
+            Refused(await carve.CallToolAsync("define_mesh", """{"name":"crate:lid","vertices":[[0,0,0],[1,0,0],[0,1,0]],"faces":[[0,1,2]]}""")));
+        Assert.Contains("mesh: " + colon, Refused(await carve.CallToolAsync("get_mesh", """{"mesh":"crate:lid"}""")));
+        Assert.Contains("mesh: " + colon, Refused(await carve.CallToolAsync("open", """{"path":"x.carve","mesh":"crate:lid"}""")));
+    }
+
+    [Fact]
     public async Task Export_merges_several_meshes_and_render_labels_and_highlight_need_mesh_among_several()
     {
         var (carve, _) = await StartWithCrateAndLidAsync(Root);
