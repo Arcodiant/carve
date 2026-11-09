@@ -48,7 +48,7 @@ internal static class RenderTool
 
     private static JsonObject PoseSchema() => new()
     {
-        ["description"] = "Draws the model posed: an object of bone name to {rotation: [x, y, z, w] unit quaternion, translation: [x, y, z]}, both local to the parent and absolute, each optional (a bone or part left out rests). Needs a skeleton and weights (set_weights). Framing stays on the rest pose.",
+        ["description"] = "Draws the model posed: an object of bone name to {rotation: [x, y, z, w] unit quaternion, translation: [x, y, z]}, both local to the parent and absolute, each optional (a bone or part left out rests). Needs a skeleton (define_skeleton); only weighted vertices move, so a mesh with no weights (set_weights) is drawn at rest, with no error. Framing stays on the rest pose.",
         ["type"] = "object",
         ["additionalProperties"] = new JsonObject
         {
@@ -229,7 +229,7 @@ internal static class RenderTool
         + "'pose' draws the model posed by its skeleton: an object of bone name to {rotation: [x, y, z, w], translation: [x, y, z]}, each part optional and absolute (local to the parent, replacing the rest value; a bone or part left out rests), skinned by the weights set_weights gave. A vertex with no weight stays where it is. The camera frames the REST pose, so the frame does not move between poses and a pose that swings far can leave it. Errors: a bone the skeleton lacks, a rotation that is not a unit quaternion, no skeleton. "
         + "'clip' and 'time' draw the model as the clip of that name (define_clip) poses it at that time in seconds, interpolated as define_clip says; framed on the rest pose like pose. Errors: clip together with pose, clip without time or time without clip, no clip of that name, a time outside 0 to the clip's duration. "
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
-        + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select and check still work there.";
+        + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select, check, define_group, set_colour, define_skeleton, get_skeleton, set_weights, define_clip and delete_clip still work there.";
 
     /// <summary>The text of render's <c>mesh</c>: it aims labels and highlight, never what is drawn.</summary>
     private const string MeshArgumentText =
