@@ -47,6 +47,7 @@ public sealed class DefineSkeletonTool(ModelStore store)
         + "Names are unique and non-empty, any text (e.g. mixamorig:Hips). At most 255 bones. "
         + SkeletonJson.RestText
         + "Bad input (more than 255 bones, an empty or duplicate name, a parent that is unknown or comes after its child, a rotation that is not a unit quaternion within 0.001 of length 1, a bone that is not {name, parent, position, rotation}) is a tool error that lists every problem by bone, e.g. bones[2]. "
+        + "Once any mesh has weights (set_weights), a skeleton with other bone names or another order is a tool error; the same names in the same order, with new rest transforms, is fine. "
         + "Returns JSON {bones: the count, names:[in order]}; get_skeleton reads the bones back. "
         + SkeletonJson.ExampleMarker + " a hip 1 m up, a spine 0.3 m above the hip, a head 0.4 m above the spine, so the head rests at y = 1.7: " + SkeletonJson.Example;
 

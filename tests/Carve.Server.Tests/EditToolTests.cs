@@ -315,7 +315,7 @@ public class EditToolTests
             Assert.Contains("Worked example", Description(tools, name));
         foreach (var name in new[] { "define_mesh", "render", "move", "extrude", "get_mesh", "undo" })
             Assert.False(Tool(tools, name).GetProperty("inputSchema").GetProperty("additionalProperties").GetBoolean(), name);
-        Assert.Equal(["view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh"],
+        Assert.Equal(["view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose"],
             Tool(tools, "render").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name));
         Assert.Contains("ids are the positions given here", Description(tools, "define_mesh"));
     }
