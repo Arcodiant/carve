@@ -223,14 +223,14 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         return Convert.FromBase64String(result.GetProperty("content")[0].GetProperty("data").GetString()!);
     }
 
-    /// <summary>Where a world point lands in the front view, framed on the bounds of both boxes, (0,0,0) to (3,2,1).</summary>
-    private static (int X, int Y) PixelOf(Vector3 world)
-    {
-        var space = DrawnSpace.Of(Vector3.Zero, new Vector3(3, 2, 1));
-        var frame = ViewFraming.Frame(space.Apply(new Vector3(3, 2, 1)), RenderView.Front);
-        var clip = Vector4.Transform(new Vector4(space.Apply(world), 1), frame.View * frame.Projection);
-        return ((int)((clip.X / clip.W + 1) / 2 * Size), (int)((1 - clip.Y / clip.W) / 2 * Size));
-    }
+    /// <summary>
+    /// Where a world point lands in the front view, framed on the bounds of both boxes, (0,0,0) to (3,2,1). Worked out by
+    /// the scenarios' own camera (<c>CameraPixels</c>, with the front direction (1.6, 1.2, 2.2) written out), not by the product's <c>ViewFraming</c>,
+    /// so a mirror or flip in the product's framing moves the image and not these points.
+    /// </summary>
+    private static (int X, int Y) PixelOf(Vector3 world) =>
+        Carve.Scenario.Crate.CameraPixels.Holding(
+            Carve.Scenario.Crate.CameraPixels.Perspective(Vector3.Zero, new Vector3(3, 2, 1), new Vector3(1.6f, 1.2f, 2.2f), Size)(world));
 
     private static bool IsBackground(ImageResult image, (int X, int Y) p)
     {
