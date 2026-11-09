@@ -103,6 +103,8 @@ public sealed class Clip
     /// Spherical interpolation along the shortest arc: q and -q are one rotation, so when the keys' dot product is
     /// negative the later key is negated, and the turn between them is never more than half a revolution.
     /// </summary>
+    // Interim until engine need 5: the engine's docs give slerp along the shortest arc but not its numerics, so this is
+    // System.Numerics' (negates the later key when the dot product is negative; lerps when the keys are almost equal).
     public static Quaternion Slerp(Quaternion from, Quaternion to, float amount) => Quaternion.Slerp(from, to, amount);
 
     /// <summary>
