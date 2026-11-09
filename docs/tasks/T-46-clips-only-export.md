@@ -4,7 +4,7 @@ description: >-
 ---
 # T-46 — Clips-only export
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
