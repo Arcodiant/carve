@@ -376,7 +376,8 @@ internal static class RenderTool
                 idsIn = named.Mesh;
                 offset = current.Model.OffsetOf(named.Name)!.Value;
                 window = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
-                shiftedFor = named.Name;
+                // Only ids asked for are shifted; a render naming the mesh with none has nothing a later model could misplace.
+                shiftedFor = wantsIds ? named.Name : null;
             }
         }
 
