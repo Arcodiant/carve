@@ -5,8 +5,8 @@ public sealed record NamedMesh(string Name, PolygonMesh Mesh);
 
 /// <summary>
 /// What a model is (D-6): named meshes in the order they were first defined. Immutable: every change returns a new
-/// model. Names are non-empty and unique; a mesh keeps its own vertex and face ids. The skeleton and clips arrive in
-/// later tasks.
+/// model. Names are non-empty and unique; a mesh keeps its own vertex and face ids. It may have a Skeleton, kept by every
+/// change to the meshes. Clips arrive in a later task.
 /// </summary>
 public sealed class Model
 {
@@ -14,19 +14,30 @@ public sealed class Model
     public const string DefaultName = "mesh";
 
     /// <summary>The model with no meshes.</summary>
-    public static readonly Model Empty = new([]);
+    public static readonly Model Empty = new([], null);
 
     private readonly NamedMesh[] _meshes;
     private PolygonMesh? _combined;
 
-    private Model(NamedMesh[] meshes)
+    private Model(NamedMesh[] meshes, Skeleton? skeleton)
     {
         _meshes = meshes;
+        Skeleton = skeleton;
         Meshes = Array.AsReadOnly(meshes);
     }
 
     /// <summary>The meshes in definition order.</summary>
     public IReadOnlyList<NamedMesh> Meshes { get; }
+
+    /// <summary>The skeleton, or null when none has been defined.</summary>
+    public Skeleton? Skeleton { get; }
+
+    /// <summary>The model with <paramref name="skeleton"/> (replacing any), its meshes unchanged.</summary>
+    public Model WithSkeleton(Skeleton skeleton)
+    {
+        ArgumentNullException.ThrowIfNull(skeleton);
+        return new Model(_meshes, skeleton);
+    }
 
     /// <summary>The names in definition order.</summary>
     public IEnumerable<string> Names => _meshes.Select(m => m.Name);
@@ -52,7 +63,7 @@ public sealed class Model
         var at = System.Array.FindIndex(_meshes, m => m.Name == name);
         var next = at >= 0 ? (NamedMesh[])_meshes.Clone() : [.. _meshes, null!];
         next[at >= 0 ? at : next.Length - 1] = new NamedMesh(name, mesh);
-        return new Model(next);
+        return new Model(next, Skeleton);
     }
 
     /// <summary>Why <paramref name="name"/> cannot name a mesh, or null when it can.</summary>
