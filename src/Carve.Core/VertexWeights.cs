@@ -66,7 +66,7 @@ public sealed class VertexWeights
         {
             given++;
             var index = names.IndexOf(bone);
-            if (index < 0) errors.Add(new MeshError($"{at}.{bone}", $"no bone named '{bone}'; the bones are {string.Join(", ", names.Select(n => $"'{n}'"))}"));
+            if (index < 0) errors.Add(new MeshError($"{at}.{bone}", $"no bone named '{bone}'; the bones are {NameList.Quoted(names)}"));
             else if (!double.IsFinite(weight) || weight < 0) errors.Add(new MeshError($"{at}.{bone}", $"{weight} is not a weight; weights are 0 or more"));
             else if (weight > 0) raw[index] = weight;
         }

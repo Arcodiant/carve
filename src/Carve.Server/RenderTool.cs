@@ -74,7 +74,7 @@ internal static class RenderTool
         if (clip!.Value.ValueKind != JsonValueKind.String) errors.Add($"clip: expected a clip name, got {Describe(clip.Value)}");
         var at = 0f;
         if (Absent(time)) errors.Add("time: required with clip; the moment in seconds, from 0 to the clip's duration");
-        else if (time!.Value.ValueKind != JsonValueKind.Number || !float.IsFinite((float)time.Value.GetDouble()))
+        else if (!IsFinite(time!.Value))
             errors.Add($"time: expected a finite number of seconds, got {Describe(time.Value)}");
         else at = (float)time.Value.GetDouble();
         return errors.Count > before ? (null, 0) : (clip.Value.GetString(), at);
@@ -106,7 +106,7 @@ internal static class RenderTool
                 if (ok)
                     foreach (var n in f.Value.EnumerateArray())
                     {
-                        if (n.ValueKind != JsonValueKind.Number || !float.IsFinite((float)n.GetDouble())) { ok = false; break; }
+                        if (!IsFinite(n)) { ok = false; break; }
                         values.Add((float)n.GetDouble());
                     }
                 if (!ok) { errors.Add($"{at}.{f.Name}: expected {want} finite numbers"); continue; }
@@ -344,7 +344,7 @@ internal static class RenderTool
             if (current.Model.FindClip(clipName) is not { } sampled)
                 return Failed("render", [current.Model.Clips.Count == 0
                     ? $"clip: there is no clip named '{clipName}'; the model has no clips (define_clip makes one)"
-                    : $"clip: there is no clip named '{clipName}'; the clips are {string.Join(", ", current.Model.Clips.Select(c => $"'{c.Name}'"))}"]);
+                    : $"clip: there is no clip named '{clipName}'; the clips are {NameList.Quoted(current.Model.Clips.Select(c => c.Name))}"]);
             if (clipTime < 0 || clipTime > sampled.Duration)
                 return Failed("render", [$"time: {clipTime} s is outside the clip '{clipName}', which runs from 0 to {sampled.Duration} s"]);
             posed = sampled.Sample(clipTime);
@@ -354,7 +354,7 @@ internal static class RenderTool
         {
             if (current.Model.Skeleton is not { } rig) return Failed("render", ["pose: the model has no skeleton; call define_skeleton first"]);
             if (Skinning.Unknown(rig, posed).ToArray() is { Length: > 0 } stray)
-                return Failed("render", [$"pose: no bone named {string.Join(", ", stray.Select(n => $"'{n}'"))}; the bones are {string.Join(", ", rig.Names.Select(n => $"'{n}'"))}"]);
+                return Failed("render", [$"pose: no bone named {NameList.Quoted(stray)}; the bones are {NameList.Quoted(rig.Names)}"]);
         }
 
         // Every mesh is drawn, as one. Labels and highlight name ids within one mesh, so with several they are aimed

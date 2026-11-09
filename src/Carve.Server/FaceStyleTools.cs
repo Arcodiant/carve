@@ -117,12 +117,7 @@ public sealed class SetColourTool(ModelStore store)
         var hex = RequiredString("colour", colour, errors);
         if (hex is not null && FaceStyle.ColourProblem(hex) is { } bad) errors.Add("colour: " + bad);
         var f = Ids("faces", faces, errors);
-        string? groupName = null;
-        if (!Absent(group))
-        {
-            if (group!.Value.ValueKind != JsonValueKind.String) errors.Add($"group: expected a string, got {Describe(group.Value)}");
-            else groupName = group.Value.GetString();
-        }
+        var groupName = OptionalString("group", group, errors);
         if (f is not null && groupName is not null) errors.Add("faces, group: give faces or group, not both");
         else if (f is null && groupName is null && errors.Count == 0) errors.Add("faces, group: give one of faces or group");
         else if (f is { Count: 0 }) errors.Add("faces: nothing to colour: list at least one face");
@@ -137,10 +132,7 @@ public sealed class SetColourTool(ModelStore store)
             if (groupName is not null)
             {
                 ids = style.FacesOf(groupName);
-                if (ids is null)
-                    problems.Add(style.Groups.Count == 0
-                        ? $"group: no group named '{groupName}'; the mesh has no groups yet, define one with define_group"
-                        : $"group: no group named '{groupName}'; the mesh's groups are {style.GroupNames}");
+                if (ids is null) problems.Add(NoGroup(style, groupName));
             }
             else FaceArguments.CheckIds(m, ids!, problems);
             if (problems.Count > 0) return (null, problems);

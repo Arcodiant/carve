@@ -104,12 +104,7 @@ public sealed class DefineClipTool(ModelStore store)
         else if (duration!.Value.ValueKind != JsonValueKind.Number) errors.Add($"duration: expected a number of seconds, got {Describe(duration.Value)}");
         else length = (float)duration.Value.GetDouble();
 
-        var loops = false;
-        if (!Absent(loop))
-        {
-            if (loop!.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) loops = loop.Value.GetBoolean();
-            else errors.Add($"loop: expected true or false, got {Describe(loop.Value)}");
-        }
+        var loops = OptionalBool("loop", loop, errors);
 
         var specs = new List<BoneChannelsSpec>();
         if (Absent(channels)) errors.Add("channels: required but missing");
@@ -215,13 +210,13 @@ public sealed class DefineClipTool(ModelStore store)
             if (field.Name is not ("time" or "value")) errors.Add($"{at}.{field.Name}: not a field of a key; its fields are time, value");
         float time = 0;
         if (!key.TryGetProperty("time", out var t)) errors.Add($"{at}.time: required but missing");
-        else if (t.ValueKind != JsonValueKind.Number || !float.IsFinite((float)t.GetDouble())) errors.Add($"{at}.time: expected a finite number of seconds, got {Describe(t)}");
+        else if (!IsFinite(t)) errors.Add($"{at}.time: expected a finite number of seconds, got {Describe(t)}");
         else time = (float)t.GetDouble();
 
         var value = new float[count];
         if (!key.TryGetProperty("value", out var v)) errors.Add($"{at}.value: required but missing");
         else if (v.ValueKind != JsonValueKind.Array || v.GetArrayLength() != count
-            || v.EnumerateArray().Any(n => n.ValueKind != JsonValueKind.Number || !float.IsFinite((float)n.GetDouble())))
+            || v.EnumerateArray().Any(n => !IsFinite(n)))
             errors.Add($"{at}.value: expected {count} finite numbers");
         else
         {

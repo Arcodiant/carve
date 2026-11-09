@@ -73,18 +73,8 @@ public sealed class ExportTool(ModelStore store)
     {
         var errors = UnknownArguments("export", context, "path", "allow_unweighted", "mode", "overwrite");
         var text = RequiredString("path", path, errors);
-        var allowUnweighted = false;
-        if (!Absent(allow_unweighted))
-        {
-            if (allow_unweighted!.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) allowUnweighted = allow_unweighted.Value.GetBoolean();
-            else errors.Add($"allow_unweighted: expected true or false, got {Describe(allow_unweighted.Value)}");
-        }
-        var replace = false;
-        if (!Absent(overwrite))
-        {
-            if (overwrite!.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) replace = overwrite.Value.GetBoolean();
-            else errors.Add($"overwrite: expected true or false, got {Describe(overwrite.Value)}");
-        }
+        var allowUnweighted = OptionalBool("allow_unweighted", allow_unweighted, errors);
+        var replace = OptionalBool("overwrite", overwrite, errors);
         var clips = false;
         if (!Absent(mode))
         {
@@ -120,9 +110,8 @@ public sealed class ExportTool(ModelStore store)
 
         var skeleton = model.Skeleton!;
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
-        static string List(IEnumerable<string> names) => string.Join(", ", names.Select(n => $"'{n}'"));
         return Line($"exported {target.Written(replaced)} as clips, with no mesh: "
-            + $"{N(skeleton.Bones.Count)} bone(s) {List(skeleton.Names)}, {N(model.Clips.Count)} clip(s) {List(model.Clips.Select(c => c.Name))}");
+            + $"{N(skeleton.Bones.Count)} bone(s) {NameList.Quoted(skeleton.Names)}, {N(model.Clips.Count)} clip(s) {NameList.Quoted(model.Clips.Select(c => c.Name))}");
     }
 
     /// <summary>A model with a skeleton: the skinned file, or a refusal listing unweighted vertices that writes nothing.</summary>
@@ -141,7 +130,6 @@ public sealed class ExportTool(ModelStore store)
         if (!ToolPaths.Write("export", target, glb.Bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
         var skeleton = model.Skeleton!;
-        static string List(IEnumerable<string> names) => string.Join(", ", names.Select(n => $"'{n}'"));
         var all = model.Meshes.SelectMany(m => m.Mesh.Vertices).ToList();
         var min = all.Aggregate(Vector3.Min);
         var max = all.Aggregate(Vector3.Max);
@@ -150,9 +138,9 @@ public sealed class ExportTool(ModelStore store)
         static string Point(Vector3 v) => $"({F(v.X)}, {F(v.Y)}, {F(v.Z)})";
 
         var line = $"exported {target.Written(replaced)} skinned: "
-            + $"{N(glb.Pieces.Count)} piece(s) {List(glb.Pieces)}, {N(glb.Materials.Count)} material(s) {List(glb.Materials)}, "
-            + $"{N(skeleton.Bones.Count)} bone(s) {List(skeleton.Names)}, {N(model.Clips.Count)} clip(s)"
-            + (model.Clips.Count > 0 ? " " + List(model.Clips.Select(c => c.Name)) : "")
+            + $"{N(glb.Pieces.Count)} piece(s) {NameList.Quoted(glb.Pieces)}, {N(glb.Materials.Count)} material(s) {NameList.Quoted(glb.Materials)}, "
+            + $"{N(skeleton.Bones.Count)} bone(s) {NameList.Quoted(skeleton.Names)}, {N(model.Clips.Count)} clip(s)"
+            + (model.Clips.Count > 0 ? " " + NameList.Quoted(model.Clips.Select(c => c.Name)) : "")
             + $", {N(glb.Triangles)} triangles, size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}";
         if (glb.BoundToRoot > 0)
             line += $"; allow_unweighted: {N(glb.BoundToRoot)} vertices with no weight were bound to the first root bone '{skeleton.Bones[0].Name}'";
@@ -171,7 +159,7 @@ public sealed class ExportTool(ModelStore store)
         var names = GlbExport.MaterialNames(mesh);
         return names.Length == 1
             ? $"1 material '{names[0]}'"
-            : $"{names.Length.ToString(CultureInfo.InvariantCulture)} materials {string.Join(", ", names.Select(n => $"'{n}'"))}";
+            : $"{names.Length.ToString(CultureInfo.InvariantCulture)} materials {NameList.Quoted(names)}";
     }
 
     private static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles)

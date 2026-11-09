@@ -159,13 +159,13 @@ public sealed class ModelStore
             var weighted = model.Meshes.Where(m => m.Mesh.Weights is not null).Select(m => m.Name).ToArray();
             if (weighted.Length > 0 && !skeleton.SameNamesAs(model.Skeleton))
             {
-                refusal = $"bones: the model has weights ({string.Join(", ", weighted.Select(n => $"'{n}'"))}), which depend on the bones' names and order, "
+                refusal = $"bones: the model has weights ({NameList.Quoted(weighted)}), which depend on the bones' names and order, "
                     + $"so the skeleton must keep them: {string.Join(", ", model.Skeleton!.Names)}. Change only the rest transforms, or define the meshes again to drop their weights";
                 return null;
             }
             if (model.Clips.Count > 0 && !skeleton.SameNamesAs(model.Skeleton))
             {
-                refusal = $"bones: the model has clips ({string.Join(", ", model.Clips.Select(c => $"'{c.Name}'"))}), which depend on the bones' names and order, "
+                refusal = $"bones: the model has clips ({NameList.Quoted(model.Clips.Select(c => c.Name))}), which depend on the bones' names and order, "
                     + $"so the skeleton must keep them: {string.Join(", ", model.Skeleton!.Names)}. Change only the rest transforms, or delete_clip the clips first";
                 return null;
             }
@@ -212,7 +212,7 @@ public sealed class ModelStore
             {
                 refusal = model.Clips.Count == 0
                     ? $"name: there is no clip named '{name}'; the model has no clips"
-                    : $"name: there is no clip named '{name}'; the clips are {string.Join(", ", model.Clips.Select(c => $"'{c.Name}'"))}";
+                    : $"name: there is no clip named '{name}'; the clips are {NameList.Quoted(model.Clips.Select(c => c.Name))}";
                 return null;
             }
             return PushLocked(model.WithoutClip(name), tool);
