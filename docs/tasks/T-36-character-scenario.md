@@ -12,7 +12,7 @@ description: >-
 
 **Batch:** — (standalone)
 
-**Depends on:** T-34, T-35, T-46
+**Depends on:** T-34, T-35, T-46, T-52
 
 **Verify:** full
 
