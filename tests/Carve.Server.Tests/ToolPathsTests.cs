@@ -47,10 +47,28 @@ public sealed class ToolPathsTests() : TempFolderTests("carve-toolpaths")
         Assert.False(replaced);
         Assert.Equal([1, 2, 3], File.ReadAllBytes(path.FullPath));
 
-        Assert.True(ToolPaths.Write("export", path, [4, 5], out replaced, out error), error);
+        Assert.True(ToolPaths.Write("export", path, [4, 5], out replaced, out error, overwrite: true), error);
         Assert.True(replaced);
         Assert.Equal([4, 5], File.ReadAllBytes(path.FullPath));
         Assert.Equal(["crate.glb"], Directory.GetFiles(Path.GetDirectoryName(path.FullPath)!).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public void Without_overwrite_an_existing_file_is_refused_byte_unchanged_and_with_it_replaced()
+    {
+        var path = Resolve("crate.glb");
+        Assert.True(ToolPaths.Write("export", path, [1, 2, 3], out var replaced, out var error, overwrite: false), error);
+        Assert.False(replaced);
+
+        Assert.False(ToolPaths.Write("export", path, [9, 9], out replaced, out error, overwrite: false));
+        Assert.False(replaced);
+        Assert.Equal($"export: {path.FullPath} already exists; pass overwrite: true to replace it. Nothing was written.", error);
+        Assert.Equal([1, 2, 3], File.ReadAllBytes(path.FullPath));
+        Assert.Equal(["crate.glb"], Directory.GetFiles(Root).Select(Path.GetFileName));
+
+        Assert.True(ToolPaths.Write("export", path, [9, 9], out replaced, out error, overwrite: true), error);
+        Assert.True(replaced);
+        Assert.Equal([9, 9], File.ReadAllBytes(path.FullPath));
     }
 
     [Theory]
