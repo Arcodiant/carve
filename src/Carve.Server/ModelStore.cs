@@ -52,27 +52,6 @@ public sealed class ModelStore
     /// <summary>Puts the mesh under the default name as a <c>define_mesh</c> step and returns the snapshot now current.</summary>
     public ModelSnapshot Replace(PolygonMesh mesh) => Push(mesh, "define_mesh");
 
-    /// <summary>
-    /// Like <see cref="Define"/>, but the name is resolved against the model current under the lock: the one named, or
-    /// when <paramref name="name"/> is null the only mesh (the default name while the model is empty). Null, with
-    /// <paramref name="problem"/> set and nothing pushed, when it is left out while the model has several.
-    /// </summary>
-    public ModelSnapshot? DefineTarget(string? name, PolygonMesh mesh, string tool, out string? problem)
-    {
-        lock (_write)
-        {
-            problem = null;
-            var model = _current.Model;
-            if (name is null && !model.IsEmpty)
-            {
-                var target = model.Target(null, out problem);
-                if (target is null) return null;
-                name = target.Name;
-            }
-            return PushLocked(model.With(name ?? Model.DefaultName, mesh), tool);
-        }
-    }
-
     /// <summary>Makes <paramref name="model"/> (a whole Carve file) the current model as the result of <paramref name="tool"/>: one step, kept for undo.</summary>
     public ModelSnapshot OpenModel(Model model, string tool)
     {
@@ -146,9 +125,9 @@ public sealed class ModelStore
     }
 
     /// <summary>
-    /// Sets the skeleton as the result of <paramref name="tool"/>, one step for undo. Once a mesh has weights, a skeleton
-    /// whose bone names or order differ (<see cref="Skeleton.SameNamesAs"/>) is refused under the lock: null, nothing
-    /// pushed, <paramref name="refusal"/> says why. (Clips, in T-33, join the rule here.)
+    /// Sets the skeleton as the result of <paramref name="tool"/>, one step for undo. Once a mesh has weights or the model
+    /// has clips, a skeleton whose bone names or order differ (<see cref="Skeleton.SameNamesAs"/>) is refused under the
+    /// lock: null, nothing pushed, <paramref name="refusal"/> says why.
     /// </summary>
     public ModelSnapshot? DefineSkeleton(Skeleton skeleton, string tool, out string? refusal)
     {

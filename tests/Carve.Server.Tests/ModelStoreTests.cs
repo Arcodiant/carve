@@ -107,22 +107,7 @@ public class ModelStoreTests
         Assert.Null(store.Edit("move", null, m => throw new InvalidOperationException("not run"), out var result, out var problem));
         Assert.Null(result);
         Assert.Equal("mesh: required, since the model has 2 meshes: 'crate', 'lid'", problem);
-        Assert.Null(store.DefineTarget(null, Triangle(), "open", out problem));
-        Assert.Contains("'crate', 'lid'", problem);
         Assert.Same(before, store.Current);
-    }
-
-    [Fact]
-    public void Define_target_with_no_name_replaces_the_only_mesh_keeping_its_name_or_names_the_first_mesh()
-    {
-        var store = new ModelStore();
-        var first = Triangle();
-        Assert.Equal([Model.DefaultName], store.DefineTarget(null, first, "open", out _)!.Model.Names);
-        var store2 = new ModelStore();
-        store2.Define("crate", Triangle(), "define_mesh");
-        var opened = Triangle();
-        Assert.Same(opened, store2.DefineTarget(null, opened, "open", out _)!.Model.Find("crate"));
-        Assert.Equal(["crate"], store2.Current.Model.Names);
     }
 
     [Fact]
