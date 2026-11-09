@@ -84,6 +84,18 @@ public class SkinnedExportTests
     }
 
     [Fact]
+    public void A_group_named_like_another_primitives_colour_falls_back_to_its_own_colour_name()
+    {
+        // RV-24 B4: green faces 0-1 are group "ff0000", and face 2 is red; both were named body:ff0000.
+        var style = FaceStyle.None.WithColour([0, 1], "#00FF00").WithGroup("ff0000", [0, 1]).WithColour([2], "#FF0000")
+            .WithColour([3], "#0000ff").WithGroup("0000ff", [3]).WithColour([4], "#123456").WithGroup("lid:top", [4]);
+        var materials = SkinnedExport.Materials(new NamedMesh("body", Box(Vector3.Zero, 1).WithStyle(style)));
+
+        Assert.Equal(["body:00ff00", "body:ff0000", "body:0000ff", "body:lid:top", "body"], materials.Select(m => m.Name));
+        Assert.Equal(materials.Count, materials.Select(m => m.Name).Distinct().Count());
+    }
+
+    [Fact]
     public void Inverse_binds_are_the_inverse_of_each_bones_rest_world_transform()
     {
         var rig = Rig();

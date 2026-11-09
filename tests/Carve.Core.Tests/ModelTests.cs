@@ -45,7 +45,16 @@ public class ModelTests
         Assert.NotNull(Model.NameProblem(name));
         Assert.Throws<ArgumentException>(() => Model.Empty.With(name!, Triangle()));
         Assert.Null(Model.NameProblem(" "));
-        Assert.Null(Model.NameProblem("a:b"));
+    }
+
+    [Fact]
+    public void A_name_with_a_colon_is_refused()
+    {
+        // RV-24 B4: '<mesh>:' prefixes a skinned export's material names, so a mesh name may not hold one.
+        Assert.Equal("a mesh name must not contain ':' (a skinned export names materials <mesh>:<group>)", Model.NameProblem("a:b"));
+        Assert.Throws<ArgumentException>(() => Model.Empty.With("a:b", Triangle()));
+        Assert.Null(Model.Of("crate", Triangle()).Target("crate:lid", out var problem));
+        Assert.Equal("mesh: a mesh name must not contain ':' (a skinned export names materials <mesh>:<group>)", problem);
     }
 
     [Fact]

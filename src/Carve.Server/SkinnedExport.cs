@@ -146,8 +146,16 @@ public static class SkinnedExport
             list.Add(f);
         }
 
-        return [.. order.Select(c => (c is null ? piece.Name : $"{piece.Name}:{GroupFor(mesh, faces[c]) ?? c.TrimStart('#').ToLowerInvariant()}", c))];
+        // A group name that is another primitive's colour would give two primitives one name; that primitive keeps its
+        // colour name instead. Colours are unique within the piece and mesh names hold no ':', so the names are unique in the file.
+        var hexes = order.Where(c => c is not null).Select(c => Hex(c!)).ToList();
+        return [.. order.Select(c => (c is null ? piece.Name : $"{piece.Name}:{UnclashedGroup(mesh, faces[c], Hex(c), hexes) ?? Hex(c)}", c))];
     }
+
+    private static string Hex(string colour) => colour.TrimStart('#').ToLowerInvariant();
+
+    private static string? UnclashedGroup(PolygonMesh mesh, List<int> faces, string own, List<string> hexes) =>
+        GroupFor(mesh, faces) is { } group && (group == own || !hexes.Contains(group)) ? group : null;
 
     private static string? GroupFor(PolygonMesh mesh, List<int> faces) =>
         mesh.Style?.Groups.FirstOrDefault(g => g.Faces.Count == faces.Count && g.Faces.Order().SequenceEqual(faces)).Name;

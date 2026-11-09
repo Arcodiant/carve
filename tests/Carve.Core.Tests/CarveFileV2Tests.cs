@@ -414,6 +414,7 @@ public class CarveFileV2Tests
 
     [Theory]
     [InlineData("\"name\": \"arm\",", "\"name\": \"\",", "meshes[0].name", "a mesh name must not be empty")]
+    [InlineData("\"name\": \"arm\",", "\"name\": \"arm:left\",", "meshes[0].name", "a mesh name must not contain ':' (a skinned export names materials <mesh>:<group>)")]
     [InlineData("        [0, 1, 2]\n", "        [0, 1, 7]\n", "meshes[0].faces[0][2]", "index 7 is out of range 0..2")]
     [InlineData("\"name\": \"arm\",", "\"nom\": \"arm\",", "meshes[0].nom", "unknown key: a mesh has only the keys \"name\", \"vertices\", \"faces\", \"colours\", \"groups\" and \"weights\"")]
     [InlineData("\"name\": \"arm\",", "\"vertices\": [],", "meshes[0].vertices", "key appears more than once")]

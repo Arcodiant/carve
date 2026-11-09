@@ -78,6 +78,7 @@ There is no fresh-agent acceptance run here: the first is T-49, once the tools a
     - T-35's file-format readings are accepted.
   - Two of these were asked before dispatch (T-35's `save`/`open` and its byte identity), because the orchestrator read ahead and saw the spec collide with what had landed. The rest stopped a member.
   - RV-24 (2026-11-09): a pure clip library (a skeleton and clips, no mesh) is allowed. `export` in `clips` mode skips the mesh check; `save` writes a version 2 file with `"meshes": []` when the model has a skeleton, and `open` reads it back. A file with no meshes and no skeleton is still refused, and `model` mode still needs a mesh.
+  - RV-24 B4 (2026-11-09): in a skinned export, a primitive whose `<mesh>:<group>` material name would clash with another material name in the file falls back to `<mesh>:<rrggbb>`, and `:` is refused in mesh names (by `define_mesh`, by every tool's `mesh` argument and on reading a Carve file). Group names may keep colons. No existing file or frame changes.
 - **Readings members landed that the spec did not settle** (none was on a stop list):
   - T-30: groups are not carried into a several-mesh render.
   - T-31: `position` and `rotation` are required.
