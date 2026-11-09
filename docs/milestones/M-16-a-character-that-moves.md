@@ -119,6 +119,27 @@ There is no fresh-agent acceptance run here: the first is T-49, once the tools a
 
 **The test report** (`cairn test report --since 3d`, a window that also takes in M-4's last day) shows no flakes. `server-regression` is the costly suite, at about 37,000 slot-seconds a week, and it caught 4 failures no other suite did. 35 jobs never ran (`cnr`); their causes were not looked into. Nothing was filed.
 
+**The review.** `main` had not moved, so there was no rebase.
+
+- **Refactor pass** (Opus, 4 commits): it shared the name-list, argument and glTF setup helpers and the rig test helpers, and removed dead code. All 105 frames and exported files stayed byte-identical, and `tools/list` was unchanged.
+- **Round 1 (RV-24):** four Opus reviewers split the diff into the Core and sampler, the file formats, whether the checks can fail, and the whole diff. They raised 30 findings: 1 Major, 14 Minor and 15 Nit.
+  - **The Major:** no check compared the exported clip keys, joints or weights with the model.
+  - **Other themes:**
+    - stale descriptions and As built notes;
+    - an overwrite race in `ToolPaths`;
+    - can checks on a face the camera cannot see;
+    - a two-mesh highlight drawn on a later snapshot;
+    - no tests of the shared argument rules on the new tools.
+  - The person ruled two:
+    - a clip library with a skeleton and no mesh can be exported in clips mode, saved and opened;
+    - `:` is refused in mesh names, and a clashing group-based material name falls back to `<mesh>:<rrggbb>`.
+  - Opus fixers fixed all 30: two on the product and docs, one continuation, and one on the tests in its own worktree. A Sonnet agent ran `verify` and the hash check. No frame changed.
+  - An old fixer that had handed off was still making calls in the worktree where `verify` ran, and was stopped.
+- **Round 2 (RV-25,** one Opus reviewer**):** all 30 answers held. It found 1 Minor and 5 Nits, all made by the fixes: D1's version check refused renders that asked for no ids, and several texts were left stale or untrue. One Opus fixer fixed all six and added a test through `render` that fails when D1's check is unwired.
+- **Round 3 (RV-26,** one Opus reviewer**):** all six answers held, and it raised no findings. It judged the new timing test unable to pass when unwired, and unlikely to flake. The test passed 5 of 5 runs locally and 4 of 4 under load.
+- **Never shown failing:** RV-24 C4's check, for a sampler holding the later key.
+- Two of the orchestrator's dispatches (the round-1 reviewers and fixers) used the Workflow tool without the person's explicit opt-in. Later rounds used separate agents.
+
 **For the next plan.**
 
 - **Read each member's Scope against what has landed since it was planned**, before dispatch: M-4's `select` and `check`, T-29's `mesh` on `save`/`open`, and the unbuilt `overwrite` would all have stopped a member. Reading ahead caught two of them for free.
