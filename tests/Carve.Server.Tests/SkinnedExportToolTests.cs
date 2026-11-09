@@ -153,14 +153,14 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
         using (var carve = await StartChainAsync(first))
         {
             Ok(await carve.CallToolAsync("export", """{"path":"chain.glb"}"""));
-            Ok(await carve.CallToolAsync("export", """{"path":"again.glb"}"""));
+            Ok(await carve.CallToolAsync("export", """{"path":"again/chain.glb"}"""));
         }
         using (var carve = await StartChainAsync(second))
             Ok(await carve.CallToolAsync("export", """{"path":"chain.glb"}"""));
 
         var a = File.ReadAllBytes(Path.Combine(first, "chain.glb"));
         Assert.Equal(a, File.ReadAllBytes(Path.Combine(second, "chain.glb")));
-        // The file stem names the mesh, node and skin, so only those bytes may differ between chain and again.
-        Assert.Equal(a.Length, File.ReadAllBytes(Path.Combine(first, "again.glb")).Length);
+        // The file stem names the mesh, node and skin, so the second export keeps the stem in another folder.
+        Assert.Equal(a, File.ReadAllBytes(Path.Combine(first, "again", "chain.glb")));
     }
 }
