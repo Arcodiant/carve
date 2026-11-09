@@ -24,7 +24,7 @@ Carve holds a model, not one mesh. An agent can name meshes and aim any existing
 
 ## Scope
 
-- **Core:** an immutable `Model` (`src/Carve.Core/Model.cs`), with named meshes in definition order. Names are non-empty and unique. Skeleton and clips arrive in T-31 and T-33.
+- **Core:** an immutable `Model` (`src/Carve.Core/Model.cs`), with named meshes in definition order. Names are non-empty and unique (and, since RV-24 B4, hold no `:`). Skeleton and clips arrive in T-31 and T-33.
 - **Store:** `ModelStore` holds a `Model`; undo and version step over models, and the 100-step depth stays.
 - **`define_mesh`** takes an optional `name` (default `mesh`). Defining an existing name replaces that mesh, and a new name adds one. Each is one undo step.
 - **`move`, `extrude`, `get_mesh`, `save`, `open`** take `mesh`, which may be left out when the model has one. Left out with several, the tool error lists the names.
@@ -44,7 +44,7 @@ Carve holds a model, not one mesh. An agent can name meshes and aim any existing
 
 Three agents, all on Opus 5.5.
 
-- **Core:** `Model` (`src/Carve.Core/Model.cs`) is immutable: named meshes in definition order, names non-empty and unique. `With` replaces a mesh in its place or adds one at the end. `Target` picks the named mesh, or the only one when no name is given, and its refusal lists the names. `Combined` is every mesh as one, with ids offset; a one-mesh model returns that mesh itself, so old frames take the old path unchanged. `OffsetOf` gives where a mesh starts in `Combined`.
+- **Core:** `Model` (`src/Carve.Core/Model.cs`) is immutable: named meshes in definition order, names non-empty and unique (and, since RV-24 B4, holding no `:`). `With` replaces a mesh in its place or adds one at the end. `Target` picks the named mesh, or the only one when no name is given, and its refusal lists the names. `Combined` is every mesh as one, with ids offset; a one-mesh model returns that mesh itself, so old frames take the old path unchanged. `OffsetOf` gives where a mesh starts in `Combined`.
 - **Store:** `ModelStore` keeps whole models, so undo and version step across meshes. The depth is still 100.
 - **Tools:** `define_mesh` takes `name` (default `mesh`) and has a two-mesh worked example (crate and lid). `move`, `extrude`, `get_mesh`, `check`, `select`, `save` and `open` take `mesh`. `export` refuses several meshes and names them (*superseded by T-34*, which merges them, or skins them with a skeleton; RV-24 A7). `undo` reports every mesh when there are several. `render` draws every mesh, framed over all of them.
 - **Ruling 1:** `render` takes `mesh`, which `labels` and `highlight` apply to with that mesh's own ids. Highlight ids are shifted by the mesh's offset, and labels are limited to the mesh by an `ElementWindow` (`RenderSpec.LabelWindow`). If `mesh` is left out while there are several meshes and labels or highlight are asked for, the tool error lists the names.
