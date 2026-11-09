@@ -42,6 +42,8 @@
     <Compile Include="../../src/Carve.Server/SheetComposer.cs" Link="SheetComposer.cs" />
     <Compile Include="../../src/Carve.Server/TargetCheck.cs" Link="TargetCheck.cs" />
     <Compile Include="../../src/Carve.Server/GlbExport.cs" Link="GlbExport.cs" />
+    <Compile Include="../../src/Carve.Server/GlbRig.cs" Link="GlbRig.cs" />
+    <Compile Include="../../src/Carve.Server/SkinnedExport.cs" Link="SkinnedExport.cs" />
     <Compile Include="../../src/Carve.Server/ToolPaths.cs" Link="ToolPaths.cs" />
     <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
     <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
