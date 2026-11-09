@@ -74,10 +74,15 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     [InlineData("get_mesh", "{}")]
     [InlineData("check", "{}")]
     [InlineData("select", """{"kind":"faces","where":"normal.y > 0.9"}""")]
+    [InlineData("set_colour", """{"colour":"#3C78C8","faces":[0]}""")]
+    [InlineData("define_group", """{"name":"top","faces":[0]}""")]
+    [InlineData("set_weights", """{"vertices":[0],"weights":{"base":1}}""")]
     public async Task Every_tool_aimed_at_one_mesh_refuses_to_guess_among_several_and_names_them(string tool, string arguments)
     {
         var (carve, _) = await StartWithCrateAndLidAsync(Root);
         using var __ = carve;
+        if (tool == "set_weights")
+            Ok(await carve.CallToolAsync("define_skeleton", """{"bones":[{"name":"base","position":[0,0,0],"rotation":[0,0,0,1]}]}"""));
         Assert.False(IsError(await carve.CallToolAsync("save", """{"path":"crate.carve","mesh":"crate"}""")));
 
         var text = Refused(await carve.CallToolAsync(tool, arguments));
@@ -86,6 +91,30 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         Assert.Contains("mesh", text);
         var named = arguments.Insert(1, arguments.Length > 2 ? "\"mesh\":\"crate\"," : "\"mesh\":\"crate\"");
         Assert.False(IsError(await carve.CallToolAsync(tool, named)), $"{tool} {named}");
+    }
+
+    [Fact]
+    public async Task Every_tool_refuses_an_unknown_argument_and_lists_exactly_the_arguments_its_schema_has()
+    {
+        // Each tool keeps its own list of known arguments beside its schema; a name in one and not the other shows here.
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        var tools = (await carve.ListToolsAsync()).EnumerateArray().ToList();
+        Assert.True(tools.Count >= 18, $"{tools.Count} tools");
+        foreach (var tool in tools)
+        {
+            var name = tool.GetProperty("name").GetString()!;
+            var schema = tool.GetProperty("inputSchema");
+            var properties = schema.TryGetProperty("properties", out var p) ? p.EnumerateObject().Select(x => x.Name).Order().ToList() : [];
+            var result = await carve.CallToolAsync(name, """{"zz_unknown":1}""");
+            Assert.True(IsError(result), name);
+            var text = TextOf(result);
+            var match = System.Text.RegularExpressions.Regex.Match(text,
+                $"zz_unknown: not an argument of {name}(?:; its arguments are ([a-z_, ]+)|, which takes none)");
+            Assert.True(match.Success, $"{name}: {text}");
+            var listed = match.Groups[1].Success ? match.Groups[1].Value.Split(", ").Order().ToList() : [];
+            Assert.True(properties.SequenceEqual(listed), $"{name}: schema has {string.Join(", ", properties)}; the refusal lists {string.Join(", ", listed)}");
+        }
     }
 
     [Fact]
