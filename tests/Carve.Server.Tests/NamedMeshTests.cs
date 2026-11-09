@@ -105,13 +105,19 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     }
 
     [Fact]
-    public async Task Export_refuses_several_meshes_and_render_labels_and_highlight_need_mesh_among_several()
+    public async Task Export_merges_several_meshes_and_render_labels_and_highlight_need_mesh_among_several()
     {
         var (carve, _) = await StartWithCrateAndLidAsync(Root);
         using var __ = carve;
 
-        Assert.Contains("2 meshes (" + Names + ")", Refused(await carve.CallToolAsync("export", """{"path":"crate.glb"}""")));
-        Assert.False(File.Exists(Path.Combine(Root, "crate.glb")));
+        // T-34 lifts the refusal: with no skeleton, several meshes merge into one, as T-30's static export writes one.
+        var exported = await carve.CallToolAsync("export", """{"path":"crate.glb"}""");
+        Assert.False(IsError(exported), TextOf(exported));
+        Assert.Contains("24 triangles", TextOf(exported));
+        var parsed = GlbExportTests.Parser.Parse(File.ReadAllBytes(Path.Combine(Root, "crate.glb")), Empyrean.ModelFormat.Gltf);
+        Assert.Empty(parsed.Warnings);
+        Assert.Null(parsed.Skin);
+        Assert.Equal(24 * 3, parsed.MeshData.Indices!.Length);
         Assert.Contains(Names, Refused(await carve.CallToolAsync("render", """{"labels":"faces"}""")));
         Assert.Contains(Names, Refused(await carve.CallToolAsync("render", """{"highlight":{"faces":[0]}}""")));
         Assert.Contains("no mesh named 'hat'; the model's meshes are " + Names,
