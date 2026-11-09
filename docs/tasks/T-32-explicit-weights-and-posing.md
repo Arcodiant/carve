@@ -4,7 +4,7 @@ description: >-
 ---
 # T-32 — Explicit weights and posing
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
