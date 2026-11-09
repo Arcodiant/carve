@@ -101,13 +101,12 @@ public sealed class DefineSkeletonTool(ModelStore store)
         else if (bones!.Value.ValueKind != JsonValueKind.Array) errors.Add($"bones: expected an array, got {Describe(bones.Value)}");
 
         var specs = new List<BoneSpec>();
-        var shapeBad = new HashSet<string>();
         if (errors.Count == 0)
         {
             var i = 0;
             foreach (var b in bones!.Value.EnumerateArray())
             {
-                specs.Add(ReadBone(i, b, errors, shapeBad));
+                specs.Add(ReadBone(i, b, errors));
                 i++;
             }
         }
@@ -115,7 +114,7 @@ public sealed class DefineSkeletonTool(ModelStore store)
         if (errors.Count == 0 || specs.Count > 0)
         {
             var (skeleton, problems) = Skeleton.Create(specs);
-            errors.AddRange(problems.Where(p => !shapeBad.Contains(p.Element)).Select(p => p.ToString()));
+            errors.AddRange(problems.Select(p => p.ToString()));
             if (errors.Count == 0)
             {
                 if (store.DefineSkeleton(skeleton!, "define_skeleton", out var refusal) is null) return Failed("define_skeleton", [refusal!]);
@@ -125,23 +124,27 @@ public sealed class DefineSkeletonTool(ModelStore store)
         return Failed("define_skeleton", errors);
     }
 
-    private static BoneSpec ReadBone(int i, JsonElement b, List<string> errors, HashSet<string> shapeBad)
+    /// <summary>
+    /// The bone as given, its shape problems added to <paramref name="errors"/>. A field that cannot be read stands in
+    /// as one that adds no problem of its own (a name no bone can have, no parent, the origin, no rotation), and the
+    /// fields that were read are kept, so <see cref="Skeleton.Create"/> reports only true problems, on this bone and
+    /// on the bones that name it.
+    /// </summary>
+    private static BoneSpec ReadBone(int i, JsonElement b, List<string> errors)
     {
         var at = $"bones[{i}]";
-        var bad = new BoneSpec("x", null, Vector3.Zero, Quaternion.Identity);
+        var unread = new string((char)0, 1) + at; // no problem of its own: the JSON gave no name, so this one is unique and named by no parent
         if (b.ValueKind != JsonValueKind.Object)
         {
             errors.Add($"{at}: expected an object {{name, parent, position, rotation}}, got {Describe(b)}");
-            shapeBad.Add(at);
-            return bad;
+            return new BoneSpec(unread, null, Vector3.Zero, Quaternion.Identity);
         }
 
-        var before = errors.Count;
         foreach (var p in b.EnumerateObject())
             if (p.Name is not ("name" or "parent" or "position" or "rotation"))
                 errors.Add($"{at}.{p.Name}: not a field of a bone; its fields are name, parent, position, rotation");
 
-        string name = "";
+        string? name = null;
         if (!b.TryGetProperty("name", out var n) || n.ValueKind == JsonValueKind.Null) errors.Add($"{at}.name: required but missing");
         else if (n.ValueKind != JsonValueKind.String) errors.Add($"{at}.name: expected a string, got {Describe(n)}");
         else name = n.GetString()!;
@@ -155,14 +158,9 @@ public sealed class DefineSkeletonTool(ModelStore store)
 
         var position = Floats($"{at}.position", b, "position", 3, errors);
         var rotation = Floats($"{at}.rotation", b, "rotation", 4, errors);
-
-        if (errors.Count > before)
-        {
-            shapeBad.Add(at);
-            return bad;
-        }
-        return new BoneSpec(name, parent, new Vector3(position![0], position[1], position[2]),
-            new Quaternion(rotation![0], rotation[1], rotation[2], rotation[3]));
+        return new BoneSpec(name ?? unread, parent,
+            position is null ? Vector3.Zero : new Vector3(position[0], position[1], position[2]),
+            rotation is null ? Quaternion.Identity : new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3]));
     }
 
     private static float[]? Floats(string at, JsonElement bone, string field, int count, List<string> errors)
