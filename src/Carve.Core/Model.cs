@@ -99,6 +99,88 @@ public sealed class Model
         return new Model(next, Skeleton, _clips);
     }
 
+    /// <summary>
+    /// A whole model from its parts, as the Carve file reads one, or every problem found, each named by where it is
+    /// (<c>meshes[1].name</c>, <c>clips[0].name</c>): a mesh name that is empty or given twice, a mesh with weights while
+    /// there is no skeleton or on a bone the skeleton does not have, or two clips of one name. The meshes, skeleton and
+    /// clips must each already be valid on their own (made by <see cref="PolygonMesh.Create"/>, <see cref="Skeleton.Create"/>
+    /// and <see cref="Clip.Create"/>).
+    /// </summary>
+    public static (Model? Model, IReadOnlyList<MeshError> Errors) Create(IReadOnlyList<NamedMesh> meshes, Skeleton? skeleton, IReadOnlyList<Clip> clips)
+    {
+        ArgumentNullException.ThrowIfNull(meshes);
+        ArgumentNullException.ThrowIfNull(clips);
+        var errors = new List<MeshError>();
+        var names = new HashSet<string>();
+        for (var i = 0; i < meshes.Count; i++)
+        {
+            var (name, mesh) = meshes[i];
+            if (NameProblem(name) is { } problem) errors.Add(new MeshError($"meshes[{i}].name", problem));
+            else if (!names.Add(name)) errors.Add(new MeshError($"meshes[{i}].name", $"a mesh named '{name}' comes earlier; mesh names must be unique"));
+            if (mesh.Weights is { } weights)
+            {
+                var bones = skeleton?.Bones.Count ?? 0;
+                if (skeleton is null) errors.Add(new MeshError($"meshes[{i}].weights", "the model has no skeleton, and weights name its bones"));
+                else if (weights.Vertices.SelectMany(weights.Of).Any(x => x.Bone < 0 || x.Bone >= bones))
+                    errors.Add(new MeshError($"meshes[{i}].weights", "a weight is on a bone the skeleton does not have"));
+            }
+        }
+        var clipNames = new HashSet<string>();
+        for (var i = 0; i < clips.Count; i++)
+            if (!clipNames.Add(clips[i].Name))
+                errors.Add(new MeshError($"clips[{i}].name", $"two clips are named '{clips[i].Name}'; clip names must be unique"));
+        return errors.Count > 0 ? (null, errors) : (new Model([.. meshes], skeleton, [.. clips]), errors);
+    }
+
+    /// <summary>
+    /// The model a Carve file of the one mesh <paramref name="name"/> holds, so that it opens on its own: that mesh, and
+    /// when it has weights the skeleton they name and the clips that move it; with no weights, the mesh alone. Null when
+    /// there is no mesh of that name.
+    /// </summary>
+    public Model? Piece(string name)
+    {
+        var found = System.Array.Find(_meshes, m => m.Name == name);
+        if (found is null) return null;
+        return found.Mesh.Weights is null ? new Model([found], null, []) : new Model([found], Skeleton, _clips);
+    }
+
+    /// <summary>
+    /// This model with the mesh <paramref name="name"/> taken from <paramref name="source"/> (a model a file holds): it
+    /// replaces the mesh of that name, or is added after the others. Its weights are moved onto this model's skeleton by
+    /// bone name, every weight kept to the bit. Null, with <paramref name="problem"/> saying why, when the source has no mesh
+    /// of that name, or the mesh has weights on bones this model's skeleton does not have; this model is unchanged.
+    /// </summary>
+    public Model? WithMeshFrom(Model source, string name, out string? problem)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        problem = null;
+        var found = System.Array.Find(source._meshes, m => m.Name == name);
+        if (found is null)
+        {
+            problem = $"mesh: the file has no mesh named '{name}'; its meshes are {source.ListNames()}";
+            return null;
+        }
+        var mesh = found.Mesh;
+        if (mesh.Weights is { } weights)
+        {
+            var from = source.Skeleton!.Bones;
+            var to = Skeleton?.Names.Select((n, i) => (n, i)).ToDictionary(p => p.n, p => p.i) ?? [];
+            var used = weights.Vertices.SelectMany(weights.Of).Select(x => from[x.Bone].Name).Distinct().ToArray();
+            var missing = used.Where(b => !to.ContainsKey(b)).ToArray();
+            if (missing.Length > 0)
+            {
+                var lacking = string.Join(", ", missing.Select(b => $"'{b}'"));
+                problem = Skeleton is null
+                    ? $"mesh: the file's mesh '{name}' has weights on the bones {lacking}, and the model has no skeleton; open the whole file, or define_skeleton with those bones first"
+                    : $"mesh: the file's mesh '{name}' has weights on bones the model's skeleton does not have: {lacking}; the model's bones are {string.Join(", ", Skeleton.Names.Select(n => $"'{n}'"))}";
+                return null;
+            }
+            mesh = mesh.WithWeights(VertexWeights.Of(weights.Vertices.Select(v => KeyValuePair.Create(v,
+                weights.Of(v).Select(x => new Influence(to[from[x.Bone].Name], x.Weight)).OrderBy(x => x.Bone).ToArray()))));
+        }
+        return With(name, mesh);
+    }
+
     /// <summary>Why <paramref name="name"/> cannot name a mesh, or null when it can.</summary>
     public static string? NameProblem(string? name) =>
         string.IsNullOrEmpty(name) ? "a mesh name must not be empty" : null;

@@ -291,16 +291,30 @@ public class MeshHealthTests
         Assert.False(TestMeshes.LeakyShed().Topology.TryGetEdge(3, 9, out _));
     }
 
-    [Fact]
-    public void The_shed_file_is_the_code_s_mesh()
+    /// <summary>
+    /// The committed sample is compared by what it holds, not its bytes (the person's ruling, 2026-11-09): read, it is one
+    /// mesh named mesh, every coordinate the code's to the bit and every face loop the same, with no colours, groups,
+    /// weights, skeleton or clips. The version 1 copy kept as a fixture reads to the same model.
+    /// </summary>
+    [Theory]
+    [InlineData("samples/leaky-shed.carve", 2)]
+    [InlineData("tests/Carve.Core.Tests/Fixtures/leaky-shed-v1.carve", 1)]
+    public void The_shed_file_is_the_code_s_mesh(string file, int version)
     {
         var mesh = TestMeshes.LeakyShed();
-        var text = File.ReadAllText(RepoFile("samples/leaky-shed.carve"));
+        var text = File.ReadAllText(RepoFile(file));
+        Assert.Contains($"\"carve\": {version},", text);
 
-        Assert.Equal(CarveFile.Write(mesh), text);
         var read = CarveFile.Read(text);
-        Assert.True(read.Succeeded);
-        Assert.Equal(mesh.Vertices, read.Mesh!.Vertices);
-        Assert.Equal(mesh.Faces.Select(f => f.ToArray()), read.Mesh.Faces.Select(f => f.ToArray()));
+        Assert.True(read.Succeeded, string.Join("; ", read.Errors));
+        var model = read.Model!;
+        var only = Assert.Single(model.Meshes);
+        Assert.Equal(Model.DefaultName, only.Name);
+        Assert.Equal(mesh.Vertices.Select(CarveFileV2Tests.Bits), only.Mesh.Vertices.Select(CarveFileV2Tests.Bits));
+        Assert.Equal(mesh.Faces.Select(f => f.ToArray()), only.Mesh.Faces.Select(f => f.ToArray()));
+        Assert.Null(only.Mesh.Style);
+        Assert.Null(only.Mesh.Weights);
+        Assert.Null(model.Skeleton);
+        Assert.Empty(model.Clips);
     }
 }

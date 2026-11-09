@@ -74,8 +74,6 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     [InlineData("get_mesh", "{}")]
     [InlineData("check", "{}")]
     [InlineData("select", """{"kind":"faces","where":"normal.y > 0.9"}""")]
-    [InlineData("save", """{"path":"crate.carve"}""")]
-    [InlineData("open", """{"path":"crate.carve"}""")]
     public async Task Every_tool_aimed_at_one_mesh_refuses_to_guess_among_several_and_names_them(string tool, string arguments)
     {
         var (carve, _) = await StartWithCrateAndLidAsync(Root);
@@ -157,7 +155,7 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     }
 
     [Fact]
-    public async Task A_defined_name_is_replaced_in_place_and_open_adds_a_mesh_by_name()
+    public async Task A_defined_name_is_replaced_in_place_and_open_takes_a_mesh_by_its_name_in_the_file()
     {
         var (carve, _) = await StartWithCrateAndLidAsync(Root);
         using var __ = carve;
@@ -165,7 +163,10 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
 
         var redefined = Ok(await carve.CallToolAsync("define_mesh", """{"name":"crate","vertices":[[0,0,0],[1,0,0],[0,1,0]],"faces":[[0,1,2]]}"""));
         Assert.Equal(3, redefined.GetProperty("vertices").GetInt32());
-        Ok(await carve.CallToolAsync("open", """{"path":"lid.carve","mesh":"spare"}"""));
+        // open with mesh takes that mesh from the file by its name there (the person's ruling, 2026-11-09): a name the file
+        // has not is refused, listing the file's meshes, and the file's 'lid' replaces the model's in its place.
+        Assert.Contains("mesh: the file has no mesh named 'spare'; its meshes are 'lid'", Refused(await carve.CallToolAsync("open", """{"path":"lid.carve","mesh":"spare"}""")));
+        Ok(await carve.CallToolAsync("open", """{"path":"lid.carve","mesh":"lid"}"""));
 
         var undo = Ok(await carve.CallToolAsync("undo", "{}"));
         Assert.Equal(["crate", "lid"], undo.GetProperty("meshes").EnumerateArray().Select(m => m.GetProperty("name").GetString()));

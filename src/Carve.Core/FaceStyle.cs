@@ -43,6 +43,13 @@ public sealed class FaceStyle
     /// <summary>The group names, quoted and comma-separated.</summary>
     public string GroupNames => string.Join(", ", _groups.Select(g => $"'{g.Name}'"));
 
+    /// <summary>Why <paramref name="name"/> cannot name a group, or null when it can (any text but the empty one).</summary>
+    public static string? GroupNameProblem(string name) => name.Length == 0 ? "a group name must not be empty" : null;
+
+    /// <summary>Why <paramref name="face"/> is not a face of a mesh of <paramref name="faceCount"/> faces, or null when it is.</summary>
+    public static string? FaceProblem(int faceCount, int face) =>
+        face < 0 || face >= faceCount ? $"there is no face {face}: ids run 0..{faceCount - 1}" : null;
+
     /// <summary>Why <paramref name="text"/> is not a colour, or null when it is <c>#RRGGBB</c>.</summary>
     public static string? ColourProblem(string? text)
     {
