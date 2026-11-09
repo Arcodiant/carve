@@ -4,7 +4,7 @@ description: >-
 ---
 # T-36 — Character scenario
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
