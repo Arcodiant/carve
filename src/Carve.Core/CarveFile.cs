@@ -12,15 +12,19 @@ namespace Carve.Core;
 /// </summary>
 public sealed class CarveFileResult
 {
-    internal CarveFileResult(Model? model, IReadOnlyList<MeshError> errors, IReadOnlyList<MeshWarning> warnings)
+    internal CarveFileResult(Model? model, IReadOnlyList<MeshError> errors, IReadOnlyList<MeshWarning> warnings, int version = 0)
     {
         Model = model;
+        Version = model is null ? 0 : version;
         Errors = errors;
         Warnings = warnings;
     }
 
     /// <summary>The model the file holds, every mesh, vertex, face, bone and clip in its place, or null when the file was refused.</summary>
     public Model? Model { get; }
+
+    /// <summary>The version the file was read as, 1 or 2, or 0 when the file was refused.</summary>
+    public int Version { get; }
 
     /// <summary>The model's only mesh, or null when the file was refused or holds several.</summary>
     public PolygonMesh? Mesh => Model is { Meshes.Count: 1 } m ? m.Meshes[0].Mesh : null;
@@ -344,7 +348,7 @@ public static class CarveFile
         var created = PolygonMesh.Create(verts!, fcs!);
         if (!created.Succeeded)
             return Refused(created.Errors);
-        return new CarveFileResult(Model.Of(Model.DefaultName, created.Mesh!), [], MeshReport.Create(created.Mesh!).Warnings);
+        return new CarveFileResult(Model.Of(Model.DefaultName, created.Mesh!), [], MeshReport.Create(created.Mesh!).Warnings, 1);
     }
 
     /// <summary>Version 2: the whole model.</summary>
@@ -397,7 +401,7 @@ public static class CarveFile
         if (errors.Count > 0) return Refused(errors);
         var (model, problems) = Model.Create(meshes, skeleton, clips);
         if (model is null) return Refused(problems);
-        return new CarveFileResult(model, [], model.Meshes.SelectMany(x => MeshReport.Create(x.Mesh).Warnings).ToArray());
+        return new CarveFileResult(model, [], model.Meshes.SelectMany(x => MeshReport.Create(x.Mesh).Warnings).ToArray(), 2);
     }
 
     private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, List<MeshError> errors)
