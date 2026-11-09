@@ -72,6 +72,21 @@ public class SkinningTests
     }
 
     [Fact]
+    public void A_turned_joint_under_a_turned_parent_composes_the_parent_after_the_child()
+    {
+        // base rests a quarter turn about Z, so the joint rests at (-1, 0, 0) and its vertex (0, 1, 0) along it at
+        // (-2, 0, 0). Posed, the joint turns a quarter about X: the vertex goes to (0, 0, 1) in the joint's frame, which
+        // the base's turn leaves at (0, 0, 1), so (-1, 0, 1). The two turns do not commute, so the product's order shows:
+        // child x parent instead gives (-2, 0, 0) for the joint's turn applied first in model space.
+        var quarterX = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI / 2);
+        var mesh = Weighted([new(-2, 0, 0), new(0, 0, 0)], (0, 1, 1), (1, 0, 1));
+        var posed = Skinning.Positions(mesh, Chain(QuarterZ), Of(("joint", quarterX, null)));
+        Assert.Equal(-1f, posed[0].X, 5);
+        Assert.Equal(0f, posed[0].Y, 5);
+        Assert.Equal(1f, posed[0].Z, 5);
+    }
+
+    [Fact]
     public void The_rest_pose_returns_the_rest_positions_exactly()
     {
         var odd = Quaternion.Normalize(new Quaternion(0.3f, -0.2f, 0.5f, 0.7f));
