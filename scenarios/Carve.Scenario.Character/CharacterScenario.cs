@@ -80,16 +80,16 @@ public sealed class CharacterScenario : IScenario
         // Walk, from the side (+X: forward, +Z, is the image's left): the near (left) hand is forward at 0 s, back at 0.5 s.
         var walk = GardenerSpec.Walk;
         var walkFrames = new Dictionary<float, ScenarioFrame>();
-        foreach (var t in new[] { 0f, 0.25f, 0.5f })
+        foreach (var t in new[] { 0f, 0.125f, 0.25f, 0.5f })
         {
-            var frame = await driver.CaptureAsync($"gardener-walk-{t:0.00}-side", new { view = "+x", clip = "Walk", time = t });
+            var frame = await driver.CaptureAsync($"gardener-walk-{t:0.000}-side", new { view = "+x", clip = "Walk", time = t });
             walkFrames[t] = frame;
             CheckCorners(driver, frame);
             Func<string, (Quaternion?, Vector3?)> locals = b => walk.Sample(b, t);
             var hand = GardenerSpec.Posed(new Vector3(0.415f, 0.60f, 0), "Hand_L", locals);
             var (hx, hy) = Holding(side(hand));
             ExpectGroup(driver, frame, hx, hy, "skin", $"Walk at {t} s: the near hand at {hand}");
-            if (t != 0.25f)
+            if (t is 0f or 0.5f)
             {
                 ExpectNot(driver, frame, Size - 1 - hx, hy, "skin", $"Walk at {t} s: the hand's mirror (the hand is at the image centre at 0.25 s, so there it is not asked)");
                 var (gx, gy) = Holding(side(new Vector3(0.09f, 0.05f, 0.05f)));
