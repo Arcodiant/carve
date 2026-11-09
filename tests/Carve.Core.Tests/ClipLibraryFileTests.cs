@@ -35,6 +35,6 @@ public class ClipLibraryFileTests
     {
         var read = CarveFile.Read("{\"carve\": 2, \"meshes\": [], \"skeleton\": null, \"clips\": []}");
         Assert.False(read.Succeeded);
-        Assert.Equal("meshes: the file has no meshes; a Carve file holds at least one", Assert.Single(read.Errors).ToString());
+        Assert.Equal("meshes: the file has no meshes and no skeleton; a Carve file holds at least one mesh, or a skeleton (a clip library)", Assert.Single(read.Errors).ToString());
     }
 }
