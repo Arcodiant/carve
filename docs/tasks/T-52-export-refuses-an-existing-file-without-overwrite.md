@@ -46,6 +46,4 @@ Built on Sonnet 5.5.
 - Break table and hash lists: `artifacts/review/T-52/` of the milestone worktree.
 
 
-### Hand-off
-
-Sonnet 5.5. Done: code, tests, scenario change and As built, committed. `server-unit` and `server-regression` PASS on the fixed product (uncommitted-code runs); the break table is in `artifacts/review/T-52/break-table.txt` of the milestone worktree. Left: `cairn task T-52 verify` (it sat queued over 20 minutes with nothing running; I stopped it), the hash lists (fresh `scenario-export` and `server-regression` artifacts against T-46's `hashes-after.txt`; no frame or export bytes should differ), `cairn lint`, `finish`, and confirming `Merge task/T-52`. Not checked: scenario-export on the fixed product.
+Two agents ran this member, both on Sonnet 5.5. Verified: `server-unit`, `scenario-export` and `server-regression` PASS on the fixed product (VERIFY PASS). The `scenario-export` run shows the refusal text on the second export and then `overwrite: true` succeeding. Against T-46's `hashes-after.txt`, every `scenario-export` frame, `crate.glb`, `crate.carve` and the viewer files hash identically; only `export-result.txt` (job temp path) and `run.json` (the added `overwrite: true` argument and the refusal text) differ, as expected. Lists in `artifacts/review/T-52/hashes-after.txt` of the milestone worktree.
