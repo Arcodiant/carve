@@ -120,3 +120,17 @@ Built by two agents, both on Opus 5.5 (2026-11-09): the first wrote the format, 
 **Tests.** `CarveFileV2Tests` (unit: round-trip bit-exactness of every field, text stability, the documented texts, version 1 reading, each refusal, `Piece` and `WithMeshFrom`); `CarveFileVersion2Tests` (regression: the whole model across processes with identical `get_mesh`, `get_skeleton`, rest and clip frames and re-saved bytes; `open` replacing the whole model as one step; `save` and `open` of one mesh by bone name; a version 1 file opened under a name). `get_mesh` does not report weights, so the regression tests check them through a re-saved file. `EditToolTests.Tools_list_shows_each_schema` needed no update: `server-regression` passed with it unchanged, so the allowed expected-schema update was not used.
 
 **Checked.** `server-regression` passed (job J-20261109-142340-fd46ed, 321 s). FRAMERESULT `scenario-shed` and `scenario-export` were added to **Verify:**, since the shed sample and the export scenario's saved file both change; `scenario-shed` then failed on its own reader of the sample, which works the expected pixels from the file apart from the product (`ShedGeometry.Shape.Parse`), and which now reads the one mesh of a version 2 file's `meshes` as well as a version 1 file's top level, its checks unchanged. Each new check is shown failing on a broken product in `M-16/artifacts/review/T-35/break-table.md` (16 breaks, each failing its checks, and a reformatted-shed control passing, as content comparison should). No new frames, so no new positive pixel check; the round-trip frames in `CarveFileVersion2Tests` are compared by bytes across processes.
+
+### Hand-off
+
+Written by the second agent (Opus 5.5) at the 60-call checkpoint (2026-11-09).
+
+**Done:** ruling 3 (`CarveFileResult.Version`, `OpenTool`, test `Open_with_mesh_places_a_version_1_files_one_mesh_under_the_name_given`); `server-regression` passed with `EditToolTests.Tools_list_shows_each_schema` unchanged (no schema update needed); `scenario-shed` and `scenario-export` added to **Verify:**; the shed scenario's own file reader (`ShedGeometry.Shape.Parse`) taught version 2, after `scenario-shed` failed on it; the break table at `M-16/artifacts/review/T-35/break-table.md`; `### As built` written. `cairn task T-35 verify` passes on the last commit (scenario-cube, -crate, -shed, -export, core-unit run; server-regression carried).
+
+**Left:**
+
+- Frame hashes after: `cairn test artifacts <suite> --out M-16/artifacts/review/T-35/after/<suite>` for scenario-cube, -crate, -shed and -export, hash every png as `hashes-before.txt` was (`sha256sum`, paths `*<suite>/<run>/frames/...`), write `hashes-after.txt`, diff against the 81 before. Every frame must be byte-identical; any change is stop-and-ask.
+- The export run's new `crate.carve` sha256, from the scenario-export artifacts: fill `CRATEHASH` in As built; fill `FRAMERESULT` in **Checked** with the hash result.
+- Remove this section, re-run `verify` (should carry), `cairn lint`, `finish`, confirm `Merge task/T-35` on the milestone.
+
+**Surprising:** in this Bash tool a heredoc holding Python with `'''` strings fails to parse; write a script file and run it, or use the Write tool.
