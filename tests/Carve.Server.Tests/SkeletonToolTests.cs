@@ -54,6 +54,7 @@ public class SkeletonToolTests
     {
         using var carve = await StartAsync();
         await carve.CallToolAsync("define_skeleton", Three);
+        var before = TextOf(await carve.CallToolAsync("get_skeleton", "{}"));
         var result = await carve.CallToolAsync("define_skeleton",
             """{"bones":[{"name":"","position":[0,0,0],"rotation":[0,0,0,1]},{"name":"a","parent":"zz","position":[0,0,0],"rotation":[0,0,0,2]},{"name":"b","position":[0,0],"rotation":[0,0,0,1]}]}""");
         Assert.True(IsError(result));
@@ -61,8 +62,8 @@ public class SkeletonToolTests
         Assert.Contains("bones[0]", text);
         Assert.Contains("bones[1]", text);
         Assert.Contains("bones[2].position", text);
-        var read = JsonDocument.Parse(TextOf(await carve.CallToolAsync("get_skeleton", "{}"))).RootElement.GetProperty("bones");
-        Assert.Equal(3, read.GetArrayLength());
+        // The refused set also has three bones, so the whole text is compared, not the count.
+        Assert.Equal(before, TextOf(await carve.CallToolAsync("get_skeleton", "{}")));
     }
 
     [Fact]
