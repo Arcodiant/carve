@@ -75,8 +75,7 @@
         "vulkan"
       ],
       "est-seconds": 15
-    }
-,
+    },
     {
       "id": "scenario-crate",
       "tier": "regression",
@@ -168,6 +167,32 @@
         "vulkan"
       ],
       "est-seconds": 30
+    },
+    {
+      "id": "scenario-character",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-character-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Character/Carve.Scenario.Character.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.CharacterLoad.Tests/Carve.CharacterLoad.Tests.csproj"
+        },
+        "samples/gardener.carve",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-character-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 90
     }
   ],
   "todo": []
