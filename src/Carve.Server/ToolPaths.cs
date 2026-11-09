@@ -82,14 +82,16 @@ public static class ToolPaths
     /// into place, so a failure leaves the old file, or none, and never a partial one. False, with
     /// <paramref name="error"/> naming the path and the system's message, on an I/O failure. With
     /// <paramref name="overwrite"/> false an existing file is refused, naming the path and <c>overwrite</c>, and left
-    /// byte for byte as it was.
+    /// byte for byte as it was; that holds for a file that appears between the check and the move too (another call or
+    /// another process writing the same path), since the move itself then refuses to replace it. Each write has a temp
+    /// file of its own, so two writes at once never share one.
     /// </summary>
     public static bool Write(string tool, ToolPath path, ReadOnlySpan<byte> bytes, out bool replaced, out string? error, bool overwrite = true)
     {
         replaced = false;
         error = null;
         var folder = Path.GetDirectoryName(path.FullPath)!;
-        var temp = Path.Combine(folder, $".{path.FileName}.{Environment.ProcessId}.tmp");
+        var temp = Path.Combine(folder, $".{path.FileName}.{Environment.ProcessId}.{Interlocked.Increment(ref _writes)}.tmp");
         try
         {
             if (Directory.Exists(path.FullPath))
@@ -101,7 +103,7 @@ public static class ToolPaths
             if (replaced && !overwrite)
             {
                 replaced = false;
-                error = $"{tool}: {path.FullPath} already exists; pass overwrite: true to replace it. Nothing was written.";
+                error = Exists(tool, path);
                 return false;
             }
             Directory.CreateDirectory(folder);
@@ -113,7 +115,15 @@ public static class ToolPaths
                     stream.Flush(flushToDisk: true); // on disk before the move, so a crash after it cannot leave the new name empty
                 }
 
-                File.Move(temp, path.FullPath, overwrite: true);
+                File.Move(temp, path.FullPath, overwrite);
+            }
+            catch (IOException) when (!overwrite && File.Exists(path.FullPath))
+            {
+                // Another writer made the file after the check: refused as if it had been there, and left as it is.
+                TryDelete(temp);
+                replaced = false;
+                error = Exists(tool, path);
+                return false;
             }
             catch
             {
@@ -129,6 +139,12 @@ public static class ToolPaths
             return false;
         }
     }
+
+    /// <summary>Counts writes, to give each its own temp file.</summary>
+    private static long _writes;
+
+    private static string Exists(string tool, ToolPath path) =>
+        $"{tool}: {path.FullPath} already exists; pass overwrite: true to replace it. Nothing was written.";
 
     private static void TryDelete(string file)
     {
