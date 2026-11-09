@@ -75,6 +75,18 @@ public sealed class CharacterScenario : IScenario
                 var (x, y) = Holding(front(new Vector3(-0.43f, 0.39f, 0.02f)));
                 ExpectNot(driver, frame, x, y, "can", "where the can rests (it has swayed out by 12 degrees at 1 s)");
             }
+            else
+            {
+                // 1.5 s lies between the keys at 1 s (-12 degrees) and 2 s (0), so the can is at -6. The drum's outer side
+                // as at 1 s and its inner side as at 2 s are each about 0.14 m from the drum's centre at -6 (radius 0.09),
+                // so a sampler that held either key draws the can on one of them.
+                foreach (var (key, drumX) in new[] { (1f, -0.50f), (2f, -0.36f) })
+                {
+                    Func<string, (Quaternion?, Vector3?)> held = b => idle.Sample(b, key);
+                    var (x, y) = Holding(front(GardenerSpec.Posed(new Vector3(drumX, 0.39f, 0.02f), "WateringCan", held)));
+                    ExpectNot(driver, frame, x, y, "can", $"Idle at {t} s: where the can's side is when the key at {key} s is held");
+                }
+            }
         }
 
         // Walk, from the side (+X: forward, +Z, is the image's left): the near (left) hand is forward at 0 s, back at 0.5 s.
@@ -243,7 +255,7 @@ public sealed class CharacterScenario : IScenario
         var targets = new (GardenerSpec.MeshSpec Mesh, string Group, Vector3 Near)[]
         {
             (body, "shirt", new Vector3(0, 0.85f, 0.3f)), (body, "trousers", new Vector3(0, 0.57f, 0.3f)), (body, "skin", new Vector3(0.07f, 1.27f, 0.3f)),
-            (body, "boots", new Vector3(0.09f, 0.05f, 0.4f)), (body, "can", new Vector3(-0.48f, 0.39f, 0.2f)),
+            (body, "boots", new Vector3(0.09f, 0.05f, 0.4f)), (body, "can", new Vector3(-0.435f, 0.39f, 0.30f)),
             (hat, "straw", new Vector3(0, 1.485f, 0.3f)), (hat, "band", new Vector3(0, 1.43f, 0.3f)),
         };
         foreach (var (mesh, group, near) in targets)
@@ -253,7 +265,7 @@ public sealed class CharacterScenario : IScenario
             ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}");
         }
 
-        var can = body.Centroid(body.NearestFace("can", new Vector3(-0.48f, 0.39f, 0.2f)));
+        var can = body.Centroid(body.NearestFace("can", new Vector3(-0.435f, 0.39f, 0.30f)));
         var (cx, cy) = Holding(project(can));
         if (cx >= Size / 2)
         {
@@ -270,7 +282,7 @@ public sealed class CharacterScenario : IScenario
     private static void CheckCan(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, GardenerSpec.MeshSpec body,
         Func<string, (Quaternion? Rotation, Vector3? Translation)> locals, string what)
     {
-        var rest = body.Centroid(body.NearestFace("can", new Vector3(-0.48f, 0.39f, 0.2f)));
+        var rest = body.Centroid(body.NearestFace("can", new Vector3(-0.435f, 0.39f, 0.30f)));
         var at = GardenerSpec.Posed(rest, "WateringCan", locals);
         var (x, y) = Holding(project(at));
         ExpectGroup(driver, frame, x, y, "can", $"{what}: the can face, posed to {at}");
@@ -298,7 +310,7 @@ public sealed class CharacterScenario : IScenario
         // The arm swung out and up: the can's old place is empty, and the posed corners are inside the frame framed on the rest bounds.
         var (x, y) = Holding(project(new Vector3(-0.43f, 0.30f, 0.02f)));
         ExpectBackground(driver, frame, x, y, "where the can rested, before the arm was raised");
-        var posedAt = GardenerSpec.Posed(body.Centroid(body.NearestFace("can", new Vector3(-0.48f, 0.39f, 0.2f))), "WateringCan", locals);
+        var posedAt = GardenerSpec.Posed(body.Centroid(body.NearestFace("can", new Vector3(-0.435f, 0.39f, 0.30f))), "WateringCan", locals);
         var (px, py) = Holding(project(posedAt));
         if (px < 0 || py < 0 || px >= Size || py >= Size)
         {
@@ -351,7 +363,7 @@ public sealed class CharacterScenario : IScenario
         var rest2 = await driver.CaptureAsync("gardener-rest-front-reopened", new { view = "+z" });
         var side2 = await driver.CaptureAsync("gardener-rest-side-reopened", new { view = "+x" });
         var walk2 = await driver.CaptureAsync("gardener-walk-0.25-side-reopened", new { view = "+x", clip = "Walk", time = 0.25 });
-        driver.AssertBytesEqual("rest from the front, after save and open (weights and colours came back)", rest.Pixels, rest2.Pixels);
+        driver.AssertBytesEqual("rest from the front, after save and open (colours and shape came back; a rest frame cannot show weights: walk2 and the re-saved bytes do)", rest.Pixels, rest2.Pixels);
         driver.AssertBytesEqual("rest from the side, after save and open", restSide.Pixels, side2.Pixels);
         driver.AssertBytesEqual("Walk at 0.25 s, after save and open (the clip came back)", walkQuarter.Pixels, walk2.Pixels);
 
@@ -412,7 +424,7 @@ public sealed class CharacterScenario : IScenario
         }
 
         var allowed = await CallTextAsync(driver, "export", new { path = loose, allow_unweighted = true });
-        if (!allowed.Contains("Hips") || !File.Exists(loose))
+        if (!allowed.Contains("bound to the first root bone 'Hips'") || !File.Exists(loose))
         {
             driver.Fail($"export allow_unweighted: expected the vertices bound to Hips and a file, got {allowed} (refusal was {refused})");
         }
