@@ -92,14 +92,17 @@ internal sealed class RenderSystem(
         }
     }
 
-    public void ShowMesh(Carve.Core.PolygonMesh mesh)
+    public void ShowMesh(Carve.Core.PolygonMesh mesh) => ShowMesh(mesh, mesh);
+
+    public void ShowMesh(Carve.Core.PolygonMesh mesh, Carve.Core.PolygonMesh frameOn)
     {
         var report = MeshReport.Create(mesh);
-        var space = DrawnSpace.Of(report.BoundsMin, report.BoundsMax);
+        var framing = ReferenceEquals(mesh, frameOn) ? report : MeshReport.Create(frameOn);
+        var space = DrawnSpace.Of(framing.BoundsMin, framing.BoundsMax);
         Looks.Show(mesh, space);
         _report = report;
         _space = space;
-        _drawnHalf = space.Apply(report.BoundsMax);
+        _drawnHalf = space.Apply(framing.BoundsMax);
     }
 
     public IReadOnlyList<Func<Mesh?>> Make(Carve.Core.PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight)
