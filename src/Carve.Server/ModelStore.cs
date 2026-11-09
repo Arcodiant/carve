@@ -73,6 +73,30 @@ public sealed class ModelStore
         }
     }
 
+    /// <summary>Makes <paramref name="model"/> (a whole Carve file) the current model as the result of <paramref name="tool"/>: one step, kept for undo.</summary>
+    public ModelSnapshot OpenModel(Model model, string tool)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        lock (_write)
+        {
+            return PushLocked(model, tool);
+        }
+    }
+
+    /// <summary>
+    /// Takes the mesh <paramref name="name"/> from <paramref name="file"/> into the current model under the lock, as one step
+    /// (<see cref="Model.WithMeshFrom"/>). Null, pushing nothing, with <paramref name="problem"/> saying why, when the file
+    /// has no such mesh or its weights name bones the current skeleton does not have.
+    /// </summary>
+    public ModelSnapshot? OpenMesh(Model file, string name, string tool, out string? problem)
+    {
+        lock (_write)
+        {
+            var next = _current.Model.WithMeshFrom(file, name, out problem);
+            return next is null ? null : PushLocked(next, tool);
+        }
+    }
+
     /// <summary>
     /// Runs <paramref name="edit"/> on the current mesh and, if it succeeds, pushes the result, all under the write lock so
     /// two calls cannot edit the same mesh. Returns null (and pushes nothing) when there is no mesh yet; otherwise the snapshot
@@ -218,22 +242,14 @@ public sealed class ModelStore
                 return null;
             }
 
-            var raw = new Dictionary<int, double>();
-            var names = skeleton.Names.ToList();
-            foreach (var (bone, weight) in influences)
-            {
-                var at = names.IndexOf(bone);
-                if (at < 0) problems.Add($"weights.{bone}: no bone named '{bone}'; the bones are {string.Join(", ", names.Select(n => $"'{n}'"))}");
-                else if (!double.IsFinite(weight) || weight < 0) problems.Add($"weights.{bone}: {weight} is not a weight; weights are 0 or more");
-                else if (weight > 0) raw[at] = weight;
-            }
-            if (influences.Count == 0) problems.Add("weights: give at least one bone and its weight");
-            else if (raw.Count == 0 && problems.Count == 0) problems.Add("weights: every weight is 0; at least one must be above 0");
+            var errors = new List<MeshError>();
+            var raw = VertexWeights.Raw(skeleton, influences, "weights", errors);
+            problems.AddRange(errors.Select(e => e.ToString()));
             var (ids, idProblems) = vertices(target.Mesh);
             problems.AddRange(idProblems);
             if (problems.Count > 0 || ids is null) return null;
 
-            var normal = VertexWeights.Normalise(raw, out var capped);
+            var normal = VertexWeights.Normalise(raw!, out var capped);
             var weights = (target.Mesh.Weights ?? VertexWeights.None).With(ids, normal);
             var mesh = target.Mesh.WithWeights(weights);
             change = new WeightsChange(target.Name, ids.Distinct().Count(), capped ? ids.Distinct().Count() : 0,

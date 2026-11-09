@@ -84,8 +84,8 @@ public sealed class SetWeightsTool(ModelStore store)
             if (ids is not null)
             {
                 foreach (var v in ids.Distinct())
-                    if (v < 0 || v >= m.Vertices.Count)
-                        problems.Add($"vertices[{v}]: there is no vertex {v}: ids run 0..{m.Vertices.Count - 1}");
+                    if (VertexWeights.VertexProblem(m.Vertices.Count, v) is { } bad)
+                        problems.Add($"vertices[{v}]: {bad}");
                 return (problems.Count > 0 ? null : ids, problems);
             }
             var faces = m.Style?.FacesOf(groupName!);

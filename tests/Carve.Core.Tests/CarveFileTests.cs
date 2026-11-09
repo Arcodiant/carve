@@ -9,7 +9,7 @@ namespace Carve.Core.Tests;
 [Trait("Tier", "unit")]
 public class CarveFileTests
 {
-    /// <summary>The cube's file, the format's worked example: <c>CarveFile.Write(Cube())</c> byte for byte.</summary>
+    /// <summary>The cube's version 1 file, T-15's worked example: <c>CarveFile.Write(Cube())</c> as it was before version 2. Version 1 still reads.</summary>
     internal const string CubeText =
         "{\n" +
         "  \"carve\": 1,\n" +
@@ -125,7 +125,7 @@ public class CarveFileTests
     public void WriteIsStable()
     {
         Assert.Equal(CarveFile.Write(TestMeshes.Crate()), CarveFile.Write(TestMeshes.Crate()));
-        Assert.Equal(CubeText, CarveFile.Write(Cube()));
+        Assert.Equal(CarveFileV2Tests.CubeText, CarveFile.Write(Cube()));
     }
 
     [Fact]
@@ -179,26 +179,26 @@ public class CarveFileTests
 
     [Fact]
     public void AMissingVersionIsRefused()
-        => Assert.Equal("missing: the file has no format version; this build reads version 1",
+        => Assert.Equal("missing: the file has no format version; this build reads versions 1 and 2",
             Refused(CubeWith("  \"carve\": 1,\n", ""), "carve"));
 
     [Theory]
-    [InlineData("1.5", "the format version is 1.5, not an integer; this build reads version 1")]
-    [InlineData("\"1\"", "the format version is a string, not an integer; this build reads version 1")]
+    [InlineData("1.5", "the format version is 1.5, not an integer; this build reads versions 1 and 2")]
+    [InlineData("\"1\"", "the format version is a string, not an integer; this build reads versions 1 and 2")]
     public void ANonIntegerVersionIsRefused(string version, string expected)
         => Assert.Equal(expected, Refused(CubeWith("\"carve\": 1,", $"\"carve\": {version},"), "carve"));
 
     [Theory]
-    [InlineData(2)]
+    [InlineData(3)]
     [InlineData(0)]
     public void AnotherVersionIsRefused(int version)
-        => Assert.Equal($"version {version} is not one this build reads; it reads version 1",
+        => Assert.Equal($"version {version} is not one this build reads; it reads versions 1 and 2",
             Refused(CubeWith("\"carve\": 1,", $"\"carve\": {version},"), "carve"));
 
     /// <summary>A newer file is refused on its version alone, even when its other keys would also be refused.</summary>
     [Fact]
     public void AnotherVersionIsRefusedBeforeItsKeys()
-        => Refused(CubeWith("\"carve\": 1,", "\"carve\": 2, \"uvs\": [],"), "carve");
+        => Refused(CubeWith("\"carve\": 1,", "\"carve\": 3, \"uvs\": [],"), "carve");
 
     [Fact]
     public void MissingVerticesAreRefused()
