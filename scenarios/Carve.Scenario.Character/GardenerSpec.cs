@@ -12,11 +12,12 @@ namespace Carve.Scenario.Character;
 /// group. 22 bones named by the engine's Synty preset (Hips, Spine_01..03, Head, Clavicle/Shoulder/Elbow/Hand, UpperLeg/
 /// LowerLeg/Ankle/Ball, both sides) plus one prop bone, <c>WateringCan</c>, under <c>Hand_R</c>. Every bone rests with no
 /// rotation; pose values and clip keys are absolute local transforms per bone, so a key's rotation is the whole local rotation.
-/// Round parts are octagonal lathes (a ring of 8 at each height), so no trigonometry is evaluated here and the numbers are
-/// the same on every machine. Two clips, <c>Idle</c> (2 s) and <c>Walk</c> (1 s), both looping and in place: the root's
+/// Round parts are octagonal lathes (a ring of 8 at each height), so the mesh needs no trigonometry. The clip and pose
+/// rotations do: <see cref="Rot"/> calls <c>MathF.Sin</c> and <c>MathF.Cos</c>, and rounds each component to 5 decimal places,
+/// which is what keeps the numbers the same on every machine. Two clips, <c>Idle</c> (2 s) and <c>Walk</c> (1 s), both looping and in place: the root's
 /// x and z are never keyed and the last key of each channel is the first.
 /// </para>
-/// This file is linked into the scenario and into the checks beside the suite, so both read one source.
+/// The scenario alone reads this file; the checks beside the suite (<c>Carve.CharacterLoad.Tests</c>) compare the sample by content.
 /// </summary>
 internal static class GardenerSpec
 {
