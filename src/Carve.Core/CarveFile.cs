@@ -51,7 +51,9 @@ public sealed class CarveFileResult
 /// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and version 2, keys in any order and
 /// any whitespace, and holds the file to exactly what the tools accept: geometry to <see cref="PolygonMesh.Create"/>, bones
 /// to <see cref="Skeleton.Create"/>, weights to <see cref="VertexWeights.Raw"/>, clips to <see cref="Clip.Create"/>, the
-/// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.</para>
+/// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.
+/// <c>"meshes": []</c> is read only beside a skeleton: a clip library, a skeleton and clips with no mesh (the person,
+/// 2026-11-09); with no skeleton it is refused.</para>
 /// </remarks>
 public static class CarveFile
 {
@@ -370,7 +372,12 @@ public static class CarveFile
         var meshes = new List<NamedMesh>();
         if (!fields.TryGetValue("meshes", out var m)) errors.Add(new MeshError("meshes", "missing: the file has no meshes array"));
         else if (m.ValueKind != JsonValueKind.Array) errors.Add(new MeshError("meshes", $"meshes is {Describe(m)}, not an array"));
-        else if (m.GetArrayLength() == 0) errors.Add(new MeshError("meshes", "the file has no meshes; a Carve file holds at least one"));
+        else if (m.GetArrayLength() == 0)
+        {
+            // A skeleton and clips with no mesh, a clip library, is a whole file (the person, 2026-11-09).
+            if (!fields.TryGetValue("skeleton", out var rig) || rig.ValueKind == JsonValueKind.Null)
+                errors.Add(new MeshError("meshes", "the file has no meshes; a Carve file holds at least one"));
+        }
         else
         {
             var i = 0;

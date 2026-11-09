@@ -23,7 +23,7 @@ public sealed class ExportTool(ModelStore store)
         + "so build the model at the size and place the game wants it. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
         + "an existing file is refused unless overwrite: true is given, and then it is replaced and the result says (replaced); the path must end in .glb, in any case. "
-        + "Errors, each a tool error that writes nothing: an existing file without overwrite: true (the error names the path and overwrite, and the file is unchanged); no mesh yet (call define_mesh or open first); an empty path; a path holding a character a file path may not; "
+        + "Errors, each a tool error that writes nothing: an existing file without overwrite: true (the error names the path and overwrite, and the file is unchanged); no mesh yet (call define_mesh or open first; clips mode needs none); an empty path; a path holding a character a file path may not; "
         + "a path naming a folder; any extension but .glb; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
         + "A model of several meshes and no skeleton is written as one mesh, every mesh merged in order, as above. "
@@ -39,7 +39,7 @@ public sealed class ExportTool(ModelStore store)
         + "mode: 'model' (the default) writes all of the above; 'clips' writes the armature, skins[0] and the animations with no mesh, no node holding a mesh and no material, "
         + "which is one file of clips for every character that shares the skeleton: a game loads it with IModelGeometryLoader.LoadAnimationSet (the same bones in the same order and the same clips as the model file) and retargets it, "
         + "and the model loader refuses it as 'glTF contains no meshes.'. The skin stays in a clips file because without it the loader reorders bones and the tracks line up with the wrong ones. "
-        + "Clips mode is refused, writing nothing, for a model with no skeleton or no clips. "
+        + "Clips mode needs no mesh: a skeleton and clips alone (a clip library) export. It is refused, writing nothing, for a model with no skeleton or no clips. "
         + "A role map (*.humanoid.json) and clip events (*.events.json) are sidecars the game writes beside the file; carve writes none. Clips mode repeats no mesh limits as it has no mesh. "
         + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
         + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
@@ -86,12 +86,13 @@ public sealed class ExportTool(ModelStore store)
 
         var model = store.Current.Model;
         var mesh = model.Combined;
-        if (mesh is null) return Error("export: " + NoMesh);
+        if (mesh is null && !clips) return Error("export: " + NoMesh); // clips mode needs no mesh (the person, 2026-11-09)
 
         var target = ToolPaths.Resolve("export", text, Extension, out var pathError);
         if (target is null) return Error(pathError!);
 
         if (clips) return Clips(model, target, replace);
+        if (mesh is null) return Error("export: " + NoMesh); // not reached: model mode was refused above
         if (model.Skeleton is not null) return Skinned(model, target, allowUnweighted, replace);
 
         var triangles = FlatShading.Triangles(mesh);

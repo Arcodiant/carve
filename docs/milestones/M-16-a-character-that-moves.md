@@ -77,6 +77,7 @@ There is no fresh-agent acceptance run here: the first is T-49, once the tools a
     - Committed `.carve` files are compared by content, not bytes. The shed sample is version 2, with a version 1 fixture.
     - T-35's file-format readings are accepted.
   - Two of these were asked before dispatch (T-35's `save`/`open` and its byte identity), because the orchestrator read ahead and saw the spec collide with what had landed. The rest stopped a member.
+  - RV-24 (2026-11-09): a pure clip library (a skeleton and clips, no mesh) is allowed. `export` in `clips` mode skips the mesh check; `save` writes a version 2 file with `"meshes": []` when the model has a skeleton, and `open` reads it back. A file with no meshes and no skeleton is still refused, and `model` mode still needs a mesh.
 - **Readings members landed that the spec did not settle** (none was on a stop list):
   - T-30: groups are not carried into a several-mesh render.
   - T-31: `position` and `rotation` are required.

@@ -120,7 +120,7 @@ Carve's preview poses on the CPU in `Carve.Core` and draws the result as a plain
 
 **Certainty:** Settled · **Strictness:** Rule
 
-`export` gets a `mode`: `model` (the default: meshes, and with a skeleton the skin and clips), `clips` (armature, skin and animations, no mesh) or `piece` (the meshes named in `meshes`, with the skin and no animations). The clips file **keeps `skins[0]`** even with no mesh, because without one the loader reorders bones depth-first, and a clip's tracks then line up with the wrong bones. Bones sit under one unanimated identity node, `Armature`, which is not a bone.
+`export` gets a `mode`: `model` (the default: meshes, and with a skeleton the skin and clips), `clips` (armature, skin and animations, no mesh) or `piece` (the meshes named in `meshes`, with the skin and no animations). The clips file **keeps `skins[0]`** even with no mesh, because without one the loader reorders bones depth-first, and a clip's tracks then line up with the wrong bones. Bones sit under one unanimated identity node, `Armature`, which is not a bone. `clips` mode needs no mesh: a skeleton and clips alone, a clip library, export, and `save` writes such a model as a version 2 Carve file with `"meshes": []`, which `open` reads back; a file with no meshes and no skeleton is refused, and `model` mode still needs a mesh (the person, 2026-11-09).
 
 The same model always writes the same bytes. `export` refuses an existing file unless given `overwrite: true`; `save` replaces, since the `.carve` file is the working copy (the person, 2026-11-06).
 

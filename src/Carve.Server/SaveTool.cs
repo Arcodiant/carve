@@ -57,6 +57,7 @@ public sealed class SaveTool(ModelStore store)
         "Writes the model to a .carve file, so the work outlives this session; open reads it back, in this carve process or a later one. Takes path, the file to write, and mesh. "
         + "With mesh left out, save writes the WHOLE model: every mesh by name with its colours, groups and weights, the skeleton and the clips. "
         + "With mesh, it writes that one mesh, and when the mesh has weights the skeleton and clips too, so the file opens on its own. "
+        + "A skeleton and clips with no mesh (a clip library) are saved too, as \"meshes\": []. "
         + "The .carve file is the one to keep working in: it holds the polygons exactly, every vertex and face in its id order and every number to the bit, so after open the ids you used before still name the same vertices and faces. "
         + "It does not hold the undo history (open starts from the file as one step), a current file name (carve remembers none: give the path every time) or any render setting. "
         + "The .glb that export writes is only for the game, and has no faces to edit. "
@@ -67,7 +68,7 @@ public sealed class SaveTool(ModelStore store)
         + CubeFile
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
         + "an existing file is replaced and the result says (replaced); the path must end in .carve, in any case. "
-        + "Errors, each a tool error that writes nothing: no mesh yet (call define_mesh or open first); a mesh name the model does not have; an empty path; a path holding a character a file path may not; "
+        + "Errors, each a tool error that writes nothing: no mesh and no skeleton yet (call define_mesh or open first); a mesh name the model does not have; an empty path; a path holding a character a file path may not; "
         + "a path naming a folder; any extension but .carve; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
         + "save changes nothing: not the model, its ids, or what undo steps back to. "
@@ -89,7 +90,7 @@ public sealed class SaveTool(ModelStore store)
 
         var current = store.Current;
         var model = current.Model;
-        if (model.IsEmpty) return Error("save: " + NoMesh);
+        if (model.IsEmpty && model.Skeleton is null) return Error("save: " + NoMesh);
         if (name is not null)
         {
             if (Target(current, "save", name, out var error) is null) return error!;
