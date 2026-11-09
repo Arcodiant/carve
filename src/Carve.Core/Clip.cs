@@ -121,7 +121,7 @@ public sealed class Clip
         var errors = new List<MeshError>();
         if (string.IsNullOrEmpty(name)) errors.Add(new MeshError("name", "a clip name must not be empty"));
         var durationOk = float.IsFinite(duration) && duration > 0;
-        if (!durationOk) errors.Add(new MeshError("duration", $"{duration} seconds: a duration must be greater than 0"));
+        if (!durationOk) errors.Add(new MeshError("duration", FormattableString.Invariant($"{duration} seconds: a duration must be greater than 0")));
 
         var seen = new HashSet<string>();
         var built = new List<BoneChannels>();
@@ -148,7 +148,7 @@ public sealed class Clip
                 var length = MathF.Sqrt(q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W);
                 if (!float.IsFinite(length)) return "must be four finite numbers [x, y, z, w]";
                 return MathF.Abs(length - 1) > Skeleton.UnitTolerance
-                    ? $"not a unit quaternion: its length is {length:G6}, and it must be 1 (within {Skeleton.UnitTolerance})"
+                    ? FormattableString.Invariant($"not a unit quaternion: its length is {length:G6}, and it must be 1 (within {Skeleton.UnitTolerance})")
                     : null;
             });
             var translation = Channel(spec.Translation, $"{at}.translation", durationOk ? duration : null, errors,
@@ -179,11 +179,11 @@ public sealed class Clip
             var key = $"{at}.keys[{i}]";
             if (!float.IsFinite(time)) errors.Add(new MeshError(key, "the time must be a finite number"));
             else if (duration is { } d && (time < 0 || time > d))
-                errors.Add(new MeshError(key, $"time {time} is outside the clip, which runs from 0 to {d}"));
+                errors.Add(new MeshError(key, FormattableString.Invariant($"time {time} is outside the clip, which runs from 0 to {d}")));
             if (i > 0 && float.IsFinite(time) && float.IsFinite(spec.Keys[i - 1].Time) && time <= spec.Keys[i - 1].Time)
                 errors.Add(new MeshError(key, time == spec.Keys[i - 1].Time
-                    ? $"time {time} is the same as the key before; key times must differ"
-                    : $"time {time} comes before the key before it ({spec.Keys[i - 1].Time}); keys must be in increasing time"));
+                    ? FormattableString.Invariant($"time {time} is the same as the key before; key times must differ")
+                    : FormattableString.Invariant($"time {time} comes before the key before it ({spec.Keys[i - 1].Time}); keys must be in increasing time")));
             if (valueProblem(value) is { } problem) errors.Add(new MeshError(key, $"value {problem}"));
         }
         return errors.Count > before ? null : new ClipChannel<T>([.. spec.Keys], interpolation);

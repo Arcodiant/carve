@@ -106,7 +106,7 @@ public sealed class Skeleton
             var length = MathF.Sqrt(q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W);
             if (!float.IsFinite(length)) errors.Add(new MeshError(at, "rotation must be four finite numbers [x, y, z, w]"));
             else if (MathF.Abs(length - 1) > UnitTolerance)
-                errors.Add(new MeshError(at, $"rotation is not a unit quaternion: its length is {length:G6}, and it must be 1 (within {UnitTolerance})"));
+                errors.Add(new MeshError(at, FormattableString.Invariant($"rotation is not a unit quaternion: its length is {length:G6}, and it must be 1 (within {UnitTolerance})")));
             bones[i] = new Bone(s.Name, parent, s.Position, s.Rotation);
         }
 
