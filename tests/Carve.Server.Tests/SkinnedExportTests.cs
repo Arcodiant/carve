@@ -8,6 +8,7 @@ using SharpGLTF.Schema2;
 using PolygonMesh = Carve.Core.PolygonMesh;
 using Skeleton = Carve.Core.Skeleton;
 using Model = Carve.Core.Model;
+using static Carve.Server.Tests.RigTestHelpers;
 
 namespace Carve.Server.Tests;
 
@@ -41,13 +42,6 @@ public class SkinnedExportTests
         return mesh.WithWeights(weights);
     }
 
-    private static Clip MakeClip(string name, float duration, Skeleton rig, params BoneChannelsSpec[] channels)
-    {
-        var (clip, errors) = Clip.Create(name, duration, true, channels, rig);
-        Assert.True(clip is not null, string.Join("; ", errors));
-        return clip!;
-    }
-
     /// <summary>A body (two colours, one a group) and a coat (uncoloured) on the five bones, with two clips keyed away from 0 and the end.</summary>
     private static Model Character()
     {
@@ -66,13 +60,6 @@ public class SkinnedExportTests
     }
 
     private static ParsedModel Parse(byte[] glb) => GlbExportTests.Parser.Parse(glb, ModelFormat.Gltf);
-
-    private static JsonElement Json(byte[] glb)
-    {
-        var length = BitConverter.ToInt32(glb, 12);
-        Assert.Equal("JSON", Encoding.ASCII.GetString(glb, 16, 4));
-        return JsonDocument.Parse(glb.AsMemory(20, length)).RootElement;
-    }
 
     [Fact]
     public void The_engine_loads_every_piece_bone_and_clip_with_no_warning()

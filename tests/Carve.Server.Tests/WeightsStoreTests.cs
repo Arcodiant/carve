@@ -1,6 +1,7 @@
 using System.Numerics;
 using Carve.Core;
 using Carve.Core.Tests;
+using static Carve.Server.Tests.RigTestHelpers;
 
 namespace Carve.Server.Tests;
 
@@ -8,9 +9,6 @@ namespace Carve.Server.Tests;
 [Trait("Tier", "unit")]
 public class WeightsStoreTests
 {
-    private static Skeleton Bones(params string[] names) => Skeleton.Create(names.Select((n, i) =>
-        new BoneSpec(n, i == 0 ? null : names[i - 1], new Vector3(0, 1, 0), Quaternion.Identity)).ToList()).Skeleton!;
-
     private static ModelStore Weighted(out ModelSnapshot? snapshot)
     {
         var store = new ModelStore();

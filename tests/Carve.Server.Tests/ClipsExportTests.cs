@@ -7,6 +7,7 @@ using Empyrean;
 using PolygonMesh = Carve.Core.PolygonMesh;
 using Skeleton = Carve.Core.Skeleton;
 using Model = Carve.Core.Model;
+using static Carve.Server.Tests.RigTestHelpers;
 
 namespace Carve.Server.Tests;
 
@@ -55,13 +56,6 @@ public class ClipsExportTests
     private static PolygonMesh Block() =>
         TestMeshes.Make(TestMeshes.CubeVertices.Select(v => new Vector3(0, 1, 0) + (v * 0.3f)), TestMeshes.CubeFaces);
 
-    private static Clip MakeClip(string name, float duration, Skeleton rig, params BoneChannelsSpec[] channels)
-    {
-        var (clip, errors) = Clip.Create(name, duration, true, channels, rig);
-        Assert.True(clip is not null, string.Join("; ", errors));
-        return clip!;
-    }
-
     private static Quaternion Turn(Vector3 axis, float angle) => Quaternion.CreateFromAxisAngle(axis, angle);
 
     /// <summary>The tall character with a walk (keys away from 0 and the end, both interpolations), a wave and an empty clip.</summary>
@@ -84,13 +78,6 @@ public class ClipsExportTests
     private static ParsedModel Parse(byte[] glb) => GlbExportTests.Parser.Parse(glb, ModelFormat.Gltf);
 
     private static ParsedAnimationSet ParseSet(byte[] glb) => GlbExportTests.Parser.ParseAnimationSet(glb);
-
-    private static JsonElement Json(byte[] glb)
-    {
-        var length = BitConverter.ToInt32(glb, 12);
-        Assert.Equal("JSON", Encoding.ASCII.GetString(glb, 16, 4));
-        return JsonDocument.Parse(glb.AsMemory(20, length)).RootElement;
-    }
 
     private static bool SameChannel<T>(AnimationChannel<T>? a, AnimationChannel<T>? b) where T : struct
     {
