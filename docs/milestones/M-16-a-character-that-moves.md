@@ -4,7 +4,7 @@ description: >-
 ---
 # M-16 — A character that moves
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *A two-mesh coloured character with a skeleton, weights and a clip is saved, exported as a skinned .glb and loads through Empyrean*
 
