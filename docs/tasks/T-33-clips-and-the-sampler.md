@@ -4,7 +4,7 @@ description: >-
 ---
 # T-33 — Clips and the sampler
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
