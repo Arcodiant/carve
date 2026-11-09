@@ -14,8 +14,8 @@ internal static class FaceArguments
     {
         foreach (var f in faces.Distinct())
         {
-            if (f < 0 || f >= mesh.Faces.Count)
-                errors.Add($"faces[{f}]: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}");
+            if (FaceStyle.FaceProblem(mesh.Faces.Count, f) is { } problem)
+                errors.Add($"faces[{f}]: {problem}");
         }
     }
 
@@ -56,7 +56,7 @@ public sealed class DefineGroupTool(ModelStore store)
         var errors = UnknownArguments("define_group", context, "name", "faces", "mesh");
         var meshName = MeshName(mesh, errors);
         var group = RequiredString("name", name, errors);
-        if (group is { Length: 0 }) errors.Add("name: a group name must not be empty");
+        if (group is not null && FaceStyle.GroupNameProblem(group) is { } badName) errors.Add("name: " + badName);
         var unknown = errors.Count;
         var f = Ids("faces", faces, errors);
         if (f is null && errors.Count == unknown) errors.Add("faces: required but missing");
