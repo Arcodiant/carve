@@ -338,4 +338,49 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         Assert.True(DiffersNear(bare, marked, PixelOf(new Vector3(2.5f, 1, 1))), "the tall box's front face has no label");
         Assert.False(DiffersNear(bare, marked, PixelOf(new Vector3(0.5f, 0.5f, 1))), "the cube's front face has a label");
     }
+
+    /// <summary>Renders while the crate is defined again and again, so the frame is drawn on a later model than the call checked.</summary>
+    private static async Task<JsonElement> RenderDuringCrateEditsAsync(CarveProcess carve, string crate, string arguments)
+    {
+        const int MostCalls = 2000;
+        var render = carve.CallToolAsync("render", arguments);
+        for (var calls = 1; !render.IsCompleted; calls++)
+        {
+            Assert.True(calls <= MostCalls, $"no answer in {MostCalls} calls of define_mesh");
+            Ok(await carve.CallToolAsync("define_mesh", crate));
+        }
+        return await render;
+    }
+
+    /// <summary>
+    /// RV-24 D1 through render's own path: ids shifted past the crate for the lid, on a frame drawn after the crate
+    /// changed, are refused. RV-25 R1: a render that names the lid but asks for no ids shifts none, so it is never refused.
+    /// </summary>
+    [Fact]
+    public async Task A_render_with_the_lids_ids_drawn_on_a_later_model_is_refused_and_one_with_no_ids_is_not()
+    {
+        const int Tries = 10;
+        const string Stale = "The model changed while the frame was drawn, so the ids given for mesh 'lid' may name other elements; call render again once the edits have settled.";
+        var (carve, tools) = await StartWithCrateAndLidAsync();
+        using var _ = carve;
+        var crate = TwoMeshExample(tools)[0].Arguments;
+
+        for (var k = 0; k < Tries; k++)
+        {
+            var plain = await RenderDuringCrateEditsAsync(carve, crate, """{"view":"front","mesh":"lid"}""");
+            Assert.False(IsError(plain), IsError(plain) ? TextOf(plain) : null);
+        }
+
+        var refused = 0;
+        for (var k = 0; k < Tries && refused == 0; k++)
+        {
+            var labelled = await RenderDuringCrateEditsAsync(carve, crate, """{"view":"front","mesh":"lid","labels":"faces"}""");
+            if (IsError(labelled))
+            {
+                Assert.Equal(Stale, TextOf(labelled));
+                refused++;
+            }
+        }
+        Assert.True(refused > 0, $"no labelled render of the lid was refused in {Tries} drawn during edits to the crate");
+    }
 }
