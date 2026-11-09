@@ -45,3 +45,7 @@ Built on Sonnet 5.5.
 - Test targets changed (only these): `ExportToolTests.Tools_list_lists_export_with_a_closed_schema` (expected schema and unknown-argument text gain `overwrite`); `ExportToolTests.Export_writes_the_cube_...` (second export, to `CUBE.GLB`, passes `overwrite: true`; refusal asserted before it); `SkinnedExportToolTests.Unweighted_vertices_...` (the `allow_unweighted` export over the pre-existing file passes `overwrite: true`); `SkinnedExportToolTests.Clips_mode_...` (the second exports assert the refusal with bytes unchanged, then `overwrite: true` with identical bytes, both modes); `ToolPathsTests` (replace case passes `overwrite: true`, new refusal test); `ExportScenario` (second export asserts the refusal and the bytes, then passes `overwrite: true`).
 - Break table and hash lists: `artifacts/review/T-52/` of the milestone worktree.
 
+
+### Hand-off
+
+Sonnet 5.5. Done: code, tests, scenario change and As built, committed. `server-unit` and `server-regression` PASS on the fixed product (uncommitted-code runs); the break table is in `artifacts/review/T-52/break-table.txt` of the milestone worktree. Left: `cairn task T-52 verify` (it sat queued over 20 minutes with nothing running; I stopped it), the hash lists (fresh `scenario-export` and `server-regression` artifacts against T-46's `hashes-after.txt`; no frame or export bytes should differ), `cairn lint`, `finish`, and confirming `Merge task/T-52`. Not checked: scenario-export on the fixed product.
