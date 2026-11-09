@@ -30,6 +30,8 @@ public static class SkinnedExport
 {
     // Interim until engine need 4: a skinned file keeps only its first skinned mesh, so every piece is a primitive of one mesh.
 
+    // D-6, Warnings for a game's limits: Orcward's numbers, not general ones; T-51 makes them per game.
+
     /// <summary>D-6, Warnings for a game's limits: Orcward's starting numbers.</summary>
     public const int MaxTriangles = 5000;
 
