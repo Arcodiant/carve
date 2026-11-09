@@ -117,7 +117,7 @@ public sealed class DefineSkeletonTool(ModelStore store)
             errors.AddRange(problems.Where(p => !shapeBad.Contains(p.Element)).Select(p => p.ToString()));
             if (errors.Count == 0)
             {
-                store.DefineSkeleton(skeleton!, "define_skeleton");
+                if (store.DefineSkeleton(skeleton!, "define_skeleton", out var refusal) is null) return Failed("define_skeleton", [refusal!]);
                 return Ok(new { bones = skeleton!.Bones.Count, names = skeleton.Names.ToArray() });
             }
         }

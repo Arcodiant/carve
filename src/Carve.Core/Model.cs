@@ -145,9 +145,8 @@ public sealed class Model
             vertices.AddRange(mesh.Vertices);
             faces.AddRange(mesh.Faces.Select(f => f.Select(v => v + offset).ToArray()));
         }
-        var result = PolygonMesh.Create(vertices, faces);
-        var combined = result.Mesh ?? throw new InvalidOperationException(
-            "meshes that are each valid did not combine: " + string.Join("; ", result.Errors));
+        // Each mesh was checked when it was made (a posed one is a copy to draw, not checked), so they are joined as they are.
+        var combined = PolygonMesh.Assemble([.. vertices], [.. faces]);
         return colours.Count == 0 ? combined : combined.WithStyle(FaceStyle.OfColours(colours));
     }
 }

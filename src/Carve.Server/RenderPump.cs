@@ -9,6 +9,9 @@ internal interface IRenderScene
     /// <summary>Puts this mesh in the scene. If it throws, the scene must not count it as shown.</summary>
     void ShowMesh(PolygonMesh mesh);
 
+    /// <summary>Puts <paramref name="mesh"/> in the scene framed on the bounds of <paramref name="frameOn"/> (the rest pose, for a posed model: D-6, framing).</summary>
+    void ShowMesh(PolygonMesh mesh, PolygonMesh frameOn) => ShowMesh(mesh);
+
     /// <summary>Points the cameras and the light for this spec of the mesh shown, and draws its look if that changed.</summary>
     void ApplyView(RenderSpec spec);
 
@@ -34,6 +37,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     private string? _meshFault;
     private (Vector3 Min, Vector3 Max)? _shownBounds;
     private PolygonMesh? _shown;
+    private Pose? _shownPose;
 
     public void Step()
     {
@@ -80,6 +84,14 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
+            // The pose is part of what is shown: a request for another one puts the mesh in the scene again, posed.
+            if (!Equals(next.Spec.Pose, _shownPose))
+            {
+                _shownPose = next.Spec.Pose;
+                ShowMesh(store.Current);
+                continue;
+            }
+
             if (next.Spec != _spec || !_viewApplied)
             {
                 ChangeView(next);
@@ -98,7 +110,11 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         _version = snapshot.Version;
         try
         {
-            scene.ShowMesh(snapshot.Mesh!);
+            var drawn = snapshot.Mesh!;
+            if (_shownPose is { } pose && snapshot.Model.Skeleton is not null)
+                scene.ShowMesh(Skinning.Posed(snapshot.Model, pose).Combined!, drawn);
+            else
+                scene.ShowMesh(drawn);
             var report = MeshReport.Create(snapshot.Mesh!);
             _shownBounds = (report.BoundsMin, report.BoundsMax);
             _shown = snapshot.Mesh;
