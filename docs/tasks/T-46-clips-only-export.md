@@ -54,3 +54,5 @@ One agent, on Sonnet 5.5.
 **Role map.** The Synty preset needed `Clavicle_L/R` as well as the bones in `SyntyRequiredBones` for the second skeleton (engine need 6's list names the role bones; the clavicles are in the test rig). Engine docs for `ParseAnimationSet`, `Parse`'s message and `ClipRetargeter` were read from the 0.119.0 Geometry cache and the Animation `.nupkg` fetched from the feed (not in the package cache). No new engine need.
 
 **Evidence** in `M-16/artifacts/review/T-46/`: `break-table.txt` (each new check failing on a broken product), hash lists.
+
+**Hashes** (own jobs `J-20261109-145432-695fc0` scenario-cube, `-145434-c3747b` scenario-crate, `-150030-1c8cf3` scenario-export, all at the rebased commit, checked against T-34's `hashes-after.txt`): every frame and `crate.glb` unchanged; the only difference is `crate.carve`, now version 2 (sha256 `4fc73e0f...fa95e`) from T-35, not this member. No new frames, so no new pixel check. Post-rebase `verify` passed (`server-regression` 266 s).
