@@ -4,7 +4,7 @@ description: >-
 ---
 # T-52 — Export refuses an existing file without overwrite
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
