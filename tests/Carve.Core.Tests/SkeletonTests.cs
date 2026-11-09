@@ -35,6 +35,23 @@ public class SkeletonTests
     }
 
     [Fact]
+    public void Rest_world_position_under_two_turned_bones_applies_the_parents_turn_after_the_childs()
+    {
+        // a turns a quarter about Z, b (at (0, 1, 0) from a, so (-1, 0, 0)) a quarter about X. c sits (0, 1, 0) from b:
+        // b's own turn takes that to (0, 0, 1), a's leaves it there, so c rests at (-1, 0, 1). The reversed product
+        // (a's turn first) would put c at (-2, 0, 0).
+        var (s, _) = Skeleton.Create([
+            new("a", null, Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 2)),
+            new("b", "a", new Vector3(0, 1, 0), Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI / 2)),
+            Bone("c", "b", 1),
+        ]);
+        var c = s!.RestWorldPosition(2);
+        Assert.Equal(-1f, c.X, 5);
+        Assert.Equal(0f, c.Y, 5);
+        Assert.Equal(1f, c.Z, 5);
+    }
+
+    [Fact]
     public void Rest_world_position_adds_the_parents_chain_and_turns_by_its_rotation()
     {
         var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 2);
