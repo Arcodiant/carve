@@ -25,6 +25,18 @@ internal static class RenderTool
         var schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!;
         schema["properties"]!["highlight"] = HighlightSchema();
         schema["properties"]!["views"] = ViewsSchema();
+        schema["properties"]!["pose"] = PoseSchema();
+        schema["properties"]!["clip"] = new JsonObject
+        {
+            ["description"] = "Draws the model posed by this clip (define_clip) at 'time'. Not with pose. Framing stays on the rest pose.",
+            ["type"] = "string",
+        };
+        schema["properties"]!["time"] = new JsonObject
+        {
+            ["description"] = "With clip, and required by it: the moment in seconds, from 0 to the clip's duration.",
+            ["type"] = "number",
+        };
+        WithMesh(schema.AsObject(), MeshArgumentText);
         schema["properties"]!["columns"] = new JsonObject
         {
             ["description"] = "With views: tiles to a row, 1 to 3. Default: the number of views, at most 3.",
@@ -32,6 +44,83 @@ internal static class RenderTool
         };
         tool.ProtocolTool.InputSchema = Closed(JsonSerializer.SerializeToElement(schema));
         return tool;
+    }
+
+    private static JsonObject PoseSchema() => new()
+    {
+        ["description"] = "Draws the model posed: an object of bone name to {rotation: [x, y, z, w] unit quaternion, translation: [x, y, z]}, both local to the parent and absolute, each optional (a bone or part left out rests). Needs a skeleton (define_skeleton); only weighted vertices move, so a mesh with no weights (set_weights) is drawn at rest, with no error. Framing stays on the rest pose.",
+        ["type"] = "object",
+        ["additionalProperties"] = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["rotation"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "number" }, ["minItems"] = 4, ["maxItems"] = 4 },
+                ["translation"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "number" }, ["minItems"] = 3, ["maxItems"] = 3 },
+            },
+        },
+    };
+
+    /// <summary>The clip and time arguments: the clip's name (null when absent) and the time; problems are added to <paramref name="errors"/>.</summary>
+    private static (string? Name, float Time) ReadClip(JsonElement? clip, JsonElement? time, JsonElement? pose, List<string> errors)
+    {
+        if (Absent(clip))
+        {
+            if (!Absent(time)) errors.Add("time: only with clip; give the clip to draw at this time");
+            return (null, 0);
+        }
+        var before = errors.Count;
+        if (!Absent(pose)) errors.Add("clip: not with pose; give a pose, or a clip and a time");
+        if (clip!.Value.ValueKind != JsonValueKind.String) errors.Add($"clip: expected a clip name, got {Describe(clip.Value)}");
+        var at = 0f;
+        if (Absent(time)) errors.Add("time: required with clip; the moment in seconds, from 0 to the clip's duration");
+        else if (!IsFinite(time!.Value))
+            errors.Add($"time: expected a finite number of seconds, got {Describe(time.Value)}");
+        else at = (float)time.Value.GetDouble();
+        return errors.Count > before ? (null, 0) : (clip.Value.GetString(), at);
+    }
+
+    /// <summary>The pose argument: null when absent, else a pose; problems are added to <paramref name="errors"/>.</summary>
+    private static Pose? ReadPose(JsonElement? pose, List<string> errors)
+    {
+        if (Absent(pose)) return null;
+        if (pose!.Value.ValueKind != JsonValueKind.Object)
+        {
+            errors.Add($"pose: expected an object of bone name to {{rotation, translation}}, got {Describe(pose.Value)}");
+            return null;
+        }
+        var bones = new Dictionary<string, (Quaternion?, Vector3?)>();
+        var before = errors.Count;
+        foreach (var b in pose.Value.EnumerateObject())
+        {
+            var at = $"pose.{b.Name}";
+            if (b.Value.ValueKind != JsonValueKind.Object) { errors.Add($"{at}: expected an object {{rotation, translation}}, got {Describe(b.Value)}"); continue; }
+            Quaternion? rotation = null;
+            Vector3? translation = null;
+            foreach (var f in b.Value.EnumerateObject())
+            {
+                if (f.Name is not ("rotation" or "translation")) { errors.Add($"{at}.{f.Name}: not a field of a pose bone; its fields are rotation, translation"); continue; }
+                var want = f.Name == "rotation" ? 4 : 3;
+                var values = new List<float>();
+                var ok = f.Value.ValueKind == JsonValueKind.Array && f.Value.GetArrayLength() == want;
+                if (ok)
+                    foreach (var n in f.Value.EnumerateArray())
+                    {
+                        if (!IsFinite(n)) { ok = false; break; }
+                        values.Add((float)n.GetDouble());
+                    }
+                if (!ok) { errors.Add($"{at}.{f.Name}: expected {want} finite numbers"); continue; }
+                if (want == 4)
+                {
+                    var q = new Quaternion(values[0], values[1], values[2], values[3]);
+                    if (MathF.Abs(q.Length() - 1) > Skeleton.UnitTolerance) errors.Add(FormattableString.Invariant($"{at}.rotation: not a unit quaternion: its length is {q.Length():G6}, and it must be 1 (within {Skeleton.UnitTolerance})"));
+                    else rotation = q;
+                }
+                else translation = new Vector3(values[0], values[1], values[2]);
+            }
+            bones[b.Name] = (rotation, translation);
+        }
+        return errors.Count > before ? null : new Pose(bones);
     }
 
     private static JsonObject HighlightSchema()
@@ -87,7 +176,7 @@ internal static class RenderTool
     }
 
     private const string Text =
-        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo, and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
+        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
         + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh, and the look's lines and spikes, the highlight's orange lines and stars, and the labels and tile captions you ask for: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
@@ -136,9 +225,17 @@ internal static class RenderTool
         + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a view that is not one of the eight names; a direction of zero or not three finite numbers; "
         + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; a mode other than 'shaded', 'wireframe' or 'normals'; a highlight that is not an object, or whose lists are not lists of ids and [a, b] pairs; "
         + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; labels other than 'none', 'faces', 'vertices' or 'both'; "
-        + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns other than 1, 2 or 3; an argument render does not take; a sheet whose tiles would show different meshes, because the mesh changed while it was drawn on each of 3 tries (\"The mesh changed while the sheet was drawn, on each of 3 tries, so its tiles would show different meshes; call render again once the edits have settled.\"). "
+        + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns other than 1, 2 or 3; an argument render does not take; a sheet whose tiles would show different meshes, because the mesh changed while it was drawn on each of 3 tries (\"The mesh changed while the sheet was drawn, on each of 3 tries, so its tiles would show different meshes; call render again once the edits have settled.\"); labels or highlight given with 'mesh' among several meshes, when an edit lands while the frame is drawn, since their ids may then name other elements (\"The model changed while the frame was drawn, so the ids given for mesh '<name>' may name other elements; call render again once the edits have settled.\"). "
+        + "'pose' draws the model posed by its skeleton: an object of bone name to {rotation: [x, y, z, w], translation: [x, y, z]}, each part optional and absolute (local to the parent, replacing the rest value; a bone or part left out rests), skinned by the weights set_weights gave. A vertex with no weight stays where it is. The camera frames the REST pose, so the frame does not move between poses and a pose that swings far can leave it. Errors: a bone the skeleton lacks, a rotation that is not a unit quaternion, no skeleton. "
+        + "'clip' and 'time' draw the model as the clip of that name (define_clip) poses it at that time in seconds, interpolated as define_clip says; framed on the rest pose like pose. Errors: clip together with pose, clip without time or time without clip, no clip of that name, a time outside 0 to the clip's duration. "
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
-        + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select and check still work there.";
+        + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select, check, define_group, set_colour, define_skeleton, get_skeleton, set_weights, define_clip and delete_clip still work there.";
+
+    /// <summary>The text of render's <c>mesh</c>: it aims labels and highlight, never what is drawn.</summary>
+    private const string MeshArgumentText =
+        "The mesh labels and highlight apply to, as named to define_mesh; ids are that mesh's own, as its edit tools take them. "
+        + "Every mesh is drawn either way. May be left out when the model has one mesh, or when neither labels nor highlight is asked for; "
+        + "left out while there are several and they are asked for, the call is a tool error that lists the names.";
 
     [McpServerTool(Name = "render"), Description(Text)]
     public static async Task<CallToolResult> Run(
@@ -157,9 +254,13 @@ internal static class RenderTool
         [Description("Element ids to write on the image: 'none' (the default), 'faces', 'vertices' or 'both'. Only what faces the camera."), AllowedValues("none", "faces", "vertices", "both")] string? labels = null,
         JsonElement? views = null,
         double? columns = null,
+        JsonElement? mesh = null,
+        JsonElement? pose = null,
+        JsonElement? clip = null,
+        JsonElement? time = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -213,6 +314,9 @@ internal static class RenderTool
         }
 
         var problems = new List<string>();
+        var meshName = MeshName(mesh, problems);
+        var posed = ReadPose(pose, problems);
+        var (clipName, clipTime) = ReadClip(clip, time, pose, problems);
         var listed = HighlightLists(highlight, problems);
         if (problems.Count > 0)
         {
@@ -229,12 +333,55 @@ internal static class RenderTool
             return Error(fault);
         }
 
-        if (store.Current.Mesh is not { } mesh)
+        var current = store.Current;
+        if (current.Mesh is not { } drawn)
         {
             return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
         }
 
-        var bounds = MeshReport.Create(mesh);
+        if (clipName is not null)
+        {
+            if (current.Model.FindClip(clipName) is not { } sampled)
+                return Failed("render", [current.Model.Clips.Count == 0
+                    ? $"clip: there is no clip named '{clipName}'; the model has no clips (define_clip makes one)"
+                    : $"clip: there is no clip named '{clipName}'; the clips are {NameList.Quoted(current.Model.Clips.Select(c => c.Name))}"]);
+            if (clipTime < 0 || clipTime > sampled.Duration)
+                return Failed("render", [FormattableString.Invariant($"time: {clipTime} s is outside the clip '{clipName}', which runs from 0 to {sampled.Duration} s")]);
+            posed = sampled.Sample(clipTime);
+        }
+
+        if (posed is not null)
+        {
+            if (current.Model.Skeleton is not { } rig) return Failed("render", ["pose: the model has no skeleton; call define_skeleton first"]);
+            if (Skinning.Unknown(rig, posed).ToArray() is { Length: > 0 } stray)
+                return Failed("render", [$"pose: no bone named {NameList.Quoted(stray)}; the bones are {NameList.Quoted(rig.Names)}"]);
+        }
+
+        // Every mesh is drawn, as one. Labels and highlight name ids within one mesh, so with several they are aimed
+        // by mesh, as the edit tools are; the ids are moved past the meshes before it in the drawn whole.
+        var wantsIds = labelled != LabelSet.None || listed.Vertices.Count > 0 || listed.Edges.Count > 0 || listed.Faces.Count > 0;
+        var idsIn = drawn;
+        ElementWindow? window = null;
+        string? shiftedFor = null;
+        (int Vertices, int Faces) offset = (0, 0);
+        if (meshName is not null || (wantsIds && current.Model.Meshes.Count > 1))
+        {
+            if (current.Model.Target(meshName, out var aimed) is not { } named)
+            {
+                return Failed("render", [meshName is null ? aimed + "; labels and highlight name ids within one mesh" : aimed!]);
+            }
+
+            if (current.Model.Meshes.Count > 1)
+            {
+                idsIn = named.Mesh;
+                offset = current.Model.OffsetOf(named.Name)!.Value;
+                window = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
+                // Only ids asked for are shifted; a render naming the mesh with none has nothing a later model could misplace.
+                shiftedFor = wantsIds ? named.Name : null;
+            }
+        }
+
+        var bounds = MeshReport.Create(drawn);
         for (var k = 0; k < tiles.Count; k++)
         {
             if (tiles[k].TargetVector is { } t && TargetCheck.Refusal(t, bounds.BoundsMin, bounds.BoundsMax) is { } refusal)
@@ -243,16 +390,19 @@ internal static class RenderTool
             }
         }
 
-        if (MeshEdits.UnknownElements(mesh, listed.Vertices, listed.Edges, listed.Faces) is { Count: > 0 } missing)
+        if (MeshEdits.UnknownElements(idsIn, listed.Vertices, listed.Edges, listed.Faces) is { Count: > 0 } missing)
         {
             return Failed("render", missing.Select(e => e.ToString()));
         }
 
-        var picked = Highlight.Of(listed.Vertices, listed.Edges, listed.Faces);
+        var picked = Highlight.Of(
+            listed.Vertices.Select(v => v + offset.Vertices),
+            listed.Edges.Select(e => (e.A + offset.Vertices, e.B + offset.Vertices)),
+            listed.Faces.Select(f => f + offset.Faces));
         async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
             var rendering = Task.WhenAll(tiles
-                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Highlight = picked, TileCaption = sheet ? tile.Caption : null })));
+                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window })));
 
             // The frame thread drains the queue; once it has ended, nothing will.
             await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
@@ -270,6 +420,11 @@ internal static class RenderTool
         if (rendered is not { } frames)
         {
             return Error(failure!);
+        }
+        // The offsets are the checked snapshot's; a frame drawn on a later model may have other elements at those ids.
+        if (SheetVersions.ShiftedIdsRefusal(shiftedFor, current.Version, frames[0].Version) is { } stale)
+        {
+            return Error(stale);
         }
         if (sheet)
         {

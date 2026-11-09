@@ -42,9 +42,14 @@
     <Compile Include="../../src/Carve.Server/SheetComposer.cs" Link="SheetComposer.cs" />
     <Compile Include="../../src/Carve.Server/TargetCheck.cs" Link="TargetCheck.cs" />
     <Compile Include="../../src/Carve.Server/GlbExport.cs" Link="GlbExport.cs" />
+    <Compile Include="../../src/Carve.Server/GlbRig.cs" Link="GlbRig.cs" />
+    <Compile Include="../../src/Carve.Server/SkinnedExport.cs" Link="SkinnedExport.cs" />
+    <Compile Include="../../src/Carve.Server/ClipsExport.cs" Link="ClipsExport.cs" />
     <Compile Include="../../src/Carve.Server/ToolPaths.cs" Link="ToolPaths.cs" />
     <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
     <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
+    <PackageReference Include="Arcodiant.Empyrean.Animation" Version="$(EmpyreanVersion)" />
     <PackageReference Include="SharpGLTF.Toolkit" Version="$(SharpGLTFVersion)" />
     <!-- The engine parser in GlbExportTests is built from a plain service collection with logging. -->
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />

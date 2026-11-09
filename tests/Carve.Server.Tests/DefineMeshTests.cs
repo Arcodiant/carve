@@ -104,7 +104,7 @@ public class DefineMeshTests
         }
 
         var properties = tool.GetProperty("inputSchema").GetProperty("properties");
-        Assert.Equal(2, properties.EnumerateObject().Count());
+        Assert.Equal(3, properties.EnumerateObject().Count());
         var vertex = properties.GetProperty("vertices").GetProperty("items");
         Assert.Equal(3, vertex.GetProperty("minItems").GetInt32());
         Assert.Equal(3, vertex.GetProperty("maxItems").GetInt32());
@@ -217,7 +217,7 @@ public class DefineMeshTests
         var schema = (await ToolAsync(carve)).GetProperty("inputSchema").GetRawText();
 
         Assert.Equal(
-            """{"type":"object","properties":{"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.","type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["vertices","faces"],"additionalProperties":false}""",
+            """{"type":"object","properties":{"name":{"description":"The name of the mesh, non-empty and without a colon (a skinned export names materials mesh:group, so such a name is refused); left out, it is mesh. An existing name replaces that mesh in its place; a new one adds a mesh after the others.","type":"string"},"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.","type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["vertices","faces"],"additionalProperties":false}""",
             schema);
     }
 }

@@ -110,5 +110,11 @@ public sealed class CrateScenario : IScenario
 
         // 5. The looks, last, so that every frame above stays as it was; the cube's frame closes the run.
         await CrateLooks.RunAsync(driver, front, tilted);
+
+        // 6. The crate coloured (T-30), after every frame above so that none of them changes.
+        await CrateColours.RunAsync(driver, front, tilted);
+
+        // 7. A two-bone chain bent at its joint (T-32), last again.
+        await ChainPose.RunAsync(driver);
     }
 }

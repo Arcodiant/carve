@@ -1,98 +1,250 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace Carve.Core;
 
 /// <summary>
-/// The outcome of <see cref="CarveFile.Read"/>: a mesh and the warnings it carries, or the errors that stopped one.
-/// On failure <see cref="Mesh"/> is null and <see cref="Warnings"/> is empty.
+/// The outcome of <see cref="CarveFile.Read"/>: a model and the warnings its meshes carry, or the errors that stopped one.
+/// On failure <see cref="Model"/> is null and <see cref="Warnings"/> is empty.
 /// </summary>
 public sealed class CarveFileResult
 {
-    internal CarveFileResult(PolygonMesh? mesh, IReadOnlyList<MeshError> errors, IReadOnlyList<MeshWarning> warnings)
+    internal CarveFileResult(Model? model, IReadOnlyList<MeshError> errors, IReadOnlyList<MeshWarning> warnings, int version = 0)
     {
-        Mesh = mesh;
+        Model = model;
+        Version = model is null ? 0 : version;
         Errors = errors;
         Warnings = warnings;
     }
 
-    /// <summary>The mesh the file holds, every vertex and face at its id, or null when the file was refused.</summary>
-    public PolygonMesh? Mesh { get; }
+    /// <summary>The model the file holds, every mesh, vertex, face, bone and clip in its place, or null when the file was refused.</summary>
+    public Model? Model { get; }
 
-    /// <summary>Every problem found, each named by where it is in the file: <c>file</c>, <c>carve</c>, <c>vertices[3]</c>, <c>faces[2][1]</c>, or an unknown key.</summary>
+    /// <summary>The version the file was read as, 1 or 2, or 0 when the file was refused.</summary>
+    public int Version { get; }
+
+    /// <summary>The model's only mesh, or null when the file was refused or holds several.</summary>
+    public PolygonMesh? Mesh => Model is { Meshes.Count: 1 } m ? m.Meshes[0].Mesh : null;
+
+    /// <summary>Every problem found, each named by where it is in the file: <c>file</c>, <c>carve</c>, <c>meshes[0].faces[2][1]</c>, <c>clips[1].duration</c>, or an unknown key.</summary>
     public IReadOnlyList<MeshError> Errors { get; }
 
-    /// <summary>The mesh's warnings, exactly as <see cref="MeshReport"/> gives them for the same mesh made by <c>define_mesh</c>.</summary>
+    /// <summary>The meshes' warnings, mesh by mesh in file order, exactly as <see cref="MeshReport"/> gives them for the same mesh made by <c>define_mesh</c>.</summary>
     public IReadOnlyList<MeshWarning> Warnings { get; }
 
-    public bool Succeeded => Mesh is not null;
+    public bool Succeeded => Model is not null;
 }
 
 /// <summary>
-/// The Carve file: a <see cref="PolygonMesh"/>'s geometry as versioned JSON text, read back bit-exact with every vertex and
-/// face at its id. Undo history is not saved.
+/// The Carve file: a <see cref="Model"/> as versioned JSON text (its meshes with their colours, groups and weights, the
+/// skeleton and the clips), read back bit-exact with every vertex, face and bone at its id. Undo history is not saved.
 /// </summary>
 /// <remarks>
-/// <para>The layout, which <see cref="Write"/> always gives byte for byte: the keys <c>carve</c> (the format version),
-/// <c>vertices</c> and <c>faces</c> in that order, two-space indent, one vertex <c>[x, y, z]</c> or one face (its vertex-id
-/// loop, counter-clockwise seen from outside) per line, <c>\n</c> line ends and a newline at the end. Each coordinate is the
-/// shortest text that reads back to the same <see cref="float"/>.</para>
-/// <para>Reading accepts any JSON with those three keys in any order and any whitespace, and holds the geometry to exactly
-/// what <see cref="PolygonMesh.Create"/> accepts. An unknown key or another version is refused, so a newer file is never
-/// half-read.</para>
+/// <para><see cref="Write"/> always gives version 2, byte for byte: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
+/// and <c>clips</c> in that order; in a mesh <c>name</c>, <c>vertices</c>, <c>faces</c>, <c>colours</c>, <c>groups</c> and
+/// <c>weights</c>; two-space indent, one vertex, face, colour, group, weighted vertex, bone or clip key per line, <c>\n</c>
+/// line ends and a newline at the end. Each float is the shortest text that reads back to the same <see cref="float"/>,
+/// each weight the shortest that reads back to the same <see cref="double"/>.</para>
+/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and version 2, keys in any order and
+/// any whitespace, and holds the file to exactly what the tools accept: geometry to <see cref="PolygonMesh.Create"/>, bones
+/// to <see cref="Skeleton.Create"/>, weights to <see cref="VertexWeights.Raw"/>, clips to <see cref="Clip.Create"/>, the
+/// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.
+/// <c>"meshes": []</c> is read only beside a skeleton: a clip library, a skeleton and clips with no mesh (the person,
+/// 2026-11-09); with no skeleton it is refused.</para>
 /// </remarks>
 public static class CarveFile
 {
     /// <summary>The version <see cref="Write"/> writes.</summary>
-    public const int Version = 1;
+    public const int Version = 2;
 
     /// <summary>The versions <see cref="Read"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1];
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2];
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
     private const string FacesKey = "faces";
 
-    /// <summary>The file's text for a mesh. The same mesh always gives the same text.</summary>
+    private static readonly string[] FileKeys = [VersionKey, "meshes", "skeleton", "clips"];
+    private static readonly string[] MeshKeys = ["name", VerticesKey, FacesKey, "colours", "groups", "weights"];
+    private static readonly string[] ColourKeys = ["colour", "faces"];
+    private static readonly string[] GroupKeys = ["name", "faces"];
+    private static readonly string[] WeightKeys = ["vertex", "bones"];
+    private static readonly string[] BoneKeys = ["name", "parent", "position", "rotation"];
+    private static readonly string[] ClipKeys = ["name", "duration", "loop", "channels"];
+    private static readonly string[] PartKeys = ["rotation", "translation"];
+    private static readonly string[] ChannelKeys = ["interpolation", "keys"];
+    private static readonly string[] KeyKeys = ["time", "value"];
+
+    private static readonly JsonSerializerOptions StringOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
+    // ---- Writing ---------------------------------------------------------------------------------------------------
+
+    /// <summary>The file's text for a model of one mesh, named <see cref="Model.DefaultName"/>.</summary>
     public static string Write(PolygonMesh mesh)
     {
         ArgumentNullException.ThrowIfNull(mesh);
-        var sb = new StringBuilder();
-        sb.Append("{\n");
-        sb.Append("  \"").Append(VersionKey).Append("\": ").Append(Version.ToString(CultureInfo.InvariantCulture)).Append(",\n");
-        sb.Append("  \"").Append(VerticesKey).Append("\": ");
-        AppendList(sb, mesh.Vertices, v => $"[{Number(v.X)}, {Number(v.Y)}, {Number(v.Z)}]");
-        sb.Append(",\n");
-        sb.Append("  \"").Append(FacesKey).Append("\": ");
-        AppendList(sb, mesh.Faces, f => "[" + string.Join(", ", f.Select(i => i.ToString(CultureInfo.InvariantCulture))) + "]");
-        sb.Append('\n');
-        sb.Append("}\n");
-        return sb.ToString();
+        return Write(Model.Of(Model.DefaultName, mesh));
     }
 
-    private static void AppendList<T>(StringBuilder sb, IReadOnlyList<T> items, Func<T, string> line)
+    /// <summary>The file's text for a model, version 2. The same model always gives the same text.</summary>
+    public static string Write(Model model)
     {
-        if (items.Count == 0)
+        ArgumentNullException.ThrowIfNull(model);
+        var w = new Writer();
+        w.Line(0, "{");
+        w.Line(1, $"\"{VersionKey}\": {Version.ToString(CultureInfo.InvariantCulture)},");
+        w.Open(1, "\"meshes\": [", model.Meshes.Count == 0, ",");
+        for (var i = 0; i < model.Meshes.Count; i++)
         {
-            sb.Append("[]");
-            return;
+            WriteMesh(w, model.Meshes[i], model.Skeleton);
+            w.Line(2, i < model.Meshes.Count - 1 ? "}," : "}");
         }
-        sb.Append("[\n");
-        for (var i = 0; i < items.Count; i++)
+        w.Close(1, "],", model.Meshes.Count == 0);
+
+        if (model.Skeleton is not { } skeleton) w.Line(1, "\"skeleton\": null,");
+        else
         {
-            sb.Append("    ").Append(line(items[i]));
-            if (i < items.Count - 1) sb.Append(',');
-            sb.Append('\n');
+            w.Line(1, "\"skeleton\": [");
+            w.Items(2, skeleton.Bones.Count, i =>
+            {
+                var b = skeleton.Bones[i];
+                var parent = b.Parent < 0 ? "null" : Text(skeleton.Bones[b.Parent].Name);
+                return $"{{\"name\": {Text(b.Name)}, \"parent\": {parent}, \"position\": {Vector(b.Position)}, \"rotation\": {Rotation(b.Rotation)}}}";
+            });
+            w.Line(1, "],");
         }
-        sb.Append("  ]");
+
+        w.Open(1, "\"clips\": [", model.Clips.Count == 0, "");
+        for (var i = 0; i < model.Clips.Count; i++)
+        {
+            WriteClip(w, model.Clips[i]);
+            w.Line(2, i < model.Clips.Count - 1 ? "}," : "}");
+        }
+        w.Close(1, "]", model.Clips.Count == 0);
+        w.Line(0, "}");
+        return w.ToString();
     }
+
+    private static void WriteMesh(Writer w, NamedMesh named, Skeleton? skeleton)
+    {
+        var (name, mesh) = named;
+        w.Line(2, "{");
+        w.Line(3, $"\"name\": {Text(name)},");
+        w.Line(3, $"\"{VerticesKey}\": [");
+        w.Items(4, mesh.Vertices.Count, i => Vector(mesh.Vertices[i]));
+        w.Line(3, "],");
+        w.Line(3, $"\"{FacesKey}\": [");
+        w.Items(4, mesh.Faces.Count, i => Ids(mesh.Faces[i]));
+        w.Line(3, "],");
+
+        var style = mesh.Style ?? FaceStyle.None;
+        var colours = style.Colours.GroupBy(c => c.Value, StringComparer.Ordinal)
+            .Select(g => (Colour: g.Key, Faces: g.Select(c => c.Key).Order().ToArray()))
+            .OrderBy(c => c.Faces[0]).ToArray();
+        w.List(3, "colours", colours.Length, i => $"{{\"colour\": {Text(colours[i].Colour)}, \"faces\": {Ids(colours[i].Faces)}}}", ",");
+        var groups = style.Groups;
+        w.List(3, "groups", groups.Count, i => $"{{\"name\": {Text(groups[i].Name)}, \"faces\": {Ids(groups[i].Faces)}}}", ",");
+
+        // A weighted mesh is only ever in a model with a skeleton (Model.Create, ModelStore.SetWeights).
+        var weights = mesh.Weights ?? VertexWeights.None;
+        var vertices = weights.Vertices.ToArray();
+        w.List(3, "weights", vertices.Length, i =>
+        {
+            var bones = string.Join(", ", weights.Of(vertices[i]).Select(x => $"{Text(skeleton!.Bones[x.Bone].Name)}: {Weight(x.Weight)}"));
+            return $"{{\"vertex\": {vertices[i].ToString(CultureInfo.InvariantCulture)}, \"bones\": {{{bones}}}}}";
+        }, "");
+    }
+
+    private static void WriteClip(Writer w, Clip clip)
+    {
+        w.Line(2, "{");
+        w.Line(3, $"\"name\": {Text(clip.Name)},");
+        w.Line(3, $"\"duration\": {Number(clip.Duration)},");
+        w.Line(3, $"\"loop\": {(clip.Loop ? "true" : "false")},");
+        w.Open(3, "\"channels\": {", clip.Channels.Count == 0, "", "{}");
+        for (var i = 0; i < clip.Channels.Count; i++)
+        {
+            var c = clip.Channels[i];
+            w.Line(4, $"{Text(c.Bone)}: {{");
+            if (c.Rotation is { } r) WriteChannel(w, "rotation", r, Rotation, c.Translation is not null);
+            if (c.Translation is { } t) WriteChannel(w, "translation", t, Vector, false);
+            w.Line(4, i < clip.Channels.Count - 1 ? "}," : "}");
+        }
+        w.Close(3, "}", clip.Channels.Count == 0);
+    }
+
+    private static void WriteChannel<T>(Writer w, string part, ClipChannel<T> channel, Func<T, string> value, bool more)
+    {
+        w.Line(5, $"\"{part}\": {{");
+        w.Line(6, $"\"interpolation\": \"{(channel.Interpolation == ClipInterpolation.Step ? "STEP" : "LINEAR")}\",");
+        w.Line(6, "\"keys\": [");
+        w.Items(7, channel.Keys.Count, i => $"{{\"time\": {Number(channel.Keys[i].Time)}, \"value\": {value(channel.Keys[i].Value)}}}");
+        w.Line(6, "]");
+        w.Line(5, more ? "}," : "}");
+    }
+
+    /// <summary>Lines with two-space indent, each ending in <c>\n</c>.</summary>
+    private sealed class Writer
+    {
+        private readonly StringBuilder _sb = new();
+
+        public void Line(int depth, string text) => _sb.Append(' ', depth * 2).Append(text).Append('\n');
+
+        /// <summary>Items one per line, commas between.</summary>
+        public void Items(int depth, int count, Func<int, string> item)
+        {
+            for (var i = 0; i < count; i++) Line(depth, item(i) + (i < count - 1 ? "," : ""));
+        }
+
+        /// <summary>A key holding a list of one-line items, written <c>[]</c> when empty.</summary>
+        public void List(int depth, string key, int count, Func<int, string> item, string after)
+        {
+            if (count == 0)
+            {
+                Line(depth, $"\"{key}\": []{after}");
+                return;
+            }
+            Line(depth, $"\"{key}\": [");
+            Items(depth + 1, count, item);
+            Line(depth, "]" + after);
+        }
+
+        /// <summary>The opening line of a key whose items span lines; when empty, the whole key on one line.</summary>
+        public void Open(int depth, string opening, bool empty, string after, string emptyValue = "[]")
+        {
+            if (empty) Line(depth, opening[..^1] + emptyValue + after);
+            else Line(depth, opening);
+        }
+
+        public void Close(int depth, string closing, bool empty)
+        {
+            if (!empty) Line(depth, closing);
+        }
+
+        public override string ToString() => _sb.ToString();
+    }
+
+    private static string Vector(Vector3 v) => $"[{Number(v.X)}, {Number(v.Y)}, {Number(v.Z)}]";
+
+    private static string Rotation(Quaternion q) => $"[{Number(q.X)}, {Number(q.Y)}, {Number(q.Z)}, {Number(q.W)}]";
+
+    private static string Ids(IEnumerable<int> ids) => "[" + string.Join(", ", ids.Select(i => i.ToString(CultureInfo.InvariantCulture))) + "]";
+
+    /// <summary>A JSON string: only <c>"</c>, <c>\</c> and control characters escaped, so names read as written.</summary>
+    private static string Text(string s) => JsonSerializer.Serialize(s, StringOptions);
 
     /// <summary>The shortest text that reads back to the same float; <c>-0</c> stays <c>-0</c>.</summary>
     private static string Number(float value) => value.ToString("R", CultureInfo.InvariantCulture);
 
-    /// <summary>Reads a file's text into a mesh, or every error that stops one, each named by where it is in the file.</summary>
+    /// <summary>The shortest text that reads back to the same double.</summary>
+    private static string Weight(double value) => value.ToString("R", CultureInfo.InvariantCulture);
+
+    // ---- Reading ---------------------------------------------------------------------------------------------------
+
+    /// <summary>Reads a file's text into a model, or every error that stops one, each named by where it is in the file.</summary>
     public static CarveFileResult Read(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -112,15 +264,36 @@ public static class CarveFile
 
         using (document)
         {
-            return Read(document.RootElement);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
+            return VersionOf(root) == 2 ? ReadVersion2(root) : ReadVersion1(root);
         }
     }
 
-    private static CarveFileResult Read(JsonElement root)
+    /// <summary>The integer the first <c>carve</c> key holds, or null.</summary>
+    private static int? VersionOf(JsonElement root)
     {
-        if (root.ValueKind != JsonValueKind.Object)
-            return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
+        foreach (var property in root.EnumerateObject())
+        {
+            try
+            {
+                if (property.Name != VersionKey) continue;
+            }
+            catch (InvalidOperationException)
+            {
+                continue;
+            }
+            return property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out var n) ? n : null;
+        }
+        return null;
+    }
 
+    private const string SurrogateKey = "the key is not valid text: it holds a lone surrogate escape (a \\ud800 to \\udfff with no partner)";
+
+    /// <summary>Version 1, T-15's file of one mesh, and every file whose version is missing, not an integer or not read here.</summary>
+    private static CarveFileResult ReadVersion1(JsonElement root)
+    {
         var errors = new List<MeshError>();
         JsonElement? version = null, vertices = null, faces = null;
         var position = -1;
@@ -137,8 +310,7 @@ public static class CarveFile
             }
             catch (InvalidOperationException)
             {
-                errors.Add(new MeshError(Invariant($"keys[{position}]"),
-                    "the key is not valid text: it holds a lone surrogate escape (a \\ud800 to \\udfff with no partner)"));
+                errors.Add(new MeshError(Invariant($"keys[{position}]"), SurrogateKey));
                 continue;
             }
 
@@ -149,7 +321,7 @@ public static class CarveFile
                 case FacesKey: Take(ref faces, property); break;
                 default:
                     errors.Add(new MeshError(key,
-                        $"unknown key: a version {Version} Carve file has only the keys \"{VersionKey}\", \"{VerticesKey}\" and \"{FacesKey}\""));
+                        $"unknown key: a version 1 Carve file has only the keys \"{VersionKey}\", \"{VerticesKey}\" and \"{FacesKey}\""));
                     break;
             }
         }
@@ -170,39 +342,462 @@ public static class CarveFile
         else if (!ReadableVersions.Contains(number))
             return Refused(new MeshError(VersionKey, Invariant($"version {number} is not one this build reads; it reads {Versions()}")));
 
-        var verts = ReadVertices(vertices, errors);
-        var fcs = ReadFaces(faces, errors);
+        var verts = ReadVertices("", "the file", vertices, errors);
+        var fcs = ReadFaces("", "the file", faces, errors);
         if (errors.Count > 0)
             return Refused(errors);
 
         var created = PolygonMesh.Create(verts!, fcs!);
         if (!created.Succeeded)
             return Refused(created.Errors);
-        return new CarveFileResult(created.Mesh, [], MeshReport.Create(created.Mesh!).Warnings);
+        return new CarveFileResult(Model.Of(Model.DefaultName, created.Mesh!), [], MeshReport.Create(created.Mesh!).Warnings, 1);
     }
 
+    /// <summary>Version 2: the whole model.</summary>
+    private static CarveFileResult ReadVersion2(JsonElement root)
+    {
+        var errors = new List<MeshError>();
+        var fields = Fields(root, "", "a version 2 Carve file", FileKeys, errors)!;
+
+        // The skeleton is read first, since weights and clips name its bones; its problems are listed after the meshes'.
+        var skeletonErrors = new List<MeshError>();
+        Skeleton? skeleton = null;
+        var skeletonGood = true;
+        if (fields.TryGetValue("skeleton", out var s) && s.ValueKind != JsonValueKind.Null)
+        {
+            skeleton = ReadSkeleton(s, skeletonErrors);
+            skeletonGood = skeleton is not null;
+        }
+
+        var meshes = new List<NamedMesh>();
+        if (!fields.TryGetValue("meshes", out var m)) errors.Add(new MeshError("meshes", "missing: the file has no meshes array"));
+        else if (m.ValueKind != JsonValueKind.Array) errors.Add(new MeshError("meshes", $"meshes is {Describe(m)}, not an array"));
+        else if (m.GetArrayLength() == 0)
+        {
+            // A skeleton and clips with no mesh, a clip library, is a whole file (the person, 2026-11-09).
+            if (!fields.TryGetValue("skeleton", out var rig) || rig.ValueKind == JsonValueKind.Null)
+                errors.Add(new MeshError("meshes", "the file has no meshes and no skeleton; a Carve file holds at least one mesh, or a skeleton (a clip library)"));
+        }
+        else
+        {
+            var i = 0;
+            foreach (var item in m.EnumerateArray())
+            {
+                if (ReadMesh(item, Invariant($"meshes[{i}]"), skeleton, skeletonGood, errors) is { } mesh) meshes.Add(mesh);
+                i++;
+            }
+        }
+        errors.AddRange(skeletonErrors);
+
+        var clips = new List<Clip>();
+        if (fields.TryGetValue("clips", out var c))
+        {
+            if (List(c, "clips", errors) is { } list)
+            {
+                if (skeleton is null && skeletonGood && list.GetArrayLength() > 0)
+                    errors.Add(new MeshError("clips", "the file has no skeleton, and clips move its bones"));
+                var i = 0;
+                foreach (var item in list.EnumerateArray())
+                {
+                    if (ReadClip(item, Invariant($"clips[{i}]"), skeleton, errors) is { } clip) clips.Add(clip);
+                    i++;
+                }
+            }
+        }
+
+        if (errors.Count > 0) return Refused(errors);
+        var (model, problems) = Model.Create(meshes, skeleton, clips);
+        if (model is null) return Refused(problems);
+        return new CarveFileResult(model, [], model.Meshes.SelectMany(x => MeshReport.Create(x.Mesh).Warnings).ToArray(), 2);
+    }
+
+    private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, List<MeshError> errors)
+    {
+        var before = errors.Count;
+        if (Fields(item, at, "a mesh", MeshKeys, errors) is not { } f) return null;
+        var name = Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
+        f.TryGetValue(VerticesKey, out var vs);
+        f.TryGetValue(FacesKey, out var fs);
+        var verts = ReadVertices(at + ".", "the mesh", f.ContainsKey(VerticesKey) ? vs : null, errors);
+        var faces = ReadFaces(at + ".", "the mesh", f.ContainsKey(FacesKey) ? fs : null, errors);
+        if (errors.Count > before) return null;
+
+        var created = PolygonMesh.Create(verts!, faces!);
+        if (!created.Succeeded)
+        {
+            errors.AddRange(created.Errors.Select(e => new MeshError($"{at}.{e.Element}", e.Message)));
+            return null;
+        }
+        var mesh = created.Mesh!;
+
+        var style = FaceStyle.None;
+        if (f.TryGetValue("colours", out var colours) && List(colours, $"{at}.colours", errors) is { } cl)
+        {
+            var coloured = new Dictionary<int, string>();
+            var i = 0;
+            foreach (var entry in cl.EnumerateArray())
+            {
+                var e = Invariant($"{at}.colours[{i++}]");
+                if (Fields(entry, e, "a colour", ColourKeys, errors) is not { } cf) continue;
+                var hex = Required(cf, e, "colour", "a colour", errors) is { } h ? Str(h, $"{e}.colour", errors) : null;
+                if (hex is not null && FaceStyle.ColourProblem(hex) is { } bad) errors.Add(new MeshError($"{e}.colour", bad));
+                var ids = FaceList(cf, e, "a colour", mesh, "nothing to colour: list at least one face", errors);
+                if (hex is null || ids is null) continue;
+                foreach (var (face, k) in ids.Select((x, k) => (x, k)))
+                    if (!coloured.TryAdd(face, hex))
+                        errors.Add(new MeshError(Invariant($"{e}.faces[{k}]"), Invariant($"face {face} is given a colour earlier; give each face one colour")));
+                style = style.WithColour(ids, hex);
+            }
+        }
+        if (f.TryGetValue("groups", out var groups) && List(groups, $"{at}.groups", errors) is { } gl)
+        {
+            var names = new HashSet<string>();
+            var i = 0;
+            foreach (var entry in gl.EnumerateArray())
+            {
+                var e = Invariant($"{at}.groups[{i++}]");
+                if (Fields(entry, e, "a group", GroupKeys, errors) is not { } gf) continue;
+                var group = Required(gf, e, "name", "a group", errors) is { } g ? Str(g, $"{e}.name", errors) : null;
+                if (group is not null && FaceStyle.GroupNameProblem(group) is { } bad) { errors.Add(new MeshError($"{e}.name", bad)); group = null; }
+                else if (group is not null && !names.Add(group)) { errors.Add(new MeshError($"{e}.name", $"a group named '{group}' comes earlier; group names must be unique")); group = null; }
+                var ids = FaceList(gf, e, "a group", mesh, "nothing to group: list at least one face", errors);
+                if (group is not null && ids is not null) style = style.WithGroup(group, ids);
+            }
+        }
+
+        var weights = new Dictionary<int, Influence[]>();
+        if (f.TryGetValue("weights", out var ws) && List(ws, $"{at}.weights", errors) is { } wl && wl.GetArrayLength() > 0)
+        {
+            if (skeleton is null && skeletonGood)
+                errors.Add(new MeshError($"{at}.weights", "the file has no skeleton, and weights name its bones"));
+            var first = new Dictionary<int, int>();
+            var i = 0;
+            foreach (var entry in wl.EnumerateArray())
+            {
+                var k = i++;
+                var e = Invariant($"{at}.weights[{k}]");
+                if (Fields(entry, e, "a weighted vertex", WeightKeys, errors) is not { } wf) continue;
+                int? vertex = null;
+                if (Required(wf, e, "vertex", "a weighted vertex", errors) is { } v && Int(v, $"{e}.vertex", "a vertex id", errors) is { } id)
+                {
+                    if (VertexWeights.VertexProblem(mesh.Vertices.Count, id) is { } bad) errors.Add(new MeshError($"{e}.vertex", bad));
+                    else if (!first.TryAdd(id, k)) errors.Add(new MeshError($"{e}.vertex", Invariant($"vertex {id} is given weights earlier, at weights[{first[id]}]; give each vertex once")));
+                    else vertex = id;
+                }
+                if (Required(wf, e, "bones", "a weighted vertex", errors) is not { } b) continue;
+                if (b.ValueKind != JsonValueKind.Object)
+                {
+                    errors.Add(new MeshError($"{e}.bones", $"bones is {Describe(b)}; it is an object of bone name to weight"));
+                    continue;
+                }
+                var given = new List<KeyValuePair<string, double>>();
+                var good = true;
+                foreach (var (bone, weight) in Pairs(b, $"{e}.bones", errors, ref good))
+                {
+                    if (Double(weight, $"{e}.bones.{bone}", errors) is { } d) given.Add(KeyValuePair.Create(bone, d));
+                    else good = false;
+                }
+                if (!good || skeleton is null) continue;
+                if (VertexWeights.Raw(skeleton, given, $"{e}.bones", errors) is { } raw && vertex is { } vx)
+                    weights[vx] = VertexWeights.Kept(raw, out _);
+            }
+        }
+
+        if (errors.Count > before || name is null) return null;
+        return new NamedMesh(name, mesh.WithStyle(style).WithWeights(VertexWeights.Of(weights)));
+    }
+
+    /// <summary>The faces of a colour or group: at least one, each a face of the mesh.</summary>
+    private static int[]? FaceList(Dictionary<string, JsonElement> f, string at, string what, PolygonMesh mesh, string none, List<MeshError> errors)
+    {
+        if (Required(f, at, "faces", what, errors) is not { } list || List(list, $"{at}.faces", errors) is not { } array) return null;
+        var before = errors.Count;
+        var ids = new List<int>();
+        var k = 0;
+        foreach (var x in array.EnumerateArray())
+        {
+            var e = Invariant($"{at}.faces[{k++}]");
+            if (Int(x, e, "a face id", errors) is not { } id) continue;
+            if (FaceStyle.FaceProblem(mesh.Faces.Count, id) is { } bad) errors.Add(new MeshError(e, bad));
+            else ids.Add(id);
+        }
+        if (k == 0) errors.Add(new MeshError($"{at}.faces", none));
+        return errors.Count > before ? null : [.. ids];
+    }
+
+    private static Skeleton? ReadSkeleton(JsonElement element, List<MeshError> errors)
+    {
+        if (List(element, "skeleton", errors, "an array of bones, or null for none") is not { } array) return null;
+        var before = errors.Count;
+        var specs = new List<BoneSpec>();
+        var i = 0;
+        foreach (var item in array.EnumerateArray())
+        {
+            var at = Invariant($"skeleton[{i++}]");
+            if (Fields(item, at, "a bone", BoneKeys, errors) is not { } f) continue;
+            var name = Required(f, at, "name", "a bone", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
+            string? parent = null;
+            if (f.TryGetValue("parent", out var p) && p.ValueKind != JsonValueKind.Null)
+                parent = Str(p, $"{at}.parent", errors, "a bone name or null");
+            var position = Required(f, at, "position", "a bone", errors) is { } pos ? Floats(pos, $"{at}.position", 3, "a position is [x, y, z]", errors) : null;
+            var rotation = Required(f, at, "rotation", "a bone", errors) is { } rot ? Floats(rot, $"{at}.rotation", 4, "a rotation is [x, y, z, w]", errors) : null;
+            if (name is null || position is null || rotation is null) continue;
+            specs.Add(new BoneSpec(name, parent, new Vector3(position[0], position[1], position[2]),
+                new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3])));
+        }
+        if (errors.Count > before) return null;
+
+        var (skeleton, problems) = Skeleton.Create(specs);
+        errors.AddRange(problems.Select(e => new MeshError(
+            e.Element.StartsWith("bones", StringComparison.Ordinal) ? "skeleton" + e.Element["bones".Length..] : e.Element,
+            e.Message.Replace("bones[", "skeleton[", StringComparison.Ordinal))));
+        return skeleton;
+    }
+
+    private static Clip? ReadClip(JsonElement item, string at, Skeleton? skeleton, List<MeshError> errors)
+    {
+        var before = errors.Count;
+        if (Fields(item, at, "a clip", ClipKeys, errors) is not { } f) return null;
+        var name = Required(f, at, "name", "a clip", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
+        var duration = Required(f, at, "duration", "a clip", errors) is { } d ? Float(d, $"{at}.duration", errors) : null;
+        var loop = false;
+        if (f.TryGetValue("loop", out var l))
+        {
+            if (l.ValueKind is JsonValueKind.True or JsonValueKind.False) loop = l.GetBoolean();
+            else errors.Add(new MeshError($"{at}.loop", $"loop is {Describe(l)}, not true or false"));
+        }
+
+        var specs = new List<BoneChannelsSpec>();
+        if (Required(f, at, "channels", "a clip", errors) is { } c)
+        {
+            if (c.ValueKind != JsonValueKind.Object)
+                errors.Add(new MeshError($"{at}.channels", $"channels is {Describe(c)}; it is an object of bone name to {{rotation, translation}}"));
+            else
+            {
+                var good = true;
+                foreach (var (bone, channels) in Pairs(c, $"{at}.channels", errors, ref good))
+                {
+                    var e = $"{at}.channels.{bone}";
+                    if (Fields(channels, e, "a bone's channels", PartKeys, errors) is not { } pf) continue;
+                    var rotation = pf.TryGetValue("rotation", out var r) ? ReadChannel(r, $"{e}.rotation", 4, "a rotation is [x, y, z, w]", v => new Quaternion(v[0], v[1], v[2], v[3]), errors) : null;
+                    var translation = pf.TryGetValue("translation", out var t) ? ReadChannel(t, $"{e}.translation", 3, "a translation is [x, y, z]", v => new Vector3(v[0], v[1], v[2]), errors) : null;
+                    specs.Add(new BoneChannelsSpec(bone, rotation, translation));
+                }
+            }
+        }
+        if (errors.Count > before || skeleton is null) return null;
+
+        var (clip, problems) = Clip.Create(name!, duration!.Value, loop, specs, skeleton);
+        errors.AddRange(problems.Select(e => new MeshError($"{at}.{e.Element}", e.Message)));
+        return clip;
+    }
+
+    private static ChannelSpec<T>? ReadChannel<T>(JsonElement element, string at, int count, string shape, Func<float[], T> make, List<MeshError> errors)
+    {
+        var before = errors.Count;
+        if (Fields(element, at, "a channel", ChannelKeys, errors) is not { } f) return null;
+        string? interpolation = null;
+        if (f.TryGetValue("interpolation", out var i)) interpolation = Str(i, $"{at}.interpolation", errors);
+        var keys = new List<ClipKey<T>>();
+        if (Required(f, at, "keys", "a channel", errors) is { } k && List(k, $"{at}.keys", errors) is { } array)
+        {
+            var n = 0;
+            foreach (var key in array.EnumerateArray())
+            {
+                var e = Invariant($"{at}.keys[{n++}]");
+                if (Fields(key, e, "a key", KeyKeys, errors) is not { } kf) continue;
+                var time = Required(kf, e, "time", "a key", errors) is { } t ? Float(t, $"{e}.time", errors) : null;
+                var value = Required(kf, e, "value", "a key", errors) is { } v ? Floats(v, $"{e}.value", count, shape, errors) : null;
+                if (time is { } tt && value is not null) keys.Add(new ClipKey<T>(tt, make(value)));
+            }
+        }
+        return errors.Count > before ? null : new ChannelSpec<T>(interpolation, keys);
+    }
+
+    // ---- Version 2's values ----------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// An object's keys, each once and each one of <paramref name="keys"/>, or null with an error when it is not an
+    /// object. An unknown, repeated or unreadable key is an error, and the rest are still returned.
+    /// </summary>
+    private static Dictionary<string, JsonElement>? Fields(JsonElement element, string at, string what, string[] keys, List<MeshError> errors)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            errors.Add(new MeshError(at, $"{Describe(element)} is not {what}; {what} is an object with the keys {KeyList(keys)}"));
+            return null;
+        }
+        var fields = new Dictionary<string, JsonElement>();
+        var position = -1;
+        foreach (var property in element.EnumerateObject())
+        {
+            position++;
+            string key;
+            try
+            {
+                key = property.Name;
+            }
+            catch (InvalidOperationException)
+            {
+                errors.Add(new MeshError(Join(at, Invariant($"keys[{position}]")), SurrogateKey));
+                continue;
+            }
+            if (!keys.Contains(key)) errors.Add(new MeshError(Join(at, key), $"unknown key: {what} has only the keys {KeyList(keys)}"));
+            else if (!fields.TryAdd(key, property.Value)) errors.Add(new MeshError(Join(at, key), "key appears more than once"));
+        }
+        return fields;
+    }
+
+    /// <summary>An object's keys and values in file order, for a map of names (bones); an unreadable key is an error.</summary>
+    private static List<(string Key, JsonElement Value)> Pairs(JsonElement element, string at, List<MeshError> errors, ref bool good)
+    {
+        var pairs = new List<(string, JsonElement)>();
+        var position = -1;
+        foreach (var property in element.EnumerateObject())
+        {
+            position++;
+            try
+            {
+                pairs.Add((property.Name, property.Value));
+            }
+            catch (InvalidOperationException)
+            {
+                errors.Add(new MeshError(Join(at, Invariant($"keys[{position}]")), SurrogateKey));
+                good = false;
+            }
+        }
+        return pairs;
+    }
+
+    private static JsonElement? Required(Dictionary<string, JsonElement> fields, string at, string key, string what, List<MeshError> errors)
+    {
+        if (fields.TryGetValue(key, out var value)) return value;
+        errors.Add(new MeshError(Join(at, key), $"missing: {what} needs {key}"));
+        return null;
+    }
+
+    private static JsonElement? List(JsonElement element, string at, List<MeshError> errors, string shape = "an array")
+    {
+        if (element.ValueKind == JsonValueKind.Array) return element;
+        errors.Add(new MeshError(at, $"{Last(at)} is {Describe(element)}, not {shape}"));
+        return null;
+    }
+
+    private static string? Str(JsonElement element, string at, List<MeshError> errors, string shape = "a string")
+    {
+        if (element.ValueKind != JsonValueKind.String)
+        {
+            errors.Add(new MeshError(at, $"{Last(at)} is {Describe(element)}, not {shape}"));
+            return null;
+        }
+        try
+        {
+            return element.GetString();
+        }
+        catch (InvalidOperationException)
+        {
+            errors.Add(new MeshError(at, "the text is not valid: it holds a lone surrogate escape (a \\ud800 to \\udfff with no partner)"));
+            return null;
+        }
+    }
+
+    private static int? Int(JsonElement element, string at, string what, List<MeshError> errors)
+    {
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out var value)) return value;
+        errors.Add(new MeshError(at, $"{Describe(element)} is not an integer {what}"));
+        return null;
+    }
+
+    /// <summary>A number's own text parsed straight to float: rounded once, <c>-0</c> kept.</summary>
+    private static float? Float(JsonElement element, string at, List<MeshError> errors)
+    {
+        if (element.ValueKind != JsonValueKind.Number)
+        {
+            errors.Add(new MeshError(at, $"{Last(at)} is {Describe(element)}, not a number"));
+            return null;
+        }
+        var raw = element.GetRawText();
+        var value = float.Parse(raw, NumberStyles.Float, CultureInfo.InvariantCulture);
+        if (float.IsFinite(value)) return value;
+        errors.Add(new MeshError(at, $"{raw} is not finite: it is outside the range of a float"));
+        return null;
+    }
+
+    /// <summary>A number's own text parsed straight to double.</summary>
+    private static double? Double(JsonElement element, string at, List<MeshError> errors)
+    {
+        if (element.ValueKind != JsonValueKind.Number)
+        {
+            errors.Add(new MeshError(at, $"weight is {Describe(element)}, not a number"));
+            return null;
+        }
+        var raw = element.GetRawText();
+        var value = double.Parse(raw, NumberStyles.Float, CultureInfo.InvariantCulture);
+        if (double.IsFinite(value)) return value;
+        errors.Add(new MeshError(at, $"{raw} is not finite: it is outside the range of a double"));
+        return null;
+    }
+
+    private static float[]? Floats(JsonElement element, string at, int count, string shape, List<MeshError> errors)
+    {
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            errors.Add(new MeshError(at, $"{Last(at)} is {Describe(element)}; {shape}"));
+            return null;
+        }
+        if (element.GetArrayLength() != count)
+        {
+            errors.Add(new MeshError(at, Invariant($"{Last(at)} has {element.GetArrayLength()} numbers; {shape}")));
+            return null;
+        }
+        var before = errors.Count;
+        var result = new float[count];
+        var k = 0;
+        foreach (var x in element.EnumerateArray())
+        {
+            if (Float(x, Invariant($"{at}[{k}]"), errors) is { } value) result[k] = value;
+            k++;
+        }
+        return errors.Count > before ? null : result;
+    }
+
+    private static string Join(string at, string key) => at.Length == 0 ? key : $"{at}.{key}";
+
+    /// <summary>The last name in a path, for a message: <c>meshes[0].colours</c> gives <c>colours</c>.</summary>
+    private static string Last(string at)
+    {
+        var name = at[(at.LastIndexOf('.') + 1)..];
+        var bracket = name.IndexOf('[', StringComparison.Ordinal);
+        return bracket > 0 && !name.EndsWith(']') ? name : bracket > 0 ? name[..bracket] + " item" : name;
+    }
+
+    private static string KeyList(string[] keys) =>
+        string.Join(", ", keys[..^1].Select(k => $"\"{k}\"")) + $" and \"{keys[^1]}\"";
+
+    // ---- Version 1's geometry, also a version 2 mesh's -------------------------------------------------------------
+
     /// <summary>The value of a key that holds an array, or null with an error when it is missing or something else.</summary>
-    private static JsonElement? ArrayAt(string key, JsonElement? element, List<MeshError> errors)
+    private static JsonElement? ArrayAt(string prefix, string owner, string key, JsonElement? element, List<MeshError> errors)
     {
         if (element is not { } array)
-            errors.Add(new MeshError(key, $"missing: the file has no {key} array"));
+            errors.Add(new MeshError(prefix + key, $"missing: {owner} has no {key} array"));
         else if (array.ValueKind != JsonValueKind.Array)
-            errors.Add(new MeshError(key, $"{key} is {Describe(array)}, not an array"));
+            errors.Add(new MeshError(prefix + key, $"{key} is {Describe(array)}, not an array"));
         else
             return array;
         return null;
     }
 
-    private static Vector3[]? ReadVertices(JsonElement? element, List<MeshError> errors)
+    private static Vector3[]? ReadVertices(string prefix, string owner, JsonElement? element, List<MeshError> errors)
     {
-        if (ArrayAt(VerticesKey, element, errors) is not { } array)
+        if (ArrayAt(prefix, owner, VerticesKey, element, errors) is not { } array)
             return null;
 
         var result = new Vector3[array.GetArrayLength()];
         var i = 0;
         foreach (var vertex in array.EnumerateArray())
         {
-            var name = Invariant($"vertices[{i}]");
+            var name = Invariant($"{prefix}vertices[{i}]");
             if (vertex.ValueKind != JsonValueKind.Array)
                 errors.Add(new MeshError(name, $"vertex is {Describe(vertex)}; a vertex is [x, y, z]"));
             else if (vertex.GetArrayLength() != 3)
@@ -213,7 +808,7 @@ public static class CarveFile
                 var k = 0;
                 foreach (var coordinate in vertex.EnumerateArray())
                 {
-                    var at = Invariant($"vertices[{i}][{k}]");
+                    var at = Invariant($"{prefix}vertices[{i}][{k}]");
                     if (coordinate.ValueKind != JsonValueKind.Number)
                         errors.Add(new MeshError(at, $"coordinate is {Describe(coordinate)}, not a number"));
                     else
@@ -234,16 +829,16 @@ public static class CarveFile
         return result;
     }
 
-    private static int[][]? ReadFaces(JsonElement? element, List<MeshError> errors)
+    private static int[][]? ReadFaces(string prefix, string owner, JsonElement? element, List<MeshError> errors)
     {
-        if (ArrayAt(FacesKey, element, errors) is not { } array)
+        if (ArrayAt(prefix, owner, FacesKey, element, errors) is not { } array)
             return null;
 
         var result = new int[array.GetArrayLength()][];
         var f = 0;
         foreach (var face in array.EnumerateArray())
         {
-            var name = Invariant($"faces[{f}]");
+            var name = Invariant($"{prefix}faces[{f}]");
             if (face.ValueKind != JsonValueKind.Array)
             {
                 errors.Add(new MeshError(name, $"face is {Describe(face)}; a face is an array of vertex ids"));
@@ -256,7 +851,7 @@ public static class CarveFile
             foreach (var index in face.EnumerateArray())
             {
                 if (index.ValueKind != JsonValueKind.Number || !index.TryGetInt32(out loop[k]))
-                    errors.Add(new MeshError(Invariant($"faces[{f}][{k}]"), $"index is {Describe(index)}, not an integer vertex id"));
+                    errors.Add(new MeshError(Invariant($"{prefix}faces[{f}][{k}]"), $"index is {Describe(index)}, not an integer vertex id"));
                 k++;
             }
             result[f++] = loop;
@@ -294,7 +889,9 @@ public static class CarveFile
         _ => "an object",
     };
 
-    private static string Versions() => "version " + string.Join(", ", ReadableVersions.Select(n => n.ToString(CultureInfo.InvariantCulture)));
+    private static string Versions() =>
+        "versions " + string.Join(", ", ReadableVersions.Take(ReadableVersions.Count - 1).Select(n => n.ToString(CultureInfo.InvariantCulture)))
+        + " and " + ReadableVersions[^1].ToString(CultureInfo.InvariantCulture);
 
     private static string Invariant(FormattableString s) => s.ToString(CultureInfo.InvariantCulture);
 

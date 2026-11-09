@@ -48,13 +48,15 @@ internal static class MeshToolSupport
     };
 
     /// <summary>
-    /// Reads a file tool's arguments, whose one argument is <c>path</c>: null with <paramref name="text"/> set, or the
-    /// failed result naming every problem (an unknown argument, a missing or non-string path).
+    /// Reads the arguments of a file tool aimed at one mesh, <c>path</c> and the optional <c>mesh</c>: null with
+    /// <paramref name="text"/> and <paramref name="meshName"/> set, or the failed result naming every problem.
     /// </summary>
-    public static CallToolResult? PathArguments(string tool, RequestContext<CallToolRequestParams> context, JsonElement? path, out string? text)
+    public static CallToolResult? PathAndMeshArguments(string tool, RequestContext<CallToolRequestParams> context, JsonElement? path, JsonElement? mesh,
+        out string? text, out string? meshName)
     {
-        var errors = UnknownArguments(tool, context, "path");
+        var errors = UnknownArguments(tool, context, "path", "mesh");
         text = RequiredString("path", path, errors);
+        meshName = MeshName(mesh, errors);
         return errors.Count > 0 ? Failed(tool, errors) : null;
     }
 
@@ -74,6 +76,54 @@ internal static class MeshToolSupport
         }
 
         return value.Value.GetString();
+    }
+
+    /// <summary>The text of the <c>mesh</c> argument every tool aimed at one mesh takes.</summary>
+    public const string MeshText =
+        "The name of the mesh to work on, as given to define_mesh. May be left out when the model has one mesh; "
+        + "left out while it has several, the call is a tool error that lists the names.";
+
+    /// <summary>The schema of the <c>mesh</c> argument, added to <paramref name="properties"/>; returns the schema it was added to.</summary>
+    public static JsonObject WithMesh(JsonObject? schema, string text = MeshText)
+    {
+        schema ??= new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() };
+        schema["properties"]!.AsObject()["mesh"] = new JsonObject { ["description"] = text, ["type"] = "string" };
+        return schema;
+    }
+
+    /// <summary>The optional <c>mesh</c> argument: null when absent; a problem when it is not a string or is empty.</summary>
+    public static string? MeshName(JsonElement? value, List<string> errors)
+    {
+        if (Absent(value)) return null;
+        if (value!.Value.ValueKind != JsonValueKind.String)
+        {
+            errors.Add($"mesh: expected a string, got {Describe(value.Value)}");
+            return null;
+        }
+        var name = value.Value.GetString()!;
+        if (Model.NameProblem(name) is { } problem)
+        {
+            errors.Add($"mesh: {problem}");
+            return null;
+        }
+        return name;
+    }
+
+    /// <summary>
+    /// The mesh a reading tool is aimed at in the current model, or the tool error to return: no mesh yet, or a name
+    /// that picks none (an unknown name, or none given while there are several).
+    /// </summary>
+    public static PolygonMesh? Target(ModelStore store, string tool, string? name, out CallToolResult? error) =>
+        Target(store.Current, tool, name, out error);
+
+    /// <summary>As <see cref="Target(ModelStore, string, string?, out CallToolResult?)"/>, in a snapshot already read.</summary>
+    public static PolygonMesh? Target(ModelSnapshot current, string tool, string? name, out CallToolResult? error)
+    {
+        var target = current.Model.Target(name, out var problem);
+        error = problem is not null ? Failed(tool, [problem])
+            : target is null ? Error($"{tool}: " + NoMesh)
+            : null;
+        return target?.Mesh;
     }
 
     public static float[] Array(Vector3 v) => [v.X, v.Y, v.Z];
@@ -97,14 +147,15 @@ internal static class MeshToolSupport
     /// Runs an edit on the store's mesh and answers as every edit tool does: no mesh, the edit's refusal, or the report
     /// plus <c>created</c> and whatever <paramref name="addIds"/> adds.
     /// </summary>
-    public static CallToolResult Edit(ModelStore store, string tool, Func<PolygonMesh, EditResult> edit,
+    public static CallToolResult Edit(ModelStore store, string tool, string? mesh, Func<PolygonMesh, EditResult> edit,
         Action<Dictionary<string, object>, EditResult> addIds)
     {
-        var snapshot = store.Edit(tool, edit, out var result);
+        var snapshot = store.Edit(tool, mesh, edit, out var result, out var problem);
+        if (problem is not null) return Failed(tool, [problem]);
         if (snapshot is null) return Error($"{tool}: " + NoMesh);
         if (!result!.Succeeded) return Failed(tool, result.Errors.Select(x => x.ToString()));
 
-        var body = Report(snapshot.Mesh!);
+        var body = Report(snapshot.Model.Find(mesh ?? snapshot.Model.Meshes[0].Name)!);
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
         addIds(body, result);
         return Ok(body);
@@ -169,6 +220,32 @@ internal static class MeshToolSupport
     }
 
     public static bool Absent(JsonElement? v) => v is null || v.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null;
+
+    /// <summary>An optional boolean: false when absent; any other kind is a problem added to <paramref name="errors"/>.</summary>
+    public static bool OptionalBool(string name, JsonElement? value, List<string> errors)
+    {
+        if (Absent(value)) return false;
+        if (value!.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) return value.Value.GetBoolean();
+        errors.Add($"{name}: expected true or false, got {Describe(value.Value)}");
+        return false;
+    }
+
+    /// <summary>An optional string: null when absent; any other kind is a problem added to <paramref name="errors"/>.</summary>
+    public static string? OptionalString(string name, JsonElement? value, List<string> errors)
+    {
+        if (Absent(value)) return null;
+        if (value!.Value.ValueKind == JsonValueKind.String) return value.Value.GetString();
+        errors.Add($"{name}: expected a string, got {Describe(value.Value)}");
+        return null;
+    }
+
+    /// <summary>Whether a JSON value is a number that is finite as a float.</summary>
+    public static bool IsFinite(JsonElement n) => n.ValueKind == JsonValueKind.Number && float.IsFinite((float)n.GetDouble());
+
+    /// <summary>The <c>group</c> problem when a mesh with <paramref name="style"/> has no face group named <paramref name="name"/>.</summary>
+    public static string NoGroup(FaceStyle? style, string name) => style is null || style.Groups.Count == 0
+        ? $"group: no group named '{name}'; the mesh has no groups yet, define one with define_group"
+        : $"group: no group named '{name}'; the mesh's groups are {style.GroupNames}";
 
     /// <summary>An optional list of integer ids; null when absent.</summary>
     public static List<int>? Ids(string name, JsonElement? value, List<string> errors)

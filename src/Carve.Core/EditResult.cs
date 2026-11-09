@@ -46,9 +46,17 @@ public sealed class EditResult
 
     internal static EditResult Refused(IReadOnlyList<MeshError> errors) => new(null, errors, [], [], [], []);
 
-    internal static EditResult From(MeshResult result, IReadOnlyList<int> movedVertices,
+    private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<ExtrudedFace> extruded)
+    {
+        var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(extruded)) : edited;
+        return source.Weights is { } weights ? mesh.WithWeights(weights) : mesh;
+    }
+
+    /// <summary>The result of an edit of <paramref name="source"/>: the new mesh keeps the source's face colours and groups, and walls take their source face's.</summary>
+    internal static EditResult From(PolygonMesh source, MeshResult result, IReadOnlyList<int> movedVertices,
         IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded)
         => result.Succeeded
-            ? new EditResult(result.Mesh, result.Errors, movedVertices, newVertices, newFaces, extruded)
+            ? new EditResult(Carried(source, result.Mesh!, extruded),
+                result.Errors, movedVertices, newVertices, newFaces, extruded)
             : Refused(result.Errors);
 }

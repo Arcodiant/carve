@@ -69,13 +69,18 @@ internal sealed record Shape(Vector3[] Vertices, int[][] Faces)
         return u >= 0 && v >= 0 && u + v <= 1 && t > 0 ? t : null;
     }
 
-    /// <summary>A <c>.carve</c> file as the scenario reads it, apart from the product: <c>vertices</c> as <c>[x, y, z]</c>, <c>faces</c> as id loops.</summary>
+    /// <summary>
+    /// A <c>.carve</c> file as the scenario reads it, apart from the product: <c>vertices</c> as <c>[x, y, z]</c>, <c>faces</c>
+    /// as id loops, at the top of a version 1 file or in the one mesh of a version 2 file's <c>meshes</c>.
+    /// </summary>
     public static Shape Parse(string text)
     {
         using var file = JsonDocument.Parse(text);
-        var vertices = file.RootElement.GetProperty("vertices").EnumerateArray()
+        var root = file.RootElement;
+        var mesh = root.TryGetProperty("meshes", out var meshes) ? meshes.EnumerateArray().Single() : root;
+        var vertices = mesh.GetProperty("vertices").EnumerateArray()
             .Select(v => new Vector3(v[0].GetSingle(), v[1].GetSingle(), v[2].GetSingle())).ToArray();
-        var faces = file.RootElement.GetProperty("faces").EnumerateArray()
+        var faces = mesh.GetProperty("faces").EnumerateArray()
             .Select(f => f.EnumerateArray().Select(x => x.GetInt32()).ToArray()).ToArray();
         return new Shape(vertices, faces);
     }

@@ -55,15 +55,42 @@ public sealed class PolygonMesh
     private readonly Vector3[] _vertices;
     private readonly int[][] _faces;
 
-    private PolygonMesh(Vector3[] vertices, int[][] faces)
+    private PolygonMesh(Vector3[] vertices, int[][] faces, FaceStyle? style = null, VertexWeights? weights = null)
     {
         _vertices = vertices;
         _faces = faces;
+        Style = style is { IsEmpty: false } ? style : null;
+        Weights = weights is { IsEmpty: false } ? weights : null;
         Vertices = Array.AsReadOnly(vertices);
         Faces = Array.AsReadOnly(faces.Select(f => (IReadOnlyList<int>)Array.AsReadOnly(f)).ToArray());
     }
 
     private MeshTopology? _topology;
+
+    /// <summary>The faces' colours and named groups (D-6, Colour is a material); null when the mesh has neither.</summary>
+    public FaceStyle? Style { get; }
+
+    /// <summary>This mesh, its geometry shared, with <paramref name="style"/> in place of its own (null or empty for none).</summary>
+    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights);
+
+    /// <summary>Faces and vertices joined as given, unchecked: for drawing meshes already checked, or posed.</summary>
+    internal static PolygonMesh Assemble(Vector3[] vertices, int[][] faces) => new(vertices, faces);
+
+    /// <summary>
+    /// This mesh's faces and colours on other vertex positions, unchecked and with no weights: a posed copy to draw, whose
+    /// faces need not stay planar. Never stored.
+    /// </summary>
+    public PolygonMesh WithVertices(IReadOnlyList<Vector3> vertices)
+    {
+        if (vertices.Count != _vertices.Length) throw new ArgumentException("one position per vertex", nameof(vertices));
+        return new PolygonMesh(vertices.ToArray(), _faces, Style);
+    }
+
+    /// <summary>The vertices' bone weights by vertex id (D-6, Weights); null when no vertex has any.</summary>
+    public VertexWeights? Weights { get; }
+
+    /// <summary>This mesh, its geometry shared, with <paramref name="weights"/> in place of its own (null or empty for none).</summary>
+    public PolygonMesh WithWeights(VertexWeights? weights) => new(_vertices, _faces, Style, weights);
 
     /// <summary>The vertices; a vertex's id is its position here.</summary>
     public IReadOnlyList<Vector3> Vertices { get; }

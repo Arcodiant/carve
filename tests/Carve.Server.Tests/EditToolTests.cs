@@ -165,9 +165,9 @@ public class EditToolTests
     [InlineData("extrude", """{"faces":[0],"distance":1e400}""", "distance: 1e400 is out of range")]
     [InlineData("extrude", """{"faces":[0],"distance":0,"inset":0}""", "distance, inset")]
     // RV-10: a misspelt or unknown argument is a problem, not silently dropped.
-    [InlineData("extrude", """{"faces":[1],"distance":-0.2,"Inset":0.1}""", "Inset: not an argument of extrude; its arguments are faces, distance, inset")]
-    [InlineData("move", """{"face":[3],"by":[0,1,0]}""", "face: not an argument of move; its arguments are vertices, edges, faces, by")]
-    [InlineData("define_mesh", """{"vertices":[[0,0,0],[1,0,0],[0,1,0]],"faces":[[0,1,2]],"name":"tri"}""", "name: not an argument of define_mesh")]
+    [InlineData("extrude", """{"faces":[1],"distance":-0.2,"Inset":0.1}""", "Inset: not an argument of extrude; its arguments are faces, distance, inset, mesh")]
+    [InlineData("move", """{"face":[3],"by":[0,1,0]}""", "face: not an argument of move; its arguments are vertices, edges, faces, by, mesh")]
+    [InlineData("define_mesh", """{"vertices":[[0,0,0],[1,0,0],[0,1,0]],"faces":[[0,1,2]],"title":"tri"}""", "title: not an argument of define_mesh")]
     // RV-10: refused by the whole-mesh check, after the arguments passed: corner 6 past the far side folds two faces.
     [InlineData("move", """{"vertices":[6],"by":[-2,0,0]}""", "faces[1]: face is self-intersecting")]
     // RV-10: a wall the distance breaks is named by the face listed, not by the wall's new id.
@@ -315,7 +315,7 @@ public class EditToolTests
             Assert.Contains("Worked example", Description(tools, name));
         foreach (var name in new[] { "define_mesh", "render", "move", "extrude", "get_mesh", "undo" })
             Assert.False(Tool(tools, name).GetProperty("inputSchema").GetProperty("additionalProperties").GetBoolean(), name);
-        Assert.Equal(["view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns"],
+        Assert.Equal(["view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time"],
             Tool(tools, "render").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name));
         Assert.Contains("ids are the positions given here", Description(tools, "define_mesh"));
     }

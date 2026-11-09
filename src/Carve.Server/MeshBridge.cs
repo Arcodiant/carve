@@ -53,4 +53,38 @@ public static class MeshBridge
 
         return new MeshData<PositionUvNormalVertex>(vertices, indices);
     }
+
+    /// <summary>
+    /// The same triangles and vertices as <see cref="ToMeshData"/>, with the index buffer cut into one submesh per colour
+    /// (D-6, Colour is a material): the uncoloured faces first when there are any, then each colour in the order its first
+    /// face appears. <paramref name="colours"/> is each submesh's colour as <c>#RRGGBB</c>, null for the uncoloured one.
+    /// Vertices stay in triangle order, so per-vertex data made for <see cref="ToMeshData"/> still lines up.
+    /// </summary>
+    public static MeshData<PositionUvNormalVertex> ToSubmeshedMeshData(PolygonMesh mesh, DrawnSpace space, out string?[] colours)
+    {
+        var plain = ToMeshData(mesh, space);
+        var triangles = FlatShading.Triangles(mesh);
+        var keys = new List<string?>();
+        var ranges = new List<List<uint>>();
+        var style = mesh.Style;
+        for (var t = 0; t < triangles.Count; t++)
+        {
+            var key = style?.ColourOf(triangles[t].Face)?.ToUpperInvariant();
+            var at = keys.IndexOf(key);
+            if (at < 0) { keys.Add(key); ranges.Add([]); at = keys.Count - 1; }
+            ranges[at].AddRange([(uint)(t * 3), (uint)(t * 3 + 1), (uint)(t * 3 + 2)]);
+        }
+
+        var order = Enumerable.Range(0, keys.Count).OrderBy(i => keys[i] is null ? 0 : 1).ThenBy(i => i).ToArray();
+        colours = order.Select(i => keys[i]).ToArray();
+        var indices = new List<uint>(triangles.Count * 3);
+        var submeshes = new Submesh[order.Length];
+        for (var s = 0; s < order.Length; s++)
+        {
+            submeshes[s] = new Submesh(indices.Count, ranges[order[s]].Count);
+            indices.AddRange(ranges[order[s]]);
+        }
+
+        return new MeshData<PositionUvNormalVertex>(plain.Vertices!, indices.ToArray(), submeshes);
+    }
 }

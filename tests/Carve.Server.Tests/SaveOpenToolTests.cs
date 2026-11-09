@@ -181,13 +181,13 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
         await NothingChanged(carve, before);
 
         File.WriteAllText(Path.Combine(Root, "future.carve"), """{"carve": 9, "vertices": [], "faces": []}""");
-        Assert.Contains("carve: version 9 is not one this build reads; it reads version 1", Refused(await carve.CallToolAsync("open", """{"path":"future.carve"}""")));
+        Assert.Contains("carve: version 9 is not one this build reads; it reads versions 1 and 2", Refused(await carve.CallToolAsync("open", """{"path":"future.carve"}""")));
         await NothingChanged(carve, before);
 
         File.WriteAllText(Path.Combine(Root, "face.carve"), """{"carve": 1, "vertices": [[0,0,0],[1,0,0],[0,1,0]], "faces": [[0,1,5]]}""");
         var face = Refused(await carve.CallToolAsync("open", """{"path":"face.carve"}"""));
         Assert.Contains("faces[0][2]: index 5 is out of range 0..2", face);
-        Assert.Contains("the current mesh is unchanged", face);
+        Assert.Contains("the model is unchanged", face);
         await NothingChanged(carve, before);
 
         Directory.CreateDirectory(Path.Combine(Root, "dir.carve"));
@@ -267,7 +267,7 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
         {
             var schema = Tool(tools, name).GetProperty("inputSchema");
             Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-            Assert.Equal(["path"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
+            Assert.Equal(["path", "mesh"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
             Assert.Contains($"unknown: not an argument of {name}", Refused(await carve.CallToolAsync(name, """{"path":"a.carve","unknown":1}""")));
             Assert.Contains("path: required but missing", Refused(await carve.CallToolAsync(name, "{}")));
         }
