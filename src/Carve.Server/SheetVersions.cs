@@ -24,4 +24,14 @@ internal static class SheetVersions
             }
         }
     }
+
+    /// <summary>
+    /// Why a render whose ids were moved past the meshes before <paramref name="shiftedFor"/> must be refused, or null:
+    /// the offsets were taken from the snapshot the call checked (<paramref name="checkedVersion"/>), and a frame drawn on
+    /// another version (<paramref name="drawnVersion"/>) may hold other elements at those ids. Null when no ids were shifted.
+    /// </summary>
+    internal static string? ShiftedIdsRefusal(string? shiftedFor, long checkedVersion, long drawnVersion) =>
+        shiftedFor is null || drawnVersion == checkedVersion
+            ? null
+            : $"The model changed while the frame was drawn, so the ids given for mesh '{shiftedFor}' may name other elements; call render again once the edits have settled.";
 }

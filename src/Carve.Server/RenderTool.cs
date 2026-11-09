@@ -362,6 +362,7 @@ internal static class RenderTool
         var wantsIds = labelled != LabelSet.None || listed.Vertices.Count > 0 || listed.Edges.Count > 0 || listed.Faces.Count > 0;
         var idsIn = drawn;
         ElementWindow? window = null;
+        string? shiftedFor = null;
         (int Vertices, int Faces) offset = (0, 0);
         if (meshName is not null || (wantsIds && current.Model.Meshes.Count > 1))
         {
@@ -375,6 +376,7 @@ internal static class RenderTool
                 idsIn = named.Mesh;
                 offset = current.Model.OffsetOf(named.Name)!.Value;
                 window = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
+                shiftedFor = named.Name;
             }
         }
 
@@ -417,6 +419,11 @@ internal static class RenderTool
         if (rendered is not { } frames)
         {
             return Error(failure!);
+        }
+        // The offsets are the checked snapshot's; a frame drawn on a later model may have other elements at those ids.
+        if (SheetVersions.ShiftedIdsRefusal(shiftedFor, current.Version, frames[0].Version) is { } stale)
+        {
+            return Error(stale);
         }
         if (sheet)
         {

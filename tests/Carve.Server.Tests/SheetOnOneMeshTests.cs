@@ -57,4 +57,15 @@ public class SheetOnOneMeshTests
         Assert.Equal("The render failed: x", error);
         Assert.Single(calls);
     }
+
+    [Fact]
+    public void Ids_shifted_for_one_mesh_of_several_are_refused_on_a_frame_of_another_version()
+    {
+        // RV-24 D1: the offsets were the checked snapshot's (version 4); a frame of version 5 may hold other elements there.
+        Assert.Equal(
+            "The model changed while the frame was drawn, so the ids given for mesh 'lid' may name other elements; call render again once the edits have settled.",
+            SheetVersions.ShiftedIdsRefusal("lid", 4, 5));
+        Assert.Null(SheetVersions.ShiftedIdsRefusal("lid", 4, 4));
+        Assert.Null(SheetVersions.ShiftedIdsRefusal(null, 4, 5));
+    }
 }
