@@ -59,7 +59,7 @@ public sealed class FaceStyle
     }
 
     /// <summary>A colour <c>#RRGGBB</c> as sRGB bytes. Throws on malformed text; check with <see cref="ColourProblem"/> first.</summary>
-    public static (byte R, byte G, byte B) ToBytes(string hex)
+    private static (byte R, byte G, byte B) ToBytes(string hex)
     {
         if (ColourProblem(hex) is { } problem) throw new ArgumentException(problem, nameof(hex));
         byte At(int i) => byte.Parse(hex.AsSpan(1 + 2 * i, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
@@ -67,7 +67,7 @@ public sealed class FaceStyle
     }
 
     /// <summary>One sRGB channel in [0, 1] as linear light (the IEC 61966-2-1 curve).</summary>
-    public static float SrgbToLinear(float c) =>
+    private static float SrgbToLinear(float c) =>
         c <= 0.04045f ? c / 12.92f : MathF.Pow((c + 0.055f) / 1.055f, 2.4f);
 
     /// <summary>A colour <c>#RRGGBB</c> as linear RGB with alpha 1.</summary>

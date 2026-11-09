@@ -56,7 +56,7 @@ public static class GlbRig
     /// The inverse of each bone's rest world transform, composed in double from the root down (rotations normalised,
     /// as the nodes are written) and inverted as a rigid transform, then narrowed once.
     /// </summary>
-    public static Matrix4x4[] InverseBinds(Skeleton skeleton)
+    private static Matrix4x4[] InverseBinds(Skeleton skeleton)
     {
         var bones = skeleton.Bones;
         var rotations = new (double X, double Y, double Z, double W)[bones.Count];
@@ -118,7 +118,7 @@ public static class GlbRig
     }
 
     /// <summary>The channel's keys, with the first key held back to 0 and the last held on to the duration.</summary>
-    public static SortedDictionary<float, T> Keyed<T>(ClipChannel<T> channel, float duration, Func<T, T> value)
+    private static SortedDictionary<float, T> Keyed<T>(ClipChannel<T> channel, float duration, Func<T, T> value)
     {
         var keys = new SortedDictionary<float, T>();
         foreach (var key in channel.Keys) keys[key.Time] = value(key.Value);
@@ -137,7 +137,7 @@ public static class GlbRig
     }
 
     /// <summary>A rotation within the skeleton's tolerance of unit, normalised in double, as glTF wants it.</summary>
-    public static Quaternion Unit(Quaternion q)
+    private static Quaternion Unit(Quaternion q)
     {
         var length = Math.Sqrt(((double)q.X * q.X) + ((double)q.Y * q.Y) + ((double)q.Z * q.Z) + ((double)q.W * q.W));
         return new Quaternion((float)(q.X / length), (float)(q.Y / length), (float)(q.Z / length), (float)(q.W / length));
