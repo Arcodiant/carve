@@ -200,11 +200,48 @@ public class SkinnedExportTests
     }
 
     [Fact]
+    public void Every_vertex_carries_its_own_bones_with_their_weights()
+    {
+        // Each written vertex is found in the model by its position (the body's and the coat's corners are all apart), and
+        // its joints and weights are compared with the model's influences: joint i is bone i, the skin being in the given order.
+        var model = Character();
+        var expected = new List<(Vector3 At, Dictionary<int, double> Influences)>();
+        foreach (var piece in model.Meshes)
+            for (var v = 0; v < piece.Mesh.Vertices.Count; v++)
+                expected.Add((piece.Mesh.Vertices[v], piece.Mesh.Weights!.Of(v).ToDictionary(i => i.Bone, i => i.Weight)));
+        var root = ModelRoot.ParseGLB(SkinnedExport.Write(model, "orc").Bytes);
+        var checkedVertices = 0;
+        foreach (var primitive in root.LogicalMeshes[0].Primitives)
+        {
+            var positions = primitive.GetVertexAccessor("POSITION").AsVector3Array();
+            var weights = primitive.GetVertexAccessor("WEIGHTS_0").AsVector4Array();
+            var joints = primitive.GetVertexAccessor("JOINTS_0").AsVector4Array();
+            for (var i = 0; i < positions.Count; i++)
+            {
+                var want = Assert.Single(expected, e => Vector3.Distance(e.At, positions[i]) < 1e-6f).Influences;
+                var got = new Dictionary<int, double>();
+                float[] w = [weights[i].X, weights[i].Y, weights[i].Z, weights[i].W], j = [joints[i].X, joints[i].Y, joints[i].Z, joints[i].W];
+                for (var k = 0; k < 4; k++)
+                    if (w[k] > 0) got[(int)j[k]] = got.GetValueOrDefault((int)j[k]) + w[k];
+                Assert.Equal(want.Keys.Order(), got.Keys.Order());
+                foreach (var (bone, weight) in want)
+                    Assert.True(Math.Abs(weight - got[bone]) < 1e-6, $"vertex at {positions[i]}, bone {bone}: expected {weight}, got {got[bone]}");
+                checkedVertices++;
+            }
+        }
+        Assert.True(checkedVertices >= 16);
+    }
+
+    [Fact]
     public void Four_influences_narrowed_to_float_still_sum_to_1()
     {
         var joints = SkinnedExport.Joints([new Influence(0, 0.1), new Influence(1, 0.2), new Influence(3, 0.3), new Influence(4, 0.4)]);
         var w = joints.Weights;
         Assert.Equal(1.0, (double)w.X + w.Y + w.Z + w.W, 6);
+        float[] jw = [w.X, w.Y, w.Z, w.W], jj = [joints.Joints.X, joints.Joints.Y, joints.Joints.Z, joints.Joints.W];
+        Assert.Equal([0f, 1f, 3f, 4f], jj.Order());
+        var given = new Dictionary<float, double> { [0] = 0.1, [1] = 0.2, [3] = 0.3, [4] = 0.4 };
+        for (var k = 0; k < 4; k++) Assert.Equal(given[jj[k]], jw[k], 6);
         Assert.Equal(new Vector4(1, 0, 0, 0), SkinnedExport.Joints([]).Weights);
         Assert.Equal(Vector4.Zero, SkinnedExport.Joints([]).Joints);
 

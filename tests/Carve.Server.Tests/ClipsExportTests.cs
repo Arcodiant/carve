@@ -121,6 +121,23 @@ public class ClipsExportTests
         Assert.Equal([0f, 0.2f, 0.8f, 1.2f], leg.Times);
         Assert.Equal(AnimationInterpolation.Linear, leg.Interpolation);
         Assert.Equal(AnimationInterpolation.Step, walk.Bones[0].Translation!.Interpolation);
+
+        // The key values are the clip's: the first key held from 0, the last held to the end, in the clip's order.
+        static void SameTurn(Quaternion expected, Quaternion actual, string what) =>
+            Assert.True(Math.Abs(Quaternion.Dot(expected, actual)) > 1 - 1e-6, $"{what}: expected {expected}, got {actual}");
+        Quaternion[] legKeys = [Turn(Vector3.UnitX, 0.4f), Turn(Vector3.UnitX, 0.4f), Turn(Vector3.UnitX, -0.4f), Turn(Vector3.UnitX, -0.4f)];
+        for (var k = 0; k < legKeys.Length; k++) SameTurn(legKeys[k], leg.Values[k], $"walk/UpperLeg_L key {k}");
+        var right = walk.Bones[Idx(Tall, "UpperLeg_R")].Rotation!;
+        Assert.Equal([0f, 0.6f, 1.2f], right.Times);
+        SameTurn(Turn(Vector3.UnitX, -0.4f), right.Values[0], "walk/UpperLeg_R key 0");
+        SameTurn(Turn(Vector3.UnitX, 0.4f), right.Values[1], "walk/UpperLeg_R key 1");
+        var hips = walk.Bones[0].Translation!;
+        Assert.Equal([0f, 0.3f, 0.9f, 1.2f], hips.Times);
+        Vector3[] hipKeys = [new(0, 1.02f, 0), new(0, 1.02f, 0), new(0, 0.98f, 0.1f), new(0, 0.98f, 0.1f)];
+        for (var k = 0; k < hipKeys.Length; k++)
+            Assert.True(Vector3.Distance(hipKeys[k], hips.Values[k]) < 1e-6f, $"walk/Hips translation key {k}: expected {hipKeys[k]}, got {hips.Values[k]}");
+        var shoulder = set.Clips[1].Bones[Idx(Tall, "Shoulder_R")].Rotation!;
+        SameTurn(Turn(Vector3.UnitZ, 1.2f), shoulder.Values[1], "wave/Shoulder_R key 1");
     }
 
     [Fact]
