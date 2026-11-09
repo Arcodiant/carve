@@ -178,4 +178,30 @@ public sealed class CarveFileVersion2Tests() : FileToolTests("carve-file-v2")
         Assert.Contains("\"undone\":\"open\"", TextOf(await carve.CallToolAsync("undo", "{}")));
         Assert.Contains("no mesh named 'upper'", Refused(await carve.CallToolAsync("get_mesh", """{"mesh":"upper"}""")));
     }
+
+    [Fact]
+    public async Task Open_with_mesh_places_a_version_1_files_one_mesh_under_the_name_given()
+    {
+        // The person's ruling (2026-11-09): a version 1 file's single mesh is taken whatever the name, and placed under it.
+        var (carve, _) = await StartAsync(mesh: null);
+        using var _carve = carve;
+        Ok(await carve.CallToolAsync("define_mesh", Box("crate", 0, 1)));
+        File.WriteAllText(Path.Combine(Root, "old.carve"),
+            """{"carve": 1, "vertices": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], "faces": [[0, 1, 2]]}""");
+        Ok(await carve.CallToolAsync("define_mesh", Box("other", 1, 2)));
+        var other = Ok(await carve.CallToolAsync("get_mesh", """{"mesh":"other"}"""));
+
+        // Replacing: 'crate' becomes the file's triangle, in its place; 'other' stays.
+        var replaced = JsonDocument.Parse(Ok(await carve.CallToolAsync("open", """{"path":"old.carve","mesh":"crate"}"""))).RootElement;
+        Assert.Equal(3, replaced.GetProperty("vertices").GetInt32());
+        Assert.Equal(1, JsonDocument.Parse(Ok(await carve.CallToolAsync("get_mesh", """{"mesh":"crate"}"""))).RootElement.GetProperty("faces").GetArrayLength());
+        Assert.Equal(other, Ok(await carve.CallToolAsync("get_mesh", """{"mesh":"other"}""")));
+
+        // Adding: a new name, after the others.
+        Ok(await carve.CallToolAsync("open", """{"path":"old.carve","mesh":"lid"}"""));
+        Assert.Contains("'crate', 'other', 'lid'", Refused(await carve.CallToolAsync("get_mesh", "{}")));
+
+        Assert.Contains("\"undone\":\"open\"", TextOf(await carve.CallToolAsync("undo", "{}")));
+        Assert.Contains("no mesh named 'lid'", Refused(await carve.CallToolAsync("get_mesh", """{"mesh":"lid"}""")));
+    }
 }
