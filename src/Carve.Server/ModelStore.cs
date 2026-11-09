@@ -100,6 +100,27 @@ public sealed class ModelStore
         }
     }
 
+    /// <summary>
+    /// Changes the face colours and groups of the mesh <paramref name="name"/> picks, under the write lock: <paramref name="change"/>
+    /// returns the new style, or the problems that refuse it. One step, kept for undo. Null, pushing nothing, when the model is
+    /// empty, the name picks no mesh (<paramref name="problem"/> says why) or the change is refused (<paramref name="refused"/>).
+    /// </summary>
+    public ModelSnapshot? Restyle(string tool, string? name, Func<PolygonMesh, (FaceStyle? Style, List<string> Problems)> change,
+        out List<string> refused, out string? problem)
+    {
+        lock (_write)
+        {
+            refused = [];
+            var model = _current.Model;
+            var target = model.Target(name, out problem);
+            if (target is null) return null;
+            var (style, problems) = change(target.Mesh);
+            refused = problems;
+            if (style is null || problems.Count > 0) return null;
+            return PushLocked(model.With(target.Name, target.Mesh.WithStyle(style)), tool);
+        }
+    }
+
     /// <summary>Steps back one change, or null when there is nothing older.</summary>
     public UndoResult? Undo()
     {

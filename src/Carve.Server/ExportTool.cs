@@ -16,7 +16,7 @@ public sealed class ExportTool(ModelStore store)
         "Writes the current mesh to a .glb file (binary glTF 2.0) that a game on the Empyrean engine loads as it is. Takes path, the file to write. "
         + "What is written: one mesh on one node, both named after the file name without its extension (crate.glb gives crate), the node's transform the identity; "
         + "the triangles render draws, with flat normals: each face keeps its own normal, so every edge is hard; "
-        + "one matte grey material named 'carve' (base colour 0.72, 0.72, 0.70, metallic 0, roughness 1, single-sided); "
+        + "one matte grey material named 'carve' (base colour 0.72, 0.72, 0.70, metallic 0, roughness 1, single-sided), and for faces coloured with set_colour one more opaque matte material per colour, named 'carve #RRGGBB', its baseColorFactor the linear form of the colour (metallic 0, roughness 1), a primitive for each; "
         + "positions and normals only, with no UVs, colours or textures. "
         + "Axes and units are the mesh's own: +Y up, +Z front, 1 unit = 1 m, the origin where you authored it. Nothing is scaled, turned, recentred or converted, "
         + "so build the model at the size and place the game wants it. "
@@ -26,7 +26,7 @@ public sealed class ExportTool(ModelStore store)
         + "a path naming a folder; any extension but .glb; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
         + "A mesh with warnings still exports, and the result repeats them. export changes nothing: not the mesh, its ids, or what undo steps back to. "
-        + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve', size <x> x <y> x <z> m, "
+        + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve' (or each material, when there are several), size <x> x <y> x <z> m, "
         + "bounds (<min x, y, z>) to (<max x, y, z>), then any warnings. "
         + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
         + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
@@ -53,13 +53,21 @@ public sealed class ExportTool(ModelStore store)
         if (target is null) return Error(pathError!);
 
         var triangles = FlatShading.Triangles(mesh);
-        var bytes = GlbExport.Write(triangles, target.Stem);
+        var bytes = GlbExport.Write(mesh, triangles, target.Stem);
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
 
         return Line(Summary(mesh, target, replaced, triangles.Count));
     }
 
     /// <summary>The result line; numbers are culture-invariant.</summary>
+    private static string Materials(PolygonMesh mesh)
+    {
+        var names = GlbExport.MaterialNames(mesh);
+        return names.Length == 1
+            ? $"1 material '{names[0]}'"
+            : $"{names.Length.ToString(CultureInfo.InvariantCulture)} materials {string.Join(", ", names.Select(n => $"'{n}'"))}";
+    }
+
     private static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles)
     {
         var report = MeshReport.Create(mesh);
@@ -69,7 +77,7 @@ public sealed class ExportTool(ModelStore store)
         static string Point(Vector3 v) => $"({N(v.X)}, {N(v.Y)}, {N(v.Z)})";
 
         var line = $"exported {target.Written(replaced)}: "
-            + $"{triangles.ToString(CultureInfo.InvariantCulture)} triangles, 1 material '{GlbExport.MaterialName}', "
+            + $"{triangles.ToString(CultureInfo.InvariantCulture)} triangles, {Materials(mesh)}, "
             + $"size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}";
         if (report.Warnings.Count > 0)
             line += $"; {report.Warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): "

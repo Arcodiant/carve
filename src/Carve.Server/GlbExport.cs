@@ -26,18 +26,40 @@ public static class GlbExport
 
     public const float Roughness = 1f;
 
-    public static byte[] Write(IReadOnlyList<FlatTriangle> triangles, string name)
-    {
-        var material = new MaterialBuilder(MaterialName)
-            .WithMetallicRoughnessShader()
-            .WithBaseColor(BaseColor)
-            .WithMetallicRoughness(Metallic, Roughness)
-            .WithDoubleSide(false);
+    /// <summary>The materials a mesh exports as, in the order their primitives are written: the grey one first when any face has no colour.</summary>
+    public static string[] MaterialNames(PolygonMesh mesh) => [.. Materials(mesh, FlatShading.Triangles(mesh)).Select(m => m.Name)];
 
-        var mesh = new MeshBuilder<VertexPositionNormal>(name);
-        var primitive = mesh.UsePrimitive(material);
+    private static List<(string Name, string? Colour)> Materials(PolygonMesh? mesh, IReadOnlyList<FlatTriangle> triangles)
+    {
+        var colours = triangles.Select(t => ColourOf(mesh, t.Face)).Distinct().ToList();
+        return colours.OrderBy(c => c is null ? 0 : 1)
+            .Select(c => (c is null ? MaterialName : $"{MaterialName} {c}", c)).ToList();
+    }
+
+    private static string? ColourOf(PolygonMesh? mesh, int face) => mesh?.Style?.ColourOf(face)?.ToUpperInvariant();
+
+    /// <summary>One opaque matte material per colour, metallic 0 and roughness 1, its base colour the linear form of the sRGB hex (D-6).</summary>
+    public static byte[] Write(IReadOnlyList<FlatTriangle> triangles, string name) => Write(null, triangles, name);
+
+    /// <summary>As above, with the colours of <paramref name="mesh"/>.</summary>
+    public static byte[] Write(PolygonMesh? mesh, IReadOnlyList<FlatTriangle> triangles, string name)
+    {
+        var mesh2 = new MeshBuilder<VertexPositionNormal>(name);
+        var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexEmpty>>();
+        foreach (var (materialName, colour) in Materials(mesh, triangles))
+        {
+            var material = new MaterialBuilder(materialName)
+                .WithMetallicRoughnessShader()
+                .WithBaseColor(colour is null ? BaseColor : FaceStyle.ToLinear(colour))
+                .WithMetallicRoughness(Metallic, Roughness)
+                .WithDoubleSide(false);
+            primitives[materialName] = mesh2.UsePrimitive(material);
+        }
+
         foreach (var t in triangles)
         {
+            var colour = ColourOf(mesh, t.Face);
+            var primitive = primitives[colour is null ? MaterialName : $"{MaterialName} {colour}"];
             primitive.AddTriangle(
                 new VertexPositionNormal(t.A, t.Normal),
                 new VertexPositionNormal(t.B, t.Normal),
@@ -45,7 +67,7 @@ public static class GlbExport
         }
 
         var scene = new SceneBuilder();
-        scene.AddRigidMesh(mesh, Matrix4x4.Identity).WithName(name);
+        scene.AddRigidMesh(mesh2, Matrix4x4.Identity).WithName(name);
         return scene.ToGltf2().WriteGLB().ToArray();
     }
 }

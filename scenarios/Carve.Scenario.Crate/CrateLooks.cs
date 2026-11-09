@@ -14,7 +14,7 @@ namespace Carve.Scenario.Crate;
 /// </summary>
 internal static class CrateLooks
 {
-    private const int Size = 512;
+    internal const int Size = 512;
 
     internal static readonly Vector3 CrateMin = new(-0.02f, 0, 0);
     internal static readonly Vector3 CrateMax = new(1.02f, 0.8f, 1);
@@ -34,7 +34,7 @@ internal static class CrateLooks
 
     // From the front the recess's near walls hide the panel's strips along +X and +Z, so its corners as
     // seen are these: the far corners of the panel, and the ends of the strips' edges, then the middle.
-    private static readonly Vector3[] PanelSeenFromFront =
+    internal static readonly Vector3[] PanelSeenFromFront =
     [
         new(0.16f, 0.72f, 0.16f), new(0.72f, 0.72f, 0.16f), new(0.16f, 0.72f, 0.66f), new(0.72f, 0.72f, 0.66f), new(0.45f, 0.72f, 0.4f),
     ];
@@ -198,7 +198,7 @@ internal static class CrateLooks
         CheckFace(driver, cubeBack, backPixel, cube, MinusXFace, MinusX, "the -X side");
     }
 
-    private static async Task<Shape> ReadAsync(ScenarioDriver driver)
+    internal static async Task<Shape> ReadAsync(ScenarioDriver driver)
     {
         var mesh = await CallJsonAsync(driver, "get_mesh", new { });
         var vertices = mesh.GetProperty("vertices").EnumerateArray().Select(v =>
