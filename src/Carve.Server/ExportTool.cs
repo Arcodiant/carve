@@ -36,6 +36,11 @@ public sealed class ExportTool(ModelStore store)
         + "A mesh with warnings still exports, and the result repeats them. export changes nothing: not the mesh, its ids, or what undo steps back to. "
         + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve' (or each material, when there are several), size <x> x <y> x <z> m, "
         + "bounds (<min x, y, z>) to (<max x, y, z>), then any warnings; a skinned export's line names its pieces, materials, bones and clips instead of the one material. "
+        + "mode: 'model' (the default) writes all of the above; 'clips' writes the armature, skins[0] and the animations with no mesh, no node holding a mesh and no material, "
+        + "which is one file of clips for every character that shares the skeleton: a game loads it with IModelGeometryLoader.LoadAnimationSet (the same bones in the same order and the same clips as the model file) and retargets it, "
+        + "and the model loader refuses it as 'glTF contains no meshes.'. The skin stays in a clips file because without it the loader reorders bones and the tracks line up with the wrong ones. "
+        + "Clips mode is refused, writing nothing, for a model with no skeleton or no clips. "
+        + "A role map (*.humanoid.json) and clip events (*.events.json) are sidecars the game writes beside the file; carve writes none. Clips mode repeats no mesh limits as it has no mesh. "
         + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
         + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
         + "Worked example, writing into a game's content folder (put the game's folder for <game>); the game then loads it as "
@@ -50,18 +55,31 @@ public sealed class ExportTool(ModelStore store)
             ["description"] = "With a skeleton: export even when some vertices have no weight, binding them wholly to the first root bone, for work in progress. Default false.",
             ["type"] = "boolean",
         };
+        schema["properties"]!.AsObject()["mode"] = new JsonObject
+        {
+            ["description"] = "model (default): the meshes, and with a skeleton the skin and clips. clips: the armature, skin and animations with no mesh, for a skeleton with clips.",
+            ["type"] = "string",
+            ["enum"] = new JsonArray("model", "clips"),
+        };
         return MeshToolSupport.Create<ExportTool>("export", Text, schema);
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? mode = null)
     {
-        var errors = UnknownArguments("export", context, "path", "allow_unweighted");
+        var errors = UnknownArguments("export", context, "path", "allow_unweighted", "mode");
         var text = RequiredString("path", path, errors);
         var allowUnweighted = false;
         if (!Absent(allow_unweighted))
         {
             if (allow_unweighted!.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) allowUnweighted = allow_unweighted.Value.GetBoolean();
             else errors.Add($"allow_unweighted: expected true or false, got {Describe(allow_unweighted.Value)}");
+        }
+        var clips = false;
+        if (!Absent(mode))
+        {
+            var value = mode!.Value.ValueKind == JsonValueKind.String ? mode.Value.GetString() : null;
+            if (value is "model" or "clips") clips = value == "clips";
+            else errors.Add($"mode: expected \"model\" or \"clips\", got {Describe(mode.Value)}");
         }
         if (errors.Count > 0) return Failed("export", errors);
 
@@ -72,6 +90,7 @@ public sealed class ExportTool(ModelStore store)
         var target = ToolPaths.Resolve("export", text, Extension, out var pathError);
         if (target is null) return Error(pathError!);
 
+        if (clips) return Clips(model, target);
         if (model.Skeleton is not null) return Skinned(model, target, allowUnweighted);
 
         var triangles = FlatShading.Triangles(mesh);
@@ -79,6 +98,20 @@ public sealed class ExportTool(ModelStore store)
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
 
         return Line(Summary(mesh, target, replaced, triangles.Count));
+    }
+
+    /// <summary>Clips mode: the armature, skin and animations with no mesh, or a refusal that writes nothing.</summary>
+    private static CallToolResult Clips(Model model, ToolPath target)
+    {
+        if (ClipsExport.Refusal(model) is { } refusal) return Error($"export: mode clips: {refusal}. Nothing was written.");
+        var bytes = ClipsExport.Write(model, target.Stem);
+        if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
+
+        var skeleton = model.Skeleton!;
+        static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
+        static string List(IEnumerable<string> names) => string.Join(", ", names.Select(n => $"'{n}'"));
+        return Line($"exported {target.Written(replaced)} as clips, with no mesh: "
+            + $"{N(skeleton.Bones.Count)} bone(s) {List(skeleton.Names)}, {N(model.Clips.Count)} clip(s) {List(model.Clips.Select(c => c.Name))}");
     }
 
     /// <summary>A model with a skeleton: the skinned file, or a refusal listing unweighted vertices that writes nothing.</summary>

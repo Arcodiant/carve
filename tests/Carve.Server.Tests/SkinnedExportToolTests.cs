@@ -71,6 +71,53 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
     }
 
     [Fact]
+    public async Task Clips_mode_writes_the_armature_skin_and_clips_with_no_mesh_and_refuses_without_either()
+    {
+        using var carve = await StartChainAsync(Root);
+        var modelPath = Path.Combine(Root, "chain.glb");
+        var clipsPath = Path.Combine(Root, "clips.glb");
+        Ok(await carve.CallToolAsync("export", """{"path":"chain.glb"}"""));
+        Ok(await carve.CallToolAsync("export", """{"path":"again/chain.glb","mode":"model"}"""));
+        Assert.Equal(File.ReadAllBytes(modelPath), File.ReadAllBytes(Path.Combine(Root, "again", "chain.glb")));
+
+        var result = await carve.CallToolAsync("export", """{"path":"clips.glb","mode":"clips"}""");
+        Ok(result);
+        Assert.Contains("as clips, with no mesh: 2 bone(s) 'base', 'joint', 2 clip(s) 'wave', 'nod'", TextOf(result));
+        var bytes = File.ReadAllBytes(clipsPath);
+        var set = GlbExportTests.Parser.ParseAnimationSet(bytes);
+        Assert.Equal(["base", "joint"], set.Skeleton.Bones.Select(b => b.Name));
+        Assert.Equal(["wave", "nod"], set.Clips.Select(c => c.Name));
+        var model = GlbExportTests.Parser.Parse(File.ReadAllBytes(modelPath), Empyrean.ModelFormat.Gltf);
+        Assert.Equal(model.Skin!.Skeleton.Bones, set.Skeleton.Bones);
+        Assert.Equal("glTF contains no meshes.", Assert.ThrowsAny<Exception>(() => GlbExportTests.Parser.Parse(bytes, Empyrean.ModelFormat.Gltf)).Message);
+
+        // An existing file is replaced, as for the model mode; a bad mode is refused.
+        Assert.Contains("(replaced)", TextOf(await carve.CallToolAsync("export", """{"path":"clips.glb","mode":"clips"}""")));
+        Assert.Equal(bytes, File.ReadAllBytes(clipsPath));
+        Assert.Contains("mode: expected", TextOf(await carve.CallToolAsync("export", """{"path":"x.glb","mode":"piece"}""")));
+
+        // No clips: refused, nothing written.
+        Ok(await carve.CallToolAsync("delete_clip", """{"name":"wave"}"""));
+        Ok(await carve.CallToolAsync("delete_clip", """{"name":"nod"}"""));
+        var none = await carve.CallToolAsync("export", """{"path":"none.glb","mode":"clips"}""");
+        Assert.True(IsError(none), TextOf(none));
+        Assert.Contains("no clips", TextOf(none));
+        Assert.False(File.Exists(Path.Combine(Root, "none.glb")));
+    }
+
+    [Fact]
+    public async Task Clips_mode_refuses_a_model_with_no_skeleton()
+    {
+        using var carve = new CarveProcess([], workingDirectory: Root);
+        await carve.InitializeAsync();
+        Ok(await carve.CallToolAsync("define_mesh", Cube("lower", 0.2f)));
+        var refused = await carve.CallToolAsync("export", """{"path":"clips.glb","mode":"clips"}""");
+        Assert.True(IsError(refused), TextOf(refused));
+        Assert.Contains("no skeleton", TextOf(refused));
+        Assert.False(File.Exists(Path.Combine(Root, "clips.glb")));
+    }
+
+    [Fact]
     public async Task The_result_names_the_path_pieces_materials_bones_and_clips()
     {
         using var carve = await StartChainAsync(Root);
