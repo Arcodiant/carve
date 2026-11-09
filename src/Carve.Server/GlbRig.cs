@@ -17,6 +17,16 @@ public static class GlbRig
 {
     public const string ArmatureName = "Armature";
 
+    /// <summary>A new glTF model whose default scene holds the armature, and the skin over its joints: how both skinned files begin.</summary>
+    public static (ModelRoot Root, Scene Scene, Node[] Joints, Skin Skin) Start(string name, Skeleton skeleton)
+    {
+        var root = ModelRoot.CreateModel();
+        var scene = root.UseScene(0);
+        root.DefaultScene = scene;
+        var joints = WriteArmature(scene, skeleton);
+        return (root, scene, joints, WriteSkin(root, name, skeleton, joints));
+    }
+
     /// <summary>The armature node and the bone nodes under it, in the default scene; returns the bones' nodes in skeleton order.</summary>
     public static Node[] WriteArmature(Scene scene, Skeleton skeleton)
     {

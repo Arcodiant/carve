@@ -67,11 +67,7 @@ public static class SkinnedExport
     public static SkinnedGlb Write(Model model, string name)
     {
         var skeleton = model.Skeleton ?? throw new ArgumentException("the model has no skeleton", nameof(model));
-        var root = ModelRoot.CreateModel();
-        var scene = root.UseScene(0);
-        root.DefaultScene = scene;
-        var joints = GlbRig.WriteArmature(scene, skeleton);
-        var skin = GlbRig.WriteSkin(root, name, skeleton, joints);
+        var (root, scene, joints, skin) = GlbRig.Start(name, skeleton);
 
         var builder = new MeshBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexJoints4>(name);
         var materials = new List<string>();
@@ -85,19 +81,14 @@ public static class SkinnedExport
             var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexJoints4>>();
             foreach (var (materialName, colour) in Materials(piece))
             {
-                var material = new MaterialBuilder(materialName)
-                    .WithMetallicRoughnessShader()
-                    .WithBaseColor(colour is null ? GlbExport.BaseColor : FaceStyle.ToLinear(colour))
-                    .WithMetallicRoughness(GlbExport.Metallic, GlbExport.Roughness)
-                    .WithDoubleSide(false);
-                primitives[colour ?? ""] = builder.UsePrimitive(material);
+                primitives[colour ?? ""] = builder.UsePrimitive(GlbExport.Material(materialName, colour));
                 materials.Add(materialName);
             }
 
             foreach (var t in triangles)
             {
                 var normal = normals[t.Face] ??= mesh.FaceNormal(t.Face);
-                var primitive = primitives[ColourOf(mesh, t.Face) ?? ""];
+                var primitive = primitives[GlbExport.ColourOf(mesh, t.Face) ?? ""];
                 primitive.AddTriangle(Vertex(mesh, t.A, normal), Vertex(mesh, t.B, normal), Vertex(mesh, t.C, normal));
             }
             triangleCount += triangles.Count;
@@ -146,7 +137,7 @@ public static class SkinnedExport
         var faces = new Dictionary<string, List<int>>();
         for (var f = 0; f < mesh.Faces.Count; f++)
         {
-            var colour = ColourOf(mesh, f);
+            var colour = GlbExport.ColourOf(mesh, f);
             if (!faces.TryGetValue(colour ?? "", out var list))
             {
                 faces[colour ?? ""] = list = [];
@@ -160,8 +151,6 @@ public static class SkinnedExport
 
     private static string? GroupFor(PolygonMesh mesh, List<int> faces) =>
         mesh.Style?.Groups.FirstOrDefault(g => g.Faces.Count == faces.Count && g.Faces.Order().SequenceEqual(faces)).Name;
-
-    private static string? ColourOf(PolygonMesh mesh, int face) => mesh.Style?.ColourOf(face)?.ToUpperInvariant();
 
     private static VertexBuilder<VertexPositionNormal, VertexEmpty, VertexJoints4> Vertex(PolygonMesh mesh, int vertex, Vector3 normal) =>
         new(new VertexPositionNormal(mesh.Vertices[vertex], normal), default(VertexEmpty), Joints(mesh.Weights?.Of(vertex) ?? []));
