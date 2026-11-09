@@ -118,6 +118,25 @@ public class SkinnedExportTests
     }
 
     [Fact]
+    public void Bone_rotations_and_rotation_keys_are_written_normalised()
+    {
+        // Inside Skeleton.UnitTolerance, so accepted, but not unit; the file holds them divided by their length.
+        var nearly = Quaternion.Multiply(Quaternion.CreateFromAxisAngle(Vector3.UnitZ, 0.3f), 1.0008f);
+        var rig = Skeleton.Create([
+            new BoneSpec("Root", null, Vector3.Zero, nearly),
+            new BoneSpec("Tip", "Root", Vector3.UnitY, Quaternion.Identity),
+        ]).Skeleton!;
+        var bar = Weighted(Box(Vector3.Zero, 0.5f), _ => [new Influence(0, 1)]);
+        var turn = MakeClip("turn", 1f, rig, new BoneChannelsSpec("Tip", new ChannelSpec<Quaternion>("LINEAR", [new(0f, nearly), new(1f, nearly)]), null));
+        var root = ModelRoot.ParseGLB(SkinnedExport.Write(Model.Of("bar", bar).WithSkeleton(rig).WithClips([turn]), "bar").Bytes);
+
+        Assert.Equal(1f, root.LogicalNodes[1].LocalTransform.Rotation.Length(), 1e-6f);
+        var keys = root.LogicalAnimations[0].FindRotationChannel(root.LogicalNodes[2]).GetRotationSampler().GetLinearKeys().ToList();
+        Assert.Equal(2, keys.Count);
+        Assert.All(keys, k => Assert.Equal(1f, k.Value.Length(), 1e-6f));
+    }
+
+    [Fact]
     public void The_file_layout_is_one_mesh_one_skin_an_armature_and_clips_keyed_at_0_and_the_duration()
     {
         var json = Json(SkinnedExport.Write(Character(), "orc").Bytes);
@@ -201,6 +220,23 @@ public class SkinnedExportTests
         Assert.Equal(1.0, (double)w.X + w.Y + w.Z + w.W, 6);
         Assert.Equal(new Vector4(1, 0, 0, 0), SkinnedExport.Joints([]).Weights);
         Assert.Equal(Vector4.Zero, SkinnedExport.Joints([]).Joints);
+
+        // Narrowed one by one these four sum to 1 + 5.2e-8; with the rounding put on the largest, to within 7.5e-9.
+        var w2 = SkinnedExport.Joints([new Influence(0, 7.0 / 97), new Influence(1, 13.0 / 97), new Influence(2, 25.0 / 97), new Influence(3, 1 - (45.0 / 97))]).Weights;
+        Assert.InRange(Math.Abs((double)w2.X + w2.Y + w2.Z + w2.W - 1), 0, 2e-8);
+    }
+
+    [Fact]
+    public void Each_channel_keeps_its_interpolation()
+    {
+        var root = ModelRoot.ParseGLB(SkinnedExport.Write(Character(), "orc").Bytes);
+        AnimationInterpolationMode Rotation(int clip, int node) =>
+            root.LogicalAnimations[clip].FindRotationChannel(root.LogicalNodes[node]).GetRotationSampler().InterpolationMode;
+        AnimationInterpolationMode Translation(int clip, int node) =>
+            root.LogicalAnimations[clip].FindTranslationChannel(root.LogicalNodes[node]).GetTranslationSampler().InterpolationMode;
+        Assert.Equal(AnimationInterpolationMode.LINEAR, Rotation(0, 2)); // walk, LegL
+        Assert.Equal(AnimationInterpolationMode.STEP, Translation(0, 1)); // walk, Hips
+        Assert.Equal(AnimationInterpolationMode.STEP, Rotation(1, 5)); // idle, FootR
     }
 
     [Fact]
