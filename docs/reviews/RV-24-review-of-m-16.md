@@ -12,7 +12,7 @@ description: >-
 
 **Previous:** —
 
-**Diff:** `git diff 620d4a0...HEAD` at b76ac34, docs/ left out (patch-id 143706d7d394…)
+**Diff:** 143706d7d39414c600569920b726237efb279974 against 620d4a0
 
 **Reviewer:** four claude-opus-5-5 reviewers, in parallel
 
