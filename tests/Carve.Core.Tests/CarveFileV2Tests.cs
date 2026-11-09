@@ -430,7 +430,7 @@ public class CarveFileV2Tests
 
     [Fact]
     public void AFileWithNoMeshesIsRefused()
-        => Refused("{\"carve\": 2, \"meshes\": []}", "meshes", "the file has no meshes; a Carve file holds at least one");
+        => Refused("{\"carve\": 2, \"meshes\": []}", "meshes", "the file has no meshes and no skeleton; a Carve file holds at least one mesh, or a skeleton (a clip library)");
 
     [Fact]
     public void AMissingMeshNameIsRefused()

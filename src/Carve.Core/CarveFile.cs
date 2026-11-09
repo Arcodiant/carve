@@ -376,7 +376,7 @@ public static class CarveFile
         {
             // A skeleton and clips with no mesh, a clip library, is a whole file (the person, 2026-11-09).
             if (!fields.TryGetValue("skeleton", out var rig) || rig.ValueKind == JsonValueKind.Null)
-                errors.Add(new MeshError("meshes", "the file has no meshes; a Carve file holds at least one"));
+                errors.Add(new MeshError("meshes", "the file has no meshes and no skeleton; a Carve file holds at least one mesh, or a skeleton (a clip library)"));
         }
         else
         {
