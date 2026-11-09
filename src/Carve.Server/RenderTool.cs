@@ -26,6 +26,16 @@ internal static class RenderTool
         schema["properties"]!["highlight"] = HighlightSchema();
         schema["properties"]!["views"] = ViewsSchema();
         schema["properties"]!["pose"] = PoseSchema();
+        schema["properties"]!["clip"] = new JsonObject
+        {
+            ["description"] = "Draws the model posed by this clip (define_clip) at 'time'. Not with pose. Framing stays on the rest pose.",
+            ["type"] = "string",
+        };
+        schema["properties"]!["time"] = new JsonObject
+        {
+            ["description"] = "With clip, and required by it: the moment in seconds, from 0 to the clip's duration.",
+            ["type"] = "number",
+        };
         WithMesh(schema.AsObject(), MeshArgumentText);
         schema["properties"]!["columns"] = new JsonObject
         {
@@ -50,6 +60,25 @@ internal static class RenderTool
             },
         },
     };
+
+    /// <summary>The clip and time arguments: the clip's name (null when absent) and the time; problems are added to <paramref name="errors"/>.</summary>
+    private static (string? Name, float Time) ReadClip(JsonElement? clip, JsonElement? time, JsonElement? pose, List<string> errors)
+    {
+        if (Absent(clip))
+        {
+            if (!Absent(time)) errors.Add("time: only with clip; give the clip to draw at this time");
+            return (null, 0);
+        }
+        var before = errors.Count;
+        if (!Absent(pose)) errors.Add("clip: not with pose; give a pose, or a clip and a time");
+        if (clip!.Value.ValueKind != JsonValueKind.String) errors.Add($"clip: expected a clip name, got {Describe(clip.Value)}");
+        var at = 0f;
+        if (Absent(time)) errors.Add("time: required with clip; the moment in seconds, from 0 to the clip's duration");
+        else if (time!.Value.ValueKind != JsonValueKind.Number || !float.IsFinite((float)time.Value.GetDouble()))
+            errors.Add($"time: expected a finite number of seconds, got {Describe(time.Value)}");
+        else at = (float)time.Value.GetDouble();
+        return errors.Count > before ? (null, 0) : (clip.Value.GetString(), at);
+    }
 
     /// <summary>The pose argument: null when absent, else a pose; problems are added to <paramref name="errors"/>.</summary>
     private static Pose? ReadPose(JsonElement? pose, List<string> errors)
@@ -198,6 +227,7 @@ internal static class RenderTool
         + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; labels other than 'none', 'faces', 'vertices' or 'both'; "
         + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns other than 1, 2 or 3; an argument render does not take; a sheet whose tiles would show different meshes, because the mesh changed while it was drawn on each of 3 tries (\"The mesh changed while the sheet was drawn, on each of 3 tries, so its tiles would show different meshes; call render again once the edits have settled.\"). "
         + "'pose' draws the model posed by its skeleton: an object of bone name to {rotation: [x, y, z, w], translation: [x, y, z]}, each part optional and absolute (local to the parent, replacing the rest value; a bone or part left out rests), skinned by the weights set_weights gave. A vertex with no weight stays where it is. The camera frames the REST pose, so the frame does not move between poses and a pose that swings far can leave it. Errors: a bone the skeleton lacks, a rotation that is not a unit quaternion, no skeleton. "
+        + "'clip' and 'time' draw the model as the clip of that name (define_clip) poses it at that time in seconds, interpolated as define_clip says; framed on the rest pose like pose. Errors: clip together with pose, clip without time or time without clip, no clip of that name, a time outside 0 to the clip's duration. "
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
         + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select and check still work there.";
 
@@ -226,9 +256,11 @@ internal static class RenderTool
         double? columns = null,
         JsonElement? mesh = null,
         JsonElement? pose = null,
+        JsonElement? clip = null,
+        JsonElement? time = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -284,6 +316,7 @@ internal static class RenderTool
         var problems = new List<string>();
         var meshName = MeshName(mesh, problems);
         var posed = ReadPose(pose, problems);
+        var (clipName, clipTime) = ReadClip(clip, time, pose, problems);
         var listed = HighlightLists(highlight, problems);
         if (problems.Count > 0)
         {
@@ -304,6 +337,17 @@ internal static class RenderTool
         if (current.Mesh is not { } drawn)
         {
             return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
+        }
+
+        if (clipName is not null)
+        {
+            if (current.Model.FindClip(clipName) is not { } sampled)
+                return Failed("render", [current.Model.Clips.Count == 0
+                    ? $"clip: there is no clip named '{clipName}'; the model has no clips (define_clip makes one)"
+                    : $"clip: there is no clip named '{clipName}'; the clips are {string.Join(", ", current.Model.Clips.Select(c => $"'{c.Name}'"))}"]);
+            if (clipTime < 0 || clipTime > sampled.Duration)
+                return Failed("render", [$"time: {clipTime} s is outside the clip '{clipName}', which runs from 0 to {sampled.Duration} s"]);
+            posed = sampled.Sample(clipTime);
         }
 
         if (posed is not null)

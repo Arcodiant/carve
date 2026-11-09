@@ -139,6 +139,71 @@ internal static class ChainPose
                 driver.Fail($"chain-bent-z: the posed corner {corner} falls at ({px}, {py}), outside the {Size} pixel image framed on the rest bounds");
             }
         }
+
+        await WaveAsync(driver, restPixel, reference, bent);
+    }
+
+    /// <summary>
+    /// T-33: the wave clip, define_clip's worked example: the joint turns from rest to <see cref="QuarterZ"/> at 0.5 s and
+    /// back by 1 s, LINEAR. At 0.25 s the slerp is half way, an eighth of a turn about +Z, so the upper box leans up and to
+    /// the LEFT along (-sin 45, cos 45) from the joint at (0, 1). At 0.5 s the clip is exactly the bent pose of T-32, so
+    /// that frame must be byte-identical to <c>chain-bent-z</c>.
+    /// </summary>
+    private static async Task WaveAsync(ScenarioDriver driver, Func<Vector3, Vector2> restPixel, (byte R, byte G, byte B, byte A) reference, ScenarioFrame bent)
+    {
+        await ExpectToolErrorAsync(driver, "render", new { view = "+z", clip = "wave", time = 0.25 }, "wave", "no clips");
+        await ExpectToolErrorAsync(driver, "define_clip", new
+        {
+            name = "wave", duration = 1,
+            channels = new { joint = new { rotation = new { interpolation = "CUBICSPLINE", keys = new[] { new { time = 0f, value = new[] { 0f, 0, 0, 1 } } } } } },
+        }, "LINEAR or STEP");
+        var defined = await CallJsonAsync(driver, "define_clip", new
+        {
+            name = "wave", duration = 1, loop = true,
+            channels = new
+            {
+                joint = new
+                {
+                    rotation = new
+                    {
+                        interpolation = "LINEAR",
+                        keys = new[]
+                        {
+                            new { time = 0f, value = new[] { 0f, 0, 0, 1 } },
+                            new { time = 0.5f, value = QuarterZ },
+                            new { time = 1f, value = new[] { 0f, 0, 0, 1 } },
+                        },
+                    },
+                },
+            },
+        });
+        if (defined.GetProperty("replaced").GetBoolean() || defined.GetProperty("bones")[0].GetString() != "joint")
+        {
+            driver.Fail($"define_clip: expected a new clip animating joint, got {defined}");
+        }
+
+        await ExpectToolErrorAsync(driver, "render", new { view = "+z", clip = "wave", time = 0.25, pose = new { } }, "not with pose");
+        await ExpectToolErrorAsync(driver, "render", new { view = "+z", time = 0.25 }, "only with clip");
+        await ExpectToolErrorAsync(driver, "render", new { view = "+z", clip = "wave" }, "required with clip");
+        await ExpectToolErrorAsync(driver, "render", new { view = "+z", clip = "walk", time = 0.25 }, "'wave'");
+        await ExpectToolErrorAsync(driver, "render", new { view = "+z", clip = "wave", time = 1.5 }, "outside");
+
+        var quarter = await driver.CaptureAsync("chain-wave-0.25-z", new { view = "+z", clip = "wave", time = 0.25 });
+        var half = await driver.CaptureAsync("chain-wave-0.5-z", new { view = "+z", clip = "wave", time = 0.5 });
+        driver.AssertBytesEqual("the wave at 0.5 s, against the bent pose it keys there", bent.Pixels, half.Pixels);
+
+        CheckCorners(driver, quarter);
+        var axis = new Vector2(-MathF.Sqrt(0.5f), MathF.Sqrt(0.5f));
+        foreach (var d in new[] { 0.5f, 0.8f })
+        {
+            var on = new Vector3(axis.X * d, 1 + axis.Y * d, Half);
+            SameAs(driver, quarter, restPixel, on, reference, $"the arm an eighth turn up-left, {d} m from the joint");
+            Background(driver, quarter, restPixel, new Vector3(-on.X, on.Y, Half), $"where a turn the other way, or a camera mirrored in X, puts the arm ({d} m)");
+        }
+
+        SameAs(driver, quarter, restPixel, new Vector3(0, 0.3f, Half), reference, "the lower box, untouched by the wave");
+        Background(driver, quarter, restPixel, new Vector3(0, 1.7f, Half), "where the upper box was at rest (a STEP or a clip held at 0 puts it there)");
+        Background(driver, quarter, restPixel, new Vector3(-0.7f, 1.0f, Half), "where the arm lies at 0.5 s (a quarter turn, not an eighth)");
     }
 
     private static (byte R, byte G, byte B, byte A) PixelAt(ScenarioFrame frame, Func<Vector3, Vector2> pixel, Vector3 point)

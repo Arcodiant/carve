@@ -139,7 +139,59 @@ public sealed class ModelStore
                     + $"so the skeleton must keep them: {string.Join(", ", model.Skeleton!.Names)}. Change only the rest transforms, or define the meshes again to drop their weights";
                 return null;
             }
+            if (model.Clips.Count > 0 && !skeleton.SameNamesAs(model.Skeleton))
+            {
+                refusal = $"bones: the model has clips ({string.Join(", ", model.Clips.Select(c => $"'{c.Name}'"))}), which depend on the bones' names and order, "
+                    + $"so the skeleton must keep them: {string.Join(", ", model.Skeleton!.Names)}. Change only the rest transforms, or delete_clip the clips first";
+                return null;
+            }
             return PushLocked(model.WithSkeleton(skeleton), tool);
+        }
+    }
+
+    /// <summary>
+    /// Adds the clip <paramref name="build"/> makes from the current skeleton, replacing one of the same name, under the
+    /// lock, as one step. Null, pushing nothing, when there is no skeleton or the clip is refused (<paramref name="problems"/>
+    /// says why). <paramref name="replaced"/> says whether a clip of that name was there before.
+    /// </summary>
+    public ModelSnapshot? DefineClip(string tool, Func<Skeleton, (Clip? Clip, IReadOnlyList<MeshError> Errors)> build,
+        out Clip? clip, out bool replaced, out List<string> problems)
+    {
+        lock (_write)
+        {
+            clip = null;
+            replaced = false;
+            problems = [];
+            var model = _current.Model;
+            if (model.Skeleton is not { } skeleton)
+            {
+                problems.Add("channels: the model has no skeleton yet; call define_skeleton first");
+                return null;
+            }
+            var (made, errors) = build(skeleton);
+            problems.AddRange(errors.Select(e => e.ToString()));
+            if (made is null) return null;
+            clip = made;
+            replaced = model.FindClip(made.Name) is not null;
+            return PushLocked(model.WithClip(made), tool);
+        }
+    }
+
+    /// <summary>Removes the clip <paramref name="name"/> as one step; null, with <paramref name="refusal"/>, when there is none.</summary>
+    public ModelSnapshot? DeleteClip(string tool, string name, out string? refusal)
+    {
+        lock (_write)
+        {
+            refusal = null;
+            var model = _current.Model;
+            if (model.FindClip(name) is null)
+            {
+                refusal = model.Clips.Count == 0
+                    ? $"name: there is no clip named '{name}'; the model has no clips"
+                    : $"name: there is no clip named '{name}'; the clips are {string.Join(", ", model.Clips.Select(c => $"'{c.Name}'"))}";
+                return null;
+            }
+            return PushLocked(model.WithoutClip(name), tool);
         }
     }
 
