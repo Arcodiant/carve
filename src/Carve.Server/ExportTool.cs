@@ -28,7 +28,7 @@ public sealed class ExportTool(ModelStore store)
         + "which leaves any file already there as it was and no partial file. "
         + "A model of several meshes and no skeleton is written as one mesh, every mesh merged in order, as above. "
         + "With a skeleton (define_skeleton) the file is skinned, for a character: one glTF mesh named after the file holding every mesh of the model as primitives, "
-        + "one per mesh and colour (meshes in order, colours by first face), each with its own material: '<mesh>' for uncoloured faces, '<mesh>:<group>' when a face group holds exactly that colour's faces, else '<mesh>:<rrggbb>'; "
+        + "one per mesh and colour (meshes in order, colours by first face), each with its own material: '<mesh>' for uncoloured faces, '<mesh>:<group>' when a face group holds exactly that colour's faces, else '<mesh>:<rrggbb>' (also when the group's name is another colour's rrggbb in that mesh, so no two materials share a name); "
         + "positions in the rest pose with JOINTS_0 and WEIGHTS_0 from set_weights; a node 'Armature' (identity, not a bone) with the bones under it in your order; skins[0] over every bone, "
         + "its inverse bind matrices the inverse of each bone's rest world transform; and one animation per clip (define_clip), LINEAR or STEP, every animated channel keyed at 0 and at the clip's duration. "
         + "A vertex with no weight is refused, the vertices listed and nothing written; allow_unweighted: true exports anyway, binding them to the first root bone, and the result says so. "
