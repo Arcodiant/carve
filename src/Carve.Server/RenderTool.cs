@@ -113,7 +113,7 @@ internal static class RenderTool
                 if (want == 4)
                 {
                     var q = new Quaternion(values[0], values[1], values[2], values[3]);
-                    if (MathF.Abs(q.Length() - 1) > Skeleton.UnitTolerance) errors.Add($"{at}.rotation: not a unit quaternion: its length is {q.Length():G6}, and it must be 1 (within {Skeleton.UnitTolerance})");
+                    if (MathF.Abs(q.Length() - 1) > Skeleton.UnitTolerance) errors.Add(FormattableString.Invariant($"{at}.rotation: not a unit quaternion: its length is {q.Length():G6}, and it must be 1 (within {Skeleton.UnitTolerance})"));
                     else rotation = q;
                 }
                 else translation = new Vector3(values[0], values[1], values[2]);
@@ -346,7 +346,7 @@ internal static class RenderTool
                     ? $"clip: there is no clip named '{clipName}'; the model has no clips (define_clip makes one)"
                     : $"clip: there is no clip named '{clipName}'; the clips are {NameList.Quoted(current.Model.Clips.Select(c => c.Name))}"]);
             if (clipTime < 0 || clipTime > sampled.Duration)
-                return Failed("render", [$"time: {clipTime} s is outside the clip '{clipName}', which runs from 0 to {sampled.Duration} s"]);
+                return Failed("render", [FormattableString.Invariant($"time: {clipTime} s is outside the clip '{clipName}', which runs from 0 to {sampled.Duration} s")]);
             posed = sampled.Sample(clipTime);
         }
 
