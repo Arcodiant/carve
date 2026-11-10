@@ -19,4 +19,9 @@
     <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The run-folder and sample helpers of the character checks, linked and not copied. -->
+    <Compile Include="../Carve.CharacterLoad.Tests/RunContent.cs" Link="RunContent.cs" />
+  </ItemGroup>
+
 </Project>

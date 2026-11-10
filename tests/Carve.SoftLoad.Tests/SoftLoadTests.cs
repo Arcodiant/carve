@@ -1,6 +1,6 @@
 using System.Numerics;
 using Empyrean;
-using Microsoft.Extensions.DependencyInjection;
+using Carve.LoadChecks;
 using Xunit;
 using CarveFile = Carve.Core.CarveFile;
 using CarveModel = Carve.Core.Model;
@@ -21,32 +21,11 @@ public class SoftLoadTests
 
     private static string RunFolder => Run ?? throw new InvalidOperationException("CARVE_SOFT_RUN is unset");
 
-    private static IModelGeometryLoader Loader()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddEmpyreanCore();
-        services.AddEmpyreanGeometry();
-        var provider = services.BuildServiceProvider();
-        provider.GetRequiredService<IContentRegistry>().Mount(ContentSources.Directory(Path.Combine(RunFolder, "game", "Content")));
-        return provider.GetRequiredService<IModelGeometryLoader>();
-    }
+    private static IModelGeometryLoader Loader() => RunContent.Loader(RunFolder);
 
-    private static CarveModel Saved(string path) => CarveFile.Read(File.ReadAllText(path)).Model!;
+    private static CarveModel Saved(string path) => RunContent.Saved(path);
 
-    private static string SamplePath()
-    {
-        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
-        {
-            var candidate = Path.Combine(d.FullName, "samples", "gardener-soft.carve");
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        throw new FileNotFoundException("samples/gardener-soft.carve");
-    }
+    private static string SamplePath() => RunContent.SamplePath("gardener-soft.carve");
 
     private static string Key(Vector3 v) => $"{v.X:0.0000},{v.Y:0.0000},{v.Z:0.0000}";
 
