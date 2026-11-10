@@ -97,11 +97,8 @@ public sealed class MarkEdgesTool(ModelStore store)
 
         var snapshot = store.Reshade("mark_edges", meshName, m =>
         {
-            var problems = new List<string>();
-            foreach (var (a, b) in pairs!.Distinct())
-                if (!m.Topology.TryGetEdge(a, b, out _))
-                    problems.Add($"edges[{Math.Min(a, b)}-{Math.Max(a, b)}]: not an edge of the mesh; select with kind edges lists the real edges");
-            return problems.Count > 0 ? (null, problems) : ((m.Shade ?? MeshShade.Flat).WithEdges(pairs!, isHard), problems);
+            var shade = Shading.MarkEdges(m, pairs!, isHard, out var notEdges);
+            return (shade, [.. notEdges.Select(e => $"edges[{e.Lo}-{e.Hi}]: not an edge of the mesh; select with kind edges lists the real edges")]);
         }, out var refused, out var problem);
         if (problem is not null) return Failed("mark_edges", [problem]);
         if (refused.Count > 0) return Failed("mark_edges", refused);
