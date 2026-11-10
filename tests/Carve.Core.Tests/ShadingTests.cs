@@ -185,4 +185,36 @@ public class ShadingTests
         for (var f = 0; f < 6; f++) Near(Shading.Corners(smooth)[f][0], corners[f][0]);
         for (var f = 6; f < 12; f++) SameBits(Cube().FaceNormal(f - 6), corners[f][0]);
     }
+
+    [Fact]
+    public void A_shared_edge_wound_the_same_way_by_both_faces_is_hard()
+    {
+        // The hinge with its wall turned over: both faces cross the edge 1-2 from 1 to 2 (ruling 3).
+        var mesh = Make([new(0, 0, 0), new(1, 0, 0), new(1, 0, 1), new(0, 0, 1), new(1, 1, 0), new(1, 1, 1)],
+            [[0, 1, 2, 3], [1, 2, 5, 4]]).WithShade(MeshShade.Of(ShadingMode.Smooth, []));
+        Assert.Equal(2, mesh.Topology.Edges.Single(e => (e.Lo, e.Hi) == (1, 2)).Faces.Count);
+        foreach (var v in new[] { 1, 2 })
+        {
+            SameBits(mesh.FaceNormal(0), CornerOf(mesh, 0, v));
+            SameBits(mesh.FaceNormal(1), CornerOf(mesh, 1, v));
+        }
+    }
+
+    [Fact]
+    public void A_refused_pair_given_in_both_orders_is_listed_once()
+    {
+        Assert.Null(Shading.MarkEdges(Cube(), [(6, 0), (0, 6), (2, 4)], true, out var notEdges));
+        Assert.Equal(new List<(int, int)> { (0, 6), (2, 4) }, notEdges);
+    }
+
+    [Fact]
+    public void A_flat_mesh_beside_a_smooth_one_keeps_its_faces_flat_in_the_combined_mesh()
+    {
+        var smooth = Cube().WithShade(MeshShade.Flat.WithMode(ShadingMode.Smooth));
+        var combined = Model.Of("a", smooth).With("b", Cube()).Combined!;
+        Assert.All(Enumerable.Range(0, 6), f => Assert.True(Shading.FaceHasCornerNormals(combined, f)));
+        Assert.All(Enumerable.Range(6, 6), f => Assert.False(Shading.FaceHasCornerNormals(combined, f)));
+        Assert.All(Enumerable.Range(0, 6), f => Assert.True(Shading.FaceHasCornerNormals(smooth, f)));
+        Assert.All(Enumerable.Range(0, 6), f => Assert.False(Shading.FaceHasCornerNormals(Cube(), f)));
+    }
 }

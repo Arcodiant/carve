@@ -139,11 +139,12 @@ public class LookMeshesTests
         var space = SpaceOf(mesh);
         var scene = LookMeshes.Compose(mesh, space, Look.Normals, Highlight.None);
 
-        var triangles = Shading.Triangles(mesh);
-        for (var i = 0; i < scene.VertexColours!.Length; i++)
+        // Each colour lands on the drawn vertex of the same index, and MeshBridge reverses each triangle (A, C, B) for the engine.
+        var drawn = MeshBridge.ToMeshData(mesh, space).Vertices!;
+        Assert.Equal(drawn.Length, scene.VertexColours!.Length);
+        for (var i = 0; i < drawn.Length; i++)
         {
-            var corner = i % 3 == 0 ? triangles[i / 3].NormalA : i % 3 == 1 ? triangles[i / 3].NormalB : triangles[i / 3].NormalC;
-            Assert.Equal(LookMeshes.NormalColour(corner), scene.VertexColours[i]);
+            Assert.Equal(LookMeshes.NormalColour(drawn[i].Normal), scene.VertexColours[i]);
         }
 
         Assert.Contains(scene.VertexColours, c => c != LookMeshes.NormalColour(mesh.FaceNormal(0)) && c != LookMeshes.NormalColour(mesh.FaceNormal(1)));
@@ -264,4 +265,32 @@ public class LookMeshesTests
     [Fact]
     public void The_counts_go_faces_edges_vertices() =>
         Assert.Equal("3 faces, 2 edges, 1 vertex", Highlight.Of([0], [(0, 1), (1, 2)], [1, 2, 3]).Counts());
+
+    [Fact]
+    public void A_flat_mesh_beside_a_smooth_one_keeps_its_centre_spikes_at_rest_and_posed()
+    {
+        var weights = VertexWeights.Of(Enumerable.Range(0, 8).Select(v => KeyValuePair.Create(v, new[] { new Influence(0, 1) })));
+        var smooth = Cube().WithShade(MeshShade.Flat.WithMode(ShadingMode.Smooth)).WithWeights(weights);
+        var flat = TestMeshes.Make(TestMeshes.CubeVertices.Select(p => p + new Vector3(2, 0, 0)), TestMeshes.CubeFaces).WithWeights(weights);
+        var rig = Carve.Core.Skeleton.Create([new BoneSpec("base", null, Vector3.Zero, Quaternion.Identity)]).Skeleton!;
+        var model = Carve.Core.Model.Of("smooth", smooth).With("flat", flat).WithSkeleton(rig);
+        var pose = new Carve.Core.Pose(new Dictionary<string, (Quaternion?, Vector3?)>
+        {
+            ["base"] = (Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.5f), null),
+        });
+
+        foreach (var mesh in new[] { model.Combined!, Skinning.Posed(model, pose).Combined! })
+        {
+            var space = SpaceOf(mesh);
+            var ends = Ends(LookMeshes.Spikes(mesh, space));
+            // A spike at each of the smooth cube's 24 corners, then one from the centre of each of the flat cube's faces.
+            Assert.Equal(2 * (24 + 6), ends.Length);
+            for (var f = 6; f < 12; f++)
+            {
+                var centre = space.Apply(mesh.FaceCentre(f));
+                AssertClose(centre, ends[48 + 2 * (f - 6)]);
+                AssertClose(centre + mesh.FaceNormal(f) * LookMeshes.SpikeLength, ends[48 + 2 * (f - 6) + 1]);
+            }
+        }
+    }
 }
