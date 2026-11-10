@@ -210,8 +210,8 @@ public class SubdivideTests
         Assert.Equal([new Influence(0, 0.25), new Influence(1, 0.25), new Influence(2, 0.25), new Influence(3, 0.25)], once.Weights!.Of(8));
         // A +z face point has bone 4 alone.
         Assert.Equal([new Influence(4, 1)], once.Weights.Of(9));
-        // The edge point of 0-4 (between -y and -x) blends 0 and 4, both faces' points: five bones, the smallest dropped.
-        Assert.Equal(VertexWeights.MaxInfluences, once.Weights.Of(14 + cube.Topology.Edges.ToList().FindIndex(e => (e.Lo, e.Hi) == (0, 4))).Count);
+        // The edge point of 0-4 (between -y and -x) blends 0 and 4 and both faces' points: bones 0, 1, 3 and 4, none dropped.
+        Assert.Equal([0, 1, 3, 4], once.Weights.Of(14 + cube.Topology.Edges.ToList().FindIndex(e => (e.Lo, e.Hi) == (0, 4))).Select(i => i.Bone));
     }
 
     [Fact]
@@ -261,5 +261,70 @@ public class SubdivideTests
         Assert.All(mesh.Faces, f => Assert.Contains(6, f));
         Assert.True(Vector3.Distance(Vector3.Zero, mesh.Vertices[6]) < 1e-6f);
         Assert.All(mesh.Vertices, p => Assert.Equal(0f, p.Z));
+    }
+
+    [Fact]
+    public void Past_four_bones_the_smallest_are_dropped_and_the_rest_renormalised()
+    {
+        // Each corner on a bone of its own: vertex 0's point blends seven, 5/12 on bone 0, 1/6 on 1, 3 and 4, 1/36 on 2, 5 and 7.
+        var weights = VertexWeights.Of(Enumerable.Range(0, 8).Select(v => KeyValuePair.Create(v, new[] { new Influence(v, 1) })));
+        var influences = Sub(Cube().WithWeights(weights), 1).Weights!.Of(0);
+
+        Assert.Equal(new[] { 0, 1, 3, 4 }, influences.Select(i => i.Bone).Order());
+        Assert.Equal(5.0 / 11, influences.Single(i => i.Bone == 0).Weight, 6);
+        Assert.All(influences.Where(i => i.Bone != 0), i => Assert.Equal(2.0 / 11, i.Weight, 6));
+    }
+
+    [Fact]
+    public void An_old_vertex_with_no_weights_stays_unweighted_and_a_new_point_blends_only_its_weighted_sources()
+    {
+        // Vertices 0 to 3 (the -z face) on bone 0, 4 to 7 unweighted (the person, 2026-11-10).
+        var weights = VertexWeights.Of(Enumerable.Range(0, 4).Select(v => KeyValuePair.Create(v, new[] { new Influence(0, 1) })));
+        var once = Sub(Cube().WithWeights(weights), 1);
+
+        for (var v = 4; v < 8; v++) Assert.False(once.Weights!.Has(v), $"vertex {v} was given weights");
+        for (var v = 0; v < 4; v++) Assert.Equal([new Influence(0, 1)], once.Weights!.Of(v));
+        // The +z face point (9) has only unweighted sources; the -y face point (10) blends its two weighted corners alone.
+        Assert.False(once.Weights!.Has(9));
+        Assert.Equal([new Influence(0, 1)], once.Weights.Of(10));
+    }
+
+    [Fact]
+    public void A_vertex_on_one_crease_is_a_dart_and_takes_the_smooth_rule()
+    {
+        var smooth = Sub(Cube().WithShade(MeshShade.Of(ShadingMode.Smooth, [])), 1);
+        var dart = Sub(Cube().WithShade(MeshShade.Of(ShadingMode.Smooth, [(0, 1)])), 1);
+
+        Assert.Equal(smooth.Vertices[0], dart.Vertices[0]);
+        Assert.NotEqual(Cube().Vertices[0], dart.Vertices[0]);
+    }
+
+    [Fact]
+    public void A_vertex_on_no_face_stays_where_it_is()
+    {
+        // Weighted, so a stencil worked from its zero edges would lose its weight as well as its place.
+        var weights = VertexWeights.Of(Enumerable.Range(0, 9).Select(v => KeyValuePair.Create(v, new[] { new Influence(0, 1) })));
+        var mesh = Sub(Make([.. CubeVertices, new(5, 6, 7)], CubeFaces).WithWeights(weights), 1);
+
+        Assert.Equal(new Vector3(5, 6, 7), mesh.Vertices[8]);
+        Assert.Equal([new Influence(0, 1)], mesh.Weights!.Of(8));
+        Assert.All(mesh.Vertices, p => Assert.False(float.IsNaN(p.X) || float.IsNaN(p.Y) || float.IsNaN(p.Z), $"{p} is not a number"));
+    }
+
+    [Fact]
+    public void A_triangle_becomes_three_quads_round_its_centre()
+    {
+        // A closed tetrahedron: 4 vertices, 4 triangles, 6 edges.
+        var tetra = Make([new(0, 0, 0), new(1, 0, 0), new(0, 1, 0), new(0, 0, 1)], [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]]);
+        var mesh = Sub(tetra, 1);
+
+        Assert.Equal(4 + 4 + 6, mesh.Vertices.Count);
+        Assert.Equal(12, mesh.Faces.Count);
+        Assert.All(mesh.Faces, f => Assert.Equal(4, f.Count));
+        Assert.All(mesh.Topology.Edges, e => Assert.Equal(2, e.Faces.Count));
+        var centre = (tetra.Vertices[0] + tetra.Vertices[1] + tetra.Vertices[2]) / 3;
+        Assert.True(Vector3.Distance(centre, mesh.Vertices[4]) < 1e-6f, $"{mesh.Vertices[4]} against {centre}");
+        Assert.Contains(4, mesh.Faces[0]);
+        Assert.Equal(3, mesh.Faces.Count(f => f.Contains(4)));
     }
 }

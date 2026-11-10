@@ -71,6 +71,34 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
             body.GetProperty("warnings")[0].GetString());
     }
 
+    [Theory]
+    [InlineData(false, 5000)]
+    [InlineData(true, 5001)]
+    public async Task The_triangles_count_every_mesh_and_only_past_5000_warn(bool extra, int triangles)
+    {
+        var (carve, _) = await StartAsync();
+        using var __ = carve;
+        // "pad": a flat 48 by 52 grid, 2496 quads, 4992 triangles, and one loose triangle more when extra.
+        var vertices = new List<float[]>();
+        for (var y = 0; y <= 52; y++) for (var x = 0; x <= 48; x++) vertices.Add([x, y, 0]);
+        var faces = new List<int[]>();
+        for (var y = 0; y < 52; y++) for (var x = 0; x < 48; x++) faces.Add([y * 49 + x, y * 49 + x + 1, (y + 1) * 49 + x + 1, (y + 1) * 49 + x]);
+        if (extra)
+        {
+            faces.Add([vertices.Count, vertices.Count + 1, vertices.Count + 2]);
+            vertices.AddRange([[60, 0, 0], [61, 0, 0], [60, 1, 0]]);
+        }
+        Ok(await carve.CallToolAsync("define_mesh", JsonSerializer.Serialize(new { name = "pad", vertices, faces })));
+        // "tile": one quad, four after one level, so 8 triangles of the model's total.
+        Ok(await carve.CallToolAsync("define_mesh", """{"name":"tile","vertices":[[0,0,1],[1,0,1],[1,1,1],[0,1,1]],"faces":[[0,1,2,3]]}"""));
+
+        var body = Ok(await carve.CallToolAsync("subdivide", """{"mesh":"tile","levels":1}"""));
+
+        Assert.Equal(4, body.GetProperty("faces").GetInt32());
+        Assert.Equal(triangles, body.GetProperty("triangles").GetInt32());
+        Assert.Equal(extra, body.GetProperty("warnings").EnumerateArray().Any(w => w.GetString()!.Contains("triangles")));
+    }
+
     [Fact]
     public async Task The_result_folds_not_planar_warnings_into_one_line_and_check_still_lists_each_face()
     {
