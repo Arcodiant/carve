@@ -364,4 +364,33 @@ public class SkinnedExportTests
         var specs = model.Skeleton!.Bones.Where(b => b.Name != "Ankle_R").Select(b => new BoneSpec(b.Name, b.Parent < 0 ? null : "Hips", b.Position, b.Rotation)).ToArray();
         Assert.Empty(SkinnedExport.Warnings(model.WithSkeleton(Skeleton.Create(specs).Skeleton!), 1, 1));
     }
+
+    [Fact]
+    public void A_smooth_mesh_is_written_with_its_corner_normals()
+    {
+        // A smooth cube: each corner's normal points out through the cube's corner, never along a face (T-42).
+        var weights = VertexWeights.Of(Enumerable.Range(0, 8).Select(v => KeyValuePair.Create(v, new[] { new Influence(0, 1) })));
+        var cube = TestMeshes.Cube().WithShade(MeshShade.Flat.WithMode(ShadingMode.Smooth)).WithWeights(weights);
+        var parsed = Parse(SkinnedExport.Write(Model.Of("cube", cube).WithSkeleton(Rig()), "cube").Bytes);
+        var vertices = parsed.MeshData.Vertices;
+
+        Assert.Equal(36, parsed.MeshData.Indices!.Length);
+        var min = vertices.Aggregate(new Vector3(float.MaxValue), (m, v) => Vector3.Min(m, v.Position));
+        var max = vertices.Aggregate(new Vector3(float.MinValue), (m, v) => Vector3.Max(m, v.Position));
+        foreach (var v in vertices)
+        {
+            var expected = Vector3.Normalize(v.Position - (min + max) / 2);
+            Assert.True(Vector3.Distance(expected, v.Normal) < 1e-5f, $"at {v.Position}: {v.Normal}, expected {expected}");
+        }
+    }
+
+    [Fact]
+    public void A_subdivided_mesh_still_names_a_vertex_that_had_no_weight()
+    {
+        // Vertices 0 to 3 on bone 0, 4 to 7 unweighted (the person, 2026-11-10): vertex 4 stays unweighted.
+        var weights = VertexWeights.Of(Enumerable.Range(0, 4).Select(v => KeyValuePair.Create(v, new[] { new Influence(0, 1) })));
+        var once = TestMeshes.Ok(MeshEdits.Subdivide(TestMeshes.Cube().WithWeights(weights), 1));
+
+        Assert.Contains(4, SkinnedExport.Unweighted(Model.Of("cube", once)).Single().Vertices);
+    }
 }

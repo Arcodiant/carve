@@ -152,7 +152,11 @@ internal static class Subdivision
         {
             var blended = new List<KeyValuePair<int, Influence[]>>();
             for (var i = 0; i < stencils.Length; i++)
+            {
+                // An old vertex that had no weights stays unweighted, so skinned export still names it (the person, 2026-11-10).
+                if (i < v0 && !w.Has(i)) continue;
                 if (stencils[i].Blend(w) is { } influences) blended.Add(KeyValuePair.Create(i, influences));
+            }
             weights = VertexWeights.Of(blended);
         }
 
