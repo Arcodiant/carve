@@ -38,7 +38,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
   - T-42's cylinder, in round 2;
   - T-43's before and after cylinder;
   - T-44's seven gardener frames.
-- **`cairn milestone M-18 verify` (2026-11-10)** passes every check but `review`, which comes after the person's go. All 3 members are done and merged, and all ten suites pass (1 ran, 9 carried).
+- **`cairn milestone M-18 verify` (2026-11-10)**, run when this retrospective was first written (954faca), passed every check but `review`, which comes after the person's go. All 3 members were done and merged, and all ten suites passed (1 ran, 9 carried). That was before the refactor pass and the RV-27 fixes. The run that counts is the one `finish` makes.
 - **Models:**
 
   | Member | Model | Agents |
@@ -69,6 +69,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
   - As ruled, the fold went into `subdivide`'s result only. T-44 showed the warnings getting in the way elsewhere.
   - `scenario-soft` therefore asserts that every export warning is a not-planar face, rather than that there are none.
   - **T-72** is filed to fold them in `check`, `get_mesh` and `export`.
+  - In review (RV-27), the person ruled that until T-72 lands, the check also pins the count of those warnings to `select faces where non_planar`.
 - **T-44 wrote a `tests.json` edit into the milestone worktree by mistake** and reverted it. The orchestrator checked that the milestone worktree was clean afterwards.
 - **Rulings the person gave during the milestone** are all recorded in the members' As built:
   - **T-42:**

@@ -34,7 +34,7 @@ description: >-
 - **What is wrong:** `MeshBridge.ToMeshData` reverses each triangle's winding for the engine: vertex `at` gets A, `at+1` gets C (`NormalC`) and `at+2` gets B. `CornerColours` writes its colours in A, B, C order, and `RenderSystem.Make` passes the two arrays to `CreateMesh(data, colours)` index for index. So on a smooth mesh each triangle's corner C is coloured with B's normal, and B with C's. Flat meshes are unaffected because their three colours are equal.
 - **Concrete failure:** on the smooth cube's top quad, v1 is drawn in v2's colour. The gradient is permuted and does not match the spikes.
 - **Why the tests miss it:** `LookMeshesTests.A_smooth_mesh_in_normals_carries_its_corner_normals_in_colour_and_spikes` (`tests/Carve.Server.Tests/LookMeshesTests.cs:136`) checks colours in the same A, B, C order. The frame checks compare only the channel order between distant points.
-- **Outcome:** —
+**Outcome:** —
 
 ### A flat mesh beside a smooth one changes its normals-look spikes
 
@@ -43,7 +43,7 @@ description: >-
 - **What is wrong:** if any mesh is smooth, `Combine` gives the combined mesh a `Smooth` shade, with every edge of each flat piece marked hard. `Spikes` then sees `HasCornerNormals(combined)` and draws corner spikes for the flat pieces' faces too, instead of centre spikes. `PosedCorners` does the same.
 - **Concrete failure:** `define_mesh` A and B, then `set_shading smooth` on A only. B's `normals` render changes from a centre spike per face to a spike at every corner.
 - **Why the tests miss it:** `ShadingTests.A_model_of_a_smooth_and_a_flat_mesh_combines_each_as_it_is` checks the normals only, and no frame shows a mixed model.
-- **Outcome:** —
+**Outcome:** —
 
 ### Ruling 3 (a mis-wound shared edge is hard) has no test
 
@@ -51,7 +51,7 @@ description: >-
 - **Rubric:** 2
 - **What is wrong:** no test builds two faces that share an edge but are wound the same way.
 - **Concrete failure:** replacing the check with `edge.Faces.Count == 2` would smooth across a flipped face, and every test would still pass.
-- **Outcome:** —
+**Outcome:** —
 
 ### Skinned `.glb` corner normals are untested in T-42
 
@@ -59,14 +59,14 @@ description: >-
 - **Rubric:** 2 (Scope: Skinning and Export)
 - **What is wrong:** skinned export writes `Shading.CornersOf(mesh)` per corner. The render-against-loaded test (`ShadingToolTests.cs:30`) covers only the unskinned `GlbExport.Write`.
 - **Concrete failure:** a wrong corner index or a fall-back to face normals in skinned export passes every T-42 test. T-44's SoftLoad checks may cover it.
-- **Outcome:** —
+**Outcome:** —
 
 ### Verify omits the suites for the changed skinning and export paths
 
 - **Where:** `docs/tasks/T-42-smooth-normals-and-hard-edges.md`, `**Verify:** server-regression, scenario-cube, scenario-crate`
 - **Rubric:** 4
 - **What is wrong:** the diff changes `Skinning.Posed`, `SkinnedExport`, `GlbExport` and `MeshBridge`, which `scenario-character` and `scenario-export` exercise, but the Verify line names neither. As built says those were guarded only in ad-hoc runs.
-- **Outcome:** —
+**Outcome:** no change needed: T-42 is Done and its Verify line is history. The milestone's own verify requires every regression suite, `scenario-character` and `scenario-export` among them, and the refactor pass ran both fresh at 46da626. `finish` runs them again after the RV-27 fixes.
 
 ### `MarkEdges` repeats a refused pair given in both orders
 
@@ -74,14 +74,14 @@ description: >-
 - **Rubric:** 1 (error path)
 - **What is wrong:** `edges.Distinct()` runs before the pairs are put lower id first, although the doc comment says each such pair is listed once.
 - **Concrete failure:** `mark_edges {"edges":[[9,8],[8,9]]}` on the cube returns `edges[8-9]: not an edge…` twice.
-- **Outcome:** —
+**Outcome:** —
 
 ### As built's ruling 4 wording differs from what `save` writes
 
 - **Where:** `src/Carve.Core/CarveFile.cs:102`
 - **Rubric:** 7
 - **What is wrong:** As built says version 3 is written "only when a mesh is shaded". The code writes version 3 whenever `Shade` is non-null, which includes a flat mesh with only hard marks. The tool text, the remarks and `ShadingFileTests.Flat_with_marked_edges_is_kept_for_later` document the code's behaviour.
-- **Outcome:** —
+**Outcome:** —
 
 Refactors `edaa7db` and `46da626` keep T-42's behaviour. Core Shading unit tests: 24 passed. Not checked by this reviewer: the server tests, the scenarios and the frames; the cube-scenario thresholds.
 
@@ -93,14 +93,14 @@ Refactors `edaa7db` and `46da626` keep T-42's behaviour. Core Shading unit tests
 - **Rubric:** 5, and the task's Notes ("Open rules: stop and ask").
 - **What is wrong:** D-6 says only "blend weights with the same stencil". The member skips unweighted sources and renormalises what is left. As a result, an old vertex can change from unweighted to weighted.
 - **Concrete failure:** a cube with vertices 0 to 3 on bone 0 and vertices 4 to 7 unweighted. After `levels 1`, vertex 4 comes out 100% bone 0. Skinned export, which refuses an unweighted vertex and used to name vertex 4, no longer does. A missing weight becomes a rigid bind without anyone noticing. Treating an unweighted source as zero weight, or refusing, would give different answers. The choice belonged with the person.
-- **Outcome:** —
+**Outcome:** —
 
 ### The "five-bone blend capped" assertion blends only four bones
 
 - **Where:** `tests/Carve.Core.Tests/SubdivideTests.cs:213-214`; As built, Tests.
 - **Rubric:** 2, 7
 - **What is wrong:** the edge point of 0-4 blends bones {0,1,3,4}: four, so nothing is dropped. `Count == MaxInfluences` passes with or without the cap, and the comment "five bones, the smallest dropped" is wrong. The cap is exercised only indirectly, by the level-3 `InRange(1, 4)` at `:204`.
-- **Outcome:** —
+**Outcome:** —
 
 ### Several sharp-edge, isolated-vertex and budget rules have no test that fails without them
 
@@ -112,7 +112,7 @@ Refactors `edaa7db` and `46da626` keep T-42's behaviour. Core Shading unit tests
   - **Triangle faces:** not tested.
   - **Budget boundary:** "past, never at" 5000 is tested only at 5376, so `>=` would pass.
   - **Whole-model `triangles` count:** never checked with two meshes.
-- **Outcome:** —
+**Outcome:** —
 
 The face, edge and vertex points, the smooth, crease, boundary and corner rules, the D-1 id order, and the carrying of hard marks, groups and colours were found correct. Refactor `2969314` keeps the old behaviour. `core-unit` passes (J-20261110-231856-ac8a17). Not checked by this reviewer: server-regression and the scenarios; the frames; non-manifold "bowtie" vertices.
 
@@ -124,7 +124,7 @@ The face, edge and vertex points, the smooth, crease, boundary and corner rules,
 - **Rubric:** 6
 - **What is wrong:** cairn's `dotnet-closure` does not follow `<Compile Include=... Link=...>` items. `scenario-soft` lists `GardenerSpec.cs` by hand but not the other linked files: `scenarios/Carve.Scenario.Crate/CrateBuild.cs`, `CameraPixels.cs`, `scenarios/Carve.Scenario.Character/GardenerPixels.cs` (refactor f3f5a06) and `tests/Carve.CharacterLoad.Tests/RunContent.cs` (refactor cf96c46).
 - **Concrete failure:** an edit to `GardenerPixels.cs`'s 0.98 threshold changes what the soft scenario checks, yet `verify` carries `scenario-soft`'s old pass. `scenario-character` has the same gap for `CrateBuild.cs` and `CameraPixels.cs`, from before this branch.
-- **Outcome:** —
+**Outcome:** —
 
 ### CLAUDE.md layout rows do not reflect the two refactors
 
@@ -134,28 +134,30 @@ The face, edge and vertex points, the smooth, crease, boundary and corner rules,
   - The Soft row names only `GardenerSpec.cs` as linked. `GardenerPixels.cs` is linked too.
   - The Character and CharacterLoad.Tests rows do not say that they own files other projects link: `GardenerPixels.cs` and `RunContent.cs`.
   - The SoftLoad.Tests row drops ", so `dotnet test Carve.slnx` passes without it".
-- **Outcome:** —
+**Outcome:** —
 
 ### The milestone's verify claim was made before the five refactor commits
 
 - **Where:** `docs/milestones/M-18-soft-characters.md`, Retrospective ("`cairn milestone M-18 verify` (2026-11-10) passes … 1 ran, 9 carried"), written in 954faca.
 - **Rubric:** 4
 - **What is wrong:** commits f3f5a06, cf96c46, edaa7db, 2969314 and 46da626 came after that line. The retrospective should say so, or be re-dated. `scenario-soft` passed fresh at 46da626 (J-20261110-231935-f579f6).
-- **Outcome:** —
+**Outcome:** fixed
+
+The retrospective now says the verify line was written at 954faca, before the refactor pass and the RV-27 fixes, and that the run that counts is `finish`'s.
 
 ### The soft export's "every warning is not-planar" check was not ruled on, and does not pin a count
 
 - **Where:** `scenarios/Carve.Scenario.Soft/SoftScenario.cs:178-185`; `tests/Carve.SoftLoad.Tests/SoftLoadTests.cs:116-123`; the milestone Retrospective.
 - **Rubric:** 5, 4
 - **What is wrong:** T-43's ruling did not settle what T-44 should assert in place of "no warnings". T-44 chose "every warning contains `face is not planar`" without asking. That holds for any count, including a regression that triples it. T-72's Scope also says the checks "go back to asserting no warning but that one", which they never asserted.
-- **Outcome:** —
+**Outcome:** —
 
 ### Refactors f3f5a06 and cf96c46 change no behaviour (no defect)
 
 - **Where:** `scenarios/Carve.Scenario.Character/GardenerPixels.cs`, `tests/Carve.CharacterLoad.Tests/RunContent.cs`
 - **Rubric:** 1
 - **What is wrong:** nothing. The moved code is token for token, and only the soft scenario's failure text now includes the pixel.
-- **Outcome:** no change needed: no defect reported.
+**Outcome:** no change needed: the reviewer reports no defect.
 
 ### T-44's checks can fail on the three named mutations (no defect)
 
@@ -164,7 +166,7 @@ The face, edge and vertex points, the smooth, crease, boundary and corner rules,
   - A mirrored camera is caught by the can-left and `ExpectNot` checks.
   - A skipped `subdivide` is caught by `triangles <= 680` and the load test's range.
   - A skipped crease is caught by `CheckHat(creased: true)`, the soft-against-uncreased byte check and the rim normals.
-- **Outcome:** no change needed: no defect reported.
+**Outcome:** no change needed: the reviewer reports no defect.
 
 `cairn lint` was clean. Not checked by this reviewer: `scenario-character` and `CharacterLoad.Tests` were not run after the refactors; the content of `samples/gardener-soft.carve`; T-42 and T-43 internals.
 
