@@ -40,16 +40,22 @@ A character's surface reads soft, with creases only where an agent puts them.
 
 ### Hand-off
 
-Run on Sonnet 5.5 (second agent; the first stopped at the open rules, which the person ruled on 2026-11-09: corner normals angle-weighted; an open edge is a plain boundary; an edge of three or more faces is hard; `mark_edges` accepts both).
+Run on Sonnet 5.5 (third agent). Handed off at the frame review: the person REJECTED the cube frames with the note "Those are hard to judge; is it easier with a sphere or cylinder?".
 
-- **Done and committed, `cairn task T-42 verify` is VERIFY PASS** (server-unit, scenario-cube, scenario-crate, core-unit, server-regression):
-  - Core: `src/Carve.Core/Shading.cs` (`ShadingMode`, `MeshShade`, `ShadedTriangle`, `Shading.Triangles/Corners/CornersOf`); `PolygonMesh.Shade`, `ShadingMode`, `HardEdges`, `WithShade`, `PosedCorners` (internal); soft edge = exactly two faces wound opposite ways and not marked hard; a corner averaging one face keeps `FaceNormal` bit for bit, so flat meshes equal `FlatShading`. `EditResult` carries the shade through move/extrude and drops marks on edges that no longer exist. `Model.Combined` keeps shading per mesh (a flat piece of a mixed model has all its edges hard). `Skinning.CornerNormals` and `Skinning.Posed` carry posed corner normals for smooth weighted meshes.
-  - File: `Write` gives version 3 only when a mesh has a shade (so every existing flat file stays version 2, byte for byte), else 2; reads 1, 2, 3; v3 keys `shading`, `hard_edges` (a v2 file with them is refused). The version-text tests now say "versions 1, 2 and 3", and the version-3 refusal tests use 4.
-  - Server: `set_shading`, `mark_edges` (`ShadingTools.cs`, `ModelStore.Reshade`); `MeshBridge`, `GlbExport`, `ExportTool`, `SkinnedExport` take normals from `Shading`. The normals look still shows face normals.
-  - Tests: `ShadingTests`, `ShadingFileTests` (core, unit); `ShadingNormalsTests` (render versus loaded normals bit for bit, unit) and `ShadingToolTests` (regression); the two tools in `NamedMeshTests`' every-tool theory.
-  - Frames: section 2c of `CubeScenario.cs`: `cube-smooth-dir-1-1-1-ortho`, `cube-creased-dir-1-1-1-ortho` (top face's four edges hard), `cube-smooth-all-hard-dir-1-1-1-ortho` (checked equal to the flat hexagon frame pixel for pixel). Pixel checks passed on the first run.
-- **Left:**
-  1. The byte-identical guard on existing frames by hash before and after: no baseline run was found (`cairn test status` lists only this branch's jobs). Fetch scenario-cube and scenario-crate for a pre-T-42 commit (or run the suites on `origin/milestone/M-18` in a throwaway worktree), compare `run.json` image hashes with this branch's jobs `J-20261110-045904-6b39c4` (cube) and `J-20261110-045909-fe46c1` (crate; fetch by job id, to `--out` a Windows path, since bash `/tmp` differs).
-  2. Look at the three new frames (crops; none opened yet) and the "each new check shown failing, as a table" item (for instance by running the smooth section against a flat mesh, or with a mirrored sample point, and listing which check fails).
-  3. Write `### As built` (the rulings, soft-edge definition, version 3 only when needed, stale marks dropped, extrude keeps the mode, normals look unchanged, model Sonnet 5.5), remove this section, `cairn lint`, `cairn task T-42 finish` from inside the worktree, quoting the `Merge task/T-42` line. Consider adding a CLAUDE.md layout/architecture note (the `.glb` export no longer always has flat normals).
-- **Surprising:** the first bash heredocs that held an apostrophe in text failed; use the Write tool for such files.
+- Done since the last hand-off (committed): `LookMeshes` normals look colours each triangle corner from `Shading.Triangles` corner normals (flat meshes are bit-identical, so flat frames do not change) and, for a mesh with `Shading.HasCornerNormals`, stands a spike on each corner along its corner normal instead of one per face; render tool text says so; `CLAUDE.md` `.glb` line updated; unit test `A_smooth_mesh_in_normals_carries_its_corner_normals_in_colour_and_spikes`; cube scenario frames `cube-smooth-normals-dir-1-1-1-ortho` and `cube-creased-normals-dir-1-1-1-ortho` with pixel checks (channel ordering via `CheckChannelGreater`).
+- Byte-identical guard DONE: baseline = e9f4e8e (origin/milestone/M-18), ad-hoc runs of `pwsh scripts/run-scenario.ps1 <s>` (jobs J-20261110-053534-a956f7 cube, -053537-987575 crate, -053540-2b9d8c shed, -053543-00fb1f character, -053545-c39a46 export) against HEAD (cube J-20261110-053553-e661f9, crate -052338-c94db3, shed -052340-d00423, character -052342-b8b0f0, export -052343-5eae9d). sha256 of every png/glb/carve file: every shared file identical; the only differences are the 5 added cube frames (smooth, creased, all-hard, smooth-normals, creased-normals) and 2 extra viewer pngs in the suite-run export artefacts (suite versus ad-hoc run, not a change). Artefacts are in the temp folder `Temp\t42` (outside the worktree).
+- New checks shown failing (local scenario-cube runs with mutated sample points or server, then reverted):
+
+| Mutation | Check that failed |
+|---|---|
+| normals look used face normals | smooth normals, red across top: 188 against 188 |
+| sample points mirrored in x (smooth top) | smooth normals red: 142 against 222 |
+| sample points flipped in z (smooth top) | smooth normals blue: 177 against 197 |
+| mirrored (creased +X face) | creased normals blue: 134 against 225 |
+| flipped (creased +Z face, y) | creased normals green: 134 against 183 |
+| creased top edges made soft before the normals frame | creased normals: top face should be one colour |
+
+- Left:
+  1. The person asked for a sphere or cylinder to judge smooth normals. Add a UV sphere (or a cylinder with hard cap rims) smooth frame, shaded plus normals, with pixel checks and a mirror/flip check as for the cube, then re-review. This adds frames beyond the spec, so the caller may want to confirm. The G: drive is absent on this machine, so the review ran from the temp folder with local paths.
+  2. `cairn task T-42 verify` clean after the last commit (scenario suites ran PASS on this code; server-unit has not run with the new unit test, which passes locally).
+  3. Write `### As built` (rulings 1 to 5, soft-edge definition, version 3 only when shaded, stale marks dropped, extrude keeps the mode, normals look now corner normals, spikes per corner on smooth meshes, model Sonnet 5.5), remove this section, `cairn lint`, `cairn task T-42 finish` from inside the worktree, quoting the merge line.
