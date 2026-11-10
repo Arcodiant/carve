@@ -4,7 +4,7 @@ description: >-
 ---
 # T-44 — Soft character scenario
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
