@@ -4,7 +4,7 @@ description: >-
 ---
 # T-42 — Smooth normals and hard edges
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
