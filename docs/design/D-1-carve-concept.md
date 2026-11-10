@@ -160,10 +160,14 @@ process and a protocol between the two.
 - **The Carve file.** *Decided at M-3 planning:* JSON text holding the geometry; see *A Carve file, and .glb export*.
 - **Scope of a model.** Which of these does Carve author, and when: UVs and
   unwrapping, materials and textures, smoothing and normals, several parts or a node
-  hierarchy, LODs, colliders, rigs and animation? *Rigs, animation, colour and smoothing are decided in D-6.*
+  hierarchy, LODs, colliders, rigs and animation? *Rigs, animation, colour and smoothing are decided in D-6.* *UVs, decided at M-6 planning (2026-11-09), by the person:*
+  - UVs are stored per face corner, in glTF's directions (origin top-left, v down) everywhere. A face may be unmapped.
+  - Seams are a marked edge set, set with `mark_edges`.
+  - `unwrap` is LSCM written here. `project_uvs` offers planar, box and cylindrical.
+  - Export writes `TEXCOORD_0` and splits vertices where UVs differ.
 - **Render modes.** Which come first, and do any need something Empyrean does not
   have? The first look at its docs did not find a normals or UV debug view; a
-  material or shader of Carve's own may do it. *Decided at M-4:* wireframe, normals and highlight came first. None needed anything of the engine: it had line lists on the headless path, per-vertex colours on the unlit `SolidColor` material and an immediate text surface for the labels (T-25, T-26), so there is no engine need. UVs are still open.
+  material or shader of Carve's own may do it. *Decided at M-4:* wireframe, normals and highlight came first. None needed anything of the engine: it had line lists on the headless path, per-vertex colours on the unlit `SolidColor` material and an immediate text surface for the labels (T-25, T-26), so there is no engine need. *UVs, decided at M-6 planning:* two looks, `checker` (the model lit with a generated checker) and `uvs` (one mesh's layout drawn flat). A planning probe showed the engine loads `TEXCOORD_0` and draws a texture headless, so no engine need is expected.
 - **Transport.** Stdio for now (decided at T-7; the README's `.mcp.json` entry starts it). HTTP, and
   how the server is installed for a game's Claude session beyond that entry, stay open until a
   use needs them.
