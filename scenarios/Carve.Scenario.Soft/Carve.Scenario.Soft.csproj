@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The soft gardener: the test character of M-16, subdivided and smoothed through the real tools, with the hat's brim creased. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Soft</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The crate scenario's call helpers and camera maths, and the gardener's data, linked and not copied. -->
+    <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../Carve.Scenario.Character/GardenerSpec.cs" Link="GardenerSpec.cs" />
+  </ItemGroup>
+
+</Project>
