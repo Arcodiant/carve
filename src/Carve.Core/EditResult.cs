@@ -49,7 +49,11 @@ public sealed class EditResult
     private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<ExtrudedFace> extruded)
     {
         var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(extruded)) : edited;
-        return source.Weights is { } weights ? mesh.WithWeights(weights) : mesh;
+        mesh = source.Weights is { } weights ? mesh.WithWeights(weights) : mesh;
+        // The mode and the hard edges carry; a hard edge the edit no longer has is dropped (T-42).
+        if (source.Shade is not { } shade) return mesh;
+        var gone = shade.Hard.Where(e => !mesh.Topology.TryGetEdge(e.Lo, e.Hi, out _)).ToArray();
+        return mesh.WithShade(gone.Length == 0 ? shade : shade.WithEdges(gone.Select(e => (e.Lo, e.Hi)), false));
     }
 
     /// <summary>The result of an edit of <paramref name="source"/>: the new mesh keeps the source's face colours and groups, and walls take their source face's.</summary>

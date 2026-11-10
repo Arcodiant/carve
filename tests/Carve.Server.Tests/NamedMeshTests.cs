@@ -76,6 +76,8 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     [InlineData("select", """{"kind":"faces","where":"normal.y > 0.9"}""")]
     [InlineData("set_colour", """{"colour":"#3C78C8","faces":[0]}""")]
     [InlineData("define_group", """{"name":"top","faces":[0]}""")]
+    [InlineData("set_shading", """{"shading":"smooth"}""")]
+    [InlineData("mark_edges", """{"edges":[[0,1]]}""")]
     [InlineData("set_weights", """{"vertices":[0],"weights":{"base":1}}""")]
     public async Task Every_tool_aimed_at_one_mesh_refuses_to_guess_among_several_and_names_them(string tool, string arguments)
     {

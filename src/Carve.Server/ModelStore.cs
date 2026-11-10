@@ -125,6 +125,26 @@ public sealed class ModelStore
     }
 
     /// <summary>
+    /// Changes the shading (mode and hard edges) of the mesh <paramref name="name"/> picks, under the write lock, as
+    /// <see cref="Restyle"/> does for the style: <paramref name="change"/> returns the new shade, or the problems that refuse it.
+    /// </summary>
+    public ModelSnapshot? Reshade(string tool, string? name, Func<PolygonMesh, (MeshShade? Shade, List<string> Problems)> change,
+        out List<string> refused, out string? problem)
+    {
+        lock (_write)
+        {
+            refused = [];
+            var model = _current.Model;
+            var target = model.Target(name, out problem);
+            if (target is null) return null;
+            var (shade, problems) = change(target.Mesh);
+            refused = problems;
+            if (shade is null || problems.Count > 0) return null;
+            return PushLocked(model.With(target.Name, target.Mesh.WithShade(shade)), tool);
+        }
+    }
+
+    /// <summary>
     /// Sets the skeleton as the result of <paramref name="tool"/>, one step for undo. Once a mesh has weights or the model
     /// has clips, a skeleton whose bone names or order differ (<see cref="Skeleton.SameNamesAs"/>) is refused under the
     /// lock: null, nothing pushed, <paramref name="refusal"/> says why.

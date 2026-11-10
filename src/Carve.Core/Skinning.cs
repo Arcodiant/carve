@@ -118,6 +118,36 @@ public static class Skinning
     }
 
     /// <summary>
+    /// The posed corner normals of <paramref name="mesh"/> (face, then position in its loop): each rest corner normal
+    /// (<see cref="Shading.Corners"/>) rotated and blended by its vertex's weights, renormalised; an unweighted vertex keeps its own.
+    /// </summary>
+    public static Vector3[][] CornerNormals(PolygonMesh mesh, Skeleton skeleton, Pose pose)
+    {
+        var rest = Shading.Corners(mesh);
+        var skin = SkinTransforms(skeleton, pose);
+        var result = new Vector3[rest.Length][];
+        for (var f = 0; f < rest.Length; f++)
+        {
+            var loop = mesh.Faces[f];
+            result[f] = new Vector3[loop.Count];
+            for (var k = 0; k < loop.Count; k++)
+            {
+                var n = rest[f][k];
+                if (mesh.Weights is not { } weights || !weights.Has(loop[k])) { result[f][k] = n; continue; }
+                double x = 0, y = 0, z = 0;
+                foreach (var (bone, w) in weights.Of(loop[k]))
+                {
+                    var (px, py, pz) = skin[bone].Rotate(n.X, n.Y, n.Z);
+                    x += w * px; y += w * py; z += w * pz;
+                }
+                var len = Math.Sqrt(x * x + y * y + z * z);
+                result[f][k] = len > 0 ? new Vector3((float)(x / len), (float)(y / len), (float)(z / len)) : n;
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
     /// The model with every weighted mesh at its posed vertex positions, colours and groups kept, weights dropped (the
     /// result is a plain mesh to draw). A model with no skeleton comes back unchanged.
     /// </summary>
@@ -127,7 +157,8 @@ public static class Skinning
         var result = Model.Empty;
         foreach (var (name, mesh) in model.Meshes)
         {
-            result = result.With(name, mesh.Weights is null ? mesh : mesh.WithVertices(Positions(mesh, skeleton, pose)));
+            result = result.With(name, mesh.Weights is null ? mesh
+                : mesh.WithVertices(Positions(mesh, skeleton, pose), mesh.ShadingMode == ShadingMode.Smooth ? CornerNormals(mesh, skeleton, pose) : null));
         }
         return result;
     }

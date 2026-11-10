@@ -78,7 +78,7 @@ public static class SkinnedExport
         {
             var mesh = piece.Mesh;
             var triangles = Triangulator.Triangulate(mesh);
-            var normals = new Vector3?[mesh.Faces.Count];
+            var corners = Shading.CornersOf(mesh);
             var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexJoints4>>();
             foreach (var (materialName, colour) in Materials(piece))
             {
@@ -88,9 +88,10 @@ public static class SkinnedExport
 
             foreach (var t in triangles)
             {
-                var normal = normals[t.Face] ??= mesh.FaceNormal(t.Face);
+                var loop = mesh.Faces[t.Face];
+                var at = corners[t.Face];
                 var primitive = primitives[GlbExport.ColourOf(mesh, t.Face) ?? ""];
-                primitive.AddTriangle(Vertex(mesh, t.A, normal), Vertex(mesh, t.B, normal), Vertex(mesh, t.C, normal));
+                primitive.AddTriangle(Vertex(mesh, t.A, at[Corner(loop, t.A)]), Vertex(mesh, t.B, at[Corner(loop, t.B)]), Vertex(mesh, t.C, at[Corner(loop, t.C)]));
             }
             triangleCount += triangles.Count;
             boundToRoot += Enumerable.Range(0, mesh.Vertices.Count).Count(v => mesh.Weights?.Has(v) != true);
@@ -160,6 +161,12 @@ public static class SkinnedExport
 
     private static string? GroupFor(PolygonMesh mesh, List<int> faces) =>
         mesh.Style?.Groups.FirstOrDefault(g => g.Faces.Count == faces.Count && g.Faces.Order().SequenceEqual(faces)).Name;
+
+    private static int Corner(IReadOnlyList<int> loop, int vertex)
+    {
+        for (var i = 0; i < loop.Count; i++) if (loop[i] == vertex) return i;
+        throw new ArgumentException("the vertex is not in the face", nameof(vertex));
+    }
 
     private static VertexBuilder<VertexPositionNormal, VertexEmpty, VertexJoints4> Vertex(PolygonMesh mesh, int vertex, Vector3 normal) =>
         new(new VertexPositionNormal(mesh.Vertices[vertex], normal), default(VertexEmpty), Joints(mesh.Weights?.Of(vertex) ?? []));

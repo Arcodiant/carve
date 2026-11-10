@@ -175,6 +175,37 @@ public sealed class CubeScenario : IScenario
         await ExpectErrorAsync(driver, "projection iso", new { projection = "iso" }, "projection: 'iso' is not a projection");
         await ExpectErrorAsync(driver, "view top", new { view = "top" }, "view: 'top' is not a view");
 
+        // 2c. T-42: smooth shading. The same hexagon view three ways. Flat is the frame above: a face is one shade. Smooth gives each corner
+        // its own normal, so the top face (a gradient from the corner at the centre of the hexagon to the far one) is not one shade.
+        // Smooth with the top's four edges hard keeps the top one shade and still grades the +Z face. Every edge hard is the flat frame,
+        // pixel for pixel. Points are worked from the mesh by the orthographic rule, so a mirrored or flipped camera samples background or another face.
+        var topNear = Rounded(hexagonPixel(new Vector3(0.85f, 1, 0.85f)));
+        var topFar = Rounded(hexagonPixel(new Vector3(0.15f, 1, 0.15f)));
+        var flatTopNear = hexagon.Pixel(topNear.X, topNear.Y).G;
+        var flatTopFar = hexagon.Pixel(topFar.X, topFar.Y).G;
+        if (flatTopNear != flatTopFar) driver.Fail($"{hexagon.Name}: the flat top face should be one shade, got {flatTopNear} and {flatTopFar}");
+
+        Ok(driver, await driver.CallAsync("set_shading", new { shading = "smooth" }));
+        var smooth = await driver.CaptureAsync("cube-smooth-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic" });
+        CheckOutline(driver, smooth, silhouette.Select(hexagonPixel).ToArray(), 3);
+        CheckDiffers(driver, smooth, topNear, topFar, "the smooth top face, near the centre corner and near the far one");
+        CheckDiffers(driver, smooth, topNear, Rounded(hexagonPixel(new Vector3(0.15f, 1, 0.85f))), "the smooth top face, along the other diagonal");
+        if (smooth.Pixels.AsSpan().SequenceEqual(hexagon.Pixels)) driver.Fail($"{smooth.Name}: smooth shading drew the flat frame");
+
+        Ok(driver, await driver.CallAsync("mark_edges", new { edges = new[] { new[] { 3, 7 }, new[] { 7, 6 }, new[] { 6, 2 }, new[] { 2, 3 } } }));
+        var creased = await driver.CaptureAsync("cube-creased-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic" });
+        CheckOutline(driver, creased, silhouette.Select(hexagonPixel).ToArray(), 3);
+        var creasedNear = creased.Pixel(topNear.X, topNear.Y).G;
+        var creasedFar = creased.Pixel(topFar.X, topFar.Y).G;
+        if (creasedNear != flatTopNear || creasedFar != flatTopFar)
+            driver.Fail($"{creased.Name}: the creased top face should keep its flat shade {flatTopNear}, got {creasedNear} and {creasedFar}");
+        CheckDiffers(driver, creased, Rounded(hexagonPixel(new Vector3(0.5f, 0.9f, 1))), Rounded(hexagonPixel(new Vector3(0.5f, 0.1f, 1))), "the +Z face, graded from its top edge to its bottom one");
+
+        var every = new[] { new[] { 0, 1 }, new[] { 1, 2 }, new[] { 2, 3 }, new[] { 3, 0 }, new[] { 4, 5 }, new[] { 5, 6 }, new[] { 6, 7 }, new[] { 7, 4 }, new[] { 0, 4 }, new[] { 1, 5 }, new[] { 2, 6 }, new[] { 3, 7 } };
+        Ok(driver, await driver.CallAsync("mark_edges", new { edges = every }));
+        var allHard = await driver.CaptureAsync("cube-smooth-all-hard-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic" });
+        if (!allHard.Pixels.AsSpan().SequenceEqual(hexagon.Pixels)) driver.Fail($"{allHard.Name}: smooth with every edge hard should draw the flat frame pixel for pixel");
+
         // 3. The L-block: two concave hexagon caps and six quad sides.
         var (lVertices, lFaces) = LBlock();
         await DefineCleanAsync(driver, "L-block", lVertices, lFaces);
@@ -336,6 +367,21 @@ public sealed class CubeScenario : IScenario
         {
             driver.Fail($"{frame.Name}: {what}: {high} should be at least {MinimumStep} above {low}");
         }
+    }
+
+    /// <summary>Two pixels at least <see cref="MinimumStep"/> apart in the green channel, either way.</summary>
+    private static void CheckDiffers(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) a, (int X, int Y) b, string what)
+    {
+        var (first, second) = (frame.Pixel(a.X, a.Y).G, frame.Pixel(b.X, b.Y).G);
+        if (Math.Abs(first - second) < MinimumStep)
+        {
+            driver.Fail($"{frame.Name}: {what}: {first} and {second} should differ by at least {MinimumStep}");
+        }
+    }
+
+    private static void Ok(ScenarioDriver driver, ModelContextProtocol.Protocol.CallToolResult result)
+    {
+        if (result.IsError == true) driver.Fail("tool error: " + string.Join(" ", result.Content.OfType<ModelContextProtocol.Protocol.TextContentBlock>().Select(t => t.Text)));
     }
 
     private static void CheckCaption(ScenarioDriver driver, ScenarioFrame frame, string expected)
