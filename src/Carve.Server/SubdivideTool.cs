@@ -19,7 +19,7 @@ public sealed class SubdivideTool(ModelStore store)
         + "Hard edges (mark_edges) stay creased: a hard edge's two halves are hard, and the surface keeps a sharp line along it. "
         + "An open edge, one with a face on one side only, follows the boundary rule, so an open rim stays a rim. A vertex where three or more hard or open edges meet is a corner and stays where it is. "
         + "New faces take their face's colour and groups; new vertices take bone weights blended from the vertices they are made from, at most four bones each. The shading mode is kept: set_shading smooth to see a soft surface. "
-        + "The new quads are generally not flat, so warnings list each non-planar face; that is expected here. "
+        + "The new quads are generally not flat, which is expected here, so this result folds the not-planar warnings into one line, \"N faces are not planar (expected after subdivide)\", after the other warnings; get_mesh, check and export still list each face, and select faces where non_planar names them. "
         + "Returns JSON {vertices, faces, edges, triangles, closed, bounds:{min,max}, warnings:[], levels, created:{vertices:{first, count}, faces:{first, count}}}, triangles counting the whole model; "
         + "a warning is added when the model has more than 5000 triangles, the most a game character should keep to. "
         + "Bad input (levels missing, not a whole number or outside 1 to 3, an argument subdivide does not take) is a tool error; the mesh is left unchanged and nothing is added to undo. "
@@ -58,7 +58,7 @@ public sealed class SubdivideTool(ModelStore store)
         var edited = snapshot.Model.Find(name ?? snapshot.Model.Meshes[0].Name)!;
         var triangles = snapshot.Model.Meshes.Sum(m => m.Mesh.Faces.Sum(f => f.Count - 2));
         var body = Report(edited);
-        var warnings = ((string[])body["warnings"]).ToList();
+        var warnings = Warnings(edited);
         if (triangles > SkinnedExport.MaxTriangles)
             warnings.Insert(0, string.Create(CultureInfo.InvariantCulture,
                 $"the model has {triangles} triangles, above the {SkinnedExport.MaxTriangles} a game character should keep to"));
@@ -79,6 +79,22 @@ public sealed class SubdivideTool(ModelStore store)
             },
         };
         return Ok(ordered);
+    }
+
+    /// <summary>
+    /// The report's warnings with the not-planar ones folded into one line at the end: Catmull-Clark quads are
+    /// almost never flat, and one line per face would bury the rest (the person's ruling, 2026-11-10). Only this
+    /// result folds them; get_mesh, check and export list each face as before.
+    /// </summary>
+    internal static List<string> Warnings(PolygonMesh mesh)
+    {
+        var all = MeshReport.Create(mesh).Warnings;
+        var warnings = all.Where(w => w.Kind != MeshWarningKind.NonPlanarFace).Select(w => w.ToString()).ToList();
+        var nonPlanar = all.Count(w => w.Kind == MeshWarningKind.NonPlanarFace);
+        if (nonPlanar > 0)
+            warnings.Add(string.Create(CultureInfo.InvariantCulture,
+                $"{nonPlanar} {(nonPlanar == 1 ? "face is" : "faces are")} not planar (expected after subdivide)"));
+        return warnings;
     }
 
     private static int? Levels(JsonElement? value, List<string> errors)

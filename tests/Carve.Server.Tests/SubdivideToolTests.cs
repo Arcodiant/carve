@@ -71,6 +71,30 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
             body.GetProperty("warnings")[0].GetString());
     }
 
+    [Fact]
+    public async Task The_result_folds_not_planar_warnings_into_one_line_and_check_still_lists_each_face()
+    {
+        var (carve, _) = await StartAsync();
+        using var __ = carve;
+        var sample = Path.Combine(Paths.RepoRoot, "samples", "gardener.carve");
+        Accepted(await carve.CallToolAsync("open", JsonSerializer.Serialize(new { path = sample })));
+
+        var body = Ok(await carve.CallToolAsync("subdivide", """{"mesh":"Body","levels":1}"""));
+
+        var warnings = body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToList();
+        Assert.DoesNotContain(warnings, w => w.Contains("face is not planar:"));
+        var folded = Assert.Single(warnings, w => w.EndsWith("not planar (expected after subdivide)"));
+        Assert.Equal(warnings.Count - 1, warnings.IndexOf(folded));
+        var selected = Ok(await carve.CallToolAsync("select", """{"mesh":"Body","kind":"faces","where":"non_planar"}"""));
+        var count = selected.GetProperty("count").GetInt32();
+        Assert.True(count > 1, $"only {count} non-planar faces");
+        Assert.Equal($"{count} faces are not planar (expected after subdivide)", folded);
+
+        // The ruling folds subdivide's own result only: check still names each face.
+        var check = Ok(await carve.CallToolAsync("check", """{"mesh":"Body"}"""));
+        Assert.Equal(count, check.GetProperty("warnings").EnumerateArray().Count(w => w.GetString()!.Contains("face is not planar:")));
+    }
+
     [Theory]
     [InlineData("{}", "levels: required but missing")]
     [InlineData("""{"levels":0}""", "levels: 0 is outside 1 to 3")]
