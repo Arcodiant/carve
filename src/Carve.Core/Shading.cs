@@ -71,13 +71,23 @@ public static class Shading
     /// <summary>Whether the corners can differ from their faces' normals: a smooth mesh, or a posed copy that carries its own.</summary>
     public static bool HasCornerNormals(PolygonMesh mesh) => mesh.ShadingMode == ShadingMode.Smooth || mesh.PosedCorners is not null;
 
+    /// <summary>
+    /// The shade of <paramref name="mesh"/> with <paramref name="edges"/> made hard or soft (mark_edges), or null when a pair is
+    /// not an edge of the mesh: <paramref name="notEdges"/> then lists each such pair once, lower id first, in the order given.
+    /// </summary>
+    public static MeshShade? MarkEdges(PolygonMesh mesh, IReadOnlyList<(int A, int B)> edges, bool hard, out List<(int Lo, int Hi)> notEdges)
+    {
+        notEdges = [.. edges.Distinct().Where(e => !mesh.Topology.TryGetEdge(e.A, e.B, out _)).Select(e => (Math.Min(e.A, e.B), Math.Max(e.A, e.B)))];
+        return notEdges.Count > 0 ? null : (mesh.Shade ?? MeshShade.Flat).WithEdges(edges, hard);
+    }
+
     /// <summary>The triangles in <see cref="Triangulator"/> order, each with its corner normals.</summary>
     public static IReadOnlyList<ShadedTriangle> Triangles(PolygonMesh mesh)
     {
         var triangles = Triangulator.Triangulate(mesh);
         var result = new ShadedTriangle[triangles.Count];
         var faceNormals = new Vector3?[mesh.Faces.Count];
-        var corners = mesh.ShadingMode == ShadingMode.Smooth || mesh.PosedCorners is not null ? CornersOf(mesh) : null;
+        var corners = HasCornerNormals(mesh) ? CornersOf(mesh) : null;
         for (var t = 0; t < triangles.Count; t++)
         {
             var triangle = triangles[t];
@@ -92,8 +102,8 @@ public static class Shading
             }
             var loop = mesh.Faces[triangle.Face];
             var at = corners[triangle.Face];
-            result[t] = new ShadedTriangle(a, b, c, at[IndexOf(loop, triangle.A)], at[IndexOf(loop, triangle.B)],
-                at[IndexOf(loop, triangle.C)], normal, triangle.Face);
+            result[t] = new ShadedTriangle(a, b, c, at[CornerOf(loop, triangle.A)], at[CornerOf(loop, triangle.B)],
+                at[CornerOf(loop, triangle.C)], normal, triangle.Face);
         }
         return result;
     }
@@ -132,7 +142,7 @@ public static class Shading
             for (var i = 0; i < around.Count; i++)
             {
                 var loop = faces[around[i]];
-                var k = IndexOf(loop, v);
+                var k = CornerOf(loop, v);
                 foreach (var other in new[] { loop[(k + 1) % loop.Count], loop[(k + loop.Count - 1) % loop.Count] })
                 {
                     if (!topology.TryGetEdge(v, other, out var edge) || !edge.IsManifold || shade.IsHard(v, other)) continue;
@@ -150,7 +160,7 @@ public static class Shading
                 {
                     var f = around[i];
                     var loop = faces[f];
-                    var k = IndexOf(loop, v);
+                    var k = CornerOf(loop, v);
                     var w = Angle(mesh.Vertices[v], mesh.Vertices[loop[(k + 1) % loop.Count]], mesh.Vertices[loop[(k + loop.Count - 1) % loop.Count]]);
                     var n = faceNormals[f];
                     x += w * n.X; y += w * n.Y; z += w * n.Z;
@@ -159,7 +169,7 @@ public static class Shading
                 foreach (var i in members)
                 {
                     var f = around[i];
-                    result[f][IndexOf(faces[f], v)] = len > 0 ? new Vector3((float)(x / len), (float)(y / len), (float)(z / len)) : faceNormals[f];
+                    result[f][CornerOf(faces[f], v)] = len > 0 ? new Vector3((float)(x / len), (float)(y / len), (float)(z / len)) : faceNormals[f];
                 }
             }
         }
@@ -177,7 +187,8 @@ public static class Shading
         return Math.Atan2(Math.Sqrt(cx * cx + cy * cy + cz * cz), ax * bx + ay * by + az * bz);
     }
 
-    private static int IndexOf(IReadOnlyList<int> loop, int vertex)
+    /// <summary>The position of <paramref name="vertex"/> in a face's <paramref name="loop"/>: the index of its corner in <see cref="Corners"/>.</summary>
+    public static int CornerOf(IReadOnlyList<int> loop, int vertex)
     {
         for (var i = 0; i < loop.Count; i++) if (loop[i] == vertex) return i;
         throw new ArgumentException("the vertex is not in the face", nameof(vertex));
