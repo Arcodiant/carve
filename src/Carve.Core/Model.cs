@@ -262,6 +262,7 @@ public sealed class Model
         var colours = new List<KeyValuePair<int, string>>();
         var hard = new List<(int, int)>();
         var corners = new List<System.Numerics.Vector3[]>();
+        var flat = new List<bool>();
         var posed = _meshes.Any(m => m.Mesh.PosedCorners is not null);
         var smooth = _meshes.Any(m => m.Mesh.ShadingMode == ShadingMode.Smooth);
         foreach (var (_, mesh) in _meshes)
@@ -271,6 +272,7 @@ public sealed class Model
             vertices.AddRange(mesh.Vertices);
             faces.AddRange(mesh.Faces.Select(f => f.Select(v => v + offset).ToArray()));
             if (posed) corners.AddRange(Shading.CornersOf(mesh));
+            flat.AddRange(Enumerable.Repeat(!Shading.HasCornerNormals(mesh), mesh.Faces.Count));
             if (!smooth) continue;
             // Shading is per mesh: a flat piece of a mixed model has every edge hard, a smooth piece its own.
             var edges = mesh.ShadingMode == ShadingMode.Smooth ? mesh.HardEdges : mesh.Topology.Edges.Select(e => (e.Lo, e.Hi));
@@ -278,7 +280,9 @@ public sealed class Model
         }
         // Each mesh was checked when it was made (a posed one is a copy to draw, not checked), so they are joined as they are.
         var shade = smooth ? MeshShade.Of(ShadingMode.Smooth, hard) : null;
-        var combined = PolygonMesh.Assemble([.. vertices], [.. faces], shade, posed ? [.. corners] : null);
+        // A flat piece keeps its face-centre spikes beside a smooth one, so the combined mesh says which faces are flat.
+        var combined = PolygonMesh.Assemble([.. vertices], [.. faces], shade, posed ? [.. corners] : null,
+            (smooth || posed) && flat.Contains(true) ? [.. flat] : null);
         return colours.Count == 0 ? combined : combined.WithStyle(FaceStyle.OfColours(colours));
     }
 }

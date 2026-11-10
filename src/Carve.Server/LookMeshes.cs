@@ -135,6 +135,7 @@ public static class LookMeshes
     /// <summary>
     /// One colour per vertex of <see cref="MeshBridge"/>'s triangles, each from its corner normal from <see cref="Shading"/>:
     /// a flat mesh's corner normal is its face's, so a flat mesh is coloured as it always was, and a smooth one blends.
+    /// The order is <see cref="MeshBridge.ToMeshData"/>'s, which reverses each triangle for the engine: A, then C, then B.
     /// </summary>
     private static Rgba8[] CornerColours(PolygonMesh mesh)
     {
@@ -143,8 +144,8 @@ public static class LookMeshes
         for (var t = 0; t < triangles.Count; t++)
         {
             colours[t * 3] = NormalColour(triangles[t].NormalA);
-            colours[t * 3 + 1] = NormalColour(triangles[t].NormalB);
-            colours[t * 3 + 2] = NormalColour(triangles[t].NormalC);
+            colours[t * 3 + 1] = NormalColour(triangles[t].NormalC);
+            colours[t * 3 + 2] = NormalColour(triangles[t].NormalB);
         }
 
         return colours;
@@ -168,21 +169,25 @@ public static class LookMeshes
         Lines(mesh.Topology.Edges.Where(e => !highlight.Edges.Contains((e.Lo, e.Hi))).SelectMany(e => Lifted(mesh, space, e)));
 
     /// <summary>
-    /// A segment per face: from its centre along its normal. On a shaded mesh (smooth, or posed with corner normals) a
-    /// segment per corner instead: from the corner along its normal, which is what the colours show.
+    /// A segment per face: from its centre along its normal. A face of a shaded mesh (smooth, or posed with corner normals)
+    /// gets a segment per corner instead: from the corner along its normal, which is what the colours show. A flat mesh's
+    /// faces keep their centre spikes when it is drawn beside a smooth one (<see cref="Shading.FaceHasCornerNormals"/>).
     /// </summary>
-    public static MeshData<PositionVertex>? Spikes(PolygonMesh mesh, DrawnSpace space) =>
-        Shading.HasCornerNormals(mesh)
-            ? Lines(Shading.CornersOf(mesh).SelectMany((normals, f) => mesh.Faces[f].SelectMany((v, k) =>
-            {
-                var at = space.Apply(mesh.Vertices[v]);
-                return new[] { at, at + normals[k] * SpikeLength };
-            })))
-            : Lines(Enumerable.Range(0, mesh.Faces.Count).SelectMany(f =>
+    public static MeshData<PositionVertex>? Spikes(PolygonMesh mesh, DrawnSpace space)
+    {
+        var corners = Shading.HasCornerNormals(mesh) ? Shading.CornersOf(mesh) : null;
+        return Lines(Enumerable.Range(0, mesh.Faces.Count).SelectMany(f =>
         {
+            if (corners is not null && Shading.FaceHasCornerNormals(mesh, f))
+                return mesh.Faces[f].SelectMany((v, k) =>
+                {
+                    var at = space.Apply(mesh.Vertices[v]);
+                    return new[] { at, at + corners[f][k] * SpikeLength };
+                });
             var centre = space.Apply(mesh.FaceCentre(f));
             return new[] { centre, centre + mesh.FaceNormal(f) * SpikeLength };
         }));
+    }
 
     /// <summary>
     /// The highlighted edges, lifted as the wireframe's, in normals the loops of the highlighted faces too,

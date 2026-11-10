@@ -72,12 +72,19 @@ public static class Shading
     public static bool HasCornerNormals(PolygonMesh mesh) => mesh.ShadingMode == ShadingMode.Smooth || mesh.PosedCorners is not null;
 
     /// <summary>
+    /// Whether face <paramref name="face"/> is drawn with corner normals: <see cref="HasCornerNormals"/>, except for the faces of
+    /// a flat mesh drawn in one combined mesh beside a smooth one (<see cref="Model.Combined"/>), which stay flat.
+    /// </summary>
+    public static bool FaceHasCornerNormals(PolygonMesh mesh, int face) =>
+        HasCornerNormals(mesh) && mesh.FlatFaces?[face] != true;
+
+    /// <summary>
     /// The shade of <paramref name="mesh"/> with <paramref name="edges"/> made hard or soft (mark_edges), or null when a pair is
     /// not an edge of the mesh: <paramref name="notEdges"/> then lists each such pair once, lower id first, in the order given.
     /// </summary>
     public static MeshShade? MarkEdges(PolygonMesh mesh, IReadOnlyList<(int A, int B)> edges, bool hard, out List<(int Lo, int Hi)> notEdges)
     {
-        notEdges = [.. edges.Distinct().Where(e => !mesh.Topology.TryGetEdge(e.A, e.B, out _)).Select(e => (Math.Min(e.A, e.B), Math.Max(e.A, e.B)))];
+        notEdges = [.. edges.Where(e => !mesh.Topology.TryGetEdge(e.A, e.B, out _)).Select(e => (Math.Min(e.A, e.B), Math.Max(e.A, e.B))).Distinct()];
         return notEdges.Count > 0 ? null : (mesh.Shade ?? MeshShade.Flat).WithEdges(edges, hard);
     }
 

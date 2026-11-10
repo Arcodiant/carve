@@ -56,8 +56,9 @@ public sealed class PolygonMesh
     private readonly int[][] _faces;
 
     private PolygonMesh(Vector3[] vertices, int[][] faces, FaceStyle? style = null, VertexWeights? weights = null,
-        MeshShade? shade = null, Vector3[][]? corners = null)
+        MeshShade? shade = null, Vector3[][]? corners = null, bool[]? flatFaces = null)
     {
+        FlatFaces = flatFaces;
         _vertices = vertices;
         _faces = faces;
         Shade = shade is { IsDefault: false } ? shade : null;
@@ -74,7 +75,7 @@ public sealed class PolygonMesh
     public FaceStyle? Style { get; }
 
     /// <summary>This mesh, its geometry shared, with <paramref name="style"/> in place of its own (null or empty for none).</summary>
-    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights, Shade, PosedCorners);
+    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights, Shade, PosedCorners, FlatFaces);
 
     /// <summary>The mesh's shading and hard edges (D-6, Smooth shading is per mesh); null for flat with no hard edge marked.</summary>
     public MeshShade? Shade { get; }
@@ -94,9 +95,16 @@ public sealed class PolygonMesh
     /// </summary>
     internal Vector3[][]? PosedCorners { get; }
 
+    /// <summary>
+    /// For a combined mesh (<see cref="Model.Combined"/>) with corner normals, which faces came from a flat mesh and are
+    /// drawn flat (<see cref="Shading.FaceHasCornerNormals"/>); null otherwise.
+    /// </summary>
+    internal bool[]? FlatFaces { get; }
+
     /// <summary>Faces and vertices joined as given, unchecked: for drawing meshes already checked, or posed.</summary>
-    internal static PolygonMesh Assemble(Vector3[] vertices, int[][] faces, MeshShade? shade = null, Vector3[][]? corners = null)
-        => new(vertices, faces, null, null, shade, corners);
+    internal static PolygonMesh Assemble(Vector3[] vertices, int[][] faces, MeshShade? shade = null, Vector3[][]? corners = null,
+        bool[]? flatFaces = null)
+        => new(vertices, faces, null, null, shade, corners, flatFaces);
 
     /// <summary>
     /// This mesh's faces and colours on other vertex positions, unchecked and with no weights: a posed copy to draw, whose
