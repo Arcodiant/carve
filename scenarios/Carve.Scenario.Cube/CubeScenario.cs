@@ -293,6 +293,37 @@ public sealed class CubeScenario : IScenario
         CheckDiffers(driver, cylSmoothNormals, capPoint, belowRim, "the crease at the rim in the normals look");
         CheckSame(driver, cylSmoothNormals, capPoint, capOther, "the hard-rimmed cap is one colour in the normals look");
 
+        // 2e. T-43: the same cylinder subdivided twice, rims still hard: 64 facets round, the caps flat, a crease at each rim. Then a fresh
+        // cylinder, smooth with no hard edge, subdivided twice: its rims round off into a pillow. Points are the cylinder's own, as above.
+        var farRim = CylAt(Ring(9, 0.97f) * new Vector3(0.9f, 1, 0.9f));   // just inside the far top rim, near the top of the image
+        var capCentre = CylAt(new Vector3(0, 1, 0));
+        Ok(driver, await driver.CallAsync("subdivide", new { levels = 2 }));
+        var subSmooth = await driver.CaptureAsync("cylinder-subdivided-smooth-dir-2-2-1-ortho", cylView);
+        CheckNotBackground(driver, subSmooth, farRim, "the subdivided cylinder just inside its far top rim, the rim being hard");
+        CheckSame(driver, subSmooth, capPoint, capOther, "the subdivided cap keeps one shade, its rim being hard");
+        if (subSmooth.Pixel(capPoint.X, capPoint.Y) != cylSmooth.Pixel(capPoint.X, capPoint.Y)) driver.Fail($"{subSmooth.Name}: the hard-rimmed cap should keep the shade it had before subdividing");
+        CheckDiffers(driver, subSmooth, capPoint, belowRim, "the crease where the subdivided cap meets the side");
+        CheckClose(driver, subSmooth, edgeLeft, edgeRight, "the subdivided side runs on across the old facet edge", 2);
+        CheckDiffers(driver, subSmooth, sideMirror, sideOther, "the subdivided side, at its two ends across the image (a mirrored camera draws other facets)");
+        CheckBrightestOf(driver, subSmooth, capPoint, "the subdivided cap is the brightest part, so a flipped camera (cap below) fails", sideMirror, sideOther, belowRim);
+
+        Ok(driver, await driver.CallAsync("set_shading", new { shading = "flat" }));
+        var subFlatNormals = await driver.CaptureAsync("cylinder-subdivided-flat-normals-dir-2-2-1-ortho", cylNormalsView);
+        CheckChannelGreater(driver, subFlatNormals, CylAt(Facet(2, 0.2f, 0)), CylAt(Facet(2, 0.8f, 0)), p => p.R, "red across one old facet, now four facets, its 49 degree end over its 63 degree end (one colour before subdividing)");
+        CheckChannelGreater(driver, subFlatNormals, CylAt(Facet(14, 0.5f, 0)), CylAt(Facet(3, 0.5f, 0)), p => p.R, "red on the +x side over the +z one (a mirrored camera swaps them)");
+        CheckChannelGreater(driver, subFlatNormals, capPoint, belowRim, p => p.G, "green on the subdivided cap (up) over the side below the rim (a flipped camera swaps them)");
+        CheckSame(driver, subFlatNormals, capPoint, capOther, "the subdivided cap is one colour in the normals look");
+
+        await DefineCleanAsync(driver, "cylinder", cylVertices, cylFaces.ToArray());
+        Ok(driver, await driver.CallAsync("set_shading", new { shading = "smooth" }));
+        Ok(driver, await driver.CallAsync("subdivide", new { levels = 2 }));
+        var subSoft = await driver.CaptureAsync("cylinder-subdivided-soft-rims-dir-2-2-1-ortho", cylView);
+        CheckBackground(driver, subSoft, farRim, "just inside the far top rim, rounded away with no hard rim");
+        CheckNotBackground(driver, subSoft, capCentre, "the soft cylinder's top");
+        CheckNotBackground(driver, subSoft, sideMirror, "the soft cylinder's side, on one side of the image");
+        CheckDiffers(driver, subSoft, sideMirror, sideOther, "the soft side, at its two ends across the image (a mirrored camera draws other parts)");
+        CheckBrightestOf(driver, subSoft, capCentre, "the soft top is the brightest part, so a flipped camera (top below) fails", sideMirror, sideOther);
+
         // 3. The L-block: two concave hexagon caps and six quad sides.
         var (lVertices, lFaces) = LBlock();
         await DefineCleanAsync(driver, "L-block", lVertices, lFaces);
