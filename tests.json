@@ -183,6 +183,8 @@
         {
           "dotnet-closure": "tests/Carve.CharacterLoad.Tests/Carve.CharacterLoad.Tests.csproj"
         },
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "samples/gardener.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1",
@@ -210,6 +212,10 @@
           "dotnet-closure": "tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj"
         },
         "scenarios/Carve.Scenario.Character/GardenerSpec.cs",
+        "scenarios/Carve.Scenario.Character/GardenerPixels.cs",
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
         "samples/gardener-soft.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1",

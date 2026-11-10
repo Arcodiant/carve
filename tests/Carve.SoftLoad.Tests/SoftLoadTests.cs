@@ -113,13 +113,19 @@ public class SoftLoadTests
     }
 
     [SkippableOrRun]
-    public void The_flat_export_is_clean_and_the_soft_ones_warnings_are_all_non_planar_faces()
+    public void The_flat_export_is_clean_and_the_soft_ones_warnings_are_the_non_planar_faces_select_finds()
     {
         Assert.DoesNotContain("warning(s)", File.ReadAllText(Path.Combine(RunFolder, "export-flat-result.txt")));
         var soft = File.ReadAllText(Path.Combine(RunFolder, "export-result.txt"));
         var at = soft.IndexOf("warning(s): ", StringComparison.Ordinal);
         Assert.True(at >= 0, "subdivide leaves faces that are not planar; the export lists them");
-        Assert.All(soft[(at + "warning(s): ".Length)..].Split("; "), w => Assert.Contains("face is not planar", w));
+        var warnings = soft[(at + "warning(s): ".Length)..].Split("; ");
+        Assert.All(warnings, w => Assert.Contains("face is not planar", w));
+        // As many as select finds non_planar on the same model, mesh by mesh (the person, 2026-11-10, until T-72 lands).
+        var nonPlanar = new[] { "Body", "Hat" }.Sum(name => System.Text.Json.JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(RunFolder, $"select-non-planar-{name}.txt"))).RootElement.GetProperty("count").GetInt32());
+        Assert.True(nonPlanar > 0, "select finds no non_planar face on the soft gardener");
+        Assert.Equal(nonPlanar, warnings.Length);
     }
 }
 
