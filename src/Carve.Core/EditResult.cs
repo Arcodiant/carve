@@ -32,7 +32,7 @@ public sealed class EditResult
 
     public bool Succeeded => Mesh is not null;
 
-    /// <summary>Ids of the existing vertices the edit moved, ascending (a move's vertices; empty for an extrude).</summary>
+    /// <summary>Ids of the existing vertices the edit moved, ascending (a move's vertices, or those a subdivide moved to their vertex points; empty for an extrude).</summary>
     public IReadOnlyList<int> MovedVertices { get; }
 
     /// <summary>Ids of the vertices the edit appended, ascending.</summary>
@@ -45,6 +45,10 @@ public sealed class EditResult
     public IReadOnlyList<ExtrudedFace> Extruded { get; }
 
     internal static EditResult Refused(IReadOnlyList<MeshError> errors) => new(null, errors, [], [], [], []);
+
+    /// <summary>The result of an edit that has already carried colours, groups, weights and shading onto <paramref name="mesh"/>.</summary>
+    internal static EditResult Made(PolygonMesh mesh, IReadOnlyList<int> movedVertices, IReadOnlyList<int> newVertices,
+        IReadOnlyList<int> newFaces) => new(mesh, [], movedVertices, newVertices, newFaces, []);
 
     private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<ExtrudedFace> extruded)
     {
