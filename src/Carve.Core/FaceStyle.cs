@@ -99,17 +99,24 @@ public sealed class FaceStyle
     /// The style after an extrude: each wall takes its source face's colour and joins its groups. Faces keep their ids, so
     /// nothing else changes.
     /// </summary>
-    internal FaceStyle Carry(IReadOnlyList<ExtrudedFace> extruded)
+    internal FaceStyle Carry(IReadOnlyList<ExtrudedFace> extruded) =>
+        Carry(extruded.Select(x => (x.Face, x.Walls)).ToList());
+
+    /// <summary>
+    /// The style after an edit that appends faces made from existing ones (an extrude's walls, a subdivided face's other
+    /// children): each added face takes its source face's colour and joins its groups. Faces keep their ids, so nothing else changes.
+    /// </summary>
+    internal FaceStyle Carry(IReadOnlyList<(int Face, IReadOnlyList<int> Added)> made)
     {
-        if (extruded.Count == 0) return this;
+        if (made.Count == 0) return this;
         var colours = new SortedDictionary<int, string>(_colours);
-        var groups = _groups.Select(g => (g.Name, Faces: g.Faces.ToList())).ToList();
-        foreach (var x in extruded)
+        var groups = _groups.Select(g => (g.Name, Members: new HashSet<int>(g.Faces), Faces: g.Faces.ToList())).ToList();
+        foreach (var (face, added) in made)
         {
-            if (_colours.TryGetValue(x.Face, out var hex))
-                foreach (var w in x.Walls) colours[w] = hex;
+            if (_colours.TryGetValue(face, out var hex))
+                foreach (var w in added) colours[w] = hex;
             foreach (var g in groups)
-                if (g.Faces.Contains(x.Face)) g.Faces.AddRange(x.Walls);
+                if (g.Members.Contains(face)) g.Faces.AddRange(added);
         }
         return new FaceStyle(colours, groups.Select(g => (g.Name, g.Faces.Order().ToArray())).ToList());
     }
