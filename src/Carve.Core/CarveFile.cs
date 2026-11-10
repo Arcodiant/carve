@@ -43,12 +43,15 @@ public sealed class CarveFileResult
 /// skeleton and the clips), read back bit-exact with every vertex, face and bone at its id. Undo history is not saved.
 /// </summary>
 /// <remarks>
-/// <para><see cref="Write"/> always gives version 2, byte for byte: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
+/// <para><see cref="Write"/> gives version 2, byte for byte, for a model with no smooth mesh and no hard edge, so no file made
+/// before version 3 changes; version 3 (T-42) adds, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or
+/// <c>"smooth"</c>) and <c>hard_edges</c> (vertex-id pairs, lower id first, in order), and is written when any mesh has either.
+/// Version 2: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
 /// and <c>clips</c> in that order; in a mesh <c>name</c>, <c>vertices</c>, <c>faces</c>, <c>colours</c>, <c>groups</c> and
 /// <c>weights</c>; two-space indent, one vertex, face, colour, group, weighted vertex, bone or clip key per line, <c>\n</c>
 /// line ends and a newline at the end. Each float is the shortest text that reads back to the same <see cref="float"/>,
 /// each weight the shortest that reads back to the same <see cref="double"/>.</para>
-/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and version 2, keys in any order and
+/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) version 2 and version 3, keys in any order and
 /// any whitespace, and holds the file to exactly what the tools accept: geometry to <see cref="PolygonMesh.Create"/>, bones
 /// to <see cref="Skeleton.Create"/>, weights to <see cref="VertexWeights.Raw"/>, clips to <see cref="Clip.Create"/>, the
 /// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.
@@ -58,10 +61,10 @@ public sealed class CarveFileResult
 public static class CarveFile
 {
     /// <summary>The version <see cref="Write"/> writes.</summary>
-    public const int Version = 2;
+    public const int Version = 3;
 
     /// <summary>The versions <see cref="Read"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2];
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3];
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
@@ -69,6 +72,7 @@ public static class CarveFile
 
     private static readonly string[] FileKeys = [VersionKey, "meshes", "skeleton", "clips"];
     private static readonly string[] MeshKeys = ["name", VerticesKey, FacesKey, "colours", "groups", "weights"];
+    private static readonly string[] MeshKeysV3 = [.. MeshKeys, "shading", "hard_edges"];
     private static readonly string[] ColourKeys = ["colour", "faces"];
     private static readonly string[] GroupKeys = ["name", "faces"];
     private static readonly string[] WeightKeys = ["vertex", "bones"];
@@ -95,11 +99,12 @@ public static class CarveFile
         ArgumentNullException.ThrowIfNull(model);
         var w = new Writer();
         w.Line(0, "{");
-        w.Line(1, $"\"{VersionKey}\": {Version.ToString(CultureInfo.InvariantCulture)},");
+        var version = model.Meshes.Any(m => m.Mesh.Shade is not null) ? 3 : 2;
+        w.Line(1, $"\"{VersionKey}\": {version.ToString(CultureInfo.InvariantCulture)},");
         w.Open(1, "\"meshes\": [", model.Meshes.Count == 0, ",");
         for (var i = 0; i < model.Meshes.Count; i++)
         {
-            WriteMesh(w, model.Meshes[i], model.Skeleton);
+            WriteMesh(w, model.Meshes[i], model.Skeleton, version);
             w.Line(2, i < model.Meshes.Count - 1 ? "}," : "}");
         }
         w.Close(1, "],", model.Meshes.Count == 0);
@@ -128,7 +133,7 @@ public static class CarveFile
         return w.ToString();
     }
 
-    private static void WriteMesh(Writer w, NamedMesh named, Skeleton? skeleton)
+    private static void WriteMesh(Writer w, NamedMesh named, Skeleton? skeleton, int version)
     {
         var (name, mesh) = named;
         w.Line(2, "{");
@@ -155,7 +160,11 @@ public static class CarveFile
         {
             var bones = string.Join(", ", weights.Of(vertices[i]).Select(x => $"{Text(skeleton!.Bones[x.Bone].Name)}: {Weight(x.Weight)}"));
             return $"{{\"vertex\": {vertices[i].ToString(CultureInfo.InvariantCulture)}, \"bones\": {{{bones}}}}}";
-        }, "");
+        }, version >= 3 ? "," : "");
+        if (version < 3) return;
+        w.Line(3, $"\"shading\": {Text(mesh.ShadingMode == ShadingMode.Smooth ? "smooth" : "flat")},");
+        var hard = mesh.HardEdges;
+        w.List(3, "hard_edges", hard.Count, i => Ids([hard[i].Lo, hard[i].Hi]), "");
     }
 
     private static void WriteClip(Writer w, Clip clip)
@@ -267,7 +276,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) == 2 ? ReadVersion2(root) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3) and { } version ? ReadVersion2(root, version) : ReadVersion1(root);
         }
     }
 
@@ -354,10 +363,10 @@ public static class CarveFile
     }
 
     /// <summary>Version 2: the whole model.</summary>
-    private static CarveFileResult ReadVersion2(JsonElement root)
+    private static CarveFileResult ReadVersion2(JsonElement root, int version)
     {
         var errors = new List<MeshError>();
-        var fields = Fields(root, "", "a version 2 Carve file", FileKeys, errors)!;
+        var fields = Fields(root, "", Invariant($"a version {version} Carve file"), FileKeys, errors)!;
 
         // The skeleton is read first, since weights and clips name its bones; its problems are listed after the meshes'.
         var skeletonErrors = new List<MeshError>();
@@ -383,7 +392,7 @@ public static class CarveFile
             var i = 0;
             foreach (var item in m.EnumerateArray())
             {
-                if (ReadMesh(item, Invariant($"meshes[{i}]"), skeleton, skeletonGood, errors) is { } mesh) meshes.Add(mesh);
+                if (ReadMesh(item, Invariant($"meshes[{i}]"), skeleton, skeletonGood, version, errors) is { } mesh) meshes.Add(mesh);
                 i++;
             }
         }
@@ -408,13 +417,13 @@ public static class CarveFile
         if (errors.Count > 0) return Refused(errors);
         var (model, problems) = Model.Create(meshes, skeleton, clips);
         if (model is null) return Refused(problems);
-        return new CarveFileResult(model, [], model.Meshes.SelectMany(x => MeshReport.Create(x.Mesh).Warnings).ToArray(), 2);
+        return new CarveFileResult(model, [], model.Meshes.SelectMany(x => MeshReport.Create(x.Mesh).Warnings).ToArray(), version);
     }
 
-    private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, List<MeshError> errors)
+    private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, int version, List<MeshError> errors)
     {
         var before = errors.Count;
-        if (Fields(item, at, "a mesh", MeshKeys, errors) is not { } f) return null;
+        if (Fields(item, at, "a mesh", version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
         var name = Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         f.TryGetValue(VerticesKey, out var vs);
         f.TryGetValue(FacesKey, out var fs);
@@ -503,8 +512,43 @@ public static class CarveFile
             }
         }
 
+        MeshShade? shade = null;
+        if (version >= 3) shade = ReadShade(f, at, mesh, errors);
+
         if (errors.Count > before || name is null) return null;
-        return new NamedMesh(name, mesh.WithStyle(style).WithWeights(VertexWeights.Of(weights)));
+        return new NamedMesh(name, mesh.WithStyle(style).WithWeights(VertexWeights.Of(weights)).WithShade(shade));
+    }
+
+    private static MeshShade? ReadShade(Dictionary<string, JsonElement> f, string at, PolygonMesh mesh, List<MeshError> errors)
+    {
+        var mode = ShadingMode.Flat;
+        if (f.TryGetValue("shading", out var sh) && Str(sh, $"{at}.shading", errors) is { } text)
+        {
+            if (text == "smooth") mode = ShadingMode.Smooth;
+            else if (text != "flat") errors.Add(new MeshError($"{at}.shading", $"'{text}' is not a shading: it is \"flat\" or \"smooth\""));
+        }
+        var hard = new List<(int, int)>();
+        if (f.TryGetValue("hard_edges", out var he) && List(he, $"{at}.hard_edges", errors) is { } list)
+        {
+            var seen = new HashSet<(int, int)>();
+            var i = 0;
+            foreach (var entry in list.EnumerateArray())
+            {
+                var e = Invariant($"{at}.hard_edges[{i++}]");
+                if (entry.ValueKind != JsonValueKind.Array || entry.GetArrayLength() != 2)
+                {
+                    errors.Add(new MeshError(e, $"{Describe(entry)} is not an edge: write two vertex ids, [a, b]"));
+                    continue;
+                }
+                var a = Int(entry[0], e + "[0]", "vertex id", errors);
+                var b = Int(entry[1], e + "[1]", "vertex id", errors);
+                if (a is not { } x || b is not { } y) continue;
+                if (!mesh.Topology.TryGetEdge(x, y, out _)) errors.Add(new MeshError(e, Invariant($"{x}-{y} is not an edge of the mesh")));
+                else if (!seen.Add(x < y ? (x, y) : (y, x))) errors.Add(new MeshError(e, Invariant($"edge {x}-{y} is listed earlier; list each edge once")));
+                else hard.Add((x, y));
+            }
+        }
+        return MeshShade.Of(mode, hard);
     }
 
     /// <summary>The faces of a colour or group: at least one, each a face of the mesh.</summary>

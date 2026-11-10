@@ -38,7 +38,7 @@ public class GlbExportTests
         _ => throw new ArgumentException(name),
     };
 
-    private static byte[] Glb(PolygonMesh mesh, string name) => GlbExport.Write(FlatShading.Triangles(mesh), name);
+    private static byte[] Glb(PolygonMesh mesh, string name) => GlbExport.Write(Shading.Triangles(mesh), name);
 
     private static string Bits(Vector3 v) =>
         $"{BitConverter.SingleToInt32Bits(v.X):X8} {BitConverter.SingleToInt32Bits(v.Y):X8} {BitConverter.SingleToInt32Bits(v.Z):X8} ({v.X:R}, {v.Y:R}, {v.Z:R})";
@@ -48,7 +48,7 @@ public class GlbExportTests
     public void The_engine_parser_reads_back_FlatShadings_triangles_bit_for_bit_in_order(string name)
     {
         var mesh = Mesh(name);
-        var expected = FlatShading.Triangles(mesh);
+        var expected = Shading.Triangles(mesh);
         var parsed = Parser.Parse(Glb(mesh, name), ModelFormat.Gltf);
         var vertices = parsed.MeshData.Vertices;
         var indices = parsed.MeshData.Indices!;

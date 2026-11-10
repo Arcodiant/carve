@@ -133,6 +133,24 @@ public class LookMeshesTests
     }
 
     [Fact]
+    public void A_smooth_mesh_in_normals_carries_its_corner_normals_in_colour_and_spikes()
+    {
+        var mesh = Cube().WithShade(MeshShade.Of(ShadingMode.Smooth, []));
+        var space = SpaceOf(mesh);
+        var scene = LookMeshes.Compose(mesh, space, Look.Normals, Highlight.None);
+
+        var triangles = Shading.Triangles(mesh);
+        for (var i = 0; i < scene.VertexColours!.Length; i++)
+        {
+            var corner = i % 3 == 0 ? triangles[i / 3].NormalA : i % 3 == 1 ? triangles[i / 3].NormalB : triangles[i / 3].NormalC;
+            Assert.Equal(LookMeshes.NormalColour(corner), scene.VertexColours[i]);
+        }
+
+        Assert.Contains(scene.VertexColours, c => c != LookMeshes.NormalColour(mesh.FaceNormal(0)) && c != LookMeshes.NormalColour(mesh.FaceNormal(1)));
+        Assert.Equal(2 * mesh.Faces.Sum(f => f.Count), Ends(scene.EdgeLines).Length);
+    }
+
+    [Fact]
     public void Only_highlighted_faces_turn_orange_in_shaded_and_the_rest_stay_white()
     {
         var mesh = Cube();

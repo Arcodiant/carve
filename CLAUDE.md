@@ -44,7 +44,7 @@ Every plan, for a milestone or a task, keeps these:
 - **The mesh is polygons**, triangles are a derived view for render and export, never stored. Work persists in a native
   Carve file; `.glb` is what reaches a game.
 - **The product has no window.** Every look is an offscreen render.
-- **The Carve file is versioned JSON geometry**, read back bit-exact; the `.glb` export has flat normals and is written with SharpGLTF (D-1, M-3).
+- **The Carve file is versioned JSON geometry**, read back bit-exact; the `.glb` export takes its normals from `Shading` (a flat mesh's are its faces', a smooth one's are per corner, D-6, T-42) and is written with SharpGLTF (D-1, M-3).
 
 The rest are decided in D-1 as they settle; add them here when they do.
 

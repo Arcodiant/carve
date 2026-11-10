@@ -26,26 +26,25 @@ public readonly record struct DrawnSpace(double X, double Y, double Z, double Ra
 
 /// <summary>
 /// A Carve mesh as the engine draws it: flat shaded, so each face's triangles get vertices of their
-/// own carrying the face's Newell normal, all from <see cref="FlatShading"/>, the triangles the export
-/// writes too. Each triangle's winding is reversed, because Carve winds counter-clockwise from outside
+/// own carrying the normal of its corner, all from <see cref="Shading"/>, the triangles and normals the export
+/// writes too (a flat mesh gives each corner its face's Newell normal). Each triangle's winding is reversed, because Carve winds counter-clockwise from outside
 /// and Empyrean clockwise.
 /// </summary>
 public static class MeshBridge
 {
     public static MeshData<PositionUvNormalVertex> ToMeshData(PolygonMesh mesh, DrawnSpace space)
     {
-        var triangles = FlatShading.Triangles(mesh);
+        var triangles = Shading.Triangles(mesh);
         var vertices = new PositionUvNormalVertex[triangles.Count * 3];
         var indices = new uint[vertices.Length];
 
         for (var t = 0; t < triangles.Count; t++)
         {
             var triangle = triangles[t];
-            var normal = triangle.Normal;
             var at = t * 3;
-            vertices[at] = new PositionUvNormalVertex { Position = space.Apply(triangle.A), Normal = normal };
-            vertices[at + 1] = new PositionUvNormalVertex { Position = space.Apply(triangle.C), Normal = normal };
-            vertices[at + 2] = new PositionUvNormalVertex { Position = space.Apply(triangle.B), Normal = normal };
+            vertices[at] = new PositionUvNormalVertex { Position = space.Apply(triangle.A), Normal = triangle.NormalA };
+            vertices[at + 1] = new PositionUvNormalVertex { Position = space.Apply(triangle.C), Normal = triangle.NormalC };
+            vertices[at + 2] = new PositionUvNormalVertex { Position = space.Apply(triangle.B), Normal = triangle.NormalB };
             indices[at] = (uint)at;
             indices[at + 1] = (uint)(at + 1);
             indices[at + 2] = (uint)(at + 2);
@@ -63,7 +62,7 @@ public static class MeshBridge
     public static MeshData<PositionUvNormalVertex> ToSubmeshedMeshData(PolygonMesh mesh, DrawnSpace space, out string?[] colours)
     {
         var plain = ToMeshData(mesh, space);
-        var triangles = FlatShading.Triangles(mesh);
+        var triangles = Shading.Triangles(mesh);
         var keys = new List<string?>();
         var ranges = new List<List<uint>>();
         var style = mesh.Style;

@@ -175,6 +175,124 @@ public sealed class CubeScenario : IScenario
         await ExpectErrorAsync(driver, "projection iso", new { projection = "iso" }, "projection: 'iso' is not a projection");
         await ExpectErrorAsync(driver, "view top", new { view = "top" }, "view: 'top' is not a view");
 
+        // 2c. T-42: smooth shading. The same hexagon view three ways. Flat is the frame above: a face is one shade. Smooth gives each corner
+        // its own normal, so the top face (a gradient from the corner at the centre of the hexagon to the far one) is not one shade.
+        // Smooth with the top's four edges hard keeps the top one shade and still grades the +Z face. Every edge hard is the flat frame,
+        // pixel for pixel. Points are worked from the mesh by the orthographic rule, so a mirrored or flipped camera samples background or another face.
+        var topNear = Rounded(hexagonPixel(new Vector3(0.85f, 1, 0.85f)));
+        var topFar = Rounded(hexagonPixel(new Vector3(0.15f, 1, 0.15f)));
+        var flatTopNear = hexagon.Pixel(topNear.X, topNear.Y).G;
+        var flatTopFar = hexagon.Pixel(topFar.X, topFar.Y).G;
+        if (flatTopNear != flatTopFar) driver.Fail($"{hexagon.Name}: the flat top face should be one shade, got {flatTopNear} and {flatTopFar}");
+
+        Ok(driver, await driver.CallAsync("set_shading", new { shading = "smooth" }));
+        var smooth = await driver.CaptureAsync("cube-smooth-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic" });
+        CheckOutline(driver, smooth, silhouette.Select(hexagonPixel).ToArray(), 3);
+        CheckDiffers(driver, smooth, topNear, topFar, "the smooth top face, near the centre corner and near the far one");
+        CheckDiffers(driver, smooth, topNear, Rounded(hexagonPixel(new Vector3(0.15f, 1, 0.85f))), "the smooth top face, along the other diagonal");
+        if (smooth.Pixels.AsSpan().SequenceEqual(hexagon.Pixels)) driver.Fail($"{smooth.Name}: smooth shading drew the flat frame");
+
+        // The normals look of the smooth cube shows corner normals: across the top face the red channel (the x of the normal) grows
+        // with x and the blue channel with z, since each corner's normal leans out along its diagonal. Flat, both would be constant.
+        var smoothNormals = await driver.CaptureAsync("cube-smooth-normals-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic", mode = "normals" });
+        var topXHigh = Rounded(hexagonPixel(new Vector3(0.9f, 1, 0.5f)));
+        var topXLow = Rounded(hexagonPixel(new Vector3(0.1f, 1, 0.5f)));
+        var topZHigh = Rounded(hexagonPixel(new Vector3(0.5f, 1, 0.9f)));
+        var topZLow = Rounded(hexagonPixel(new Vector3(0.5f, 1, 0.1f)));
+        CheckNotBackground(driver, smoothNormals, topXHigh, "the smooth top face, +X side");
+        CheckNotBackground(driver, smoothNormals, topXLow, "the smooth top face, -X side");
+        CheckChannelGreater(driver, smoothNormals, topXHigh, topXLow, p => p.R, "red across the smooth top, +X side over -X side (a mirrored camera swaps them)");
+        CheckChannelGreater(driver, smoothNormals, topZHigh, topZLow, p => p.B, "blue across the smooth top, +Z side over -Z side (a flipped camera swaps them)");
+
+        Ok(driver, await driver.CallAsync("mark_edges", new { edges = new[] { new[] { 3, 7 }, new[] { 7, 6 }, new[] { 6, 2 }, new[] { 2, 3 } } }));
+        var creased = await driver.CaptureAsync("cube-creased-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic" });
+        CheckOutline(driver, creased, silhouette.Select(hexagonPixel).ToArray(), 3);
+        var creasedNear = creased.Pixel(topNear.X, topNear.Y).G;
+        var creasedFar = creased.Pixel(topFar.X, topFar.Y).G;
+        if (creasedNear != flatTopNear || creasedFar != flatTopFar)
+            driver.Fail($"{creased.Name}: the creased top face should keep its flat shade {flatTopNear}, got {creasedNear} and {creasedFar}");
+        CheckDiffers(driver, creased, Rounded(hexagonPixel(new Vector3(0.5f, 0.9f, 1))), Rounded(hexagonPixel(new Vector3(0.5f, 0.1f, 1))), "the +Z face, graded from its top edge to its bottom one");
+
+        // Creased, the top face's corners keep the face normal, so the top is one colour in the normals look, and the +Z face is still blended:
+        // its top corners lean toward +Z and the sides only, its bottom ones down as well. The +X face blends in z.
+        var creasedNormals = await driver.CaptureAsync("cube-creased-normals-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic", mode = "normals" });
+        var creasedTop = (Rounded(hexagonPixel(new Vector3(0.9f, 1, 0.5f))), Rounded(hexagonPixel(new Vector3(0.1f, 1, 0.5f))));
+        var sideHigh = Rounded(hexagonPixel(new Vector3(1, 0.5f, 0.9f)));
+        var sideLow = Rounded(hexagonPixel(new Vector3(1, 0.5f, 0.1f)));
+        var upperFront = Rounded(hexagonPixel(new Vector3(0.5f, 0.9f, 1)));
+        var lowerFront = Rounded(hexagonPixel(new Vector3(0.5f, 0.1f, 1)));
+        CheckNotBackground(driver, creasedNormals, creasedTop.Item1, "the creased top face, +X side");
+        if (creasedNormals.Pixel(creasedTop.Item1.X, creasedTop.Item1.Y) != creasedNormals.Pixel(creasedTop.Item2.X, creasedTop.Item2.Y))
+            driver.Fail($"{creasedNormals.Name}: the creased top face should be one colour in the normals look");
+        CheckChannelGreater(driver, creasedNormals, sideHigh, sideLow, p => p.B, "blue across the creased +X face, +Z end over -Z end (a mirrored camera swaps them)");
+        CheckChannelGreater(driver, creasedNormals, upperFront, lowerFront, p => p.G, "green down the creased +Z face, top over bottom (a flipped camera swaps them)");
+
+        var every = new[] { new[] { 0, 1 }, new[] { 1, 2 }, new[] { 2, 3 }, new[] { 3, 0 }, new[] { 4, 5 }, new[] { 5, 6 }, new[] { 6, 7 }, new[] { 7, 4 }, new[] { 0, 4 }, new[] { 1, 5 }, new[] { 2, 6 }, new[] { 3, 7 } };
+        Ok(driver, await driver.CallAsync("mark_edges", new { edges = every }));
+        var allHard = await driver.CaptureAsync("cube-smooth-all-hard-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic" });
+        if (!allHard.Pixels.AsSpan().SequenceEqual(hexagon.Pixels)) driver.Fail($"{allHard.Name}: smooth with every edge hard should draw the flat frame pixel for pixel");
+
+        // 2d. T-42: the cylinder, a sixteen-sided prism (axis Y, radius 1, y -1 to 1) defined through define_mesh, shown flat and then smooth with
+        // both cap rims marked hard: a soft side all round and a crease where each cap meets it. The view (2, 2, 1) is not symmetric about
+        // x = z, so a mirrored camera draws another frame (the cylinder is otherwise its own mirror image). Points are worked from the mesh.
+        const int Sides = 16;
+        Vector3 Ring(int i, float y) { var a = 2 * MathF.PI * (i % Sides) / Sides; return new Vector3(MathF.Cos(a), y, MathF.Sin(a)); }
+        Vector3 Facet(int k, float t, float y) => Vector3.Lerp(Ring(k, y), Ring(k + 1, y), t);
+        var cylVertices = Enumerable.Range(0, Sides).Select(i => Ring(i, -1)).Concat(Enumerable.Range(0, Sides).Select(i => Ring(i, 1)))
+            .Select(v => new[] { (double)v.X, v.Y, v.Z }).ToArray();
+        var cylFaces = new List<int[]> { Enumerable.Range(0, Sides).ToArray(), Enumerable.Range(0, Sides).Reverse().Select(i => Sides + i).ToArray() };
+        for (var i = 0; i < Sides; i++) cylFaces.Add([i, Sides + i, Sides + (i + 1) % Sides, (i + 1) % Sides]);
+        await DefineCleanAsync(driver, "cylinder", cylVertices, cylFaces.ToArray());
+        var cylView = new { direction = new[] { 2, 2, 1 }, projection = "orthographic" };
+        var cylNormalsView = new { direction = new[] { 2, 2, 1 }, projection = "orthographic", mode = "normals" };
+        var cylPixel = OrthographicPixels(new Vector3(-1, -1, -1), Vector3.One, new Vector3(2, 2, 1), Vector3.UnitY, 512);
+        (int X, int Y) CylAt(Vector3 p) => Rounded(cylPixel(p));
+        var edgeAt = CylAt(Facet(1, 1, 0));                      // the side edge at 45 degrees, mid height, a vertical line in the image
+        var edgeLeft = (edgeAt.X - 3, edgeAt.Y);
+        var edgeRight = (edgeAt.X + 3, edgeAt.Y);
+        var capPoint = CylAt(Facet(1, 0.5f, 1) * new Vector3(0.85f, 1, 0.85f));
+        var capOther = CylAt(new Vector3(-0.3f, 1, -0.2f));
+        var belowRim = CylAt(Facet(1, 0.5f, 0.85f));
+        var sideMirror = CylAt(Facet(14, 0.5f, 0));              // facing (+x, -z): the one side of the image
+        var sideOther = CylAt(Facet(3, 0.5f, 0));                // facing (+z): the other side
+
+        var cylFlat = await driver.CaptureAsync("cylinder-flat-dir-2-2-1-ortho", cylView);
+        CheckNotBackground(driver, cylFlat, capPoint, "the flat cylinder's top cap");
+        CheckNotBackground(driver, cylFlat, belowRim, "the flat cylinder's side, below the rim");
+        CheckNotBackground(driver, cylFlat, sideMirror, "the flat cylinder's side, on one side of the image");
+        CheckNotBackground(driver, cylFlat, sideOther, "the flat cylinder's side, on the other side of the image");
+        CheckSame(driver, cylFlat, capPoint, capOther, "the flat cap is one shade");
+        CheckSame(driver, cylFlat, CylAt(Facet(2, 0.2f, 0)), CylAt(Facet(2, 0.8f, 0)), "the flat side facet is one shade, a plateau");
+        CheckDiffers(driver, cylFlat, capPoint, belowRim, "the flat cap against the side below the rim");
+        CheckDiffers(driver, cylFlat, sideMirror, sideOther, "the flat side, at its two ends across the image (a mirrored camera draws other facets)");
+        CheckBrightestOf(driver, cylFlat, capPoint, "the cap is the brightest part, so a flipped camera (cap below) fails", sideMirror, sideOther, belowRim);
+
+        var cylFlatNormals = await driver.CaptureAsync("cylinder-flat-normals-dir-2-2-1-ortho", cylNormalsView);
+        CheckSame(driver, cylFlatNormals, CylAt(Facet(2, 0.2f, 0)), CylAt(Facet(2, 0.8f, 0)), "the flat side facet is one colour in the normals look");
+
+        Ok(driver, await driver.CallAsync("set_shading", new { shading = "smooth" }));
+        var rim = new List<int[]>();
+        for (var i = 0; i < Sides; i++) { rim.Add([i, (i + 1) % Sides]); rim.Add([Sides + i, Sides + (i + 1) % Sides]); }
+        Ok(driver, await driver.CallAsync("mark_edges", new { edges = rim }));
+
+        var cylSmooth = await driver.CaptureAsync("cylinder-smooth-dir-2-2-1-ortho", cylView);
+        CheckSame(driver, cylSmooth, capPoint, capOther, "the cap keeps one shade, its rim being hard");
+        if (cylSmooth.Pixel(capPoint.X, capPoint.Y) != cylFlat.Pixel(capPoint.X, capPoint.Y)) driver.Fail($"{cylSmooth.Name}: the hard-rimmed cap should keep its flat shade");
+        CheckClose(driver, cylSmooth, edgeLeft, edgeRight, "the smooth side runs on across a facet edge", 2);
+        CheckDiffers(driver, cylSmooth, CylAt(Facet(2, 0.2f, 0)), CylAt(Facet(2, 0.8f, 0)), "the smooth side grades across one facet, where flat is a plateau", 3);
+        CheckDiffers(driver, cylSmooth, capPoint, belowRim, "the crease where the cap meets the side");
+        CheckDiffers(driver, cylSmooth, sideMirror, sideOther, "the smooth side, at its two ends across the image (a mirrored camera draws other facets)");
+        CheckBrightestOf(driver, cylSmooth, capPoint, "the cap is the brightest part, so a flipped camera (cap below) fails", sideMirror, sideOther, belowRim);
+
+        var cylSmoothNormals = await driver.CaptureAsync("cylinder-smooth-normals-dir-2-2-1-ortho", cylNormalsView);
+        CheckChannelGreater(driver, cylSmoothNormals, CylAt(Facet(2, 0.2f, 0)), CylAt(Facet(2, 0.8f, 0)), p => p.R, "red across one smooth facet, its 45 degree end over its 67 degree end");
+        CheckClose(driver, cylSmoothNormals, edgeLeft, edgeRight, "the smooth side's colour runs on across a facet edge");
+        CheckChannelGreater(driver, cylSmoothNormals, CylAt(Facet(14, 0.5f, 0)), CylAt(Facet(3, 0.5f, 0)), p => p.R, "red on the +x side facet over the +z one (a mirrored camera swaps them)");
+        CheckChannelGreater(driver, cylSmoothNormals, CylAt(Facet(3, 0.5f, 0)), CylAt(Facet(14, 0.5f, 0)), p => p.B, "blue on the +z side facet over the -z one (a mirrored camera swaps them)");
+        CheckChannelGreater(driver, cylSmoothNormals, capPoint, belowRim, p => p.G, "green on the cap (up) over the side just below the rim (a flipped camera swaps them)");
+        CheckDiffers(driver, cylSmoothNormals, capPoint, belowRim, "the crease at the rim in the normals look");
+        CheckSame(driver, cylSmoothNormals, capPoint, capOther, "the hard-rimmed cap is one colour in the normals look");
+
         // 3. The L-block: two concave hexagon caps and six quad sides.
         var (lVertices, lFaces) = LBlock();
         await DefineCleanAsync(driver, "L-block", lVertices, lFaces);
@@ -336,6 +454,53 @@ public sealed class CubeScenario : IScenario
         {
             driver.Fail($"{frame.Name}: {what}: {high} should be at least {MinimumStep} above {low}");
         }
+    }
+
+    /// <summary>Two pixels at least <see cref="MinimumStep"/> apart in the green channel, either way.</summary>
+    private static void CheckDiffers(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) a, (int X, int Y) b, string what, int least = MinimumStep)
+    {
+        var (first, second) = (frame.Pixel(a.X, a.Y).G, frame.Pixel(b.X, b.Y).G);
+        if (Math.Abs(first - second) < least)
+        {
+            driver.Fail($"{frame.Name}: {what}: {first} and {second} should differ by at least {least}");
+        }
+    }
+
+    /// <summary>One channel of the first pixel exceeding the second's by at least <see cref="MinimumStep"/>, in that order only.</summary>
+    private static void CheckChannelGreater(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) high, (int X, int Y) low, Func<(byte R, byte G, byte B, byte A), int> channel, string what)
+    {
+        var (first, second) = (channel(frame.Pixel(high.X, high.Y)), channel(frame.Pixel(low.X, low.Y)));
+        if (first - second < MinimumStep)
+        {
+            driver.Fail($"{frame.Name}: {what}: {first} against {second} should differ by at least {MinimumStep}, the first greater");
+        }
+    }
+
+    /// <summary>Two pixels of exactly one colour.</summary>
+    private static void CheckSame(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) a, (int X, int Y) b, string what)
+    {
+        if (frame.Pixel(a.X, a.Y) != frame.Pixel(b.X, b.Y)) driver.Fail($"{frame.Name}: {what}: {frame.Pixel(a.X, a.Y)} against {frame.Pixel(b.X, b.Y)}");
+    }
+
+    /// <summary>Two pixels within <paramref name="most"/> of each other in every channel: a continuous run.</summary>
+    private static void CheckClose(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) a, (int X, int Y) b, string what, int most = 4)
+    {
+        var (p, q) = (frame.Pixel(a.X, a.Y), frame.Pixel(b.X, b.Y));
+        if (Math.Abs(p.R - q.R) > most || Math.Abs(p.G - q.G) > most || Math.Abs(p.B - q.B) > most)
+            driver.Fail($"{frame.Name}: {what}: {p} against {q} should be within {most} in each channel");
+    }
+
+    /// <summary>The first pixel brighter (green) than every other by at least <see cref="MinimumStep"/>.</summary>
+    private static void CheckBrightestOf(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) top, string what, params (int X, int Y)[] others)
+    {
+        var high = frame.Pixel(top.X, top.Y).G;
+        foreach (var o in others)
+            if (high < frame.Pixel(o.X, o.Y).G + MinimumStep) driver.Fail($"{frame.Name}: {what}: {high} against {frame.Pixel(o.X, o.Y).G} at {o}");
+    }
+
+    private static void Ok(ScenarioDriver driver,ModelContextProtocol.Protocol.CallToolResult result)
+    {
+        if (result.IsError == true) driver.Fail("tool error: " + string.Join(" ", result.Content.OfType<ModelContextProtocol.Protocol.TextContentBlock>().Select(t => t.Text)));
     }
 
     private static void CheckCaption(ScenarioDriver driver, ScenarioFrame frame, string expected)

@@ -124,13 +124,31 @@ public static class LookMeshes
         return look switch
         {
             Look.Wireframe => new LookScene(picked ? Vector4.One : Fill, picked ? Picked(FillVertex) : null, WireframeLines(mesh, space, highlight), orange),
-            Look.Normals => new LookScene(Vector4.One, FaceColours(mesh, f => NormalColour(mesh.FaceNormal(f))), Spikes(mesh, space), orange),
+            Look.Normals => new LookScene(Vector4.One, CornerColours(mesh), Spikes(mesh, space), orange),
             _ => new LookScene(null, picked ? Picked(Rgba8.White) : null, null, orange),
         };
     }
 
     /// <summary>A face's colour in the normals look: <c>(n + 1) / 2</c>, in linear RGB.</summary>
     public static Rgba8 NormalColour(Vector3 normal) => Rgba8.FromVector((normal + Vector3.One) / 2);
+
+    /// <summary>
+    /// One colour per vertex of <see cref="MeshBridge"/>'s triangles, each from its corner normal from <see cref="Shading"/>:
+    /// a flat mesh's corner normal is its face's, so a flat mesh is coloured as it always was, and a smooth one blends.
+    /// </summary>
+    private static Rgba8[] CornerColours(PolygonMesh mesh)
+    {
+        var triangles = Shading.Triangles(mesh);
+        var colours = new Rgba8[triangles.Count * 3];
+        for (var t = 0; t < triangles.Count; t++)
+        {
+            colours[t * 3] = NormalColour(triangles[t].NormalA);
+            colours[t * 3 + 1] = NormalColour(triangles[t].NormalB);
+            colours[t * 3 + 2] = NormalColour(triangles[t].NormalC);
+        }
+
+        return colours;
+    }
 
     /// <summary>One colour per vertex of <see cref="MeshBridge"/>'s triangles, each its face's.</summary>
     private static Rgba8[] FaceColours(PolygonMesh mesh, Func<int, Rgba8> colour)
@@ -149,9 +167,18 @@ public static class LookMeshes
     public static MeshData<PositionVertex>? WireframeLines(PolygonMesh mesh, DrawnSpace space, Highlight highlight) =>
         Lines(mesh.Topology.Edges.Where(e => !highlight.Edges.Contains((e.Lo, e.Hi))).SelectMany(e => Lifted(mesh, space, e)));
 
-    /// <summary>A segment per face: from its centre along its normal.</summary>
+    /// <summary>
+    /// A segment per face: from its centre along its normal. On a shaded mesh (smooth, or posed with corner normals) a
+    /// segment per corner instead: from the corner along its normal, which is what the colours show.
+    /// </summary>
     public static MeshData<PositionVertex>? Spikes(PolygonMesh mesh, DrawnSpace space) =>
-        Lines(Enumerable.Range(0, mesh.Faces.Count).SelectMany(f =>
+        Shading.HasCornerNormals(mesh)
+            ? Lines(Shading.CornersOf(mesh).SelectMany((normals, f) => mesh.Faces[f].SelectMany((v, k) =>
+            {
+                var at = space.Apply(mesh.Vertices[v]);
+                return new[] { at, at + normals[k] * SpikeLength };
+            })))
+            : Lines(Enumerable.Range(0, mesh.Faces.Count).SelectMany(f =>
         {
             var centre = space.Apply(mesh.FaceCentre(f));
             return new[] { centre, centre + mesh.FaceNormal(f) * SpikeLength };

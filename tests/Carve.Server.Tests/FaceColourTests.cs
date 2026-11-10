@@ -21,7 +21,7 @@ public class FaceColourTests
     public void The_export_has_a_material_per_colour_with_its_linear_base_colour_and_its_own_triangles()
     {
         var mesh = Coloured();
-        var glb = GlbExport.Write(mesh, FlatShading.Triangles(mesh), "cube");
+        var glb = GlbExport.Write(mesh, Shading.Triangles(mesh), "cube");
         var parsed = GlbExportTests.Parser.Parse(glb, ModelFormat.Gltf);
 
         var materials = parsed.SubmeshMaterials.Select(m => m!).ToArray();
@@ -46,7 +46,7 @@ public class FaceColourTests
     public void An_uncoloured_mesh_exports_as_it_always_did_with_one_material()
     {
         var mesh = TestMeshes.Cube();
-        var triangles = FlatShading.Triangles(mesh);
+        var triangles = Shading.Triangles(mesh);
         Assert.Equal(GlbExport.Write(triangles, "cube"), GlbExport.Write(mesh, triangles, "cube"));
         Assert.Equal(["carve"], GlbExport.MaterialNames(mesh));
     }

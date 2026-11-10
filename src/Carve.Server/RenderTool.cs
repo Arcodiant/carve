@@ -201,7 +201,7 @@ internal static class RenderTool
         + "'mode' is the look: 'shaded' (the default), 'wireframe' or 'normals'. Neither of the last two depends on the light. "
         + "'wireframe' draws every edge in light grey over faces filled near black: use it to count and place edges and see the face loops. It is hidden-line, not see-through: "
         + "an edge behind a face is hidden, so look from another side to see it. "
-        + "'normals' colours each face by the way it faces and stands a light grey spike on its centre along its normal: use it to find a face pointing the wrong way, or a non-planar face, whose spike is off. "
+        + "'normals' colours each face by the way it faces and stands a light grey spike on its centre along its normal: use it to find a face pointing the wrong way, or a non-planar face, whose spike is off. On a smooth mesh (set_shading) it shows the corner normals instead: the colour blends across a soft edge and breaks at a hard one, and a spike stands on each corner along its normal. "
         + "The colour code, as linear red, green, blue, is (normal + 1) / 2: +X (1, 0.5, 0.5) pink, -X (0, 0.5, 0.5) teal, +Y (0.5, 1, 0.5) green, -Y (0.5, 0, 0.5) purple, +Z (0.5, 0.5, 1) blue, -Z (0.5, 0.5, 0) olive; "
         + "a face reversed shows the opposite colour. A face wound the wrong way is still culled as in shaded, so from outside it shows as MISSING, and its opposite colour is seen from inside, through the gap. "
         + "The caption says the mode after the projection: '512x512, view front, wireframe, 72 vertices, 70 faces'. "
