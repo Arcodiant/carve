@@ -57,19 +57,19 @@ public sealed class SubdivideTool(ModelStore store)
 
         var edited = snapshot.Model.Find(name ?? snapshot.Model.Meshes[0].Name)!;
         var triangles = snapshot.Model.Meshes.Sum(m => m.Mesh.Faces.Sum(f => f.Count - 2));
-        var body = Report(edited);
-        var warnings = Warnings(edited);
+        var report = MeshReport.Create(edited);
+        var warnings = Warnings(report);
         if (triangles > SkinnedExport.MaxTriangles)
             warnings.Insert(0, string.Create(CultureInfo.InvariantCulture,
                 $"the model has {triangles} triangles, above the {SkinnedExport.MaxTriangles} a game character should keep to"));
         var ordered = new Dictionary<string, object>
         {
-            ["vertices"] = body["vertices"],
-            ["faces"] = body["faces"],
-            ["edges"] = body["edges"],
+            ["vertices"] = report.VertexCount,
+            ["faces"] = report.FaceCount,
+            ["edges"] = report.EdgeCount,
             ["triangles"] = triangles,
-            ["closed"] = body["closed"],
-            ["bounds"] = body["bounds"],
+            ["closed"] = report.Closed,
+            ["bounds"] = new { min = Array(report.BoundsMin), max = Array(report.BoundsMax) },
             ["warnings"] = warnings,
             ["levels"] = n!.Value,
             ["created"] = new
@@ -86,9 +86,9 @@ public sealed class SubdivideTool(ModelStore store)
     /// almost never flat, and one line per face would bury the rest (the person's ruling, 2026-11-10). Only this
     /// result folds them; get_mesh, check and export list each face as before.
     /// </summary>
-    internal static List<string> Warnings(PolygonMesh mesh)
+    internal static List<string> Warnings(MeshReport report)
     {
-        var all = MeshReport.Create(mesh).Warnings;
+        var all = report.Warnings;
         var warnings = all.Where(w => w.Kind != MeshWarningKind.NonPlanarFace).Select(w => w.ToString()).ToList();
         var nonPlanar = all.Count(w => w.Kind == MeshWarningKind.NonPlanarFace);
         if (nonPlanar > 0)
