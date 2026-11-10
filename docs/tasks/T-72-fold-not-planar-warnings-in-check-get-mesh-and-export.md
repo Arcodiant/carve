@@ -21,7 +21,7 @@ A subdivided mesh's report stays readable: Catmull-Clark faces are almost never 
 ## Scope
 
 - `check`, `get_mesh` and `export` fold not-planar warnings past some count into one line with the count, as `subdivide` already does (T-43). `select faces where non_planar` still names every face.
-- The soft gardener's export (T-44: 504 not-planar warnings) then carries one folded line, and `scenario-soft` and `tests/Carve.SoftLoad.Tests` go back to asserting no warning but that one.
+- The soft gardener's export (T-44: 504 not-planar warnings) then carries one folded line, and `scenario-soft` and `tests/Carve.SoftLoad.Tests` assert that one folded line and no other warning. Today, by the person's ruling in RV-27, they assert that every warning is a not-planar face, with the count equal to `select faces where non_planar`.
 
 ## Notes
 
