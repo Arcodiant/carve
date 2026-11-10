@@ -38,24 +38,35 @@ A character's surface reads soft, with creases only where an agent puts them.
 - **Open rules: stop and ask.** Anything D-6 does not settle, any loosened check, and any change to a D-6 decision.
 - Run `finish` from inside the worktree and leave the folder.
 
-### Hand-off
+### As built
 
-Run on Sonnet 5.5 (third agent). Handed off at the frame review: the person REJECTED the cube frames with the note "Those are hard to judge; is it easier with a sphere or cylinder?".
+Run on Sonnet 5.5 (several agents in turn; the last built the cylinder and finished).
 
-- Done since the last hand-off (committed): `LookMeshes` normals look colours each triangle corner from `Shading.Triangles` corner normals (flat meshes are bit-identical, so flat frames do not change) and, for a mesh with `Shading.HasCornerNormals`, stands a spike on each corner along its corner normal instead of one per face; render tool text says so; `CLAUDE.md` `.glb` line updated; unit test `A_smooth_mesh_in_normals_carries_its_corner_normals_in_colour_and_spikes`; cube scenario frames `cube-smooth-normals-dir-1-1-1-ortho` and `cube-creased-normals-dir-1-1-1-ortho` with pixel checks (channel ordering via `CheckChannelGreater`).
-- Byte-identical guard DONE: baseline = e9f4e8e (origin/milestone/M-18), ad-hoc runs of `pwsh scripts/run-scenario.ps1 <s>` (jobs J-20261110-053534-a956f7 cube, -053537-987575 crate, -053540-2b9d8c shed, -053543-00fb1f character, -053545-c39a46 export) against HEAD (cube J-20261110-053553-e661f9, crate -052338-c94db3, shed -052340-d00423, character -052342-b8b0f0, export -052343-5eae9d). sha256 of every png/glb/carve file: every shared file identical; the only differences are the 5 added cube frames (smooth, creased, all-hard, smooth-normals, creased-normals) and 2 extra viewer pngs in the suite-run export artefacts (suite versus ad-hoc run, not a change). Artefacts are in the temp folder `Temp\t42` (outside the worktree).
-- New checks shown failing (local scenario-cube runs with mutated sample points or server, then reverted):
+Rulings of the person, as built:
 
-| Mutation | Check that failed |
+1. Corner normals are angle-weighted.
+2. An open edge is a plain boundary; an edge of three or more faces is hard. `mark_edges` accepts both.
+3. Two faces sharing an edge but wound the same way make that edge hard.
+4. `save` writes version 3 only when a mesh is shaded; every flat file stays version 2, byte for byte.
+5. `render`'s `normals` look shows corner normals for a smooth mesh, with a spike on each corner along its corner normal; flat meshes are bit-identical to before.
+6. (2026-11-10) A sixteen-sided cylinder (axis Y, radius 1) built in the cube scenario through `define_mesh`, `set_shading` and `mark_edges`, both cap rims hard: a soft side all round and a crease at each rim. Frames `cylinder-flat`, `cylinder-smooth`, `cylinder-flat-normals`, `cylinder-smooth-normals` (direction 2 2 1, orthographic; not symmetric about x = z, so a mirrored camera draws another frame). The person approved them (round-2).
+
+Also: stale marks are dropped, extrude keeps the shading mode, `.glb` export takes corner normals from `Shading`.
+
+Pixel checks of the cylinder frames, worked from the mesh: flat side facet is a plateau and the flat cap one shade; smooth side runs on across a facet edge (within 2) and grades across one facet; the hard-rimmed cap keeps its flat shade and breaks from the side below the rim; in normals, red falls across one smooth facet, red/blue order the two sides of the image, green puts the cap over the side.
+
+New checks shown failing (local runs with mutated sample points, reverted):
+
+| Mutation | First check that failed |
 |---|---|
-| normals look used face normals | smooth normals, red across top: 188 against 188 |
-| sample points mirrored in x (smooth top) | smooth normals red: 142 against 222 |
-| sample points flipped in z (smooth top) | smooth normals blue: 177 against 197 |
-| mirrored (creased +X face) | creased normals blue: 134 against 225 |
-| flipped (creased +Z face, y) | creased normals green: 134 against 183 |
-| creased top edges made soft before the normals frame | creased normals: top face should be one colour |
+| every cylinder point mirrored in x | flat side facet is one shade: (169,169,166) against (160,160,158) |
+| every cylinder point flipped in y | flat cap against the side below the rim: 171 and 171 |
+| smooth step skipped | smooth side runs on across a facet edge: 166 against 171 |
+| smooth-frame points mirrored in x | smooth normals, red across one facet: 254 against 253 |
+| smooth-frame points flipped in y | smooth cap keeps one shade: (171,171,169) against (171,171,168) |
 
-- Left:
-  1. The person asked for a sphere or cylinder to judge smooth normals. Add a UV sphere (or a cylinder with hard cap rims) smooth frame, shaded plus normals, with pixel checks and a mirror/flip check as for the cube, then re-review. This adds frames beyond the spec, so the caller may want to confirm. The G: drive is absent on this machine, so the review ran from the temp folder with local paths.
-  2. `cairn task T-42 verify` clean after the last commit (scenario suites ran PASS on this code; server-unit has not run with the new unit test, which passes locally).
-  3. Write `### As built` (rulings 1 to 5, soft-edge definition, version 3 only when shaded, stale marks dropped, extrude keeps the mode, normals look now corner normals, spikes per corner on smooth meshes, model Sonnet 5.5), remove this section, `cairn lint`, `cairn task T-42 finish` from inside the worktree, quoting the merge line.
+Cube-frame checks failing (earlier): normals look on face normals, mirrored and flipped sample points (red 188 against 188; red 142 against 222; blue 177 against 197; blue 134 against 225; green 134 against 183).
+
+Hash guard: baseline e9f4e8e (origin/milestone/M-18). Cube job J-20261110-143023-5f8705 (scenario-cube, verify run): all 20 frames of the baseline cube run are byte-identical; the only additions are the cube smooth/creased/all-hard/normals frames and the four cylinder frames. Crate, shed, character and export were guarded earlier on this product code (ad-hoc runs, every shared file identical); since then only the cube scenario file changed. Not re-fetched by job id after the cylinder commit.
+
+Not checked: cylinder frames were not opened by the agent (the person reviewed them); the thresholds 2 and 3 on the shaded ramp are calibrated to measured values (flat steps across facets are only 5 in green), the normals frames carry the strong checks.
