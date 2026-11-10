@@ -192,6 +192,18 @@ public sealed class CubeScenario : IScenario
         CheckDiffers(driver, smooth, topNear, Rounded(hexagonPixel(new Vector3(0.15f, 1, 0.85f))), "the smooth top face, along the other diagonal");
         if (smooth.Pixels.AsSpan().SequenceEqual(hexagon.Pixels)) driver.Fail($"{smooth.Name}: smooth shading drew the flat frame");
 
+        // The normals look of the smooth cube shows corner normals: across the top face the red channel (the x of the normal) grows
+        // with x and the blue channel with z, since each corner's normal leans out along its diagonal. Flat, both would be constant.
+        var smoothNormals = await driver.CaptureAsync("cube-smooth-normals-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic", mode = "normals" });
+        var topXHigh = Rounded(hexagonPixel(new Vector3(0.9f, 1, 0.5f)));
+        var topXLow = Rounded(hexagonPixel(new Vector3(0.1f, 1, 0.5f)));
+        var topZHigh = Rounded(hexagonPixel(new Vector3(0.5f, 1, 0.9f)));
+        var topZLow = Rounded(hexagonPixel(new Vector3(0.5f, 1, 0.1f)));
+        CheckNotBackground(driver, smoothNormals, topXHigh, "the smooth top face, +X side");
+        CheckNotBackground(driver, smoothNormals, topXLow, "the smooth top face, -X side");
+        CheckChannelGreater(driver, smoothNormals, topXHigh, topXLow, p => p.R, "red across the smooth top, +X side over -X side (a mirrored camera swaps them)");
+        CheckChannelGreater(driver, smoothNormals, topZHigh, topZLow, p => p.B, "blue across the smooth top, +Z side over -Z side (a flipped camera swaps them)");
+
         Ok(driver, await driver.CallAsync("mark_edges", new { edges = new[] { new[] { 3, 7 }, new[] { 7, 6 }, new[] { 6, 2 }, new[] { 2, 3 } } }));
         var creased = await driver.CaptureAsync("cube-creased-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic" });
         CheckOutline(driver, creased, silhouette.Select(hexagonPixel).ToArray(), 3);
@@ -200,6 +212,20 @@ public sealed class CubeScenario : IScenario
         if (creasedNear != flatTopNear || creasedFar != flatTopFar)
             driver.Fail($"{creased.Name}: the creased top face should keep its flat shade {flatTopNear}, got {creasedNear} and {creasedFar}");
         CheckDiffers(driver, creased, Rounded(hexagonPixel(new Vector3(0.5f, 0.9f, 1))), Rounded(hexagonPixel(new Vector3(0.5f, 0.1f, 1))), "the +Z face, graded from its top edge to its bottom one");
+
+        // Creased, the top face's corners keep the face normal, so the top is one colour in the normals look, and the +Z face is still blended:
+        // its top corners lean toward +Z and the sides only, its bottom ones down as well. The +X face blends in z.
+        var creasedNormals = await driver.CaptureAsync("cube-creased-normals-dir-1-1-1-ortho", new { direction = new[] { 1, 1, 1 }, projection = "orthographic", mode = "normals" });
+        var creasedTop = (Rounded(hexagonPixel(new Vector3(0.9f, 1, 0.5f))), Rounded(hexagonPixel(new Vector3(0.1f, 1, 0.5f))));
+        var sideHigh = Rounded(hexagonPixel(new Vector3(1, 0.5f, 0.9f)));
+        var sideLow = Rounded(hexagonPixel(new Vector3(1, 0.5f, 0.1f)));
+        var upperFront = Rounded(hexagonPixel(new Vector3(0.5f, 0.9f, 1)));
+        var lowerFront = Rounded(hexagonPixel(new Vector3(0.5f, 0.1f, 1)));
+        CheckNotBackground(driver, creasedNormals, creasedTop.Item1, "the creased top face, +X side");
+        if (creasedNormals.Pixel(creasedTop.Item1.X, creasedTop.Item1.Y) != creasedNormals.Pixel(creasedTop.Item2.X, creasedTop.Item2.Y))
+            driver.Fail($"{creasedNormals.Name}: the creased top face should be one colour in the normals look");
+        CheckChannelGreater(driver, creasedNormals, sideHigh, sideLow, p => p.B, "blue across the creased +X face, +Z end over -Z end (a mirrored camera swaps them)");
+        CheckChannelGreater(driver, creasedNormals, upperFront, lowerFront, p => p.G, "green down the creased +Z face, top over bottom (a flipped camera swaps them)");
 
         var every = new[] { new[] { 0, 1 }, new[] { 1, 2 }, new[] { 2, 3 }, new[] { 3, 0 }, new[] { 4, 5 }, new[] { 5, 6 }, new[] { 6, 7 }, new[] { 7, 4 }, new[] { 0, 4 }, new[] { 1, 5 }, new[] { 2, 6 }, new[] { 3, 7 } };
         Ok(driver, await driver.CallAsync("mark_edges", new { edges = every }));
@@ -376,6 +402,16 @@ public sealed class CubeScenario : IScenario
         if (Math.Abs(first - second) < MinimumStep)
         {
             driver.Fail($"{frame.Name}: {what}: {first} and {second} should differ by at least {MinimumStep}");
+        }
+    }
+
+    /// <summary>One channel of the first pixel exceeding the second's by at least <see cref="MinimumStep"/>, in that order only.</summary>
+    private static void CheckChannelGreater(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) high, (int X, int Y) low, Func<(byte R, byte G, byte B, byte A), int> channel, string what)
+    {
+        var (first, second) = (channel(frame.Pixel(high.X, high.Y)), channel(frame.Pixel(low.X, low.Y)));
+        if (first - second < MinimumStep)
+        {
+            driver.Fail($"{frame.Name}: {what}: {first} against {second} should differ by at least {MinimumStep}, the first greater");
         }
     }
 

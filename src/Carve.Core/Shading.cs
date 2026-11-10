@@ -68,6 +68,9 @@ public readonly record struct ShadedTriangle(
 /// </summary>
 public static class Shading
 {
+    /// <summary>Whether the corners can differ from their faces' normals: a smooth mesh, or a posed copy that carries its own.</summary>
+    public static bool HasCornerNormals(PolygonMesh mesh) => mesh.ShadingMode == ShadingMode.Smooth || mesh.PosedCorners is not null;
+
     /// <summary>The triangles in <see cref="Triangulator"/> order, each with its corner normals.</summary>
     public static IReadOnlyList<ShadedTriangle> Triangles(PolygonMesh mesh)
     {
