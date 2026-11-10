@@ -47,9 +47,11 @@ Rulings of the person, as built:
 1. Corner normals are angle-weighted.
 2. An open edge is a plain boundary; an edge of three or more faces is hard. `mark_edges` accepts both.
 3. Two faces sharing an edge but wound the same way make that edge hard.
-4. `save` writes version 3 only when a mesh is shaded; every flat file stays version 2, byte for byte.
+4. `save` writes version 3 whenever a mesh has a shade: smooth, or flat with hard edges marked (corrected after RV-27). A file whose meshes are all flat with no mark stays version 2, byte for byte.
 5. `render`'s `normals` look shows corner normals for a smooth mesh, with a spike on each corner along its corner normal; flat meshes are bit-identical to before.
 6. (2026-11-10) A sixteen-sided cylinder (axis Y, radius 1) built in the cube scenario through `define_mesh`, `set_shading` and `mark_edges`, both cap rims hard: a soft side all round and a crease at each rim. Frames `cylinder-flat`, `cylinder-smooth`, `cylinder-flat-normals`, `cylinder-smooth-normals` (direction 2 2 1, orthographic; not symmetric about x = z, so a mirrored camera draws another frame). The person approved them (round-2).
+
+**RV-27 fixes (Opus 5.5):** the normals look coloured each smooth triangle's corners B and C with each other's normals, since `MeshBridge` reverses the winding for the engine; `CornerColours` now follows its A, C, B order, and the test compares each colour with the vertex it lands on. A flat mesh drawn beside a smooth one keeps its face-centre spikes, at rest and posed (`PolygonMesh.FlatFaces`, `Shading.FaceHasCornerNormals`). `MarkEdges` lists a refused pair once in either order. New tests: a mis-wound shared edge is hard, and skinned `.glb` export writes corner normals.
 
 Also: stale marks are dropped, extrude keeps the shading mode, `.glb` export takes corner normals from `Shading`.
 
