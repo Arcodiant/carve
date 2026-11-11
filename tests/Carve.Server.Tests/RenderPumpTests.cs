@@ -451,4 +451,40 @@ public class RenderPumpTests
             FailureOf(waiting));
         Assert.Empty(_scene.Rendered);
     }
+
+    [Fact]
+    public void A_weights_render_then_a_model_without_that_bone_leaves_plain_renders_served()
+    {
+        var pump = Started();
+        _store.DefineSkeleton(RigTestHelpers.Bones("Root", "Tip"), "define_skeleton", out _);
+        var front = CameraSpec.ForView(RenderView.Front);
+        _queue.Post(new RenderSpec(front) { Weights = "Root" });
+        for (var i = 0; i < 4; i++) pump.Step();
+        Assert.Equal("Root", Assert.Single(_scene.Rendered).Request.Spec.Weights);
+
+        Assert.NotNull(_store.Undo()); // the skeleton is gone
+        pump.Step();
+        Assert.Empty(_scene.Reported);
+
+        _queue.Post(new RenderSpec(front));
+        for (var i = 0; i < 4; i++) pump.Step();
+        Assert.Equal(2, _scene.Rendered.Count);
+        Assert.Null(_scene.Rendered[1].Request.Spec.Weights);
+
+        // Only a weights request for the missing bone fails, with the tool's own text; the next plain one is served.
+        var stale = _queue.Post(new RenderSpec(front) { Weights = "Root" });
+        _queue.Post(new RenderSpec(front));
+        for (var i = 0; i < 4; i++) pump.Step();
+        Assert.Equal("weights: the model has no skeleton; call define_skeleton first", FailureOf(stale));
+        Assert.Equal(3, _scene.Rendered.Count);
+
+        // A renaming define_skeleton: the bone is gone, the skeleton is not.
+        _store.DefineSkeleton(RigTestHelpers.Bones("Base", "Tip"), "define_skeleton", out _);
+        var renamed = _queue.Post(new RenderSpec(front) { Weights = "Root" });
+        _queue.Post(new RenderSpec(front));
+        for (var i = 0; i < 4; i++) pump.Step();
+        Assert.StartsWith("weights: no bone named 'Root'", FailureOf(renamed));
+        Assert.Equal(4, _scene.Rendered.Count);
+        Assert.Empty(_scene.Reported);
+    }
 }
