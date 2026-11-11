@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-27 — Review of M-18
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-18
 
@@ -12,7 +12,7 @@ description: >-
 
 **Previous:** —
 
-**Diff:** —
+**Diff:** `910a59a6ea122045d5da2d4f5aed0ffb796a799c against e9f4e8e` (the milestone at 46da626)
 
 **Reviewer:** claude-opus-5-5 (three reviewers: T-42's range, T-43's range, the whole diff with T-44's range and the refactor)
 
@@ -205,12 +205,8 @@ The person ruled on two findings on 2026-11-10:
 - subdivide keeps an unweighted vertex unweighted;
 - the soft export check pins the count of not-planar warnings to `select faces where non_planar`.
 
-## Hand-off
-
-Written by Opus 5.5 at the checkpoint "fixes committed and verified, frame review still to come".
-
-- **Done:** all twelve open findings fixed (commits e9f2d69, bac210c, 74aa87a), each with a test, and each new test shown failing against the old behaviour, mutated locally and then restored. The person's two rulings of 2026-11-10 are recorded in the outcomes and in T-43's and T-44's As built. T-42's As built has ruling 4 corrected and an RV-27 paragraph. `cairn milestone M-18 verify` at 74aa87a: every suite ran fresh and passed (10 ran, 0 carried); only `review` fails.
-- **Frames:** baseline from the gate jobs at 46da626 (code equal to b860174), fetched by job id; new from the verify jobs at 74aa87a (each `output.log` names `carve@74aa87a`). Of 121 frames over cube, crate, shed, export, character and soft, two changed, both M-18's own: `cube-smooth-normals-dir-1-1-1-ortho` and `cube-creased-normals-dir-1-1-1-ortho` (the B/C colour fix). Every frame from before M-18 is byte-identical. `scenario-cube` passed with the two new frames.
-- **Left:** the person's review of round 1. The two changed frames and their old versions are in `C:\Users\andre\artifacts\carve\M-18\RV-27\round-1` (`*.old.png`, `*.new.png`). Ask with `mcp__waystone__review`, and record the answer. Then set the review's status (not done here). `finish` is not run.
-- **Surprising:** the cylinder's smooth-normals frame and the subdivided normals frames did not change, by hash. The subdivided ones are flat, and on the cylinder's sides each triangle's B and C corners evidently share a normal. Removing the isolated-vertex guard alone gives no NaN, because a one-term stencil returns its vertex as it is. It does drop a weighted vertex's weight, so the test weights the vertex. The mixed-model spike change alters no frame, since no scenario draws a flat mesh beside a smooth one.
-- **Not checked:** only the new smooth-cube frame was opened, and it looks right: each corner's colour matches its outward diagonal. The creased frame was compared by hash and by its passing checks only.
+**Answers (2026-11-10).**
+- All twelve code findings were fixed by an Opus 5.5 agent in commits e9f2d69, bac210c and 74aa87a, each with a test shown failing against the old behaviour.
+- Of 121 frames, two changed, both M-18's own: `cube-smooth-normals` and `cube-creased-normals`, from the B/C fix. Every frame from before M-18 is byte-identical.
+- The person approved the two changed frames in Waystone ("the smooth meshes look correct now, the old may have been bugged").
+- Because code was fixed, a re-review follows in a new round.
