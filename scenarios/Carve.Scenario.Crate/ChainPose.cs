@@ -142,6 +142,7 @@ internal static class ChainPose
 
         await WaveAsync(driver, restPixel, reference, bent);
         await WeighedArmAsync(driver, restPixel, reference);
+        await ChainBones.RunAsync(driver);
     }
 
     /// <summary>A column of <paramref name="rings"/> square rings (y values), 0.4 m square, capped at both ends.</summary>
