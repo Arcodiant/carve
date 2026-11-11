@@ -34,7 +34,9 @@ description: >-
 - **Failure:** a regression in the by-vertex read of a weighted vertex, or in the idle-bone note, passes this test.
 - **Suggested fix:** do the `set_weights` first; assert vertex 0 reads `{Head: 1}`, vertex 7 `{}`, "6 vertices have no weight: 2, 3, 4, 5, 6, 7", and the note names 'Hips', 'Tail'. Or change the description's premise.
 
-**Outcome:** fixed: 3a15bc4. The test runs `set_weights {"vertices":[0,1],"weights":{"Head":1}}` first and compares the whole result; the description names the bones and shows the `Result:` line.
+**Outcome:** fixed
+
+Fixed in 3a15bc4. The test runs `set_weights {"vertices":[0,1],"weights":{"Head":1}}` first and compares the whole result; the description names the bones and shows the `Result:` line.
 
 ### `weigh`'s `bones` argument is never run successfully through the tool, and two of its documented errors are never tested
 
@@ -43,7 +45,9 @@ description: >-
 - **Failure:** replace `indices` with `null`, or add `i + 1`, in `ModelStore.Weigh`, and every test still passes; drop the no-skeleton check and `AutoWeights.Segments` throws on null, a crash rather than a tool error.
 - **Suggested fix:** a server test on the Hips/Head/Tail chain: `weigh {"bones":["Head"]}`, assert the counts, read back with `get_weights` that only the vertices nearest Head are weighted, wholly to Head. Add `weigh` with no skeleton and with `"bones":[]`, asserting a tool error and no new undo step.
 
-**Outcome:** fixed: f4cec67. `GetWeightsToolTests` runs `weigh {"bones":["Head"]}` on the Hips/Head/Tail chain (4 weighed, 0 kept, 4 unweighted; `get_weights` reads 2, 3, 6, 7 wholly Head, the rest empty), and `weigh` with no skeleton and with `"bones":[]` is a tool error with no new undo step.
+**Outcome:** fixed
+
+Fixed in f4cec67. `GetWeightsToolTests` runs `weigh {"bones":["Head"]}` on the Hips/Head/Tail chain (4 weighed, 0 kept, 4 unweighted; `get_weights` reads 2, 3, 6, 7 wholly Head, the rest empty), and `weigh` with no skeleton and with `"bones":[]` is a tool error with no new undo step.
 
 ### No test checks that a leaf's segment is half its parent's length
 
@@ -52,7 +56,9 @@ description: >-
 - **Failure:** change `* 0.5` to `* 1.0` or `* 2.0`, or `d < bestD` to `d <= bestD`, and all nine `AutoWeightsTests` pass.
 - **Suggested fix:** a point at `(0, 1.8, 0)` on `TwoBones`, distance 0.3 to the leaf, weights per `(0.3/0.8)^4`; and a `bones` case with a vertex equidistant from a named and an unnamed bone (the joint at `(0, 1, 0)` with `bones: [1]`), which must be out of scope.
 
-**Outcome:** fixed: 5a377ae. (0, 1.8, 0) on `TwoBones` weighs the half-length leaf, and the joint (0, 1, 0) with `bones: [1]` is out of scope; `* 1.0` and `<=` each fail a test (mutations reverted).
+**Outcome:** fixed
+
+Fixed in 5a377ae. (0, 1.8, 0) on `TwoBones` weighs the half-length leaf, and the joint (0, 1, 0) with `bones: [1]` is out of scope; `* 1.0` and `<=` each fail a test (mutations reverted).
 
 ### `Math.Pow` makes "bit for bit" determinism depend on the platform
 
@@ -61,7 +67,9 @@ description: >-
 - **Failure:** the same mesh weighed on Windows and on a Linux host can differ in the last bit, so a saved `.carve` or `.glb` differs across machines. Latent today.
 - **Suggested fix:** `var r = nearest / d[k]; var r2 = r * r; w = r2 * r2;`.
 
-**Outcome:** fixed: 8e89b67. `FourthPower(r)` is `r2 = r * r; r2 * r2`, IEEE-exact. fixed: 8e89b67, restored by 859ff2a on the person's ruling (2026-11-11); every frame and .glb byte-identical, gardener-weighed.carve changes in the last bit of 507 numbers
+**Outcome:** fixed
+
+Fixed in 8e89b67. `FourthPower(r)` is `r2 = r * r; r2 * r2`, IEEE-exact. fixed: 8e89b67, restored by 859ff2a on the person's ruling (2026-11-11); every frame and .glb byte-identical, gardener-weighed.carve changes in the last bit of 507 numbers
 
 ### `scenario-rig`'s inputs leave out a file its project links
 
@@ -70,7 +78,9 @@ description: >-
 - **Failure:** an edit to `GardenerPixels.cs` that breaks the Rig build can carry `scenario-rig`'s earlier pass.
 - **Suggested fix:** add it to the inputs, or drop the unused link.
 
-**Outcome:** fixed: 3bc670e. The unused `GardenerPixels.cs` link is dropped from the Rig csproj, so the suite's inputs cover every file it compiles.
+**Outcome:** fixed
+
+Fixed in 3bc670e. The unused `GardenerPixels.cs` link is dropped from the Rig csproj, so the suite's inputs cover every file it compiles.
 
 Covered: `src/Carve.Core/AutoWeights.cs`, `VertexWeights.cs`, `PolygonMesh.cs` and `Model.cs` (weights parts); `src/Carve.Server/WeighTool.cs`, `GetWeightsTool.cs`, `ModelStore.cs` (diff, `DefineSkeleton`, `PushLocked`), `Program.cs`; tests `AutoWeightsTests`, `GetWeightsToolTests`, `NamedMeshTests`, `EditToolTests` (diff); `RigScenario.cs` and its csproj; the weigh parts of `ChainPose.cs` and `CharacterScenario.cs`; `tests.json`; T-37, T-38, T-41; D-6's Weights diff; the milestone retrospective. Found sound: normalisation and the cap of four with ties to the lower index; distance-0 sharing; several-children segments; the `bones` scope and `replace`/keep follow the rulings; `weigh` is one undo step; `get_weights`' summary, warnings and errors; an empty `weigh` result does not mark a mesh as weighted.
 
@@ -83,7 +93,9 @@ Covered: `src/Carve.Core/AutoWeights.cs`, `VertexWeights.cs`, `PolygonMesh.cs` a
 - **Failure:** `render {weights:"Elbow_L"}`, then `open` of a file without Elbow_L, `undo` past `define_skeleton`, or a renaming `define_skeleton`; then `render {}` and every render after it fail with "weights: no bone named 'Elbow_L'…".
 - **Suggested fix:** in `ShowMesh`, compute the heat only when the snapshot's skeleton has that bone, else show the mesh shaded; fail only the weights request itself, re-checked at the head of the queue as target and highlight are. Add a `RenderPumpTests` case: weights request, then a model with no skeleton, then a plain request that must be served.
 
-**Outcome:** fixed: fdf17f2. `ShowMesh` shows the mesh shaded when the weights bone is gone, and the pump fails only a weights request whose bone is missing, re-checked at the head of the queue; `RenderPumpTests` cover `undo` past `define_skeleton` and a renaming `define_skeleton`, then a plain render served.
+**Outcome:** fixed
+
+Fixed in fdf17f2. `ShowMesh` shows the mesh shaded when the weights bone is gone, and the pump fails only a weights request whose bone is missing, re-checked at the head of the queue; `RenderPumpTests` cover `undo` past `define_skeleton` and a renaming `define_skeleton`, then a plain render served.
 
 ### Several named "mirror" and "flip" checks don't test the transform they name
 
@@ -92,7 +104,9 @@ Covered: `src/Carve.Core/AutoWeights.cs`, `VertexWeights.cs`, `PolygonMesh.cs` a
 - **Failure:** with the overlay flipped in y, ChainBones:61 still passes; if the positive bent-frame checks were removed, nothing would test the y-flip there.
 - **Suggested fix:** ChainBones:61 uses `(d.X·0.5, 2 − d.Y·0.5)` or derives it from `RestMin.Y + RestMax.Y`; relabel ChainWeights:65-66 as corner-order checks and name the middle-quad and magenta checks as the camera guards.
 
-**Outcome:** fixed: ec42db3. ChainBones tests the y-flip at `RestMin.Y + RestMax.Y - d.Y * 0.5`, shown failing on an overlay flipped in y with the other bones checks taken out (the old point passed there); ChainWeights' red corner checks are relabelled as corner order and the middle-quad green and corner magenta named as the camera guards; T-39's and T-40's As built updated.
+**Outcome:** fixed
+
+Fixed in ec42db3. ChainBones tests the y-flip at `RestMin.Y + RestMax.Y - d.Y * 0.5`, shown failing on an overlay flipped in y with the other bones checks taken out (the old point passed there); ChainWeights' red corner checks are relabelled as corner order and the middle-quad green and corner magenta named as the camera guards; T-39's and T-40's As built updated.
 
 Covered: T-39 and T-40 task files, D-6's leaf paragraph; `src/Carve.Core/BoneLines.cs`, `Skinning.cs`; `src/Carve.Server/BoneOverlay.cs`, `LabelLayout.cs`, `LookMeshes.cs`, `RenderPump.cs` (whole), `RenderQueue.cs`, `RenderSystem.cs`, `RenderTool.cs`, `WeightHeat.cs`, and for context `LookHolder.cs`, `MeshBridge.cs`, `SkeletonTools.cs`, `OpenTool.cs`; tests `BoneLinesTests`, `BoneOverlayTests`, `BoneRenderToolTests`, `WeightsLookTests`, `EditToolTests`; scenario diffs of `ChainBones.cs`, `ChainWeights.cs`, `ChainPose.cs`, `CharacterScenario.cs`. Found sound: posed heads match `SkinTransforms`; `bones` and `weights` take the clip's sampled pose; the `mode` refusal; heat stops, clamping and corner order (A, C, B); frames without the new arguments take the old path; the weights → plain fallback.
 
@@ -105,7 +119,9 @@ Covered: T-39 and T-40 task files, D-6's leaf paragraph; `src/Carve.Core/BoneLin
 - **Failure:** `define_mesh`, `define_skeleton`, then `render {"weights":"Root"}`. Then `undo` (the skeleton is gone), or `open samples/leaky-shed.carve`, or `define_skeleton` with that bone renamed. Then a plain `render {}` fails with "The current mesh could not be put in the scene: weights: no bone named 'Root'…". Every render after that fails the same way, even after further edits.
 - **Suggested fix:** in `ShowMesh`, work out the heat only when the snapshot's skeleton has `_shownWeights`; otherwise pass no heat. Or clear `_shownWeights` before the `_meshFault` check. Add a `RenderPumpTests` case: weights render, then the skeleton removed, then a plain render succeeds.
 
-**Outcome:** fixed: fdf17f2, the same as the render side's first finding.
+**Outcome:** fixed
+
+Fixed in fdf17f2, the same as the render side's first finding.
 
 ### `scenario-rig` inputs miss `GardenerPixels.cs`, which the Rig project compiles
 
@@ -114,7 +130,9 @@ Covered: T-39 and T-40 task files, D-6's leaf paragraph; `src/Carve.Core/BoneLin
 - **Failure:** a change to `scenarios/Carve.Scenario.Character/GardenerPixels.cs` leaves the `scenario-rig` fingerprint unchanged, so a stale pass carries, including a change that breaks the Rig build.
 - **Suggested fix:** drop the unused `GardenerPixels.cs` link from the Rig csproj, or add it to the suite's inputs and the CLAUDE.md row.
 
-**Outcome:** fixed: 3bc670e, the same as the weights side's fifth finding.
+**Outcome:** fixed
+
+Fixed in 3bc670e, the same as the weights side's fifth finding.
 
 ### `get_weights`'s worked example states a setup that neither the test nor the description's own reading runs
 
@@ -123,7 +141,9 @@ Covered: T-39 and T-40 task files, D-6's leaf paragraph; `src/Carve.Core/BoneLin
 - **Failure:** an agent reading the description expects `{"vertex":0,"weights":{"Head":1}}`. The only check of the example asserts the opposite state, so the claimed setup is unverified.
 - **Suggested fix:** call `set_weights {"vertices":[0,1],"weights":{"Head":1}}` before the example in the test and assert vertex 0 is `{"Head":1}`, vertex 7 is `{}`, 6 unweighted. Or reword the description.
 
-**Outcome:** fixed: 3a15bc4, the same as the weights side's first finding.
+**Outcome:** fixed
+
+Fixed in 3a15bc4, the same as the weights side's first finding.
 
 ### `render`'s list of tools that work without Vulkan still leaves out `weigh`
 
@@ -132,7 +152,9 @@ Covered: T-39 and T-40 task files, D-6's leaf paragraph; `src/Carve.Core/BoneLin
 - **Failure:** an agent on a machine with no Vulkan device concludes `weigh` is unavailable, though it works.
 - **Suggested fix:** add `weigh` to the list; say "the weights set_weights or weigh gave" in both places.
 
-**Outcome:** fixed: 3a8f45e. `weigh` is in the "still work there" list, and both places say "the weights set_weights or weigh gave".
+**Outcome:** fixed
+
+Fixed in 3a8f45e. `weigh` is in the "still work there" list, and both places say "the weights set_weights or weigh gave".
 
 Covered: the whole diff, with full reads of `src/Carve.Core/{AutoWeights,BoneLines,Skinning}.cs`, `src/Carve.Server/{WeighTool,GetWeightsTool,ModelStore,Program,RenderTool,RenderPump,RenderQueue,RenderSystem,BoneOverlay,WeightHeat,LookMeshes,LabelLayout}.cs`, `tests.json`, `Carve.slnx`, CLAUDE.md, the changelog, D-6's diff, every csproj's `Link=` items, `GetWeightsToolTests`, the milestone doc and the As built of T-37 to T-41. Checked with no finding: `AutoWeights` and `BoneLines` agree on segments; `get_weights`, the `weights` look and `weigh` read the same `VertexWeights`; the changelog and D-6 match what was built.
 
