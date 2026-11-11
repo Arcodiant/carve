@@ -4,7 +4,7 @@ description: >-
 ---
 # T-39 — Bones in renders
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
