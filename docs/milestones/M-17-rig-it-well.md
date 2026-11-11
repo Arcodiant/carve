@@ -4,7 +4,7 @@ description: >-
 ---
 # M-17 — Rig it well
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *Automatic weights, group overrides and read-back, with bones and weights shown in renders so skinning faults are seen before export*
 
