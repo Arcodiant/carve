@@ -59,3 +59,5 @@ Run on Sonnet 5.5 (claude-sonnet-5-5), one agent.
 **Hash guard:** local runs on this machine, tree stashed (before) and applied (after): crate 50 of 50 existing frames byte-identical (55 after: five new), cube 32 of 32, character 21 of 21. The person approved three frames (`artifacts/carve/M-17/T-40/round-1`).
 
 **Not checked:** `weights` on a sheet of `views` or several meshes by frame (shared code path); the gardener model (no frame added, so `scenario-character` is not in Verify); a pose rotation that swings mesh parts through a mirrored x position (the x-mirror is covered by the static frames). No engine need recorded.
+
+- Landing (rebase, verify, finish) ran on Sonnet 5.5 (claude-sonnet-5-5).
