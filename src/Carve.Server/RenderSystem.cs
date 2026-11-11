@@ -40,6 +40,7 @@ internal sealed class RenderSystem(
     private ViewFrame? _frame;
     private bool _composed;
     private RenderPump? _pump;
+    private float[]? _weights;
 
     private LookHolder<Mesh> Looks => _looks ??= new LookHolder<Mesh>(this);
 
@@ -94,8 +95,11 @@ internal sealed class RenderSystem(
 
     public void ShowMesh(Carve.Core.PolygonMesh mesh) => ShowMesh(mesh, mesh);
 
-    public void ShowMesh(Carve.Core.PolygonMesh mesh, Carve.Core.PolygonMesh frameOn)
+    public void ShowMesh(Carve.Core.PolygonMesh mesh, Carve.Core.PolygonMesh frameOn) => ShowMesh(mesh, frameOn, null);
+
+    public void ShowMesh(Carve.Core.PolygonMesh mesh, Carve.Core.PolygonMesh frameOn, float[]? weights)
     {
+        _weights = weights;
         var report = MeshReport.Create(mesh);
         var framing = ReferenceEquals(mesh, frameOn) ? report : MeshReport.Create(frameOn);
         var space = DrawnSpace.Of(framing.BoundsMin, framing.BoundsMax);
@@ -107,7 +111,8 @@ internal sealed class RenderSystem(
 
     public IReadOnlyList<Func<Mesh?>> Make(Carve.Core.PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight)
     {
-        var scene = LookMeshes.Compose(mesh, space, look, highlight);
+        // The pump puts a mesh in under the previous look before it applies the next: with no weights to hand, draw it shaded for now.
+        var scene = LookMeshes.Compose(mesh, space, look == Look.Weights && _weights is null ? Look.Shaded : look, highlight, _weights);
         // The fill's material, put on its entity by Install with the meshes made here. A mesh with coloured faces drawn
         // in the shaded look is a submesh and a material per colour (D-6); anything else is the one mesh it always was.
         _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
