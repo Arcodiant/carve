@@ -250,6 +250,48 @@ public sealed class ModelStore
         }
     }
 
+    /// <summary>
+    /// Weighs the mesh <paramref name="name"/> picks automatically (<see cref="AutoWeights.Weigh"/>), limited to the bones named in
+    /// <paramref name="bones"/> when given, under the lock, as one step. Null, pushing nothing, when the model is empty, the name picks
+    /// no mesh, there is no skeleton or a bone name is unknown (<paramref name="problems"/> says why).
+    /// </summary>
+    public ModelSnapshot? Weigh(string tool, string? name, IReadOnlyList<string>? bones, bool replace, out (string Mesh, WeighOutcome Outcome)? change,
+        out List<string> problems)
+    {
+        lock (_write)
+        {
+            change = null;
+            problems = [];
+            var model = _current.Model;
+            var target = model.Target(name, out var problem);
+            if (problem is not null) problems.Add(problem);
+            if (target is null) return null;
+            if (model.Skeleton is not { } skeleton)
+            {
+                problems.Add("weigh: the model has no skeleton yet; call define_skeleton first");
+                return null;
+            }
+
+            List<int>? indices = null;
+            if (bones is not null)
+            {
+                var names = skeleton.Names.ToList();
+                indices = [];
+                foreach (var b in bones)
+                {
+                    var i = names.IndexOf(b);
+                    if (i < 0) problems.Add($"bones: no bone named '{b}'; the bones are {NameList.Quoted(names)}");
+                    else indices.Add(i);
+                }
+            }
+            if (problems.Count > 0) return null;
+
+            var weights = AutoWeights.Weigh(target.Mesh, skeleton, indices, replace, out var outcome);
+            change = (target.Name, outcome);
+            return PushLocked(model.With(target.Name, target.Mesh.WithWeights(weights)), tool);
+        }
+    }
+
     /// <summary>Steps back one change, or null when there is nothing older.</summary>
     public UndoResult? Undo()
     {
