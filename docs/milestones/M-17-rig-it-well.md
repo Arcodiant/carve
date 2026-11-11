@@ -117,6 +117,16 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - Bone labels crowd around the gardener's clavicles and shoulders (T-39).
 - Distance-only automatic weights pinch at joints and give torso sides to a hanging arm. Explicit overrides are the person's answer for now.
 
+**After the person's go (2026-11-11).**
+
+- **Rebase:** `origin/main` had not moved, so there was nothing to rebase.
+- **Refactor pass (Sonnet 5.5):** it added `get_weights` to `render`'s pose list. It left `AutoWeights` and `BoneLines` apart, since sharing one segment function would change either the weights or the frames.
+- **Review round 1, RV-29:** three Opus 5.5 reviewers (the weights side, the render side, the whole diff) gave 11 findings, 8 distinct. All were fixed by two Opus 5.5 agents, one handing off to the other, with a Sonnet 5.5 agent landing the fixes. Two notes:
+  - **The stuck render pump** was the serious one. After a `weights` render, any model without that bone failed every later render. Two reviewers found it independently. The fix is covered by a `RenderPumpTests` case.
+  - **The `Math.Pow` falloff** was replaced by exact multiplication for cross-platform bit-exactness, on the person's ruling. Every frame and `.glb` stayed byte-identical. The weighed gardener `.carve` changed in the last bit of 507 numbers.
+- **Review round 2, RV-30:** one Opus 5.5 reviewer found nothing, and every RV-29 outcome held.
+- **Next time:** the members' mirror and flip checks were labelled for camera transforms they did not test (RV-29). A brief should ask for each guard point to be worked from the framing's bounds.
+
 **Test report** (`cairn test report --since 2d`):
 - `server-regression` is again most of the slot time, about 80%. It caught 5 failures, 4 of them unique to it.
 - There were no flakes, and nothing to file from it.
