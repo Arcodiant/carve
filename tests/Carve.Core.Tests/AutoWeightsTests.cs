@@ -55,6 +55,29 @@ public class AutoWeightsTests
     }
 
     [Fact]
+    public void A_leafs_segment_runs_on_for_half_its_parents_length_and_no_further()
+    {
+        // (0, 1.8): 0.3 past the leaf's end at y 1.5 and 0.8 from base's end at y 1. A leaf of the parent's whole length (to y 2)
+        // would hold the point (wholly joint's); one of twice it, the same.
+        var w = At(TwoBones(), new Vector3(0, 1.8f, 0));
+        var y = (double)1.8f;
+        var r = Math.Pow((y - 1.5) / (y - 1), 4);
+        Assert.Equal(r / (1 + r), w.Single(i => i.Bone == 0).Weight, 9);
+        Assert.Equal(1 / (1 + r), w.Single(i => i.Bone == 1).Weight, 9);
+    }
+
+    [Fact]
+    public void Under_bones_a_vertex_as_near_a_named_bone_as_an_unnamed_one_of_lower_index_is_out_of_scope()
+    {
+        // The joint at (0, 1, 0) lies on base's segment and on joint's: the tie goes to base, index 0, so with bones [1] it is left alone.
+        var w = AutoWeights.Weigh(Points(Vector3.UnitY), TwoBones(), [1], false, out var outcome);
+        Assert.False(w.Has(0));
+        Assert.Equal(0, outcome.Weighed);
+        // With bones [0] it is in scope, and weighed among base alone.
+        Assert.Equal([new Influence(0, 1)], AutoWeights.Weigh(Points(Vector3.UnitY), TwoBones(), [0], false, out _).Of(0));
+    }
+
+    [Fact]
     public void A_bone_with_several_children_is_as_near_as_its_nearest_segment()
     {
         var s = Chain(("hips", null, Vector3.Zero), ("leg", "hips", new Vector3(1, -1, 0)), ("spine", "hips", new Vector3(0, 1, 0)));
