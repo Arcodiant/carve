@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-44
 
-**Verify:** server-regression, scenario-cube, scenario-crate
+**Verify:** server-regression, scenario-cube, scenario-crate, scenario-character
 
 **Perf:** skip: Carve declares no heavy suites
 
