@@ -61,6 +61,21 @@ public sealed class CharacterScenario : IScenario
         var posed = await driver.CaptureAsync("gardener-pose-front", new { view = "+z", pose = GardenerSpec.Pose });
         CheckPose(driver, posed, rest, front, body);
 
+        // T-39: the skeleton over the gardener, at rest and in that pose. Heads are worked from the bones' local offsets
+        // above (every rest rotation is identity): Elbow_R rests at (-0.30, 0.80) and, with Shoulder_R (-0.17, 1.00)
+        // turned -35 degrees about Z, lands at (-0.391, 0.911).
+        var restBones = await driver.CaptureAsync("gardener-bones-rest-front", new { view = "+z", bones = true });
+        var posedBones = await driver.CaptureAsync("gardener-bones-pose-front", new { view = "+z", bones = true, bone_labels = true, pose = GardenerSpec.Pose, size = 1024 });
+        CheckCorners(driver, restBones);
+        BoneAt(driver, restBones, front, new Vector3(0, 1.10f, 0), true, "the Head bone's head, at rest");
+        BoneAt(driver, restBones, front, new Vector3(0.30f, 0.80f, 0), true, "Elbow_L's head, at rest");
+        BoneAt(driver, restBones, front, new Vector3(-0.30f, 0.80f, 0), true, "Elbow_R's head, at rest");
+        var big = Perspective(min, max, Vector3.UnitZ, 1024);
+        BoneAt(driver, posedBones, big, new Vector3(-0.391f, 0.911f, 0), true, "Elbow_R's head, posed");
+        BoneAt(driver, posedBones, big, new Vector3(0.391f, 0.911f, 0), false, "where an image mirror puts Elbow_R's head");
+        BoneAt(driver, posedBones, big, new Vector3(-0.391f, min.Y + max.Y - 0.911f, 0), false, "where a flipped image puts Elbow_R's head");
+        BoneAt(driver, posedBones, big, new Vector3(-0.30f, 0.80f, 0), false, "where Elbow_R's head rests, posed away");
+
         // Idle: at 0 s every key is the rest, so the frame is the rest frame; at 1 s the can has swayed out and the hips dropped.
         var idle = GardenerSpec.Idle;
         var idle0 = await driver.CaptureAsync("gardener-idle-0.0-front", new { view = "+z", clip = "Idle", time = 0.0 });
@@ -129,6 +144,7 @@ public sealed class CharacterScenario : IScenario
 
         await SaveReopenAsync(driver, work, rest, restSide, walkFrames[0.25f]);
         await ExportAsync(driver, work, models);
+        await WeighAsync(driver, work, models, rest, front, body);
     }
 
     // ---- build, through the tools ----
@@ -235,6 +251,21 @@ public sealed class CharacterScenario : IScenario
         ExpectGroup(driver, frame, x, y, "can", $"{what}: the can face, posed to {at}");
         var (mx, my) = Holding(project(new Vector3(-at.X, at.Y, at.Z)));
         ExpectNot(driver, frame, mx, my, "can", $"{what}: the can's mirror in X");
+    }
+
+    /// <summary>Whether a pixel within 3 of the point's is the bone colour (255, 0, 255), the line being 3 wide and the dot 4 in radius.</summary>
+    private static void BoneAt(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, Vector3 point, bool expected, string what)
+    {
+        var (x, y) = Holding(project(point));
+        var found = false;
+        for (var dx = -3; dx <= 3 && !found; dx++)
+        for (var dy = -3; dy <= 3 && !found; dy++)
+        {
+            var p = frame.Pixel(x + dx, y + dy);
+            found = p.R > 200 && p.B > 200 && p.G < 80;
+        }
+
+        if (found != expected) driver.Fail($"{frame.Name}: {(expected ? "no bone colour" : "bone colour")} at {what}, ({x}, {y})");
     }
 
     private static void CheckPose(ScenarioDriver driver, ScenarioFrame frame, ScenarioFrame rest, Func<Vector3, Vector2> project, GardenerSpec.MeshSpec body)
@@ -384,5 +415,92 @@ public sealed class CharacterScenario : IScenario
 
         await CallTextAsync(driver, "export", new { path = glb, overwrite = true });
         driver.AssertBytesEqual("gardener.glb, exported after the extrude was undone", glbBytes, await File.ReadAllBytesAsync(glb));
+    }
+
+    // ---- automatic weights (T-37) ----
+
+    /// <summary>
+    /// T-37: <c>weigh</c> on the gardener. First the default fills only what has no weight: the hat's top extruded again makes
+    /// unweighted vertices, and <c>weigh</c> weighs exactly those and keeps the rest; undone, the export is byte-identical to the
+    /// hand-weighted one. Then both meshes are weighed again from scratch (<c>replace: true</c>), saved to
+    /// <c>work/gardener-weighed.carve</c>, and the dominant bone of every vertex compared with the hand weights of
+    /// <c>work/gardener.carve</c>, logged to <c>weigh-agreement.txt</c> in the run folder. The weighed gardener is shown at rest,
+    /// which must be byte-identical to the hand-weighted rest (weights do not move a vertex at rest), and in the pose, with the
+    /// pose's checks: the can follows the raised right arm, and is not where a mirrored frame would put it.
+    /// </summary>
+    private static async Task WeighAsync(ScenarioDriver driver, string work, string models, ScenarioFrame rest, Func<Vector3, Vector2> front, GardenerSpec.MeshSpec body)
+    {
+        var glb = Path.Combine(models, "gardener.glb");
+        var glbBytes = await File.ReadAllBytesAsync(glb);
+        var hatBefore = await CallTextAsync(driver, "get_mesh", new { mesh = "Hat" });
+        var hatVertices = JsonDocument.Parse(hatBefore).RootElement.GetProperty("vertices").GetArrayLength();
+        await CallJsonAsync(driver, "extrude", new { mesh = "Hat", faces = new[] { GardenerSpec.HatTopFace }, distance = 0.02 });
+        var added = JsonDocument.Parse(await CallTextAsync(driver, "get_mesh", new { mesh = "Hat" })).RootElement.GetProperty("vertices").GetArrayLength() - hatVertices;
+        var filled = await CallJsonAsync(driver, "weigh", new { mesh = "Hat" });
+        if (added <= 0 || filled.GetProperty("weighed").GetInt32() != added || filled.GetProperty("kept").GetInt32() != hatVertices
+            || filled.GetProperty("unweighted").GetInt32() != 0)
+        {
+            driver.Fail($"weigh Hat after the extrude: expected the {added} new vertices weighed and the {hatVertices} hand-weighted kept, got {filled}");
+        }
+
+        await CallJsonAsync(driver, "undo", new { });
+        await CallJsonAsync(driver, "undo", new { });
+        if (await CallTextAsync(driver, "get_mesh", new { mesh = "Hat" }) != hatBefore)
+        {
+            driver.Fail("undo of the weigh and the extrude: the hat is not as it was");
+        }
+
+        await CallTextAsync(driver, "export", new { path = glb, overwrite = true });
+        driver.AssertBytesEqual("gardener.glb, exported after the weigh and the extrude were undone", glbBytes, await File.ReadAllBytesAsync(glb));
+
+        // From scratch: every vertex of both meshes weighed again.
+        foreach (var mesh in new[] { "Body", "Hat" })
+        {
+            var weighed = await CallJsonAsync(driver, "weigh", new { mesh, replace = true });
+            if (weighed.GetProperty("kept").GetInt32() != 0 || weighed.GetProperty("unweighted").GetInt32() != 0 || weighed.GetProperty("weighed").GetInt32() == 0)
+            {
+                driver.Fail($"weigh {mesh} replace: expected every vertex weighed again, got {weighed}");
+            }
+        }
+
+        var weighedPath = Path.Combine(work, "gardener-weighed.carve");
+        await CallTextAsync(driver, "save", new { path = weighedPath });
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "weigh-agreement.txt"), Agreement(Path.Combine(work, "gardener.carve"), weighedPath));
+
+        var weighedRest = await driver.CaptureAsync("gardener-weighed-rest-front", new { view = "+z" });
+        driver.AssertBytesEqual("the weighed gardener at rest, against the hand-weighted rest", rest.Pixels, weighedRest.Pixels);
+        var posed = await driver.CaptureAsync("gardener-weighed-pose-front", new { view = "+z", pose = GardenerSpec.Pose });
+        CheckPose(driver, posed, rest, front, body);
+    }
+
+    /// <summary>
+    /// The dominant bone of each vertex (the largest weight, ties to the lower bone index) in the hand-weighted file against the
+    /// weighed one, per mesh, with the disagreements counted by (hand, weighed) bone pair.
+    /// </summary>
+    private static string Agreement(string handPath, string weighedPath)
+    {
+        using var hand = JsonDocument.Parse(File.ReadAllText(handPath));
+        using var auto = JsonDocument.Parse(File.ReadAllText(weighedPath));
+        var order = hand.RootElement.GetProperty("skeleton").EnumerateArray().Select(b => b.GetProperty("name").GetString()!).ToList();
+        Dictionary<int, string> Dominant(JsonElement mesh) => mesh.GetProperty("weights").EnumerateArray().ToDictionary(
+            w => w.GetProperty("vertex").GetInt32(),
+            w => w.GetProperty("bones").EnumerateObject().OrderByDescending(b => b.Value.GetDouble()).ThenBy(b => order.IndexOf(b.Name)).First().Name);
+
+        var lines = new List<string> { "Dominant bone per vertex, hand weights (work/gardener.carve) against weigh replace (work/gardener-weighed.carve)." };
+        foreach (var handMesh in hand.RootElement.GetProperty("meshes").EnumerateArray())
+        {
+            var name = handMesh.GetProperty("name").GetString()!;
+            var autoMesh = auto.RootElement.GetProperty("meshes").EnumerateArray().First(m => m.GetProperty("name").GetString() == name);
+            var (h, a) = (Dominant(handMesh), Dominant(autoMesh));
+            var same = h.Count(p => a.TryGetValue(p.Key, out var b) && b == p.Value);
+            lines.Add($"{name}: {same} of {h.Count} vertices agree ({100.0 * same / h.Count:0.0}%)");
+            foreach (var pair in h.Where(p => !a.TryGetValue(p.Key, out var b) || b != p.Value)
+                .GroupBy(p => $"{p.Value} -> {(a.TryGetValue(p.Key, out var b) ? b : "none")}").OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal))
+            {
+                lines.Add($"  {pair.Key}: {pair.Count()}");
+            }
+        }
+
+        return string.Join("\n", lines) + "\n";
     }
 }

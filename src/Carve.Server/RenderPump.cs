@@ -12,6 +12,9 @@ internal interface IRenderScene
     /// <summary>Puts <paramref name="mesh"/> in the scene framed on the bounds of <paramref name="frameOn"/> (the rest pose, for a posed model: D-6, framing).</summary>
     void ShowMesh(PolygonMesh mesh, PolygonMesh frameOn) => ShowMesh(mesh);
 
+    /// <summary>As above, with the weight of one bone at each vertex of <paramref name="mesh"/> (NaN where unweighted), for the weights look.</summary>
+    void ShowMesh(PolygonMesh mesh, PolygonMesh frameOn, float[] weights) => ShowMesh(mesh, frameOn);
+
     /// <summary>Points the cameras and the light for this spec of the mesh shown, and draws its look if that changed.</summary>
     void ApplyView(RenderSpec spec);
 
@@ -37,7 +40,9 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     private string? _meshFault;
     private (Vector3 Min, Vector3 Max)? _shownBounds;
     private PolygonMesh? _shown;
+    private Model? _shownModel;
     private Pose? _shownPose;
+    private string? _shownWeights;
 
     public void Step()
     {
@@ -84,10 +89,27 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
+            // And for a weights look: its bone was checked against the model of the call. Only this request fails;
+            // the mesh shown stays shaded, so a later plain render is served.
+            if (next.Spec.Weights is { } bone && _shownModel is { } model && WeightHeat.Refusal(model, bone) is { } noBone)
+            {
+                queue.TryTake(out _);
+                next.Fail(new InvalidOperationException(noBone));
+                continue;
+            }
+
             // The pose is part of what is shown: a request for another one puts the mesh in the scene again, posed.
             if (!Equals(next.Spec.Pose, _shownPose))
             {
                 _shownPose = next.Spec.Pose;
+                ShowMesh(store.Current);
+                continue;
+            }
+
+            // So is the bone whose weights are drawn.
+            if (next.Spec.Weights != _shownWeights)
+            {
+                _shownWeights = next.Spec.Weights;
                 ShowMesh(store.Current);
                 continue;
             }
@@ -111,13 +133,24 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         try
         {
             var drawn = snapshot.Mesh!;
+            // The bone of the last weights look may be gone from a newer model (an undo, open or renaming define_skeleton):
+            // then the mesh is shown shaded, and only a weights request for that bone fails, at the head of the queue.
+            var heat = _shownWeights is null || WeightHeat.Refusal(snapshot.Model, _shownWeights) is not null
+                ? null : WeightHeat.Of(snapshot.Model, _shownWeights);
             if (_shownPose is { } pose && snapshot.Model.Skeleton is not null)
-                scene.ShowMesh(Skinning.Posed(snapshot.Model, pose).Combined!, drawn);
+            {
+                var posed = Skinning.Posed(snapshot.Model, pose).Combined!;
+                if (heat is null) scene.ShowMesh(posed, drawn);
+                else scene.ShowMesh(posed, drawn, heat);
+            }
+            else if (heat is not null)
+                scene.ShowMesh(drawn, drawn, heat);
             else
                 scene.ShowMesh(drawn);
             var report = MeshReport.Create(snapshot.Mesh!);
             _shownBounds = (report.BoundsMin, report.BoundsMax);
             _shown = snapshot.Mesh;
+            _shownModel = snapshot.Model;
             _meshFault = null;
         }
         catch (Exception e)

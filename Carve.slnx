@@ -6,6 +6,7 @@
   <Project Path="scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj" />
   <Project Path="scenarios/Carve.Scenario.Character/Carve.Scenario.Character.csproj" />
   <Project Path="scenarios/Carve.Scenario.Soft/Carve.Scenario.Soft.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Rig/Carve.Scenario.Rig.csproj" />
   <Project Path="tests/Carve.CharacterLoad.Tests/Carve.CharacterLoad.Tests.csproj" />
   <Project Path="tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj" />
   <Project Path="spikes/Carve.ModelViewer/Carve.ModelViewer.csproj" />
