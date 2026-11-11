@@ -53,17 +53,21 @@ internal static class ChainWeights
         // Weights of base: 1 on the left quad, 0 on the top quad, 0.5 on the middle one.
         Is(driver, baseFrame, pixel, -0.7f, 0.25f, Red, "the left quad, wholly base (weight 1)");
         Is(driver, baseFrame, pixel, -0.2f, 1.5f, Blue, "the top quad, not base at all (weight 0)");
-        Is(driver, baseFrame, pixel, 0.3f, 0.5f, Green, "the middle quad, half base (weight 0.5)");
+        // The middle quad is the camera guard: a camera mirrored in x (about x = 0.05, the middle of the quads) or flipped in y
+        // (about y = 1) puts background at (0.3, 0.5), not green.
+        Is(driver, baseFrame, pixel, 0.3f, 0.5f, Green, "the middle quad, half base (weight 0.5); background under a camera mirrored in x or flipped in y");
         // The same bone from the other side: joint is 0 on the left, 1 on top, 0.5 in the middle.
         Is(driver, jointFrame, pixel, -0.7f, 0.25f, Blue, "the left quad, not joint at all");
         Is(driver, jointFrame, pixel, -0.2f, 1.5f, Red, "the top quad, wholly joint");
         Is(driver, jointFrame, pixel, 0.3f, 0.5f, Green, "the middle quad, half joint");
 
         // The planted unweighted vertex: the top left corner of the stray quad (0.6, 1), magenta there and not at the others.
-        Is(driver, baseFrame, pixel, 0.62f, 0.97f, Magenta, "beside the unweighted corner of the stray quad", 40);
+        // The magenta check is a camera guard too (mirrored in x it lands on background at (-0.52, 0.97), flipped in y at (0.62, 1.03));
+        // the red checks at the other three corners test corner order: each corner takes its own vertex's colour.
+        Is(driver, baseFrame, pixel, 0.62f, 0.97f, Magenta, "beside the unweighted corner of the stray quad (a camera mirrored in x or flipped in y puts background here)", 40);
         Is(driver, baseFrame, pixel, 0.98f, 0.03f, Red, "beside the stray quad's weighted corner (1, 0)", 70);
-        Is(driver, baseFrame, pixel, 0.98f, 0.97f, Red, "where a camera mirrored in x puts the unweighted corner", 70);
-        Is(driver, baseFrame, pixel, 0.62f, 0.03f, Red, "where a camera flipped in y puts the unweighted corner", 70);
+        Is(driver, baseFrame, pixel, 0.98f, 0.97f, Red, "beside the stray quad's weighted corner (1, 1), across x from the unweighted one (corner order)", 70);
+        Is(driver, baseFrame, pixel, 0.62f, 0.03f, Red, "beside the stray quad's weighted corner (0.6, 0), across y from the unweighted one (corner order)", 70);
         Is(driver, jointFrame, pixel, 0.62f, 0.97f, Magenta, "the unweighted corner, in joint's look as in base's", 40);
 
         // The look follows the pose: joint turned a quarter about its head (0, 1) carries the top quad to x -1..0, y 0.6..1.
