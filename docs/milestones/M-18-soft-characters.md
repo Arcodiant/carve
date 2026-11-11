@@ -4,7 +4,7 @@ description: >-
 ---
 # M-18 — Soft characters
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *Smooth normals with marked hard edges and a subdivide edit, so a character reads soft and painterly in render and game*
 
