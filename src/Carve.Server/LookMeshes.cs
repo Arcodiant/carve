@@ -12,6 +12,9 @@ public enum Look
     Shaded,
     Wireframe,
     Normals,
+
+    /// <summary>One bone's weights as heat, unlit (T-40).</summary>
+    Weights,
 }
 
 /// <summary>
@@ -116,7 +119,7 @@ public static class LookMeshes
     /// With no face highlighted, a look that needs no vertex colours carries none: the shaded look is then
     /// the mesh as it always was, and the fill is exactly <see cref="Fill"/>, not its nearest eight bits.
     /// </summary>
-    public static LookScene Compose(PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight)
+    public static LookScene Compose(PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight, float[]? weights = null)
     {
         var orange = OrangeLines(mesh, space, look, highlight);
         var picked = highlight.Faces.Any(f => f >= 0 && f < mesh.Faces.Count);
@@ -125,8 +128,40 @@ public static class LookMeshes
         {
             Look.Wireframe => new LookScene(picked ? Vector4.One : Fill, picked ? Picked(FillVertex) : null, WireframeLines(mesh, space, highlight), orange),
             Look.Normals => new LookScene(Vector4.One, CornerColours(mesh), Spikes(mesh, space), orange),
+            Look.Weights => new LookScene(Vector4.One, HeatColours(mesh, weights ?? throw new InvalidOperationException("The weights look needs a weight for each vertex.")), null, orange),
             _ => new LookScene(null, picked ? Picked(Rgba8.White) : null, null, orange),
         };
+    }
+
+    /// <summary>An unweighted vertex in the weights look, linear.</summary>
+    public static readonly Vector3 Unweighted = new(1, 0, 1);
+
+    /// <summary>
+    /// A weight's colour in the weights look, linear: dark blue (0, 0, 0.5) at 0, green (0, 1, 0) at 0.5, red (1, 0, 0) at 1,
+    /// straight between. A weight outside 0 to 1 is clamped; NaN marks a vertex with no weight at all, magenta.
+    /// </summary>
+    public static Vector3 HeatColour(float weight)
+    {
+        if (float.IsNaN(weight)) return Unweighted;
+        var w = Math.Clamp(weight, 0f, 1f);
+        return w < 0.5f
+            ? Vector3.Lerp(new Vector3(0, 0, 0.5f), new Vector3(0, 1, 0), w * 2)
+            : Vector3.Lerp(new Vector3(0, 1, 0), new Vector3(1, 0, 0), (w - 0.5f) * 2);
+    }
+
+    /// <summary>One colour per vertex of the triangles, in <see cref="MeshBridge.ToMeshData"/>'s order (A, C, B), from the weight of each corner's vertex.</summary>
+    private static Rgba8[] HeatColours(PolygonMesh mesh, float[] weights)
+    {
+        var triangles = Triangulator.Triangulate(mesh);
+        var colours = new Rgba8[triangles.Count * 3];
+        for (var t = 0; t < triangles.Count; t++)
+        {
+            colours[t * 3] = Rgba8.FromVector(HeatColour(weights[triangles[t].A]));
+            colours[t * 3 + 1] = Rgba8.FromVector(HeatColour(weights[triangles[t].C]));
+            colours[t * 3 + 2] = Rgba8.FromVector(HeatColour(weights[triangles[t].B]));
+        }
+
+        return colours;
     }
 
     /// <summary>A face's colour in the normals look: <c>(n + 1) / 2</c>, in linear RGB.</summary>
