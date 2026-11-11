@@ -4,7 +4,7 @@ description: >-
 ---
 # T-38 — Weight overrides and read-back
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
