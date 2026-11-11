@@ -12,7 +12,7 @@ description: >-
 
 **Previous:** —
 
-**Diff:** `af34d07159e0a50d93864024c56e5651fca3f3c6 against f618e79`
+**Diff:** af34d07159e0a50d93864024c56e5651fca3f3c6 against origin/main
 
 **Reviewer:** claude-opus-5-5 ×3 (the weights side; the render side; the whole diff)
 
