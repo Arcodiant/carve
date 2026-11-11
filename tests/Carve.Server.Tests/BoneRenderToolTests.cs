@@ -29,7 +29,7 @@ public sealed class BoneRenderToolTests() : TempFolderTests("carve-bone-render")
         var plain = await carve.CallToolAsync("render", """{"bones":false}""");
         Assert.DoesNotContain("bones", TextOf(plain, 1));
         var drawn = await carve.CallToolAsync("render", """{"bones":true,"bone_labels":true,"size":256}""");
-        Assert.False(IsError(drawn), TextOf(drawn, 0));
+        Assert.False(IsError(drawn), "render failed");
         Assert.Contains("bones, bone labels", TextOf(drawn, 1));
     }
 }
