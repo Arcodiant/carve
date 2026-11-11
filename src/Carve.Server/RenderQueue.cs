@@ -35,6 +35,9 @@ internal sealed record RenderSpec(
 
     /// <summary>The one mesh labels are written for, in a model of several; null labels the whole drawn mesh.</summary>
     public ElementWindow? LabelWindow { get; init; }
+
+    /// <summary>The skeleton drawn over the model, or null for none. Compared by reference: one per call.</summary>
+    internal BoneDraw? Bones { get; init; }
 }
 
 /// <summary>One asked-for render, waiting for the frame thread.</summary>

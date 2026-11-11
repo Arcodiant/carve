@@ -61,6 +61,21 @@ public sealed class CharacterScenario : IScenario
         var posed = await driver.CaptureAsync("gardener-pose-front", new { view = "+z", pose = GardenerSpec.Pose });
         CheckPose(driver, posed, rest, front, body);
 
+        // T-39: the skeleton over the gardener, at rest and in that pose. Heads are worked from the bones' local offsets
+        // above (every rest rotation is identity): Elbow_R rests at (-0.30, 0.80) and, with Shoulder_R (-0.17, 1.00)
+        // turned -35 degrees about Z, lands at (-0.391, 0.911).
+        var restBones = await driver.CaptureAsync("gardener-bones-rest-front", new { view = "+z", bones = true });
+        var posedBones = await driver.CaptureAsync("gardener-bones-pose-front", new { view = "+z", bones = true, bone_labels = true, pose = GardenerSpec.Pose, size = 1024 });
+        CheckCorners(driver, restBones);
+        BoneAt(driver, restBones, front, new Vector3(0, 1.10f, 0), true, "the Head bone's head, at rest");
+        BoneAt(driver, restBones, front, new Vector3(0.30f, 0.80f, 0), true, "Elbow_L's head, at rest");
+        BoneAt(driver, restBones, front, new Vector3(-0.30f, 0.80f, 0), true, "Elbow_R's head, at rest");
+        var big = Perspective(min, max, Vector3.UnitZ, 1024);
+        BoneAt(driver, posedBones, big, new Vector3(-0.391f, 0.911f, 0), true, "Elbow_R's head, posed");
+        BoneAt(driver, posedBones, big, new Vector3(0.391f, 0.911f, 0), false, "where an image mirror puts Elbow_R's head");
+        BoneAt(driver, posedBones, big, new Vector3(-0.391f, min.Y + max.Y - 0.911f, 0), false, "where a flipped image puts Elbow_R's head");
+        BoneAt(driver, posedBones, big, new Vector3(-0.30f, 0.80f, 0), false, "where Elbow_R's head rests, posed away");
+
         // Idle: at 0 s every key is the rest, so the frame is the rest frame; at 1 s the can has swayed out and the hips dropped.
         var idle = GardenerSpec.Idle;
         var idle0 = await driver.CaptureAsync("gardener-idle-0.0-front", new { view = "+z", clip = "Idle", time = 0.0 });
@@ -236,6 +251,21 @@ public sealed class CharacterScenario : IScenario
         ExpectGroup(driver, frame, x, y, "can", $"{what}: the can face, posed to {at}");
         var (mx, my) = Holding(project(new Vector3(-at.X, at.Y, at.Z)));
         ExpectNot(driver, frame, mx, my, "can", $"{what}: the can's mirror in X");
+    }
+
+    /// <summary>Whether a pixel within 3 of the point's is the bone colour (255, 0, 255), the line being 3 wide and the dot 4 in radius.</summary>
+    private static void BoneAt(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, Vector3 point, bool expected, string what)
+    {
+        var (x, y) = Holding(project(point));
+        var found = false;
+        for (var dx = -3; dx <= 3 && !found; dx++)
+        for (var dy = -3; dy <= 3 && !found; dy++)
+        {
+            var p = frame.Pixel(x + dx, y + dy);
+            found = p.R > 200 && p.B > 200 && p.G < 80;
+        }
+
+        if (found != expected) driver.Fail($"{frame.Name}: {(expected ? "no bone colour" : "bone colour")} at {what}, ({x}, {y})");
     }
 
     private static void CheckPose(ScenarioDriver driver, ScenarioFrame frame, ScenarioFrame rest, Func<Vector3, Vector2> project, GardenerSpec.MeshSpec body)

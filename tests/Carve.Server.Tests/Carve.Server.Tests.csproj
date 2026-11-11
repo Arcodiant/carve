@@ -39,6 +39,7 @@
     <Compile Include="../../src/Carve.Server/SheetVersions.cs" Link="SheetVersions.cs" />
     <Compile Include="../../src/Carve.Server/LabelLayout.cs" Link="LabelLayout.cs" />
     <Compile Include="../../src/Carve.Server/ScreenProjection.cs" Link="ScreenProjection.cs" />
+    <Compile Include="../../src/Carve.Server/BoneOverlay.cs" Link="BoneOverlay.cs" />
     <Compile Include="../../src/Carve.Server/SheetComposer.cs" Link="SheetComposer.cs" />
     <Compile Include="../../src/Carve.Server/TargetCheck.cs" Link="TargetCheck.cs" />
     <Compile Include="../../src/Carve.Server/GlbExport.cs" Link="GlbExport.cs" />

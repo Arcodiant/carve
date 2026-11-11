@@ -216,7 +216,7 @@ internal sealed class RenderSystem(
     /// <summary>Queues what this frame writes on the image, for the next <c>RenderFrame</c> to draw and drain; a plain render queues nothing.</summary>
     private void DrawOverlay(RenderSpec spec)
     {
-        if (spec.Labels == LabelSet.None && spec.TileCaption is null)
+        if (spec.Labels == LabelSet.None && spec.TileCaption is null && spec.Bones is null)
         {
             return;
         }
@@ -236,6 +236,29 @@ internal sealed class RenderSystem(
         foreach (var label in labels)
         {
             Draw(surface, label);
+        }
+
+        // The bones come after the ids and before the caption, over the model and over the ids' backings.
+        if (spec.Bones is { } bones)
+        {
+            var (lines, joints) = BoneOverlay.Plan(bones, _space, _frame!, spec.Size);
+            foreach (var (from, to) in lines)
+            {
+                surface.Primitives.DrawLine(from, to, BoneOverlay.LineWidth, BoneOverlay.Colour);
+            }
+
+            foreach (var joint in joints)
+            {
+                surface.Primitives.DrawCircle(joint, BoneOverlay.JointRadius, BoneOverlay.Colour);
+            }
+
+            if (bones.Labels)
+            {
+                foreach (var label in LabelLayout.BoneLabels(bones.Names, bones.Heads, _space, _frame!, spec.Size, Measure))
+                {
+                    Draw(surface, label);
+                }
+            }
         }
 
         if (spec.TileCaption is { } caption)

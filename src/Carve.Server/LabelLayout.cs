@@ -111,6 +111,27 @@ public static class LabelLayout
         return plan;
     }
 
+    /// <summary>
+    /// Bone names (T-39): each beside its head, up and to the right of it as a vertex's id is, in bone order. The bones
+    /// are drawn on top of the model, so none is left out for being behind it; one wholly off the image is.
+    /// </summary>
+    public static IReadOnlyList<OverlayLabel> BoneLabels(
+        IReadOnlyList<string> names, IReadOnlyList<Vector3> heads, DrawnSpace space, ViewFrame frame, int size, Func<string, Vector2> measure)
+    {
+        var plan = new List<OverlayLabel>();
+        for (var i = 0; i < names.Count; i++)
+        {
+            var head = ScreenProjection.ToPixel(space.Apply(heads[i]), frame.View, frame.Projection, size);
+            var label = At(names[i], Whole(head + VertexOffset), measure(names[i]));
+            if (OnImage(label.Backing, size))
+            {
+                plan.Add(label);
+            }
+        }
+
+        return plan;
+    }
+
     /// <summary>A tile's caption, at its fixed place; it runs off the tile's edge if it is longer.</summary>
     public static OverlayLabel Caption(string text, Func<string, Vector2> measure) => At(text, CaptionAt, measure(text));
 
