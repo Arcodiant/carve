@@ -19,8 +19,15 @@ public sealed class GetWeightsTool(ModelStore store)
         + "Returns JSON {mesh, vertices: [{vertex, weights: {bone: weight}}] (by vertex), or bone, followers: [{vertex, weight}] (by bone), "
         + "summary: {vertices, weighted, unweighted, unweightedVertices, boneVertices: {bone: how many vertices follow it}}, warnings: [text]}. "
         + "Errors, each a tool error: no mesh yet, no skeleton yet, both of vertices and bone, an unknown bone name, a vertex id the mesh does not have. "
-        + "Worked example, after set_weights binds vertices 0 and 1 of a cube wholly to a bone Head:\n"
-        + ExampleMarker + """{"vertices":[0,7]}""";
+        + "Worked example, after set_weights binds vertices 0 and 1 of a cube wholly to a bone Head, with the bones Hips, Head and Tail:\n"
+        + ExampleMarker + """{"vertices":[0,7]}""" + "\n"
+        + ResultMarker + """{"mesh":"cube","vertices":[{"vertex":0,"weights":{"Head":1}},{"vertex":7,"weights":{}}]"""
+        + ""","summary":{"vertices":8,"weighted":2,"unweighted":6,"unweightedVertices":[2,3,4,5,6,7],"boneVertices":{"Hips":0,"Head":2,"Tail":0}}"""
+        + ""","warnings":["6 vertices have no weight: 2, 3, 4, 5, 6, 7; they stay where they are when posed and export refuses them (weigh or set_weights)","""
+        + """ "note: no vertex follows 'Hips', 'Tail'"]}""";
+
+    /// <summary>Starts the line of the worked example's result, as select's does.</summary>
+    public const string ResultMarker = SelectTool.ResultMarker;
 
     public static McpServerTool Create() => MeshToolSupport.Create<GetWeightsTool>("get_weights", Text, WithMesh(new JsonObject
     {
