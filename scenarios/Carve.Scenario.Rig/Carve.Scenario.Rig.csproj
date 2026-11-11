@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The rigged gardener (M-17): weighed by hand with planted skinning faults, found and fixed through the tools. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Rig</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The crate scenario's call helpers and camera maths, and the gardener's data and pixel classifier, linked and not copied. -->
+    <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../Carve.Scenario.Character/GardenerSpec.cs" Link="GardenerSpec.cs" />
+    <Compile Include="../Carve.Scenario.Character/GardenerPixels.cs" Link="GardenerPixels.cs" />
+  </ItemGroup>
+
+</Project>
