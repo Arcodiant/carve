@@ -10,8 +10,8 @@ namespace Carve.Server;
 /// <summary>
 /// The mesh as a self-contained binary glTF: one scene, one node with an identity transform and one mesh, both named
 /// for the file; one indexed triangle primitive of <c>POSITION</c> and <c>NORMAL</c> alone, from
-/// <see cref="FlatShading"/>, with every position the mesh's own float (no scale, axis change or recentring) and every
-/// normal its face's, so every edge is hard. glTF winds counter-clockwise from outside, as Carve does, so the
+/// <see cref="Shading"/>, with every position the mesh's own float (no scale, axis change or recentring) and every
+/// normal its corner's: its face's on a flat mesh, so every edge is hard. glTF winds counter-clockwise from outside, as Carve does, so the
 /// triangles are written as they are. One matte material. The same mesh always writes the same bytes.
 /// </summary>
 public static class GlbExport
@@ -27,9 +27,9 @@ public static class GlbExport
     public const float Roughness = 1f;
 
     /// <summary>The materials a mesh exports as, in the order their primitives are written: the grey one first when any face has no colour.</summary>
-    public static string[] MaterialNames(PolygonMesh mesh) => [.. Materials(mesh, FlatShading.Triangles(mesh)).Select(m => m.Name)];
+    public static string[] MaterialNames(PolygonMesh mesh) => [.. Materials(mesh, Shading.Triangles(mesh)).Select(m => m.Name)];
 
-    private static List<(string Name, string? Colour)> Materials(PolygonMesh? mesh, IReadOnlyList<FlatTriangle> triangles)
+    private static List<(string Name, string? Colour)> Materials(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles)
     {
         var colours = triangles.Select(t => ColourOf(mesh, t.Face)).Distinct().ToList();
         return colours.OrderBy(c => c is null ? 0 : 1)
@@ -47,10 +47,10 @@ public static class GlbExport
         .WithDoubleSide(false);
 
     /// <summary>One opaque matte material per colour, metallic 0 and roughness 1, its base colour the linear form of the sRGB hex (D-6).</summary>
-    public static byte[] Write(IReadOnlyList<FlatTriangle> triangles, string name) => Write(null, triangles, name);
+    public static byte[] Write(IReadOnlyList<ShadedTriangle> triangles, string name) => Write(null, triangles, name);
 
     /// <summary>As above, with the colours of <paramref name="mesh"/>.</summary>
-    public static byte[] Write(PolygonMesh? mesh, IReadOnlyList<FlatTriangle> triangles, string name)
+    public static byte[] Write(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name)
     {
         var mesh2 = new MeshBuilder<VertexPositionNormal>(name);
         var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexEmpty>>();
@@ -62,9 +62,9 @@ public static class GlbExport
             var colour = ColourOf(mesh, t.Face);
             var primitive = primitives[colour is null ? MaterialName : $"{MaterialName} {colour}"];
             primitive.AddTriangle(
-                new VertexPositionNormal(t.A, t.Normal),
-                new VertexPositionNormal(t.B, t.Normal),
-                new VertexPositionNormal(t.C, t.Normal));
+                new VertexPositionNormal(t.A, t.NormalA),
+                new VertexPositionNormal(t.B, t.NormalB),
+                new VertexPositionNormal(t.C, t.NormalC));
         }
 
         var scene = new SceneBuilder();

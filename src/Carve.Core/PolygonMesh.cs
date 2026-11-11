@@ -55,10 +55,14 @@ public sealed class PolygonMesh
     private readonly Vector3[] _vertices;
     private readonly int[][] _faces;
 
-    private PolygonMesh(Vector3[] vertices, int[][] faces, FaceStyle? style = null, VertexWeights? weights = null)
+    private PolygonMesh(Vector3[] vertices, int[][] faces, FaceStyle? style = null, VertexWeights? weights = null,
+        MeshShade? shade = null, Vector3[][]? corners = null, bool[]? flatFaces = null)
     {
+        FlatFaces = flatFaces;
         _vertices = vertices;
         _faces = faces;
+        Shade = shade is { IsDefault: false } ? shade : null;
+        PosedCorners = corners;
         Style = style is { IsEmpty: false } ? style : null;
         Weights = weights is { IsEmpty: false } ? weights : null;
         Vertices = Array.AsReadOnly(vertices);
@@ -71,26 +75,55 @@ public sealed class PolygonMesh
     public FaceStyle? Style { get; }
 
     /// <summary>This mesh, its geometry shared, with <paramref name="style"/> in place of its own (null or empty for none).</summary>
-    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights);
+    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights, Shade, PosedCorners, FlatFaces);
+
+    /// <summary>The mesh's shading and hard edges (D-6, Smooth shading is per mesh); null for flat with no hard edge marked.</summary>
+    public MeshShade? Shade { get; }
+
+    /// <summary>Flat (the default) or smooth.</summary>
+    public ShadingMode ShadingMode => Shade?.Mode ?? ShadingMode.Flat;
+
+    /// <summary>The hard edges as vertex-id pairs, lower id first, in order; kept while the mesh is flat, and then they do nothing.</summary>
+    public IReadOnlyList<(int Lo, int Hi)> HardEdges => Shade?.Hard ?? [];
+
+    /// <summary>This mesh, its geometry shared, with <paramref name="shade"/> in place of its own (null for flat with no hard edges).</summary>
+    public PolygonMesh WithShade(MeshShade? shade) => new(_vertices, _faces, Style, Weights, shade, PosedCorners);
+
+    /// <summary>
+    /// Corner normals given for a posed copy (<see cref="Skinning"/>), by face and then by position in the face's loop;
+    /// null otherwise. <see cref="Shading"/> uses them in place of its own working.
+    /// </summary>
+    internal Vector3[][]? PosedCorners { get; }
+
+    /// <summary>
+    /// For a combined mesh (<see cref="Model.Combined"/>) with corner normals, which faces came from a flat mesh and are
+    /// drawn flat (<see cref="Shading.FaceHasCornerNormals"/>); null otherwise.
+    /// </summary>
+    internal bool[]? FlatFaces { get; }
 
     /// <summary>Faces and vertices joined as given, unchecked: for drawing meshes already checked, or posed.</summary>
-    internal static PolygonMesh Assemble(Vector3[] vertices, int[][] faces) => new(vertices, faces);
+    internal static PolygonMesh Assemble(Vector3[] vertices, int[][] faces, MeshShade? shade = null, Vector3[][]? corners = null,
+        bool[]? flatFaces = null)
+        => new(vertices, faces, null, null, shade, corners, flatFaces);
 
     /// <summary>
     /// This mesh's faces and colours on other vertex positions, unchecked and with no weights: a posed copy to draw, whose
     /// faces need not stay planar. Never stored.
     /// </summary>
-    public PolygonMesh WithVertices(IReadOnlyList<Vector3> vertices)
+    public PolygonMesh WithVertices(IReadOnlyList<Vector3> vertices) => WithVertices(vertices, null);
+
+    /// <summary>As above, drawn with <paramref name="corners"/> (face, then loop position) as its corner normals when given.</summary>
+    internal PolygonMesh WithVertices(IReadOnlyList<Vector3> vertices, Vector3[][]? corners)
     {
         if (vertices.Count != _vertices.Length) throw new ArgumentException("one position per vertex", nameof(vertices));
-        return new PolygonMesh(vertices.ToArray(), _faces, Style);
+        return new PolygonMesh(vertices.ToArray(), _faces, Style, null, Shade, corners);
     }
 
     /// <summary>The vertices' bone weights by vertex id (D-6, Weights); null when no vertex has any.</summary>
     public VertexWeights? Weights { get; }
 
     /// <summary>This mesh, its geometry shared, with <paramref name="weights"/> in place of its own (null or empty for none).</summary>
-    public PolygonMesh WithWeights(VertexWeights? weights) => new(_vertices, _faces, Style, weights);
+    public PolygonMesh WithWeights(VertexWeights? weights) => new(_vertices, _faces, Style, weights, Shade, PosedCorners);
 
     /// <summary>The vertices; a vertex's id is its position here.</summary>
     public IReadOnlyList<Vector3> Vertices { get; }

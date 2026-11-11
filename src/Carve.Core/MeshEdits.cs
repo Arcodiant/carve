@@ -4,7 +4,7 @@ using System.Numerics;
 namespace Carve.Core;
 
 /// <summary>
-/// The edit operations: move and extrude. Each returns a new mesh, by the id contract on <see cref="PolygonMesh"/>, and what
+/// The edit operations: move, extrude and subdivide. Each returns a new mesh, by the id contract on <see cref="PolygonMesh"/>, and what
 /// it made, or refuses with every problem named; the mesh given is never changed. Every result also passes
 /// <see cref="PolygonMesh.Create"/>'s validation, which may refuse it by element.
 /// </summary>
@@ -258,6 +258,35 @@ public static class MeshEdits
                 Invariant($"the {name} {value:G6} is too {scale} for this face: {what}, is refused: {error.Message}"));
         }
         return error;
+    }
+
+    /// <summary>The most levels one <see cref="Subdivide"/> takes.</summary>
+    public const int MaxSubdivideLevels = 3;
+
+    /// <summary>
+    /// Catmull-Clark subdivision, <paramref name="levels"/> times (1 to <see cref="MaxSubdivideLevels"/>), as one edit
+    /// (D-6, Subdivide is a destructive edit), by the id contract on <see cref="PolygonMesh"/>: every vertex keeps its id
+    /// and moves to its vertex point, each face keeps its id as its first child, and face points, edge points and the
+    /// other children are appended (see <see cref="Subdivision"/> for the order and the sharp-edge rules). Hard edges stay
+    /// creased and are carried to both halves; children take their face's colour and groups; weights are blended by
+    /// each point's own stencil and capped at four. Two levels are exactly one level done twice.
+    /// </summary>
+    public static EditResult Subdivide(PolygonMesh mesh, int levels)
+    {
+        if (levels < 1 || levels > MaxSubdivideLevels)
+            return EditResult.Refused([new MeshError("levels", Invariant($"levels is {levels}; it must be 1 to {MaxSubdivideLevels}"))]);
+
+        var level = new Subdivision.Level(mesh.Vertices.ToArray(), mesh.Faces.Select(f => f.ToArray()).ToArray(),
+            mesh.Style, mesh.Weights, mesh.Shade);
+        for (var i = 0; i < levels; i++) level = Subdivision.Once(level);
+
+        var result = PolygonMesh.Create(level.Vertices, level.Faces);
+        if (!result.Succeeded) return EditResult.Refused(result.Errors);
+        var made = result.Mesh!.WithStyle(level.Style).WithWeights(level.Weights).WithShade(level.Shade);
+        var moved = Enumerable.Range(0, mesh.Vertices.Count).Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
+        return EditResult.Made(made, moved,
+            Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).ToArray(),
+            Enumerable.Range(mesh.Faces.Count, made.Faces.Count - mesh.Faces.Count).ToArray());
     }
 
     /// <summary>Each listed element the mesh does not have, named by element and by its place in its list: what <c>move</c> and <c>render</c>'s highlight refuse.</summary>

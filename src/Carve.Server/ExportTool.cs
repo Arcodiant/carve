@@ -95,7 +95,7 @@ public sealed class ExportTool(ModelStore store)
         if (mesh is null) return Error("export: " + NoMesh); // not reached: model mode was refused above
         if (model.Skeleton is not null) return Skinned(model, target, allowUnweighted, replace);
 
-        var triangles = FlatShading.Triangles(mesh);
+        var triangles = Shading.Triangles(mesh);
         var bytes = GlbExport.Write(mesh, triangles, target.Stem);
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, replace)) return Error(writeError!);
 

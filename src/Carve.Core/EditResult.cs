@@ -32,7 +32,7 @@ public sealed class EditResult
 
     public bool Succeeded => Mesh is not null;
 
-    /// <summary>Ids of the existing vertices the edit moved, ascending (a move's vertices; empty for an extrude).</summary>
+    /// <summary>Ids of the existing vertices the edit moved, ascending (a move's vertices, or those a subdivide moved to their vertex points; empty for an extrude).</summary>
     public IReadOnlyList<int> MovedVertices { get; }
 
     /// <summary>Ids of the vertices the edit appended, ascending.</summary>
@@ -46,10 +46,18 @@ public sealed class EditResult
 
     internal static EditResult Refused(IReadOnlyList<MeshError> errors) => new(null, errors, [], [], [], []);
 
+    /// <summary>The result of an edit that has already carried colours, groups, weights and shading onto <paramref name="mesh"/>.</summary>
+    internal static EditResult Made(PolygonMesh mesh, IReadOnlyList<int> movedVertices, IReadOnlyList<int> newVertices,
+        IReadOnlyList<int> newFaces) => new(mesh, [], movedVertices, newVertices, newFaces, []);
+
     private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<ExtrudedFace> extruded)
     {
         var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(extruded)) : edited;
-        return source.Weights is { } weights ? mesh.WithWeights(weights) : mesh;
+        mesh = source.Weights is { } weights ? mesh.WithWeights(weights) : mesh;
+        // The mode and the hard edges carry; a hard edge the edit no longer has is dropped (T-42).
+        if (source.Shade is not { } shade) return mesh;
+        var gone = shade.Hard.Where(e => !mesh.Topology.TryGetEdge(e.Lo, e.Hi, out _)).ToArray();
+        return mesh.WithShade(gone.Length == 0 ? shade : shade.WithEdges(gone.Select(e => (e.Lo, e.Hi)), false));
     }
 
     /// <summary>The result of an edit of <paramref name="source"/>: the new mesh keeps the source's face colours and groups, and walls take their source face's.</summary>

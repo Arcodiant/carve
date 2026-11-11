@@ -1,7 +1,7 @@
 using Empyrean;
-using Microsoft.Extensions.DependencyInjection;
 using CarveFile = Carve.Core.CarveFile;
 using CarveModel = Carve.Core.Model;
+using Carve.LoadChecks;
 using Xunit;
 
 namespace Carve.CharacterLoad.Tests;
@@ -19,32 +19,11 @@ public class CharacterLoadTests
 
     private static string RunFolder => Run ?? throw new InvalidOperationException("CARVE_CHARACTER_RUN is unset");
 
-    private static IModelGeometryLoader Loader()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddEmpyreanCore();
-        services.AddEmpyreanGeometry();
-        var provider = services.BuildServiceProvider();
-        provider.GetRequiredService<IContentRegistry>().Mount(ContentSources.Directory(Path.Combine(RunFolder, "game", "Content")));
-        return provider.GetRequiredService<IModelGeometryLoader>();
-    }
+    private static IModelGeometryLoader Loader() => RunContent.Loader(RunFolder);
 
-    private static CarveModel Saved(string path) => CarveFile.Read(File.ReadAllText(path)).Model!;
+    private static CarveModel Saved(string path) => RunContent.Saved(path);
 
-    private static string SamplePath()
-    {
-        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
-        {
-            var candidate = Path.Combine(d.FullName, "samples", "gardener.carve");
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        throw new FileNotFoundException("samples/gardener.carve");
-    }
+    private static string SamplePath() => RunContent.SamplePath("gardener.carve");
 
     [SkippableOrRun]
     public void The_model_loads_with_the_bones_in_order_and_the_clips_named()
