@@ -12,9 +12,8 @@ internal static class WeightHeat
     /// </summary>
     public static float[] Of(Model model, string bone)
     {
-        var skeleton = model.Skeleton ?? throw new InvalidOperationException("weights: the model has no skeleton; call define_skeleton first");
-        var index = skeleton.Names.ToList().IndexOf(bone);
-        if (index < 0) throw new InvalidOperationException($"weights: no bone named '{bone}'; the bones are {NameList.Quoted(skeleton.Names)}");
+        if (Refusal(model, bone) is { } refusal) throw new InvalidOperationException(refusal);
+        var index = model.Skeleton!.Names.ToList().IndexOf(bone);
         var heat = new List<float>();
         foreach (var (_, mesh) in model.Meshes)
         {
@@ -27,4 +26,10 @@ internal static class WeightHeat
 
         return [.. heat];
     }
+
+    /// <summary>Why <paramref name="bone"/>'s weights cannot be drawn on <paramref name="model"/>, or null when they can.</summary>
+    public static string? Refusal(Model model, string bone) =>
+        model.Skeleton is not { } skeleton ? "weights: the model has no skeleton; call define_skeleton first"
+        : skeleton.Names.Contains(bone) ? null
+        : $"weights: no bone named '{bone}'; the bones are {NameList.Quoted(skeleton.Names)}";
 }

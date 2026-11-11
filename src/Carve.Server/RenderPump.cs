@@ -40,6 +40,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     private string? _meshFault;
     private (Vector3 Min, Vector3 Max)? _shownBounds;
     private PolygonMesh? _shown;
+    private Model? _shownModel;
     private Pose? _shownPose;
     private string? _shownWeights;
 
@@ -88,6 +89,15 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
+            // And for a weights look: its bone was checked against the model of the call. Only this request fails;
+            // the mesh shown stays shaded, so a later plain render is served.
+            if (next.Spec.Weights is { } bone && _shownModel is { } model && WeightHeat.Refusal(model, bone) is { } noBone)
+            {
+                queue.TryTake(out _);
+                next.Fail(new InvalidOperationException(noBone));
+                continue;
+            }
+
             // The pose is part of what is shown: a request for another one puts the mesh in the scene again, posed.
             if (!Equals(next.Spec.Pose, _shownPose))
             {
@@ -123,7 +133,10 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         try
         {
             var drawn = snapshot.Mesh!;
-            var heat = _shownWeights is null ? null : WeightHeat.Of(snapshot.Model, _shownWeights);
+            // The bone of the last weights look may be gone from a newer model (an undo, open or renaming define_skeleton):
+            // then the mesh is shown shaded, and only a weights request for that bone fails, at the head of the queue.
+            var heat = _shownWeights is null || WeightHeat.Refusal(snapshot.Model, _shownWeights) is not null
+                ? null : WeightHeat.Of(snapshot.Model, _shownWeights);
             if (_shownPose is { } pose && snapshot.Model.Skeleton is not null)
             {
                 var posed = Skinning.Posed(snapshot.Model, pose).Combined!;
@@ -137,6 +150,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             var report = MeshReport.Create(snapshot.Mesh!);
             _shownBounds = (report.BoundsMin, report.BoundsMax);
             _shown = snapshot.Mesh;
+            _shownModel = snapshot.Model;
             _meshFault = null;
         }
         catch (Exception e)
