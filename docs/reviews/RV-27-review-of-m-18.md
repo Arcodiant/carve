@@ -12,7 +12,7 @@ description: >-
 
 **Previous:** —
 
-**Diff:** `910a59a6ea122045d5da2d4f5aed0ffb796a799c against e9f4e8e` (the milestone at 46da626)
+**Diff:** 910a59a6ea122045d5da2d4f5aed0ffb796a799c against origin/main
 
 **Reviewer:** claude-opus-5-5 (three reviewers: T-42's range, T-43's range, the whole diff with T-44's range and the refactor)
 
