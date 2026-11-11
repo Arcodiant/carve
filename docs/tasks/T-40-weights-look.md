@@ -4,7 +4,7 @@ description: >-
 ---
 # T-40 — Weights look
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
