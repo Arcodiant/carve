@@ -58,7 +58,7 @@ internal static class ChainBones
         Line(driver, bent, pixel, new Vector3(d.X * 1.25f, d.Y * 1.25f, 0), "the leaf, leaning left");
         NoLine(driver, bent, pixel, new Vector3(-d.X * 0.5f, d.Y * 0.5f, 0), "where a mirrored camera or a turn the other way draws base to joint");
         NoLine(driver, bent, pixel, new Vector3(-d.X * 1.25f, d.Y * 1.25f, 0), "where a mirrored camera draws the leaf");
-        NoLine(driver, bent, pixel, new Vector3(d.X * 0.5f, 1 - d.Y * 0.5f, 0), "where a camera flipped in y draws base to joint");
+        NoLine(driver, bent, pixel, new Vector3(d.X * 0.5f, RestMin.Y + RestMax.Y - d.Y * 0.5f, 0), "where a camera flipped in y (about the middle of the rest bounds) draws base to joint");
         NoLine(driver, bent, pixel, new Vector3(0, 0.5f, 0), "where the rest pose had base to joint");
     }
 
