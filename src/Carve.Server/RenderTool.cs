@@ -227,6 +227,7 @@ internal static class RenderTool
         + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; labels other than 'none', 'faces', 'vertices' or 'both'; "
         + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns other than 1, 2 or 3; an argument render does not take; a sheet whose tiles would show different meshes, because the mesh changed while it was drawn on each of 3 tries (\"The mesh changed while the sheet was drawn, on each of 3 tries, so its tiles would show different meshes; call render again once the edits have settled.\"); labels or highlight given with 'mesh' among several meshes, when an edit lands while the frame is drawn, since their ids may then name other elements (\"The model changed while the frame was drawn, so the ids given for mesh '<name>' may name other elements; call render again once the edits have settled.\"). "
         + "'pose' draws the model posed by its skeleton: an object of bone name to {rotation: [x, y, z, w], translation: [x, y, z]}, each part optional and absolute (local to the parent, replacing the rest value; a bone or part left out rests), skinned by the weights set_weights gave. A vertex with no weight stays where it is. The camera frames the REST pose, so the frame does not move between poses and a pose that swings far can leave it. Errors: a bone the skeleton lacks, a rotation that is not a unit quaternion, no skeleton. "
+        + "'bones' draws the skeleton over the model, in the pose or clip of the frame: magenta lines, 3 pixels wide, over the model and not hidden by it. A bone with children is a line from its head to each child's head; a leaf bone is a line along its parent's direction for half its parent's length; every head has a dot; a lone bone with no parent and no child is a dot. 'bone_labels' (needs bones: true) writes each bone's name white on a dark backing, up and to the right of its head; names crowd on a dense skeleton, so use size 1024 or zoom. The caption says 'bones' or 'bones, bone labels' after the labels and highlight. Both are independent of labels, highlight, mode and mesh. Errors: bones or bone_labels with no skeleton, bone_labels without bones: true. "
         + "'clip' and 'time' draw the model as the clip of that name (define_clip) poses it at that time in seconds, interpolated as define_clip says; framed on the rest pose like pose. Errors: clip together with pose, clip without time or time without clip, no clip of that name, a time outside 0 to the clip's duration. "
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
         + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select, check, define_group, set_colour, define_skeleton, get_skeleton, set_weights, define_clip and delete_clip still work there.";
@@ -258,9 +259,11 @@ internal static class RenderTool
         JsonElement? pose = null,
         JsonElement? clip = null,
         JsonElement? time = null,
+        [Description("true draws the skeleton over the model, in the frame's pose: a line from each bone's head to each child's head, a dot on every head, and a leaf bone as a line along its parent's direction for half its parent's length. Magenta, drawn over the model and not hidden by it.")] bool? bones = null,
+        [Description("true writes each bone's name beside its head, white on a dark backing. Needs bones: true.")] bool? bone_labels = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "bones", "bone_labels") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -313,6 +316,11 @@ internal static class RenderTool
             return Error($"labels: '{labels}' is not a label set; use 'none', 'faces', 'vertices' or 'both'.");
         }
 
+        if (bone_labels == true && bones != true)
+        {
+            return Error("bone_labels: needs bones: true; the names are written beside the bones.");
+        }
+
         var problems = new List<string>();
         var meshName = MeshName(mesh, problems);
         var posed = ReadPose(pose, problems);
@@ -355,6 +363,13 @@ internal static class RenderTool
             if (current.Model.Skeleton is not { } rig) return Failed("render", ["pose: the model has no skeleton; call define_skeleton first"]);
             if (Skinning.Unknown(rig, posed).ToArray() is { Length: > 0 } stray)
                 return Failed("render", [$"pose: no bone named {NameList.Quoted(stray)}; the bones are {NameList.Quoted(rig.Names)}"]);
+        }
+
+        BoneDraw? skeleton = null;
+        if (bones == true)
+        {
+            if (current.Model.Skeleton is not { } bonesRig) return Failed("render", ["bones: the model has no skeleton; call define_skeleton first"]);
+            skeleton = BoneDraw.Of(bonesRig, posed, bone_labels == true);
         }
 
         // Every mesh is drawn, as one. Labels and highlight name ids within one mesh, so with several they are aimed
@@ -402,7 +417,7 @@ internal static class RenderTool
         async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
             var rendering = Task.WhenAll(tiles
-                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window })));
+                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton })));
 
             // The frame thread drains the queue; once it has ended, nothing will.
             await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
@@ -436,7 +451,7 @@ internal static class RenderTool
                 Content =
                 [
                     ImageContentBlock.FromBytes(EncodePng(composed.Pixels, composed.Width, composed.Height), "image/png"),
-                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked) },
+                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton) },
                 ],
             };
         }
@@ -448,7 +463,7 @@ internal static class RenderTool
             Content =
             [
                 ImageContentBlock.FromBytes(EncodePng(image.Pixels, image.Width, image.Height), "image/png"),
-                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target) },
+                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton) },
             ],
         };
     }
@@ -623,7 +638,7 @@ internal static class RenderTool
     /// each thing asked for beyond the default, only where set: the projection, the mode, the labels, the
     /// highlight, zoom, target. The counts close it, so a part added here goes before them.
     /// </summary>
-    internal static string Caption(RenderedFrame frame, string? view, double[]? direction, Projection projection, Look look, LabelSet labels, Highlight highlight, double zoom, double[]? target)
+    internal static string Caption(RenderedFrame frame, string? view, double[]? direction, Projection projection, Look look, LabelSet labels, Highlight highlight, double zoom, double[]? target, BoneDraw? bones = null)
     {
         var parts = new List<string>
         {
@@ -631,7 +646,7 @@ internal static class RenderTool
             direction is null ? $"view {view ?? "front"}" : $"direction ({Join(direction)})",
         };
 
-        AddLookParts(parts, projection, look, labels, highlight);
+        AddLookParts(parts, projection, look, labels, highlight, bones);
         AddZoomAndTarget(parts, zoom, target);
         return WithCounts(parts, frame);
     }
@@ -640,10 +655,10 @@ internal static class RenderTool
     /// <c>3x2 tiles of 256x256</c>, columns by rows; the parts every tile shares, as the single caption has them;
     /// then <c>views</c> and each tile's own caption, so a caption cut off at a tile's edge is whole here; the counts.
     /// </summary>
-    private static string SheetCaption(RenderedFrame frame, int columns, IReadOnlyList<Tile> tiles, Projection projection, Look look, LabelSet labels, Highlight highlight)
+    private static string SheetCaption(RenderedFrame frame, int columns, IReadOnlyList<Tile> tiles, Projection projection, Look look, LabelSet labels, Highlight highlight, BoneDraw? bones = null)
     {
         var parts = new List<string> { $"{columns}x{SheetComposer.Rows(tiles.Count, columns)} tiles of {frame.Pixels.Width}x{frame.Pixels.Height}" };
-        AddLookParts(parts, projection, look, labels, highlight);
+        AddLookParts(parts, projection, look, labels, highlight, bones);
         parts.Add($"views {string.Join(", ", tiles.Select(t => t.Caption))}");
         return WithCounts(parts, frame);
     }
@@ -656,7 +671,7 @@ internal static class RenderTool
         return string.Join(", ", parts);
     }
 
-    private static void AddLookParts(List<string> parts, Projection projection, Look look, LabelSet labels, Highlight highlight)
+    private static void AddLookParts(List<string> parts, Projection projection, Look look, LabelSet labels, Highlight highlight, BoneDraw? bones = null)
     {
         if (projection == Projection.Orthographic)
         {
@@ -676,6 +691,11 @@ internal static class RenderTool
         if (!highlight.IsEmpty)
         {
             parts.Add($"highlight {highlight.Counts()}");
+        }
+
+        if (bones is not null)
+        {
+            parts.Add(bones.Labels ? "bones, bone labels" : "bones");
         }
     }
 

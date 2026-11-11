@@ -163,6 +163,21 @@ public static class Skinning
         return result;
     }
 
+    /// <summary>Where each bone's head is in model space in <paramref name="pose"/>, by bone index (bone world transform of the pose; a bone it leaves out rests).</summary>
+    public static Vector3[] Heads(Skeleton skeleton, Pose pose)
+    {
+        var posed = new Rigid[skeleton.Bones.Count];
+        var heads = new Vector3[posed.Length];
+        for (var i = 0; i < posed.Length; i++)
+        {
+            var b = skeleton.Bones[i];
+            var local = Local(pose.RotationOf(b.Name) ?? b.Rotation, pose.TranslationOf(b.Name) ?? b.Position);
+            posed[i] = b.Parent < 0 ? local : posed[b.Parent].Then(local);
+            heads[i] = new Vector3((float)posed[i].Tx, (float)posed[i].Ty, (float)posed[i].Tz);
+        }
+        return heads;
+    }
+
     /// <summary>The bone names of <paramref name="pose"/> that <paramref name="skeleton"/> does not have.</summary>
     public static IEnumerable<string> Unknown(Skeleton skeleton, Pose pose) =>
         pose.Names.Where(n => !skeleton.Names.Contains(n));
