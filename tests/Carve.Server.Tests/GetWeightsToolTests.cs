@@ -59,8 +59,9 @@ public sealed class GetWeightsToolTests
         Ok(await carve.CallToolAsync("define_group", """{"name":"lid","faces":[0]}"""));
         Ok(await carve.CallToolAsync("set_weights", """{"group":"lid","weights":{"Head":3,"Tail":1}}"""));
         var lid = Body(await carve.CallToolAsync("get_weights", "{}"));
-        var set = lid.GetProperty("vertices").EnumerateArray().Where(v => v.GetProperty("weights").TryGetProperty("Tail", out _)).ToArray();
-        Assert.NotEmpty(set);
+        var lidVertices = TestMeshes.CubeFaces[0].ToHashSet();
+        var set = lid.GetProperty("vertices").EnumerateArray().Where(v => lidVertices.Contains(v.GetProperty("vertex").GetInt32())).ToArray();
+        Assert.Equal(lidVertices.Count, set.Length);
         foreach (var v in set)
         {
             Assert.Equal(0.75, v.GetProperty("weights").GetProperty("Head").GetDouble(), 12);
@@ -74,8 +75,7 @@ public sealed class GetWeightsToolTests
         var byBone = Body(await carve.CallToolAsync("get_weights", """{"bone":"Tail"}"""));
         Assert.Equal("Tail", byBone.GetProperty("bone").GetString());
         var followers = byBone.GetProperty("followers").EnumerateArray().ToArray();
-        Assert.Equal(set.Length, followers.Length);
-        Assert.All(followers, f => Assert.Equal(0.25, f.GetProperty("weight").GetDouble(), 12));
+        Assert.All(set, v => Assert.Contains(followers, f => f.GetProperty("vertex").GetInt32() == v.GetProperty("vertex").GetInt32() && Math.Abs(f.GetProperty("weight").GetDouble() - 0.25) < 1e-12));
     }
 
     [Fact]
