@@ -4,7 +4,7 @@ description: >-
 ---
 # T-37 — Automatic weights
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
