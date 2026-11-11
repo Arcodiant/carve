@@ -4,7 +4,7 @@ description: >-
 ---
 # T-41 — Rig scenario
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
