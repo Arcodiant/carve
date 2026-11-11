@@ -70,10 +70,20 @@ public static class AutoWeights
         var raw = new Dictionary<int, double>();
         for (var k = 0; k < bones.Count; k++)
         {
-            var w = nearest == 0 ? (d[k] == 0 ? 1 : 0) : Math.Pow(nearest / d[k], Power);
+            var w = nearest == 0 ? (d[k] == 0 ? 1 : 0) : FourthPower(nearest / d[k]);
             if (w > 0) raw[bones[k]] = w;
         }
         return VertexWeights.Normalise(raw, out _);
+    }
+
+    /// <summary>
+    /// <paramref name="r"/> to the <see cref="Power"/>, by two IEEE multiplications, never <c>Math.Pow</c>: the C runtime's <c>pow</c>
+    /// may differ in the last bit from one platform to another, and D-6 promises the same weights bit for bit.
+    /// </summary>
+    private static double FourthPower(double r)
+    {
+        var r2 = r * r;
+        return r2 * r2;
     }
 
     /// <summary>
