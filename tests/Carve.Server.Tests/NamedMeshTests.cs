@@ -79,11 +79,12 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     [InlineData("set_shading", """{"shading":"smooth"}""")]
     [InlineData("mark_edges", """{"edges":[[0,1]]}""")]
     [InlineData("set_weights", """{"vertices":[0],"weights":{"base":1}}""")]
+    [InlineData("weigh", "{}")]
     public async Task Every_tool_aimed_at_one_mesh_refuses_to_guess_among_several_and_names_them(string tool, string arguments)
     {
         var (carve, _) = await StartWithCrateAndLidAsync(Root);
         using var __ = carve;
-        if (tool == "set_weights")
+        if (tool is "set_weights" or "weigh")
             Ok(await carve.CallToolAsync("define_skeleton", """{"bones":[{"name":"base","position":[0,0,0],"rotation":[0,0,0,1]}]}"""));
         Assert.False(IsError(await carve.CallToolAsync("save", """{"path":"crate.carve","mesh":"crate"}""")));
 

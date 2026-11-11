@@ -141,6 +141,71 @@ internal static class ChainPose
         }
 
         await WaveAsync(driver, restPixel, reference, bent);
+        await WeighedArmAsync(driver, restPixel, reference);
+    }
+
+    /// <summary>A column of <paramref name="rings"/> square rings (y values), 0.4 m square, capped at both ends.</summary>
+    private static (float[][] Vertices, int[][] Faces) Column(params float[] rings)
+    {
+        var vertices = rings.SelectMany(y => new[] { new[] { -Half, y, -Half }, [Half, y, -Half], [Half, y, Half], [-Half, y, Half] }).ToArray();
+        var faces = new List<int[]> { new[] { 0, 1, 2, 3 } };
+        for (var r = 0; r + 1 < rings.Length; r++)
+        {
+            for (var k = 0; k < 4; k++)
+            {
+                int a = r * 4 + k, b = r * 4 + (k + 1) % 4;
+                faces.Add([a, a + 4, b + 4, b]);
+            }
+        }
+        var top = (rings.Length - 1) * 4;
+        faces.Add([top, top + 3, top + 2, top + 1]);
+        return (vertices, faces.ToArray());
+    }
+
+    /// <summary>
+    /// T-37: the same chain weighted by <c>weigh</c> instead of by hand. Both boxes are defined again as columns with a ring every
+    /// 0.5 m (which drops their hand weights), weighed with one call each, and bent a quarter turn. Base's segment is y 0..1;
+    /// joint, a leaf, runs on along base's direction for half base's length, y 1..1.5. The ring at the joint is on both and
+    /// shares them evenly (an elbow), the rings above lean wholly toward joint (0.94 and 0.92), so the arm lies along -X
+    /// from about x -0.1 to -0.93 and nothing is left standing where the upper box rested: a vertex left unweighted, or at
+    /// rest, stretches a face up through (0, 1.7).
+    /// </summary>
+    private static async Task WeighedArmAsync(ScenarioDriver driver, Func<Vector3, Vector2> restPixel, (byte R, byte G, byte B, byte A) reference)
+    {
+        var lower = Column(0, 0.5f, 1);
+        var upper = Column(1, 1.5f, 2);
+        await CallJsonAsync(driver, "define_mesh", new { name = "mesh", vertices = lower.Vertices, faces = lower.Faces });
+        await CallJsonAsync(driver, "define_mesh", new { name = "upper", vertices = upper.Vertices, faces = upper.Faces });
+        await ExpectToolErrorAsync(driver, "weigh", new { }, "'mesh'", "'upper'");
+        await ExpectToolErrorAsync(driver, "weigh", new { mesh = "mesh", bones = new[] { "elbow" } }, "elbow", "'base', 'joint'");
+        foreach (var m in new[] { "mesh", "upper" })
+        {
+            var weighed = await CallJsonAsync(driver, "weigh", new { mesh = m });
+            if (weighed.GetProperty("weighed").GetInt32() != 12 || weighed.GetProperty("unweighted").GetInt32() != 0)
+            {
+                driver.Fail($"weigh {m}: expected all 12 vertices weighed and none left, got {weighed}");
+            }
+
+            var again = await CallJsonAsync(driver, "weigh", new { mesh = m });
+            if (again.GetProperty("weighed").GetInt32() != 0 || again.GetProperty("kept").GetInt32() != 12)
+            {
+                driver.Fail($"weigh {m} again without replace: expected every weight kept, got {again}");
+            }
+        }
+
+        var bent = await driver.CaptureAsync("chain-weighed-bent-z", new { view = "+z", pose = new { joint = new { rotation = QuarterZ } } });
+        CheckCorners(driver, bent);
+        foreach (var x in new[] { -0.3f, -0.7f, -0.85f })
+        {
+            SameAs(driver, bent, restPixel, new Vector3(x, 1.05f, Half), reference, $"the weighed arm at x {x}");
+        }
+
+        SameAs(driver, bent, restPixel, new Vector3(0, 0.3f, Half), reference, "the lower column, almost wholly base's");
+        Background(driver, bent, restPixel, new Vector3(0, 1.7f, Half), "where the upper column rested (a vertex left at rest stretches a face here)");
+        Background(driver, bent, restPixel, new Vector3(0.4f, 1.0f, Half), "where a bend turned the other way, or a mirrored camera, puts the arm (x +0.4)");
+        Background(driver, bent, restPixel, new Vector3(0.7f, 1.0f, Half), "where a bend turned the other way, or a mirrored camera, puts the arm (x +0.7)");
+        Background(driver, bent, restPixel, new Vector3(-0.6f, 0.5f, Half), "below the arm");
+        Background(driver, bent, restPixel, new Vector3(-0.6f, 1.6f, Half), "above the arm");
     }
 
     /// <summary>
