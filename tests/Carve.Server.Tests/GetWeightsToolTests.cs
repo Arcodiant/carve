@@ -117,6 +117,44 @@ public sealed class GetWeightsToolTests
     }
 
     [Fact]
+    public async Task Weigh_with_bones_weighs_only_the_vertices_nearest_a_named_bone_wholly_to_it()
+    {
+        // On the unit cube, Head (0, 0.5, 0) to (0, 1, 0) is the nearest bone of the whole skeleton to vertices 2, 3, 6 and 7;
+        // Hips is nearest to 0, 1, 4 and 5 (D-6's bones scope), which stay unweighted.
+        using var carve = await StartAsync();
+        var weighed = Body(await carve.CallToolAsync("weigh", """{"bones":["Head"]}"""));
+        Assert.Equal(4, weighed.GetProperty("weighed").GetInt32());
+        Assert.Equal(0, weighed.GetProperty("kept").GetInt32());
+        Assert.Equal(4, weighed.GetProperty("unweighted").GetInt32());
+
+        var read = Body(await carve.CallToolAsync("get_weights", "{}"));
+        var byVertex = read.GetProperty("vertices").EnumerateArray().ToDictionary(
+            v => v.GetProperty("vertex").GetInt32(),
+            v => v.GetProperty("weights").EnumerateObject().Select(p => (p.Name, p.Value.GetDouble())).ToArray());
+        foreach (var v in new[] { 2, 3, 6, 7 }) Assert.Equal([("Head", 1.0)], byVertex[v]);
+        foreach (var v in new[] { 0, 1, 4, 5 }) Assert.Empty(byVertex[v]);
+        Assert.Equal([0, 1, 4, 5], read.GetProperty("summary").GetProperty("unweightedVertices").EnumerateArray().Select(e => e.GetInt32()));
+    }
+
+    [Fact]
+    public async Task Weigh_with_no_skeleton_or_an_empty_bones_list_is_a_tool_error_and_no_undo_step()
+    {
+        using var bare = new CarveProcess([]);
+        await bare.InitializeAsync();
+        Ok(await bare.CallToolAsync("define_mesh", Cube));
+        var noSkeleton = await bare.CallToolAsync("weigh", "{}");
+        Assert.True(IsError(noSkeleton));
+        Assert.Contains("no skeleton yet", TextOf(noSkeleton));
+        Assert.Contains("nothing to undo", TextOf(await bare.CallToolAsync("undo", "{}"))); // define_mesh is still the only step
+
+        using var carve = await StartAsync();
+        var empty = await carve.CallToolAsync("weigh", """{"bones":[]}""");
+        Assert.True(IsError(empty));
+        Assert.Contains("bones: an empty list weighs nothing", TextOf(empty));
+        Assert.Equal("define_skeleton", Body(await carve.CallToolAsync("undo", "{}")).GetProperty("undone").GetString());
+    }
+
+    [Fact]
     public async Task Without_a_skeleton_or_a_mesh_it_is_a_tool_error()
     {
         using var carve = new CarveProcess([]);
