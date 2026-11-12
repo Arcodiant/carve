@@ -103,6 +103,8 @@ internal sealed class LoopCutStage : ICutsStage
         var extruded = await CallJsonAsync(driver, "extrude", new { faces = new[] { band }, distance = 0.1 });
         Summary("extrude the band", extruded, 20, 18, true);
         var solid = await Solid.ReadAsync(driver);
+        SameList("the band's front face stands out to", ["1.1", "1.1", "1.1", "1.1"],
+            solid.Faces[band].Loop.Select(v => solid.Vertices[v].Z.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)));
         var camera2 = new Camera(Vector3.Zero, new Vector3(1, 2, 1.1f), ToVector(Front), 512);
         var shaded = await driver.CaptureAsync("loop-cut-band-extruded", new { direction = Front });
         Caption(shaded, "512x512, direction (0.6, 0.35, 1), 20 vertices, 18 faces");
