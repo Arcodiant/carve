@@ -6,3 +6,4 @@
 - T-65: plane_cut splits faces along a plane, keeping both sides or one with the cut filled, on Core's shared face-splitting step that reports each split face's pieces
 - T-66: loop_cut adds edge loops across a ring of quads at given fractions
 - T-67: knife cuts a path of surface points through faces; a closed path inside a face cuts out an inner face and leaves a hole
+- T-69: The gatehouse wall built by cuts alone: cornice, gable, door and a see-through window, shown at each stage and kept as samples/gatehouse.carve
