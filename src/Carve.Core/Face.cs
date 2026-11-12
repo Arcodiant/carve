@@ -32,6 +32,15 @@ public sealed class Face : IEquatable<Face>
         Corners = Array.AsReadOnly(_corners);
     }
 
+    /// <summary>
+    /// The tombstone a deleted face's slot holds (T-64): no corners, and distinct from any face built from a list, even an
+    /// empty one, so an empty face is still refused as a face of 0 indices. Its id is never given out again.
+    /// </summary>
+    public static Face Deleted { get; } = new([]);
+
+    /// <summary>Whether this is <see cref="Deleted"/>, a deleted face's tombstone.</summary>
+    public bool IsDeleted => ReferenceEquals(this, Deleted);
+
     /// <summary>A plain face, as <c>define_mesh</c>'s plain array form.</summary>
     public static implicit operator Face(int[] loop) => new(loop);
 
@@ -87,7 +96,7 @@ public sealed class Face : IEquatable<Face>
     }
 
     /// <summary>This face with every vertex id mapped by <paramref name="map"/>, holes kept.</summary>
-    public Face Map(Func<int, int> map) => new(_loop.Select(map), _holes.Select(h => h.Select(map)));
+    public Face Map(Func<int, int> map) => IsDeleted ? this : new(_loop.Select(map), _holes.Select(h => h.Select(map)));
 
     /// <summary><c>faces[n]</c> for the outer loop (-1), else <c>faces[n].holes[k]</c>.</summary>
     public static string LoopName(int face, int hole) => hole < 0 ? $"faces[{face}]" : $"faces[{face}].holes[{hole}]";
@@ -96,7 +105,7 @@ public sealed class Face : IEquatable<Face>
     public static string CornerName(int face, int hole, int index) => $"{LoopName(face, hole)}[{index}]";
 
     public bool Equals(Face? other) =>
-        other is not null && _loop.AsSpan().SequenceEqual(other._loop) && _holes.Length == other._holes.Length
+        other is not null && IsDeleted == other.IsDeleted && _loop.AsSpan().SequenceEqual(other._loop) && _holes.Length == other._holes.Length
         && _holes.Zip(other._holes).All(p => p.First.AsSpan().SequenceEqual(p.Second));
 
     public override bool Equals(object? obj) => Equals(obj as Face);
@@ -109,7 +118,7 @@ public sealed class Face : IEquatable<Face>
         return hash.ToHashCode();
     }
 
-    public override string ToString() => _holes.Length == 0
+    public override string ToString() => IsDeleted ? "deleted" : _holes.Length == 0
         ? $"[{string.Join(", ", _loop)}]"
         : $"{{loop: [{string.Join(", ", _loop)}], holes: [{string.Join(", ", _holes.Select(h => $"[{string.Join(", ", h)}]"))}]}}";
 }

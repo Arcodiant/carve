@@ -326,18 +326,4 @@ public class HoleTests
     [Fact]
     public void AModelWithNoHoledFaceStillWritesVersion2()
         => Assert.Contains("\"carve\": 2", CarveFile.Write(TestMeshes.Cube()));
-
-    [Theory]
-    [InlineData("vertices")]
-    [InlineData("faces")]
-    public void ANullTombstoneIsRefusedUntilT64(string key)
-    {
-        var text = CarveFile.Write(Box(inner: false)).Replace("\r", "");
-        text = key == "faces"
-            ? text.Replace("\"faces\": [\n", "\"faces\": [\n    null,\n")
-            : text.Replace("\"vertices\": [\n", "\"vertices\": [\n    null,\n");
-        var read = CarveFile.Read(text);
-        Assert.False(read.Succeeded);
-        Assert.Contains(read.Errors, e => e.Message.StartsWith("null is the tombstone"));
-    }
 }
