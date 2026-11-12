@@ -4,7 +4,7 @@ description: >-
 ---
 # T-64 — Tombstones and delete
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
