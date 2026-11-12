@@ -66,14 +66,14 @@ public class GatehouseGeometry
         stages.Add(new("merged", m));
 
         // 4. plane_cut through (0, 3.4, 0), normal (0.8, 1.5, 0) then (-0.8, 1.5, 0), keeping below with fill.
-        var first = PlaneCut.Cut(m, V(0, 3.4f, 0), Vector3.Normalize(V(0.8f, 1.5f, 0)), PlaneKeep.Below, true);
+        var first = PlaneCut.Cut(m, V(0, 3.4f, 0), V((float)(0.8 / 1.7), (float)(1.5 / 1.7), 0), PlaneKeep.Below, true);
         m = TestMeshes.Ok(first.Edit);
         Assert.Empty(first.Warnings);
         Assert.Equal([20, 21, 22, 23], first.Edit.NewVertices);
         Assert.Equal([22], first.Edit.NewFaces);
         Assert.Equal([2, 6], first.Edit.Deleted.Vertices);
         Assert.Equal([18, 19, 20, 21], first.Edit.Deleted.Faces);
-        var second = PlaneCut.Cut(m, V(0, 3.4f, 0), Vector3.Normalize(V(-0.8f, 1.5f, 0)), PlaneKeep.Below, true);
+        var second = PlaneCut.Cut(m, V(0, 3.4f, 0), V((float)(-0.8 / 1.7), (float)(1.5 / 1.7), 0), PlaneKeep.Below, true);
         m = TestMeshes.Ok(second.Edit);
         Assert.Empty(second.Warnings);
         Assert.Equal([24, 25, 26, 27], second.Edit.NewVertices);
@@ -298,5 +298,20 @@ public class GatehouseGeometry
         var after = SolidOf(Mesh(2));
         var seen = GatehousePlan.InSight(after, CameraFor(after, "front"), GatehousePlan.FromFront);
         Assert.DoesNotContain((12, 14), seen);
+    }
+
+    [Fact]
+    public void TheSampleIsTheGatehouseBuiltInCoreByContent()
+    {
+        // The door's face is coloured, as the scenario's set_colour does. Compared by content: each is read, then written the one way.
+        var built = Mesh(7).WithStyle(FaceStyle.None.WithColour([28], "#6b4423"));
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(root.FullName, "samples", "gatehouse.carve")))
+        {
+            root = root.Parent ?? throw new FileNotFoundException("samples/gatehouse.carve");
+        }
+
+        var sample = CarveFile.Read(File.ReadAllText(Path.Combine(root.FullName, "samples", "gatehouse.carve"))).Model!;
+        Assert.Equal(CarveFile.Write(Model.Of("mesh", built)), CarveFile.Write(sample));
     }
 }
