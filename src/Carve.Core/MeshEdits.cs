@@ -383,7 +383,7 @@ public static class MeshEdits
     /// <summary>Agent-facing text is the same on every host: numbers (a negative id's sign among them) in the invariant culture.</summary>
     internal static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 
-    private static string Ordinal(int index)
+    internal static string Ordinal(int index)
     {
         var n = index + 1;
         var suffix = (n % 100) is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
