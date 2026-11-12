@@ -22,7 +22,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
     private const int Gutter = 2;
 
     /// <summary>For the wireframe stages: the stage's new edges, and how many of them are on faces toward the camera. Worked in Core.</summary>
-    private static readonly Dictionary<int, (int Added, int InSight)> Wires = new() { [2] = (16, 11), [4] = (7, 5), [6] = (10, 5) };
+    private static readonly Dictionary<int, (int Added, int InSight)> Wires = new() { [2] = (16, 10), [4] = (7, 5), [6] = (10, 5) };
 
     private static readonly string[] Views = ["+x", "-x", "+y", "-y", "+z", "-z"];
 
@@ -74,7 +74,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
         Caption(frame, $"512x512, direction (0.6, 0.35, 1), wireframe, highlight {fresh.Length} edges, {counts}");
         var (added, inSight) = Wires[stage];
         Equal($"{frame.Name}: the stage's new edges", added, fresh.Length);
-        var seen = GatehousePlan.InSight(solid, ToVector(Front));
+        var seen = GatehousePlan.InSight(solid, camera, ToVector(Front));
         Equal($"{frame.Name}: the new edges in sight", inSight, seen.Count(fresh.Contains));
         var lines = GatehousePlan.Edges(solid).Select(e => (camera.Project(solid.Vertices[e.Lo]), camera.Project(solid.Vertices[e.Hi]))).ToArray();
         Look(frame, solid, camera, GatehousePlan.Probes(solid), stage, "wire", -1, lines);
