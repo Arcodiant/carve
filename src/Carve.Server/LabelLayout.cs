@@ -74,7 +74,7 @@ public static class LabelLayout
         Vector2 Pixel(Vector3 point) => ScreenProjection.ToPixel(space.Apply(point), frame.View, frame.Projection, size);
 
         var faces = window is { } w ? Enumerable.Range(w.FirstFace, w.FaceCount) : Enumerable.Range(0, mesh.Faces.Count);
-        var facing = faces.Where(f =>
+        var facing = faces.Where(f => !mesh.IsFaceDeleted(f) &&
             Vector3.Dot(mesh.FaceNormal(f), projection == Projection.Orthographic ? direction : frame.Eye - space.Apply(mesh.FaceCentre(f))) > 0).ToList();
 
         if (labels is LabelSet.Faces or LabelSet.Both)

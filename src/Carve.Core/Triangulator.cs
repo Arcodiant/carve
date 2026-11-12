@@ -31,6 +31,7 @@ public static class Triangulator
     public static IReadOnlyList<MeshTriangle> TriangulateFace(PolygonMesh mesh, int face)
     {
         var f = mesh.Faces[face];
+        if (f.IsDeleted) return []; // a tombstone has no triangles, so nothing draws or exports it
         IReadOnlyList<int> outline = f.HasHoles
             ? Bridge(mesh.Vertices, f)?.Ids ?? throw new InvalidOperationException($"faces[{face}] cannot be bridged")
             : f.Loop;

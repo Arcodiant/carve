@@ -11,6 +11,7 @@ public sealed class GetMeshTool(ModelStore store)
         "Reads back the current mesh in full, so you can learn its ids before editing. Takes one optional argument, mesh, the name of the mesh to read, which may be left out while the model has one mesh; any other argument is a tool error. "
         + "Vertex and face ids are the positions given to define_mesh, kept by every edit; the vertices and faces an extrude adds are appended after them. "
         + "Returns JSON {vertices:[{id, at:[x,y,z]}], faces:[{id, vertices:[ids, counter-clockwise seen from outside], or for a face with holes {loop:[ids], holes:[[ids], ...]} as define_mesh takes it, normal:[x,y,z] (unit, outward), centre:[x,y,z] (mean of the outer loop's corners)}], "
+        + "A deleted vertex or face (see delete) is null in its slot of vertices or faces: its id is never given out again, so every other id keeps its place. "
         + "edges:[{vertices:[a,b] (a < b), faces:[ids of the faces using the edge]}], "
         + "closed, bounds:{min,max}, warnings:[], "
         + "colours:[{colour:\"#RRGGBB\" as given to set_colour, faces:[ids]}] (the coloured faces only), groups:[{name, faces:[ids]}] (from define_group)}. Here vertices, faces and edges are lists, where define_mesh and the edits return their counts. "
@@ -31,8 +32,8 @@ public sealed class GetMeshTool(ModelStore store)
 
         var body = new Dictionary<string, object>
         {
-            ["vertices"] = target.Vertices.Select((v, i) => new { id = i, at = Array(v) }).ToArray(),
-            ["faces"] = Enumerable.Range(0, target.Faces.Count).Select(f => new
+            ["vertices"] = target.Vertices.Select((v, i) => target.IsVertexDeleted(i) ? null : (object)new { id = i, at = Array(v) }).ToArray(),
+            ["faces"] = Enumerable.Range(0, target.Faces.Count).Select(f => target.IsFaceDeleted(f) ? null : (object)new
             {
                 id = f,
                 // A holed face in define_mesh's object form; a plain face as its plain array, as before holes.

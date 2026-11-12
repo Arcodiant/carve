@@ -411,10 +411,14 @@ public sealed class PolygonMesh
         return errors.Count == 0 ? result : new MeshResult(null, [.. errors, .. result.Errors]);
     }
 
+    /// <summary>A live face; a tombstone is refused plainly (callers skip tombstones, through <see cref="LiveFaces"/>).</summary>
+    private Face LiveFace(int face) =>
+        _faces[face] is { IsDeleted: false } f ? f : throw new InvalidOperationException($"faces[{face}]: {DeletedMessage}");
+
     /// <summary>A face's area: its outer loop's less its holes'.</summary>
     public double FaceArea(int face)
     {
-        var f = _faces[face];
+        var f = LiveFace(face);
         var area = Length(NewellVector(_vertices, f.Loop)) / 2;
         foreach (var hole in f.Holes) area -= Length(NewellVector(_vertices, hole)) / 2;
         return area;
@@ -422,7 +426,7 @@ public sealed class PolygonMesh
     /// <summary>Centre of a face: the mean of its outer loop's vertices.</summary>
     public Vector3 FaceCentre(int face)
     {
-        var loop = _faces[face].Loop;
+        var loop = LiveFace(face).Loop;
         var o = _vertices[loop[0]];
         double x = 0, y = 0, z = 0;
         foreach (var i in loop)
@@ -440,7 +444,7 @@ public sealed class PolygonMesh
     /// </summary>
     public Vector3 FaceLabelPoint(int face)
     {
-        if (!_faces[face].HasHoles) return FaceCentre(face);
+        if (!LiveFace(face).HasHoles) return FaceCentre(face);
         var best = -1.0;
         var at = FaceCentre(face);
         foreach (var t in Triangulator.TriangulateFace(this, face))
@@ -457,7 +461,7 @@ public sealed class PolygonMesh
     /// <summary>Unit normal of a face's outer loop by Newell's method; outward for a face wound counter-clockwise from outside.</summary>
     public Vector3 FaceNormal(int face)
     {
-        var (x, y, z) = Unit(NewellVector(_vertices, _faces[face].Loop));
+        var (x, y, z) = Unit(NewellVector(_vertices, LiveFace(face).Loop));
         return new Vector3((float)x, (float)y, (float)z);
     }
 

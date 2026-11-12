@@ -58,7 +58,7 @@ public static class SkinnedExport
     /// <summary>Every vertex with no weight, per mesh, in mesh order; empty when every vertex has one.</summary>
     public static IReadOnlyList<(string Mesh, IReadOnlyList<int> Vertices)> Unweighted(Model model) =>
         [.. model.Meshes
-            .Select(m => (m.Name, (IReadOnlyList<int>)[.. Enumerable.Range(0, m.Mesh.Vertices.Count).Where(v => m.Mesh.Weights?.Has(v) != true)]))
+            .Select(m => (m.Name, (IReadOnlyList<int>)[.. m.Mesh.LiveVertices.Where(v => m.Mesh.Weights?.Has(v) != true)]))
             .Where(m => m.Item2.Count > 0)];
 
     /// <summary>
@@ -94,7 +94,7 @@ public static class SkinnedExport
                 primitive.AddTriangle(Vertex(mesh, t.A, at[face.CornerOf(t.A)]), Vertex(mesh, t.B, at[face.CornerOf(t.B)]), Vertex(mesh, t.C, at[face.CornerOf(t.C)]));
             }
             triangleCount += triangles.Count;
-            boundToRoot += Enumerable.Range(0, mesh.Vertices.Count).Count(v => mesh.Weights?.Has(v) != true);
+            boundToRoot += mesh.LiveVertices.Count(v => mesh.Weights?.Has(v) != true);
         }
 
         var meshNode = scene.CreateNode(name);
@@ -120,7 +120,7 @@ public static class SkinnedExport
             warnings.Add($"{N(submeshes)} submeshes and {N(colours)} colours, above the {N(MaxSubmeshes)} a game character should keep to; share colours between pieces where you can");
         if (model.Skeleton is { } skeleton && SyntyRequiredBones.All(skeleton.Names.Contains))
         {
-            var ys = model.Meshes.SelectMany(m => m.Mesh.Vertices).Select(v => v.Y).ToList();
+            var ys = model.Meshes.SelectMany(m => m.Mesh.LiveVertices.Select(v => m.Mesh.Vertices[v])).Select(v => v.Y).ToList();
             if (ys.Count > 0)
             {
                 var height = (float)((double)ys.Max() - ys.Min());
@@ -137,7 +137,7 @@ public static class SkinnedExport
         var mesh = piece.Mesh;
         var order = new List<string?>();
         var faces = new Dictionary<string, List<int>>();
-        for (var f = 0; f < mesh.Faces.Count; f++)
+        foreach (var f in mesh.LiveFaces)
         {
             var colour = GlbExport.ColourOf(mesh, f);
             if (!faces.TryGetValue(colour ?? "", out var list))

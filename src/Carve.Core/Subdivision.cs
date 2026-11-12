@@ -116,6 +116,7 @@ internal static class Subdivision
         {
             var loop = faces[f];
             var n = loop.Length;
+            if (n == 0) { outFaces[f] = []; continue; } // a tombstone keeps its slot; its face point is used by nothing
             var added = new List<int>();
             for (var k = 0; k < n; k++)
             {

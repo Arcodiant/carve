@@ -110,10 +110,14 @@ public static class MeshQuery
 
         var table = Tables[kind];
         var matches = Compile(expression.Root, table, new Facts(mesh));
-        var of = table.Count(mesh);
+        var slots = table.Count(mesh);
+        bool Deleted(int i) => kind == ElementKind.Vertices ? mesh.IsVertexDeleted(i) : kind == ElementKind.Faces && mesh.IsFaceDeleted(i);
         var ids = new List<int>();
-        for (var i = 0; i < of; i++)
+        var of = 0;
+        for (var i = 0; i < slots; i++)
         {
+            if (Deleted(i)) continue; // a tombstone is never a row
+            of++;
             if (matches(i)) ids.Add(i);
         }
 

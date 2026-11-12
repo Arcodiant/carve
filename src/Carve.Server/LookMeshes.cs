@@ -122,7 +122,7 @@ public static class LookMeshes
     public static LookScene Compose(PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight, float[]? weights = null)
     {
         var orange = OrangeLines(mesh, space, look, highlight);
-        var picked = highlight.Faces.Any(f => f >= 0 && f < mesh.Faces.Count);
+        var picked = highlight.Faces.Any(f => f >= 0 && f < mesh.Faces.Count && !mesh.IsFaceDeleted(f));
         Rgba8[] Picked(Rgba8 others) => FaceColours(mesh, f => highlight.Faces.Contains(f) ? OrangeVertex : others);
         return look switch
         {
@@ -211,7 +211,7 @@ public static class LookMeshes
     public static MeshData<PositionVertex>? Spikes(PolygonMesh mesh, DrawnSpace space)
     {
         var corners = Shading.HasCornerNormals(mesh) ? Shading.CornersOf(mesh) : null;
-        return Lines(Enumerable.Range(0, mesh.Faces.Count).SelectMany(f =>
+        return Lines(mesh.LiveFaces.SelectMany(f =>
         {
             if (corners is not null && Shading.FaceHasCornerNormals(mesh, f))
                 return mesh.Faces[f].Corners.SelectMany((v, k) =>
@@ -232,11 +232,11 @@ public static class LookMeshes
     public static MeshData<PositionVertex>? OrangeLines(PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight)
     {
         var loops = look == Look.Normals
-            ? highlight.Faces.Where(f => f >= 0 && f < mesh.Faces.Count).SelectMany(f => mesh.Topology.FaceEdges(f)).Select(e => (e.Lo, e.Hi))
+            ? highlight.Faces.Where(f => f >= 0 && f < mesh.Faces.Count && !mesh.IsFaceDeleted(f)).SelectMany(f => mesh.Topology.FaceEdges(f)).Select(e => (e.Lo, e.Hi))
             : [];
         var wanted = highlight.Edges.Union(loops);
         var edges = mesh.Topology.Edges.Where(e => wanted.Contains((e.Lo, e.Hi))).SelectMany(e => Lifted(mesh, space, e));
-        var stars = highlight.Vertices.Where(v => v >= 0 && v < mesh.Vertices.Count).SelectMany(v =>
+        var stars = highlight.Vertices.Where(v => v >= 0 && v < mesh.Vertices.Count && !mesh.IsVertexDeleted(v)).SelectMany(v =>
         {
             var at = space.Apply(mesh.Vertices[v]);
             return new[] { Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ }.SelectMany(axis => new[] { at - axis * StarHalfLength, at + axis * StarHalfLength });

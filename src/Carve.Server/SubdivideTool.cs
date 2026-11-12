@@ -77,6 +77,7 @@ public sealed class SubdivideTool(ModelStore store)
                 vertices = new { first = edited.Vertices.Count - result.NewVertices.Count, count = result.NewVertices.Count },
                 faces = new { first = edited.Faces.Count - result.NewFaces.Count, count = result.NewFaces.Count },
             },
+            ["deleted"] = Deleted(result.Deleted),
         };
         return Ok(ordered);
     }

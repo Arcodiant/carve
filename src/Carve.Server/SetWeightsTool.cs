@@ -79,7 +79,7 @@ public sealed class SetWeightsTool(ModelStore store)
             if (ids is not null)
             {
                 foreach (var v in ids.Distinct())
-                    if (VertexWeights.VertexProblem(m.Vertices.Count, v) is { } bad)
+                    if (VertexWeights.VertexProblem(m, v) is { } bad)
                         problems.Add($"vertices[{v}]: {bad}");
                 return (problems.Count > 0 ? null : ids, problems);
             }

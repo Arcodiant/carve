@@ -171,7 +171,9 @@ public sealed class DefineMeshTool(ModelStore store)
 
         var mesh = result.Mesh!;
         store.Define(meshName!, mesh, "define_mesh");
-        return Ok(Report(mesh));
+        var body = Report(mesh);
+        body["deleted"] = Deleted(DeletedElements.None);
+        return Ok(body);
     }
 
     /// <summary>The name argument: the default when absent; null, with the problem added, when it is not a non-empty string.</summary>
