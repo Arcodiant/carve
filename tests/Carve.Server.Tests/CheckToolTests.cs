@@ -23,7 +23,7 @@ public class CheckToolTests
     private static string ShedArguments()
     {
         var shed = TestMeshes.LeakyShed();
-        return JsonSerializer.Serialize(new { vertices = shed.Vertices.Select(v => new[] { v.X, v.Y, v.Z }), faces = shed.Faces });
+        return JsonSerializer.Serialize(new { vertices = shed.Vertices.Select(v => new[] { v.X, v.Y, v.Z }), faces = shed.Faces.Select(f => f.Loop) });
     }
 
     private static void ExpectShed(JsonElement body)

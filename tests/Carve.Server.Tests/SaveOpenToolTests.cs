@@ -15,7 +15,7 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
     {
         static string N(float x) => x.ToString("R", CultureInfo.InvariantCulture);
         var vertices = string.Join(",", mesh.Vertices.Select(v => $"[{N(v.X)},{N(v.Y)},{N(v.Z)}]"));
-        var faces = string.Join(",", mesh.Faces.Select(f => "[" + string.Join(",", f) + "]"));
+        var faces = string.Join(",", mesh.Faces.Select(f => "[" + string.Join(",", f.Loop) + "]"));
         return $$"""{"vertices":[{{vertices}}],"faces":[{{faces}}]}""";
     }
 
