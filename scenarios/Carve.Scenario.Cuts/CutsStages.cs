@@ -14,5 +14,6 @@ internal static class CutsStages
     public static readonly IReadOnlyList<ICutsStage> All =
     [
         new HolesStage(),
+        new DeleteStage(),
     ];
 }
