@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The cuts: one stage per cut, each in its own file and started from its own define_mesh, run in the order of CutsStages.cs. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Cuts</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <!-- The shed's checks and its camera (render's framing rule, worked apart from the product). -->
+  <ItemGroup>
+    <Compile Include="../Carve.Scenario.Shed/ShedChecks.cs" Link="ShedChecks.cs" />
+    <Compile Include="../Carve.Scenario.Shed/ShedGeometry.cs" Link="ShedGeometry.cs" />
+  </ItemGroup>
+
+</Project>

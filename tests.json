@@ -250,6 +250,29 @@
         "vulkan"
       ],
       "est-seconds": 90
+    },
+    {
+      "id": "scenario-cuts",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 cuts -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Cuts/Carve.Scenario.Cuts.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
     }
   ],
   "todo": []
