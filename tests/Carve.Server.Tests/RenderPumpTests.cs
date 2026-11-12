@@ -524,12 +524,17 @@ public class RenderPumpTests
         _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)) { Glb = glb });
         _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)));
 
-        for (var i = 0; i < 6; i++) pump.Step();
+        // "|" marks the end of each step: putting the glb in, or taking it out, is all its step does.
+        for (var i = 0; i < 6; i++)
+        {
+            pump.Step();
+            _scene.Log.Add("|");
+        }
 
         Assert.Equal(2, _scene.Rendered.Count);
         Assert.Same(glb, _scene.Rendered[0].Request.Spec.Glb);
         Assert.Null(_scene.Rendered[1].Request.Spec.Glb);
-        Assert.Equal(["glb", "view", "render", "model", "view", "render"], _scene.Log.Select(l => l.Split(' ')[0]));
+        Assert.Equal(["glb", "|", "view", "|", "render", "model", "|", "view", "|", "render", "|", "|"], _scene.Log.Select(l => l.Split(' ')[0]));
     }
 
     [Fact]
