@@ -89,7 +89,7 @@ Ray-test pixel checks, each shown failing on a break.
 
 ### As built
 
-First agent: Opus (claude-opus-5-5). **The Core (`Knife`, and `FaceSplit`'s interior points), the `knife` tool, the unit and regression tests and their breaks.** The Cuts stage, its frames and the GPU run are left (see Hand-off).
+First agent: Opus (claude-opus-5-5). **The Core (`Knife`, and `FaceSplit`'s interior points), the `knife` tool, the unit and regression tests and their breaks.** The Cuts stage, its frames, the GPU run, the one-point rule and the `Reverses` case are the second agent's (below).
 
 **`FaceSplit`'s addition** (`src/Carve.Core/FaceSplit.cs`, additive, on the orchestrator's ruling; every T-65 test passes unedited, and with no interior point nothing in its behaviour, vertex order or `split` changes):
 
@@ -128,22 +128,38 @@ First agent: Opus (claude-opus-5-5). **The Core (`Knife`, and `FaceSplit`'s inte
   | refused: an open path ending inside a face | the check never fires | 2 fail |
   | refused: too few points | the check never fires | 1 fails |
   | refused (FaceSplit): an interior point not inside its face | the check never fires | 1 fails |
-  | a closed inner path's hole goes to the face around it, not the inner face (`Reverses`) | the check dropped | **0 fail: not yet shown** (see Hand-off) |
+  | a closed inner path's hole goes to the face around it, not the inner face (`Reverses`) | the check dropped | 1 fails (first run: 0 failed, since the square's traced hole started at a vertex the ray test put outside the inner outline; the second agent added the square started at each of its four corners, and the rerun fails it) |
   | an interior point shared by two segments is one vertex | every interior point a new vertex | 7 fail |
   | an interior vertex blends its triangle's corners barycentrically | two corners' weights swapped | 1 fails |
   | an interior vertex is given weights | no blend | 1 fails |
   | `knife` is a tool | left out of `Program.cs`'s list | 2 fail (`KnifeToolTests`) |
   | `closed` reaches the knife | ignored | 1 fails (`KnifeToolTests`) |
+  | refused: a closed path touching the boundary at one point only (second agent) | the check never fires | 1 fails (`AClosedPathTouchingTheBoundaryAtOnePointOnlyIsRefused`; the mesh's own repeated-index refusal comes back instead) |
+
+
+**Second agent: Opus (claude-opus-5-5).** The one-point rule, the `Reverses` case, the Cuts stage and its local run; the GPU suites submitted (see Hand-off).
+
+- **The person's ruling (2026-11-12):** a closed path inside one face that touches the face's boundary (a vertex or an edge point) at exactly one point is refused in the knife's own words, facts only: `points[2]: the closed path touches the face's boundary at one point only, at [0.5, 0, 1]; touch it at two points to split the face, or keep it clear of the edge to cut a hole`. Before it, the mesh's own check refused it with `faces[1][4]: index 8 repeats faces[1][1]`. The point named is the vertex, or the point at the snap's fraction along the edge. The tool's description says so. Test: `AClosedPathTouchingTheBoundaryAtOnePointOnlyIsRefused` (an edge point and a vertex); break in the table above.
+- **`Reverses` kept:** `AClosedPathInsideAFaceLeavesTheHoleInTheFaceWhicheverCornerItStartsAt` cuts the square from each of its four corners; with the check dropped, one start puts the traced hole's first vertex inside the inner outline by the ray test, and the hole goes to the inner face (break 12 above, rerun).
+- **The Cuts stage** (`scenarios/Carve.Scenario.Cuts/KnifeStage.cs`, its line after `PlaneCutStage` in `CutsStages.cs`): the 2 x 2 x 0.2 slab (front at z = 0.2), the closed hexagon `[1.3,0.9] [1.6,0.9] [1.8,1.2] [1.6,1.5] [1.3,1.5] [1.1,1.2]` (14 vertices, 7 faces, closed, created face 6, the front one hole), then the open door `[0.3,0] [0.3,1] [0.7,1] [0.7,0]` from the bottom edge (18 vertices, 8 faces, closed). The knifed edges are found from get_mesh (an edge whose midpoint lies on a path segment, 9) and passed as `highlight`. Frame `knife-slab-wireframe` from `[0.6, 0.35, 1]`: caption, the ray-tested probes (`Look`, as `PlaneCutStage`), each knifed edge in sight orange and each other edge in sight not. Then `extrude` face 6 by -0.05 (24 vertices, 14 faces, closed, the hexagon at z = 0.15); frame `knife-slab-recess`, shaded: caption, the recess probes show face 6 (`Expect`), and `Look` with each face's shade.
+- **Local run** (`scripts/run-scenario.ps1 cuts` on `f23c78f`): passed. Its 12 existing frames are byte-identical to T-65's `frames-aae1140/all.sha256`. New: `knife-slab-wireframe` `175724fa4cb2...`, `knife-slab-recess` `84957d9dc2db...`. Both looked at: the orange hexagon and door on the front; the pocket's walls showing at its left and bottom.
+- **Stage breaks** (`C:/Users/andre/AppData/Local/Temp/t67/breaks3.py`, each applied alone, the Cuts scenario run here, restored; log appended to `breaks.log`): every one is caught, but by the stage's count and caption checks or by the knife refusing, **none by a pixel check**:
+
+  | Check | Break | Result |
+  |---|---|---|
+  | Cuts: an interior point becomes a vertex where the path puts it | the vertex 0.05 off in x | 3 checks fail (knifed edges 3 not 9, the caption, edges in sight) |
+  | Cuts: the hole is wound opposite the face | the hole wound as the face | the knife refused (1 problem) |
+  | Cuts: an edge point is at its fraction along the edge | at 1 - t | the knife refused (2 problems) |
+  | Cuts: `closed` reaches the knife | ignored | the knife refused (2 problems) |
 
 ### Hand-off
 
-First agent (Opus, claude-opus-5-5), handing off at the tool-call checkpoint.
+Second agent (Opus, claude-opus-5-5), handing off at the tool-call checkpoint.
 
-- **Done and committed:** `FaceSplit`'s interior points, `Knife`, the `knife` tool, `KnifeTests` (17), `KnifeToolTests` (2), the breaks above. Core unit (693), server unit (279) and `KnifeToolTests` pass locally. T-65's `FaceSplitTests` pass unedited.
+- **Done and committed:** the one-point rule (test, break), the `Reverses` case (break 12 now fails 1), the tool description's line for the one-point rule, `KnifeStage` and its `CutsStages` line, the stage breaks above. Server unit + regression (664) passed here; `KnifeTests` 19; the Cuts scenario passed here.
+- **GPU suites submitted** on `f23c78f` (the last code commit), member priority, jobs `J-20261112-163330-71596b` (core-unit) to `J-20261112-163343-4c3727` (scenario-cuts); viewer-cube carried. Follow with `cairn test status`. Not yet fetched or hashed: fetch each by job id (check `output.log` names `f23c78f`) into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-67/frames-f23c78f/`, list `all.sha256`, compare with T-65's 133 plus any T-66 frames landed by then (T-66 had not landed on `origin/milestone/M-5` at this hand-off), and check the two new frames match the local hashes.
 - **Left:**
-  1. `KnifeStage.cs` in the Cuts scenario and its line in `CutsStages.cs` (after `PlaneCutStage`; T-66 adds one too, keep both): the 2 x 2 x 0.2 slab, the closed hexagon and the open door path on its front, the wireframe from `[0.6, 0.35, 1]` with the new edges highlighted (`KnifeResult.Edges` is not in the tool's report; find the new edges from `get_mesh` as `PlaneCutStage` does), and the hexagon's inner face extruded by -0.05 (recessed), shaded. Ray-test pixel checks on the existing `CutsGeometry.cs`, each with a break. New frames go to the person.
-  2. The GPU run, once, on a near-final commit; every existing frame byte-identical against `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/frames-aae1140/all.sha256` (133) plus T-66's if landed, listed under `artifacts/review/T-67/`.
-  3. `cairn task T-67 verify` (not run yet), then `finish`.
-  4. The `Reverses` break failed nothing: the test's inner square happens to put the hole's first point where the ray test already says "in the outer outline only". Either add a case that needs it (an inner path whose first vertex's ray test falls inside the inner outline) and rerun break 12, or drop the check. Not settled here.
-- **Open rule for the person (not decided here):** a closed path wholly inside a face that touches the boundary at **one point only** (e.g. a triangle with one corner on an edge). The face around it would be a loop that passes through that point twice, which a face cannot be, so it is refused today by the mesh's own check with `faces[1][4]: index 8 repeats faces[1][1]`, a fact but not one in the knife's words. The spec's "a closed path that touches the boundary splits the face as usual" does not cover it. Ask whether it is refused (and in what words) or cut some other way. The test of a closed path touching an edge uses two corners on the edge, which splits cleanly.
-- **Surprising:** none beyond the two points above. The piece loop rule (a piece starts at its corner first in the face's corners) puts an edge vertex ahead of an old corner where it comes first in the face's loop (`[8, 5, 6, 9, 10]`), as T-65 wrote it.
+  1. **The pixel checks' own breaks.** Every product break of the knife so far is caught before the pixels are read, because `Look`, `Line` and `NotLine` compare the frame with get_mesh's geometry, which the broken knife also changes. A break that leaves get_mesh right but the image wrong has to be in the render path (for example the highlight drawing skipping hole-loop edges, or the renderer dropping a face's holes), each run alone through the Cuts scenario. Not tried; the frames of the existing stages would also change under such a break, which is expected for a break.
+  2. The person's review of the two new frames (`knife-slab-wireframe`, `knife-slab-recess`) through `mcp__waystone__review`, copied under the evidence folder.
+  3. `cairn task T-67 verify` (not run yet; the submitted jobs should be carried or reused), `cairn lint`, then `finish`. Fold this Hand-off into As built first.
+- **Surprising:** none. The piece loop rule (a piece starts at its corner first in the face's corners) puts an edge vertex ahead of an old corner where it comes first in the face's loop (`[8, 5, 6, 9, 10]`), as T-65 wrote it (first agent's note).
