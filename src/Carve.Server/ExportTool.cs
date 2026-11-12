@@ -131,7 +131,7 @@ public sealed class ExportTool(ModelStore store)
         if (!ToolPaths.Write("export", target, glb.Bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
         var skeleton = model.Skeleton!;
-        var all = model.Meshes.SelectMany(m => m.Mesh.Vertices).ToList();
+        var all = model.Meshes.SelectMany(m => m.Mesh.LiveVertices.Select(v => m.Mesh.Vertices[v])).ToList();
         var min = all.Aggregate(Vector3.Min);
         var max = all.Aggregate(Vector3.Max);
         static string F(float x) => x.ToString(CultureInfo.InvariantCulture);

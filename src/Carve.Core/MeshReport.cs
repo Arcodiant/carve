@@ -96,7 +96,7 @@ public sealed class MeshReport
 
         for (var i = 0; i < verts.Count; i++)
         {
-            if (!used[i])
+            if (!used[i] && !mesh.IsVertexDeleted(i))
                 warnings.Add(new MeshWarning(MeshWarningKind.UnusedVertex, $"vertices[{i}]", "no face uses this vertex"));
         }
 
@@ -109,6 +109,6 @@ public sealed class MeshReport
             max = Vector3.Max(max, verts[i]);
         }
 
-        return new MeshReport(verts.Count, mesh.Faces.Count, topology.Edges.Count, closed, min, max, warnings);
+        return new MeshReport(mesh.LiveVertexCount, mesh.LiveFaceCount, topology.Edges.Count, closed, min, max, warnings);
     }
 }

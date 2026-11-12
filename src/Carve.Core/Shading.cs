@@ -125,6 +125,7 @@ public static class Shading
         var result = new Vector3[faces.Count][];
         for (var f = 0; f < faces.Count; f++)
         {
+            if (faces[f].IsDeleted) { result[f] = []; continue; }
             var n = mesh.FaceNormal(f);
             result[f] = Enumerable.Repeat(n, faces[f].Corners.Count).ToArray();
         }
@@ -132,7 +133,7 @@ public static class Shading
 
         var topology = mesh.Topology;
         var shade = mesh.Shade!;
-        var faceNormals = result.Select(r => r[0]).ToArray();
+        var faceNormals = result.Select(r => r.Length > 0 ? r[0] : Vector3.Zero).ToArray();
         for (var v = 0; v < mesh.Vertices.Count; v++)
         {
             var around = topology.VertexFaces(v);

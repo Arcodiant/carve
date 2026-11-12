@@ -128,6 +128,9 @@ internal static class MeshToolSupport
 
     public static float[] Array(Vector3 v) => [v.X, v.Y, v.Z];
 
+    /// <summary>The <c>deleted</c> field of every edit's report: the vertex and face ids the edit tombstoned, ascending.</summary>
+    public static object Deleted(DeletedElements deleted) => new { vertices = deleted.Vertices, faces = deleted.Faces };
+
     /// <summary>The report fields every tool returns: vertices, faces, edges, closed, bounds, warnings.</summary>
     public static Dictionary<string, object> Report(PolygonMesh mesh)
     {
@@ -157,6 +160,7 @@ internal static class MeshToolSupport
 
         var body = Report(snapshot.Model.Find(mesh ?? snapshot.Model.Meshes[0].Name)!);
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
+        body["deleted"] = Deleted(result.Deleted);
         addIds(body, result);
         return Ok(body);
     }

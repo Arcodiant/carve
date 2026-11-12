@@ -245,7 +245,7 @@ public sealed class ModelStore
             var weights = (target.Mesh.Weights ?? VertexWeights.None).With(ids, normal);
             var mesh = target.Mesh.WithWeights(weights);
             change = new WeightsChange(target.Name, ids.Distinct().Count(), capped ? ids.Distinct().Count() : 0,
-                mesh.Vertices.Count - weights.Count, normal);
+                mesh.LiveVertexCount - weights.Count, normal);
             return PushLocked(model.With(target.Name, mesh), tool);
         }
     }

@@ -330,12 +330,17 @@ public static class MeshEdits
             mesh.Style, mesh.Weights, mesh.Shade);
         for (var i = 0; i < levels; i++) level = Subdivision.Once(level);
 
-        var result = PolygonMesh.Create(level.Vertices, level.Faces.Select(f => (IEnumerable<int>)f));
+        // Tombstones stay tombstones: a deleted face's slot, and the face point each level makes for it, which no face uses.
+        var used = new bool[level.Vertices.Length];
+        foreach (var f in level.Faces) foreach (var v in f) used[v] = true;
+        var gone = Enumerable.Range(0, level.Vertices.Length)
+            .Where(v => mesh.IsVertexDeleted(v) || (v >= mesh.Vertices.Count && !used[v])).ToArray();
+        var result = PolygonMesh.Create(level.Vertices, level.Faces.Select(f => f.Length == 0 ? Face.Deleted : (Face)f), gone);
         if (!result.Succeeded) return EditResult.Refused(result.Errors);
         var made = result.Mesh!.WithStyle(level.Style).WithWeights(level.Weights).WithShade(level.Shade);
-        var moved = Enumerable.Range(0, mesh.Vertices.Count).Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
+        var moved = mesh.LiveVertices.Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
         return EditResult.Made(made, moved,
-            Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).ToArray(),
+            Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).Where(v => !made.IsVertexDeleted(v)).ToArray(),
             Enumerable.Range(mesh.Faces.Count, made.Faces.Count - mesh.Faces.Count).ToArray());
     }
 

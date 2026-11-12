@@ -14,7 +14,7 @@ internal static class FaceArguments
     {
         foreach (var f in faces.Distinct())
         {
-            if (FaceStyle.FaceProblem(mesh.Faces.Count, f) is { } problem)
+            if (FaceStyle.FaceProblem(mesh, f) is { } problem)
                 errors.Add($"faces[{f}]: {problem}");
         }
     }

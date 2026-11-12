@@ -263,6 +263,7 @@ public sealed class Model
         var hard = new List<(int, int)>();
         var corners = new List<System.Numerics.Vector3[]>();
         var flat = new List<bool>();
+        var deleted = new List<bool>();
         var posed = _meshes.Any(m => m.Mesh.PosedCorners is not null);
         var smooth = _meshes.Any(m => m.Mesh.ShadingMode == ShadingMode.Smooth);
         foreach (var (_, mesh) in _meshes)
@@ -270,6 +271,7 @@ public sealed class Model
             var offset = vertices.Count;
             if (mesh.Style is { } style) colours.AddRange(style.ColoursOffset(faces.Count));
             vertices.AddRange(mesh.Vertices);
+            deleted.AddRange(Enumerable.Range(0, mesh.Vertices.Count).Select(mesh.IsVertexDeleted));
             faces.AddRange(mesh.Faces.Select(f => f.Map(v => v + offset)));
             if (posed) corners.AddRange(Shading.CornersOf(mesh));
             flat.AddRange(Enumerable.Repeat(!Shading.HasCornerNormals(mesh), mesh.Faces.Count));
@@ -282,7 +284,7 @@ public sealed class Model
         var shade = smooth ? MeshShade.Of(ShadingMode.Smooth, hard) : null;
         // A flat piece keeps its face-centre spikes beside a smooth one, so the combined mesh says which faces are flat.
         var combined = PolygonMesh.Assemble([.. vertices], [.. faces], shade, posed ? [.. corners] : null,
-            (smooth || posed) && flat.Contains(true) ? [.. flat] : null);
+            (smooth || posed) && flat.Contains(true) ? [.. flat] : null, deleted.Contains(true) ? [.. deleted] : null);
         return colours.Count == 0 ? combined : combined.WithStyle(FaceStyle.OfColours(colours));
     }
 }
