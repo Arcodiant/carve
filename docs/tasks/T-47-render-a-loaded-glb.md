@@ -4,7 +4,7 @@ description: >-
 ---
 # T-47 — Render a loaded glb
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
