@@ -139,3 +139,4 @@ From the first agent (Opus, claude-opus-5-5), handing off at the call checkpoint
   4. **The open question** in As built, on the bridge example "open-ended box" versus the closed, inside-out box. Put it to the person with the review.
   5. Then the break table in As built, `cairn lint`, a commit, `verify` until VERIFY PASS, and `finish` from inside the worktree.
 - **Surprising:** a `heredoc` with `'EOF'` through the Bash tool failed twice here on C# raw strings and on markdown with backticks, so write files with the Write tool. A raw string can't start with a `"`: `""""faces"...` opens a four-quote raw string. The T-65 sibling had not landed by `990b937`, and I did no rebase.
+- **Breaks, finished after the hand-off was sent:** all 27 Core and server breaks in `breaks.log` failed at least one test (1 to 8 each), none was "NOT APPLIED", and the unbroken run passed 22 of 22. Only the stage's pixel-check breaks are left.
