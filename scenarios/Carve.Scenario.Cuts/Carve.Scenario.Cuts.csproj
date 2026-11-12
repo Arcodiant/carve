@@ -18,4 +18,9 @@
     <Compile Include="../Carve.Scenario.Shed/ShedGeometry.cs" Link="ShedGeometry.cs" />
   </ItemGroup>
 
+  <!-- The Crate scenario's colour rule (T-30), for the knife stage's coloured faces. -->
+  <ItemGroup>
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
+  </ItemGroup>
+
 </Project>

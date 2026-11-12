@@ -104,6 +104,29 @@ internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] F
         return first;
     }
 
+    /// <summary>
+    /// As <see cref="Seen"/>, but sure when the pixel's eight neighbours agree: for a face only a few pixels across (a
+    /// pocket's wall, the edge-on top of a slab), which the three pixels round of <see cref="Seen"/> always leave.
+    /// </summary>
+    public int SeenNarrow(Camera camera, int size, int x, int y)
+    {
+        if (x < 4 || y < 4 || x >= size - 4 || y >= size - 4)
+        {
+            return -2;
+        }
+
+        var first = Cast(camera, x, y);
+        foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1) })
+        {
+            if (Cast(camera, x + dx, y + dy) != first)
+            {
+                return -2;
+            }
+        }
+
+        return first;
+    }
+
     private int Cast(Camera camera, int x, int y)
     {
         var (o, d) = camera.Ray(x, y);
