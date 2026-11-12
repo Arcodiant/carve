@@ -47,9 +47,8 @@ internal sealed class DeleteStage : ICutsStage
         var topless = await CallJsonAsync(driver, "delete", new { faces = new[] { 3 } });
         Summary("delete faces [3]", topless, 8, 5, false);
         Deleted("delete faces [3]", topless, [], ["3"]);
+        await Nulls(driver, "get_mesh after delete faces [3]", 8, [], 6, ["3"]);
         var open = await Solid.ReadAsync(driver);
-        Equal("get_mesh after delete faces [3]: face slots", 6, open.Faces.Length);
-        Equal("get_mesh after delete faces [3]: face 3 is null", true, open.IsDeleted(3));
         var shaded = await driver.CaptureAsync("delete-top", new { direction = Direction });
         Caption(shaded, "512x512, direction (0.6, 0.35, 1), 8 vertices, 5 faces");
         Expect(shaded, camera, open, "the top (y = 1)", -1, 12);
@@ -64,10 +63,8 @@ internal sealed class DeleteStage : ICutsStage
         var cornerless = await CallJsonAsync(driver, "delete", new { vertices = new[] { 6 } });
         Summary("delete vertices [6]", cornerless, 7, 3, false);
         Deleted("delete vertices [6]", cornerless, ["6"], ["1", "3", "5"]);
+        await Nulls(driver, "get_mesh after delete vertices [6]", 8, ["6"], 6, ["1", "3", "5"]);
         var corner = await Solid.ReadAsync(driver);
-        Equal("get_mesh after delete vertices [6]: vertex slots", 8, corner.Vertices.Length);
-        SameList("get_mesh after delete vertices [6]: the null faces", ["1", "3", "5"],
-            Enumerable.Range(0, corner.Faces.Length).Where(corner.IsDeleted).Select(f => $"{f}"));
         var wire = await driver.CaptureAsync("delete-corner-wireframe", new { direction = Direction, mode = "wireframe" });
         Caption(wire, "512x512, direction (0.6, 0.35, 1), wireframe, 7 vertices, 3 faces");
         var live = Enumerable.Range(0, corner.Faces.Length).Where(f => !corner.IsDeleted(f)).ToArray();
@@ -134,6 +131,18 @@ internal sealed class DeleteStage : ICutsStage
         Equal($"{what}: vertices", vertices, result.GetProperty("vertices").GetInt32());
         Equal($"{what}: faces", faces, result.GetProperty("faces").GetInt32());
         Equal($"{what}: closed", closed, result.GetProperty("closed").GetBoolean());
+    }
+
+    /// <summary>get_mesh keeps every slot, and writes null in exactly the deleted ones.</summary>
+    private static async Task Nulls(ScenarioDriver driver, string what, int vertexSlots, string[] vertices, int faceSlots, string[] faces)
+    {
+        var mesh = JsonDocument.Parse(await CallTextAsync(driver, "get_mesh", new { })).RootElement;
+        foreach (var (key, slots, expected) in new[] { ("vertices", vertexSlots, vertices), ("faces", faceSlots, faces) })
+        {
+            var all = mesh.GetProperty(key).EnumerateArray().ToArray();
+            Equal($"{what}: {key} slots", slots, all.Length);
+            SameList($"{what}: the null {key}", expected, Enumerable.Range(0, all.Length).Where(i => all[i].ValueKind == JsonValueKind.Null).Select(i => $"{i}"));
+        }
     }
 
     private static void Deleted(string what, JsonElement result, string[] vertices, string[] faces)
