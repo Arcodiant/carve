@@ -12,11 +12,12 @@ public static class ClipChecks
     /// <summary>
     /// How far a clip's end may be from its start and still count as closed, and how far a root may end from where it
     /// began and still count as in place: rotation within 1 degree (q and -q are the same rotation), translation within
-    /// 1 mm on X and Z. The person's ruling, 2026-11-11, recorded in D-6's Clips section.
+    /// 1 mm. A looping translation closes on X, Y and Z (the person's ruling, 2026-11-12); a root's travel is X/Z only, on the
+    /// ground plane. The person's ruling, 2026-11-11, recorded in D-6's Clips section.
     /// </summary>
     public const float RotationToleranceDegrees = 1f;
 
-    /// <summary>The translation tolerance in metres: 1 mm, compared on X and Z only (the ground plane).</summary>
+    /// <summary>The translation tolerance in metres: 1 mm: the distance between first and last key in 3D for loop closure, on X and Z only for root travel.</summary>
     public const float TranslationToleranceMetres = 0.001f;
 
     /// <summary>The warnings for <paramref name="clip"/> on <paramref name="skeleton"/>, in channel order; empty for a clean clip.</summary>
@@ -35,14 +36,12 @@ public static class ClipChecks
             if (c.Translation is { } t)
             {
                 var (a, b) = (t.Keys[0].Value, t.Keys[^1].Value);
-                var gap = MathF.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Z - a.Z) * (b.Z - a.Z));
-                if (gap > TranslationToleranceMetres)
-                {
-                    if (clip.Loop)
-                        warnings.Add(Inv($"clip '{clip.Name}' loops but bone '{c.Bone}' translation ends {gap * 1000:0.#} mm from where it starts on X/Z (more than {TranslationToleranceMetres * 1000:0.#} mm); the loop pops at its seam"));
-                    if (isRoot)
-                        warnings.Add(Inv($"clip '{clip.Name}' moves root bone '{c.Bone}' {gap * 1000:0.#} mm along the ground (X/Z) between its start and end (more than {TranslationToleranceMetres * 1000:0.#} mm); clips are in place"));
-                }
+                var ground = MathF.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Z - a.Z) * (b.Z - a.Z));
+                var full = (b - a).Length();
+                if (clip.Loop && full > TranslationToleranceMetres)
+                    warnings.Add(Inv($"clip '{clip.Name}' loops but bone '{c.Bone}' translation ends {full * 1000:0.#} mm from where it starts on X/Y/Z (more than {TranslationToleranceMetres * 1000:0.#} mm); the loop pops at its seam"));
+                if (isRoot && ground > TranslationToleranceMetres)
+                    warnings.Add(Inv($"clip '{clip.Name}' moves root bone '{c.Bone}' {ground * 1000:0.#} mm along the ground (X/Z) between its start and end (more than {TranslationToleranceMetres * 1000:0.#} mm); clips are in place"));
             }
         }
         return warnings;

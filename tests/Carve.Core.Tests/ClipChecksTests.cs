@@ -31,7 +31,7 @@ public class ClipChecksTests
 
     [Fact]
     public void A_clean_looping_clip_has_no_warning() =>
-        Assert.Empty(Warnings(true, Rot("spine", Quaternion.Identity, Quaternion.Identity), Move("hips", new Vector3(0, 1, 0), new Vector3(0, 1.2f, 0))));
+        Assert.Empty(Warnings(true, Rot("spine", Quaternion.Identity, Quaternion.Identity), Move("hips", new Vector3(0, 1, 0), new Vector3(0, 1, 0))));
 
     [Fact]
     public void A_rotation_equal_up_to_sign_counts_as_closed() =>
@@ -85,4 +85,23 @@ public class ClipChecksTests
     [Fact]
     public void A_child_bone_moving_is_not_travel() =>
         Assert.Empty(Warnings(false, Move("spine", new Vector3(0, 1, 0), new Vector3(0.4f, 1, 0))));
+
+    [Fact]
+    public void A_looping_translation_that_fails_to_close_on_Y_alone_warns()
+    {
+        var w = Assert.Single(Warnings(true, Move("hips", Vector3.Zero, new Vector3(0, -0.05f, 0))));
+        Assert.Contains("loops", w);
+        Assert.Contains("50 mm", w);
+    }
+
+    [Fact]
+    public void A_looping_translation_within_a_millimetre_on_every_axis_is_closed() =>
+        Assert.Empty(Warnings(true, Move("spine", new Vector3(0, 1, 0), new Vector3(0.0004f, 1.0004f, 0.0004f))));
+
+    [Fact]
+    public void A_looping_root_that_moves_on_Y_but_returns_on_XZ_is_not_travelling()
+    {
+        var w = Assert.Single(Warnings(true, Move("hips", Vector3.Zero, new Vector3(0, 0.05f, 0))));
+        Assert.DoesNotContain("root bone", w);
+    }
 }

@@ -106,7 +106,7 @@ glTF has no clip duration, only the last key. Export therefore keys every animat
 
 A looping clip whose channels do not end as they start is a warning, as is a clip whose root bones end somewhere else on the ground plane, since clips are in place.
 
-**Closing tolerance** (the person, 2026-11-11: "1° / 1 mm"): a rotation channel closes when its last key differs from its first by at most 1° (q and -q are equal); a translation channel closes, and a root bone counts as in place, when its last key is within 1 mm of its first on X and Z (Y is not compared). Both are constants in `ClipChecks`. The warnings name the clip, bone, channel and difference; `define_clip`, `get_clips`, `save` and `export` carry them, and `get_clips` reads the clips back as given.
+**Closing tolerance** (the person, 2026-11-11: "1° / 1 mm"): a rotation channel closes when its last key differs from its first by at most 1° (q and -q are equal); a looping translation channel closes when its last key is within 1 mm of its first, compared on X, Y and Z (the person, 2026-11-12: "all axes"); a root bone counts as in place when within 1 mm on X and Z only (travel is on the ground plane). Both are constants in `ClipChecks`. The warnings name the clip, bone, channel and difference; `define_clip`, `get_clips`, `save` and `export` carry them, and `get_clips` reads the clips back as given.
 
 **Alternatives:** refusing a clip that does not close, which the request does not ask for and which blocks work in progress; keys relative to rest, which reads well for small motions but differs from what glTF stores.
 **Would change if:** agents leave these warnings unfixed and a popping clip reaches a game.
