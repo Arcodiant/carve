@@ -28,10 +28,11 @@ public sealed class EditResult
 {
     private EditResult(PolygonMesh? mesh, IReadOnlyList<MeshError> errors, IReadOnlyList<int> movedVertices,
         IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded,
-        DeletedElements? deleted = null)
+        DeletedElements? deleted = null, IReadOnlyList<SplitFace>? split = null)
     {
         Mesh = mesh;
         Deleted = deleted ?? DeletedElements.None;
+        Split = split ?? [];
         Errors = errors;
         MovedVertices = movedVertices;
         NewVertices = newVertices;
@@ -65,11 +66,19 @@ public sealed class EditResult
     /// </summary>
     public DeletedElements Deleted { get; }
 
+    /// <summary>
+    /// The faces the edit split (T-65), one entry per face in id order, each with its pieces, the kept id first and the
+    /// appended ones after it ascending (<see cref="SplitFace"/>); empty for every edit that splits nothing, and on
+    /// failure: the field every edit reports, as <c>split</c> in the server's report.
+    /// </summary>
+    public IReadOnlyList<SplitFace> Split { get; }
+
     internal static EditResult Refused(IReadOnlyList<MeshError> errors) => new(null, errors, [], [], [], []);
 
     /// <summary>The result of an edit that has already carried colours, groups, weights and shading onto <paramref name="mesh"/>.</summary>
     internal static EditResult Made(PolygonMesh mesh, IReadOnlyList<int> movedVertices, IReadOnlyList<int> newVertices,
-        IReadOnlyList<int> newFaces, DeletedElements? deleted = null) => new(mesh, [], movedVertices, newVertices, newFaces, [], deleted);
+        IReadOnlyList<int> newFaces, DeletedElements? deleted = null, IReadOnlyList<SplitFace>? split = null)
+        => new(mesh, [], movedVertices, newVertices, newFaces, [], deleted, split);
 
     private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<(int Face, IReadOnlyList<int> Added)> made)
     {
