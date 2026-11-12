@@ -41,7 +41,7 @@ public sealed class ExportTool(ModelStore store)
         + "The file is a JSON object of optional keys: max_triangles (the whole model), max_submeshes (submeshes, or distinct colours), and min_height and max_height in metres (the rest height of every mesh, only for a skeleton with the Synty humanoid bones: Hips, Spine_01, Head, Shoulder/Elbow/Hand and UpperLeg/LowerLeg/Ankle _L and _R); each warns past its value and never at it, a key left out never warns, and with no file there are no limit warnings, which the result says. "
         + "write_limits: true fills in the keys the file is missing with Orcward's starting numbers (max_triangles 5000, max_submeshes 8, min_height 1.4, max_height 2.4), creating the file beside the .glb when none was named or found, and never changes a key already set, though it rewrites the file with the keys in a fixed order (plain JSON, no comments); it is written after the .glb, and the result says what it filled. Edit the numbers to the game's own. "
         + "A limits file that is not a plain JSON object of those keys (a count a whole number of at least 1, a height a number above 0, min_height not above max_height), a limits argument naming no file without write_limits, or one no file could be written at (a file that is not .json, a folder, a character a path may not hold), is a tool error that writes nothing. "
-        + "A mesh with warnings still exports, and the result repeats them. export changes nothing: not the mesh, its ids, or what undo steps back to. "
+        + "A mesh with warnings still exports, and the result repeats them; so do a skinned or clips export's clip warnings (see define_clip: a looping clip that does not close, a root that ends elsewhere on the ground plane). export changes nothing: not the mesh, its ids, or what undo steps back to. "
         + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve' (or each material, when there are several) (the colours' and each material's name), size <x> x <y> x <z> m, "
         + "bounds (<min x, y, z>) to (<max x, y, z>), then where the limits came from (limits from <file>, or no game limits), then any warnings; a skinned export's line names its pieces, materials, bones and clips instead of the one material. "
         + "mode: 'model' (the default) writes all of the above; 'clips' writes the armature, skins[0] and the animations with no mesh, no node holding a mesh and no material, "
@@ -155,9 +155,11 @@ public sealed class ExportTool(ModelStore store)
 
         var skeleton = model.Skeleton!;
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
+        var warnings = ClipChecks.Check(model);
         return Line($"exported {target.Written(replaced)} as clips, with no mesh: "
             + $"{N(skeleton.Bones.Count)} bone(s) {NameList.Quoted(skeleton.Names)}, {N(model.Clips.Count)} clip(s) {NameList.Quoted(model.Clips.Select(c => c.Name))}"
-            + source.Describe(written: false));
+            + source.Describe(written: false)
+            + (warnings.Count > 0 ? $"; {N(warnings.Count)} warning(s): " + string.Join("; ", warnings) : ""));
     }
 
     /// <summary>A model with a skeleton: the skinned file, or a refusal listing unweighted vertices that writes nothing.</summary>
@@ -195,6 +197,7 @@ public sealed class ExportTool(ModelStore store)
         var warnings = source.Limits.Warnings(model, glb.Triangles, glb.Primitives).ToList();
         warnings.AddRange(GlbExport.UvWarnings(model));
         warnings.AddRange(GlbExport.MaterialUvWarnings(model));
+        warnings.AddRange(ClipChecks.Check(model));
         foreach (var piece in model.Meshes)
             warnings.AddRange(MeshReport.Create(piece.Mesh).Warnings.Select(w => $"mesh '{piece.Name}': " + w.ToString().ReplaceLineEndings(" ")));
         if (warnings.Count > 0)

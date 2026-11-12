@@ -57,6 +57,7 @@ public sealed class SaveTool(ModelStore store)
         "Writes the model to a .carve file, so the work outlives this session; open reads it back, in this carve process or a later one. Takes path, the file to write, and mesh. "
         + "With mesh left out, save writes the WHOLE model: every mesh by name with its colours, groups and weights, the skeleton and the clips. "
         + "With mesh, it writes that one mesh, and when the mesh has weights the skeleton and clips too, so the file opens on its own. "
+        + "The result lists the clips' warnings, as define_clip's do. "
         + "A skeleton and clips with no mesh (a clip library) are saved too, as \"meshes\": []. "
         + "The .carve file is the one to keep working in: it holds the polygons exactly, every vertex and face in its id order and every number to the bit, so after open the ids you used before still name the same vertices and faces. "
         + "It does not hold the undo history (open starts from the file as one step), a current file name (carve remembers none: give the path every time) or any render setting. "
@@ -108,7 +109,10 @@ public sealed class SaveTool(ModelStore store)
         var bytes = new UTF8Encoding(false).GetBytes(CarveFile.Write(model, folder));
         if (!ToolPaths.Write("save", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
 
-        return Line($"saved {target.Written(replaced)}: {Summary(model)}" + string.Concat(MissingTextures(model).Select(w => "\nwarning: " + w)));
+        var warnings = ClipChecks.Check(model);
+        return Line($"saved {target.Written(replaced)}: {Summary(model)}"
+            + (warnings.Count > 0 ? $"; {warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): " + string.Join("; ", warnings) : "")
+            + string.Concat(MissingTextures(model).Select(w => "\nwarning: " + w)));
     }
 
     /// <summary>

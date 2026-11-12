@@ -34,3 +34,20 @@ An agent finds a popping loop or a drifting walk from a result, not from the gam
 - **Carried from the M-1 to M-4 plans:** the byte-identical guard on every existing frame, by hash before and after; a positive pixel check on every new frame, and one a mirrored or flipped camera would fail; each new check shown failing, as a table.
 - **Open rules: stop and ask.** Anything D-6 does not settle, any loosened check, and any change to a D-6 decision.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Run on Sonnet 5.5 (claude-sonnet-5-5), one agent.
+
+- **Closing tolerance** (the person's ruling, 2026-11-11, "1° / 1 mm"): rotation closes when first and last key differ by at most 1° (q and -q equal); translation closes, and a root counts as in place, when within 1 mm on X/Z. Constants `RotationToleranceDegrees` and `TranslationToleranceMetres` in `src/Carve.Core/ClipChecks.cs`, commented; recorded in D-6's *Clips*. Read literally: Y is not compared, so a looping bob in Y that does not close is not warned.
+- **Warnings** (`ClipChecks.Check`, compared on each channel's first and last key): a looping clip's rotation or translation that does not close, naming clip, bone, channel and difference; a root bone whose translation ends more than 1 mm away on X/Z, looping or not. A looping root that drifts gets both. Carried in `define_clip`'s result (`warnings`), `get_clips`, `save`'s line and `export`'s line (skinned and clips modes; piece mode is T-50's and has no clips).
+- **`get_clips(name?)`**: `{clips:[{name, duration, loop, channels:{bone:{rotation, translation}}, warnings}]}`, keys as given; an unknown name is an error listing the clips.
+- **Tests**: `ClipChecksTests` (unit: each warning, clean, sign-flip closed, 1° boundary, non-loop, child bone not travel) and `Clip_warnings_reach_define_clip_get_clips_save_and_export` (regression).
+- **Guard checks**: no render, mesh or frame code changed, so existing frames are unchanged by construction; the scenario suites in verify (`scenario-cube`, `scenario-crate`) are the hash guard. No new frame, so no pixel check. Each new check shown failing by mutation of `ClipChecks`:
+
+| Mutation | Tests failing |
+|---|---|
+| both tolerances set to 100 | 5 (rotation, 1° boundary, root travel x2, loop+travel) |
+| loop condition dropped from the rotation check | `A_non_looping_rotation_may_end_elsewhere` |
+
+- **Not checked**: no frame or sound review (none made). Engine needs: none.
