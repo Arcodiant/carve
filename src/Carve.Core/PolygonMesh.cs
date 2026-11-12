@@ -54,10 +54,14 @@ public sealed class PolygonMesh
 
     private readonly Vector3[] _vertices;
     private readonly Face[] _faces;
+    private readonly bool[]? _deletedVertices;
 
     private PolygonMesh(Vector3[] vertices, Face[] faces, FaceStyle? style = null, VertexWeights? weights = null,
-        MeshShade? shade = null, Vector3[][]? corners = null, bool[]? flatFaces = null)
+        MeshShade? shade = null, Vector3[][]? corners = null, bool[]? flatFaces = null, bool[]? deletedVertices = null)
     {
+        _deletedVertices = deletedVertices is not null && Array.IndexOf(deletedVertices, true) >= 0 ? deletedVertices : null;
+        LiveVertexCount = vertices.Length - (_deletedVertices?.Count(d => d) ?? 0);
+        LiveFaceCount = faces.Count(f => !f.IsDeleted);
         FlatFaces = flatFaces;
         _vertices = vertices;
         _faces = faces;
@@ -75,7 +79,7 @@ public sealed class PolygonMesh
     public FaceStyle? Style { get; }
 
     /// <summary>This mesh, its geometry shared, with <paramref name="style"/> in place of its own (null or empty for none).</summary>
-    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights, Shade, PosedCorners, FlatFaces);
+    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights, Shade, PosedCorners, FlatFaces, _deletedVertices);
 
     /// <summary>The mesh's shading and hard edges (D-6, Smooth shading is per mesh); null for flat with no hard edge marked.</summary>
     public MeshShade? Shade { get; }
@@ -87,7 +91,7 @@ public sealed class PolygonMesh
     public IReadOnlyList<(int Lo, int Hi)> HardEdges => Shade?.Hard ?? [];
 
     /// <summary>This mesh, its geometry shared, with <paramref name="shade"/> in place of its own (null for flat with no hard edges).</summary>
-    public PolygonMesh WithShade(MeshShade? shade) => new(_vertices, _faces, Style, Weights, shade, PosedCorners);
+    public PolygonMesh WithShade(MeshShade? shade) => new(_vertices, _faces, Style, Weights, shade, PosedCorners, null, _deletedVertices);
 
     /// <summary>
     /// Corner normals given for a posed copy (<see cref="Skinning"/>), by face and then by position in the face's loop;
@@ -103,8 +107,8 @@ public sealed class PolygonMesh
 
     /// <summary>Faces and vertices joined as given, unchecked: for drawing meshes already checked, or posed.</summary>
     internal static PolygonMesh Assemble(Vector3[] vertices, Face[] faces, MeshShade? shade = null, Vector3[][]? corners = null,
-        bool[]? flatFaces = null)
-        => new(vertices, faces, null, null, shade, corners, flatFaces);
+        bool[]? flatFaces = null, bool[]? deletedVertices = null)
+        => new(vertices, faces, null, null, shade, corners, flatFaces, deletedVertices);
 
     /// <summary>
     /// This mesh's faces and colours on other vertex positions, unchecked and with no weights: a posed copy to draw, whose
@@ -116,20 +120,67 @@ public sealed class PolygonMesh
     internal PolygonMesh WithVertices(IReadOnlyList<Vector3> vertices, Vector3[][]? corners)
     {
         if (vertices.Count != _vertices.Length) throw new ArgumentException("one position per vertex", nameof(vertices));
-        return new PolygonMesh(vertices.ToArray(), _faces, Style, null, Shade, corners);
+        return new PolygonMesh(vertices.ToArray(), _faces, Style, null, Shade, corners, null, _deletedVertices);
     }
 
     /// <summary>The vertices' bone weights by vertex id (D-6, Weights); null when no vertex has any.</summary>
     public VertexWeights? Weights { get; }
 
     /// <summary>This mesh, its geometry shared, with <paramref name="weights"/> in place of its own (null or empty for none).</summary>
-    public PolygonMesh WithWeights(VertexWeights? weights) => new(_vertices, _faces, Style, weights, Shade, PosedCorners);
+    public PolygonMesh WithWeights(VertexWeights? weights) => new(_vertices, _faces, Style, weights, Shade, PosedCorners, null, _deletedVertices);
 
-    /// <summary>The vertices; a vertex's id is its position here.</summary>
+    /// <summary>
+    /// The vertex slots; a vertex's id is its position here, so <c>Count</c> is a slot count, tombstones included. A
+    /// deleted vertex's slot (<see cref="IsVertexDeleted"/>) holds <see cref="Vector3.Zero"/> and must be skipped.
+    /// </summary>
     public IReadOnlyList<Vector3> Vertices { get; }
 
-    /// <summary>The faces, each an outer loop and its holes (<see cref="Face"/>); a face's id is its position here.</summary>
+    /// <summary>
+    /// The face slots, each an outer loop and its holes (<see cref="Face"/>); a face's id is its position here, so
+    /// <c>Count</c> is a slot count, tombstones included. A deleted face's slot holds <see cref="Face.Deleted"/>, which has
+    /// no corners, and must be skipped (<see cref="IsFaceDeleted"/>, <see cref="LiveFaces"/>).
+    /// </summary>
     public IReadOnlyList<Face> Faces { get; }
+
+    /// <summary>The vertices not deleted (D-1, T-64: a deleted slot is kept, and its id is never given out again).</summary>
+    public int LiveVertexCount { get; }
+
+    /// <summary>The faces not deleted.</summary>
+    public int LiveFaceCount { get; }
+
+    /// <summary>Whether any slot, vertex or face, is a tombstone.</summary>
+    public bool HasTombstones => _deletedVertices is not null || LiveFaceCount != _faces.Length;
+
+    /// <summary>Whether vertex <paramref name="id"/> is a tombstone. False for an id out of range (see <see cref="VertexProblem"/>).</summary>
+    public bool IsVertexDeleted(int id) => _deletedVertices is { } d && id >= 0 && id < d.Length && d[id];
+
+    /// <summary>Whether face <paramref name="id"/> is a tombstone. False for an id out of range (see <see cref="FaceProblem"/>).</summary>
+    public bool IsFaceDeleted(int id) => id >= 0 && id < _faces.Length && _faces[id].IsDeleted;
+
+    /// <summary>The live vertex ids, ascending.</summary>
+    public IEnumerable<int> LiveVertices => Enumerable.Range(0, _vertices.Length).Where(v => !IsVertexDeleted(v));
+
+    /// <summary>The live face ids, ascending.</summary>
+    public IEnumerable<int> LiveFaces => Enumerable.Range(0, _faces.Length).Where(f => !_faces[f].IsDeleted);
+
+    /// <summary>The message an edit gives for a tombstoned id it is handed: <c>faces[7]: deleted</c>.</summary>
+    public const string DeletedMessage = "deleted";
+
+    /// <summary>
+    /// Why <paramref name="id"/> names no live vertex, or null when it does: <c>there is no vertex n: ids run 0..m</c> for
+    /// an id that never existed, <see cref="DeletedMessage"/> for a tombstone. Element <c>vertices[n]</c>.
+    /// </summary>
+    public string? VertexProblem(int id) =>
+        id < 0 || id >= _vertices.Length ? MeshEdits.Invariant($"there is no vertex {id}: ids run 0..{_vertices.Length - 1}")
+        : IsVertexDeleted(id) ? DeletedMessage : null;
+
+    /// <summary>As <see cref="VertexProblem"/>, for face <paramref name="id"/>. Element <c>faces[n]</c>.</summary>
+    public string? FaceProblem(int id) =>
+        id < 0 || id >= _faces.Length ? MeshEdits.Invariant($"there is no face {id}: ids run 0..{_faces.Length - 1}")
+        : _faces[id].IsDeleted ? DeletedMessage : null;
+
+    /// <summary>The deleted vertex ids as a mask by slot, or null when none is deleted.</summary>
+    internal bool[]? DeletedVertexMask => _deletedVertices;
 
     /// <summary>The mesh's edge table, built on first use and held by the mesh.</summary>
     public MeshTopology Topology => LazyInitializer.EnsureInitialized(ref _topology, () => new MeshTopology(this));
@@ -145,15 +196,33 @@ public sealed class PolygonMesh
     /// the face's loops, the outer loop's winding, a place not strictly inside the outer loop, or a meeting with another
     /// hole; then the whole face, its holes bridged in (<see cref="Triangulator.Bridge"/>), takes the plain face's checks.
     /// </summary>
-    public static MeshResult Create(IEnumerable<Vector3> vertices, IEnumerable<Face> faces)
+    public static MeshResult Create(IEnumerable<Vector3> vertices, IEnumerable<Face> faces) => Create(vertices, faces, null);
+
+    /// <summary>
+    /// As <see cref="Create(IEnumerable{Vector3}, IEnumerable{Face})"/>, with tombstones (T-64): the vertex ids in
+    /// <paramref name="deletedVertices"/> are deleted slots (their positions are not checked and are kept as
+    /// <see cref="Vector3.Zero"/>), and a <see cref="Face.Deleted"/> in <paramref name="faces"/> is a deleted face's slot,
+    /// which is not checked. A live face using a deleted vertex is refused at its corner (<c>faces[n][i]</c>), and so is a
+    /// mesh with no live face.
+    /// </summary>
+    public static MeshResult Create(IEnumerable<Vector3> vertices, IEnumerable<Face> faces, IEnumerable<int>? deletedVertices)
     {
         var verts = vertices.ToArray();
         var fcs = faces.ToArray();
         var errors = new List<MeshError>();
 
+        var deleted = new bool[verts.Length];
+        foreach (var d in deletedVertices ?? [])
+        {
+            if (d < 0 || d >= verts.Length) throw new ArgumentOutOfRangeException(nameof(deletedVertices), d, "no such vertex slot");
+            deleted[d] = true;
+            verts[d] = Vector3.Zero;
+        }
+
         var badVertex = new bool[verts.Length];
         for (var i = 0; i < verts.Length; i++)
         {
+            if (deleted[i]) continue;
             var v = verts[i];
             if (!float.IsFinite(v.X) || !float.IsFinite(v.Y) || !float.IsFinite(v.Z))
             {
@@ -164,10 +233,13 @@ public sealed class PolygonMesh
 
         if (fcs.Length == 0)
             errors.Add(new MeshError("faces", "mesh has no faces"));
+        else if (fcs.All(f => f.IsDeleted))
+            errors.Add(new MeshError("faces", "mesh has no faces: every face is deleted"));
 
         for (var f = 0; f < fcs.Length; f++)
         {
             var face = fcs[f];
+            if (face.IsDeleted) continue;
             var faceOk = true;
             var seen = new Dictionary<int, string>();
             for (var h = -1; h < face.Holes.Count; h++)
@@ -185,6 +257,11 @@ public sealed class PolygonMesh
                     if (loop[k] < 0 || loop[k] >= verts.Length)
                     {
                         errors.Add(new MeshError(Face.CornerName(f, h, k), verts.Length == 0 ? MeshEdits.Invariant($"index {loop[k]} is out of range: there are no vertices") : MeshEdits.Invariant($"index {loop[k]} is out of range 0..{verts.Length - 1}")));
+                        faceOk = false;
+                    }
+                    else if (deleted[loop[k]])
+                    {
+                        errors.Add(new MeshError(Face.CornerName(f, h, k), MeshEdits.Invariant($"index {loop[k]} is a deleted vertex")));
                         faceOk = false;
                     }
                 }
@@ -261,7 +338,7 @@ public sealed class PolygonMesh
 
         return errors.Count > 0
             ? new MeshResult(null, errors)
-            : new MeshResult(new PolygonMesh(verts, fcs), errors);
+            : new MeshResult(new PolygonMesh(verts, fcs, deletedVertices: deleted), errors);
     }
 
     /// <summary>
@@ -274,22 +351,32 @@ public sealed class PolygonMesh
     /// <param name="addedVertices">Vertices appended after the last, taking ids <c>Vertices.Count</c> onward.</param>
     /// <param name="addedFaces">Faces appended after the last, taking ids <c>Faces.Count</c> onward. Their indices, like
     /// those in <paramref name="reshapedFaces"/>, are ids in the result, so they may use added vertices.</param>
-    /// <remarks>An id in <paramref name="movedVertices"/> or <paramref name="reshapedFaces"/> that this mesh does not
-    /// have is refused as <c>vertices[n]</c> or <c>faces[n]</c>, beside whatever else is wrong.</remarks>
+    /// <param name="deletedVertices">Vertex ids made tombstones (T-64), exactly these: the rule of what a delete takes
+    /// with it is <see cref="MeshDelete.Closure"/>'s, not this method's. A live face left using one is refused.</param>
+    /// <param name="deletedFaces">Face ids made tombstones (<see cref="Face.Deleted"/>), exactly these.</param>
+    /// <remarks>An id in <paramref name="movedVertices"/>, <paramref name="reshapedFaces"/> or the deleted lists that
+    /// this mesh does not have is refused as <c>vertices[n]</c> or <c>faces[n]</c>, beside whatever else is wrong; one
+    /// already deleted is refused as <c>vertices[n]: deleted</c> or <c>faces[n]: deleted</c>. Tombstones carry: their
+    /// slots stay, and added elements are appended after them, so no id is ever given out twice.</remarks>
     public MeshResult Edit(
         IEnumerable<KeyValuePair<int, Vector3>>? movedVertices = null,
         IEnumerable<KeyValuePair<int, Face>>? reshapedFaces = null,
         IEnumerable<Vector3>? addedVertices = null,
-        IEnumerable<Face>? addedFaces = null)
+        IEnumerable<Face>? addedFaces = null,
+        IEnumerable<int>? deletedVertices = null,
+        IEnumerable<int>? deletedFaces = null)
     {
         var errors = new List<MeshError>();
         var verts = (Vector3[])_vertices.Clone();
         var fcs = (Face[])_faces.Clone();
+        var gone = new SortedSet<int>(_deletedVertices is null ? [] : Enumerable.Range(0, verts.Length).Where(IsVertexDeleted));
 
         foreach (var (id, position) in movedVertices ?? [])
         {
             if (id < 0 || id >= verts.Length)
                 errors.Add(new MeshError($"vertices[{id}]", $"there is no vertex {id} to move: ids run 0..{verts.Length - 1}"));
+            else if (IsVertexDeleted(id))
+                errors.Add(new MeshError($"vertices[{id}]", DeletedMessage));
             else
                 verts[id] = position;
         }
@@ -298,11 +385,29 @@ public sealed class PolygonMesh
         {
             if (id < 0 || id >= fcs.Length)
                 errors.Add(new MeshError($"faces[{id}]", $"there is no face {id} to reshape: ids run 0..{fcs.Length - 1}"));
+            else if (fcs[id].IsDeleted)
+                errors.Add(new MeshError($"faces[{id}]", DeletedMessage));
             else
                 fcs[id] = face;
         }
 
-        var result = Create(verts.Concat(addedVertices ?? []), fcs.Concat(addedFaces ?? []));
+        foreach (var id in deletedVertices ?? [])
+        {
+            if (VertexProblem(id) is { } problem)
+                errors.Add(new MeshError(MeshEdits.Invariant($"vertices[{id}]"), problem));
+            else
+                gone.Add(id);
+        }
+
+        foreach (var id in deletedFaces ?? [])
+        {
+            if (FaceProblem(id) is { } problem)
+                errors.Add(new MeshError(MeshEdits.Invariant($"faces[{id}]"), problem));
+            else
+                fcs[id] = Face.Deleted;
+        }
+
+        var result = Create(verts.Concat(addedVertices ?? []), fcs.Concat(addedFaces ?? []), gone);
         return errors.Count == 0 ? result : new MeshResult(null, [.. errors, .. result.Errors]);
     }
 

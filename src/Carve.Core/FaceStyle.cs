@@ -50,6 +50,9 @@ public sealed class FaceStyle
     public static string? FaceProblem(int faceCount, int face) =>
         face < 0 || face >= faceCount ? $"there is no face {face}: ids run 0..{faceCount - 1}" : null;
 
+    /// <summary>Why <paramref name="face"/> names no live face of <paramref name="mesh"/>, or null when it does: a deleted one is <c>deleted</c> (T-64).</summary>
+    public static string? FaceProblem(PolygonMesh mesh, int face) => mesh.FaceProblem(face);
+
     /// <summary>Why <paramref name="text"/> is not a colour, or null when it is <c>#RRGGBB</c>.</summary>
     public static string? ColourProblem(string? text)
     {
@@ -119,6 +122,17 @@ public sealed class FaceStyle
                 if (g.Members.Contains(face)) g.Faces.AddRange(added);
         }
         return new FaceStyle(colours, groups.Select(g => (g.Name, g.Faces.Order().ToArray())).ToList());
+    }
+
+    /// <summary>This style with <paramref name="faces"/> in no colour and no group (a deleted face leaves both, T-64); a group left empty goes.</summary>
+    internal FaceStyle Without(IEnumerable<int> faces)
+    {
+        var gone = faces.ToHashSet();
+        if (gone.Count == 0) return this;
+        var colours = new SortedDictionary<int, string>(_colours.Where(c => !gone.Contains(c.Key)).ToDictionary());
+        var groups = _groups.Select(g => (g.Name, Faces: g.Faces.Where(f => !gone.Contains(f)).ToArray()))
+            .Where(g => g.Faces.Length > 0).ToList();
+        return new FaceStyle(colours, groups);
     }
 
     /// <summary>The colours alone, with every face id moved up by <paramref name="faceOffset"/> (groups are not carried).</summary>

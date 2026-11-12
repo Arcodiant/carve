@@ -103,7 +103,11 @@ non-manifold and mixed-winding meshes stay legal, with warnings. A vertex's and 
 face's id is its position in the mesh's arrays; an edit never renumbers, appends
 new elements at the end, and keeps a reshaped face's id. Along the current chain of
 edits an id is never reused; undo frees the undone step's ids, and the next edit
-gives them out again (qualified after RV-10).
+gives them out again (qualified after RV-10). A delete never renumbers either
+(T-64, ruled 2026-11-09): a deleted vertex's or face's slot is kept as a tombstone
+(`null` in `get_mesh` and the Carve file), counts are live counts, and a tombstoned
+id is never given out again along the current chain of edits; naming one in an edit
+is refused as `deleted`. Only export compacts, and there is no `compact` tool.
 
 **Alternatives:** a half-edge structure, which makes walking a manifold surface
 cheap but cannot hold the non-manifold and open input Carve accepts without special

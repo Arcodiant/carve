@@ -32,7 +32,7 @@ public static class MeshEdits
             errors.Add(new MeshError("by", "the move is zero: nothing would change"));
 
         errors.AddRange(UnknownElements(mesh, vertexList, edgeList, faceList));
-        moved.UnionWith(vertexList.Where(v => v >= 0 && v < mesh.Vertices.Count));
+        moved.UnionWith(vertexList.Where(v => mesh.VertexProblem(v) is null));
         foreach (var (a, b) in edgeList)
         {
             if (mesh.Topology.TryGetEdge(a, b, out var edge))
@@ -348,6 +348,8 @@ public static class MeshEdits
         {
             if (v < 0 || v >= mesh.Vertices.Count)
                 errors.Add(new MeshError(Invariant($"vertices[{v}]"), Invariant($"the {Ordinal(i)} listed vertex: there is no vertex {v}: ids run 0..{mesh.Vertices.Count - 1}")));
+            else if (mesh.IsVertexDeleted(v))
+                errors.Add(new MeshError(Invariant($"vertices[{v}]"), PolygonMesh.DeletedMessage));
         }
 
         foreach (var ((a, b), i) in edges.Select((e, i) => (e, i)))
@@ -365,10 +367,13 @@ public static class MeshEdits
         return errors;
     }
 
-    private static bool HasFace(PolygonMesh mesh, int f) => f >= 0 && f < mesh.Faces.Count;
+    /// <summary>Whether <paramref name="f"/> names a live face: an id out of range or a tombstone does not.</summary>
+    private static bool HasFace(PolygonMesh mesh, int f) => mesh.FaceProblem(f) is null;
 
     private static MeshError UnknownFace(PolygonMesh mesh, int index, int f) =>
-        new(Invariant($"faces[{f}]"), Invariant($"the {Ordinal(index)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}"));
+        mesh.IsFaceDeleted(f)
+            ? new(Invariant($"faces[{f}]"), PolygonMesh.DeletedMessage)
+            : new(Invariant($"faces[{f}]"), Invariant($"the {Ordinal(index)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}"));
 
     /// <summary>Agent-facing text is the same on every host: numbers (a negative id's sign among them) in the invariant culture.</summary>
     internal static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
