@@ -4,7 +4,7 @@ description: >-
 ---
 # T-67 — Knife
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
