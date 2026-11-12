@@ -4,7 +4,7 @@ description: >-
 ---
 # T-66 — Loop cut
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
