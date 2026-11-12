@@ -47,7 +47,7 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
   - Pieces take their face's colour and groups.
   - Both pieces of a split hard edge stay hard, and new edges are soft, except a plane cut's fill border on a smooth mesh, which is hard.
   - New vertices blend weights: by fraction on an edge, or barycentrically inside a face, renormalised and capped at 4. UVs blend the same way if M-6 has landed; how seams carry goes back to the person.
-- **The file version.** One new Carve file version, owned by T-63 and taken as the next free one at dispatch: 4 after T-42's 3, unless M-6's UVs took it first. It holds holed faces and the `null` tombstones.
+- **The file version.** One new Carve file version, owned by T-63 and taken as the next free one at dispatch: 4 after T-42's 3, unless M-6's UVs took it first. It holds holed faces and the `null` tombstones. `CarveFile.Write` writes the lowest version that holds the model: this one only when the model needs it (a holed face, a tombstone), otherwise 2 or 3 byte for byte as T-42's tests require (ruled by the person, 2026-11-11).
 - **The sample**, as agreed: a gatehouse wall, built by T-69, coordinates in metres.
 
   ```text
