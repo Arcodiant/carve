@@ -14,9 +14,22 @@ public readonly record struct CutPoint(int A, int B, double T)
     /// <summary>The cut crosses edge <paramref name="a"/>-<paramref name="b"/> at fraction <paramref name="t"/> from <paramref name="a"/>.</summary>
     public static CutPoint OnEdge(int a, int b, double t) => new(a, b, t);
 
-    public bool IsVertex => B < 0;
+    /// <summary>The cut passes through a point inside the face, at <paramref name="at"/> (T-67): a new vertex there.</summary>
+    public static CutPoint Interior(Vector3 at) => new(-1, InteriorMark, 0) { At = at };
 
-    public override string ToString() => IsVertex
+    private const int InteriorMark = -2;
+
+    /// <summary>Where an <see cref="Interior"/> point is; zero for the other kinds.</summary>
+    public Vector3 At { get; init; }
+
+    public bool IsVertex => B == -1;
+
+    /// <summary>A point inside the face (<see cref="Interior"/>, T-67).</summary>
+    public bool IsInterior => B == InteriorMark;
+
+    public override string ToString() => IsInterior
+        ? MeshEdits.Invariant($"the point [{At.X:G6}, {At.Y:G6}, {At.Z:G6}] inside the face")
+        : IsVertex
         ? MeshEdits.Invariant($"vertex {A}")
         : MeshEdits.Invariant($"edge {A}-{B} at {T:G6}");
 }
@@ -58,6 +71,12 @@ public sealed record FaceSplitResult(EditResult Edit, IReadOnlyList<(int From, i
 /// <item><b>What carries.</b> Each piece takes the split face's colour and groups; each piece of a split hard edge stays
 /// hard and the segments' new edges are not hard; a new vertex blends its edge's ends' weights by its fraction along it,
 /// renormalised and capped at four as <c>subdivide</c> does.</item>
+/// <item><b>Interior points</b> (T-67). A <see cref="CutPoint.Interior"/> point is a new vertex inside its face, appended
+/// after the edge vertices in the order the cuts give them; two such points of one face within the tolerance of each
+/// other are one. A closed loop of segments touching no boundary cuts out an inner face (appended, never the kept piece)
+/// and leaves the face around it a hole on the same loop, wound opposite. In a piece's loop the interior vertices rank
+/// after the face's corners, by id. A new interior vertex blends the weights of the corners of the face's triangle it
+/// lies in, barycentrically, renormalised and capped at four.</item>
 /// </list>
 /// Refused, naming <c>cuts[i]</c>: a face that is not live, a point whose vertex or edge is not the face's, a fraction
 /// not in 0..1, a segment that leaves the face or crosses its boundary or another segment, and segments that leave a
@@ -98,6 +117,7 @@ public static class FaceSplit
         // 1. Every edge point, snapped to an end or to an earlier point on its edge, else a new vertex.
         var onEdges = new SortedDictionary<(int Lo, int Hi), List<(double T, int Ref)>>();
         var ends = new int[cuts.Count * 2];
+        var interior = new List<(int Face, Vector3 At, int Slot)>();
         for (var i = 0; i < cuts.Count; i++)
         {
             Place(cuts[i].From, 2 * i);
@@ -106,6 +126,7 @@ public static class FaceSplit
 
         void Place(CutPoint p, int slot)
         {
+            if (p.IsInterior) { ends[slot] = -1; interior.Add((cuts[slot / 2].Face, p.At, slot)); return; }
             if (p.IsVertex) { ends[slot] = p.A; return; }
             var (lo, hi, t) = p.A < p.B ? (p.A, p.B, p.T) : (p.B, p.A, 1 - p.T);
             var length = Distance(verts[lo], verts[hi]);
@@ -139,6 +160,26 @@ public static class FaceSplit
                 ends[slot] = chain[^1];
             }
             chains[(lo, hi)] = chain;
+        }
+
+        // 1b. Every interior point (T-67): one new vertex per face and place, after the edge vertices.
+        var stencils = addedT.Select(e =>
+        {
+            var stencil = new Subdivision.Stencil();
+            stencil.Add(e.Lo, 1 - e.T);
+            stencil.Add(e.Hi, e.T);
+            return stencil;
+        }).ToList();
+        var placed = new List<(int Face, Vector3 At, int Id)>();
+        foreach (var (f, at, slot) in interior)
+        {
+            var same = placed.FindIndex(q => q.Face == f && Distance(q.At, at) <= tol);
+            if (same >= 0) { ends[slot] = placed[same].Id; continue; }
+            var id = verts.Count + added.Count;
+            placed.Add((f, at, id));
+            added.Add(at);
+            stencils.Add(Barycentric(mesh, f, at));
+            ends[slot] = id;
         }
 
         var all = verts.Concat(added).ToArray();
@@ -196,7 +237,7 @@ public static class FaceSplit
         var result = mesh.Edit(reshapedFaces: reshaped, addedVertices: added, addedFaces: newFaces);
         if (!result.Succeeded) return new FaceSplitResult(EditResult.Refused(result.Errors), []);
 
-        var edited = Carry(mesh, result.Mesh!, chains, addedT, made);
+        var edited = Carry(mesh, result.Mesh!, chains, stencils, made);
         var newVertexIds = Enumerable.Range(verts.Count, added.Count).ToArray();
         var newFaceIds = Enumerable.Range(mesh.Faces.Count, newFaces.Count).ToArray();
         return new FaceSplitResult(EditResult.Made(edited, [], newVertexIds, newFaceIds, split: split), segments);
@@ -214,7 +255,12 @@ public static class FaceSplit
         var face = mesh.Faces[cut.Face];
         foreach (var (p, end) in new[] { (cut.From, "from"), (cut.To, "to") })
         {
-            if (p.IsVertex)
+            if (p.IsInterior)
+            {
+                if (!InsideFace(mesh, face, p.At))
+                    errors.Add(new MeshError(at, MeshEdits.Invariant($"{end}: [{p.At.X:G6}, {p.At.Y:G6}, {p.At.Z:G6}] is not inside faces[{cut.Face}], clear of its edges")));
+            }
+            else if (p.IsVertex)
             {
                 if (!face.Corners.Contains(p.A))
                     errors.Add(new MeshError(at, MeshEdits.Invariant($"{end}: vertex {p.A} is not a corner of faces[{cut.Face}]")));
@@ -226,7 +272,32 @@ public static class FaceSplit
         }
     }
 
-    private static bool HasEdge(Face face, int a, int b)
+    /// <summary>Whether <paramref name="point"/> lies in the face's plane (within the tolerance), inside it, and further than
+    /// the tolerance from every edge of its loops.</summary>
+    internal static bool InsideFace(PolygonMesh mesh, Face face, Vector3 point)
+    {
+        if (!float.IsFinite(point.X) || !float.IsFinite(point.Y) || !float.IsFinite(point.Z)) return false;
+        var tol = Tolerance(mesh);
+        var verts = mesh.Vertices;
+        var n = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, face.Loop));
+        var origin = D(verts[face.Loop[0]]);
+        var p = D(point);
+        if (Math.Abs(Dot(p - origin, new Vector3D(n.X, n.Y, n.Z))) > tol) return false;
+        var (u, v) = Basis(n);
+        Vector2D P(int vertex)
+        {
+            var d = D(verts[vertex]) - origin;
+            return new Vector2D(Dot(d, u), Dot(d, v));
+        }
+        var loops = face.Holes.Prepend(face.Loop).ToArray();
+        if (!Inside(loops, P, new Vector2D(Dot(p - origin, u), Dot(p - origin, v)))) return false;
+        foreach (var loop in loops)
+            for (var i = 0; i < loop.Count; i++)
+                if (SegmentDistance(p, D(verts[loop[i]]), D(verts[loop[(i + 1) % loop.Count]])) <= tol) return false;
+        return true;
+    }
+
+    internal static bool HasEdge(Face face, int a, int b)
     {
         foreach (var loop in face.Holes.Prepend(face.Loop))
             for (var i = 0; i < loop.Count; i++)
@@ -369,13 +440,14 @@ public static class FaceSplit
         // Each piece's loop starts at its corner first in the face's corners; each hole goes to the piece around it.
         var rank = new Dictionary<int, int>();
         foreach (var c in face.Corners) rank.TryAdd(c, rank.Count);
+        foreach (var c in segments.SelectMany(s => new[] { s.A, s.B }).Order()) rank.TryAdd(c, rank.Count);
         var pieceHoles = outlines.Select(_ => new List<(int Rank, IReadOnlyList<int> Loop)>()).ToList();
         foreach (var hole in holes)
         {
             var point = P(hole[0]);
             var owner = -1;
             for (var k = 0; k < outlines.Count; k++)
-                if (InPolygon(outlines[k], P, point) && (owner < 0 || Math.Abs(SignedArea(outlines[k], P)) < Math.Abs(SignedArea(outlines[owner], P))))
+                if (!Reverses(outlines[k], hole) && InPolygon(outlines[k], P, point) && (owner < 0 || Math.Abs(SignedArea(outlines[k], P)) < Math.Abs(SignedArea(outlines[owner], P))))
                     owner = k;
             if (owner < 0)
             {
@@ -386,6 +458,35 @@ public static class FaceSplit
         }
 
         return outlines.Select((l, k) => new Face(Rotate(l, rank), pieceHoles[k].OrderBy(h => h.Rank).Select(h => h.Loop))).ToList();
+    }
+
+    /// <summary>Whether <paramref name="hole"/> runs round the same vertices as <paramref name="outline"/>: the far side of
+    /// an inner face a closed interior cut made, which lies on that face's edge, not inside it (T-67).</summary>
+    private static bool Reverses(List<int> outline, List<int> hole) => outline.Count == hole.Count && outline.ToHashSet().SetEquals(hole);
+
+    /// <summary>The barycentric blend of the corners of the face's triangle that <paramref name="at"/> lies in (T-67; the
+    /// one it is least outside, for a point on none).</summary>
+    private static Subdivision.Stencil Barycentric(PolygonMesh mesh, int face, Vector3 at)
+    {
+        var verts = mesh.Vertices;
+        var (u, v) = Basis(PolygonMesh.Unit(PolygonMesh.NewellVector(verts, mesh.Faces[face].Loop)));
+        Vector2D P(Vector3 x) => new(Dot(D(x), u), Dot(D(x), v));
+        var p = P(at);
+        var best = (Score: double.MinValue, A: 0, B: 0, C: 0, Wa: 1.0, Wb: 0.0, Wc: 0.0);
+        foreach (var tri in Triangulator.TriangulateFace(mesh, face))
+        {
+            var (a, b, c) = (P(verts[tri.A]), P(verts[tri.B]), P(verts[tri.C]));
+            var area = Orient(a, b, c);
+            if (area == 0) continue;
+            var (wa, wb, wc) = (Orient(p, b, c) / area, Orient(a, p, c) / area, Orient(a, b, p) / area);
+            var score = Math.Min(wa, Math.Min(wb, wc));
+            if (score > best.Score) best = (score, tri.A, tri.B, tri.C, wa, wb, wc);
+        }
+        var stencil = new Subdivision.Stencil();
+        stencil.Add(best.A, best.Wa);
+        stencil.Add(best.B, best.Wb);
+        stencil.Add(best.C, best.Wc);
+        return stencil;
     }
 
     private static int[] Rotate(List<int> loop, Dictionary<int, int> rank)
@@ -405,19 +506,15 @@ public static class FaceSplit
 
     /// <summary>Colours, groups, weights and hard edges carried onto the split mesh.</summary>
     private static PolygonMesh Carry(PolygonMesh source, PolygonMesh edited, Dictionary<(int Lo, int Hi), List<int>> chains,
-        List<(int Lo, int Hi, double T)> addedT, List<(int Face, IReadOnlyList<int> Added)> made)
+        List<Subdivision.Stencil> stencils, List<(int Face, IReadOnlyList<int> Added)> made)
     {
         var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(made)) : edited;
         if (source.Weights is { } weights)
         {
             var blended = new List<KeyValuePair<int, Influence[]>>();
-            for (var k = 0; k < addedT.Count; k++)
+            for (var k = 0; k < stencils.Count; k++)
             {
-                var (lo, hi, t) = addedT[k];
-                var stencil = new Subdivision.Stencil();
-                stencil.Add(lo, 1 - t);
-                stencil.Add(hi, t);
-                if (stencil.Blend(weights) is { } influences)
+                if (stencils[k].Blend(weights) is { } influences)
                     blended.Add(KeyValuePair.Create(source.Vertices.Count + k, influences));
             }
             mesh = mesh.WithWeights(blended.Count == 0 ? weights : VertexWeights.Of(
@@ -489,7 +586,7 @@ public static class FaceSplit
     private static double Orient(Vector2D a, Vector2D b, Vector2D c) => (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
 
     /// <summary>Whether segments p-q and r-s cross properly (each strictly separates the other's ends).</summary>
-    private static bool Crosses(Vector2D p, Vector2D q, Vector2D r, Vector2D s)
+    internal static bool Crosses(Vector2D p, Vector2D q, Vector2D r, Vector2D s)
         => Math.Sign(Orient(p, q, r)) * Math.Sign(Orient(p, q, s)) < 0 && Math.Sign(Orient(r, s, p)) * Math.Sign(Orient(r, s, q)) < 0;
 
     internal static double SignedArea(IReadOnlyList<int> loop, Func<int, Vector2D> at)
