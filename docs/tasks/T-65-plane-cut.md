@@ -173,7 +173,7 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
   - **Refused:** `point: must be a finite point`; `normal: must be a finite, non-zero vector`; `faces: a cut limited to some faces keeps both sides: leave faces out to keep one side`; `faces` empty, unknown or deleted (`MeshEdits.UnknownElements`); `point, normal: the plane touches no face` (no target face with a corner on it or corners on both sides); `keep: this would leave nothing: every face is below the plane`.
   - `FaceSplit`'s geometry helpers (`Vector2D`, `Vector3D`, `D`, `Dot`, `Cross`, `Basis`, `SegmentDistance`, `SignedArea`, `InPolygon`, `Inside`) became `internal` so `PlaneCut` uses the same geometry. Nothing else in `FaceSplit` changed.
   - **A non-manifold cut** (a border that meets itself at a vertex): at a vertex with more than one way on, the chaining takes the lowest vertex id (ruled as built, below). `ANonManifoldCutBorderIsChainedByLowestVertexId` covers it.
-- **The `plane_cut` tool** (`src/Carve.Server/PlaneCutTool.cs`, in `Program.cs`'s list after `delete`): the description, the worked example `{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}` on `define_mesh`'s cube (a half-height closed box, 8 vertices, 6 faces), and one `undo` step (the store's one `Edit`). A `keep` other than both, above or below is refused (`keep: expected both, above or below, got "left"`).
+- **The `plane_cut` tool** (`src/Carve.Server/PlaneCutTool.cs`, in `Program.cs`'s list after `bridge` since the rebase on T-68; after `delete` before it): the description, the worked example `{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}` on `define_mesh`'s cube (a half-height closed box, 8 vertices, 6 faces), and one `undo` step (the store's one `Edit`). A `keep` other than both, above or below is refused (`keep: expected both, above or below, got "left"`).
 - **Tests.** `PlaneCutTests` (Core unit, 18):
   - keeping both on the cube (ids 8..11, faces 6..9, the four cut edges);
   - keeping below with fill: the half-height box, deleted `[2, 3, 6, 7]` and `[3, 6, 7, 8, 9]`, split `[0, 6] [1, 7] [4, 8] [5, 9]`, the cap `[8, 10, 11, 9]` facing up, area 1, closed;
@@ -247,16 +247,14 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
 
 **Frames (GPU run of `3a809ec`, whose last code commit is `e3c1ca9`):** `cairn task T-65 verify` passed, ran 8, carried 3. The shed, cuts, export, character and soft runs (jobs `J-20261112-151319-1f83cc` to `-151327-d2c189`, each `carve@3a809ec`) were fetched with `cairn test artifacts` into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/frames-e3c1ca9/`, with their list in `all.sha256` there. Their 51 frames that T-64's 127 also has are byte-identical. The three new ones match the local run: `plane-cut-below-back` `fc88fdeb...`, `plane-cut-below-front` `81c9a77d...`, `plane-cut-both-wireframe` `d1bcda5a...`. T-68 had landed nothing on `origin/milestone/M-5`, so no T-68 frames are in the baseline. **Not hash-checked on this commit:** cube (32 frames) and crate (44). Verify carried them from `40a51d5` (their inputs unchanged), and `cairn test artifacts scenario-cube` returns the latest run, which was T-68's (`1cccc9a`), not this member's. The `40a51d5` job ids are not in the local queue records. A forced fresh run was not tried, since `cairn test submit` carries them again.
 
-### Hand-off
+**Fourth agent: Opus (claude-opus-5-5).** Rebased onto `origin/milestone/M-5` after T-68 landed (`merge_faces`, `bridge`, `MergeBridgeStage`). Two add-only conflicts, both sides kept: `Program.cs`'s tool list (`PlaneCutTool` after `BridgeTool`) and `CutsStages.cs` (`PlaneCutStage` after `MergeBridgeStage`). The rebased tree built with no warnings and the unit suites passed here (Core 676, Server 662, ModelViewer 15), so the rebase needed no fix commit.
 
-**Done (third agent, Opus claude-opus-5-5):** the person's three rulings recorded; `ANonManifoldCutBorderIsChainedByLowestVertexId` added with its break (1 fails, in `breaks.log`); verify passed on `3a809ec`; frames compared above. `cairn lint` clean.
+**Frames (GPU run of `aae1140`, the rebased last code commit):** `cairn task T-65 verify` passed, ran 10, carried 1 (viewer-cube, from `99c846e`). Cube and crate ran fresh, which settles the third agent's open question. The seven scenario runs (jobs `J-20261112-153155-852077` to `J-20261112-153206-0bbf28`, the `job` line of each `output.log` reading `carve@aae1140...`) were fetched by job id into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/frames-aae1140/`, 133 frames, listed in `all.sha256` there. The baseline is T-64's 127 (`T-64/frames-737853a/all.sha256`) plus T-68's three new Cuts frames (`bridge-slab`, `bridge-slab-ortho`, `merge-plate-wireframe`, from `T-68/frames-990b937/all.sha256`), 130 in all. All 130 are byte-identical, none is missing, and there are three new ones, each the same hash as the local and `e3c1ca9` runs:
 
-**Left:**
+  | Frame | sha256 |
+  |---|---|
+  | `cuts/frames/plane-cut-below-back.png` | `fc88fdeb93fcd33cd017158128f927882847649e59dd119f7f35ca83b04e521f` |
+  | `cuts/frames/plane-cut-below-front.png` | `81c9a77ddc9b3df96ce0f6ef9ce45005e84dd64ecfee9311ffc5ce8e18aa7185` |
+  | `cuts/frames/plane-cut-both-wireframe.png` | `d1bcda5ac6641859eccf991efcc6ad1623f4739ea698e05b037f185c6a937b34` |
 
-1. Send the three new frames (`frames-e3c1ca9/cuts/cuts/frames/plane-cut-*.png`) to the person through `mcp__waystone__review` and record the outcome under **Frames**.
-2. Cube and crate on this commit by hash: find the `40a51d5` cube and crate job ids (or another way to fetch a carried run's artifacts), or ask the person whether the carry is enough.
-3. Fold this section away, verify, `cairn lint`, `cairn task T-65 finish` from inside the worktree.
-
-**Checked:** PlaneCutTests 18 passed here; verify (server-unit, core-unit, the five scenario suites and server-regression ran). **Not checked:** the person's review; cube and crate frames on this commit.
-
-**Surprising:** `cairn test artifacts <suite>` takes the latest run of the suite from any member, so it handed back T-68's cube and crate. Check the `job` line of each `output.log`.
+**The person's review (2026-11-12):** the three new frames from the `aae1140` run were sent through Waystone, and the person approved them with no notes.
