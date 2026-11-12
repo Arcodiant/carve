@@ -4,7 +4,7 @@ description: >-
 ---
 # T-63 — Faces with holes
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
