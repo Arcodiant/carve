@@ -14,7 +14,11 @@
         {
           "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
         },
-        "samples/leaky-shed.carve"
+        "samples/leaky-shed.carve",
+        "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
+        "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs"
       ],
       "resources": "cpu",
       "est-seconds": 30

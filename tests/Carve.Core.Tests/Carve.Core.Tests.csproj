@@ -13,6 +13,15 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
+    <!-- GatehouseGeometry works the gatehouse's pixel checks with the scenario's own camera, ray test and plan (T-69). -->
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../../scenarios/Carve.Scenario.Shed/ShedChecks.cs" Link="Gatehouse/ShedChecks.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Shed/ShedGeometry.cs" Link="Gatehouse/ShedGeometry.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Cuts/CutsGeometry.cs" Link="Gatehouse/CutsGeometry.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs" Link="Gatehouse/GatehousePlan.cs" />
   </ItemGroup>
 
 </Project>
