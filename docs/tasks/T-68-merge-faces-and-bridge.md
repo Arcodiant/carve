@@ -4,7 +4,7 @@ description: >-
 ---
 # T-68 — Merge faces and bridge
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
