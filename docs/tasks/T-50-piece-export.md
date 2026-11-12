@@ -4,7 +4,7 @@ description: >-
 ---
 # T-50 — Piece export
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
