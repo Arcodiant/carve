@@ -109,7 +109,7 @@ A face can have holes. An agent defines a plate with a window in it, sees the op
 
 ### As built
 
-First to fourth agents: Opus (claude-opus-5-5). The Core half, its tests, the server's define_mesh, get_mesh and labels, and the Cuts scenario are in.
+First to fifth agents: Opus (claude-opus-5-5). The Core half, its tests, the server's define_mesh, get_mesh and labels, and the Cuts scenario are in.
 
 - **The face type.** `Carve.Core.Face` (`src/Carve.Core/Face.cs`), immutable: `Loop` (outer, CCW from outside), `Holes` (each CW from outside), `HasHoles`, `Corners` (every vertex id, outer loop first, then each hole in order: the face's corner numbering), `LoopAt(hole)` (-1 is the outer loop), `Locate(corner) -> (Hole, Index)`, `CornerAt(hole, index)`, `CornerOf(vertex)`, `Neighbours(corner)` (the previous and next vertex in the corner's own loop), `Map(f)`, and the names `LoopName(face, hole)` (`faces[n]` or `faces[n].holes[k]`) and `CornerName(face, hole, i)` (`faces[n][i]` or `faces[n].holes[k][i]`). It is deliberately not a list of ints, so every consumer of `PolygonMesh.Faces` (now `IReadOnlyList<Face>`) failed to compile and was visited. `int[]` converts implicitly to a plain `Face`; equality is structural. `PolygonMesh.Create` keeps its plain-loop overload and gains one taking `Face`s; `Edit` takes `Face`s for reshaped and added faces. New `PolygonMesh.FaceArea` (outer less holes); `FaceNormal` and `FaceCentre` use the outer loop.
 - **`EdgeUse`** is `EdgeUse(Face, Hole, Corner, LoToHi)`: `Hole` is -1 for the outer loop, else the hole's index; `Corner` is the index within that loop; `CornerName` gives `faces[n][i]` or `faces[n].holes[k][i]`. Hole edges' direction is the hole's own (clockwise), so a hole edge shared with an inner face is manifold. `FaceEdges(f)` lists the outer loop's edges, then each hole's, in corner order.
@@ -151,17 +151,6 @@ First to fourth agents: Opus (claude-opus-5-5). The Core half, its tests, the se
   | Cuts: the plate's corners and middles in the one shade | a holed face's first triangle dropped | 55 checks fail |
   | Cuts frame 4: the hole's edges drawn | the wireframe skips a hole's edges | 16 checks fail (each hole edge in four stretches) |
   | Cuts: get_mesh's object form | get_mesh gives a holed face as its plain loop | 56 checks fail |
-
-### Hand-off
-
-Fourth agent (Opus, claude-opus-5-5), stopped at the checkpoint "code committed, a real run still to come". **Done:** the break for the `loop`-missing refusal (row in the table, output appended to `breaks.log`); the Hand-off's earlier items 1 and 2 folded into As built. No code changed: the code commit is `99c846e`, and no sibling commit is on `origin/milestone/M-5` beyond it (fetched 2026-11-12 02:1x UTC).
-
-**Run under way:** `cairn task T-63 verify` on `99c846e` submitted these jobs; `server-unit` (J-20261112-020526-612880) and `core-unit` (J-20261112-020531-e3b074) show `done`; the GPU ones were still `queued` behind about 17 Empyrean, voidmarches and waystone jobs, with no progress in 11 minutes: scenario-cube J-20261112-020528-0bcf14, scenario-crate J-20261112-020529-7b8d94, scenario-shed J-20261112-020532-4ed2c0, viewer-cube J-20261112-020534-608b99, scenario-cuts J-20261112-020535-c446b1, scenario-export J-20261112-020537-fcb988, scenario-character J-20261112-020538-6c7b37, scenario-soft J-20261112-020539-16528f, server-regression J-20261112-020541-2871c4. These are for the code commit `99c846e`; the commit holding this hand-off changes only this file, so their results stand for the code (re-run only if code changes). The older J-20261112-015231-945854 is stale.
-
-**Left:**
-1. Wait for those jobs (or re-run `cairn task T-63 verify`, which picks them up by commit), and read their results.
-2. Hash every frame of that run against `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-63/frames-before.sha256` (136 frames, `sha256sum -c` format, paths relative to the run's artifacts) and list them in As built; any that differ, compare with a fresh run of the base before blaming T-63. Hash the four Cuts frames against `cuts/cuts-frames.sha256`.
-3. The frames' review through `mcp__waystone__review`: the four Cuts frames in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-63/cuts/`.
-4. Remove this Hand-off, `cairn task T-63 verify` to `VERIFY PASS`, `cairn lint`, `finish`.
-
-**Surprising:** `cairn task T-63 verify` writes nothing to its stdout while it waits on queued jobs, so a redirected log stays empty; `cairn test status` shows the jobs. `cairn test report <job>` does not take a job id.
+- **Two regression tests fixed (fifth agent, `ef9d98c`).** `server-regression` on `99c846e` failed 3: `CheckToolTests.The_shed_through_define_mesh_gives_the_exact_findings` and `SaveOpenToolTests.Open_brings_back_the_saved_mesh_bit_for_bit_in_one_undoable_step` (crate, lblock) built define_mesh arguments from `PolygonMesh.Faces`, which are now `Face` objects. They now send each face's `Loop`. This is a test-only change, and the product is unchanged.
+- **Frames.** The baseline `frames-before.sha256` (136 frames) took crate and character from `3b51d88` on `milestone/M-17`. That run had 15 bones and weights frames (`chain-bones-*`, `chain-*-bones`, `weights-*`, `gardener-bones-*`, `gardener-weighed-*`) that this branch's base `9e4bcf7` doesn't make, since no scenario there names them. All 121 frames the branch makes (cube 32, crate 44, shed 10, export 7, character 17, soft 11), from the run of `99c846e` (carried for `ef9d98c`, whose change is test-only), are byte-identical to the baseline. Their list is `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-63/frames-after-99c846e.sha256`. The character frames from the re-run on `ef9d98c` are identical too. The four Cuts frames on `99c846e` and on `ef9d98c` match `cuts/cuts-frames.sha256`.
+- **Review.** The person approved the four Cuts frames through `mcp__waystone__review` (2026-11-12).
