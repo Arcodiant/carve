@@ -94,7 +94,7 @@ internal sealed class HolesStage : ICutsStage
             .SelectMany(loop => loop.Select((v, k) => (camera.Project(holed.Vertices[v]), camera.Project(holed.Vertices[loop[(k + 1) % loop.Length]]))))
             .ToArray();
         Look(wire, camera, holed, _ => Fill, lines, "the wireframe");
-        foreach (var (loop, what) in new[] { (holed.Faces[0].Holes[0], "the hole's edge"), (holed.Faces[0].Loop, "the front's outer edge") })
+        foreach (var (loop, what) in new[] { (holed.Faces[0].Holes.FirstOrDefault() ?? [], "the hole's edge"), (holed.Faces[0].Loop, "the front's outer edge") })
         {
             for (var k = 0; k < loop.Length; k++)
             {
