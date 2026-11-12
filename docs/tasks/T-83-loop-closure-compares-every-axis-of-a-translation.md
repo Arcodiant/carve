@@ -4,7 +4,7 @@ description: >-
 ---
 # T-83 — Loop closure compares every axis of a translation
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
