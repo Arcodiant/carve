@@ -23,8 +23,8 @@ public sealed class MeshResult
 }
 
 /// <summary>
-/// An immutable polygon mesh in plain indexed storage: vertices, and faces as index lists of 3 or more.
-/// Winding is counter-clockwise seen from outside. Triangles are a derived view (<see cref="Triangulator"/>), never stored,
+/// An immutable polygon mesh in plain indexed storage: vertices, and faces (<see cref="Face"/>), each an outer loop of 3
+/// or more vertex ids and zero or more hole loops of 3 or more. Winding is counter-clockwise seen from outside, holes clockwise. Triangles are a derived view (<see cref="Triangulator"/>), never stored,
 /// and so is the edge table (<see cref="Topology"/>).
 /// </summary>
 /// <remarks>
@@ -53,9 +53,9 @@ public sealed class PolygonMesh
         "face covers part of its area twice: its outline overlaps itself";
 
     private readonly Vector3[] _vertices;
-    private readonly int[][] _faces;
+    private readonly Face[] _faces;
 
-    private PolygonMesh(Vector3[] vertices, int[][] faces, FaceStyle? style = null, VertexWeights? weights = null,
+    private PolygonMesh(Vector3[] vertices, Face[] faces, FaceStyle? style = null, VertexWeights? weights = null,
         MeshShade? shade = null, Vector3[][]? corners = null, bool[]? flatFaces = null)
     {
         FlatFaces = flatFaces;
@@ -66,7 +66,7 @@ public sealed class PolygonMesh
         Style = style is { IsEmpty: false } ? style : null;
         Weights = weights is { IsEmpty: false } ? weights : null;
         Vertices = Array.AsReadOnly(vertices);
-        Faces = Array.AsReadOnly(faces.Select(f => (IReadOnlyList<int>)Array.AsReadOnly(f)).ToArray());
+        Faces = Array.AsReadOnly(faces);
     }
 
     private MeshTopology? _topology;
@@ -102,7 +102,7 @@ public sealed class PolygonMesh
     internal bool[]? FlatFaces { get; }
 
     /// <summary>Faces and vertices joined as given, unchecked: for drawing meshes already checked, or posed.</summary>
-    internal static PolygonMesh Assemble(Vector3[] vertices, int[][] faces, MeshShade? shade = null, Vector3[][]? corners = null,
+    internal static PolygonMesh Assemble(Vector3[] vertices, Face[] faces, MeshShade? shade = null, Vector3[][]? corners = null,
         bool[]? flatFaces = null)
         => new(vertices, faces, null, null, shade, corners, flatFaces);
 
@@ -112,7 +112,7 @@ public sealed class PolygonMesh
     /// </summary>
     public PolygonMesh WithVertices(IReadOnlyList<Vector3> vertices) => WithVertices(vertices, null);
 
-    /// <summary>As above, drawn with <paramref name="corners"/> (face, then loop position) as its corner normals when given.</summary>
+    /// <summary>As above, drawn with <paramref name="corners"/> (face, then corner, <see cref="Face.Corners"/>) as its corner normals when given.</summary>
     internal PolygonMesh WithVertices(IReadOnlyList<Vector3> vertices, Vector3[][]? corners)
     {
         if (vertices.Count != _vertices.Length) throw new ArgumentException("one position per vertex", nameof(vertices));
@@ -128,17 +128,27 @@ public sealed class PolygonMesh
     /// <summary>The vertices; a vertex's id is its position here.</summary>
     public IReadOnlyList<Vector3> Vertices { get; }
 
-    /// <summary>The faces as vertex-id loops; a face's id is its position here.</summary>
-    public IReadOnlyList<IReadOnlyList<int>> Faces { get; }
+    /// <summary>The faces, each an outer loop and its holes (<see cref="Face"/>); a face's id is its position here.</summary>
+    public IReadOnlyList<Face> Faces { get; }
 
     /// <summary>The mesh's edge table, built on first use and held by the mesh.</summary>
     public MeshTopology Topology => LazyInitializer.EnsureInitialized(ref _topology, () => new MeshTopology(this));
 
-    /// <summary>Validates and builds a mesh (the inputs are copied), or returns every error found.</summary>
+    /// <summary>Validates and builds a mesh of plain faces (the inputs are copied), or returns every error found.</summary>
     public static MeshResult Create(IEnumerable<Vector3> vertices, IEnumerable<IEnumerable<int>> faces)
+        => Create(vertices, faces.Select(f => new Face(f)));
+
+    /// <summary>
+    /// Validates and builds a mesh (the inputs are copied), or returns every error found. A face's outer loop is checked
+    /// as a plain face's always was. A hole is refused, by <c>faces[n].holes[k]</c> or one corner's
+    /// <c>faces[n].holes[k][i]</c>, when it has fewer than 3 vertices, an index out of range, a vertex used twice across
+    /// the face's loops, the outer loop's winding, a place not strictly inside the outer loop, or a meeting with another
+    /// hole; then the whole face, its holes bridged in (<see cref="Triangulator.Bridge"/>), takes the plain face's checks.
+    /// </summary>
+    public static MeshResult Create(IEnumerable<Vector3> vertices, IEnumerable<Face> faces)
     {
         var verts = vertices.ToArray();
-        var fcs = faces.Select(f => f.ToArray()).ToArray();
+        var fcs = faces.ToArray();
         var errors = new List<MeshError>();
 
         var badVertex = new bool[verts.Length];
@@ -159,37 +169,41 @@ public sealed class PolygonMesh
         {
             var face = fcs[f];
             var faceOk = true;
-            if (face.Length < 3)
+            var seen = new Dictionary<int, string>();
+            for (var h = -1; h < face.Holes.Count; h++)
             {
-                errors.Add(new MeshError($"faces[{f}]", $"face has {face.Length} indices; at least 3 are needed"));
-                faceOk = false;
-            }
-
-            for (var k = 0; k < face.Length; k++)
-            {
-                if (face[k] < 0 || face[k] >= verts.Length)
+                var loop = face.LoopAt(h);
+                var what = h < 0 ? "face" : "hole";
+                if (loop.Count < 3)
                 {
-                    errors.Add(new MeshError($"faces[{f}][{k}]", verts.Length == 0 ? MeshEdits.Invariant($"index {face[k]} is out of range: there are no vertices") : MeshEdits.Invariant($"index {face[k]} is out of range 0..{verts.Length - 1}")));
+                    errors.Add(new MeshError(Face.LoopName(f, h), $"{what} has {loop.Count} indices; at least 3 are needed"));
                     faceOk = false;
                 }
-            }
 
-            for (var k = 0; k < face.Length; k++)
-            {
-                for (var j = 0; j < k; j++)
+                for (var k = 0; k < loop.Count; k++)
                 {
-                    if (face[j] == face[k])
+                    if (loop[k] < 0 || loop[k] >= verts.Length)
                     {
-                        errors.Add(new MeshError($"faces[{f}][{k}]", MeshEdits.Invariant($"index {face[k]} repeats faces[{f}][{j}]")));
+                        errors.Add(new MeshError(Face.CornerName(f, h, k), verts.Length == 0 ? MeshEdits.Invariant($"index {loop[k]} is out of range: there are no vertices") : MeshEdits.Invariant($"index {loop[k]} is out of range 0..{verts.Length - 1}")));
                         faceOk = false;
-                        break;
                     }
                 }
+
+                for (var k = 0; k < loop.Count; k++)
+                {
+                    if (seen.TryGetValue(loop[k], out var earlier))
+                    {
+                        errors.Add(new MeshError(Face.CornerName(f, h, k), MeshEdits.Invariant($"index {loop[k]} repeats {earlier}")));
+                        faceOk = false;
+                    }
+                    else
+                        seen[loop[k]] = Face.CornerName(f, h, k);
+                }
             }
-            if (!faceOk || face.Any(i => badVertex[i])) continue;
+            if (!faceOk || face.Corners.Any(i => badVertex[i])) continue;
 
             // Crossing and folding first, so an outline that crosses always names its edges.
-            if (Triangulator.FindCrossing(verts, face) is var (first, second, fold))
+            if (Triangulator.FindCrossing(verts, face.Loop) is var (first, second, fold))
             {
                 errors.Add(new MeshError($"faces[{f}]", fold
                     ? $"face folds back on itself: the edge from faces[{f}][{first}] overlaps the edge from faces[{f}][{second}]"
@@ -197,15 +211,51 @@ public sealed class PolygonMesh
                 continue;
             }
 
-            if (IsZeroArea(verts, face))
+            if (IsZeroArea(verts, face.Loop))
             {
                 errors.Add(new MeshError($"faces[{f}]", "face has zero area"));
                 continue;
             }
 
-            if (!Triangulator.TryTriangulate(verts, face, out var triangles))
+            IReadOnlyList<int> outline = face.Loop;
+            if (face.HasHoles)
+            {
+                var holeErrors = Triangulator.HoleProblems(verts, face, f);
+                if (holeErrors.Count > 0)
+                {
+                    errors.AddRange(holeErrors);
+                    continue;
+                }
+                if (Triangulator.Bridge(verts, face) is not { } bridged)
+                {
+                    errors.Add(new MeshError($"faces[{f}]", "face cannot be triangulated: a hole could not be bridged to its outer loop"));
+                    continue;
+                }
+
+                // The plain face's checks on the bridged outline, naming each edge by the corner it starts at.
+                outline = bridged.Ids;
+                string Name(int p)
+                {
+                    var (hole, i) = face.Locate(bridged.Corners[p]);
+                    return Face.CornerName(f, hole, i);
+                }
+                if (Triangulator.FindCrossing(verts, outline) is var (a, b, folds))
+                {
+                    errors.Add(new MeshError($"faces[{f}]", folds
+                        ? $"face folds back on itself: the edge from {Name(a)} overlaps the edge from {Name(b)}"
+                        : $"face is self-intersecting: the edge from {Name(a)} crosses the edge from {Name(b)}"));
+                    continue;
+                }
+                if (IsZeroArea(verts, outline))
+                {
+                    errors.Add(new MeshError($"faces[{f}]", "face has zero area once its holes are taken out"));
+                    continue;
+                }
+            }
+
+            if (!Triangulator.TryTriangulate(verts, outline, out var triangles))
                 errors.Add(new MeshError($"faces[{f}]", "face cannot be triangulated (degenerate outline)"));
-            else if (Triangulator.CoversTwice(verts, face, triangles))
+            else if (Triangulator.CoversTwice(verts, outline, triangles))
                 errors.Add(new MeshError($"faces[{f}]", CoversTwiceMessage));
         }
 
@@ -216,11 +266,11 @@ public sealed class PolygonMesh
 
     /// <summary>
     /// Builds the mesh an edit makes from this one, by the id contract on <see cref="PolygonMesh"/>, and runs
-    /// <see cref="Create"/>'s validation on the whole result, so a bad result is refused by element exactly as
-    /// <c>define_mesh</c> is. This mesh is not changed.
+    /// <see cref="Create(IEnumerable{Vector3}, IEnumerable{Face})"/>'s validation on the whole result, so a bad result is
+    /// refused by element exactly as <c>define_mesh</c> is. This mesh is not changed.
     /// </summary>
     /// <param name="movedVertices">New positions, by vertex id.</param>
-    /// <param name="reshapedFaces">New loops, by face id; the face keeps its id.</param>
+    /// <param name="reshapedFaces">New faces (outer loop and holes), by face id; the face keeps its id.</param>
     /// <param name="addedVertices">Vertices appended after the last, taking ids <c>Vertices.Count</c> onward.</param>
     /// <param name="addedFaces">Faces appended after the last, taking ids <c>Faces.Count</c> onward. Their indices, like
     /// those in <paramref name="reshapedFaces"/>, are ids in the result, so they may use added vertices.</param>
@@ -228,13 +278,13 @@ public sealed class PolygonMesh
     /// have is refused as <c>vertices[n]</c> or <c>faces[n]</c>, beside whatever else is wrong.</remarks>
     public MeshResult Edit(
         IEnumerable<KeyValuePair<int, Vector3>>? movedVertices = null,
-        IEnumerable<KeyValuePair<int, IEnumerable<int>>>? reshapedFaces = null,
+        IEnumerable<KeyValuePair<int, Face>>? reshapedFaces = null,
         IEnumerable<Vector3>? addedVertices = null,
-        IEnumerable<IEnumerable<int>>? addedFaces = null)
+        IEnumerable<Face>? addedFaces = null)
     {
         var errors = new List<MeshError>();
         var verts = (Vector3[])_vertices.Clone();
-        var fcs = (int[][])_faces.Clone();
+        var fcs = (Face[])_faces.Clone();
 
         foreach (var (id, position) in movedVertices ?? [])
         {
@@ -244,22 +294,30 @@ public sealed class PolygonMesh
                 verts[id] = position;
         }
 
-        foreach (var (id, loop) in reshapedFaces ?? [])
+        foreach (var (id, face) in reshapedFaces ?? [])
         {
             if (id < 0 || id >= fcs.Length)
                 errors.Add(new MeshError($"faces[{id}]", $"there is no face {id} to reshape: ids run 0..{fcs.Length - 1}"));
             else
-                fcs[id] = loop.ToArray();
+                fcs[id] = face;
         }
 
-        var result = Create(verts.Concat(addedVertices ?? []), fcs.Concat((addedFaces ?? []).Select(f => f.ToArray())));
+        var result = Create(verts.Concat(addedVertices ?? []), fcs.Concat(addedFaces ?? []));
         return errors.Count == 0 ? result : new MeshResult(null, [.. errors, .. result.Errors]);
     }
 
-    /// <summary>Centre of a face: the mean of its vertices.</summary>
+    /// <summary>A face's area: its outer loop's less its holes'.</summary>
+    public double FaceArea(int face)
+    {
+        var f = _faces[face];
+        var area = Length(NewellVector(_vertices, f.Loop)) / 2;
+        foreach (var hole in f.Holes) area -= Length(NewellVector(_vertices, hole)) / 2;
+        return area;
+    }
+    /// <summary>Centre of a face: the mean of its outer loop's vertices.</summary>
     public Vector3 FaceCentre(int face)
     {
-        var loop = _faces[face];
+        var loop = _faces[face].Loop;
         var o = _vertices[loop[0]];
         double x = 0, y = 0, z = 0;
         foreach (var i in loop)
@@ -267,13 +325,13 @@ public sealed class PolygonMesh
             var v = _vertices[i];
             x += (double)v.X - o.X; y += (double)v.Y - o.Y; z += (double)v.Z - o.Z;
         }
-        return new Vector3((float)(o.X + x / loop.Length), (float)(o.Y + y / loop.Length), (float)(o.Z + z / loop.Length));
+        return new Vector3((float)(o.X + x / loop.Count), (float)(o.Y + y / loop.Count), (float)(o.Z + z / loop.Count));
     }
 
-    /// <summary>Unit normal of a face by Newell's method; outward for a face wound counter-clockwise from outside.</summary>
+    /// <summary>Unit normal of a face's outer loop by Newell's method; outward for a face wound counter-clockwise from outside.</summary>
     public Vector3 FaceNormal(int face)
     {
-        var (x, y, z) = Unit(NewellVector(_vertices, _faces[face]));
+        var (x, y, z) = Unit(NewellVector(_vertices, _faces[face].Loop));
         return new Vector3((float)x, (float)y, (float)z);
     }
 

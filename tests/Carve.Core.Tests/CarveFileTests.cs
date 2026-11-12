@@ -179,26 +179,26 @@ public class CarveFileTests
 
     [Fact]
     public void AMissingVersionIsRefused()
-        => Assert.Equal("missing: the file has no format version; this build reads versions 1, 2 and 3",
+        => Assert.Equal("missing: the file has no format version; this build reads versions 1, 2, 3 and 4",
             Refused(CubeWith("  \"carve\": 1,\n", ""), "carve"));
 
     [Theory]
-    [InlineData("1.5", "the format version is 1.5, not an integer; this build reads versions 1, 2 and 3")]
-    [InlineData("\"1\"", "the format version is a string, not an integer; this build reads versions 1, 2 and 3")]
+    [InlineData("1.5", "the format version is 1.5, not an integer; this build reads versions 1, 2, 3 and 4")]
+    [InlineData("\"1\"", "the format version is a string, not an integer; this build reads versions 1, 2, 3 and 4")]
     public void ANonIntegerVersionIsRefused(string version, string expected)
         => Assert.Equal(expected, Refused(CubeWith("\"carve\": 1,", $"\"carve\": {version},"), "carve"));
 
     [Theory]
-    [InlineData(4)]
+    [InlineData(5)]
     [InlineData(0)]
     public void AnotherVersionIsRefused(int version)
-        => Assert.Equal($"version {version} is not one this build reads; it reads versions 1, 2 and 3",
+        => Assert.Equal($"version {version} is not one this build reads; it reads versions 1, 2, 3 and 4",
             Refused(CubeWith("\"carve\": 1,", $"\"carve\": {version},"), "carve"));
 
     /// <summary>A newer file is refused on its version alone, even when its other keys would also be refused.</summary>
     [Fact]
     public void AnotherVersionIsRefusedBeforeItsKeys()
-        => Refused(CubeWith("\"carve\": 1,", "\"carve\": 4, \"uvs\": [],"), "carve");
+        => Refused(CubeWith("\"carve\": 1,", "\"carve\": 5, \"uvs\": [],"), "carve");
 
     [Fact]
     public void MissingVerticesAreRefused()

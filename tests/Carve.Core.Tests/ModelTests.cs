@@ -114,7 +114,7 @@ public class ModelTests
         Assert.Equal(1 + 6, combined.Faces.Count);
         Assert.Equal(new Vector3(1, 0, 0), combined.Vertices[1]);
         Assert.Equal(TestMeshes.Cube().Vertices[0], combined.Vertices[3]);
-        Assert.Equal(TestMeshes.Cube().Faces[0].Select(v => v + 3), combined.Faces[1]);
+        Assert.Equal(TestMeshes.Cube().Faces[0].Loop.Select(v => v + 3), combined.Faces[1].Loop);
         Assert.Same(combined, model.Combined);
     }
 }

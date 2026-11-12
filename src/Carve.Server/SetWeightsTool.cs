@@ -89,7 +89,7 @@ public sealed class SetWeightsTool(ModelStore store)
                 problems.Add(NoGroup(m.Style, groupName!));
                 return (null, problems);
             }
-            return (faces.SelectMany(f => m.Faces[f]).Distinct().Order().ToArray(), problems);
+            return (faces.SelectMany(f => m.Faces[f].Corners).Distinct().Order().ToArray(), problems);
         }, given, out var change, out var refused);
         if (refused.Count > 0) return Failed("set_weights", refused);
         if (snapshot is null || change is null) return Error("set_weights: " + NoMesh);

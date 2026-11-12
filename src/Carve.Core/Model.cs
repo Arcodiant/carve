@@ -258,7 +258,7 @@ public sealed class Model
     private PolygonMesh Combine()
     {
         var vertices = new List<System.Numerics.Vector3>();
-        var faces = new List<int[]>();
+        var faces = new List<Face>();
         var colours = new List<KeyValuePair<int, string>>();
         var hard = new List<(int, int)>();
         var corners = new List<System.Numerics.Vector3[]>();
@@ -270,7 +270,7 @@ public sealed class Model
             var offset = vertices.Count;
             if (mesh.Style is { } style) colours.AddRange(style.ColoursOffset(faces.Count));
             vertices.AddRange(mesh.Vertices);
-            faces.AddRange(mesh.Faces.Select(f => f.Select(v => v + offset).ToArray()));
+            faces.AddRange(mesh.Faces.Select(f => f.Map(v => v + offset)));
             if (posed) corners.AddRange(Shading.CornersOf(mesh));
             flat.AddRange(Enumerable.Repeat(!Shading.HasCornerNormals(mesh), mesh.Faces.Count));
             if (!smooth) continue;

@@ -311,7 +311,7 @@ public class MeshHealthTests
         var only = Assert.Single(model.Meshes);
         Assert.Equal(Model.DefaultName, only.Name);
         Assert.Equal(mesh.Vertices.Select(CarveFileV2Tests.Bits), only.Mesh.Vertices.Select(CarveFileV2Tests.Bits));
-        Assert.Equal(mesh.Faces.Select(f => f.ToArray()), only.Mesh.Faces.Select(f => f.ToArray()));
+        Assert.Equal(mesh.Faces.Select(f => f.Loop.ToArray()), only.Mesh.Faces.Select(f => f.Loop.ToArray()));
         Assert.Null(only.Mesh.Style);
         Assert.Null(only.Mesh.Weights);
         Assert.Null(model.Skeleton);

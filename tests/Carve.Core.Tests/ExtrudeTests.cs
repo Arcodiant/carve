@@ -47,13 +47,13 @@ public class ExtrudeTests
         Assert.Empty(result.MovedVertices);
 
         // The cap keeps id 3, is the new ring, and stands one above where the top was.
-        Assert.Equal([8, 9, 10, 11], mesh.Faces[3]);
+        Assert.Equal([8, 9, 10, 11], mesh.Faces[3].Loop);
         for (var k = 0; k < 4; k++)
-            AssertNear(cube.Vertices[cube.Faces[3][k]] + Vector3.UnitY, mesh.Vertices[8 + k]);
+            AssertNear(cube.Vertices[cube.Faces[3].Loop[k]] + Vector3.UnitY, mesh.Vertices[8 + k]);
         AssertNear(Vector3.UnitY, mesh.FaceNormal(3));
 
         // Wall k is [old k, old k+1, new k+1, new k], and every wall faces out.
-        Assert.Equal([3, 7, 9, 8], mesh.Faces[6]);
+        Assert.Equal([3, 7, 9, 8], mesh.Faces[6].Loop);
         foreach (var wall in record.Walls)
         {
             Assert.True(Outwardness(mesh, wall) > 0.49f, $"faces[{wall}] faces inward: normal {mesh.FaceNormal(wall)}");
@@ -68,7 +68,7 @@ public class ExtrudeTests
         var mesh = Ok(result);
         AssertClosedAndClean(mesh);
         AssertNear(Vector3.UnitY, mesh.FaceNormal(3));
-        foreach (var v in mesh.Faces[3])
+        foreach (var v in mesh.Faces[3].Loop)
         {
             Assert.Equal(0.8f, mesh.Vertices[v].Y, Tolerance);
             Assert.InRange(mesh.Vertices[v].X, 0.2f - Tolerance, 0.8f + Tolerance);
@@ -121,8 +121,8 @@ public class ExtrudeTests
         var mesh = Ok(result);
         AssertClosedAndClean(mesh);
 
-        var oldLoop = block.Faces[1];
-        var newLoop = mesh.Faces[1];
+        var oldLoop = block.Faces[1].Loop;
+        var newLoop = mesh.Faces[1].Loop;
         for (var k = 0; k < 6; k++)
         {
             var j = (k + 1) % 6;
@@ -154,7 +154,7 @@ public class ExtrudeTests
         Assert.Equal("faces[1]", error.Element);
         Assert.Contains("inset 0.6 is too large for this face", error.Message);
         Assert.Equal(TestMeshes.CubeVertices, cube.Vertices);
-        Assert.Equal(TestMeshes.CubeFaces, cube.Faces);
+        Assert.Equal(TestMeshes.CubeFaces, cube.Faces.Select(f => f.Loop));
     }
 
     [Fact]

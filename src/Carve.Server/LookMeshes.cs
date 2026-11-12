@@ -214,7 +214,7 @@ public static class LookMeshes
         return Lines(Enumerable.Range(0, mesh.Faces.Count).SelectMany(f =>
         {
             if (corners is not null && Shading.FaceHasCornerNormals(mesh, f))
-                return mesh.Faces[f].SelectMany((v, k) =>
+                return mesh.Faces[f].Corners.SelectMany((v, k) =>
                 {
                     var at = space.Apply(mesh.Vertices[v]);
                     return new[] { at, at + corners[f][k] * SpikeLength };

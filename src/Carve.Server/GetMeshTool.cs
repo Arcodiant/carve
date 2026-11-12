@@ -35,7 +35,10 @@ public sealed class GetMeshTool(ModelStore store)
             ["faces"] = Enumerable.Range(0, target.Faces.Count).Select(f => new
             {
                 id = f,
-                vertices = target.Faces[f].ToArray(),
+                // A holed face in define_mesh's object form; a plain face as its plain array, as before holes.
+                vertices = target.Faces[f].HasHoles
+                    ? (object)new { loop = target.Faces[f].Loop.ToArray(), holes = target.Faces[f].Holes.Select(h => h.ToArray()).ToArray() }
+                    : target.Faces[f].Loop.ToArray(),
                 normal = Array(target.FaceNormal(f)),
                 centre = Array(target.FaceCentre(f)),
             }).ToArray(),

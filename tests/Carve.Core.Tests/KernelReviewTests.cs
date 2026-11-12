@@ -324,7 +324,7 @@ public class KernelReviewTests
         faces[0] = [5, 6, 7];
 
         Assert.Equal(Vector3.Zero, mesh.Vertices[0]);
-        Assert.Equal([0, 3, 2, 1], mesh.Faces[0]);
+        Assert.Equal([0, 3, 2, 1], mesh.Faces[0].Loop);
         Assert.Single(mesh.Faces);
     }
 
@@ -333,7 +333,7 @@ public class KernelReviewTests
     {
         var mesh = TestMeshes.Cube();
         Assert.Throws<NotSupportedException>(() => ((IList<Vector3>)mesh.Vertices)[0] = Vector3.One);
-        Assert.Throws<NotSupportedException>(() => ((IList<int>)mesh.Faces[0])[0] = 7);
-        Assert.Throws<NotSupportedException>(() => ((IList<IReadOnlyList<int>>)mesh.Faces)[0] = new[] { 1, 2, 3 });
+        Assert.Throws<NotSupportedException>(() => ((IList<int>)mesh.Faces[0].Loop)[0] = 7);
+        Assert.Throws<NotSupportedException>(() => ((IList<Face>)mesh.Faces)[0] = new[] { 1, 2, 3 });
     }
 }

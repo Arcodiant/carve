@@ -79,15 +79,17 @@ public sealed class MeshReport
 
         for (var f = 0; f < mesh.Faces.Count; f++)
         {
-            var face = mesh.Faces[f];
-            if (face.Count <= 3) continue;
+            // The plane is the outer loop's (its normal and the mean of its corners); a hole corner off it is non-planar too.
+            var face = mesh.Faces[f].Loop;
+            var corners = mesh.Faces[f].Corners;
+            if (corners.Count <= 3) continue;
             var normal = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, face));
             var o = verts[face[0]];
             double cx = 0, cy = 0, cz = 0;
             foreach (var i in face) { cx += (double)verts[i].X - o.X; cy += (double)verts[i].Y - o.Y; cz += (double)verts[i].Z - o.Z; }
             cx /= face.Count; cy /= face.Count; cz /= face.Count;
-            var limit = PolygonMesh.PlanarityTolerance * PolygonMesh.FaceSize(verts, face);
-            var worst = face.Max(i => Math.Abs(((double)verts[i].X - o.X - cx) * normal.X + ((double)verts[i].Y - o.Y - cy) * normal.Y + ((double)verts[i].Z - o.Z - cz) * normal.Z));
+            var limit = PolygonMesh.PlanarityTolerance * PolygonMesh.FaceSize(verts, corners);
+            var worst = corners.Max(i => Math.Abs(((double)verts[i].X - o.X - cx) * normal.X + ((double)verts[i].Y - o.Y - cy) * normal.Y + ((double)verts[i].Z - o.Z - cz) * normal.Z));
             if (worst > limit)
                 warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", MeshEdits.Invariant($"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})")));
         }

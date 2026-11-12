@@ -56,7 +56,7 @@ public sealed class SubdivideTool(ModelStore store)
         if (!result!.Succeeded) return Failed("subdivide", result.Errors.Select(x => x.ToString()));
 
         var edited = snapshot.Model.Find(name ?? snapshot.Model.Meshes[0].Name)!;
-        var triangles = snapshot.Model.Meshes.Sum(m => m.Mesh.Faces.Sum(f => f.Count - 2));
+        var triangles = snapshot.Model.Meshes.Sum(m => m.Mesh.Faces.Sum(f => f.Corners.Count - 2 + 2 * f.Holes.Count));
         var report = MeshReport.Create(edited);
         var warnings = Warnings(report);
         if (triangles > SkinnedExport.MaxTriangles)

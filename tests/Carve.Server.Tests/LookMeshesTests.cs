@@ -148,7 +148,7 @@ public class LookMeshesTests
         }
 
         Assert.Contains(scene.VertexColours, c => c != LookMeshes.NormalColour(mesh.FaceNormal(0)) && c != LookMeshes.NormalColour(mesh.FaceNormal(1)));
-        Assert.Equal(2 * mesh.Faces.Sum(f => f.Count), Ends(scene.EdgeLines).Length);
+        Assert.Equal(2 * mesh.Faces.Sum(f => f.Loop.Count), Ends(scene.EdgeLines).Length);
     }
 
     [Fact]
@@ -195,7 +195,7 @@ public class LookMeshesTests
         var scene = LookMeshes.Compose(mesh, space, Look.Normals, Highlight.Of([], [], [3]));
 
         Assert.Equal(plain.VertexColours, scene.VertexColours);
-        Assert.Equal(2 * mesh.Faces[3].Count, Ends(scene.OrangeLines).Length);
+        Assert.Equal(2 * mesh.Faces[3].Loop.Count, Ends(scene.OrangeLines).Length);
     }
 
     [Theory]

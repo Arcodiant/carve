@@ -24,10 +24,17 @@ public static class Triangulator
         return result;
     }
 
-    /// <summary>Triangles of one face. A validated mesh's faces always triangulate.</summary>
+    /// <summary>
+    /// Triangles of one face. A validated mesh's faces always triangulate. A plain face's loop is ear-clipped; a holed
+    /// face's holes are first bridged into its outer loop (<see cref="Bridge"/>) and the one outline is ear-clipped.
+    /// </summary>
     public static IReadOnlyList<MeshTriangle> TriangulateFace(PolygonMesh mesh, int face)
     {
-        if (!TryTriangulate(mesh.Vertices, mesh.Faces[face], out var tris))
+        var f = mesh.Faces[face];
+        IReadOnlyList<int> outline = f.HasHoles
+            ? Bridge(mesh.Vertices, f)?.Ids ?? throw new InvalidOperationException($"faces[{face}] cannot be bridged")
+            : f.Loop;
+        if (!TryTriangulate(mesh.Vertices, outline, out var tris))
             throw new InvalidOperationException($"faces[{face}] cannot be triangulated");
         return tris.Select(t => new MeshTriangle(t.A, t.B, t.C, face)).ToArray();
     }
@@ -37,13 +44,18 @@ public static class Triangulator
     {
         var normal = PlaneNormal(verts, face);
         if (normal == (0, 0, 0)) return null;
+        return ProjectWith(verts, face, normal, verts[face[0]]);
+    }
 
+    /// <summary>The vertices <paramref name="ids"/> in 2D, in the plane through <paramref name="o"/> of unit <paramref name="normal"/>.</summary>
+    private static (double X, double Y)[] ProjectWith(IReadOnlyList<Vector3> verts, IReadOnlyList<int> ids,
+        (double X, double Y, double Z) normal, Vector3 o)
+    {
         // Basis (u, v) with u x v = normal, so a face wound CCW about its normal is CCW in 2D.
         var helper = Math.Abs(normal.X) < 0.9 ? (1.0, 0.0, 0.0) : (0.0, 1.0, 0.0);
         var u = PolygonMesh.Unit(Cross3(helper, normal));
         var v = Cross3(normal, u);
-        var o = verts[face[0]];
-        return face.Select(i =>
+        return ids.Select(i =>
         {
             double dx = (double)verts[i].X - o.X, dy = (double)verts[i].Y - o.Y, dz = (double)verts[i].Z - o.Z;
             return (dx * u.X + dy * u.Y + dz * u.Z, dx * v.X + dy * v.Y + dz * v.Z);
@@ -281,4 +293,175 @@ public static class Triangulator
     /// <summary>p is left of a-b, or within the tolerance (of the face size) of the line on its right.</summary>
     private static bool Inside((double X, double Y) a, (double X, double Y) b, (double X, double Y) p, double size)
         => Cross(a, b, p) >= -CollinearTolerance * size * Distance(a, b);
+
+    /// <summary>
+    /// A holed face as one outline: <see cref="Ids"/> the vertex ids in order, and <see cref="Corners"/> the face corner
+    /// (an index into <see cref="Face.Corners"/>) each position came from. A bridge vertex appears twice.
+    /// </summary>
+    internal sealed record Bridged(int[] Ids, int[] Corners);
+
+    /// <summary>
+    /// Each hole of <paramref name="face"/> (its <c>faces[<paramref name="faceId"/>]</c>) refused for its winding (not
+    /// clockwise against the outer loop, seen from outside), for not lying strictly inside the outer loop, or for
+    /// meeting another hole. "Meeting" counts touching: a point within <see cref="CollinearTolerance"/> of the face size
+    /// of another loop's edge, the "on" of <see cref="FindCrossing"/>. Assumes the loops' indices are valid and the outer
+    /// loop has an area.
+    /// </summary>
+    internal static List<MeshError> HoleProblems(IReadOnlyList<Vector3> verts, Face face, int faceId)
+    {
+        var errors = new List<MeshError>();
+        var normal = PlaneNormal(verts, face.Loop);
+        var o = verts[face.Loop[0]];
+        var size = PolygonMesh.FaceSize(verts, face.Loop);
+        var outer = ProjectWith(verts, face.Loop, normal, o);
+        var holes = face.Holes.Select(h => ProjectWith(verts, h, normal, o)).ToArray();
+        var ok = new bool[holes.Length];
+        for (var k = 0; k < holes.Length; k++)
+        {
+            var name = Face.LoopName(faceId, k);
+            if (SignedArea(holes[k]) > 0)
+                errors.Add(new MeshError(name,
+                    "hole winds the same way as the face's outer loop: seen from outside, a hole winds clockwise"));
+            else if (LoopsMeet(outer, holes[k], size) || !InsidePolygon(outer, holes[k][0]))
+                errors.Add(new MeshError(name,
+                    $"hole is not strictly inside the outer loop of faces[{faceId}]: it crosses, touches or lies outside it"));
+            else
+                ok[k] = true;
+        }
+
+        for (var k = 0; k < holes.Length; k++)
+        {
+            for (var j = 0; j < k && ok[k]; j++)
+            {
+                if (!ok[j]) continue;
+                if (LoopsMeet(holes[j], holes[k], size) || InsidePolygon(holes[j], holes[k][0]) || InsidePolygon(holes[k], holes[j][0]))
+                    errors.Add(new MeshError(Face.LoopName(faceId, k),
+                        $"hole overlaps or touches {Face.LoopName(faceId, j)}: the holes of a face must lie apart"));
+            }
+        }
+        return errors;
+    }
+
+    /// <summary>
+    /// The holes of <paramref name="face"/> bridged into its outer loop, the standard way: holes are taken by their
+    /// rightmost vertex (in the plane of the outer loop), rightmost first, and each such vertex is joined to the nearest
+    /// vertex of the outline so far that it sees: the join lies inside that vertex's corner and meets no edge of the
+    /// outline or of any hole left. The outline then runs to the join, round the hole from its rightmost vertex and back
+    /// to it, and back along the join. Null when some hole sees no vertex. Plain faces are not bridged.
+    /// </summary>
+    internal static Bridged? Bridge(IReadOnlyList<Vector3> verts, Face face)
+    {
+        var normal = PlaneNormal(verts, face.Loop);
+        if (normal == (0, 0, 0)) return null;
+        var size = PolygonMesh.FaceSize(verts, face.Loop);
+        var pts = ProjectWith(verts, face.Corners, normal, verts[face.Loop[0]]);
+        var combined = Enumerable.Range(0, face.Loop.Count).ToList();
+
+        var holeCorners = Enumerable.Range(0, face.Holes.Count)
+            .Select(h => Enumerable.Range(0, face.Holes[h].Count).Select(i => face.CornerAt(h, i)).ToArray())
+            .ToArray();
+        var order = Enumerable.Range(0, holeCorners.Length)
+            .OrderByDescending(h => holeCorners[h].Max(c => pts[c].X)).ThenBy(h => h).ToList();
+        var left = new HashSet<int>(order);
+
+        foreach (var h in order)
+        {
+            var cs = holeCorners[h];
+            var m = 0;
+            for (var i = 1; i < cs.Length; i++) if (pts[cs[i]].X > pts[cs[m]].X) m = i;
+            var mc = cs[m];
+            var at = pts[mc];
+
+            var best = -1;
+            var bestDistance = double.MaxValue;
+            for (var i = 0; i < combined.Count; i++)
+            {
+                var p = pts[combined[i]];
+                var d = Distance(at, p);
+                if (d >= bestDistance) continue;
+                var prev = pts[combined[(i + combined.Count - 1) % combined.Count]];
+                var next = pts[combined[(i + 1) % combined.Count]];
+                if (!InCone(prev, p, next, at)) continue;
+                if (Blocked(at, p, size, combined, pts, skipAt: p)) continue;
+                if (left.Any(other => Blocked(at, p, size, holeCorners[other], pts, skipAt: at))) continue;
+                best = i;
+                bestDistance = d;
+            }
+            if (best < 0) return null;
+
+            var splice = new List<int>(cs.Length + 2);
+            for (var i = 0; i <= cs.Length; i++) splice.Add(cs[(m + i) % cs.Length]);
+            splice.Add(combined[best]);
+            combined.InsertRange(best + 1, splice);
+            left.Remove(h);
+        }
+        return new Bridged(combined.Select(c => face.Corners[c]).ToArray(), [.. combined]);
+    }
+
+    /// <summary>Whether the join a-b meets an edge of the closed loop <paramref name="loop"/> (corner indices into <paramref name="pts"/>), leaving out the edges that end at <paramref name="skipAt"/>.</summary>
+    private static bool Blocked((double X, double Y) a, (double X, double Y) b, double size, IReadOnlyList<int> loop,
+        (double X, double Y)[] pts, (double X, double Y) skipAt)
+    {
+        for (var k = 0; k < loop.Count; k++)
+        {
+            var c = pts[loop[k]];
+            var d = pts[loop[(k + 1) % loop.Count]];
+            if (c == skipAt || d == skipAt) continue;
+            if (SegmentsMeet(a, b, c, d, size)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Whether p lies strictly inside the corner at b of a loop running a, b, c counter-clockwise.</summary>
+    private static bool InCone((double X, double Y) a, (double X, double Y) b, (double X, double Y) c, (double X, double Y) p)
+        => Cross(a, b, c) > 0
+            ? Cross(a, b, p) > 0 && Cross(b, c, p) > 0
+            : !(Cross(a, b, p) <= 0 && Cross(b, c, p) <= 0);
+
+    /// <summary>Twice-signed area of a 2D loop: positive counter-clockwise.</summary>
+    private static double SignedArea((double X, double Y)[] loop)
+    {
+        double area = 0;
+        for (var k = 0; k < loop.Length; k++)
+        {
+            var a = loop[k];
+            var b = loop[(k + 1) % loop.Length];
+            area += a.X * b.Y - b.X * a.Y;
+        }
+        return area;
+    }
+
+    /// <summary>Whether some edge of one loop meets (crosses or touches) some edge of the other.</summary>
+    private static bool LoopsMeet((double X, double Y)[] p, (double X, double Y)[] q, double size)
+    {
+        for (var i = 0; i < p.Length; i++)
+            for (var j = 0; j < q.Length; j++)
+                if (SegmentsMeet(p[i], p[(i + 1) % p.Length], q[j], q[(j + 1) % q.Length], size)) return true;
+        return false;
+    }
+
+    /// <summary>Whether segments a-b and c-d cross or touch, "on" within the tolerance <see cref="Side"/> uses.</summary>
+    private static bool SegmentsMeet((double X, double Y) a, (double X, double Y) b, (double X, double Y) c, (double X, double Y) d, double size)
+    {
+        var d1 = Side(a, b, c, size);
+        var d2 = Side(a, b, d, size);
+        var d3 = Side(c, d, a, size);
+        var d4 = Side(c, d, b, size);
+        if (d1 == 0 && d2 == 0 && d3 == 0 && d4 == 0) return !Disjoint(a, b, c, d);
+        return d1 * d2 <= 0 && d3 * d4 <= 0;
+    }
+
+    /// <summary>Whether p is inside the loop by the even-odd rule; for a point on no edge of the loop.</summary>
+    private static bool InsidePolygon((double X, double Y)[] loop, (double X, double Y) p)
+    {
+        var inside = false;
+        for (int i = 0, j = loop.Length - 1; i < loop.Length; j = i++)
+        {
+            var a = loop[i];
+            var b = loop[j];
+            if ((a.Y > p.Y) != (b.Y > p.Y) && p.X < (b.X - a.X) * (p.Y - a.Y) / (b.Y - a.Y) + a.X)
+                inside = !inside;
+        }
+        return inside;
+    }
 }

@@ -14,7 +14,7 @@ public class ShadingTests
             $"expected {expected}, got {actual}");
 
     private static Vector3 CornerOf(PolygonMesh mesh, int face, int vertex) =>
-        Shading.Corners(mesh)[face][mesh.Faces[face].ToList().IndexOf(vertex)];
+        Shading.Corners(mesh)[face][mesh.Faces[face].Loop.ToList().IndexOf(vertex)];
 
     private static void Near(Vector3 expected, Vector3 actual) =>
         Assert.True((expected - actual).Length() < 1e-6f, $"expected {expected}, got {actual}");
@@ -60,7 +60,7 @@ public class ShadingTests
     {
         var mesh = Cube().WithShade(MeshShade.Flat.WithMode(ShadingMode.Smooth));
         for (var f = 0; f < mesh.Faces.Count; f++)
-            foreach (var v in mesh.Faces[f])
+            foreach (var v in mesh.Faces[f].Loop)
             {
                 var expected = Vector3.Normalize(mesh.Vertices[v] - new Vector3(0.5f));
                 Near(expected, CornerOf(mesh, f, v));

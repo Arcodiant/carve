@@ -118,7 +118,7 @@ public static class Skinning
     }
 
     /// <summary>
-    /// The posed corner normals of <paramref name="mesh"/> (face, then position in its loop): each rest corner normal
+    /// The posed corner normals of <paramref name="mesh"/> (face, then corner, <see cref="Face.Corners"/>): each rest corner normal
     /// (<see cref="Shading.Corners"/>) rotated and blended by its vertex's weights, renormalised; an unweighted vertex keeps its own.
     /// </summary>
     public static Vector3[][] CornerNormals(PolygonMesh mesh, Skeleton skeleton, Pose pose)
@@ -128,7 +128,7 @@ public static class Skinning
         var result = new Vector3[rest.Length][];
         for (var f = 0; f < rest.Length; f++)
         {
-            var loop = mesh.Faces[f];
+            var loop = mesh.Faces[f].Corners;
             result[f] = new Vector3[loop.Count];
             for (var k = 0; k < loop.Count; k++)
             {

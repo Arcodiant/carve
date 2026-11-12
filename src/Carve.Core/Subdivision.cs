@@ -27,7 +27,7 @@ internal static class Subdivision
     {
         var verts = input.Vertices;
         var faces = input.Faces;
-        var topology = PolygonMesh.Assemble(verts, faces).Topology;
+        var topology = PolygonMesh.Assemble(verts, faces.Select(f => (Face)f).ToArray()).Topology;
         var edges = topology.Edges;
         int v0 = verts.Length, f0 = faces.Length, e0 = edges.Count;
         var shade = input.Shade;
