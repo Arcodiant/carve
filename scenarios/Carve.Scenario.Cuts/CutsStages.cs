@@ -17,5 +17,6 @@ internal static class CutsStages
         new DeleteStage(),
         new MergeBridgeStage(),
         new PlaneCutStage(),
+        new LoopCutStage(),
     ];
 }
