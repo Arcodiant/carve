@@ -84,11 +84,52 @@ internal static class GatehousePlan
         return Vector3.Distance(p, a + (t * (b - a)));
     }
 
-    /// <summary>The edges of the faces turned toward the camera (as T-67's wireframe check takes them).</summary>
-    public static (int Lo, int Hi)[] InSight(Solid solid, Vector3 direction)
+    /// <summary>The nudge of the in-sight rule, as a fraction of the mesh's bounds diagonal.</summary>
+    private const float Nudge = 1e-3f;
+
+    /// <summary>
+    /// The edges in sight (the person's ruling of 2026-11-12): an edge is in sight when a ray from the eye to the edge's
+    /// middle, nudged into one of its two faces, first hits that face. The nudge is 1e-3 of the mesh's bounds diagonal, from
+    /// the middle toward that face's centroid, in the face's plane. Computed from the geometry, not from a pixel; for an
+    /// orthographic camera the ray runs along the view direction.
+    /// </summary>
+    public static (int Lo, int Hi)[] InSight(Solid solid, Camera camera, Vector3 toEye, bool orthographic = false)
     {
-        var unit = Vector3.Normalize(direction);
-        return Edges(solid, Enumerable.Range(0, solid.Faces.Length).Where(f => !solid.IsDeleted(f) && Vector3.Dot(solid.Normal(f), unit) > 0.2f));
+        var (min, max) = Bounds(solid);
+        var nudge = Nudge * (max - min).Length();
+        var faces = new Dictionary<(int, int), List<int>>();
+        for (var f = 0; f < solid.Faces.Length; f++)
+        {
+            if (solid.IsDeleted(f))
+            {
+                continue;
+            }
+
+            foreach (var l in solid.Faces[f].Holes.Prepend(solid.Faces[f].Loop))
+            {
+                for (var k = 0; k < l.Length; k++)
+                {
+                    var (a, b) = (l[k], l[(k + 1) % l.Length]);
+                    var key = (Math.Min(a, b), Math.Max(a, b));
+                    if (!faces.TryGetValue(key, out var list))
+                    {
+                        faces[key] = list = [];
+                    }
+
+                    list.Add(f);
+                }
+            }
+        }
+
+        return faces.Where(e => e.Value.Distinct().Any(f =>
+        {
+            var middle = (solid.Vertices[e.Key.Item1] + solid.Vertices[e.Key.Item2]) / 2;
+            var corners = solid.Faces[f].Loop.Select(v => solid.Vertices[v]).ToArray();
+            var centroid = corners.Aggregate(Vector3.Zero, (a, b) => a + b) / corners.Length;
+            var at = middle + (Vector3.Normalize(centroid - middle) * nudge);
+            var (origin, direction) = orthographic ? (at + (Vector3.Normalize(toEye) * 100), -Vector3.Normalize(toEye)) : (camera.Eye, Vector3.Normalize(at - camera.Eye));
+            return solid.FirstHit(origin, direction) == f;
+        })).Select(e => e.Key).OrderBy(e => e).ToArray();
     }
 
     public static IEnumerable<Probe> Probes(Solid solid)

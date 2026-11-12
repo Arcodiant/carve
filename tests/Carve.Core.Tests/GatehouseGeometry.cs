@@ -281,14 +281,22 @@ public class GatehouseGeometry
     public void TheWireframesHighlightTheStagesNewEdges()
     {
         // (stage, new edges, in sight from the front among them, in sight from the back among them)
-        (int, int, int, int)[] expected = [(2, 16, 11, 10), (4, 7, 5, 5), (6, 10, 5, 5)];
+        (int, int, int, int)[] expected = [(2, 16, 10, 7), (4, 7, 5, 5), (6, 10, 5, 5)];
         foreach (var (stage, added, fromFront, fromBack) in expected)
         {
             var (before, after) = (SolidOf(Mesh(stage - 1)), SolidOf(Mesh(stage)));
             var fresh = GatehousePlan.NewEdges(before, after);
             Assert.Equal(added, fresh.Length);
-            Assert.Equal(fromFront, GatehousePlan.InSight(after, GatehousePlan.FromFront).Count(fresh.Contains));
-            Assert.Equal(fromBack, GatehousePlan.InSight(after, GatehousePlan.FromBack).Count(fresh.Contains));
+            Assert.Equal(fromFront, GatehousePlan.InSight(after, CameraFor(after, "front"), GatehousePlan.FromFront).Count(fresh.Contains));
+            Assert.Equal(fromBack, GatehousePlan.InSight(after, CameraFor(after, "back"), GatehousePlan.FromBack).Count(fresh.Contains));
         }
+    }
+
+    [Fact]
+    public void TheEdgeUnderTheCorniceIsNotInSightFromTheFront()
+    {
+        var after = SolidOf(Mesh(2));
+        var seen = GatehousePlan.InSight(after, CameraFor(after, "front"), GatehousePlan.FromFront);
+        Assert.DoesNotContain((12, 14), seen);
     }
 }
