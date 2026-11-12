@@ -72,6 +72,7 @@ if (!services.Any(d => d.ServiceType == typeof(ITransport)))
 }
 
 services.AddSingleton(RenderTool.Create);
+services.AddSingleton(RenderGlbTool.Create);
 mcp.WithTools([DefineMeshTool.Create(), MoveTool.Create(), ExtrudeTool.Create(), SubdivideTool.Create(), DeleteTool.Create(), MergeFacesTool.Create(), BridgeTool.Create(), PlaneCutTool.Create(), LoopCutTool.Create(), KnifeTool.Create(), GetMeshTool.Create(), UndoTool.Create(), ExportTool.Create(), SaveTool.Create(), OpenTool.Create(), CheckTool.Create(), SelectTool.Create(), DefineGroupTool.Create(), SetColourTool.Create(), DefineMaterialTool.Create(), SetMaterialTool.Create(), SetShadingTool.Create(), MarkEdgesTool.Create(), SetUvsTool.Create(), UnwrapTool.Create(), ProjectUvsTool.Create(), DefineSkeletonTool.Create(), GetSkeletonTool.Create(), SetWeightsTool.Create(), GetWeightsTool.Create(), WeighTool.Create(), DefineClipTool.Create(), DeleteClipTool.Create(), GetClipsTool.Create()]);
 
 services.AddSingleton<EngineStatus>();

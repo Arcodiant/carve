@@ -44,6 +44,9 @@ internal sealed record RenderSpec(
 
     /// <summary>The skeleton drawn over the model, or null for none. Compared by reference: one per call.</summary>
     internal BoneDraw? Bones { get; init; }
+
+    /// <summary>A loaded <c>.glb</c> drawn in place of the model (render_glb), or null for the model. Compared by reference: one per call.</summary>
+    internal GlbScene? Glb { get; init; }
 }
 
 /// <summary>One asked-for render, waiting for the frame thread.</summary>
