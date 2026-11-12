@@ -437,23 +437,23 @@ public static class FaceSplit
         return mesh.WithShade(whole.Count == 0 ? shade : shade.WithEdges(whole, false).WithEdges(halves, true));
     }
 
-    private readonly record struct Vector2D(double X, double Y)
+    internal readonly record struct Vector2D(double X, double Y)
     {
         public static Vector2D operator +(Vector2D a, Vector2D b) => new(a.X + b.X, a.Y + b.Y);
         public static Vector2D operator -(Vector2D a, Vector2D b) => new(a.X - b.X, a.Y - b.Y);
         public static Vector2D operator *(Vector2D a, double s) => new(a.X * s, a.Y * s);
     }
 
-    private readonly record struct Vector3D(double X, double Y, double Z)
+    internal readonly record struct Vector3D(double X, double Y, double Z)
     {
         public static Vector3D operator +(Vector3D a, Vector3D b) => new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
         public static Vector3D operator -(Vector3D a, Vector3D b) => new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
         public static Vector3D operator *(Vector3D a, double s) => new(a.X * s, a.Y * s, a.Z * s);
     }
 
-    private static Vector3D D(Vector3 v) => new(v.X, v.Y, v.Z);
+    internal static Vector3D D(Vector3 v) => new(v.X, v.Y, v.Z);
 
-    private static double Dot(Vector3D a, Vector3D b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+    internal static double Dot(Vector3D a, Vector3D b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
 
     private static double Distance(Vector3 a, Vector3 b)
     {
@@ -464,7 +464,7 @@ public static class FaceSplit
     private static Vector3 Lerp(Vector3 a, Vector3 b, double t) => new(
         (float)(a.X + (b.X - (double)a.X) * t), (float)(a.Y + (b.Y - (double)a.Y) * t), (float)(a.Z + (b.Z - (double)a.Z) * t));
 
-    private static double SegmentDistance(Vector3D p, Vector3D a, Vector3D b)
+    internal static double SegmentDistance(Vector3D p, Vector3D a, Vector3D b)
     {
         var ab = b - a;
         var len2 = Dot(ab, ab);
@@ -473,7 +473,7 @@ public static class FaceSplit
         return Math.Sqrt(Dot(d, d));
     }
 
-    private static (Vector3D U, Vector3D V) Basis((double X, double Y, double Z) normal)
+    internal static (Vector3D U, Vector3D V) Basis((double X, double Y, double Z) normal)
     {
         var n = new Vector3D(normal.X, normal.Y, normal.Z);
         var helper = Math.Abs(n.X) < 0.9 ? new Vector3D(1, 0, 0) : new Vector3D(0, 1, 0);
@@ -482,7 +482,7 @@ public static class FaceSplit
         return (u, Cross(n, u));
     }
 
-    private static Vector3D Cross(Vector3D a, Vector3D b) => new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
+    internal static Vector3D Cross(Vector3D a, Vector3D b) => new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
 
     private static double Angle(Vector2D from, Vector2D to) => Math.Atan2(to.Y - from.Y, to.X - from.X);
 
@@ -492,7 +492,7 @@ public static class FaceSplit
     private static bool Crosses(Vector2D p, Vector2D q, Vector2D r, Vector2D s)
         => Math.Sign(Orient(p, q, r)) * Math.Sign(Orient(p, q, s)) < 0 && Math.Sign(Orient(r, s, p)) * Math.Sign(Orient(r, s, q)) < 0;
 
-    private static double SignedArea(IReadOnlyList<int> loop, Func<int, Vector2D> at)
+    internal static double SignedArea(IReadOnlyList<int> loop, Func<int, Vector2D> at)
     {
         double area = 0;
         for (var i = 0; i < loop.Count; i++)
@@ -503,7 +503,7 @@ public static class FaceSplit
         return area / 2;
     }
 
-    private static bool InPolygon(IReadOnlyList<int> loop, Func<int, Vector2D> at, Vector2D p)
+    internal static bool InPolygon(IReadOnlyList<int> loop, Func<int, Vector2D> at, Vector2D p)
     {
         var inside = false;
         for (var i = 0; i < loop.Count; i++)
@@ -515,6 +515,6 @@ public static class FaceSplit
     }
 
     /// <summary>Inside the outer loop and in no hole.</summary>
-    private static bool Inside(IReadOnlyList<int>[] loops, Func<int, Vector2D> at, Vector2D p)
+    internal static bool Inside(IReadOnlyList<int>[] loops, Func<int, Vector2D> at, Vector2D p)
         => InPolygon(loops[0], at, p) && !loops.Skip(1).Any(h => InPolygon(h, at, p));
 }
