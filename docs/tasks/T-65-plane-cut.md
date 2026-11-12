@@ -104,7 +104,7 @@ Ray-test pixel checks, each shown failing on a break.
 
 ### As built
 
-First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.Split` and the `split` report field** (the member's own checkpoint: "`FaceSplit` with its tests, then `PlaneCut` and the tool"). `PlaneCut`, the tool and the content are left to the next agent (see Hand-off).
+First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.Split` and the `split` report field** (the member's own checkpoint: "`FaceSplit` with its tests, then `PlaneCut` and the tool"). `PlaneCut`, the tool and the content were left to the second agent, below.
 
 **`FaceSplit`** (`src/Carve.Core/FaceSplit.cs`), the API T-66 and T-67 build on:
 
@@ -157,34 +157,100 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
 
 **Frames:** none taken. Nothing here changes a frame: the report gains a key, and no stage cuts yet. The hash check against T-64's 127 (`D:/repos/carve/branches/milestone/M-5/artifacts/review/T-64/frames-737853a/all.sha256`) is for the agent that runs the GPU suites.
 
+**The person's rulings (2026-11-12), on the first agent's hand-off:**
+
+1. `FaceSplit`'s snap tolerance is 1e-4 of the whole mesh's bounds diagonal, as built.
+2. With `keep` above or below, a piece the split appends and the cut removes is listed in both `split` and `deleted`, as built.
+3. T-64's `Drawn` pixel check (a nearby pixel at least half way from the background to the line colour, along an edge over the background) is accepted as the rule for edges over the background. This member's stage checks no edge over the background, so it does not use it.
+
+**Second agent: Opus (claude-opus-5-5). `PlaneCut`, the `plane_cut` tool, the Cuts stage, the breaks and the GPU run.**
+
+- **`PlaneCut`** (`src/Carve.Core/PlaneCut.cs`): `PlaneCut.Cut(mesh, point, normal, keep = PlaneKeep.Both, fill = true, faces = null) -> PlaneCutResult(EditResult Edit, IReadOnlyList<string> Warnings, IReadOnlyList<(int Lo, int Hi)> CutEdges)`.
+  - A vertex within `FaceSplit.Tolerance(mesh)` of the plane is on it (the one tolerance, ruling 1). Per face (the `faces` given, else every live face): its crossings are the corners on the plane and the edges whose ends are strictly on opposite sides (`CutPoint.OnEdge(a, b, da / (da - db))`), sorted along the line where the plane meets the face. Each gap between consecutive crossings whose middle is inside the face, and not within the tolerance of its boundary, is one `FaceCut`. So a concave face gives several segments (the L-block's arms), and a corner or edge that only touches the plane gives none. A face with every corner on the plane is not split. All the segments go to one `FaceSplit.Split`. With no segment at all the mesh is unchanged (not refused, if the plane touches a face).
+  - **keep above/below:** each live face of the split mesh is above when every corner is >= -tol, below when every corner is <= tol, and a face with every corner on the plane goes with its normal. The other side's faces go through `MeshDelete.Closure` (T-64's orphan rule) and one `Edit` with the caps.
+  - **fill:** the cap border is each kept face's edge that a deleted face has the other way round, with both ends on the plane, taken reversed, so the caps wind outward on the kept side. The border chains into loops. Open chains are traced first, from each vertex with more border edges out than in, and each is a warning, `fill: the cut from vertex 11 to vertex 10 is not a closed loop (the mesh is open there), so it is left open`, which the tool appends to the report's `warnings`. A closed loop wound counter-clockwise about the kept side's outward normal is a cap. One wound the other way is a hole of the smallest cap around it (T-63's clockwise holes), so a tube cut across gives one holed cap. Each loop starts at its lowest vertex id, and caps are appended in order of their lowest id. On a smooth mesh every cap edge is made hard (`MeshShade.WithEdges`).
+  - **The report:** `Split` is the split's. `Deleted` is the closure, which with `keep` includes the appended pieces of the far side (ruling 2). `NewVertices` and `NewFaces` (`created`) list what the split and the fill made **and is still live**. This follows `subdivide`'s precedent of leaving tombstoned ids out of `created`, and is a reading the person may want to confirm. Caps take no colour and no group, since they are no face's pieces. This is a reading too: the spec says nothing about a cap's colour.
+  - **Refused:** `point: must be a finite point`; `normal: must be a finite, non-zero vector`; `faces: a cut limited to some faces keeps both sides: leave faces out to keep one side`; `faces` empty, unknown or deleted (`MeshEdits.UnknownElements`); `point, normal: the plane touches no face` (no target face with a corner on it or corners on both sides); `keep: this would leave nothing: every face is below the plane`.
+  - `FaceSplit`'s geometry helpers (`Vector2D`, `Vector3D`, `D`, `Dot`, `Cross`, `Basis`, `SegmentDistance`, `SignedArea`, `InPolygon`, `Inside`) became `internal` so `PlaneCut` uses the same geometry. Nothing else in `FaceSplit` changed.
+  - **Not handled specially:** a cut whose border meets itself at a vertex (a non-manifold cut, which the spec sends to the person). The chaining takes the lowest-id way on, and no test covers it.
+- **The `plane_cut` tool** (`src/Carve.Server/PlaneCutTool.cs`, in `Program.cs`'s list after `delete`): the description, the worked example `{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}` on `define_mesh`'s cube (a half-height closed box, 8 vertices, 6 faces), and one `undo` step (the store's one `Edit`). A `keep` other than both, above or below is refused (`keep: expected both, above or below, got "left"`).
+- **Tests.** `PlaneCutTests` (Core unit, 17):
+  - keeping both on the cube (ids 8..11, faces 6..9, the four cut edges);
+  - keeping below with fill: the half-height box, deleted `[2, 3, 6, 7]` and `[3, 6, 7, 8, 9]`, split `[0, 6] [1, 7] [4, 8] [5, 9]`, the cap `[8, 10, 11, 9]` facing up, area 1, closed;
+  - keeping above with fill (the cap facing down), and without fill (four open edges);
+  - the L-block cut by x + y = 2.5: front and back each in three pieces, two caps below, eight open edges above without fill;
+  - a square tube: a cap with one hole, area 3;
+  - the cube with its front deleted: the warning naming vertices 11 and 10;
+  - a cut in the top face's plane: not split, the top going above with its normal, the cap `[2, 3, 7, 6]` below;
+  - a smooth cube's cap border hard, beside a hard edge it had;
+  - a cut limited to face 4;
+  - each refusal.
+
+  `PlaneCutToolTests` (Server regression, 2):
+  - the worked example through the client: `split` (faces 0, 1, 4, 5, each its own id first), `deleted` (the upper pieces in it) and `created`, then `check` closed, then `undo` back to the cube in one step;
+  - keep both, the open-mesh warning in the report, and five refusals.
+- **The Cuts stage** (`scenarios/Carve.Scenario.Cuts/PlaneCutStage.cs`, one line in `CutsStages.cs`).
+  - **The cut.** The diagonal cut is the plane x + 2y - z = 1.2, through `[0.5, 0.6, 0.5]` with normal `[1, 2, -1]`, chosen so that no cube corner lies on it. It crosses five edges and leaves a pentagonal cap, seen from both directions.
+  - **Keeping below with fill.** The report is 10 vertices, 7 faces, closed, split faces 0, 1, 3, 4, 5, deleted vertices 2, 3, 6, and a five-cornered cap. The frames are `plane-cut-below-front` (from `[0.6, 0.35, 1]`) and `plane-cut-below-back` (from `[-0.6, 0.35, -1]`). The probes are a 4 x 4 grid on each cube plane, six points outside the cube, and the grid points of the cut plane. In each frame:
+    - every probe on the cut plane inside the cube that the ray test is sure of shows the cap, and at least 8 are sure;
+    - every sure probe where the ray meets nothing shows the background;
+    - every other sure probe shows the mesh, within `Exact` of the shade read at that face's first sure probe.
+  - **Keeping both.** 13 vertices, 11 faces, closed, nothing deleted. The cut edges are found from get_mesh (face edges with both ends on the plane, five of them) and passed as render's `highlight`. Frame `plane-cut-both-wireframe` (from `[0.6, 0.35, 1]`) checks:
+    - the caption's `highlight 5 edges`;
+    - the faces `Fill` away from lines;
+    - on the faces turned to the camera, the three cut edges in sight are `Line` orange and every other edge in sight is `NotLine` orange. These are the crate's highlight checks, over the faces' fill, not over the background.
+
+**Breaks** (each applied alone by `C:/Users/andre/AppData/Local/Temp/t65/breaks2.py`, built with warnings as errors, `PlaneCutTests`, `PlaneCutToolTests` or the Cuts scenario run on this machine, then restored; output appended to `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/breaks.log`):
+
+  | Check | Break | Result |
+  |---|---|---|
+  | keep both only splits | keep both goes on to delete | 2 fail |
+  | above is the side the normal points to | above and below swapped | 9 fail |
+  | keeping one side deletes the other | no face deleted | 9 fail |
+  | the orphan rule (T-64's closure) | only the faces deleted | 4 fail |
+  | fill caps each closed loop | no cap | 7 fail |
+  | the cap is wound outward on the kept side | the outward normal reversed | 6 fail |
+  | nested loops give a cap with a hole | holes dropped | 1 fails |
+  | an open chain is a warning naming its ends | the ends named the wrong way round | 1 fails |
+  | a face in the plane goes with its normal | against its normal | 1 fails |
+  | a smooth mesh's fill border is hard | not marked | 1 fails |
+  | `faces` limits the cut | every face cut | 2 fail (first written so it did not build, CS8604; rewritten and rerun) |
+  | a concave face's gaps outside it are not cut | the inside test dropped | 1 fails (first written so it did not build, CS8321; rewritten and rerun) |
+  | `split` reported beside `deleted` | `split` left out | 1 fails |
+  | `created` lists only what is left | the deleted pieces listed | 3 fail |
+  | refused: a zero or non-finite normal | the check never fires | 3 fail |
+  | refused: a non-finite point | x not checked | 1 fails |
+  | refused: a limited cut keeping a side | the check never fires | 1 fails |
+  | refused: a plane touching no face | the check never fires | 1 fails |
+  | refused: a cut leaving nothing | the check never fires | 1 fails |
+  | tool: the open-chain warning reaches the report | not appended | 1 fails |
+  | tool: `keep: below` is read | read as both | 2 fail |
+  | tool: `fill` defaults to true | defaults to false | 2 fail |
+  | Cuts: the fill caps the cut | no cap | 35 checks fail |
+  | Cuts: the cap faces out of the kept side | the outward normal reversed | 35 checks fail |
+  | Cuts: keep below deletes the corner above | no face deleted | 31 checks fail |
+  | Cuts: the cut is where the plane is, and the highlighted edges with it | each crossing at 1 - t along its edge | 24 checks fail |
+
+  The one `undo` step per call has no break of its own. It is the store's one `Edit`, as for every edit tool, and `PlaneCutToolTests` checks that one `undo` restores the cube.
+
+**Frames:** the Cuts scenario was run on this machine (`scripts/run-scenario.ps1 cuts`, outcome passed) on `69f9afa`. Its six existing frames are byte-identical to T-64's `cuts-frames.sha256`. The run's nine frames and their list are in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/cuts-local-69f9afa/`.
+
 ### Hand-off
 
-**Done (first agent, Opus claude-opus-5-5):** `FaceSplit`, `EditResult.Split`, the `split` report field, `FaceSplitTests` (15), the `split` assertion in `DeleteToolTests`, and the breaks above. By `dotnet test` here: Core 636, server unit 279, `DeleteToolTests` 2, all pass. `cairn task T-65 verify` has **not** been run: no GPU suite was submitted, and nothing here can be seen.
+**Done (second agent, Opus claude-opus-5-5):** everything in As built above. `cairn task T-65 verify` passed on `40a51d5`: server-unit, core-unit, scenario-cube, crate, shed, cuts, export, character, soft and server-regression all ran (viewer-cube carried). The code and its stage are final unless the review asks for a change. Only this document has changed since `40a51d5`.
 
 **Left:**
 
-1. **`PlaneCut`** (Core, its own file), on `FaceSplit`. A suggested shape:
-   - Take the signed distance `d` of each live vertex from the plane. A vertex within `FaceSplit.Tolerance(mesh)` is on the plane (one tolerance for the whole cut).
-   - A face with every corner on the plane is not split. With `keep`, it goes with the side its normal points to.
-   - For every other face, collect its crossings: `CutPoint.AtVertex` for a corner on the plane, and `CutPoint.OnEdge(a, b, da / (da - db))` for an edge whose ends are strictly on opposite sides. Sort them along the plane's line in the face, and keep the gaps between consecutive points whose midpoints are inside the face. `FaceSplit` refuses a segment outside the face, so filter before calling it: a concave face, or a holed one, gives several segments, and a corner that only touches the plane gives none.
-   - Then call `FaceSplit.Split`. Its `Segments` are the cut edges.
-   - **keep above/below:** classify each live face of the split mesh by its corners' distances (above when all are >= -tol, below when all are <= tol). Delete the other side with `MeshDelete.Closure` and a second `Edit(deletedVertices, deletedFaces)`. Refuse a limited (`faces`) cut that keeps a side, a zero or non-finite normal, a plane touching no face, and a cut that leaves nothing.
-   - **fill:** chain the cut edges on the kept side into closed loops and cap each, wound outward on the kept side (for `below`, the cap's normal is `+normal`). Two nested loops give a holed cap (T-63, holes clockwise). An open chain is a warning naming its ends. On a smooth mesh the caps' border edges go hard (`MeshShade.WithEdges`).
-   - The combined `EditResult` must report the split's and the fill's `NewVertices` and `NewFaces`, with `Split` and `Deleted`, together (`EditResult.Made(..., deleted, split)`). A piece the split appends and then deletes with the other side appears in both `split` and `deleted`. That follows the spec's wording, but the person may want to look at it.
-   - Tests per Scope: keep both, above and below, with and without fill, on the cube, an L-block and an open mesh (the warning); a cut in a face's plane; each refusal; each with a break.
-2. **The `plane_cut` tool** in `Program.cs`'s list (beside T-68's; keep both sides), with its description and the worked example (the unit cube cut at y = 0.5 keeping `below` with fill gives a half-height closed box), as one `undo` step. Add the `regression` test through the client: the cube, its `split` and `deleted` fields, then `check` closed.
-3. **`PlaneCutStage.cs`** and its line in `CutsStages.cs` (beside T-68's), with:
-   - the three frames per Scope, and ray-test pixel checks, each shown failing;
-   - the GPU suites, run once on a near-final commit, with every existing frame byte-identical to T-64's 127;
-   - the new frames to the person through `mcp__waystone__review`;
-   - then verify, lint and finish.
+1. **Fetch the run's frames** with `cairn test artifacts <suite>` for each scenario suite of `40a51d5`, into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/frames-40a51d5/`. Write `all.sha256` there and compare it with T-64's 127 (`.../T-64/frames-737853a/all.sha256`). Every one must be byte-identical. T-68 had landed nothing on `origin/milestone/M-5` when this was written, so check again. The three new frames should match the local run's hashes (`plane-cut-below-back` `fc88fdeb...`, `plane-cut-below-front` `81c9a77d...`, `plane-cut-both-wireframe` `d1bcda5a...`). List the result in As built's **Frames**.
+2. **Send the three new frames to the person** through `mcp__waystone__review` (files under the evidence folder) and record the outcome.
+3. **Put to the person the readings flagged in As built:**
+   - `created` lists only live ids, so a far-side piece is in `split` and `deleted` but not in `created`;
+   - caps take no colour or group;
+   - the non-manifold-cut chaining.
+4. Then remove this section, verify again, `cairn lint`, and `cairn task T-65 finish` from inside the worktree.
 
-**Checked:** everything in the breaks table. **Not checked:**
-- Any frame.
-- `server-regression` as a whole. Only `DeleteToolTests` ran here. Every other regression test sees one more report key, `split`; no test checks an exact key set as far as a search found, but the suite was not run.
+**Checked:** the breaks table; Core 17 and server 2 new tests; server unit 279; the local Cuts run, its six old frames byte-identical to T-64's. One scaled-down contact sheet of the three new local frames was looked at: the cut solid from both sides with its cap, and the wireframe with the orange cut line across the front, right and top.
 
-**Surprising:**
-- Two breaks caught nothing on the first run (the table says which, and how each test was strengthened). The tracing order happened to agree with the id rule, and the outline count caught the lone bridge on its own.
-- A backslash in the breaks script was eaten on its way through the shell, as the machine's CLAUDE.md warns. The script now uses `os.path.join`.
+**Not checked:** the GPU run's frames by hash (step 1); the person's review.
 
-**For the person: one reading to confirm.** The spec says "within `PolygonMesh`'s planarity tolerance of an existing vertex". `PlanarityTolerance` (1e-4) is a fraction of a size, and the planarity check measures that size as each face's bounding-box diagonal. `FaceSplit` uses the bounding-box diagonal of the mesh's live vertices instead, so that the two faces on an edge always agree about a point; the knife's "1e-4 of the bounds diagonal" is this length too. If the person wants a per-face or per-edge length instead, the change is confined to the one method `FaceSplit.Tolerance`.
+**Surprising:** nothing failed on the first run of the new tests or the stage, which is why every check has a break above. Two breaks did not build at first. Heredocs with backticks failed in this Bash tool, so the breaks script and the doc were written with the Write and Edit tools.
