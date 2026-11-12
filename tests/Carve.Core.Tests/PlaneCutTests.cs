@@ -131,6 +131,44 @@ public class PlaneCutTests
         Assert.All(ma.LiveVertices, v => Assert.True(ma.Vertices[v].X + ma.Vertices[v].Y >= 2.5f - 1e-4f));
     }
 
+    /// <summary>A square tube along y: outer 2 x 2 (0..3 at y = 0, 4..7 at y = 1), inner 1 x 1 (8..11, 12..15), holed ends.</summary>
+    private static PolygonMesh Tube()
+    {
+        (float X, float Z)[] outer = [(0, 0), (2, 0), (2, 2), (0, 2)];
+        (float X, float Z)[] inner = [(0.5f, 0.5f), (1.5f, 0.5f), (1.5f, 1.5f), (0.5f, 1.5f)];
+        var v = new[] { outer, inner }.SelectMany(ring => new[] { 0f, 1f }.SelectMany(y => ring.Select(p => new Vector3(p.X, y, p.Z)))).ToArray();
+        var faces = new List<Face> { new([0, 1, 2, 3], [[8, 11, 10, 9]]), new([4, 7, 6, 5], [[12, 13, 14, 15]]) };
+        for (var i = 0; i < 4; i++)
+        {
+            var j = (i + 1) % 4;
+            faces.Add(new Face([i, i + 4, j + 4, j]));
+            faces.Add(new Face([8 + i, 8 + j, 12 + j, 12 + i]));
+        }
+        var r = PolygonMesh.Create(v, faces);
+        Assert.True(r.Succeeded, string.Join("; ", r.Errors));
+        IsClosed(r.Mesh!);
+        return r.Mesh!;
+    }
+
+    [Fact]
+    public void TwoNestedLoopsGiveACapWithAHole()
+    {
+        var r = PlaneCut.Cut(Tube(), Half, Up, PlaneKeep.Below);
+        var m = Ok(r);
+
+        var cap = m.Faces[Assert.Single(r.Edit.NewFaces, f => f >= 10 && m.Faces[f].Holes.Count > 0)];
+        Assert.Single(cap.Holes);
+        Assert.Equal(4, cap.Loop.Count);
+        Assert.Equal(4, cap.Holes[0].Count);
+        var id = m.Faces.ToList().IndexOf(cap);
+        Assert.Equal(3.0, m.FaceArea(id), 5);
+        Assert.True(Vector3.Dot(m.FaceNormal(id), Up) > 0.99f);
+        Assert.Empty(r.Warnings);
+        Assert.Equal(1, r.Edit.NewFaces.Count(f => f >= 18));
+        IsClosed(m);
+        Assert.Equal(0.5f, Top(m));
+    }
+
     [Fact]
     public void AnOpenMeshLeavesTheCutOpenWithAWarningNamingItsEnds()
     {
