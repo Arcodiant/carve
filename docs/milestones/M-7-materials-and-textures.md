@@ -22,6 +22,121 @@ Content: a textured sample model imported into a game, and the textures it needs
 - Which of Empyrean's PBR material fields Carve authors, and whether by `.glb` or a material file.
 - Does the textured render use the same materials the game would?
 
+**Decided at planning (2026-11-11).** Each question below was put to the person and answered by them. The first three were the questions this file left open.
+
+- **Order:** M-7 runs after M-6 is Done. It builds on M-6's corner UVs, `project_uvs`, `TEXCOORD_0` export and the barrel sample.
+- **Where textures come from:** supplied PNG files only. A material names a PNG by path, and export embeds it in the `.glb`. The sample's textures are made by committed, deterministic code and committed as PNGs (T-77). There is no texture-making tool in M-7. A palette bake and a pattern tool were offered and not chosen.
+- **Fields:** everything the engine's glTF loader reads:
+  - base colour (sRGB hex) and its texture;
+  - metallic and roughness, and the metallic-roughness map (roughness in G, metallic in B);
+  - the normal map;
+  - emissive colour and its texture;
+  - occlusion strength and its map;
+  - double-sided.
+
+  Unset fields are matte: metallic 0, roughness 1, base colour white.
+- **How they reach the game:** inside the `.glb`, as glTF `pbrMetallicRoughness` with the PNGs embedded. No Empyrean material files.
+- **In the Carve file:** textures as paths relative to the `.carve` file. The PNG bytes are read when a material is defined or a file is opened, and held. A missing texture fails `open` with its path.
+- **Tool shape:** named, model-wide materials.
+  - `define_material` adds a material, or replaces one in place.
+  - `set_material` assigns one to faces or a group.
+  - A face has a colour or a material, never both: each tool clears the other.
+  - `get_mesh` and `check` read them back.
+  - A material is exported under its own name.
+- **Render:** `shaded` draws a face with a material through `Material.Pbr`, built by one function. A test shows that function draws byte-identically to what `IModelLoader` makes of the exported `.glb` (T-78). Uncoloured and colour-only faces stay `LitMesh`, so every existing frame is unchanged.
+- **Metal light:** a fixed `ProceduralSky` lights the render, so metal reads. T-78 proves first that no `LitMesh` frame changes, and stops if one does. The model viewer gains the same sky behind `--sky` (T-79).
+- **Sample:** M-6's barrel, textured:
+  - iron hoops on the thin top and bottom rows;
+  - wood staves with normal and occlusion maps;
+  - end-grain caps;
+  - one rune stave with an emissive map.
+- **"Into a game":** the exported `.glb` loaded by the model viewer (the game stand-in, `StandardHdr`, `IModelLoader`) with its frames reviewed, plus load checks in tests. A real game stays M-8's.
+- **Alpha:** the loader reads no glTF `alphaMode` or `alphaCutoff`, so M-7's materials are opaque. Recorded as engine need 7 in D-1, Low. No request filed.
+- **Acceptance:** a closing run by fresh agents with a planted missing texture path (T-81).
+
+**Checked at planning** (2026-11-11, files in `%TEMP%\m7-probe`): a `.glb` written with SharpGLTF 1.0.7 held six boxes:
+
+- matte;
+- an embedded 8 x 8 base-colour PNG;
+- metallic 1 at roughness 0.35;
+- glossy at roughness 0.15;
+- emissive;
+- an embedded metallic-roughness map.
+
+It loaded through `IModelLoader` in `spikes/Carve.ModelViewer`. Every material came through as `pbr: true` with its factors as written. The texture drew with its (0, 0) texel at UV (0, 0), and the metallic-roughness map split its box into metal and rough halves. Two findings shaped the decisions:
+
+- metallic 1 drew near-black under sun and ambient light alone, which is why the sky was chosen;
+- the glossy box showed no visible highlight from the front.
+
+The engine docs (`ParsedMaterial`, `Material`, `IModelLoader`) list the fields above and no alpha mode.
+
+**Set by the planner, open to the person's objection:**
+
+- material names may not contain `:` or `#`, and may not be `carve`, so a material can never take an exported colour material's name (T-74);
+- a texture is 1 to 4096 texels on a side (T-74);
+- the sky is the engine's `ProceduralSky` defaults with its sun along Carve's light (T-78);
+- the textures' colours, gap, rust and glyph (T-77);
+- the UVs the sample uses: `cylindrical` on the sides, `planar` on the caps (T-77, T-80).
+
+**The agreed sketch** (approved by the person as drawn). `front` looks from (1.6, 1.2, 2.2); `back` from (-1.6, -1.2, -2.2), up from below:
+
+```
+shaded, view front, 512 (today's camera and light, plus the fixed sky for Pbr faces):
+
+        ____________
+       /  end grain  \      <- cap (+Y), seen from above at front's angle
+      |==============|     <- top hoop, iron: metallic, rust patches from MR map
+      ||  |  |  |  | ||
+     | | |  |##|  | | |    <- staves: wood base-colour texture, normal map grooves,
+     | | |  |##|  | | |       occlusion darkening the gaps; ## = glowing rune
+      ||  |  |  |  | ||       (emissive texture) on one stave only (faces 14, 22)
+      |==============|     <- bottom hoop, iron
+       \____________/
+
+1 barrel-front        shaded, front, 512 (above)
+2 barrel-back         shaded, back: no rune, hoops and staves only
+3 barrel-top          shaded, +y: the end-grain cap with its normal map
+4 barrel-hoop-close   front, zoom 3 at the top hoop: metal vs rust
+5 barrel-sheet        2x2 views sheet (front, back, +y, -x)
+6 barrel-front-256 / -1024   sizes
+7 barrel-mixed        one stave column set_colour, beside material faces
+8 viewer-front / viewer-angle  the exported .glb in the model viewer with --sky
+```
+
+**Order.**
+
+1. T-74 and T-77 side by side. T-77 needs only M-6's projection.
+2. T-75 and T-76 side by side, after T-74.
+3. T-78, after T-74 and T-76. It may overlap T-75, since their files are apart.
+4. T-79, after T-78.
+5. T-80.
+6. T-81.
+
+**Models:**
+
+- Opus on T-74 (the record and the file format) and T-78 (a new engine path and the sky), each planned for two agents.
+- Sonnet on the rest.
+
+Eight tasks.
+
+**Before dispatch:**
+
+- check one GPU suite through the queue, and that every runner's feed has the pinned engine;
+- read every member's Scope against what M-6, M-5, M-17 and T-71 have landed by then;
+- put any open rule found to the person before the first dispatch, as M-18's retrospective asks;
+- add M-6's `scenario-uvs` to every member's `**Verify:**` line that guards existing frames. Lint refuses it until M-6 has put it in `tests.json`.
+
+The looks add no sound, motion or feel, so the person's look at the frames of T-78 and T-80 is the whole review. Those frames are approved before they become the suite's baseline.
+
 ## Required tasks
+
+- [ ] [T-74](../tasks/T-74-materials-in-the-kernel-and-the-file.md) — A model holds named PBR materials, faces are assigned one, and edits, undo and the Carve file carry them with texture paths relative to the file
+- [ ] [T-75](../tasks/T-75-define-material-set-material-and-read-back.md) — An agent defines named materials from PNG textures and PBR values, assigns them to faces or groups, and reads them back through get_mesh and check
+- [ ] [T-76](../tasks/T-76-materials-in-export.md) — export writes each material as a glTF metallic-roughness material with its textures embedded, static and skinned, and the engine's loader reads every field back
+- [ ] [T-77](../tasks/T-77-sample-textures.md) — Committed code generates the textured barrel's eight 256 x 256 PNG textures, and a test keeps the committed files equal to it pixel for pixel
+- [ ] [T-78](../tasks/T-78-materials-in-render.md) — render draws a face with a material through Material.Pbr, the same material the engine's loader makes of the export, lit with a fixed sky so metal reads
+- [ ] [T-79](../tasks/T-79-viewer-sky-and-material-report.md) — The model viewer takes --sky to light a model with Carve's fixed sky, and view.json reports every PBR field and texture of each material
+- [ ] [T-80](../tasks/T-80-textured-barrel-scenario.md) — The barrel is given wood, iron, end-grain and rune materials, seen in eight frames, saved, reopened, exported and shown in the viewer, in suite scenario-materials
+- [ ] [T-81](../tasks/T-81-materials-acceptance-run.md) — Fresh agents texture a model from the tool descriptions alone and recover from a planted missing texture path
 
 ## Retrospective

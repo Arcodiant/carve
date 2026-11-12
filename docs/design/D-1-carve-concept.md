@@ -165,6 +165,12 @@ process and a protocol between the two.
   - Seams are a marked edge set, set with `mark_edges`.
   - `unwrap` is LSCM written here. `project_uvs` offers planar, box and cylindrical.
   - Export writes `TEXCOORD_0` and splits vertices where UVs differ.
+
+  *Materials and textures, decided at M-7 planning (2026-11-11), by the person:*
+  - Named, model-wide materials hold every field Empyrean's glTF loader reads. They are set with `define_material` and `set_material`.
+  - A face has a colour or a material, never both.
+  - Textures are supplied PNGs. The Carve file refers to each by a path relative to itself, and export embeds them in the `.glb`.
+  - `render` draws material faces through `Material.Pbr`, under a fixed sky, and leaves other faces as they were.
 - **Render modes.** Which come first, and do any need something Empyrean does not
   have? The first look at its docs did not find a normals or UV debug view; a
   material or shader of Carve's own may do it. *Decided at M-4:* wireframe, normals and highlight came first. None needed anything of the engine: it had line lists on the headless path, per-vertex colours on the unlit `SolidColor` material and an immediate text surface for the labels (T-25, T-26), so there is no engine need. *UVs, decided at M-6 planning:* two looks, `checker` (the model lit with a generated checker) and `uvs` (one mesh's layout drawn flat). A planning probe showed the engine loads `TEXCOORD_0` and draws a texture headless, so no engine need is expected.
@@ -186,3 +192,4 @@ process and a protocol between the two.
 | 4 | A skinned model of several meshes: a skinned file loads only its first skinned mesh and drops the rest with a warning | Low | D-6: every piece is written as a primitive of one glTF mesh |
 | 5 | The slerp's numerics: `AnimationInterpolation` (Geometry 0.119.0) says LINEAR rotation slerps along the shortest arc, but not the formula for keys almost the same (a lerp fallback, and its threshold) or whether the result is normalised, so Carve's preview sampler cannot be shown to match the engine's to the last bit | Low | `Clip.Slerp` is `System.Numerics.Quaternion.Slerp` (shortest arc, lerp below a small angle, not normalised); the difference is at float rounding, far below a pixel |
 | 6 | The Synty preset's bone per role: `HumanoidRoleMap.Synty` (Animation 0.119.0) lists the preset's bones (`Hips`, `Spine_01..03`, `Clavicle_L`, `Shoulder_L`, `Elbow_L`, `Hand_L`, `UpperLeg_L`, `LowerLeg_L`, `Ankle_L`, `Ball_L`, ...) and `HumanoidRoles.Required` the required roles, but not which bone fills each role (the head's name, whether the upper arm is `Clavicle_*` or `Shoulder_*`), so Carve cannot know exactly which skeletons the preset resolves | Low | `SkinnedExport.SyntyRequiredBones` reads them from Synty's rig: `Hips`, `Spine_01`, `Head`, `Shoulder_*`, `Elbow_*`, `Hand_*`, `UpperLeg_*`, `LowerLeg_*`, `Ankle_*`; it only decides when the height warning applies |
+| 7 | Alpha from glTF: `ParsedMaterial` (Geometry 0.119.0) has no alpha mode or cutoff, so a `.glb` material's `alphaMode` `MASK` and `alphaCutoff` are not read, though `Material` supports cutout (`AlphaCutoff`) | Low | M-7's materials are opaque, and Carve writes no alpha fields |
