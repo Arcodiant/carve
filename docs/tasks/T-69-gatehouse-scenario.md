@@ -4,7 +4,7 @@ description: >-
 ---
 # T-69 — Gatehouse scenario
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
