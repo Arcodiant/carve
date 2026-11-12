@@ -59,6 +59,7 @@ public sealed class HoledFaceToolTests() : FileToolTests("carve-holes")
     [InlineData("""{"loop":[0,1,2,3],"holes":[[4,5,2,7]]}""", "faces[0].holes[0][2]", "repeats")]
     [InlineData("""{"loop":[0,1,2,3],"holes":[[4,5,6,9]]}""", "faces[0].holes[0][3]", "out of range")]
     [InlineData("""{"loop":[0,1,2,3]}""", "faces[0].holes", "required")]
+    [InlineData("""{"holes":[[4,5,6,7]]}""", "faces[0].loop", "required")]
     [InlineData("""{"loop":[0,1,2,3],"holes":[[4,5,6,7]],"hole":1}""", "faces[0].hole", "only loop and holes")]
     [InlineData("""{"loop":[0,1,2,3],"holes":[[4,5,6,"x"]]}""", "faces[0].holes[0][3]", "integer")]
     public async Task A_bad_hole_is_a_tool_error_naming_it(string face, string element, string words)
