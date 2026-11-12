@@ -31,6 +31,12 @@ internal sealed class KnifeStage : ICutsStage
     /// <summary>The door, up from the bottom edge and back down to it.</summary>
     private static readonly double[][] Door = [[0.3, 0, 0.2], [0.3, 1, 0.2], [0.7, 1, 0.2], [0.7, 0, 0.2]];
 
+    /// <summary>The gatehouse's door brown, for the door piece.</summary>
+    private const string DoorBrown = "#6b4423";
+
+    /// <summary>The hexagon's inner face.</summary>
+    private const string HexagonBlue = "#4a7a9b";
+
     private static readonly Vector3 Low = Vector3.Zero;
     private static readonly Vector3 High = new(2, 2, 0.2f);
 
@@ -109,7 +115,14 @@ internal sealed class KnifeStage : ICutsStage
             }
         }
 
-        // 3. The hexagon's inner face recessed by 0.05, shaded: a pocket in the front.
+        // 3. The faces the knife cut out coloured (the person's ruling, 2026-11-12), before the recess so that the pocket's
+        // floor carries the colour: the door piece the gatehouse's door brown, the hexagon's inner face blue.
+        var doorPiece = Enumerable.Range(0, cut.Faces.Length).Single(f => !cut.IsDeleted(f) && cut.Faces[f].Loop.All(v =>
+            cut.Vertices[v] is var p && p.X is >= 0.3f - 1e-5f and <= 0.7f + 1e-5f && p.Y <= 1 + 1e-5f && MathF.Abs(p.Z - 0.2f) < 1e-5f));
+        await CallJsonAsync(driver, "set_colour", new { faces = new[] { doorPiece }, colour = DoorBrown });
+        await CallJsonAsync(driver, "set_colour", new { faces = new[] { 6 }, colour = HexagonBlue });
+
+        // 4. The hexagon's inner face recessed by 0.05, shaded: a pocket in the front.
         var recess = await CallJsonAsync(driver, "extrude", new { faces = new[] { 6 }, distance = -0.05 });
         Summary("extrude the hexagon by -0.05", recess, 24, 14, true);
         var pocket = await Solid.ReadAsync(driver);
