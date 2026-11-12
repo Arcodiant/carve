@@ -10,7 +10,7 @@ public sealed class GetMeshTool(ModelStore store)
     public const string Text =
         "Reads back the current mesh in full, so you can learn its ids before editing. Takes one optional argument, mesh, the name of the mesh to read, which may be left out while the model has one mesh; any other argument is a tool error. "
         + "Vertex and face ids are the positions given to define_mesh, kept by every edit; the vertices and faces an extrude adds are appended after them. "
-        + "Returns JSON {vertices:[{id, at:[x,y,z]}], faces:[{id, vertices:[ids, counter-clockwise seen from outside], normal:[x,y,z] (unit, outward), centre:[x,y,z] (mean of the corners)}], "
+        + "Returns JSON {vertices:[{id, at:[x,y,z]}], faces:[{id, vertices:[ids, counter-clockwise seen from outside], or for a face with holes {loop:[ids], holes:[[ids], ...]} as define_mesh takes it, normal:[x,y,z] (unit, outward), centre:[x,y,z] (mean of the outer loop's corners)}], "
         + "edges:[{vertices:[a,b] (a < b), faces:[ids of the faces using the edge]}], "
         + "closed, bounds:{min,max}, warnings:[], "
         + "colours:[{colour:\"#RRGGBB\" as given to set_colour, faces:[ids]}] (the coloured faces only), groups:[{name, faces:[ids]}] (from define_group)}. Here vertices, faces and edges are lists, where define_mesh and the edits return their counts. "

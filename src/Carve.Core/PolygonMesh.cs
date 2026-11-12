@@ -328,6 +328,27 @@ public sealed class PolygonMesh
         return new Vector3((float)(o.X + x / loop.Count), (float)(o.Y + y / loop.Count), (float)(o.Z + z / loop.Count));
     }
 
+    /// <summary>
+    /// Where a face's label goes: on the face itself. For a plain face this is <see cref="FaceCentre"/>; for a face with
+    /// holes, whose centre may lie in a hole, it is the centroid of the largest triangle of its triangulation, which lies
+    /// on the outer loop's area less its holes.
+    /// </summary>
+    public Vector3 FaceLabelPoint(int face)
+    {
+        if (!_faces[face].HasHoles) return FaceCentre(face);
+        var best = -1.0;
+        var at = FaceCentre(face);
+        foreach (var t in Triangulator.TriangulateFace(this, face))
+        {
+            Vector3 a = _vertices[t.A], b = _vertices[t.B], c = _vertices[t.C];
+            var area = Vector3.Cross(b - a, c - a).Length();
+            if (area <= best) continue;
+            best = area;
+            at = (a + b + c) / 3;
+        }
+        return at;
+    }
+
     /// <summary>Unit normal of a face's outer loop by Newell's method; outward for a face wound counter-clockwise from outside.</summary>
     public Vector3 FaceNormal(int face)
     {

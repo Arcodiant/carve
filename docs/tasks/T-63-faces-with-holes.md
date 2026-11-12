@@ -32,7 +32,7 @@ A face can have holes. An agent defines a plate with a window in it, sees the op
 - **Validation in `PolygonMesh.Create`.** Each of these is an error naming `faces[n].holes[k]`, or `faces[n].holes[k][i]` for one corner:
   - a hole of fewer than 3 vertices;
   - a hole wound the same way as the outer loop (seen from outside, holes are clockwise);
-  - a hole not strictly inside the outer loop, or touching it;
+  - a hole not strictly inside the outer loop, or touching it ("touching" within the kernel's existing `CollinearTolerance`, no new tolerance: ruled by the person, 2026-11-11);
   - two holes overlapping or touching;
   - a vertex used twice across the loops of one face.
 
@@ -61,7 +61,7 @@ A face can have holes. An agent defines a plate with a window in it, sees the op
 - Take the next version after the newest on `main` at dispatch. At planning that is 4, after T-42's 3. If M-6's UVs have taken 4 by then, take 5. Say which in As built.
 - In this version a face is a plain array or the `{"loop", "holes"}` object, as `define_mesh` takes it.
 - Reserve the tombstone form that T-64 fills: a `null` in `vertices` or `faces`. Write it into the format's doc comment as reserved, and refuse it with an error until T-64 lands.
-- Every older version still reads. `Write` always writes the new one. Files read back bit-exact.
+- Every older version still reads. `Write` writes the lowest version that holds the model: the new one only when the model needs it (a holed face now, tombstones once T-64 lands), otherwise 2 or 3 as T-42's tests require, byte for byte. Files read back bit-exact. (Ruled by the person, 2026-11-11.)
 
 **Tests.**
 
@@ -101,7 +101,7 @@ A face can have holes. An agent defines a plate with a window in it, sees the op
 - **Before writing code, read what has landed since planning:** T-42's `hard_edges` and shading, T-43's `subdivide`, and anything from M-6. Every edit that has landed must handle holed faces:
   - subdivide on a holed face: if Catmull-Clark of a holed face is not obvious, refuse it with an error naming the face, and say so;
   - smooth shading's corner normals: hole corners join their neighbours like any corner.
-- **Open rules: stop and ask.** Any validation rule beyond the list above. A tolerance for "strictly inside". A change to how a plain face triangulates. Holes in subdivide, if refusing them does not fit.
+- **Open rules: stop and ask.** Any validation rule beyond the list above. (The tolerance for "strictly inside" is settled: the existing `CollinearTolerance`.) A change to how a plain face triangulates. Holes in subdivide, if refusing them does not fit.
 - Every existing frame must stay byte-identical by hash: cube, crate, shed, export, character and the soft character. Check by hash before and after, and list them.
 - Plan for two agents. If the topology and triangulation fill the first, hand off at the server half with the As built notes written.
 - Evidence (frames, `breaks.log`) goes to the milestone worktree's `artifacts/review/T-63/` by its absolute path, given in the brief, not to this task's worktree.

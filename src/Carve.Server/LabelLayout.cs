@@ -83,7 +83,7 @@ public static class LabelLayout
             {
                 var text = (face - (window?.FirstFace ?? 0)).ToString(CultureInfo.InvariantCulture);
                 var extent = measure(text);
-                var label = At(text, Whole(Pixel(mesh.FaceCentre(face)) - extent / 2), extent);
+                var label = At(text, Whole(Pixel(mesh.FaceLabelPoint(face)) - extent / 2), extent);
                 if (OnImage(label.Backing, size))
                 {
                     plan.Add(label);
