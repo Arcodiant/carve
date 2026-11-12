@@ -63,6 +63,7 @@
         "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
         "samples/leaky-shed.carve",
         "samples/barrel.carve",
+        "samples/gardener.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],
