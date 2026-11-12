@@ -4,7 +4,7 @@ description: >-
 ---
 # T-70 — Cut acceptance run
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
