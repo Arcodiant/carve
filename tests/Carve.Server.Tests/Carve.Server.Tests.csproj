@@ -56,6 +56,7 @@
     <Compile Include="../../src/Carve.Server/GlbRig.cs" Link="GlbRig.cs" />
     <Compile Include="../../src/Carve.Server/SkinnedExport.cs" Link="SkinnedExport.cs" />
     <Compile Include="../../src/Carve.Server/ClipsExport.cs" Link="ClipsExport.cs" />
+    <Compile Include="../../src/Carve.Server/PieceExport.cs" Link="PieceExport.cs" />
     <Compile Include="../../src/Carve.Server/ToolPaths.cs" Link="ToolPaths.cs" />
     <Compile Include="../../src/Carve.Server/GameLimits.cs" Link="GameLimits.cs" />
     <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
