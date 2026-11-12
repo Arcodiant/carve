@@ -80,6 +80,18 @@ public class CharacterLoadTests
     }
 
     [SkippableOrRun]
+    public void The_hat_piece_loads_with_the_bodys_bones_in_order_and_no_clips()
+    {
+        var loader = Loader();
+        var body = loader.Load(new ContentPath("models/gardener.glb")).Skin!;
+        var piece = loader.Load(new ContentPath("models/gardener.hat.glb"));
+        Assert.Empty(piece.Warnings);
+        Assert.Equal(body.Skeleton.Bones.Select(b => b.Name), piece.Skin!.Skeleton.Bones.Select(b => b.Name));
+        Assert.Equal(body.Skeleton.Bones, piece.Skin.Skeleton.Bones);
+        Assert.Empty(piece.Skin.Animations);
+    }
+
+    [SkippableOrRun]
     public void The_sample_is_the_gardener_the_tools_built_by_content()
     {
         // Compared by content, not bytes: each is read, then written the one way, which gives floats back bit for bit.

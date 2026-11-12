@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-41
 
-**Verify:** server-regression, scenario-cube, scenario-crate
+**Verify:** server-regression, scenario-cube, scenario-crate, scenario-character
 
 **Perf:** skip: Carve declares no heavy suites
 
@@ -52,8 +52,6 @@ Model: Sonnet 5.5.
 
 Existing frames and exported files: no scenario or frame code changed; model-mode bytes are asserted equal before and after a piece export, and `scenario-cube`/`scenario-crate` pass. Hash comparison of existing frames was not run separately.
 
-Not done: the Hat piece sample (see Hand-off).
+**Hat sample (second agent, Sonnet 5.5; rebased onto `origin/milestone/M-19` first, T-45's clip warnings sat beside the mode handling without conflict).** The person's answer of 2026-11-12 to the first agent's question was "Scenario content only": the Character scenario exports `models/gardener.hat.glb` into its content folder (`export` with `mode: piece`, `meshes: [Hat]`; the result must say "as a piece", 22 bones, no warnings; a second export is refused as existing and an overwrite is byte-identical), and `CharacterLoadTests.The_hat_piece_loads_with_the_bodys_bones_in_order_and_no_clips` loads it through `IModelGeometryLoader.Load`: no warnings, bones equal to the body's, no animations. Nothing is added to `samples/`. T-48 reads the piece the same way, from the scenario's content folder. `scenario-character` is added to **Verify**.
 
-### Hand-off
-
-QUESTION. Scope says "Sample: the gardener's `Hat` as a piece file". `samples/` holds only `.carve` files, and neither the spec nor D-6 says where a `.glb` piece sample lives or how it is kept current. Options: (a) `samples/gardener.hat.glb`, checked in, compared by content with the piece the character scenario exports (in `tests/Carve.CharacterLoad.Tests`); (b) the piece is only exported into the scenario's content folder as `models/gardener.hat.glb` and loaded by `CharacterLoad.Tests`, nothing in `samples/`. Either needs a scenario change (and T-48's check 4 reads a piece file). Which?
+Character suite guard, by SHA-256 of every file in the run folder before (baseline run on the rebased tree) and after: 29 files before; after, the same 29 hash-identical (every frame, `gardener.glb`, `gardener.clips.glb`, the `.carve` files) except `run.json` (the step log, which now records the new step), plus the new `game/Content/models/gardener.hat.glb`. The five existing checks pass and the sixth is new (6 passed).

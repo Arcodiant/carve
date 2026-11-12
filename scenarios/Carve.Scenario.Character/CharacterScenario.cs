@@ -23,7 +23,7 @@ public sealed class CharacterExtension : ICarveExtension
 /// <summary>
 /// The thin slice of M-16 proved through the real tools, on the gardener (<see cref="GardenerSpec"/>): built, looked at at
 /// rest, in a pose and in each clip at three times, saved, reopened and compared, and exported into <c>game/Content/models/</c>
-/// of the run folder (a stand-in content folder) as a model and as clips, with the refusals of an existing file and of an
+/// of the run folder (a stand-in content folder) as a model, as clips and the hat as a piece, with the refusals of an existing file and of an
 /// unweighted vertex. <c>tests/Carve.CharacterLoad.Tests</c> then reads that folder as a game would.
 /// </summary>
 public sealed class CharacterScenario : IScenario
@@ -390,6 +390,19 @@ public sealed class CharacterScenario : IScenario
         await ExpectToolErrorAsync(driver, "export", new { path = clips, mode = "clips" }, "already exists", "overwrite");
         await CallTextAsync(driver, "export", new { path = clips, mode = "clips", overwrite = true });
         driver.AssertBytesEqual("gardener.clips.glb, exported again with overwrite", clipsBytes, await File.ReadAllBytesAsync(clips));
+
+        // The hat as a piece: its own file with every bone in the body's order and no clips, for a game to wear on the body's palette.
+        var hat = Path.Combine(models, "gardener.hat.glb");
+        var hatResult = await CallTextAsync(driver, "export", new { path = hat, mode = "piece", meshes = new[] { "Hat" } });
+        if (!hatResult.Contains("as a piece") || !hatResult.Contains("22 bone(s)") || hatResult.Contains("warning(s)"))
+        {
+            driver.Fail($"export mode piece: got {hatResult}");
+        }
+
+        var hatBytes = await File.ReadAllBytesAsync(hat);
+        await ExpectToolErrorAsync(driver, "export", new { path = hat, mode = "piece", meshes = new[] { "Hat" } }, "already exists", "overwrite");
+        await CallTextAsync(driver, "export", new { path = hat, mode = "piece", meshes = new[] { "Hat" }, overwrite = true });
+        driver.AssertBytesEqual("gardener.hat.glb, exported again with overwrite", hatBytes, await File.ReadAllBytesAsync(hat));
 
         // A vertex with no weight: extruding the hat's top face makes new ones. Refused and nothing written, then bound to the first root bone.
         var hatBefore = await CallTextAsync(driver, "get_mesh", new { mesh = "Hat" });
