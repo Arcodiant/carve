@@ -77,3 +77,20 @@ How many calls it took, which tools it chose, and whether it used `undo`, `merge
 - Sonnet is enough.
 - Nothing has sound or motion, so there is no listening or real-time pass.
 - Run `finish` from inside the worktree and leave the folder.
+
+### Hand-off
+
+Written by an agent running on **Sonnet 5.5** (claude-sonnet-5-5). Stopped after round 1 to ask the person two things; nothing else is done (no description change, no D-1 update, no README section, no review).
+
+**Done.** Release publish of `carve` to `%TEMP%\carve-m5-acceptance\carve-bin`. Round 1 run under the spec's conditions (stdin prompt, `--strict-mcp-config --mcp-config .mcp.json --allowedTools "mcp__carve__*"`, no other flag; I added `--output-format stream-json --verbose` only to capture the transcript, as the stop list's "no extra flag" may or may not cover this: T-28 needed a transcript too). Evidence in `%TEMP%\carve-m5-acceptance\round-1\` and copied to `D:\repos\carve\branches\milestone\M-5\artifacts\m5-acceptance\round-1\` (uncommitted there).
+
+**Round 1.** The session model reported was claude-fable-5-2 (default). 11 carve calls after one ToolSearch: `define_mesh` (a 10-vertex, 7-face gable prism with 5-gon front and back), `knife` x3 (window front, window back, door), `delete` [7,8], `bridge` [[10..14],[15..19]], `set_colour` #7A4A24 on face 9, one `render` (6 tiles incl. zoomed views through the window), `check`, `get_mesh`, `save`. No `undo`, `merge_faces`, `loop_cut`, `plane_cut`. Gable built in `define_mesh`, not by cuts.
+- Final `check`: ok, no problems, no warnings, one closed shell. `get_mesh` kept. Door face 9 brown. `wall.carve` saved (24 vertices, 13 faces).
+- Render through the window (tile 6 of the sheet, zoomed): the opening is the tile's background colour (48,53,56), the same as the tile corner outside the wall; the wall is light grey (about 219,219,216). Judged from pixel samples and one crop.
+- **The plant was not met.** The agent never sent z = 0.17: it worked out that a 0.3 m wall centred on z = 0 has its front at 0.15, cut at 0.15 and told the person. So there was no off-surface error to read. T-28's round 3 had the same shape ("not met as written").
+- **The prompt contradicts itself.** It says 4 m tall and also apex y = 3.4 with the slopes meeting the ends at y = 2.6. The agent followed the gable figures (3.4 m tall) and said so. This is not the plant; it is a second inconsistency in the prompt.
+
+**Left / questions for the person** (both touch the stop list, so not decided here):
+1. The "4 m tall" vs "apex y = 3.4" clash: change the prompt (for example "3.4 m tall"), or accept that agents will flag it?
+2. The plant was reasoned out before any call. Run again fresh as is (it may hit the error), or rule that round 1 stands as "declined to correct, and said why" (the spec records that either way, correcting is the pass)? No description hesitation was seen, so no description text changed.
+Rounds 2 and 3 are unused. Remaining after the rulings: more rounds if wanted, D-1 updates, README section *Cutting*, `verify`, As built, `finish`, the review.
