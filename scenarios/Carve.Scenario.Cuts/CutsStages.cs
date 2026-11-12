@@ -18,5 +18,6 @@ internal static class CutsStages
         new MergeBridgeStage(),
         new PlaneCutStage(),
         new LoopCutStage(),
+        new KnifeStage(),
     ];
 }
