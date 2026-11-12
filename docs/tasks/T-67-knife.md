@@ -152,14 +152,26 @@ First agent: Opus (claude-opus-5-5). **The Core (`Knife`, and `FaceSplit`'s inte
   | Cuts: an edge point is at its fraction along the edge | at 1 - t | the knife refused (2 problems) |
   | Cuts: `closed` reaches the knife | ignored | the knife refused (2 problems) |
 
+**Third agent: Opus (claude-opus-5-5).** The render-path breaks, the GPU frames, the review (rejected, see Hand-off).
+
+- **GPU run of `f23c78f`** (the last code commit; every suite's `output.log` names `carve@f23c78f3352d`), fetched by job id into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-67/frames-f23c78f/`, hashed in its `all.sha256` (135 frames): all 133 of T-65's `frames-aae1140/all.sha256` byte-identical; new `scenario-cuts/cuts/frames/knife-slab-wireframe.png` `175724fa4cb2...` and `knife-slab-recess.png` `84957d9dc2db...`, the same bytes as the local run. T-66 had not landed on `origin/milestone/M-5`. The local run's frames are kept in `.../T-67/local-f23c78f/`.
+- **Render-path breaks** (`C:/Users/andre/AppData/Local/Temp/t67/breaks4.py`; each applied alone to the drawing code only, so get_mesh is right and the frame wrong, built with warnings as errors, the Cuts scenario run here, restored; log in `breaks.log`, the uncaught frames in `.../T-67/breaks-render/`):
+
+  | Check | Break | Result |
+  |---|---|---|
+  | `knife-slab-wireframe`: each knifed edge in sight is orange (`Line`) | the highlight skips edges on a hole loop (`LookMeshes.OrangeLines`) | 6 fail (the hexagon's edges, e.g. `the knifed edge 8-9 ... the closest pixel to (255, 196, 89) is (85, 87, 89)`) |
+  | `knife-slab-wireframe`: each other edge in sight is not orange (`NotLine`) | the highlight adds every edge of a holed face | 6 fail (e.g. `the unknifed edge 3-7 ... should not be drawn in that colour`) |
+  | both frames: each probe is the mesh, in its face's colour (`Look`) | a holed face is not drawn (`MeshBridge`, its triangles collapsed) | wireframe 28 fail, recess 14 fail (`the front ... is the background, expected the mesh`) |
+  | `knife-slab-recess`: `Look` and `Expect` | the drawn triangulation ignores the holes, the outline filled (`Shading.Triangles`) | **0 fail in either knife frame** (47 in other stages' frames). The wireframe frame is byte-identical to the good one (one fill colour); the recess frame changes (the pocket covered flat) |
+  | `knife-slab-recess`: `Look` and `Expect` | the recessed face drawn at its old depth (z 0.15 drawn at 0.2, `MeshBridge`) | **not caught: the scenario passed.** The frame changes, 810 pixels round the hexagon (`breaks-render/R5-knife-slab-recess.png`; the same bytes as the filled-hole break's) |
+
+  So each knife frame's pixel checks fail on at least one render break, but **the recess frame's pixel checks cannot see the pocket itself**: the probes at the recess and on the front all show faces of the same normal and so the same shade, and no probe lands on a pocket wall, so a pocket drawn flat passes. Not fixed here: a new probe or check is the person's call (Hand-off).
+
 ### Hand-off
 
-Second agent (Opus, claude-opus-5-5), handing off at the tool-call checkpoint.
+Third agent (Opus, claude-opus-5-5), stopping for the person's ruling.
 
-- **Done and committed:** the one-point rule (test, break), the `Reverses` case (break 12 now fails 1), the tool description's line for the one-point rule, `KnifeStage` and its `CutsStages` line, the stage breaks above. Server unit + regression (664) passed here; `KnifeTests` 19; the Cuts scenario passed here.
-- **GPU suites submitted** on `f23c78f` (the last code commit), member priority, jobs `J-20261112-163330-71596b` (core-unit) to `J-20261112-163343-4c3727` (scenario-cuts); viewer-cube carried. Follow with `cairn test status`. Not yet fetched or hashed: fetch each by job id (check `output.log` names `f23c78f`) into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-67/frames-f23c78f/`, list `all.sha256`, compare with T-65's 133 plus any T-66 frames landed by then (T-66 had not landed on `origin/milestone/M-5` at this hand-off), and check the two new frames match the local hashes.
-- **Left:**
-  1. **The pixel checks' own breaks.** Every product break of the knife so far is caught before the pixels are read, because `Look`, `Line` and `NotLine` compare the frame with get_mesh's geometry, which the broken knife also changes. A break that leaves get_mesh right but the image wrong has to be in the render path (for example the highlight drawing skipping hole-loop edges, or the renderer dropping a face's holes), each run alone through the Cuts scenario. Not tried; the frames of the existing stages would also change under such a break, which is expected for a break.
-  2. The person's review of the two new frames (`knife-slab-wireframe`, `knife-slab-recess`) through `mcp__waystone__review`, copied under the evidence folder.
-  3. `cairn task T-67 verify` (not run yet; the submitted jobs should be carried or reused), `cairn lint`, then `finish`. Fold this Hand-off into As built first.
-- **Surprising:** none. The piece loop rule (a piece starts at its corner first in the face's corners) puts an edge vertex ahead of an old corner where it comes first in the face's loop (`[8, 5, 6, 9, 10]`), as T-65 wrote it (first agent's note).
+- **Done:** the render-path breaks (table above), the GPU frames of `f23c78f` hashed (133 identical, the two new as local), the review sent. No code changed since `f23c78f`; this commit is the member file only. The submitted suites on `f23c78f` were all done or running at the stop (server-regression last); `verify` not run yet.
+- **The review was rejected.** The person's note: "The cuts don't appear to be visible in the second and third pictures? The second has a recessed hex but nothing else." (The second was `knife-slab-recess`, shaded, which draws no edges, so the door path and the hexagon's outline show only as the pocket; the third was the R5 break frame, sent for comparison.) Needs the person's ruling on what `knife-slab-recess` should show, e.g. the knifed edges highlighted in the shaded frame too, or the frame dropped or redesigned. Any such change alters the frame and its checks.
+- **Also for the person:** the recess frame's pixel checks miss a pocket drawn flat (breaks R4 and R5 above). Whether to add a probe on a pocket wall or a different check, and its threshold, is theirs.
+- **Left after the ruling:** the change to `KnifeStage`, a local Cuts run (the 133 frames still byte-identical), a GPU run of the new commit fetched and hashed against T-65's list plus T-66's frames if landed (rebase first), the review again, then `verify`, `cairn lint`, `finish`. Fold this Hand-off into As built first.
