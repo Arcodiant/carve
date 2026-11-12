@@ -71,9 +71,9 @@ public sealed class EditResult
     internal static EditResult Made(PolygonMesh mesh, IReadOnlyList<int> movedVertices, IReadOnlyList<int> newVertices,
         IReadOnlyList<int> newFaces, DeletedElements? deleted = null) => new(mesh, [], movedVertices, newVertices, newFaces, [], deleted);
 
-    private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<ExtrudedFace> extruded)
+    private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<(int Face, IReadOnlyList<int> Added)> made)
     {
-        var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(extruded)) : edited;
+        var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(made)) : edited;
         mesh = source.Weights is { } weights ? mesh.WithWeights(weights) : mesh;
         // A tombstoned face leaves its colour and its groups, and a tombstoned vertex its weights (T-64).
         if (mesh.HasTombstones)
@@ -92,7 +92,17 @@ public sealed class EditResult
         IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded,
         DeletedElements? deleted = null)
         => result.Succeeded
-            ? new EditResult(Carried(source, result.Mesh!, extruded),
+            ? new EditResult(Carried(source, result.Mesh!, extruded.Select(x => (x.Face, x.Walls)).ToList()),
                 result.Errors, movedVertices, newVertices, newFaces, extruded, deleted)
+            : Refused(result.Errors);
+
+    /// <summary>
+    /// The result of an edit of <paramref name="source"/> that appends faces taking another face's colour and groups
+    /// (<c>bridge</c>, T-68): each <c>Added</c> face takes its <c>Face</c>'s, as extrude's walls take theirs.
+    /// </summary>
+    internal static EditResult From(PolygonMesh source, MeshResult result, IReadOnlyList<int> newFaces,
+        IReadOnlyList<(int Face, IReadOnlyList<int> Added)> styledFrom)
+        => result.Succeeded
+            ? new EditResult(Carried(source, result.Mesh!, styledFrom), result.Errors, [], [], newFaces, [])
             : Refused(result.Errors);
 }
