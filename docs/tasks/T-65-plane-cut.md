@@ -245,22 +245,18 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
 
 **Third agent: Opus (claude-opus-5-5).** Recorded the rulings, added the non-manifold test and its break, and ran the GPU suites on the final code commit.
 
+**Frames (GPU run of `3a809ec`, whose last code commit is `e3c1ca9`):** `cairn task T-65 verify` passed, ran 8, carried 3. The shed, cuts, export, character and soft runs (jobs `J-20261112-151319-1f83cc` to `-151327-d2c189`, each `carve@3a809ec`) were fetched with `cairn test artifacts` into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/frames-e3c1ca9/`, with their list in `all.sha256` there. Their 51 frames that T-64's 127 also has are byte-identical. The three new ones match the local run: `plane-cut-below-back` `fc88fdeb...`, `plane-cut-below-front` `81c9a77d...`, `plane-cut-both-wireframe` `d1bcda5a...`. T-68 had landed nothing on `origin/milestone/M-5`, so no T-68 frames are in the baseline. **Not hash-checked on this commit:** cube (32 frames) and crate (44). Verify carried them from `40a51d5` (their inputs unchanged), and `cairn test artifacts scenario-cube` returns the latest run, which was T-68's (`1cccc9a`), not this member's. The `40a51d5` job ids are not in the local queue records. A forced fresh run was not tried, since `cairn test submit` carries them again.
+
 ### Hand-off
 
-**Done (second agent, Opus claude-opus-5-5):** everything in As built above. `cairn task T-65 verify` passed on `40a51d5`: server-unit, core-unit, scenario-cube, crate, shed, cuts, export, character, soft and server-regression all ran (viewer-cube carried). The code and its stage are final unless the review asks for a change. Only this document has changed since `40a51d5`.
+**Done (third agent, Opus claude-opus-5-5):** the person's three rulings recorded; `ANonManifoldCutBorderIsChainedByLowestVertexId` added with its break (1 fails, in `breaks.log`); verify passed on `3a809ec`; frames compared above. `cairn lint` clean.
 
 **Left:**
 
-1. **Fetch the run's frames** with `cairn test artifacts <suite>` for each scenario suite of `40a51d5`, into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/frames-40a51d5/`. Write `all.sha256` there and compare it with T-64's 127 (`.../T-64/frames-737853a/all.sha256`). Every one must be byte-identical. T-68 had landed nothing on `origin/milestone/M-5` when this was written, so check again. The three new frames should match the local run's hashes (`plane-cut-below-back` `fc88fdeb...`, `plane-cut-below-front` `81c9a77d...`, `plane-cut-both-wireframe` `d1bcda5a...`). List the result in As built's **Frames**.
-2. **Send the three new frames to the person** through `mcp__waystone__review` (files under the evidence folder) and record the outcome.
-3. **Put to the person the readings flagged in As built:**
-   - `created` lists only live ids, so a far-side piece is in `split` and `deleted` but not in `created`;
-   - caps take no colour or group;
-   - the non-manifold-cut chaining.
-4. Then remove this section, verify again, `cairn lint`, and `cairn task T-65 finish` from inside the worktree.
+1. Send the three new frames (`frames-e3c1ca9/cuts/cuts/frames/plane-cut-*.png`) to the person through `mcp__waystone__review` and record the outcome under **Frames**.
+2. Cube and crate on this commit by hash: find the `40a51d5` cube and crate job ids (or another way to fetch a carried run's artifacts), or ask the person whether the carry is enough.
+3. Fold this section away, verify, `cairn lint`, `cairn task T-65 finish` from inside the worktree.
 
-**Checked:** the breaks table; Core 17 and server 2 new tests; server unit 279; the local Cuts run, its six old frames byte-identical to T-64's. One scaled-down contact sheet of the three new local frames was looked at: the cut solid from both sides with its cap, and the wireframe with the orange cut line across the front, right and top.
+**Checked:** PlaneCutTests 18 passed here; verify (server-unit, core-unit, the five scenario suites and server-regression ran). **Not checked:** the person's review; cube and crate frames on this commit.
 
-**Not checked:** the GPU run's frames by hash (step 1); the person's review.
-
-**Surprising:** nothing failed on the first run of the new tests or the stage, which is why every check has a break above. Two breaks did not build at first. Heredocs with backticks failed in this Bash tool, so the breaks script and the doc were written with the Write and Edit tools.
+**Surprising:** `cairn test artifacts <suite>` takes the latest run of the suite from any member, so it handed back T-68's cube and crate. Check the `job` line of each `output.log`.
