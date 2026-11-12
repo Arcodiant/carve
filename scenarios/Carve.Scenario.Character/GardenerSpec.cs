@@ -339,6 +339,12 @@ internal static class GardenerSpec
 
     private static MeshSpec.Ring Ring(float y, float r, Dictionary<string, double> w, float x = 0, float z = 0) => new(y, r, x, z, w);
 
+    /// <summary>
+    /// The torso's top segment, from the chest ring (y 1.02) to the neck ring (y 1.12), is the slope of the shoulders, the arms' sleeves
+    /// start on it, so it is the shirt's: it was skin (T-84), a patch of flesh at the top of each arm. The cap above it stays skin, a neck.
+    /// </summary>
+    public const string ShoulderSegment = "shirt";
+
     /// <summary>The Hat's top cap, the face the unweighted-export step extrudes (its new vertices start with no weight).</summary>
     public static int HatTopFace { get; private set; }
 
@@ -353,7 +359,7 @@ internal static class GardenerSpec
         body.Lathe(
             [Ring(0.52f, 0.16f, hips), Ring(0.62f, 0.22f, hips), Ring(0.76f, 0.25f, W(("Hips", 0.5), ("Spine_02", 0.5))),
              Ring(0.90f, 0.21f, chest), Ring(1.02f, 0.15f, chest), Ring(1.12f, 0.07f, chest)],
-            ["trousers", "shirt", "shirt", "shirt", "skin"], "trousers", "skin");
+            ["trousers", "shirt", "shirt", "shirt", ShoulderSegment], "trousers", "skin");
 
         // The head and a nose on its front.
         var head = W(("Head", 1));

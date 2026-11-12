@@ -228,6 +228,23 @@ public sealed class CharacterScenario : IScenario
             ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}");
         }
 
+        // T-84: the torso's top segment, the slope of each shoulder below the neck, is the shirt's and not skin. Each side's front face of
+        // it, projected from the mesh under the framing's bounds, reads as the shirt; the same point with the image flipped upside down
+        // lands on the legs or the gap between them, so a camera flipped in Y fails the first and a mesh whose slope is skin the same.
+        foreach (var sign in new[] { 1f, -1f })
+        {
+            var slope = body.NearestFace("shirt", new Vector3(0.04f * sign, 1.07f, 0.1f));
+            var s = body.Centroid(slope);
+            if (s.Y is < 1.02f or > 1.12f)
+            {
+                driver.Fail($"{frame.Name}: the nearest shirt face to the shoulder slope is at {s}, not between the chest and neck rings");
+            }
+
+            var (sx, sy) = Holding(project(s));
+            ExpectGroup(driver, frame, sx, sy, "shirt", $"the shoulder slope's face at {s}, not skin");
+            ExpectNot(driver, frame, sx, Size - 1 - sy, "shirt", $"the shoulder slope's point flipped upside down, at the image's ({sx}, {Size - 1 - sy})");
+        }
+
         var can = body.Centroid(body.NearestFace("can", new Vector3(-0.435f, 0.39f, 0.30f)));
         var (cx, cy) = Holding(project(can));
         if (cx >= Size / 2)
