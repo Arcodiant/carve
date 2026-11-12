@@ -23,7 +23,7 @@ public sealed class CarveFileResult
     /// <summary>The model the file holds, every mesh, vertex, face, bone and clip in its place, or null when the file was refused.</summary>
     public Model? Model { get; }
 
-    /// <summary>The version the file was read as, 1 or 2, or 0 when the file was refused.</summary>
+    /// <summary>The version the file was read as, 1 to 4, or 0 when the file was refused.</summary>
     public int Version { get; }
 
     /// <summary>The model's only mesh, or null when the file was refused or holds several.</summary>
@@ -43,15 +43,20 @@ public sealed class CarveFileResult
 /// skeleton and the clips), read back bit-exact with every vertex, face and bone at its id. Undo history is not saved.
 /// </summary>
 /// <remarks>
-/// <para><see cref="Write"/> gives version 2, byte for byte, for a model with no smooth mesh and no hard edge, so no file made
-/// before version 3 changes; version 3 (T-42) adds, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or
-/// <c>"smooth"</c>) and <c>hard_edges</c> (vertex-id pairs, lower id first, in order), and is written when any mesh has either.
+/// <para><see cref="Write"/> gives version 4 (T-63) for a model with a holed face, and otherwise what earlier builds gave
+/// (version 3 with a smooth mesh or a hard edge, else version 2, byte for byte), pending the person's ruling. Version 4 is version 3 with faces that may have holes: a face is
+/// either a plain array of vertex ids, its outer loop, or the object <c>{"loop": [...], "holes": [[...], ...]}</c>, as
+/// <c>define_mesh</c> takes it; a face with no hole is always written as the plain array, a holed one as the object on one
+/// line. Version 4 also reserves the tombstone form T-64 fills, a <c>null</c> in <c>vertices</c> or <c>faces</c> standing
+/// for a removed element whose id is not reused; until T-64 lands it is refused with an error saying it is reserved.
+/// Version 3 (T-42) added, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or <c>"smooth"</c>) and
+/// <c>hard_edges</c> (vertex-id pairs, lower id first, in order).
 /// Version 2: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
 /// and <c>clips</c> in that order; in a mesh <c>name</c>, <c>vertices</c>, <c>faces</c>, <c>colours</c>, <c>groups</c> and
 /// <c>weights</c>; two-space indent, one vertex, face, colour, group, weighted vertex, bone or clip key per line, <c>\n</c>
 /// line ends and a newline at the end. Each float is the shortest text that reads back to the same <see cref="float"/>,
 /// each weight the shortest that reads back to the same <see cref="double"/>.</para>
-/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) version 2 and version 3, keys in any order and
+/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2, 3 and 4, keys in any order and
 /// any whitespace, and holds the file to exactly what the tools accept: geometry to <see cref="PolygonMesh.Create"/>, bones
 /// to <see cref="Skeleton.Create"/>, weights to <see cref="VertexWeights.Raw"/>, clips to <see cref="Clip.Create"/>, the
 /// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.
@@ -61,10 +66,10 @@ public sealed class CarveFileResult
 public static class CarveFile
 {
     /// <summary>The version <see cref="Write"/> writes.</summary>
-    public const int Version = 3;
+    public const int Version = 4;
 
     /// <summary>The versions <see cref="Read"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3];
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4];
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
@@ -93,13 +98,16 @@ public static class CarveFile
         return Write(Model.Of(Model.DefaultName, mesh));
     }
 
-    /// <summary>The file's text for a model, version 2. The same model always gives the same text.</summary>
+    /// <summary>The file's text for a model, version 2, 3 or 4 as the remarks say. The same model always gives the same text.</summary>
     public static string Write(Model model)
     {
         ArgumentNullException.ThrowIfNull(model);
         var w = new Writer();
         w.Line(0, "{");
-        var version = model.Meshes.Any(m => m.Mesh.Shade is not null) ? 3 : 2;
+        // Interim pending the person's ruling (T-63 hand-off): version 4 only when a face has holes, so a model a version 2
+        // or 3 file can hold is still written as before, byte for byte (T-42's rule and its tests).
+        var version = model.Meshes.Any(m => m.Mesh.Faces.Any(f => f.HasHoles)) ? Version
+            : model.Meshes.Any(m => m.Mesh.Shade is not null) ? 3 : 2;
         w.Line(1, $"\"{VersionKey}\": {version.ToString(CultureInfo.InvariantCulture)},");
         w.Open(1, "\"meshes\": [", model.Meshes.Count == 0, ",");
         for (var i = 0; i < model.Meshes.Count; i++)
@@ -142,7 +150,7 @@ public static class CarveFile
         w.Items(4, mesh.Vertices.Count, i => Vector(mesh.Vertices[i]));
         w.Line(3, "],");
         w.Line(3, $"\"{FacesKey}\": [");
-        w.Items(4, mesh.Faces.Count, i => Ids(mesh.Faces[i]));
+        w.Items(4, mesh.Faces.Count, i => FaceText(mesh.Faces[i]));
         w.Line(3, "],");
 
         var style = mesh.Style ?? FaceStyle.None;
@@ -240,6 +248,11 @@ public static class CarveFile
 
     private static string Rotation(Quaternion q) => $"[{Number(q.X)}, {Number(q.Y)}, {Number(q.Z)}, {Number(q.W)}]";
 
+    /// <summary>A face as version 4 writes it: its loop as a plain array, or with holes the object form.</summary>
+    private static string FaceText(Face face) => face.HasHoles
+        ? $"{{\"loop\": {Ids(face.Loop)}, \"holes\": [{string.Join(", ", face.Holes.Select(Ids))}]}}"
+        : Ids(face.Loop);
+
     private static string Ids(IEnumerable<int> ids) => "[" + string.Join(", ", ids.Select(i => i.ToString(CultureInfo.InvariantCulture))) + "]";
 
     /// <summary>A JSON string: only <c>"</c>, <c>\</c> and control characters escaped, so names read as written.</summary>
@@ -276,7 +289,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) is (2 or 3) and { } version ? ReadVersion2(root, version) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3 or 4) and { } version ? ReadVersion2(root, version) : ReadVersion1(root);
         }
     }
 
@@ -427,8 +440,8 @@ public static class CarveFile
         var name = Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         f.TryGetValue(VerticesKey, out var vs);
         f.TryGetValue(FacesKey, out var fs);
-        var verts = ReadVertices(at + ".", "the mesh", f.ContainsKey(VerticesKey) ? vs : null, errors);
-        var faces = ReadFaces(at + ".", "the mesh", f.ContainsKey(FacesKey) ? fs : null, errors);
+        var verts = ReadVertices(at + ".", "the mesh", f.ContainsKey(VerticesKey) ? vs : null, errors, version);
+        var faces = ReadFaces(at + ".", "the mesh", f.ContainsKey(FacesKey) ? fs : null, errors, version);
         if (errors.Count > before) return null;
 
         var created = PolygonMesh.Create(verts!, faces!);
@@ -832,7 +845,11 @@ public static class CarveFile
         return null;
     }
 
-    private static Vector3[]? ReadVertices(string prefix, string owner, JsonElement? element, List<MeshError> errors)
+    /// <summary>The error on a <c>null</c> in <c>vertices</c> or <c>faces</c> of a version 4 file: the tombstone form, reserved for T-64.</summary>
+    internal const string TombstoneMessage =
+        "null is the tombstone of a removed element, a form version 4 reserves for a later build; this build does not read it";
+
+    private static Vector3[]? ReadVertices(string prefix, string owner, JsonElement? element, List<MeshError> errors, int version = 1)
     {
         if (ArrayAt(prefix, owner, VerticesKey, element, errors) is not { } array)
             return null;
@@ -842,7 +859,9 @@ public static class CarveFile
         foreach (var vertex in array.EnumerateArray())
         {
             var name = Invariant($"{prefix}vertices[{i}]");
-            if (vertex.ValueKind != JsonValueKind.Array)
+            if (version >= 4 && vertex.ValueKind == JsonValueKind.Null)
+                errors.Add(new MeshError(name, TombstoneMessage));
+            else if (vertex.ValueKind != JsonValueKind.Array)
                 errors.Add(new MeshError(name, $"vertex is {Describe(vertex)}; a vertex is [x, y, z]"));
             else if (vertex.GetArrayLength() != 3)
                 errors.Add(new MeshError(name, Invariant($"vertex has {vertex.GetArrayLength()} coordinates; a vertex is [x, y, z]")));
@@ -873,34 +892,71 @@ public static class CarveFile
         return result;
     }
 
-    private static int[][]? ReadFaces(string prefix, string owner, JsonElement? element, List<MeshError> errors)
+    private static readonly string[] FaceKeys = ["loop", "holes"];
+
+    private static Face[]? ReadFaces(string prefix, string owner, JsonElement? element, List<MeshError> errors, int version = 1)
     {
         if (ArrayAt(prefix, owner, FacesKey, element, errors) is not { } array)
             return null;
 
-        var result = new int[array.GetArrayLength()][];
+        var result = new Face[array.GetArrayLength()];
         var f = 0;
         foreach (var face in array.EnumerateArray())
         {
             var name = Invariant($"{prefix}faces[{f}]");
-            if (face.ValueKind != JsonValueKind.Array)
+            if (version >= 4 && face.ValueKind == JsonValueKind.Null)
+                errors.Add(new MeshError(name, TombstoneMessage));
+            else if (version >= 4 && face.ValueKind == JsonValueKind.Object)
             {
-                errors.Add(new MeshError(name, $"face is {Describe(face)}; a face is an array of vertex ids"));
-                result[f++] = [];
+                if (Fields(face, name, "a face with holes", FaceKeys, errors) is { } fields
+                    && Required(fields, name, "loop", "a face with holes", errors) is { } loop
+                    && Required(fields, name, "holes", "a face with holes", errors) is { } holes)
+                {
+                    var outer = ReadIds(loop, $"{name}.loop", "a loop", errors);
+                    var holeLoops = new List<int[]>();
+                    if (holes.ValueKind != JsonValueKind.Array)
+                        errors.Add(new MeshError($"{name}.holes", $"holes is {Describe(holes)}, not an array of loops"));
+                    else
+                    {
+                        var h = 0;
+                        foreach (var hole in holes.EnumerateArray())
+                            holeLoops.Add(ReadIds(hole, Invariant($"{name}.holes[{h++}]"), "a hole", errors) ?? []);
+                    }
+                    result[f++] = new Face(outer ?? [], holeLoops);
+                    continue;
+                }
+            }
+            else if (face.ValueKind != JsonValueKind.Array)
+                errors.Add(new MeshError(name, version >= 4
+                    ? $"face is {Describe(face)}; a face is an array of vertex ids or {{\"loop\": [...], \"holes\": [[...], ...]}}"
+                    : $"face is {Describe(face)}; a face is an array of vertex ids"));
+            else
+            {
+                result[f++] = new Face(ReadIds(face, name, "a face", errors)!);
                 continue;
             }
-
-            var loop = new int[face.GetArrayLength()];
-            var k = 0;
-            foreach (var index in face.EnumerateArray())
-            {
-                if (index.ValueKind != JsonValueKind.Number || !index.TryGetInt32(out loop[k]))
-                    errors.Add(new MeshError(Invariant($"{prefix}faces[{f}][{k}]"), $"index is {Describe(index)}, not an integer vertex id"));
-                k++;
-            }
-            result[f++] = loop;
+            result[f++] = new Face([]);
         }
         return result;
+    }
+
+    /// <summary>A JSON array of integer vertex ids at <paramref name="name"/>, each bad one named <c>name[k]</c>; null when it is not an array.</summary>
+    private static int[]? ReadIds(JsonElement element, string name, string what, List<MeshError> errors)
+    {
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            errors.Add(new MeshError(name, $"{what} is {Describe(element)}, not an array of vertex ids"));
+            return null;
+        }
+        var loop = new int[element.GetArrayLength()];
+        var k = 0;
+        foreach (var index in element.EnumerateArray())
+        {
+            if (index.ValueKind != JsonValueKind.Number || !index.TryGetInt32(out loop[k]))
+                errors.Add(new MeshError(Invariant($"{name}[{k}]"), $"index is {Describe(index)}, not an integer vertex id"));
+            k++;
+        }
+        return loop;
     }
 
     private static string NotJsonMessage(JsonException e)

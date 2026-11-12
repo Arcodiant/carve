@@ -181,7 +181,7 @@ public class CarveFileV2Tests
         {
             var (e, a) = (expected.Meshes[m].Mesh, actual.Meshes[m].Mesh);
             Assert.Equal(e.Vertices.Select(Bits), a.Vertices.Select(Bits));
-            Assert.Equal(e.Faces.Select(f => f.ToArray()), a.Faces.Select(f => f.ToArray()));
+            Assert.Equal(e.Faces.Select(f => f.Loop.ToArray()), a.Faces.Select(f => f.Loop.ToArray()));
             Assert.Equal(e.Style?.Colours.ToArray(), a.Style?.Colours.ToArray());
             Assert.Equal(e.Style?.Groups.Select(g => (g.Name, g.Faces.ToArray())), a.Style?.Groups.Select(g => (g.Name, g.Faces.ToArray())));
             Assert.Equal(e.Weights is null, a.Weights is null);

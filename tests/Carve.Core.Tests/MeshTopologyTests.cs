@@ -33,13 +33,13 @@ public class MeshTopologyTests
         foreach (var edge in edges)
         foreach (var use in edge.Faces)
         {
-            var loop = cube.Faces[use.Face];
+            var loop = cube.Faces[use.Face].Loop;
             var from = loop[use.Corner];
             var to = loop[(use.Corner + 1) % loop.Count];
             Assert.Equal(use.LoToHi ? (edge.Lo, edge.Hi) : (edge.Hi, edge.Lo), (from, to));
         }
 
-        Assert.Equal([new EdgeUse(0, 3, false), new EdgeUse(2, 0, true)], Edge(cube, 1, 0).Faces);
+        Assert.Equal([new EdgeUse(0, -1, 3, false), new EdgeUse(2, -1, 0, true)], Edge(cube, 1, 0).Faces);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class MeshTopologyTests
         var v = new Vector3[] { new(0, 0, 0), new(1, 0, 0), new(0, 1, 0), new(0, -1, 0), new(0, 0, 1) };
         var mesh = TestMeshes.Make(v, [[0, 1, 2], [1, 0, 3], [0, 1, 4]]);
         var edge = Edge(mesh, 0, 1);
-        Assert.Equal([new EdgeUse(0, 0, true), new EdgeUse(1, 0, false), new EdgeUse(2, 0, true)], edge.Faces);
+        Assert.Equal([new EdgeUse(0, -1, 0, true), new EdgeUse(1, -1, 0, false), new EdgeUse(2, -1, 0, true)], edge.Faces);
         Assert.False(edge.IsManifold);
     }
 
@@ -140,9 +140,9 @@ public class MeshTopologyTests
         var cube = TestMeshes.Cube();
         var result = cube.Edit(
             movedVertices: [new(3, new Vector3(0, 1.5f, 0))],
-            reshapedFaces: [new(1, [4, 5, 8])],
+            reshapedFaces: [new(1, new[] { 4, 5, 8 })],
             addedVertices: [new(0.5f, 0.5f, 2)],
-            addedFaces: [[5, 6, 8], [6, 7, 8], [7, 4, 8]]);
+            addedFaces: [new[] { 5, 6, 8 }, new[] { 6, 7, 8 }, new[] { 7, 4, 8 }]);
         Assert.True(result.Succeeded, string.Join("; ", result.Errors));
         var edited = result.Mesh!;
 
@@ -154,9 +154,9 @@ public class MeshTopologyTests
         Assert.Equal(9, edited.Faces.Count);
         for (var f = 0; f < 6; f++)
             Assert.Equal(f == 1 ? [4, 5, 8] : TestMeshes.CubeFaces[f], edited.Faces[f]);
-        Assert.Equal([5, 6, 8], edited.Faces[6]);
-        Assert.Equal([6, 7, 8], edited.Faces[7]);
-        Assert.Equal([7, 4, 8], edited.Faces[8]);
+        Assert.Equal([5, 6, 8], edited.Faces[6].Loop);
+        Assert.Equal([6, 7, 8], edited.Faces[7].Loop);
+        Assert.Equal([7, 4, 8], edited.Faces[8].Loop);
 
         // The old mesh is untouched, and the new one has its own edge table.
         Assert.Equal(TestMeshes.CubeVertices, cube.Vertices);
@@ -179,8 +179,8 @@ public class MeshTopologyTests
         var cube = TestMeshes.Cube();
         var result = cube.Edit(
             movedVertices: [new(3, new Vector3(float.NaN, 0, 0))],
-            reshapedFaces: [new(2, [0, 1, 1])],
-            addedFaces: [[0, 9, 1]]);
+            reshapedFaces: [new(2, new[] { 0, 1, 1 })],
+            addedFaces: [new[] { 0, 9, 1 }]);
         Assert.False(result.Succeeded);
         Assert.Null(result.Mesh);
 
@@ -202,7 +202,7 @@ public class MeshTopologyTests
     {
         var result = TestMeshes.Cube().Edit(
             movedVertices: [new(8, Vector3.Zero)],
-            reshapedFaces: [new(-1, [0, 1, 2])]);
+            reshapedFaces: [new(-1, new[] { 0, 1, 2 })]);
         Assert.False(result.Succeeded);
         Assert.Equal(["vertices[8]", "faces[-1]"], result.Errors.Select(e => e.Element));
     }

@@ -156,7 +156,7 @@ internal static class TestMeshes
     /// <summary>The face's highest and lowest edges in Y, as vertex pairs.</summary>
     private static ((int A, int B) Top, (int A, int B) Bottom) TopAndBottom(PolygonMesh mesh, int face)
     {
-        var loop = mesh.Faces[face];
+        var loop = mesh.Faces[face].Loop;
         var pairs = Enumerable.Range(0, loop.Count).Select(k => (A: loop[k], B: loop[(k + 1) % loop.Count])).ToArray();
         float Y((int A, int B) e) => Math.Min(mesh.Vertices[e.A].Y, mesh.Vertices[e.B].Y);
         bool Level((int A, int B) e) => Math.Abs(mesh.Vertices[e.A].Y - mesh.Vertices[e.B].Y) < 1e-6f;

@@ -1,9 +1,10 @@
 namespace Carve.Core;
 
 /// <summary>
-/// What one extruded face became: <see cref="Cap"/> is the face itself, which keeps its id with the new ring as its loop;
-/// <see cref="Walls"/> are the quads appended for it, one per edge in loop order (wall <c>k</c> runs from corner <c>k</c> to
-/// <c>k + 1</c>); <see cref="NewVertices"/> is the ring, in the face's loop order (new vertex <c>k</c> stands over corner <c>k</c>).
+/// What one extruded face became: <see cref="Cap"/> is the face itself, which keeps its id with the new rings as its loop
+/// and holes; <see cref="Walls"/> are the quads appended for it, one per edge in corner order (<see cref="Face.Corners"/>:
+/// the outer loop, then each hole), wall <c>k</c> running from corner <c>k</c> to the next corner of its loop;
+/// <see cref="NewVertices"/> are the rings in the same corner order (new vertex <c>k</c> stands over corner <c>k</c>).
 /// </summary>
 public sealed record ExtrudedFace(int Face, int Cap, IReadOnlyList<int> Walls, IReadOnlyList<int> NewVertices);
 

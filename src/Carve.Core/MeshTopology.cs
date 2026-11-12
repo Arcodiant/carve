@@ -1,11 +1,16 @@
 namespace Carve.Core;
 
 /// <summary>
-/// One face's use of an edge: the face's id, the corner its side along the edge starts at
-/// (the side runs from <c>Faces[Face][Corner]</c> to the next corner in the loop), and which way it runs.
+/// One face's use of an edge: the face's id, the loop its side lies on (<see cref="Hole"/>: -1 for the outer loop, else
+/// the hole's index in <see cref="Face.Holes"/>), the corner of that loop the side starts at (the side runs from
+/// <c>Faces[Face].LoopAt(Hole)[Corner]</c> to the next corner of the same loop), and which way it runs. A hole winds
+/// opposite to its outer loop, so a hole edge shared with a face filling the hole is crossed once each way.
 /// </summary>
-/// <param name="LoToHi">True when the face runs along the edge from <see cref="MeshEdge.Lo"/> to <see cref="MeshEdge.Hi"/>.</param>
-public readonly record struct EdgeUse(int Face, int Corner, bool LoToHi);
+public readonly record struct EdgeUse(int Face, int Hole, int Corner, bool LoToHi)
+{
+    /// <summary>The element name of the corner the side starts at: <c>faces[n][i]</c>, or <c>faces[n].holes[k][i]</c> on a hole.</summary>
+    public string CornerName => Carve.Core.Face.CornerName(Face, Hole, Corner);
+}
 
 /// <summary>
 /// An undirected edge of a <see cref="PolygonMesh"/>: the vertex pair <c>(Lo, Hi)</c> with <c>Lo &lt; Hi</c>,
@@ -57,25 +62,29 @@ public sealed class MeshTopology
         for (var f = 0; f < faces.Count; f++)
         {
             var face = faces[f];
-            for (var k = 0; k < face.Count; k++)
+            for (var h = -1; h < face.Holes.Count; h++)
             {
-                var a = face[k];
-                var b = face[(k + 1) % face.Count];
-                var key = a < b ? (a, b) : (b, a);
-                if (!uses.TryGetValue(key, out var list))
-                    uses[key] = list = [];
-                list.Add(new EdgeUse(f, k, a < b));
+                var ring = face.LoopAt(h);
+                for (var k = 0; k < ring.Count; k++)
+                {
+                    var a = ring[k];
+                    var b = ring[(k + 1) % ring.Count];
+                    var key = a < b ? (a, b) : (b, a);
+                    if (!uses.TryGetValue(key, out var list))
+                        uses[key] = list = [];
+                    list.Add(new EdgeUse(f, h, k, a < b));
 
-                // A face never repeats a vertex (Create refuses it), so one add per face per vertex.
-                (vertexFaces[a] ??= []).Add(f);
+                    // A face never repeats a vertex across its loops (Create refuses it), so one add per face per vertex.
+                    (vertexFaces[a] ??= []).Add(f);
+                }
             }
         }
 
         _byPair = new Dictionary<(int, int), MeshEdge>(uses.Count);
         var edges = new MeshEdge[uses.Count];
-        var n = 0;
+        var e = 0;
         foreach (var (key, list) in uses.OrderBy(e => e.Key))
-            _byPair[key] = edges[n++] = new MeshEdge(key.Item1, key.Item2, list.ToArray());
+            _byPair[key] = edges[e++] = new MeshEdge(key.Item1, key.Item2, list.ToArray());
         Edges = Array.AsReadOnly(edges);
 
         _vertexFaces = vertexFaces.Select(l => (IReadOnlyList<int>)Array.AsReadOnly(l?.ToArray() ?? [])).ToArray();
@@ -84,12 +93,17 @@ public sealed class MeshTopology
         for (var f = 0; f < faces.Count; f++)
         {
             var face = faces[f];
-            var loop = new MeshEdge[face.Count];
-            for (var k = 0; k < face.Count; k++)
+            var loop = new MeshEdge[face.Corners.Count];
+            var n = 0;
+            for (var h = -1; h < face.Holes.Count; h++)
             {
-                var a = face[k];
-                var b = face[(k + 1) % face.Count];
-                loop[k] = _byPair[a < b ? (a, b) : (b, a)];
+                var ring = face.LoopAt(h);
+                for (var k = 0; k < ring.Count; k++)
+                {
+                    var a = ring[k];
+                    var b = ring[(k + 1) % ring.Count];
+                    loop[n++] = _byPair[a < b ? (a, b) : (b, a)];
+                }
             }
             _faceEdges[f] = Array.AsReadOnly(loop);
         }
@@ -101,7 +115,10 @@ public sealed class MeshTopology
     /// <summary>The faces that use a vertex, by face id ascending; empty for an unused vertex.</summary>
     public IReadOnlyList<int> VertexFaces(int vertex) => _vertexFaces[vertex];
 
-    /// <summary>A face's edges in loop order: edge <c>k</c> runs from corner <c>k</c> to corner <c>k + 1</c> (wrapping).</summary>
+    /// <summary>
+    /// A face's edges, outer loop first and then each hole in order, by corner (<see cref="Face.Corners"/>): edge <c>c</c>
+    /// runs from corner <c>c</c> to the next corner of the same loop (wrapping within the loop).
+    /// </summary>
     public IReadOnlyList<MeshEdge> FaceEdges(int face) => _faceEdges[face];
 
     /// <summary>The edge between two vertices, given in either order, if any face uses it.</summary>

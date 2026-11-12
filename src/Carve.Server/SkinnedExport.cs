@@ -88,10 +88,10 @@ public static class SkinnedExport
 
             foreach (var t in triangles)
             {
-                var loop = mesh.Faces[t.Face];
+                var face = mesh.Faces[t.Face];
                 var at = corners[t.Face];
                 var primitive = primitives[GlbExport.ColourOf(mesh, t.Face) ?? ""];
-                primitive.AddTriangle(Vertex(mesh, t.A, at[Shading.CornerOf(loop, t.A)]), Vertex(mesh, t.B, at[Shading.CornerOf(loop, t.B)]), Vertex(mesh, t.C, at[Shading.CornerOf(loop, t.C)]));
+                primitive.AddTriangle(Vertex(mesh, t.A, at[face.CornerOf(t.A)]), Vertex(mesh, t.B, at[face.CornerOf(t.B)]), Vertex(mesh, t.C, at[face.CornerOf(t.C)]));
             }
             triangleCount += triangles.Count;
             boundToRoot += Enumerable.Range(0, mesh.Vertices.Count).Count(v => mesh.Weights?.Has(v) != true);

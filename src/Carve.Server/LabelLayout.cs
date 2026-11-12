@@ -93,7 +93,7 @@ public static class LabelLayout
 
         if (labels is LabelSet.Vertices or LabelSet.Both)
         {
-            foreach (var vertex in facing.SelectMany(f => mesh.Faces[f]).Distinct().Order())
+            foreach (var vertex in facing.SelectMany(f => mesh.Faces[f].Corners).Distinct().Order())
             {
                 var text = (vertex - (window?.FirstVertex ?? 0)).ToString(CultureInfo.InvariantCulture);
                 var dot = Pixel(mesh.Vertices[vertex]);

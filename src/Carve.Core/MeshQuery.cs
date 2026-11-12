@@ -242,7 +242,7 @@ public static class MeshQuery
 
         public MeshEdge Edge(int i) => Mesh.Topology.Edges[i];
 
-        public IEnumerable<Vector3> Corners(int face) => Mesh.Faces[face].Select(v => Mesh.Vertices[v]);
+        public IEnumerable<Vector3> Corners(int face) => Mesh.Faces[face].Corners.Select(v => Mesh.Vertices[v]);
 
         public int EdgesAt(int vertex)
         {
@@ -330,8 +330,8 @@ public static class MeshQuery
                     ["normal.x"] = (f, i) => f.Mesh.FaceNormal(i).X,
                     ["normal.y"] = (f, i) => f.Mesh.FaceNormal(i).Y,
                     ["normal.z"] = (f, i) => f.Mesh.FaceNormal(i).Z,
-                    ["vertices"] = (f, i) => f.Mesh.Faces[i].Count,
-                    ["area"] = (f, i) => (float)(PolygonMesh.Length(PolygonMesh.NewellVector(f.Mesh.Vertices, f.Mesh.Faces[i])) * 0.5),
+                    ["vertices"] = (f, i) => f.Mesh.Faces[i].Corners.Count,
+                    ["area"] = (f, i) => (float)f.Mesh.FaceArea(i),
                 }),
             new()
             {

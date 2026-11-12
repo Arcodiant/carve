@@ -335,13 +335,13 @@ public class MeshQueryTests
         Assert.Equal(Enumerable.Range(0, verts.Count).Where(i => verts[i].Y > 0.5f), Ids(crate, Vertices, "y > 0.5"));
         Assert.Equal(Enumerable.Range(0, crate.Faces.Count).Where(f => crate.FaceNormal(f).Y > 0.9f), Ids(crate, Faces, "normal.y > 0.9"));
         Assert.Equal(Enumerable.Range(0, crate.Faces.Count).Where(f => crate.FaceCentre(f).X < 0.1f), Ids(crate, Faces, "x < 0.1"));
-        Assert.Equal(Enumerable.Range(0, crate.Faces.Count).Where(f => crate.Faces[f].Min(v => verts[v].Y) >= 0.5f), Ids(crate, Faces, "min.y >= 0.5"));
-        Assert.Equal(Enumerable.Range(0, crate.Faces.Count).Where(f => crate.Faces[f].Max(v => verts[v].Z) <= 0.5f), Ids(crate, Faces, "max.z <= 0.5"));
+        Assert.Equal(Enumerable.Range(0, crate.Faces.Count).Where(f => crate.Faces[f].Loop.Min(v => verts[v].Y) >= 0.5f), Ids(crate, Faces, "min.y >= 0.5"));
+        Assert.Equal(Enumerable.Range(0, crate.Faces.Count).Where(f => crate.Faces[f].Loop.Max(v => verts[v].Z) <= 0.5f), Ids(crate, Faces, "max.z <= 0.5"));
         Assert.Equal(edges.Where(e => Vector3.Distance(verts[e.Lo], verts[e.Hi]) > 0.3f).Select(e => (e.Lo, e.Hi)), Pairs(crate, "length > 0.3"));
         Assert.Equal(edges.Where(e => Math.Max(verts[e.Lo].Y, verts[e.Hi].Y) < 0.2f).Select(e => (e.Lo, e.Hi)), Pairs(crate, "max.y < 0.2"));
 
         // Each vertex's faces add up to the corners, and its edges to both ends of every edge.
-        var corners = crate.Faces.Sum(f => f.Count);
+        var corners = crate.Faces.Sum(f => f.Loop.Count);
         Assert.Equal(corners, Enumerable.Range(1, 12).Sum(n => n * Run(crate, Vertices, $"faces == {n}").Count));
         Assert.Equal(2 * edges.Count, Enumerable.Range(1, 12).Sum(n => n * Run(crate, Vertices, $"edges == {n}").Count));
         Assert.Equal(corners, Enumerable.Range(3, 10).Sum(n => n * Run(crate, Faces, $"vertices == {n}").Count));
