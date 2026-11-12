@@ -280,4 +280,38 @@ public class PlaneCutTests
         var r = PlaneCut.Cut(TestMeshes.Cube(), new Vector3(float.NaN, 0, 0), Up);
         Assert.Equal(["point: must be a finite point"], r.Edit.Errors.Select(e => e.ToString()));
     }
+
+    /// <summary>
+    /// Two unit cubes meeting along one edge, 5-6 at x = z = 1: the first is <see cref="TestMeshes.Cube"/>, the second
+    /// the same moved by (1, 0, 1), its corners 5, 8, 9, 6, 10, 11, 12, 13. Edge 5-6 has four faces.
+    /// </summary>
+    private static PolygonMesh TwoCubesOnAnEdge()
+    {
+        int[] b = [5, 8, 9, 6, 10, 11, 12, 13];
+        var shift = new Vector3(1, 0, 1);
+        var v = TestMeshes.CubeVertices.Concat(new[] { 1, 2, 4, 5, 6, 7 }.Select(i => TestMeshes.CubeVertices[i] + shift));
+        var faces = TestMeshes.CubeFaces.Concat(TestMeshes.CubeFaces.Select(f => f.Select(c => b[c]).ToArray()));
+        return TestMeshes.Make(v, faces);
+    }
+
+    [Fact]
+    public void ANonManifoldCutBorderIsChainedByLowestVertexId()
+    {
+        // The person's ruling (2026-11-12): a non-manifold cut border is chained by lowest vertex id. The border meets
+        // itself at 17, the new vertex on edge 5-6, with two ways on: 15 (the first cube's) and 19 (the second's).
+        // The lowest closes the first cube's loop, so each cube gets its own cap; the highest would wind both into one.
+        var r = PlaneCut.Cut(TwoCubesOnAnEdge(), Half, Up, PlaneKeep.Below);
+        var m = Ok(r);
+
+        Assert.Empty(r.Warnings);
+        Assert.Equal([14, 15, 16, 17, 18, 19, 20], r.Edit.NewVertices);
+        Assert.Equal([20, 21], r.Edit.NewFaces);
+        Assert.Equal([14, 16, 17, 15], m.Faces[20].Loop);
+        Assert.Equal([17, 19, 20, 18], m.Faces[21].Loop);
+        foreach (var f in r.Edit.NewFaces)
+        {
+            Assert.True(Vector3.Dot(m.FaceNormal(f), Up) > 0.99f, "each cap faces up, out of the kept side");
+            Assert.Equal(1.0, m.FaceArea(f), 6);
+        }
+    }
 }
