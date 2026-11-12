@@ -8,10 +8,13 @@ namespace Carve.Scenario.Cuts;
 /// <summary>
 /// The mesh as get_mesh gives it, holes and all, with the rules the renderer follows, worked here apart from the
 /// product: a face's normal is its outer loop's Newell normal, a face is culled from behind, and a ray meets a face where
-/// it crosses the face's plane inside the outer loop and inside none of its holes.
+/// it crosses the face's plane inside the outer loop and inside none of its holes. A deleted face (null in get_mesh) has
+/// an empty loop and is met by no ray; a deleted vertex (null) sits at the origin, used by no live face.
 /// </summary>
 internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] Faces)
 {
+    public bool IsDeleted(int face) => Faces[face].Loop.Length == 0;
+
     public Vector3 Normal(int face)
     {
         var loop = Faces[face].Loop;
@@ -31,6 +34,11 @@ internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] F
         var (best, nearest) = (-1, float.MaxValue);
         for (var f = 0; f < Faces.Length; f++)
         {
+            if (IsDeleted(f))
+            {
+                continue;
+            }
+
             var n = Normal(f);
             var facing = Vector3.Dot(n, direction);
             if (facing >= 0)
@@ -102,18 +110,31 @@ internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] F
         return FirstHit(o, d);
     }
 
-    /// <summary>The current mesh from get_mesh: a face's <c>vertices</c> is its loop, or <c>{loop, holes}</c> for a holed face.</summary>
+    /// <summary>
+    /// The current mesh from get_mesh: a face's <c>vertices</c> is its loop, or <c>{loop, holes}</c> for a holed face; a
+    /// deleted slot is null.
+    /// </summary>
     public static async Task<Solid> ReadAsync(ScenarioDriver driver)
     {
         var mesh = JsonDocument.Parse(await Checks.CallTextAsync(driver, "get_mesh", new { })).RootElement;
         var vertices = mesh.GetProperty("vertices").EnumerateArray().Select(v =>
         {
+            if (v.ValueKind == JsonValueKind.Null)
+            {
+                return Vector3.Zero;
+            }
+
             var at = v.GetProperty("at");
             return new Vector3(at[0].GetSingle(), at[1].GetSingle(), at[2].GetSingle());
         }).ToArray();
         static int[] Ids(JsonElement e) => e.EnumerateArray().Select(x => x.GetInt32()).ToArray();
         var faces = mesh.GetProperty("faces").EnumerateArray().Select(f =>
         {
+            if (f.ValueKind == JsonValueKind.Null)
+            {
+                return (Array.Empty<int>(), Array.Empty<int[]>());
+            }
+
             var v = f.GetProperty("vertices");
             return v.ValueKind == JsonValueKind.Object
                 ? (Ids(v.GetProperty("loop")), v.GetProperty("holes").EnumerateArray().Select(Ids).ToArray())
