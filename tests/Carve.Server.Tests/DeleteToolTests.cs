@@ -40,6 +40,9 @@ public sealed class DeleteToolTests() : TempFolderTests("carve-delete")
         var body = Ok(await carve.CallToolAsync("delete", ToolList.Examples(tools, "delete").Single()));
         Assert.Equal([3], Ints(body.GetProperty("deleted").GetProperty("faces")));
         Assert.Empty(Ints(body.GetProperty("deleted").GetProperty("vertices")));
+        // Every edit's report carries split (T-65), empty when nothing was split.
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, body.GetProperty("split").ValueKind);
+        Assert.Equal(0, body.GetProperty("split").GetArrayLength());
         Assert.Equal(5, body.GetProperty("faces").GetInt32());
         Assert.Equal(8, body.GetProperty("vertices").GetInt32());
         Assert.False(body.GetProperty("closed").GetBoolean());

@@ -131,6 +131,13 @@ internal static class MeshToolSupport
     /// <summary>The <c>deleted</c> field of every edit's report: the vertex and face ids the edit tombstoned, ascending.</summary>
     public static object Deleted(DeletedElements deleted) => new { vertices = deleted.Vertices, faces = deleted.Faces };
 
+    /// <summary>
+    /// The <c>split</c> field of every edit's report (T-65): one entry per face the edit split, <c>{face, pieces}</c>, its
+    /// pieces ascending with the kept id (the face's own) first; empty for an edit that splits nothing.
+    /// </summary>
+    public static object[] Split(IReadOnlyList<SplitFace> split) =>
+        [.. split.Select(s => new { face = s.Face, pieces = s.Pieces })];
+
     /// <summary>The report fields every tool returns: vertices, faces, edges, closed, bounds, warnings.</summary>
     public static Dictionary<string, object> Report(PolygonMesh mesh)
     {
@@ -161,6 +168,7 @@ internal static class MeshToolSupport
         var body = Report(snapshot.Model.Find(mesh ?? snapshot.Model.Meshes[0].Name)!);
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
         body["deleted"] = Deleted(result.Deleted);
+        body["split"] = Split(result.Split);
         addIds(body, result);
         return Ok(body);
     }

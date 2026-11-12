@@ -173,6 +173,7 @@ public sealed class DefineMeshTool(ModelStore store)
         store.Define(meshName!, mesh, "define_mesh");
         var body = Report(mesh);
         body["deleted"] = Deleted(DeletedElements.None);
+        body["split"] = Split([]);
         return Ok(body);
     }
 

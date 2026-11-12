@@ -101,3 +101,90 @@ Ray-test pixel checks, each shown failing on a break.
 - Plan for two agents: `FaceSplit` with its tests, then `PlaneCut` and the tool.
 - Evidence goes to the milestone worktree's `artifacts/review/T-65/` by absolute path.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.Split` and the `split` report field** (the member's own checkpoint: "`FaceSplit` with its tests, then `PlaneCut` and the tool"). `PlaneCut`, the tool and the content are left to the next agent (see Hand-off).
+
+**`FaceSplit`** (`src/Carve.Core/FaceSplit.cs`), the API T-66 and T-67 build on:
+
+- `CutPoint` (record struct): `CutPoint.AtVertex(v)`, or `CutPoint.OnEdge(a, b, t)`, a point on edge `a`-`b` at fraction `t` from `a` (0..1). `IsVertex`.
+- `FaceCut(int Face, CutPoint From, CutPoint To)`: one straight segment across one live face, from a boundary point to a boundary point (a corner of the face, in its outer loop or a hole, or a point on one of its edges). Interior points are not taken yet: the knife's path through a face's interior (T-67) needs them, and adds them here (the tracing below already handles a closed inner loop as a hole of the piece around it, but nothing makes interior vertices yet).
+- `FaceSplit.Split(mesh, cuts) -> FaceSplitResult(EditResult Edit, IReadOnlyList<(int From, int To)> Segments)`: `Segments` gives, per cut in the order given, the vertex ids its two ends became (empty on failure), which is what a caller needs to know its cut edges (the plane cut's fill loops, the loop cut's ring).
+- `FaceSplit.Tolerance(mesh)`: `PolygonMesh.PlanarityTolerance` (1e-4) times the bounding-box diagonal of the mesh's live vertices. **This is a reading, flagged for the person (see Hand-off):** `PlanarityTolerance` is a fraction of a face's bounding-box diagonal, and the spec says only "within `PolygonMesh`'s planarity tolerance". A per-face length would let the two faces on an edge disagree about one point, so it is one length for the mesh (the knife's 1e-4 of the bounds diagonal is the same number).
+- **Vertex order.** An edge point within the tolerance of an edge end is that vertex; two points on one edge within it of each other are one. Every other edge point is one new vertex, shared by both faces on that edge. New vertices are appended **by edge, low id then high (the `(lo, hi)` pair ascending), and along each edge from its low end**, position `lo + t (hi - lo)` in doubles. So the same call always gives the same ids.
+- **Faces.** Every live face with a new vertex on an edge takes it into that loop (outer or hole), in the loop's direction, keeping its id. A split face's pieces are traced as a planar subdivision in the face's plane (the loops in their own winding, each segment both ways; at each vertex the next half-edge is the first clockwise from the way back): counter-clockwise loops are outlines, clockwise ones untouched holes. **The kept id** goes to the piece holding the face's first outer-loop corner, or, if that corner is a segment's end, the next corner of the original outer loop that is not. The other pieces are appended: faces in id order, a face's pieces in the order found from its corners (outer loop then holes). Each piece's outer loop starts at its vertex that comes first in the face's corners (with the new vertices in place), so the kept piece of a face whose corner 0 is off the cut starts at corner 0; winding is the face's.
+- **Holes.** A segment ending on a hole cuts the hole's loop into the pieces' outlines; a hole no segment meets stays a hole of the piece containing its first vertex (the smallest such, ready for T-67's nested case), its loop rotated the same way.
+- **Skipped, not refused:** a segment from a vertex to itself, or one running along the boundary (its midpoint within the tolerance of a boundary edge). It splits nothing, though its edge points still become vertices. A repeated segment counts once.
+- **Refused**, each named `cuts[i]`: no cuts (`cuts: nothing to split: give at least one segment`); a face that is not live (`cuts[0]: faces[0]: deleted`); a vertex not a corner of the face; an edge not the face's; a fraction not finite or not in 0..1; a segment whose midpoint is outside the face (in no outline, or in a hole); one properly crossing a boundary edge or another segment; segments that leave the same piece on both sides of one (`FaceSplit.OnePieceMessage`, e.g. a single bridge from the outer loop to a hole). On failure the mesh is untouched, `Split` and `Segments` empty.
+- **What carries:** pieces take the face's colour and groups (`FaceStyle.Carry`); a hard edge with new vertices on it becomes hard pieces, and the segments' edges are soft; a new vertex's weights are `Subdivision.Stencil`'s blend of its edge's ends, `(1 - t)` and `t`, capped at four and renormalised as `subdivide` does; an old vertex's weights are unchanged. M-6's UVs have not landed (no UV in the Core), so nothing about UVs.
+
+**`EditResult.Split`** (`src/Carve.Core/EditResult.cs`): `IReadOnlyList<SplitFace>`, `SplitFace(int Face, IReadOnlyList<int> Pieces)`, one entry per face split in face id order, its pieces the kept id (the face's own) first, then the appended ones ascending; empty for every other edit and on failure. `EditResult.Made` takes it as `split:`.
+
+**The `split` report field** (`src/Carve.Server/MeshToolSupport.cs`, `MeshToolSupport.Split`): `split: [{face, pieces}]` in the shared `Edit` body (so every edit tool), and in `subdivide`'s and `define_mesh`'s bodies, which are written apart, as `deleted` is. Always present, `[]` when nothing was split.
+
+**Tests.** `tests/Carve.Core.Tests/FaceSplitTests.cs` (unit, 15): the cube's top split in two with its neighbours taking the new vertices and keeping their ids, closed; a triangle cut through a vertex (corner 0 on the cut, corner 1 decides); the id rule on a square both ways off corner 0 and on both diagonals, and on a hexagon cut 0-3 and 1-3, where corners 0 and 1 are both on the cut and corner 2 decides; a holed plate cut through the hole (the hole loop in both outlines, areas 6 and 6) and beside it (the hole kept in the piece around it, both ways round); a vertex on a shared edge made once when the two faces give it from opposite ends; the tolerance (a point at half of it is the vertex, at twice it new, two points closer than it one vertex); determinism over two runs of three cuts; colour, groups, smooth mode and split hard edges carried, the new edge soft; weights blended by fraction, capped at four and renormalised; a segment along an edge or to itself splitting nothing; every refusal's text, the one-piece refusal for a lone bridge to a hole and for the same bridge beside a cut that does divide the face; a failed split leaving the mesh and reporting no split, and `move` reporting none. `DeleteToolTests` (server regression) checks `split` is `[]` in delete's report. Core 636 passed, server unit 279 and `DeleteToolTests` 2 passed, by `dotnet test` here.
+
+**Breaks** (each applied alone by `C:/Users/andre/AppData/Local/Temp/t65/breaks.py`, built with warnings as errors, `FaceSplitTests` or `DeleteToolTests` run, restored; output in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/breaks.log`):
+
+  | Check | Break | Result |
+  |---|---|---|
+  | a point within the tolerance of a vertex is that vertex | the low-end snap never fires | 1 fails |
+  | two points on one edge are one vertex (a shared edge's vertex made once) | every point a new vertex | 3 fail |
+  | new vertices by edge, low id then high | edges in the order met | 2 fail |
+  | the same call gives the same ids | every other call takes the edges in reverse | 5 fail |
+  | corner 0 on the cut: the next corner off it decides | corner 0 always decides | 1 fails (first run: 0 failed, because the tracing order agreed with the rule in every case; the hexagon test was added and the break rerun) |
+  | the piece holding the deciding corner keeps the id | the last piece keeps it | 5 fail |
+  | a neighbour on the edge takes the new vertex | only cut faces take it | 3 fail |
+  | a hole wholly on one side stays a hole of its piece | every hole to the kept piece | 1 fails |
+  | a cut through a hole cuts the hole loop into the outlines | the holes left out of the tracing | 2 fail |
+  | pieces take colour and groups | the style not carried | 1 fails |
+  | each piece of a split hard edge stays hard | only every other piece | 1 fails |
+  | new edges are not hard | the first new edge made hard | 1 fails |
+  | a new vertex blends weights by its fraction | `t` and `1 - t` swapped | 1 fails |
+  | the new vertex's weights carried | no blend | 1 fails |
+  | a segment along an edge splits nothing | the along-boundary test dropped | 1 fails |
+  | refused: a face that is not live | the check never fires | 1 fails |
+  | refused: a vertex not a corner of the face | the check never fires | 1 fails |
+  | refused: a fraction not in 0..1 | the check never fires | 1 fails |
+  | refused: an edge not of the face | the check never fires | 1 fails |
+  | refused: a segment outside the face | the check never fires | 1 fails |
+  | refused: a segment crossing an edge | the check never fires | 1 fails |
+  | refused: segments crossing | the check never fires | 1 fails |
+  | refused: a cut leaving the face in one piece | the per-segment check never fires | 1 fails (first run: 0 failed, because the outline count caught the lone bridge on its own; the bridge-beside-a-cut case was added and the break rerun) |
+  | `Split` lists the kept id first | the kept id left out | 3 fail |
+  | every report carries `split` | the key left out of `MeshToolSupport.Edit` | 1 fails (`DeleteToolTests`) |
+
+**Frames:** none taken. Nothing here changes a frame: the report gains a key, and no stage cuts yet. The hash check against T-64's 127 (`D:/repos/carve/branches/milestone/M-5/artifacts/review/T-64/frames-737853a/all.sha256`) is for the agent that runs the GPU suites.
+
+### Hand-off
+
+**Done (first agent, Opus claude-opus-5-5):** `FaceSplit`, `EditResult.Split`, the `split` report field, `FaceSplitTests` (15), the `split` assertion in `DeleteToolTests`, and the breaks above. By `dotnet test` here: Core 636, server unit 279, `DeleteToolTests` 2, all pass. `cairn task T-65 verify` has **not** been run: no GPU suite was submitted, and nothing here can be seen.
+
+**Left:**
+
+1. **`PlaneCut`** (Core, its own file), on `FaceSplit`. A suggested shape:
+   - Take the signed distance `d` of each live vertex from the plane. A vertex within `FaceSplit.Tolerance(mesh)` is on the plane (one tolerance for the whole cut).
+   - A face with every corner on the plane is not split. With `keep`, it goes with the side its normal points to.
+   - For every other face, collect its crossings: `CutPoint.AtVertex` for a corner on the plane, and `CutPoint.OnEdge(a, b, da / (da - db))` for an edge whose ends are strictly on opposite sides. Sort them along the plane's line in the face, and keep the gaps between consecutive points whose midpoints are inside the face. `FaceSplit` refuses a segment outside the face, so filter before calling it: a concave face, or a holed one, gives several segments, and a corner that only touches the plane gives none.
+   - Then call `FaceSplit.Split`. Its `Segments` are the cut edges.
+   - **keep above/below:** classify each live face of the split mesh by its corners' distances (above when all are >= -tol, below when all are <= tol). Delete the other side with `MeshDelete.Closure` and a second `Edit(deletedVertices, deletedFaces)`. Refuse a limited (`faces`) cut that keeps a side, a zero or non-finite normal, a plane touching no face, and a cut that leaves nothing.
+   - **fill:** chain the cut edges on the kept side into closed loops and cap each, wound outward on the kept side (for `below`, the cap's normal is `+normal`). Two nested loops give a holed cap (T-63, holes clockwise). An open chain is a warning naming its ends. On a smooth mesh the caps' border edges go hard (`MeshShade.WithEdges`).
+   - The combined `EditResult` must report the split's and the fill's `NewVertices` and `NewFaces`, with `Split` and `Deleted`, together (`EditResult.Made(..., deleted, split)`). A piece the split appends and then deletes with the other side appears in both `split` and `deleted`. That follows the spec's wording, but the person may want to look at it.
+   - Tests per Scope: keep both, above and below, with and without fill, on the cube, an L-block and an open mesh (the warning); a cut in a face's plane; each refusal; each with a break.
+2. **The `plane_cut` tool** in `Program.cs`'s list (beside T-68's; keep both sides), with its description and the worked example (the unit cube cut at y = 0.5 keeping `below` with fill gives a half-height closed box), as one `undo` step. Add the `regression` test through the client: the cube, its `split` and `deleted` fields, then `check` closed.
+3. **`PlaneCutStage.cs`** and its line in `CutsStages.cs` (beside T-68's), with:
+   - the three frames per Scope, and ray-test pixel checks, each shown failing;
+   - the GPU suites, run once on a near-final commit, with every existing frame byte-identical to T-64's 127;
+   - the new frames to the person through `mcp__waystone__review`;
+   - then verify, lint and finish.
+
+**Checked:** everything in the breaks table. **Not checked:**
+- Any frame.
+- `server-regression` as a whole. Only `DeleteToolTests` ran here. Every other regression test sees one more report key, `split`; no test checks an exact key set as far as a search found, but the suite was not run.
+
+**Surprising:**
+- Two breaks caught nothing on the first run (the table says which, and how each test was strengthened). The tracing order happened to agree with the id rule, and the outline count caught the lone bridge on its own.
+- A backslash in the breaks script was eaten on its way through the shell, as the machine's CLAUDE.md warns. The script now uses `os.path.join`.
+
+**For the person: one reading to confirm.** The spec says "within `PolygonMesh`'s planarity tolerance of an existing vertex". `PlanarityTolerance` (1e-4) is a fraction of a size, and the planarity check measures that size as each face's bounding-box diagonal. `FaceSplit` uses the bounding-box diagonal of the mesh's live vertices instead, so that the two faces on an edge always agree about a point; the knife's "1e-4 of the bounds diagonal" is this length too. If the person wants a per-face or per-edge length instead, the change is confined to the one method `FaceSplit.Tolerance`.
