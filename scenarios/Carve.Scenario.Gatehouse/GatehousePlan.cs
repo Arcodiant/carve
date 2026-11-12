@@ -23,6 +23,21 @@ internal static class GatehousePlan
     public static readonly Vector3 FromBack = new(-0.6f, 0.35f, -1);
     public static readonly Vector3 Straight = new(0, 0, 1);
 
+    /// <summary>
+    /// What the ray test is sure of for each stage (1 to 7) and view (front, back, straight): the number of sure probes and the
+    /// faces they show. Worked in Core by <c>GatehouseGeometry</c> from the agreed geometry, and held by the scenario's frames.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<(int Stage, string View), (int Sure, string Faces)> Expected = new Dictionary<(int, string), (int, string)>
+    {
+        [(1, "front")] = (25, "1 5"), [(1, "back")] = (25, "0 4"), [(1, "straight")] = (10, "1"),
+        [(2, "front")] = (70, "1 5 8 9 12 13 14"), [(2, "back")] = (79, "0 4 6 7 10 11 16"), [(2, "straight")] = (30, "1 8 9"),
+        [(3, "front")] = (42, "1 5 8 9 14"), [(3, "back")] = (51, "0 4 16"), [(3, "straight")] = (20, "1 8 9"),
+        [(4, "front")] = (52, "1 5 8 9 14 26"), [(4, "back")] = (60, "0 4 16 27"), [(4, "straight")] = (22, "1 8 9"),
+        [(5, "front")] = (57, "1 5 8 9 14 26 28"), [(5, "back")] = (69, "0 4 16 27"), [(5, "straight")] = (29, "1 8 9 28"),
+        [(6, "front")] = (68, "1 5 8 9 14 26 28 29"), [(6, "back")] = (81, "0 4 16 27 30"), [(6, "straight")] = (41, "1 8 9 28 29"),
+        [(7, "front")] = (78, "1 5 8 9 14 26 28 31 35"), [(7, "back")] = (90, "0 4 16 27 34 35"), [(7, "straight")] = (29, "1 8 9 28"),
+    };
+
     /// <summary>A face whose shortest edge is under this is narrow on screen (the cornice's ends, the window's reveal).</summary>
     private const float NarrowEdge = 0.35f;
 
