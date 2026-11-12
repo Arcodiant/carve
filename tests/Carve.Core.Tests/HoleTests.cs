@@ -176,6 +176,17 @@ public class HoleTests
         AssertCovers(Make(v, Holed([0, 1, 2, 3, 4, 5], [6, 7, 8, 9])), 3 - 0.16);
     }
 
+    [Fact]
+    public void AHoledFacesLabelPointLiesOnTheFaceNotInItsHole()
+    {
+        var m = Make(Plate, Holed(Outer, Hole));
+        var p = m.FaceLabelPoint(0);
+        Assert.True(Inside(Outer.Select(i => Plate[i]).ToArray(), p), $"{p} is off the plate");
+        Assert.False(Inside(Hole.Select(i => Plate[i]).ToArray(), p), $"{p} is in the hole");
+        var plain = Make(Plate, Outer);
+        Assert.Equal(plain.FaceCentre(0), plain.FaceLabelPoint(0));
+    }
+
     // ---- topology and health ----------------------------------------------------------------------------------
 
     /// <summary>The plate as a 0.2-thick box: the holed front, optionally the inner face, the back and four sides.</summary>
