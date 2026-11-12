@@ -4,7 +4,7 @@ description: >-
 ---
 # T-45 — Clip checks and read-back
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
