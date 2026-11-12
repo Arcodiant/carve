@@ -109,7 +109,7 @@ A face can have holes. An agent defines a plate with a window in it, sees the op
 
 ### As built
 
-First, second and third agents: Opus (claude-opus-5-5). The Core half, its tests, the server's define_mesh, get_mesh and labels, and the Cuts scenario are in; the regression run on the final commit, the frame hashes and the frames' review are not (see Hand-off).
+First to fourth agents: Opus (claude-opus-5-5). The Core half, its tests, the server's define_mesh, get_mesh and labels, and the Cuts scenario are in.
 
 - **The face type.** `Carve.Core.Face` (`src/Carve.Core/Face.cs`), immutable: `Loop` (outer, CCW from outside), `Holes` (each CW from outside), `HasHoles`, `Corners` (every vertex id, outer loop first, then each hole in order: the face's corner numbering), `LoopAt(hole)` (-1 is the outer loop), `Locate(corner) -> (Hole, Index)`, `CornerAt(hole, index)`, `CornerOf(vertex)`, `Neighbours(corner)` (the previous and next vertex in the corner's own loop), `Map(f)`, and the names `LoopName(face, hole)` (`faces[n]` or `faces[n].holes[k]`) and `CornerName(face, hole, i)` (`faces[n][i]` or `faces[n].holes[k][i]`). It is deliberately not a list of ints, so every consumer of `PolygonMesh.Faces` (now `IReadOnlyList<Face>`) failed to compile and was visited. `int[]` converts implicitly to a plain `Face`; equality is structural. `PolygonMesh.Create` keeps its plain-loop overload and gains one taking `Face`s; `Edit` takes `Face`s for reshaped and added faces. New `PolygonMesh.FaceArea` (outer less holes); `FaceNormal` and `FaceCentre` use the outer loop.
 - **`EdgeUse`** is `EdgeUse(Face, Hole, Corner, LoToHi)`: `Hole` is -1 for the outer loop, else the hole's index; `Corner` is the index within that loop; `CornerName` gives `faces[n][i]` or `faces[n].holes[k][i]`. Hole edges' direction is the hole's own (clockwise), so a hole edge shared with an inner face is manifold. `FaceEdges(f)` lists the outer loop's edges, then each hole's, in corner order.
@@ -144,6 +144,7 @@ First, second and third agents: Opus (claude-opus-5-5). The Core half, its tests
   | tombstone refused | the refusal never added | 2 fail |
   | label point | always the centre | 1 fails |
   | define_mesh object form | holes dropped | 5 fail |
+  | define_mesh `loop` missing refused | the refusal never fires | 1 fails (`A_bad_hole_is_a_tool_error_naming_it`, `faces[0].loop`) |
   | define_mesh schema, an `anyOf` | `anyOf` renamed `oneOf` | 2 fail (`The_published_input_schema_is_the_typed_one`, `Tools_list_shows_the_schema_and_the_description_rules`) |
   | Cuts frame 1: the hole's centre is the inner face, in the plate's shade | the inner face's triangles not drawn | 9 checks fail (hole centre and inside the hole: background) |
   | Cuts frames 2 to 4: the opening is the background | holes not bridged | 27 checks fail (shaded, orthographic and wireframe) |
@@ -153,13 +154,14 @@ First, second and third agents: Opus (claude-opus-5-5). The Core half, its tests
 
 ### Hand-off
 
-Third agent (Opus, claude-opus-5-5), stopped at its call budget. **Done and committed:** ruling 3 recorded (Server bullet) and a `loop`-missing case added to `HoledFaceToolTests`; the file's version comments no longer say "pending the ruling"; the schema break shown (row in the table); the Cuts scenario, its suite, slnx and layout rows, passing locally (`run-scenario.ps1 cuts`, run 2), with five breaks shown (rows in the table, output appended to `breaks.log`).
+Fourth agent (Opus, claude-opus-5-5), stopped at the checkpoint "code committed, a real run still to come". **Done:** the break for the `loop`-missing refusal (row in the table, output appended to `breaks.log`); the Hand-off's earlier items 1 and 2 folded into As built. No code changed: the code commit is `99c846e`, and no sibling commit is on `origin/milestone/M-5` beyond it (fetched 2026-11-12 02:1x UTC).
+
+**Run under way:** `cairn task T-63 verify` on `99c846e` submitted these jobs; `server-unit` (J-20261112-020526-612880) and `core-unit` (J-20261112-020531-e3b074) show `done`; the GPU ones were still `queued` behind about 17 Empyrean, voidmarches and waystone jobs, with no progress in 11 minutes: scenario-cube J-20261112-020528-0bcf14, scenario-crate J-20261112-020529-7b8d94, scenario-shed J-20261112-020532-4ed2c0, viewer-cube J-20261112-020534-608b99, scenario-cuts J-20261112-020535-c446b1, scenario-export J-20261112-020537-fcb988, scenario-character J-20261112-020538-6c7b37, scenario-soft J-20261112-020539-16528f, server-regression J-20261112-020541-2871c4. These are for the code commit `99c846e`; the commit holding this hand-off changes only this file, so their results stand for the code (re-run only if code changes). The older J-20261112-015231-945854 is stale.
 
 **Left:**
-1. A break for the new `loop`-missing case (the refusal never fires), and its row.
-2. Run `server-unit` and `server-regression` on the final commit (only `DefineMesh*` was run after the new case; it was not run alone).
-3. The six existing scenario suites, `scenario-cuts` and `server-regression` on the final commit (`cairn test run ...`); the third agent's early run of the six plus `server-regression` was queued as J-20261112-015231-945854 behind other projects' GPU jobs and had not started when it stopped. Hash every frame against `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-63/frames-before.sha256` and list them in As built.
-4. The frames' review through `mcp__waystone__review`: the four Cuts frames in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-63/cuts/`.
-5. Fold this Hand-off into As built, `cairn task T-63 verify`, `cairn lint`, `finish`.
+1. Wait for those jobs (or re-run `cairn task T-63 verify`, which picks them up by commit), and read their results.
+2. Hash every frame of that run against `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-63/frames-before.sha256` (136 frames, `sha256sum -c` format, paths relative to the run's artifacts) and list them in As built; any that differ, compare with a fresh run of the base before blaming T-63. Hash the four Cuts frames against `cuts/cuts-frames.sha256`.
+3. The frames' review through `mcp__waystone__review`: the four Cuts frames in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-63/cuts/`.
+4. Remove this Hand-off, `cairn task T-63 verify` to `VERIFY PASS`, `cairn lint`, `finish`.
 
-**Surprising:** the break script builds only `Carve.Server`, so a scenario change needs its own build before a break run (`-NoBuild` runs the old scenario dll). A break in `MeshTopology`'s edge list makes `define_mesh` throw, so the wireframe's break is in `LookMeshes` instead. Backslashes in a Python heredoc are eaten on the way to the Bash tool: write a break script with the Write tool.
+**Surprising:** `cairn task T-63 verify` writes nothing to its stdout while it waits on queued jobs, so a redirected log stays empty; `cairn test status` shows the jobs. `cairn test report <job>` does not take a job id.
