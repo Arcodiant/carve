@@ -183,30 +183,19 @@ public class GatehouseGeometry
     }
 
     /// <summary>What the scenario's camera and ray test are sure of at each stage and direction: the sure probes, and the faces they show.</summary>
-    public static TheoryData<int, string, int, string> RayTests => new()
+    public static TheoryData<int, string, int, string> RayTests
     {
-        { 1, "front", 25, "1 5" },
-        { 1, "back", 25, "0 4" },
-        { 1, "straight", 10, "1" },
-        { 2, "front", 70, "1 5 8 9 12 13 14" },
-        { 2, "back", 79, "0 4 6 7 10 11 16" },
-        { 2, "straight", 30, "1 8 9" },
-        { 3, "front", 42, "1 5 8 9 14" },
-        { 3, "back", 51, "0 4 16" },
-        { 3, "straight", 20, "1 8 9" },
-        { 4, "front", 52, "1 5 8 9 14 26" },
-        { 4, "back", 60, "0 4 16 27" },
-        { 4, "straight", 22, "1 8 9" },
-        { 5, "front", 57, "1 5 8 9 14 26 28" },
-        { 5, "back", 69, "0 4 16 27" },
-        { 5, "straight", 29, "1 8 9 28" },
-        { 6, "front", 68, "1 5 8 9 14 26 28 29" },
-        { 6, "back", 81, "0 4 16 27 30" },
-        { 6, "straight", 41, "1 8 9 28 29" },
-        { 7, "front", 78, "1 5 8 9 14 26 28 31 35" },
-        { 7, "back", 90, "0 4 16 27 34 35" },
-        { 7, "straight", 29, "1 8 9 28" },
-    };
+        get
+        {
+            var data = new TheoryData<int, string, int, string>();
+            foreach (var ((stage, view), (sure, faces)) in GatehousePlan.Expected)
+            {
+                data.Add(stage, view, sure, faces);
+            }
+
+            return data;
+        }
+    }
 
     private static Camera CameraFor(Solid solid, string view)
     {
