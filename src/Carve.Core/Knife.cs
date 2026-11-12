@@ -70,6 +70,19 @@ public static class Knife
         }
         if (errors.Count > 0) return Refused(errors);
 
+        // A closed path in one face that touches its boundary at one point only: the face around it would pass through
+        // that point twice, which a face cannot (the person's ruling, 2026-11-12).
+        if (closed && cuts.Select(c => c.Face).Distinct().Count() == 1)
+        {
+            var touching = Enumerable.Range(0, points.Count).Where(i => snaps[i].Kind != Kind.Inside).ToArray();
+            if (touching.Length == 1)
+            {
+                var i = touching[0];
+                return Refused([new MeshError(MeshEdits.Invariant($"points[{i}]"), MeshEdits.Invariant(
+                    $"the closed path touches the face's boundary at one point only, at {Show(OnSurface(mesh, snaps[i]))}; touch it at two points to split the face, or keep it clear of the edge to cut a hole"))]);
+            }
+        }
+
         var r = Split(mesh, cuts);
         if (!r.Edit.Succeeded)
             return Refused(r.Edit.Errors.Select(e => new MeshError(Segments(e.Element, points.Count), e.Message)).ToArray());
@@ -84,6 +97,11 @@ public static class Knife
         if (!element.StartsWith("cuts[", StringComparison.Ordinal) || !int.TryParse(element[5..^1], out var k)) return element;
         return MeshEdits.Invariant($"points[{k}], points[{(k + 1) % n}]");
     }
+
+    /// <summary>Where a vertex or edge snap lies: the vertex, or the point at its fraction along the edge.</summary>
+    private static Vector3 OnSurface(PolygonMesh mesh, Snap s) => s.Point.IsVertex || s.Point.IsInterior
+        ? s.At
+        : Vector3.Lerp(mesh.Vertices[s.Point.A], mesh.Vertices[s.Point.B], (float)s.Point.T);
 
     internal static string Show(Vector3 p) => MeshEdits.Invariant($"[{p.X:G6}, {p.Y:G6}, {p.Z:G6}]");
 

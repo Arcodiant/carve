@@ -108,6 +108,39 @@ public class KnifeTests
     }
 
     [Fact]
+    public void AClosedPathTouchingTheBoundaryAtOnePointOnlyIsRefused()
+    {
+        // The person's ruling (2026-11-12): the face around it would pass through that point twice.
+        var cube = TestMeshes.Cube();
+        Assert.Equal(
+            "points[2]: the closed path touches the face's boundary at one point only, at [0.5, 0, 1]; touch it at two points to split the face, or keep it clear of the edge to cut a hole",
+            Refusal(cube, true, V(0.75f, 0.5f, 1), V(0.25f, 0.5f, 1), V(0.5f, 0, 1)));
+        Assert.Equal(
+            "points[0]: the closed path touches the face's boundary at one point only, at [0, 0, 1]; touch it at two points to split the face, or keep it clear of the edge to cut a hole",
+            Refusal(cube, true, V(0, 0, 1), V(0.5f, 0.25f, 1), V(0.25f, 0.5f, 1)));
+    }
+
+    [Fact]
+    public void AClosedPathInsideAFaceLeavesTheHoleInTheFaceWhicheverCornerItStartsAt()
+    {
+        // The far side of the inner face is a hole in the face around it, never in the inner face itself, whichever
+        // corner the path starts at (and so whichever vertex the traced hole starts at).
+        for (var start = 0; start < Square.Length; start++)
+        {
+            var path = Square.Skip(start).Concat(Square.Take(start)).ToArray();
+            var (m, r) = Cut(TestMeshes.Cube(), true, path);
+            Assert.Equal([1, 6], Assert.Single(r.Edit.Split).Pieces);
+            var hole = Assert.Single(m.Faces[1].Holes);
+            Assert.Empty(m.Faces[6].Holes);
+            Assert.Equal([8, 9, 10, 11], hole.Order());
+            Assert.Equal([8, 9, 10, 11], m.Faces[6].Loop.Order());
+            Assert.Equal(0.75, m.FaceArea(1), 5);
+            Assert.Equal(0.25, m.FaceArea(6), 5);
+            IsClosed(m);
+        }
+    }
+
+    [Fact]
     public void APathCrossesTwoFacesByAPointOnTheirSharedEdge()
     {
         var (m, r) = Cut(TestMeshes.Cube(), false, V(0, 0.5f, 1), V(1, 0.5f, 1), V(1, 0.5f, 0));
