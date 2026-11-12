@@ -169,12 +169,12 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
   - A vertex within `FaceSplit.Tolerance(mesh)` of the plane is on it (the one tolerance, ruling 1). Per face (the `faces` given, else every live face): its crossings are the corners on the plane and the edges whose ends are strictly on opposite sides (`CutPoint.OnEdge(a, b, da / (da - db))`), sorted along the line where the plane meets the face. Each gap between consecutive crossings whose middle is inside the face, and not within the tolerance of its boundary, is one `FaceCut`. So a concave face gives several segments (the L-block's arms), and a corner or edge that only touches the plane gives none. A face with every corner on the plane is not split. All the segments go to one `FaceSplit.Split`. With no segment at all the mesh is unchanged (not refused, if the plane touches a face).
   - **keep above/below:** each live face of the split mesh is above when every corner is >= -tol, below when every corner is <= tol, and a face with every corner on the plane goes with its normal. The other side's faces go through `MeshDelete.Closure` (T-64's orphan rule) and one `Edit` with the caps.
   - **fill:** the cap border is each kept face's edge that a deleted face has the other way round, with both ends on the plane, taken reversed, so the caps wind outward on the kept side. The border chains into loops. Open chains are traced first, from each vertex with more border edges out than in, and each is a warning, `fill: the cut from vertex 11 to vertex 10 is not a closed loop (the mesh is open there), so it is left open`, which the tool appends to the report's `warnings`. A closed loop wound counter-clockwise about the kept side's outward normal is a cap. One wound the other way is a hole of the smallest cap around it (T-63's clockwise holes), so a tube cut across gives one holed cap. Each loop starts at its lowest vertex id, and caps are appended in order of their lowest id. On a smooth mesh every cap edge is made hard (`MeshShade.WithEdges`).
-  - **The report:** `Split` is the split's. `Deleted` is the closure, which with `keep` includes the appended pieces of the far side (ruling 2). `NewVertices` and `NewFaces` (`created`) list what the split and the fill made **and is still live**. This follows `subdivide`'s precedent of leaving tombstoned ids out of `created`, and is a reading the person may want to confirm. Caps take no colour and no group, since they are no face's pieces. This is a reading too: the spec says nothing about a cap's colour.
+  - **The report:** `Split` is the split's. `Deleted` is the closure, which with `keep` includes the appended pieces of the far side (ruling 2). `NewVertices` and `NewFaces` (`created`) list what the split and the fill made **and is still live**. This follows `subdivide`'s precedent of leaving tombstoned ids out of `created` (ruled as built, below). Caps take no colour and no group, since they are no face's pieces (ruled as built, below).
   - **Refused:** `point: must be a finite point`; `normal: must be a finite, non-zero vector`; `faces: a cut limited to some faces keeps both sides: leave faces out to keep one side`; `faces` empty, unknown or deleted (`MeshEdits.UnknownElements`); `point, normal: the plane touches no face` (no target face with a corner on it or corners on both sides); `keep: this would leave nothing: every face is below the plane`.
   - `FaceSplit`'s geometry helpers (`Vector2D`, `Vector3D`, `D`, `Dot`, `Cross`, `Basis`, `SegmentDistance`, `SignedArea`, `InPolygon`, `Inside`) became `internal` so `PlaneCut` uses the same geometry. Nothing else in `FaceSplit` changed.
-  - **Not handled specially:** a cut whose border meets itself at a vertex (a non-manifold cut, which the spec sends to the person). The chaining takes the lowest-id way on, and no test covers it.
+  - **A non-manifold cut** (a border that meets itself at a vertex): at a vertex with more than one way on, the chaining takes the lowest vertex id (ruled as built, below). `ANonManifoldCutBorderIsChainedByLowestVertexId` covers it.
 - **The `plane_cut` tool** (`src/Carve.Server/PlaneCutTool.cs`, in `Program.cs`'s list after `delete`): the description, the worked example `{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}` on `define_mesh`'s cube (a half-height closed box, 8 vertices, 6 faces), and one `undo` step (the store's one `Edit`). A `keep` other than both, above or below is refused (`keep: expected both, above or below, got "left"`).
-- **Tests.** `PlaneCutTests` (Core unit, 17):
+- **Tests.** `PlaneCutTests` (Core unit, 18):
   - keeping both on the cube (ids 8..11, faces 6..9, the four cut edges);
   - keeping below with fill: the half-height box, deleted `[2, 3, 6, 7]` and `[3, 6, 7, 8, 9]`, split `[0, 6] [1, 7] [4, 8] [5, 9]`, the cap `[8, 10, 11, 9]` facing up, area 1, closed;
   - keeping above with fill (the cap facing down), and without fill (four open edges);
@@ -184,7 +184,8 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
   - a cut in the top face's plane: not split, the top going above with its normal, the cap `[2, 3, 7, 6]` below;
   - a smooth cube's cap border hard, beside a hard edge it had;
   - a cut limited to face 4;
-  - each refusal.
+  - each refusal;
+  - two cubes meeting on edge 5-6, cut at y = 0.5 keeping below (added by the third agent): the border meets itself at 17, the new vertex on 5-6, and the lowest way on gives each cube its own cap, `[14, 16, 17, 15]` and `[17, 19, 20, 18]`, both facing up, area 1, no warning.
 
   `PlaneCutToolTests` (Server regression, 2):
   - the worked example through the client: `split` (faces 0, 1, 4, 5, each its own id first), `deleted` (the upper pieces in it) and `created`, then `check` closed, then `undo` back to the cube in one step;
@@ -223,6 +224,7 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
   | refused: a limited cut keeping a side | the check never fires | 1 fails |
   | refused: a plane touching no face | the check never fires | 1 fails |
   | refused: a cut leaving nothing | the check never fires | 1 fails |
+  | a non-manifold cut border is chained by lowest vertex id (third agent) | the highest way on taken (`outs[^1]` in `Caps`) | 1 fails (`ANonManifoldCutBorderIsChainedByLowestVertexId`; the other 17 pass) |
   | tool: the open-chain warning reaches the report | not appended | 1 fails |
   | tool: `keep: below` is read | read as both | 2 fail |
   | tool: `fill` defaults to true | defaults to false | 2 fail |
@@ -234,6 +236,14 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
   The one `undo` step per call has no break of its own. It is the store's one `Edit`, as for every edit tool, and `PlaneCutToolTests` checks that one `undo` restores the cube.
 
 **Frames:** the Cuts scenario was run on this machine (`scripts/run-scenario.ps1 cuts`, outcome passed) on `69f9afa`. Its six existing frames are byte-identical to T-64's `cuts-frames.sha256`. The run's nine frames and their list are in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/cuts-local-69f9afa/`.
+
+**The person's rulings (2026-11-12), on the second agent's hand-off:**
+
+1. `created` lists only live ids, so a far-side piece appears in `split` and `deleted` but not in `created`, as built.
+2. Fill caps get no colour and no groups, as built.
+3. A non-manifold cut border is chained by lowest vertex id, as built, with a test and a break showing it failing (both above).
+
+**Third agent: Opus (claude-opus-5-5).** Recorded the rulings, added the non-manifold test and its break, and ran the GPU suites on the final code commit.
 
 ### Hand-off
 
