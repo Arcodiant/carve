@@ -65,9 +65,4 @@ Two agents, both on Opus 5.5: the first built and committed the tool, and the se
 
 - *Not checked:* a real file with loader warnings. The warnings path is tested only with a fake loader. The queued server-regression job kept no frames, so the reviewed frames come from a local run of `RenderGlbTests` on the committed code.
 - *Known limits:* the engine does not cache a load from bytes, so `RenderSystem` keeps the last file's `Model` and reuses it while the bytes are equal. Each distinct file is uploaded once and never released, because the docs do not say that a by-bytes model's mesh may be destroyed.
-
-### Hand-off
-
-**QUESTION for the person.** The round-1 review (`C:\Users\andre\artifacts\carve\M-19\T-47\round-1`) rejected the frames: "Something wrong with the top of the arm - there's a little piece of flesh colour at the top instead of green" (glb Walk 0 s +x). A crop of the shoulder, glb against render at the same clip and time, shows **the same skin patch in render's own frame of the `.carve`**. It therefore comes from the gardener's geometry or colours, not from `render_glb`. Those are in `GardenerSpec.cs` (the arm lathe, lines 370-374, and the torso's neck band), which `samples/gardener.carve` and every character scenario's frames share. Fixing it would change the shared sample and existing frames, which is outside T-47's scope. Should T-47 finish as it is, with a separate member fixing the sample, or should T-47 fix the sample?
-
-Left after the answer: `cairn lint`, then `cairn task T-47 finish`, and fold this section into As built.
+- *Review:* round 1 (`C:\Users\andre\artifacts\carve\M-19\T-47\round-1`) was rejected for a skin-coloured patch at the top of the near sleeve (glb Walk 0 s +x). A crop of the shoulder shows the same patch in render's own frame of the `.carve`, at the same clip and time. It therefore comes from the gardener's geometry or colours, not from `render_glb`. On 2026-11-12 the person ruled that T-47 finishes as it is and that **T-84 owns the patch**: `GardenerSpec.cs`, the samples and their frames. T-47 does not touch the sample.
