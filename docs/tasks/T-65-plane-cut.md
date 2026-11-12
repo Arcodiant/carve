@@ -4,7 +4,7 @@ description: >-
 ---
 # T-65 — Plane cut
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
