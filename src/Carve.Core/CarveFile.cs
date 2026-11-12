@@ -44,7 +44,8 @@ public sealed class CarveFileResult
 /// </summary>
 /// <remarks>
 /// <para><see cref="Write"/> gives version 4 (T-63) for a model with a holed face, and otherwise what earlier builds gave
-/// (version 3 with a smooth mesh or a hard edge, else version 2, byte for byte), pending the person's ruling. Version 4 is version 3 with faces that may have holes: a face is
+/// (version 3 with a smooth mesh or a hard edge, else version 2, byte for byte): the lowest version that holds the model,
+/// as the person ruled (2026-11-11). Version 4 is version 3 with faces that may have holes: a face is
 /// either a plain array of vertex ids, its outer loop, or the object <c>{"loop": [...], "holes": [[...], ...]}</c>, as
 /// <c>define_mesh</c> takes it; a face with no hole is always written as the plain array, a holed one as the object on one
 /// line. Version 4 also reserves the tombstone form T-64 fills, a <c>null</c> in <c>vertices</c> or <c>faces</c> standing
@@ -104,7 +105,7 @@ public static class CarveFile
         ArgumentNullException.ThrowIfNull(model);
         var w = new Writer();
         w.Line(0, "{");
-        // Interim pending the person's ruling (T-63 hand-off): version 4 only when a face has holes, so a model a version 2
+        // The lowest version that holds the model (the person's ruling, 2026-11-11): version 4 only when a face has holes, so a model a version 2
         // or 3 file can hold is still written as before, byte for byte (T-42's rule and its tests).
         var version = model.Meshes.Any(m => m.Mesh.Faces.Any(f => f.HasHoles)) ? Version
             : model.Meshes.Any(m => m.Mesh.Shade is not null) ? 3 : 2;
