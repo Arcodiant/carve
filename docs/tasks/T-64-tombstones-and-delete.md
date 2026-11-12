@@ -136,19 +136,35 @@ First agent: Opus (claude-opus-5-5). **Core only** (the member's own checkpoint:
 - `select edges where open` on an open mesh works (4 edges on the topless cube, tested); the first agent's surprise was not a bug.
 - Tests: `TombstoneSweepTests` (Core unit, 9: triangulation, smooth shading, face geometry refusal, topology, report, check, select, subdivide, combined), `TombstoneExportTests` (Server unit, 2: skinned export of a rigged cube with vertex 6 deleted, every written vertex used and carrying its own two weights; a plain export of the topless cube through the engine's parser), `DeleteToolTests` (Server regression, 2: the worked example, `get_mesh` nulls, vertex delete, `deleted` errors, refusals, ids appended after the last slot, undo; and the topless cube exported through the client and read back through the engine's parser). All pass by `dotnet test` here; Core 621, Server unit 279.
 
-### Hand-off
+**Third agent: Opus (claude-opus-5-5). The content, the sweep's breaks and the frames.** The second agent's queued `server-regression` (`J-20261112-131058-0d01aa`, on `cbd4644`) passed, 378 of 378.
 
-**Done:** Core (first agent), the consumer sweep, the `delete` tool, the report's `deleted`, `get_mesh` nulls, export compaction, and their tests (second agent, commit `cbd4644`). `dotnet build Carve.slnx` is clean with warnings as errors.
+- **The Cuts delete stage** (`scenarios/Carve.Scenario.Cuts/DeleteStage.cs`, one line in `CutsStages.cs`). `define_mesh`'s unit cube, then `delete {"faces":[3]}`: the report (8 vertices, 5 faces, open, `deleted` `{vertices: [], faces: [3]}`), get_mesh's slots (8 and 6, null exactly at face 3), and frame `delete-top` from `[0.6, 0.35, 1]`: the top's probes are the background (the back, left and bottom face away and are culled), the front's and the right's are each one shade within `Exact`. Then the cube again and `delete {"vertices":[6]}`: 7 vertices, 3 faces, `deleted` `{vertices: [6], faces: [1, 3, 5]}` (no other vertex goes; each is still on a live face), get_mesh null at vertex 6 and faces 1, 3, 5, and frame `delete-corner-wireframe` from the same direction: every probe the background (all three faces left face away), each of the 9 live edges drawn in four stretches, and the middles of the deleted edges 2-6, 5-6 and 6-7 the background. The captions give live counts (`8 vertices, 5 faces`; `wireframe, 7 vertices, 3 faces`), which is the test the second agent's item on `render` captions asked for. 96 probes (a 4 x 4 grid on each of the cube's six planes, and six outside it), worked by `Solid.FirstHit`. `CutsGeometry.cs`'s `Solid` now reads a null slot: a null face has an empty loop, which no ray meets (`Solid.IsDeleted`), and a null vertex sits at the origin. The stage reads get_mesh's nulls from the raw JSON, so a tombstone written as an empty face is not taken for one.
+- **The wireframe's lines over the background** are not checked with `Checks.Line`. Its one pixel within 10 of the line's colour does not fit here: a near-vertical edge at x = 219.2 reads 210 and 133 side by side, and the 45-degree edge 1-5 reads 177 and 177, with no pixel at 237. Instead, `DeleteStage.Drawn` needs each of 17 points along each stretch to have, within one pixel, a grey at least half way from the background to `Edge`. This is a new check of this stage, not a change to `Line`, which every other scenario still uses.
 
-**Left:**
+**Breaks for the sweep, the server and the stage.** Each was applied alone by `C:/Users/andre/AppData/Local/Temp/t64/breaks2.py`, built with warnings as errors and run (Core tests, `TombstoneExportTests`, `DeleteToolTests`, or the Cuts scenario), then restored. The output is appended to `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-64/breaks.log`.
 
-1. `cairn test run server-regression` was queued as `J-20261112-131058-0d01aa` on this machine's runner and its result was **not** seen; check it (the new `deleted` field or the new tool may trip a test that lists tool names or report keys exactly).
-2. **Breaks for the second agent's checks** are not yet run: one per row of the sweep (e.g. `TriangulateFace` not skipping a tombstone, `MeshQuery` not skipping, `MeshReport` live counts, `Model.Combined` dropping the mask, `subdivide` leaving the face point live, `get_mesh` writing the face, `deleted` missing from the report, the skinned `Unweighted` counting the tombstone), each shown failing, with the table added to As built and the log appended to `D:
-epos\carveranches\milestone\M-5rtifacts
-eview\T-64reaks.log`.
-3. **Content:** `DeleteStage.cs` in `scenarios/Carve.Scenario.Cuts` and its line in `CutsStages.cs`: the cube with its top (face 3) deleted from `[0.6, 0.35, 1]`, and the cube with vertex 6 (1, 1, 1) deleted (faces 1, 3, 5) from the same direction in the wireframe; pixels by ray test (`CutsGeometry.cs`), each shown failing on a break.
-4. **Frames:** the GPU suites once on a near-final commit; every existing frame byte-identical to T-63's `frames-after-99c846e.sha256` (121) and `cuts\cuts-frames.sha256` (4), listed, into the evidence folder; the new frames' hashes too. The member's spec asks for no review by the person.
-5. `render` captions: `RenderSystem` takes its counts from `MeshReport`, so they are live counts now, but no test shows it yet.
-6. `cairn task T-64 verify` until clean, `cairn lint`, then `finish`. Remove this section or fold it in.
+  | Check | Break | Result |
+  |---|---|---|
+  | triangulation gives a tombstone no triangles | `TriangulateFace`'s tombstone test removed | 3 fail |
+  | smooth shading gives a tombstone no corners | `Shading`'s tombstone test removed | 1 fails |
+  | select never returns a tombstone | `MeshQuery.Select` skips none | 1 fails |
+  | the report counts live elements | slot counts | 2 fail |
+  | no unused-vertex warning for a tombstone | the warning for any unused slot | 2 fail |
+  | check skips tombstones | the area summed over every slot | 1 fails |
+  | the combined model keeps the mask | every vertex marked live | 1 fails |
+  | subdivide's face point for a tombstone is a tombstone | only old tombstones kept | 1 fails (first applied to the wrong file and logged `BREAK NOT APPLIED`, then rerun) |
+  | the skinned export's unweighted list is live vertices | every slot | 1 fails |
+  | the skinned export's bound-to-root count is live vertices | every slot | 1 fails |
+  | get_mesh writes null for a deleted face | the face written | 1 fails |
+  | get_mesh writes null for a deleted vertex | the vertex written | 1 fails |
+  | every edit report carries `deleted` | the key left out | 1 fails |
+  | Cuts: captions and reports give live counts | slot counts | 5 checks fail |
+  | Cuts: get_mesh nulls exactly the deleted faces, and the frame matches | a live front written null | 69 checks fail |
+  | Cuts: get_mesh writes the deleted face null | the tombstone written as a face | get_mesh fails, run fails |
+  | Cuts: the report lists what went | `deleted` left out | the stage throws, run fails |
+  | Cuts: a vertex delete takes all its faces, nothing of vertex 6 drawn | the tool deletes only face 1 | 45 checks fail, incl. the middles of 2-6 and 5-6 |
+  | Cuts: every live edge drawn | edges at vertex 0 dropped from the wireframe | 12 checks fail |
 
-**Checked:** Core and Server unit tests and the two new regression tests pass by `dotnet test`. Not checked: the full regression suites, any GPU suite, any frame.
+  The vertex-delete break first did not build (`List<int>` has no `Length`), so the runner recorded no run. It was fixed and rerun, and the log keeps both.
+
+**Frames:** the GPU suites ran on `737853a` (`cairn task T-64 verify`: scenario-cube, crate, shed, cuts, export, character and soft ran there; viewer-cube and server-regression were carried). All 121 frames of `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-63/frames-after-99c846e.sha256` (cube 32, crate 44, shed 10, export 7, character 17, soft 11) are byte-identical, and so are the four Holes frames of `T-63/cuts/cuts-frames.sha256`. The run's frames and their list are in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-64/frames-737853a/` (`all.sha256`, 127 frames). The two new frames, `delete-top` (`880e7e0a...`) and `delete-corner-wireframe` (`8c7c3cb3...`), are byte-identical to this machine's local run. They and the Cuts list are in `.../T-64/cuts/` (`cuts-frames.sha256`).
