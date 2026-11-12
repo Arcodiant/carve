@@ -43,6 +43,15 @@ public sealed class GatehouseScenario : IScenario
 
     public async Task RunAsync(ScenarioDriver driver)
     {
+        var work = Path.Combine(driver.RunFolder, "work");
+        foreach (var owned in new[] { work, Path.Combine(driver.RunFolder, "game") })
+        {
+            if (Directory.Exists(owned))
+            {
+                Directory.Delete(owned, recursive: true);
+            }
+        }
+
         var frames = new GatehouseFrames(driver);
 
         // 1. The slab.
@@ -127,10 +136,42 @@ public sealed class GatehouseScenario : IScenario
         Equal("check: no warnings", 0, check.GetProperty("warnings").GetArrayLength());
         await frames.StageAsync(7, "bridged", beforeWindows, doorFace: doorFace, last: true);
 
+        await SaveOpenExportAsync(driver, work);
+
         if (Failures.Count > 0)
         {
             driver.Fail($"{Failures.Count} check(s) failed:\n" + string.Join("\n", Failures.Select(f => "  " + f)));
         }
+    }
+
+    /// <summary>
+    /// The result saved, something else opened over it, then reopened and compared to the build in ids and positions, tombstones
+    /// included (get_mesh keeps both), and exported into <c>game/Content/models</c> for the load checks to read as a game would.
+    /// </summary>
+    private static async Task SaveOpenExportAsync(ScenarioDriver driver, string work)
+    {
+        var path = Path.Combine(work, "gatehouse.carve");
+        var built = await CallTextAsync(driver, "get_mesh", new { });
+        var saved = await CallTextAsync(driver, "save", new { path });
+        Equal("save: a new gatehouse.carve", true, saved.Contains("gatehouse.carve") && !saved.Contains("replaced"));
+        var bytes = await File.ReadAllBytesAsync(path);
+
+        await CallJsonAsync(driver, "define_mesh", new { vertices = new[] { new[] { 0f, 0, 0 }, [1f, 0, 0], [0f, 1, 0] }, faces = new[] { new[] { 0, 1, 2 } } });
+        await CallJsonAsync(driver, "open", new { path });
+        var reopened = await CallTextAsync(driver, "get_mesh", new { });
+        Equal("open: get_mesh equals the build's (ids, positions, tombstones)", true, reopened == built);
+        var check = await CallJsonAsync(driver, "check", new { });
+        Equal("open: the reopened model is closed", true, check.GetProperty("stats").GetProperty("closed").GetBoolean());
+
+        var again = await CallTextAsync(driver, "save", new { path });
+        Equal("save (again): replaced", true, again.Contains("(replaced)"));
+        driver.AssertBytesEqual("gatehouse.carve, saved again after open", bytes, await File.ReadAllBytesAsync(path));
+
+        var glb = Path.Combine(driver.RunFolder, "game", "Content", "models", "gatehouse.glb");
+        var exported = await CallTextAsync(driver, "export", new { path = glb });
+        Equal("export: names the file", true, exported.Contains("gatehouse.glb"));
+        Equal("export: no warnings", true, !exported.Contains("warning(s)"));
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "export-result.txt"), exported);
     }
 
     private static int Created(JsonElement result) => result.GetProperty("created").GetProperty("faces").EnumerateArray().Single().GetInt32();

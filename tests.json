@@ -18,7 +18,8 @@
         "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
         "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
-        "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs"
+        "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs",
+        "samples/gatehouse.carve"
       ],
       "resources": "cpu",
       "est-seconds": 30
@@ -277,6 +278,36 @@
         "vulkan"
       ],
       "est-seconds": 30
+    },
+    {
+      "id": "scenario-gatehouse",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-gatehouse-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Gatehouse/Carve.Scenario.Gatehouse.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.GatehouseLoad.Tests/Carve.GatehouseLoad.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "samples/gatehouse.carve",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-gatehouse-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 60
     }
   ],
   "todo": []
