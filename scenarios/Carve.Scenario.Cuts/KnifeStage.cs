@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Text.Json;
 using Carve.Debug;
+using Carve.Scenario.Crate;
 using Carve.Scenario.Shed;
 using static Carve.Scenario.Shed.Checks;
 
@@ -53,6 +54,18 @@ internal sealed class KnifeStage : ICutsStage
         .. new[] { 1.3f, 1.45f, 1.6f }.SelectMany(x => new[] { 1.05f, 1.2f, 1.35f }.Select(y => ("the recess", new Vector3(x, y, 0.15f)))),
         .. new[] { -0.3f, 2.3f }.SelectMany(x => new[] { -0.3f, 1f, 2.3f }.Select(y => ("outside the slab", new Vector3(x, y, 0.1f)))),
     ];
+
+    /// <summary>Points on the pocket's three walls in sight, halfway down (z = 0.175): the bottom one (y = 0.9, facing +Y) and
+    /// the two slanted ones on the left, each a third, a half and two thirds along.</summary>
+    private static readonly (string Name, Vector3 At)[] Walls =
+    [
+        .. Along("the bottom wall", new Vector2(1.3f, 0.9f), new Vector2(1.6f, 0.9f)),
+        .. Along("the lower left wall", new Vector2(1.1f, 1.2f), new Vector2(1.3f, 0.9f)),
+        .. Along("the upper left wall", new Vector2(1.3f, 1.5f), new Vector2(1.1f, 1.2f)),
+    ];
+
+    private static IEnumerable<(string, Vector3)> Along(string name, Vector2 a, Vector2 b) =>
+        new[] { 1 / 3f, 0.5f, 2 / 3f }.Select(t => (name, new Vector3(Vector2.Lerp(a, b, t), 0.175f)));
 
     private static IEnumerable<(string, Vector3)> Grid(string name, Func<float, float, Vector3> at) =>
         Steps.SelectMany(u => Steps.Select(v => (name, at(u, v))));
@@ -131,6 +144,134 @@ internal sealed class KnifeStage : ICutsStage
         Caption(shaded, "512x512, direction (0.6, 0.35, 1), 24 vertices, 14 faces");
         Expect(shaded, camera, pocket, "the recess", 6, 5);
         Look(shaded, camera, pocket, Shades(shaded, camera, pocket), [], "the slab with the hexagon recessed");
+        Predicted(shaded, camera, pocket, doorPiece);
+    }
+
+    /// <summary>
+    /// The person's rulings on shade prediction (2026-11-12). A coloured face's pixel is predicted by the Crate scenario's
+    /// rule (<see cref="ColourRule"/>) from a grey face of the same normal in the same frame, at <see cref="Checks.Exact"/>:
+    /// the door piece and the pocket floor from the front (face 1), the pocket's bottom wall (+Y, blue as the extrude
+    /// leaves it) from the slab's top (face 3). The two slanted walls have no face of the same normal, so each of their
+    /// probes must differ from the pocket floor's shade by more than <see cref="Checks.Exact"/> in at least one channel.
+    /// </summary>
+    private static void Predicted(ScenarioFrame frame, Camera camera, Solid solid, int doorPiece)
+    {
+        Equal("the door piece is not the front", true, doorPiece != 1);
+        var front = Reference(frame, camera, solid, 1, false, "the front");
+        var top = Reference(frame, camera, solid, 3, true, "the top");
+
+        // The extrude's walls round the hexagon, each found by its normal: +Y, and the two facing +X (lower and upper).
+        int Wall(Func<Vector3, bool> facing, string what)
+        {
+            var walls = Enumerable.Range(0, solid.Faces.Length).Where(f => !solid.IsDeleted(f) && f != 6
+                && solid.Faces[f].Loop.All(v => solid.Vertices[v] is var p && p.Z is >= 0.15f - 1e-5f and <= 0.2f + 1e-5f
+                    && p.X is >= 1.1f - 1e-5f and <= 1.8f + 1e-5f && p.Y is >= 0.9f - 1e-5f and <= 1.5f + 1e-5f)
+                && facing(solid.Normal(f))).ToArray();
+            Equal($"{what}: one face", 1, walls.Length);
+            return walls.Length == 1 ? walls[0] : -1;
+        }
+
+        var bottom = Wall(n => n.Y > 0.99f, "the bottom wall");
+        var lowerLeft = Wall(n => n.X > 0.5f && n.Y > 0.3f, "the lower left wall");
+        var upperLeft = Wall(n => n.X > 0.5f && n.Y < -0.3f, "the upper left wall");
+        if (front is not { } f || top is not { } t)
+        {
+            return;
+        }
+
+        var floor = Predict(f, HexagonBlue);
+        Coloured(frame, camera, solid, Probes.Where(p => p.Name == "the door"), doorPiece, Predict(f, DoorBrown), "the door piece, brown, from the front", false);
+        Coloured(frame, camera, solid, Probes.Where(p => p.Name == "the recess"), 6, floor, "the pocket floor, blue, from the front", false);
+        Coloured(frame, camera, solid, Walls.Where(p => p.Name == "the bottom wall"), bottom, Predict(t, HexagonBlue), "the bottom wall, blue, from the top", true);
+        foreach (var (wall, name) in new[] { (lowerLeft, "the lower left wall"), (upperLeft, "the upper left wall") })
+        {
+            var sure = 0;
+            foreach (var (_, at) in Walls.Where(p => p.Name == name))
+            {
+                var (x, y) = camera.Pixel(at);
+                if (Shows(frame, camera, solid, x, y, wall, true, $"{name} {at}") is not { } p)
+                {
+                    continue;
+                }
+
+                sure++;
+                if (Math.Abs(p.R - floor.R) <= Exact && Math.Abs(p.G - floor.G) <= Exact && Math.Abs(p.B - floor.B) <= Exact)
+                {
+                    Note($"{frame.Name}: {name} {at} at ({x}, {y}) is {p}, within {Exact} of the pocket floor's {floor} in every channel: not shaded as a wall");
+                }
+            }
+
+            Least(frame, name, sure, 1);
+        }
+    }
+
+    /// <summary>The grey pixel of <paramref name="face"/> at the first probe that surely shows it.</summary>
+    private static Rgb? Reference(ScenarioFrame frame, Camera camera, Solid solid, int face, bool narrow, string what)
+    {
+        foreach (var (_, at) in Probes)
+        {
+            var (x, y) = camera.Pixel(at);
+            if ((narrow ? solid.SeenNarrow(camera, frame.Width, x, y) : solid.Seen(camera, frame.Width, x, y)) == face)
+            {
+                var p = frame.Pixel(x, y);
+                return (p.R, p.G, p.B);
+            }
+        }
+
+        Note($"{frame.Name}: no probe surely shows {what} (face {face}), the reference for a coloured face");
+        return null;
+    }
+
+    /// <summary>The grey pixel times colour / grey in each channel, in linear light (<see cref="ColourRule"/>).</summary>
+    private static Rgb Predict(Rgb grey, string hex)
+    {
+        var scale = ColourRule.Scale(hex);
+        return Srgb(ColourRule.Linear(grey.R) * scale[0], ColourRule.Linear(grey.G) * scale[1], ColourRule.Linear(grey.B) * scale[2]);
+    }
+
+    /// <summary>Each probe the ray test is sure of must show <paramref name="face"/>, in <paramref name="colour"/> within <see cref="Checks.Exact"/>.</summary>
+    private static void Coloured(ScenarioFrame frame, Camera camera, Solid solid, IEnumerable<(string Name, Vector3 At)> probes, int face, Rgb colour, string what, bool narrow)
+    {
+        var sure = 0;
+        foreach (var (_, at) in probes)
+        {
+            var (x, y) = camera.Pixel(at);
+            if (Shows(frame, camera, solid, x, y, face, narrow, $"{what} {at}") is null)
+            {
+                continue;
+            }
+
+            sure++;
+            Colour(frame, (x, y), colour, Exact, $"{what} {at}, predicted {colour}");
+        }
+
+        Least(frame, what, sure, 1);
+    }
+
+    /// <summary>
+    /// The pixel, if the ray test is sure of it; it must then show <paramref name="face"/>. A face only a few pixels across
+    /// (the slab's top, a pocket wall) is never sure by <see cref="Solid.Seen"/>, so for it <paramref name="narrow"/> asks
+    /// <see cref="Solid.SeenNarrow"/>.
+    /// </summary>
+    private static Rgb? Shows(ScenarioFrame frame, Camera camera, Solid solid, int x, int y, int face, bool narrow, string what)
+    {
+        var seen = narrow ? solid.SeenNarrow(camera, frame.Width, x, y) : solid.Seen(camera, frame.Width, x, y);
+        if (seen == -2)
+        {
+            return null;
+        }
+
+        Equal($"{frame.Name}: what the geometry shows at {what} (pixel ({x}, {y}))", face, seen);
+        var p = frame.Pixel(x, y);
+        return (p.R, p.G, p.B);
+    }
+
+    private static void Least(ScenarioFrame frame, string what, int sure, int least)
+    {
+        if (sure < least)
+        {
+            Note($"{frame.Name}: only {sure} probes on {what} were sure, fewer than {least}");
+        }
     }
 
     private static (int Lo, int Hi)[] Edges(Solid solid, IEnumerable<int>? faces = null) =>

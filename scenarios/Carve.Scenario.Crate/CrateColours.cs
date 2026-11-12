@@ -21,8 +21,6 @@ internal static class CrateColours
 {
     private const string Wood = "#C8503C";
     private const string Blue = "#3C78C8";
-    private static readonly Vector3 Grey = new(0.72f, 0.72f, 0.70f);
-
     /// <summary>How far a channel, in linear light, may be from the one predicted, as a fraction of the prediction (8 bit steps and the pixel's own blending).</summary>
     private const double Relative = 0.08;
 
@@ -94,8 +92,7 @@ internal static class CrateColours
     private static void CheckSurface(ScenarioDriver driver, ScenarioFrame coloured, ScenarioFrame grey, Func<Vector3, Vector2> pixel,
         IEnumerable<Vector3> points, string hex, string what)
     {
-        var (r, g, b) = (Convert.ToInt32(hex[1..3], 16), Convert.ToInt32(hex[3..5], 16), Convert.ToInt32(hex[5..7], 16));
-        var albedo = new Vector3((float)Linear(r), (float)Linear(g), (float)Linear(b));
+        var scale = ColourRule.Scale(hex);
         var checkedPoints = 0;
         foreach (var point in points)
         {
@@ -104,7 +101,6 @@ internal static class CrateColours
             var k = grey.Pixel(x, y);
             double[] got = [Linear(c.R), Linear(c.G), Linear(c.B)];
             double[] lit = [Linear(k.R), Linear(k.G), Linear(k.B)];
-            double[] scale = [albedo.X / Grey.X, albedo.Y / Grey.Y, albedo.Z / Grey.Z];
             for (var ch = 0; ch < 3; ch++)
             {
                 var expected = lit[ch] * scale[ch];
@@ -125,9 +121,5 @@ internal static class CrateColours
         }
     }
 
-    private static double Linear(int channel)
-    {
-        var c = channel / 255.0;
-        return c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
-    }
+    private static double Linear(int channel) => ColourRule.Linear(channel);
 }
