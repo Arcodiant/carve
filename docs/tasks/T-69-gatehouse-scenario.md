@@ -71,34 +71,36 @@ Every frame has a positive pixel check from the ray test, at corners as well as 
 - Evidence goes to the milestone worktree's `artifacts/review/T-69/` by absolute path.
 - Run `finish` from inside the worktree and leave the folder.
 
-### Hand-off
+### As built
 
-Third agent (Sonnet, claude-sonnet-5-5), at about 60 tool calls, 0 images opened. The first two agents' hand-offs are folded in below; the STOPs are ruled.
+Built by four Sonnet agents (claude-sonnet-5-5), the last one finishing it. The earlier hand-offs are folded in here.
 
-**Ruling applied (the person, 2026-11-12), in sight.** `GatehousePlan.InSight(solid, camera, toEye, orthographic)` is the geometric rule: a ray from the eye to the edge's middle nudged 1e-3 of the bounds diagonal toward a face's centroid (in its plane), first hit is that face, for either of the edge's two faces. Worked in `GatehouseGeometry.TheWireframesHighlightTheStagesNewEdges`: new edges in sight from the front 10 / 5 / 5 at stages 2 / 4 / 6 (planned 10 at stage 2: it matches; 12-14 is not in sight, test `TheEdgeUnderTheCorniceIsNotInSightFromTheFront`; the others hidden at stage 2: 8-10, 8-12, 9-11, 9-13, 12-19); from the back 7 / 5 / 5 (worked, no plan; stage 2 hidden: 10-14, 11-15, 12-14, 13-15, 14-16, 15-17, 16-17, 16-19, 17-18). Stage 4 front hidden 24-25, 24-26 (back 21-23, 23-27); stage 6 front hidden 37-38, 37-41, 38-39, 39-40, 40-41 (back 32-33, 32-36, 33-34, 34-35, 35-36). `Wires` in `GatehouseFrames.cs` is now `[2] = (16, 10)`.
+**The rulings (the person, 2026-11-12).** `in sight` for the wireframe highlight is geometric: `GatehousePlan.InSight(solid, camera, toEye, orthographic)` casts a ray from the eye to the edge's middle, nudged 1e-3 of the bounds diagonal toward a face's centroid (in its plane); the first hit must be one of the edge's two faces. New edges in sight from the front 10 / 5 / 5 at stages 2 / 4 / 6 (the planned 10 at stage 2 matches; 12-14 under the cornice is not in sight); from the back 7 / 5 / 5. Hidden at stage 2 (front): 8-10, 8-12, 9-11, 9-13, 12-19; (back): 10-14, 11-15, 12-14, 13-15, 14-16, 15-17, 16-17, 16-19, 17-18. Stage 4 front hidden 24-25, 24-26 (back 21-23, 23-27); stage 6 front hidden 37-38, 37-41, 38-39, 39-40, 40-41 (back 32-33, 32-36, 33-34, 34-35, 35-36).
 
-**Done and committed** (commits after `114ae4e`): the ruling above; suite `scenario-gatehouse` in `tests.json` (and `samples/gatehouse.carve` in `core-unit`'s inputs); `scripts/run-gatehouse-scenario.ps1`; new project `tests/Carve.GatehouseLoad.Tests` (in `Carve.slnx`; sample equal by content to the run's saved file, live triangles only read back through `IModelGeometryLoader.Load`, the door's material present, export clean); the scenario's `SaveOpenExportAsync` (save new, something else opened over it, open, `get_mesh` text equal to the build's incl. tombstones, closed, save again replaced with equal bytes, export to `game/Content/models/gatehouse.glb`); `samples/gatehouse.carve` (copied from local run 3's `work/`); Core unit test `TheSampleIsTheGatehouseBuiltInCoreByContent` (the plane_cut normals in `GatehouseGeometry` now use the scenario's doubles `0.8/1.7`, `1.5/1.7`, since a pre-normalised float differs by 1e-8 in the cut's x); `CLAUDE.md` Layout rows; `cairn lint` clean. A local `scripts/run-gatehouse-scenario.ps1` run passes, with all checks and the 4 load checks (artifacts `artifacts/scenarios/gatehouse/3`, not yet the review folder).
+**What was built.** Core `unit` test `GatehouseGeometry` (counts, tombstones, closed, ids and a ray test for every checked pixel, written before any frame); project `scenarios/Carve.Scenario.Gatehouse` with suite `scenario-gatehouse` (seven stages through the real tools; 2 frames per stage, 3 wireframes at 2/4/6, and at stage 7 the orthographic window, the labelled reveals, the six-view sheet: 26 frames); `scripts/run-gatehouse-scenario.ps1`; `tests/Carve.GatehouseLoad.Tests` (the export read back through `IModelGeometryLoader`: live triangles only, the door's material present, export clean); save, an unrelated open, reopen, `get_mesh` text equal to the build's including tombstones, save again byte-equal, export; `samples/gatehouse.carve` (version 4, kept equal by content to the Core build by `TheSampleIsTheGatehouseBuiltInCoreByContent`; the plane_cut normals use the scenario's doubles 0.8/1.7 and 1.5/1.7); `CLAUDE.md` Layout rows. Folded findings: the end-merge picks four faces unless the cornice walls (z over 0.15) are excluded; the top face leaves a sliver after the first plane cut and is deleted by the second; the top face and the cornice's thin ends are asked about only where `SeenNarrow` is sure. No tool code changed; no bug reserved.
 
-**Breaks done** (`C:/Users/andre/AppData/Local/Temp/t69/breaks.py`, each alone, build with warnings as errors, scenario run, restored; log in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-69/breaks.log`). All caught:
+**Breaks** (each alone, build with warnings as errors, scenario run, restored; script `C:/Users/andre/AppData/Local/Temp/t69/breaks.py`, log `artifacts/review/T-69/breaks.log` in the milestone worktree). All caught.
 
 | Check | Break | Result |
 |---|---|---|
-| shaded frames' ray-test pixels (mirrored camera) | B1 eye and target x negated in `ViewFraming` | caught, 404 failures (gate-1-slab-front corner 1 of face 2 is background, expected the mesh) |
-| orthographic window frame and sheet captions | B2 orthographic drawn in perspective | caught, 18 failures (caption lacks "orthographic") |
-| six-view sheet tile order | B3 tile columns reversed | caught, 4 failures (tile +x at (121, 20) is background, expected the +x view's pixel) |
-| reveal labels | B4 labels not drawn (when no tile caption) | caught, 4 failures (no white pixel in reveal face 31's label box) |
-| wireframe highlight (in-sight Line) | B5 highlight drops edges from vertex 18 | caught, 1 failure (the new edge 18-19, closest pixel to orange is the fill) |
-| door colour (Crate colour rule at Exact) | B6 colour not applied in the draw | caught, 35 failures |
-| plane_cut counts | B7 `keep=below` keeps both | caught, 34 failures (vertices expected 22, got 24) |
-| door material read back through the loader | B8 export ignores face colours | caught by `The_doors_material_is_present_...` |
-| in-sight rule (Core) | plain facing test in place of the ray | `TheWireframesHighlightTheStagesNewEdges` fails (11, not 10) and `TheEdgeUnderTheCorniceIsNotInSightFromTheFront` |
+| shaded frames' ray-test pixels (mirrored camera) | B1 eye and target x negated in `ViewFraming` | caught, 404 failures |
+| orthographic window frame and sheet captions | B2 orthographic drawn in perspective | caught, 18 failures |
+| six-view sheet tile order | B3 tile columns reversed | caught, 4 failures |
+| reveal labels | B4 labels not drawn | caught, 4 failures |
+| wireframe highlight (in-sight Line) | B5 highlight drops edges from vertex 18 | caught, 1 failure |
+| door colour | B6 colour not applied in the draw | caught, 35 failures |
+| plane_cut counts | B7 `keep=below` keeps both | caught, 34 failures |
+| door material through the loader | B8 export ignores face colours | caught by `The_doors_material_is_present_...` |
+| in-sight rule (Core) | plain facing test in place of the ray | `TheWireframesHighlightTheStagesNewEdges` (11, not 10) and `TheEdgeUnderTheCorniceIsNotInSightFromTheFront` fail |
+| delete tombstones | B9 `MeshDelete` deletes nothing | caught, 9 failures (bridge refused, 10 problems) |
+| bridge is run | B10 the bridge call replaced by `check` | caught, 12 failures (the scenario throws KeyNotFound reading the bridge summary, so by exception not by a count) |
+| save/open keeps tombstones | B11 save writes deleted vertices as live (0,0,0) | caught, 2 failures (reopened `get_mesh` differs; export warns) |
+| save/open keeps colours | B12 save drops face colours | caught, 1 failure (reopened `get_mesh` differs) |
 
-Not broken: delete not tombstoning, bridge not run (their counts and the closed `check` are asserted by `Summary` / `Equal` and by `GatehouseGeometry`; B7 shows the counts bite), the NotLine on old edges, and the save/open comparison. Do one or two of these if time allows (a scenario edit that skips `bridge`; `save` dropping the colours, for the sample/open check), or state them as not broken.
+Not broken separately: the NotLine check on old edges (the highlight counts and B5 bite on the same drawing).
 
-**Left to do**
+**GPU run.** `cairn task T-69 verify` on commit 4764a90: `VERIFY PASS`, ran 12, carried 0, failed 0. `scenario-cube` and `scenario-crate` are not queued by verify, so they were submitted separately on 4764a90 (both PASS); every suite's `output.log` names 4764a904b. Evidence: `artifacts/review/T-69/frames-4764a90/` (frames per suite, `all.sha256`, 163 frames), local run in `local-run-3/`.
 
-1. Commit, then submit the GPU suites once on the near-final commit: `cairn task T-69 verify` (it queues `scenario-gatehouse`, `core-unit`, etc.). Follow with `cairn test status`. Take `cairn test artifacts scenario-gatehouse`, check `output.log` names the commit, copy `frames` and a `all.sha256` to `D:epos\carveranches\milestone\M-5rtifactseview\T-69rames-<commit>\`, and compare to the T-67 baseline `...\T-67rames-8481a22ll.sha256`: every existing frame byte-identical (list). Run twice to show byte-identical frames (the verify run plus one more, or a local run 3 vs 4 hash).
-2. Review of the gatehouse frames through `mcp__waystone__review` (kind `approve`; at most 32 files; real frames only, not a broken one). Local frames of run 1 are in `...\T-69\local-run-1rames`; use the GPU run's.
-3. `### As built` (Sonnet, claude-sonnet-5-5; the person's ruling recorded; every count from the above and the stage 4/6 hidden edges; the break table above; the folded hand-offs: the end-merge picks four faces unless cornice walls (z over 0.15) are excluded, the top face leaves a sliver after the first cut and is deleted by the second, the top face and the cornice's thin ends are asked about only where `SeenNarrow` is sure), remove this Hand-off section, `verify` until `VERIFY PASS`, `cairn lint`, commit, `finish` from the worktree.
+**Existing frames:** all 137 in the T-67 baseline `frames-8481a22/all.sha256` (character 17, crate 44, cube 32, cuts 16, export 7, shed 10, soft 11) are byte-identical in the GPU run (diff of the sorted hash lists empty). The 26 gatehouse frames are byte-identical between the local run 3 and the GPU run (two runs); so are `gatehouse.carve` (and `samples/gatehouse.carve`) and `gatehouse.glb`.
 
-**Surprising:** `export` and `check` work as in the character scenario; the sample is a version 4 file (holes and tombstones). The in-sight rule needed the scenario's camera `Eye`, which `Camera` already exposes (nothing in Shed changed).
+**Review:** the person approved the 20 gatehouse frames (stages 1-7, front/back, three wireframes, ortho window, reveal labels, sheet) through `mcp__waystone__review` (kind approve), on the GPU run's frames. The six per-axis 256 px tiles (`gate-7-axis-*`) are the sheet's tiles and were not sent separately.
