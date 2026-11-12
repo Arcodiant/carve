@@ -85,68 +85,24 @@ Pixel checks are worked by ray test, each shown failing on a break.
 
 ### As built
 
-First agent: Opus (claude-opus-5-5). **Core only** (the member's own checkpoint: "hand off after Core with the sweep list"). The consumer sweep, the server and the content are left; see `### Hand-off`.
+First agent: Opus (claude-opus-5-5). **Core only** (the member's own checkpoint: "hand off after Core with the sweep list"). The consumer sweep, the server and the content are left; see `**Second agent: Opus (claude-opus-5-5). The consumer sweep, the server and the tests** (commit `cbd4644`):
 
-**The tombstone API** (for T-65, T-68 and every later M-5 edit; add nothing of your own):
-
-- `Face.Deleted` (`src/Carve.Core/Face.cs`): the one tombstone a deleted face's slot holds. It has no corners (`Loop`, `Holes`, `Corners` empty), `face.IsDeleted` is reference identity with it, so a face built from an empty list is still refused as `faces[n]: face has 0 indices`, never taken for a tombstone. `Map` returns it unchanged; `ToString()` is `deleted`.
-- `PolygonMesh` (`src/Carve.Core/PolygonMesh.cs`): `Vertices.Count` and `Faces.Count` stay **slot counts**, so an id is still a position. A deleted vertex's slot holds `Vector3.Zero` (canonical, so a file round trip compares equal), a deleted face's `Face.Deleted`. New: `LiveVertexCount`, `LiveFaceCount`, `HasTombstones`, `IsVertexDeleted(id)`, `IsFaceDeleted(id)` (both false for an id out of range), `LiveVertices`, `LiveFaces` (ids ascending), `VertexProblem(id)` / `FaceProblem(id)` (null for a live id, `there is no vertex n: ids run 0..m` for one that never existed, `deleted` for a tombstone), `DeletedMessage = "deleted"`, and internal `DeletedVertexMask`. `FaceStyle.FaceProblem(mesh, id)` and `VertexWeights.VertexProblem(mesh, id)` are the mesh-aware forms of the old count-only checks.
-- `PolygonMesh.Create(vertices, faces, deletedVertices)`: the deleted ids are tombstones (positions not checked, set to zero); a `Face.Deleted` slot is not checked; a live face using a deleted vertex is refused at its corner (`faces[3][2]: index 6 is a deleted vertex`); a mesh whose every face is a tombstone is refused (`faces: mesh has no faces: every face is deleted`). The old two-argument overloads are unchanged.
-- `PolygonMesh.Edit(..., deletedVertices, deletedFaces)`: tombstones exactly these ids (no cascade); existing tombstones always carry and added elements append after the last slot, so no id is given twice. A moved vertex, reshaped face or deleted id that is a tombstone is refused as `vertices[n]: deleted` / `faces[n]: deleted`. **An edit that removes elements** computes what goes with `MeshDelete.Closure` (or its own rule if the spec gives one), passes it to `Edit`, and reports it through `EditResult.From(..., deleted)` / `EditResult.Made(..., deleted)`.
-- `EditResult.Deleted` (`src/Carve.Core/EditResult.cs`): a `DeletedElements(Vertices, Faces)` record, ids ascending, `DeletedElements.None` for every edit that deletes nothing and on failure. `EditResult.From` (the `Carried` step) strips, for any edit that leaves tombstones, a tombstoned face's colour and groups (`FaceStyle.Without`; a group left empty goes) and a tombstoned vertex's weights (`VertexWeights.Without`); a hard edge no live face has is dropped as before.
-- `MeshDelete` (`src/Carve.Core/MeshDelete.cs`): `Closure(mesh, vertices, faces)` and `Delete(mesh, vertices?, faces?)`. A listed vertex takes every live face using it in any loop (outer or hole: a face is deleted whole, never reshaped); a deleted face takes every vertex of its own that no live face uses afterwards. **Reading of "every vertex no live face uses afterwards":** only the deleted faces' own vertices, per the person's "deleting a face takes vertices left with no face"; a vertex no face used before the delete (a stray, as in the leaky shed) is not taken unless listed. Refused: nothing listed (`vertices, faces: nothing to delete: list at least one vertex or face`), an id out of range (`MeshEdits.UnknownElements`'s message) or already deleted (`faces[7]: deleted`), and a delete that would take every live face (`vertices, faces: this would delete every face, and a mesh keeps at least one face (as define_mesh requires)`).
-- `MeshEdits`: `UnknownElements` (used by `move`, `render`'s highlight and `delete`) and `extrude`'s face check give `deleted` for a tombstone, so `move` and `extrude` already refuse one (`faces[1]: deleted`).
-- **The Carve file** (`src/Carve.Core/CarveFile.cs`, version 4): a `null` in `vertices` or `faces` is a tombstone, read and written bit-exact; `Write` takes version 4 when a mesh `HasTombstones` or a face has holes, else 2 or 3 as before. A live face on a `null` vertex is refused by `Create` at its corner, which names the face (`meshes[0].faces[3][2]: index 6 is a deleted vertex`). A colour, group or weight naming a tombstone in a file is refused (`deleted`). Versions 1 to 3 still refuse `null` as before. T-63's `HoleTests.ANullTombstoneIsRefusedUntilT64` is replaced by the round-trip and refusal tests below.
-- **D-1's *Polygon meshes*** now says a deleted slot is kept and its id never reused.
-
-**Tests** (`tests/Carve.Core.Tests/TombstoneTests.cs`, unit, 14): a face deleted (slot kept, others unchanged, the original mesh untouched), a vertex deleted with its three faces, the orphan rule (only vertex 6 when faces 1, 3, 5 go; a stray kept), a hole losing a vertex deletes its face whole, ids after a delete then an extrude (vertices 8..11, faces 6..9), undo (the earlier mesh untouched, the undone ids given out again), every edit naming a deleted id (`move` by vertex and by face, `extrude`, `delete` again, `Edit`'s reshape) distinct from one that never existed, nothing and every face refused, colour, groups and weights left, topology with no edge of a tombstone, `Create`'s live-face-on-deleted-vertex, tombstones-only and empty-face-is-not-a-tombstone, the file round trip with nulls (version 4, text equal on rewrite), a file's live face on a null vertex refused naming it, and a plain model still version 2. Core: 612 passed.
-
-**Breaks** (each applied alone by `C:\Users\andre\AppData\Local\Temp\t64\breaks.py`, Core tests built and run, restored; output in `D:\repos\carve\branches\milestone\M-5\artifacts\review\T-64\breaks.log`):
-
-  | Check | Break | Result |
-  |---|---|---|
-  | a deleted face keeps its slot as a tombstone | `Edit` never writes `Face.Deleted` | 11 fail |
-  | a vertex takes every face on it | `Closure` adds no face for a listed vertex | 8 fail |
-  | a face takes the vertices left with no face | no orphan taken | 2 fail (orphan rule, holed face) |
-  | only the deleted faces' own vertices are taken | every vertex no live face uses taken | 1 fails (the stray) |
-  | a hole losing a vertex deletes the face whole | the outer loop only searched | 1 fails |
-  | tombstones carry through a later edit (ids not reused) | `Edit` passes only the new deleted ids to `Create` | 1 fails (delete then extrude) |
-  | a deleted vertex id in an edit is `deleted` | `UnknownElements` skips the tombstone test | 1 fails |
-  | a deleted face id in an edit is `deleted` | `UnknownFace` always says there is no face | 1 fails |
-  | deleting every face refused, with its own message | the check never fires | 1 fails |
-  | deleting nothing refused | the check never fires | 1 fails |
-  | a deleted face leaves its colour and groups | the style not stripped | 1 fails |
-  | a deleted vertex leaves its weights | the weights not stripped | 1 fails |
-  | the file writes `null` for a deleted vertex | its position written | 1 fails (round trip) |
-  | the file reads a `null` face as a tombstone | read as an empty face | 2 fail |
-  | tombstones need version 4 | the version chosen by holes only | 2 fail |
-  | a live face on a deleted vertex refused | `Create`'s check never fires | 2 fail (`Create`, file) |
-  | a mesh of tombstones only refused | the check never fires | 1 fails |
-  | an empty face is not a tombstone | `IsDeleted` is an empty loop | 1 fails |
-
-  Three breaks first written as `if (false)` did not build (CS0162, unreachable code, a warning made an error); they were rewritten as `if (x < 0)` and rerun, and the log keeps both runs.
-
-**Frames:** none taken; Core alone changes no frame (no existing mesh has a tombstone, and every changed path is the old one when `HasTombstones` is false). The hash check against T-63's 121 + 4 is for the agent that runs the GPU suites.
+- Core: `Triangulator.TriangulateFace` gives a tombstone no triangles (so `FlatShading`, `Shading`, render, export and `Skinning` draw none); `PolygonMesh.FaceArea`/`FaceCentre`/`FaceLabelPoint`/`FaceNormal` refuse a tombstone plainly (`InvalidOperationException("faces[n]: deleted")`, callers skip through `LiveFaces`); `Shading.Corners` gives a tombstone no corners; `MeshHealth` (shells, area, duplicate faces, coincident vertices) and `MeshQuery.Select` (vertices and faces; `Of` is the live row count) skip tombstones; `MeshReport` counts live elements and gives no unused-vertex warning for a tombstone; `Model.Combined` carries the deleted vertices at their offsets (`OffsetOf` stays slot counts, so ids map); `subdivide` keeps tombstones, and the face point each level makes for a tombstone is a tombstone vertex, not a live stray.
+- Server: the `delete` tool (`DeleteTool.cs`, worked example `{"faces":[3]}` on `define_mesh`'s cube, the top at y = 1); `deleted: {vertices, faces}` in `MeshToolSupport.Edit`'s body (move, extrude, delete), in `subdivide`'s and in `define_mesh`'s; `get_mesh` writes `null` in a tombstoned slot and says so; labels, spikes and the highlight skip tombstones; `set_colour`/`define_group` and `set_weights` use the mesh-aware `FaceProblem`/`VertexProblem` (`deleted`); the skinned export's unweighted list, bound-to-root count, height and materials, and `export`'s bounds line, take live elements only. The `.glb` compacts with no code of its own: it is built from triangles, so no tombstone's vertex is written.
+- `select edges where open` on an open mesh works (4 edges on the topless cube, tested); the first agent's surprise was not a bug.
+- Tests: `TombstoneSweepTests` (Core unit, 9: triangulation, smooth shading, face geometry refusal, topology, report, check, select, subdivide, combined), `TombstoneExportTests` (Server unit, 2: skinned export of a rigged cube with vertex 6 deleted, every written vertex used and carrying its own two weights; a plain export of the topless cube through the engine's parser), `DeleteToolTests` (Server regression, 2: the worked example, `get_mesh` nulls, vertex delete, `deleted` errors, refusals, ids appended after the last slot, undo; and the topless cube exported through the client and read back through the engine's parser). All pass by `dotnet test` here; Core 621, Server unit 279.
 
 ### Hand-off
 
-**Done (first agent, Opus):** the Core tombstones, `MeshDelete`, `EditResult.Deleted`, the `deleted` id errors in `Create`/`Edit`/`UnknownElements`/`extrude`, the version 4 file's nulls, D-1, 14 unit tests with every break shown failing. `dotnet build Carve.slnx` is clean (warnings as errors), `Carve.Core.Tests` passes (612) and `Carve.Server.Tests` at `Tier=unit` passes (277), both by `dotnet test` here. `cairn task T-64 verify`, `server-regression` and the GPU suites have **not** been run on this commit.
+**Done:** Core (first agent), the consumer sweep, the `delete` tool, the report's `deleted`, `get_mesh` nulls, export compaction, and their tests (second agent, commit `cbd4644`). `dotnet build Carve.slnx` is clean with warnings as errors.
 
-**Left: the consumer sweep.** A probe on the cube with vertex 6 deleted (removed again, not committed) found, in Core:
+**Left:**
 
-| Consumer | On a tombstone today |
-|---|---|
-| `Triangulator.Triangulate` / `TriangulateFace` | throws (index out of range on `Face.Deleted`) |
-| `FlatShading.Triangles`, `Shading.Triangles` (flat and smooth, T-42 corner normals) | throws |
-| `MeshHealth.Create` (`check`) | throws |
-| `PolygonMesh.FaceCentre`, `FaceNormal`, `FaceArea`, `FaceLabelPoint` on a deleted face | throws (callers must skip, or these must refuse plainly) |
-| `MeshQuery.Select` faces (`y > 0.5`, `area > 0`) | throws |
-| `MeshQuery.Select` vertices (`unattached`) | returns the tombstone 6: must skip |
-| `MeshEdits.Subdivide` | throws (`ArgumentNullException`); Subdivision is not in the spec's list but must keep tombstone slots or refuse |
-| `Model.Combined` / `OffsetOf` | does not throw, but copies tombstone slots; export and render must use live elements |
-| `MeshReport.Create` | does not throw; check its vertex loops |
-| `MeshTopology` | already skips (`Face.Deleted` has no edges) |
+1. `cairn test run server-regression` was queued as `J-20261112-131058-0d01aa` on this machine's runner and its result was **not** seen; check it (the new `deleted` field or the new tool may trip a test that lists tool names or report keys exactly).
+2. **Breaks for the second agent's checks** are not yet run: one per row of the sweep (e.g. `TriangulateFace` not skipping a tombstone, `MeshQuery` not skipping, `MeshReport` live counts, `Model.Combined` dropping the mask, `subdivide` leaving the face point live, `get_mesh` writing the face, `deleted` missing from the report, the skinned `Unweighted` counting the tombstone), each shown failing, with the table added to As built and the log appended to `D:epos\carveranches\milestone\M-5rtifactseview\T-64reaks.log`.
+3. **Content:** `DeleteStage.cs` in `scenarios/Carve.Scenario.Cuts` and its line in `CutsStages.cs`: the cube with its top (face 3) deleted from `[0.6, 0.35, 1]`, and the cube with vertex 6 (1, 1, 1) deleted (faces 1, 3, 5) from the same direction in the wireframe; pixels by ray test (`CutsGeometry.cs`), each shown failing on a break.
+4. **Frames:** the GPU suites once on a near-final commit; every existing frame byte-identical to T-63's `frames-after-99c846e.sha256` (121) and `cuts\cuts-frames.sha256` (4), listed, into the evidence folder; the new frames' hashes too. The member's spec asks for no review by the person.
+5. `render` captions: `RenderSystem` takes its counts from `MeshReport`, so they are live counts now, but no test shows it yet.
+6. `cairn task T-64 verify` until clean, `cairn lint`, then `finish`. Remove this section or fold it in.
 
-Still to visit (from the spec's list and a search of `.Faces`/`.Vertices` in `src/Carve.Server`): `Skinning` (positions, normals, corner normals), `CheckTool`, `ExportTool` (compact: live elements only, indices remapped, weights following), `SkinnedExport`, `GetMeshTool` (`null` in tombstoned slots; description), `LabelLayout`, `LookMeshes`, `RenderTool` (captions: live counts), `SelectTool`, `SetWeightsTool` and `FaceStyleTools` (switch to the mesh-aware `VertexProblem`/`FaceProblem` so a tombstone gives `deleted`), `SubdivideTool`, `MeshBridge`, `ModelStore`, `mark_edges` (`Shading.MarkEdges`), and `MeshToolSupport`'s shared report (`deleted: {vertices, faces}` from `EditResult.Deleted`, live counts). Then the `delete` tool with its description and the worked example on `define_mesh`'s unit cube, the regression tests, `DeleteStage.cs` in the Cuts scenario with ray-tested pixels and breaks, and the frame hash check against T-63's lists.
-
-**Surprising:** `select edges where open` on the probe mesh returned nothing, though the mesh is open; I did not chase it (it may be the property's name). The Bash tool refused one inline Python heredoc with a quoting error, so the edits went through scripts under `C:\Users\andre\AppData\Local\Temp\t64\`.
+**Checked:** Core and Server unit tests and the two new regression tests pass by `dotnet test`. Not checked: the full regression suites, any GPU suite, any frame.
