@@ -22,9 +22,9 @@ public sealed record LoopCutResult(EditResult Edit, IReadOnlyList<int> Ring);
 /// Refused: a pair that is not an edge of the mesh, an edge with no quad on it, an edge on more than two faces (a
 /// non-manifold edge: an open rule, provisional), a ring that closes on itself reversed (a Mobius band, B-3), and a bad <c>at</c> (empty, not
 /// strictly ascending, a fraction not strictly between 0 and 1, or one too near an end of the shortest ring edge by
-/// <see cref="FaceSplit.Tolerance"/>). A cut across a quad that would run along one of its edges, cross one, or pass
-/// through a corner (a concave quad can make any of these) is refused naming the fraction, the face and the edge or corner
-/// (the person's ruling, 2026-11-13), never as a <see cref="FaceSplit"/> <c>cuts[k]</c>.
+/// <see cref="FaceSplit.Tolerance"/>). A cut across a quad that would run along one of its edges or cross one (a concave
+/// quad can make either; a cut through a corner runs along the entry or exit edge that corner ends) is refused naming the
+/// fraction, the face and the edge (the person's ruling, 2026-11-13), never as a <see cref="FaceSplit"/> <c>cuts[k]</c>.
 /// </remarks>
 public static class LoopCut
 {
@@ -118,7 +118,7 @@ public static class LoopCut
         }
         if (errors.Count > 0) return new LoopCutResult(EditResult.Refused(errors), []);
 
-        // Each cut must run across its quad: one along an edge, over an edge or through a corner is refused in loop_cut's
+        // Each cut must run across its quad: one along an edge or over an edge is refused in loop_cut's
         // own words (the person's ruling, 2026-11-13).
         foreach (var s in steps.OrderBy(s => s.Face))
             foreach (var t in at)
@@ -146,9 +146,6 @@ public static class LoopCut
         for (var k = 0; k < 4; k++)
             if (Overlaps(p, q, At(loop[k]), At(loop[(k + 1) % 4]), tol))
                 return MeshEdits.Invariant($"runs along its edge [{loop[k]}, {loop[(k + 1) % 4]}]");
-        foreach (var c in loop)
-            if (SegmentDistance(At(c), p, q) <= tol && Length(At(c) - p) > tol && Length(At(c) - q) > tol)
-                return MeshEdits.Invariant($"passes through its corner {c}");
         var n = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, loop));
         var (u, w) = Basis(n);
         var origin = At(loop[0]);
