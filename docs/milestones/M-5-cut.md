@@ -161,11 +161,28 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 
 - **B-3, the person's ruling after T-66 ("refuse it, fix later"), was fixed before `finish`.** `loop_cut` now refuses a ring that closes on itself reversed (a Mobius band), on a hand-built band of eight planar quads, with a break shown failing (Sonnet 5.5, two agents). Pushing it needed the rebased milestone branch on origin first, which the person allowed with `--force-with-lease`.
 - **The refactor pass** (Opus 5.5) moved the helpers the cut stages had copied into `CutsChecks.cs` (`dc27cde`) and the geometry Knife and PlaneCut borrowed from `FaceSplit` into `PlaneGeometry.cs` (`6322324`). All 187 frames stayed byte-identical.
-- **Review round 1 (RV-31)** had five Opus reviewers: Core topology, cut algorithms, server tools, scenarios, and the whole diff. It raised 30 findings, 6 of them Major: the knife cutting nothing along a boundary, `subdivide`'s report after a delete (found by three reviewers), two frames whose checks could not fail, the y-axis tiles with no geometric check, and suite inputs missing linked files. The person ruled three:
+- **Review round 1 (RV-31)** had five Opus reviewers: Core topology, cut algorithms, server tools, scenarios, and the whole diff. It raised 30 findings, 6 of them Major, covering five defects:
+  - the knife cutting nothing along a boundary;
+  - `subdivide`'s report after a delete (rated Major by two reviewers and Minor by a third);
+  - `loop-cut-band-extruded`, whose checks could not see the extrude;
+  - the y-axis tiles with no check worked from the geometry;
+  - suite inputs missing linked files.
+
+  The person ruled three:
   - the knife cuts boundary-touching segments as `plane_cut` does;
   - a face in a plane cut's plane stays untouched;
   - a merged fold warns.
-  The orchestrator ruled the README's merge example onto the ids `loop_cut` really leaves. Two Opus fixers fixed all 30, each with a break, and all 187 frames stayed byte-identical.
+  The orchestrator ruled the README's merge example onto the ids `loop_cut` really leaves. All 30 were fixed:
+  - fixer A (Opus, three agents) took 20, in the product;
+  - fixer B (Opus, two agents) took 9, in the scenarios;
+  - the orchestrator took the Retrospective.
+
+  Every code fix has a test or check shown failing without it. Five fixes are text or configuration with no break: D-1, `CLAUDE.md`'s Layout, `tests.json`'s inputs, a test rename, and the Retrospective. All 187 frames stayed byte-identical.
+- **Review round 2 (RV-32)** had two Opus reviewers, on the fix diff and the answers. 28 of the 31 answers checked held, and it raised 7 findings, none Major. The person ruled two:
+  - `loop_cut` refuses a cut that would run along a quad's edge, and `FaceSplit` never skips a cut silently;
+  - the -y tile's orientation is recorded as a known limit.
+
+  An Opus fixer fixed five, each with a break, and the orchestrator answered the Retrospective and the -y tile.
 
 **Never verified.**
 
@@ -179,6 +196,7 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - **Carried passes:**
   - `viewer-cube` was carried from `99c846e` (T-63) through most members, though it ran fresh in the milestone's `verify`.
   - T-63 to T-68 each hashed frames from the run of their last code commit, not from their final notes-only commit.
+- **The gatehouse's -y axis tile, seen from below,** shows only two downward faces of one shade inside a plain rectangle. A -y view drawn mirrored or with the wrong up passes; only a swap with +y is caught. The person kept the approved frame and recorded this as a known limit (RV-32).
 - **Machines:** any GPU but Mantorok's and Xellotath's (both RTX 5070), and any client but `claude -p`.
 - **The installed carve:** `C:\tools\carve` has not been republished.
 - The orchestrator opened no frame. Every look above is a member's or the person's.
