@@ -19,7 +19,8 @@
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
         "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
         "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs",
-        "samples/gatehouse.carve"
+        "samples/gatehouse.carve",
+        "samples/barrel.carve"
       ],
       "resources": "cpu",
       "est-seconds": 30
@@ -53,6 +54,7 @@
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "samples/leaky-shed.carve",
+        "samples/barrel.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],
