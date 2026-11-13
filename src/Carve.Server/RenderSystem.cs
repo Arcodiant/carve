@@ -41,8 +41,21 @@ internal sealed class RenderSystem(
     private bool _composed;
     private RenderPump? _pump;
     private float[]? _weights;
+    private Texture? _checker;
+    private Material? _checkerMaterial;
 
     private LookHolder<Mesh> Looks => _looks ??= new LookHolder<Mesh>(this);
+
+    /// <summary>
+    /// The checker (<see cref="CheckerTexture"/>) as an engine texture, made on the frame thread the first time a look asks
+    /// for it, sRGB, sampled nearest with repeat and no mipmaps, and held for the process's life, as the cameras and light
+    /// are. A render that never asks for it makes nothing. T-58's layout look draws it again.
+    /// </summary>
+    internal Texture Checker => _checker ??= resources.CreateTexture(
+        CheckerTexture.Pixels.Span, CheckerTexture.Size, CheckerTexture.Size, TextureFormat.Rgba8Srgb, SamplerDescriptions.PixelArt, generateMipmaps: false);
+
+    /// <summary>The checker look's one material: lit from the mesh's normals, the checker times each vertex's colour.</summary>
+    private Material CheckerMaterial => _checkerMaterial ??= Material.LitTextured(Checker);
 
     public void Initialise()
     {
@@ -118,7 +131,13 @@ internal sealed class RenderSystem(
         _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
         _nextSubmeshMaterials = null;
         MeshData<PositionUvNormalVertex> data;
-        if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 })
+        if (scene.Uvs is { } uvs)
+        {
+            // The checker: one mesh and one material whatever the face colours, which it replaces.
+            _nextMaterial = CheckerMaterial;
+            data = MeshBridge.ToMeshData(mesh, space, uvs);
+        }
+        else if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 })
         {
             data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours);
             _nextSubmeshMaterials = colours

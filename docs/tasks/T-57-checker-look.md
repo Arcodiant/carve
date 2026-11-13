@@ -4,7 +4,7 @@ description: >-
 ---
 # T-57 — Checker look
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -127,3 +127,33 @@ Per frame at least: front: white at the +Z side's top-left, violet at its top-ri
 ### Rulings (the person, 2026-11-13)
 
 All eleven as recommended. On rule 9 in particular: T-57 lands UVs through `Model.Combined` as its first commit, pushed early to `milestone/M-6`, and T-59, running beside it, rebases onto that commit and does not change `Combined` itself. On rule 10: the white and magenta thresholds are shown to the person, from the probe frame, before they are used.
+
+### As built
+
+Built by three agents, all Claude Opus 5.5 (`claude-opus-5-5`), 2026-11-13: the first wrote the engine path, the texture and the probe; the second the argument tests, `CameraPixels`' vertical rule, the crate stage and the broken-product table; the third rebased onto T-55, T-56 and T-60, ran `verify`, the hash guard and the round-2 review, and wrote this. The probe passed: no engine need.
+
+**How UVs reach the GPU.** `Model.Combine` (`src/Carve.Core/Model.cs`, the first commit, for T-59) offsets each mesh's `Uvs` into the combined mesh (face ids by the faces before it, seams by the vertices before it); no mesh with UVs gives null, so a combined mesh without UVs is as before. `LookMeshes.Compose` for `Look.Checker` gives `LookScene.Uvs`, one UV per triangle vertex in A, C, B order (`LookMeshes.CornerUvs`: `mesh.Uvs.Of(face)[CornerOf(v)]` over `Triangulator.Triangulate`, holes included; an unmapped face's corners all at `CheckerTexture.WhiteCentre`), and vertex colours white for mapped, magenta for unmapped, orange for highlighted (`CheckerColours`); no edge lines, face colours not drawn. `MeshBridge.ToMeshData(mesh, space, uvs?)` writes `Uv` only when given; null is byte for byte the old buffer. `RenderSystem.Make` uses that path and the checker material when `scene.Uvs` is set. So unmapped = white texel x magenta = lit magenta, one mesh, one material.
+
+**The checker, formula and API** (`src/Carve.Server/CheckerTexture.cs`, CPU only): `Size = 256`, `Cells = 8`, `CellPixels = 32`; `Hues` `#E04040 #E08A30 #D8C830 #50B050 #40B0C0 #4070E0 #6A50D0 #B050C0` (column 0 = u 0, red, to column 7, violet); `Cell(c, r)`: (0,0) white `#FFFFFF`, `c + r` even the hue, odd each channel `(x * 55 + 50) / 100` (round(x * 0.55)): `#7B2323 #7B4C1A #776E1A #2C612C #23616A #233E7B #3A2C72 #612C6A`. `Pixels`: RGBA8, A 255, row 0 = v 0 (top), made once. `WhiteCentre = (16/256, 16/256)`. Pinned SHA-256 of `Pixels`: `27EBA66D119AAC9255DBD826EB165AE918976FF5123D226367C0CADC741B53EC`. On the GPU: `RenderSystem.Checker` (internal, lazy, frame thread) is `CreateTexture(Pixels, 256, 256, Rgba8Srgb, SamplerDescriptions.PixelArt, generateMipmaps: false)`, and the lazy `Material.LitTextured(Checker)`; both held for the process's life; a render that never asks makes neither.
+
+**`render`.** `mode: "checker"` (`RenderTool.cs`: validation, `AllowedValues`, both descriptions with the worked example, error "use 'shaded', 'wireframe', 'normals' or 'checker'"); caption `512x512, view front, checker, ...`; `no face has UVs` follows `checker` when no face of the drawn model has UVs (counted over the mesh named by `mesh`, else the whole model; `mesh` aims only, every mesh is still drawn); `weights` with `checker` refused.
+
+**What T-58 reuses.** `RenderSystem.Checker` (the texture, drawn again in the `uvs` layout), `CheckerTexture` (`Cell`, `Hues`, `WhiteCentre`), the `Look`/`LookScene.Uvs` plumbing and `ToMeshData(..., uvs)`; in the crate scenario `CrateUvs` (`Side`, `Normal`, `SideOf`, `Uv`, `At`, `Lay(shape, unmapped...)`) and the classifier `scenarios/Carve.Scenario.Crate/CheckerColours.cs` (thresholds approved in round 1: white spread <= 24 and least >= 120; magenta G <= 30, |R-B| <= 24, min(R,B) - G >= 100; hue nearest of eight, no angle bound). `CameraPixels` gained the `UpFor` rule (-Z up within 1 degree of vertical) and `Eye(...)`.
+
+**Frames and their checks** (`CrateChecker.RunAsync`, after `CrateLooks`, its own crate build, every face but `TopFace` laid; then `undo`). Hashes from the verify run at `17d6073` (crate job `J-20261113-170755-8d9167`):
+
+| Frame | SHA-256 |
+|---|---|
+| `crate-checker-front` | `438473c296b50fe060a520db433175c9d28c62cc65ce5cff89114699cdbf5afa` |
+| `crate-checker-back` | `ac7e297efa1cf8a398c0c3cef3a8186054c1ca719ca18df1d540840256f81635` |
+| `crate-checker-plusy` | `3c5327ab10cd39a339c220ec47179aa4b8299027007aba2408d7a337a71a9b81` |
+| `crate-checker-sheet` (2x2: front, back, +x, +y) | `f9082d8abe21ec8f4c1fbced24a72e11aac0f8df8bf797113a19def04304de4e` |
+| `crate-checker-front-256` | `5d884652877bc27d71cfcf708b442b796e47163abb548ae78911357f71cb630e` |
+| `crate-checker-front-1024` | `430c46fe45fc52e24f3175e14c01006ba7e1dd28b3184260edee4876489fee6e` |
+| `crate-front-after-checker` (= `crate-front`) | `bf8ecf04ae27c76c1b4d0a0ff1f12200ec7f2f4ac04ab9f97b57852b0a436924` |
+
+Every cell centre of every face is swept: kept if facing the eye, in sight by a ray test, with a 3.5 px ring also in sight, 4 px inside the frame and clear of captions; then magenta on `TopFace`, white at (0,0), else not white, not magenta and nearest hue = its column; a light cell brighter than the dark one below it on each face. Named cells required: front +Z (0,0), (7,0), (0,7) and all of row 0; back the same on -Z; plusy +Y (0,0), (7,0), (0,7); each sheet tile its side's three. 920 samples, 0 failures, logged to `checker-samples.txt`. Regression: `CheckerLookTests` (the probe) and `CheckerArgumentTests` (each argument family with its caption and uv (0,0) white with its u-mirror and v-flip not; all-magenta with `no face has UVs`; two meshes, UVs on the second only; mode error text; `weights` refused; a shaded frame byte-equal before and after `set_uvs`).
+
+**Rulings at round 2 (the person, 2026-11-13).** (1) The 3 px check ring may reach onto a neighbouring face in the same plane and side, where the UVs carry on unchanged (the +Z white cell at 256 px, where the frame's mitred bands meet on a diagonal through it). (2) On the 2x2 sheet, magenta is required in the front and +y tiles and required absent in the back and +x tiles (the lid panel cannot be seen from either). The person approved all six frames in round 2 with no notes.
+
+**Evidence** (`milestone/M-6` worktree, `artifacts/review/T-57/`): `broken-product.md` (v-flipped upload, u-mirrored texture, corner UVs A,B,C, unmapped white, UVs not written, `Combined` dropping UVs, the checker stage's camera mirrored and flipped: each fails; run before the T-60 rebase at `7b86ead`), `hash-guard.md` (cube, crate, shed, export and character at base `63d5d83` against the verify run: every existing frame and exported file identical; the two `export-result.txt` differ only in the job's temp path), `frames/` (the six frames and `checker-samples.txt`).

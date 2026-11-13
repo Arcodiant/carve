@@ -117,4 +117,31 @@ public class ModelTests
         Assert.Equal(TestMeshes.Cube().Faces[0].Loop.Select(v => v + 3), combined.Faces[1].Loop);
         Assert.Same(combined, model.Combined);
     }
+
+    [Fact]
+    public void The_combined_mesh_carries_each_mesh_s_uvs_and_seams_with_their_ids_offset()
+    {
+        var a = Triangle().WithUvs(MeshUvs.None.WithFace(0, [new(0, 0), new(1, 0), new(0, 1)]).WithSeams([(0, 1)], true));
+        var cube = TestMeshes.Cube();
+        var b = cube.WithUvs(MeshUvs.None.WithFace(2, [new(0.25f, 0), new(1, 0), new(1, 1), new(0, 1)]).WithSeams([(4, 5)], true));
+        var model = Model.Of("a", a).With("plain", Triangle(2)).With("b", b);
+
+        var uvs = model.Combined!.Uvs!;
+
+        Assert.Equal([0, 1 + 1 + 2], uvs.MappedFaces);
+        Assert.Equal(a.Uvs!.Of(0), uvs.Of(0));
+        Assert.Equal(b.Uvs!.Of(2), uvs.Of(4));
+        Assert.False(uvs.IsMapped(1));
+        Assert.Equal([(0, 1), (3 + 3 + 4, 3 + 3 + 5)], uvs.Seams);
+        Assert.Empty(MeshUvs.Check(model.Combined!, uvs));
+    }
+
+    [Fact]
+    public void A_combined_mesh_has_no_uvs_when_no_mesh_has_them()
+    {
+        var model = Model.Of("a", Triangle()).With("b", TestMeshes.Cube());
+
+        Assert.Null(model.Combined!.Uvs);
+        Assert.Empty(model.Combined!.Seams);
+    }
 }

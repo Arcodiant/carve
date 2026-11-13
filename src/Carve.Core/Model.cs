@@ -245,7 +245,7 @@ public sealed class Model
 
     /// <summary>
     /// Every mesh as one, for drawing them together and taking bounds over all of them: the meshes' vertices and faces
-    /// in definition order, each mesh's ids offset past the ones before. A model of one mesh gives that mesh itself, so
+    /// in definition order, each mesh's ids offset past the ones before, its UVs and seams with them. A model of one mesh gives that mesh itself, so
     /// it draws exactly as before; an empty model gives null.
     /// </summary>
     public PolygonMesh? Combined => _meshes.Length switch
@@ -264,12 +264,21 @@ public sealed class Model
         var corners = new List<System.Numerics.Vector3[]>();
         var flat = new List<bool>();
         var deleted = new List<bool>();
+        var uvFaces = new List<KeyValuePair<int, IReadOnlyList<System.Numerics.Vector2>?>>();
+        var seams = new List<(int, int)>();
         var posed = _meshes.Any(m => m.Mesh.PosedCorners is not null);
         var smooth = _meshes.Any(m => m.Mesh.ShadingMode == ShadingMode.Smooth);
         foreach (var (_, mesh) in _meshes)
         {
             var offset = vertices.Count;
             if (mesh.Style is { } style) colours.AddRange(style.ColoursOffset(faces.Count));
+            if (mesh.Uvs is { } uvs)
+            {
+                // Each mesh's UVs and seams offset as its faces and vertices are, so a mapped face stays mapped.
+                var faceOffset = faces.Count;
+                uvFaces.AddRange(uvs.MappedFaces.Select(f => KeyValuePair.Create(f + faceOffset, uvs.Of(f))));
+                seams.AddRange(uvs.Seams.Select(e => (e.Lo + offset, e.Hi + offset)));
+            }
             vertices.AddRange(mesh.Vertices);
             deleted.AddRange(Enumerable.Range(0, mesh.Vertices.Count).Select(mesh.IsVertexDeleted));
             faces.AddRange(mesh.Faces.Select(f => f.Map(v => v + offset)));
@@ -285,6 +294,10 @@ public sealed class Model
         // A flat piece keeps its face-centre spikes beside a smooth one, so the combined mesh says which faces are flat.
         var combined = PolygonMesh.Assemble([.. vertices], [.. faces], shade, posed ? [.. corners] : null,
             (smooth || posed) && flat.Contains(true) ? [.. flat] : null, deleted.Contains(true) ? [.. deleted] : null);
-        return colours.Count == 0 ? combined : combined.WithStyle(FaceStyle.OfColours(colours));
+        var styled = colours.Count == 0 ? combined : combined.WithStyle(FaceStyle.OfColours(colours));
+        // No mesh with UVs or seams gives a combined mesh without them, as before.
+        return uvFaces.Count == 0 && seams.Count == 0
+            ? styled
+            : styled.WithUvs(MeshUvs.None.WithFaces(uvFaces).WithSeams(seams, seam: true));
     }
 }
