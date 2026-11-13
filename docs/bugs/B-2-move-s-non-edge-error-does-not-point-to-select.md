@@ -4,7 +4,7 @@ description: >-
 ---
 # B-2 — move's non-edge error does not point to select
 
-**Status:** In Progress
+**Status:** Fixed
 
 **Severity:** Major
 
