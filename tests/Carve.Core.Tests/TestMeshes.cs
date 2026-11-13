@@ -57,6 +57,56 @@ internal static class TestMeshes
         return Make(vertices, faces);
     }
 
+    /// <summary>The barrel's seams (T-56): the four vertical edges at -Z and both cap rings.</summary>
+    public static readonly (int A, int B)[] BarrelSeams =
+    [
+        (2, 10), (10, 18), (18, 26), (26, 34),
+        .. Enumerable.Range(0, 8).Select(k => (k, (k + 1) % 8)),
+        .. Enumerable.Range(0, 8).Select(k => (32 + k, 32 + (k + 1) % 8)),
+    ];
+
+    /// <summary>The barrel with <see cref="BarrelSeams"/> marked: three islands, the side (32 faces) and both caps.</summary>
+    public static PolygonMesh SeamedBarrel() => Barrel().WithUvs(MeshUvs.None.WithSeams(BarrelSeams, true));
+
+    /// <summary>The barrel's side, faces 0 to 31 only: a tube with two boundary loops and no seam.</summary>
+    public static PolygonMesh Tube()
+    {
+        var barrel = Barrel();
+        return Make(barrel.Vertices, barrel.Faces.Take(32).Select(f => f.Loop.ToArray()));
+    }
+
+    /// <summary>A flat n x m grid of quads of side 0.25 in the z = 0 plane, wound counterclockwise about +Z; vertex (i, j) is j * (n + 1) + i.</summary>
+    public static PolygonMesh Grid(int n, int m)
+    {
+        var vertices = new List<Vector3>();
+        for (var j = 0; j <= m; j++)
+            for (var i = 0; i <= n; i++)
+                vertices.Add(new Vector3(0.25f * i, 0.25f * j, 0));
+        var faces = new List<int[]>();
+        for (var j = 0; j < m; j++)
+            for (var i = 0; i < n; i++)
+            {
+                var a = j * (n + 1) + i;
+                faces.Add([a, a + 1, a + n + 2, a + n + 1]);
+            }
+        return Make(vertices, faces);
+    }
+
+    /// <summary>A strip of four 0.5 m quads, folded 90 degrees along its middle rung (x = 1): flat along +X, then up +Z.</summary>
+    public static PolygonMesh BentStrip()
+    {
+        var vertices = new List<Vector3>();
+        for (var k = 0; k <= 4; k++)
+        {
+            var p = k <= 2 ? new Vector3(0.5f * k, 0, 0) : new Vector3(1, 0, 0.5f * (k - 2));
+            vertices.Add(p);
+            vertices.Add(p + new Vector3(0, 0.5f, 0));
+        }
+        var faces = new List<int[]>();
+        for (var k = 0; k < 4; k++) faces.Add([2 * k, 2 * k + 2, 2 * k + 3, 2 * k + 1]);
+        return Make(vertices, faces);
+    }
+
     /// <summary>
     /// The leaky shed: a gabled house with every fault once, for check and select to find. samples/leaky-shed.carve is
     /// this mesh, kept equal by a test. T-27 and T-28 build on these ids; T-23's As built lists them.
