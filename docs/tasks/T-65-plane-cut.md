@@ -55,7 +55,7 @@ An agent slices a mesh with a plane: it splits it in place, or cuts one side awa
   - a plane that touches no face;
   - a cut that would leave nothing.
 
-  A face lying in the plane is not split: with `keep`, it goes with the side its normal points to.
+  A face lying in the plane is not split: with `keep`, it goes with the side its normal points to (superseded by the ruling of 2026-11-13 in As built: it stays whichever side is kept).
 
 **Server.**
 
@@ -242,6 +242,8 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
 1. `created` lists only live ids, so a far-side piece appears in `split` and `deleted` but not in `created`, as built.
 2. Fill caps get no colour and no groups, as built.
 3. A non-manifold cut border is chained by lowest vertex id, as built, with a test and a break showing it failing (both above).
+
+**The person's ruling (2026-11-13), RV-31 round 1:** a face lying in a `plane_cut`'s plane stays untouched. It keeps its id and colour, no cap is laid over it, and it stays whichever side is kept, since it is the border. This replaces "a face with every corner on the plane goes with its normal" (Scope and *keep above/below* below record the earlier reading). Built in `PlaneCut.Cut`: a face in the plane is never deleted; for the border, one facing into the kept side counts with the deleted faces (it is the cut-away side's surface), one facing out of it as any kept face, so the cap fills only what the face leaves open. The cube cut at y = 1 keeps face 3 with either side and adds no cap; the L-block cut at its step keeps the step's face 4 and caps only the tower's section. Tests `AFaceInThePlaneIsNotSplitAndStaysUntouchedWhicheverSideIsKept` (replacing the earlier `...GoesWithTheSideItsNormalPointsTo`) and `ACapBesideAFaceInThePlaneFillsOnlyTheCutAndNotThatFace`; the break is in `artifacts/review/RV-31/breaks-A.log`.
 
 **Third agent: Opus (claude-opus-5-5).** Recorded the rulings, added the non-manifold test and its break, and ran the GPU suites on the final code commit.
 

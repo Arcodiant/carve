@@ -185,25 +185,59 @@ public class PlaneCutTests
     }
 
     [Fact]
-    public void AFaceInThePlaneIsNotSplitAndGoesWithTheSideItsNormalPointsTo()
+    public void AFaceInThePlaneIsNotSplitAndStaysUntouchedWhicheverSideIsKept()
     {
+        // Ruled 2026-11-13: a face in the plane is the border. It keeps its id and colour, and no cap is laid over it.
         var top = new Vector3(0, 1, 0);
+        var red = TestMeshes.Cube().WithStyle(FaceStyle.None.WithColour([3], "#ff0000"));
 
-        var both = PlaneCut.Cut(TestMeshes.Cube(), top, Up);
+        var both = PlaneCut.Cut(red, top, Up);
         Assert.Empty(both.Edit.Split);
         Assert.Equal(6, Ok(both).LiveFaceCount);
 
-        var below = PlaneCut.Cut(TestMeshes.Cube(), top, Up, PlaneKeep.Below);
+        var below = PlaneCut.Cut(red, top, Up, PlaneKeep.Below);
         var m = Ok(below);
-        Assert.Equal([3], below.Edit.Deleted.Faces);
+        Assert.Empty(below.Edit.Deleted.Faces);
         Assert.Empty(below.Edit.Deleted.Vertices);
-        Assert.Equal([6], below.Edit.NewFaces);
-        Assert.Equal([2, 3, 7, 6], m.Faces[6].Loop);
+        Assert.Empty(below.Edit.NewFaces);
+        Assert.Equal([3, 7, 6, 2], m.Faces[3].Loop);
+        Assert.Equal("#ff0000", m.Style!.ColourOf(3));
         IsClosed(m);
 
-        var above = PlaneCut.Cut(TestMeshes.Cube(), top, Up, PlaneKeep.Above, fill: false);
-        var ma = Ok(above);
-        Assert.Equal([3], ma.LiveFaces);
+        foreach (var fill in new[] { true, false })
+        {
+            var above = PlaneCut.Cut(red, top, Up, PlaneKeep.Above, fill: fill);
+            var ma = Ok(above);
+            Assert.Equal([3], ma.LiveFaces);
+            Assert.Empty(above.Edit.NewFaces);
+            Assert.Equal("#ff0000", ma.Style!.ColourOf(3));
+        }
+
+        var floor = PlaneCut.Cut(TestMeshes.Cube(), Vector3.Zero, Up, PlaneKeep.Above);
+        var mf = Ok(floor);
+        Assert.Empty(floor.Edit.Deleted.Faces);
+        Assert.Empty(floor.Edit.NewFaces);
+        Assert.Equal([0, 1, 5, 4], mf.Faces[2].Loop);
+    }
+
+    [Fact]
+    public void ACapBesideAFaceInThePlaneFillsOnlyTheCutAndNotThatFace()
+    {
+        // The L-block cut at its step's height: side 4 (the step's top, [2, 3, 9, 8]) lies in the plane. Either side kept,
+        // it stays, and the cap is the tower's section alone, on corners 3 and 9 and the two made on side 7.
+        foreach (var keep in new[] { PlaneKeep.Above, PlaneKeep.Below })
+        {
+            var r = PlaneCut.Cut(TestMeshes.LBlock(), new Vector3(0, 1, 0), Up, keep);
+            var m = Ok(r);
+            Assert.Equal([2, 3, 9, 8], m.Faces[4].Loop);
+            Assert.DoesNotContain(4, r.Edit.Deleted.Faces);
+            var cap = Assert.Single(r.Edit.NewFaces, f => m.Faces[f].Corners.All(c => MathF.Abs(m.Vertices[c].Y - 1) < 1e-6f));
+            Assert.Equal(4, m.Faces[cap].Corners.Count);
+            Assert.Contains(3, m.Faces[cap].Corners);
+            Assert.Contains(9, m.Faces[cap].Corners);
+            Assert.DoesNotContain(2, m.Faces[cap].Corners);
+            Assert.DoesNotContain(8, m.Faces[cap].Corners);
+        }
     }
 
     [Fact]
