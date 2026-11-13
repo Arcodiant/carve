@@ -21,7 +21,7 @@ namespace Carve.Core;
 internal static class Subdivision
 {
     /// <summary>A mesh's geometry and its carried attributes, between levels.</summary>
-    internal sealed record Level(Vector3[] Vertices, int[][] Faces, FaceStyle? Style, VertexWeights? Weights, MeshShade? Shade);
+    internal sealed record Level(Vector3[] Vertices, int[][] Faces, FaceStyle? Style, VertexWeights? Weights, MeshShade? Shade, MeshUvs? Uvs = null);
 
     internal static Level Once(Level input)
     {
@@ -148,6 +148,37 @@ internal static class Subdivision
             outShade = MeshShade.Of(shade.Mode, halves);
         }
 
+        // UVs are linear in their own face (T-53): child k of a mapped face is [u_k, (u_k + u_k+1) / 2, mean, (u_k-1 + u_k) / 2],
+        // worked in double and rounded once; an unmapped face's children are unmapped. A seam goes to both halves of its edge,
+        // as a hard mark does, but never makes an edge sharp, so positions do not depend on UVs.
+        MeshUvs? outUvs = null;
+        if (input.Uvs is { } uvs)
+        {
+            var mapped = new List<KeyValuePair<int, IReadOnlyList<Vector2>?>>();
+            foreach (var (f, added) in children)
+            {
+                if (uvs.Of(f) is not { } u) continue;
+                var n = u.Count;
+                double mx = 0, my = 0;
+                foreach (var c in u) { mx += c.X; my += c.Y; }
+                var mean = new Vector2((float)(mx / n), (float)(my / n));
+                Vector2 Mid(Vector2 a, Vector2 b) => new((float)(((double)a.X + b.X) / 2), (float)(((double)a.Y + b.Y) / 2));
+                for (var k = 0; k < n; k++)
+                {
+                    Vector2[] child = [u[k], Mid(u[k], u[(k + 1) % n]), mean, Mid(u[(k + n - 1) % n], u[k])];
+                    mapped.Add(KeyValuePair.Create(k == 0 ? f : added[k - 1], (IReadOnlyList<Vector2>?)child));
+                }
+            }
+            var seams = new List<(int, int)>();
+            foreach (var (lo, hi) in uvs.Seams)
+            {
+                if (!edgeIndex.TryGetValue((lo, hi), out var e)) continue;
+                seams.Add((lo, v0 + f0 + e));
+                seams.Add((hi, v0 + f0 + e));
+            }
+            outUvs = MeshUvs.None.WithFaces(mapped).WithSeams(seams, true);
+        }
+
         VertexWeights? weights = null;
         if (input.Weights is { } w)
         {
@@ -161,7 +192,7 @@ internal static class Subdivision
             weights = VertexWeights.Of(blended);
         }
 
-        return new Level(positions, [.. outFaces, .. appended], style, weights, outShade);
+        return new Level(positions, [.. outFaces, .. appended], style, weights, outShade, outUvs);
     }
 
     /// <summary>A weighted sum of vertices, kept in the order its terms were first added so its sums are repeatable.</summary>
@@ -195,6 +226,23 @@ internal static class Subdivision
                 x += c * verts[v].X; y += c * verts[v].Y; z += c * verts[v].Z;
             }
             return new Vector3((float)x, (float)y, (float)z);
+        }
+
+        /// <summary>
+        /// This stencil over the UVs <paramref name="uv"/> gives, summed in double and rounded once (T-53); null when a term's
+        /// vertex has none. A stencil of one term gives that UV exactly.
+        /// </summary>
+        public Vector2? Apply(Func<int, Vector2?> uv)
+        {
+            double x = 0, y = 0;
+            foreach (var v in _order)
+            {
+                if (uv(v) is not { } at) return null;
+                if (_order.Count == 1) return at;
+                var c = _terms[v];
+                x += c * at.X; y += c * at.Y;
+            }
+            return new Vector2((float)x, (float)y);
         }
 
         /// <summary>

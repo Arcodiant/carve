@@ -26,6 +26,25 @@ public class ModelStoreTests
     }
 
     [Fact]
+    public void Undo_restores_uvs_and_seams_with_the_rest_of_the_mesh()
+    {
+        // T-53: UVs and seams live on the mesh, so the snapshot undo keeps them with no code of its own.
+        var store = new ModelStore();
+        var cube = TestMeshes.Cube().WithUvs(MeshUvs.None.WithFace(1, [new(0, 0), new(1, 0), new(1, 1), new(0, 1)]).WithSeams([(0, 1)], true));
+        store.Push(cube, "define_mesh");
+        Assert.NotNull(store.Edit("extrude", m => MeshEdits.Extrude(m, [1], 0.5f), out _));
+        Assert.NotSame(cube.Uvs, store.Current.Mesh!.Uvs);
+        Assert.NotNull(store.Edit("delete", m => MeshDelete.Delete(m, null, [1]), out _));
+        Assert.False(store.Current.Mesh!.Uvs?.IsMapped(1) ?? false);
+
+        store.Undo();
+        Assert.True(store.Current.Mesh!.Uvs!.IsMapped(1));
+        store.Undo();
+        Assert.Same(cube.Uvs, store.Current.Mesh!.Uvs);
+        Assert.Equal([(0, 1)], store.Current.Mesh!.Seams);
+    }
+
+    [Fact]
     public void Undo_steps_back_to_the_older_mesh_and_raises_the_version_by_one()
     {
         var store = new ModelStore();

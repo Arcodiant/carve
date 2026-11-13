@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Carve.Core;
 
 /// <summary>
@@ -13,7 +15,7 @@ namespace Carve.Core;
 /// <para>The outer loop starts at the first corner of the survivor's own outer loop that is still on it (else at its
 /// lowest vertex id); each hole starts at its lowest vertex id, and the holes are in order of that id.</para>
 /// <para>The survivor keeps its colour and groups. A listed face of another colour (no colour counts as one) is a
-/// warning naming it, never an error. A hard mark on a dissolved edge goes with the edge. A non-planar result is the
+/// warning naming it, never an error. A hard mark or a seam on a dissolved edge goes with the edge. The merged face keeps UVs only when the listed faces' agree at every vertex (T-53); otherwise they are dropped with a warning. A non-planar result is the
 /// report's non-planar warning, as define_mesh's is.</para>
 /// </remarks>
 public static class FaceMerge
@@ -26,7 +28,7 @@ public static class FaceMerge
     /// same way (mixed winding), and a result that is not one face (faces touching at a vertex only, a closed shell, two
     /// outlines). The result is also refused by <see cref="PolygonMesh.Edit"/>'s validation, as define_mesh would be.
     /// </summary>
-    /// <param name="warnings">The fold warnings, for each listed face whose normal is 90 degrees or more from the merged face's, then the colour warnings (<c>faces[n]: ...</c>); empty when neither applies.</param>
+    /// <param name="warnings">The fold warnings, for each listed face whose normal is 90 degrees or more from the merged face's, then the colour warnings (<c>faces[n]: ...</c>), then a warning when the listed faces' UVs are dropped (T-53); empty when none applies.</param>
     public static EditResult Merge(PolygonMesh mesh, IEnumerable<int> faces, out IReadOnlyList<string> warnings)
     {
         warnings = [];
@@ -159,8 +161,10 @@ public static class FaceMerge
         var others = listed.Where(f => f != survivor).ToArray();
 
         var result = mesh.Edit(reshapedFaces: [KeyValuePair.Create(survivor, merged)], deletedVertices: gone, deletedFaces: others);
-        var edit = EditResult.From(mesh, result, [], [], [], [], new DeletedElements(gone, others));
-        if (edit.Succeeded) warnings = [.. FoldWarnings(mesh, listed, survivor, PolygonMesh.NewellVector(mesh.Vertices, merged.Loop)), .. ColourWarnings(mesh, survivor, others)];
+        var mergedUvs = MergedUvs(mesh, listed, merged);
+        var uvFaces = mesh.Uvs is null ? null : new Dictionary<int, IReadOnlyList<Vector2>?> { [survivor] = mergedUvs };
+        var edit = EditResult.From(mesh, result, [], [], [], [], new DeletedElements(gone, others), uvFaces);
+        if (edit.Succeeded) warnings = [.. FoldWarnings(mesh, listed, survivor, PolygonMesh.NewellVector(mesh.Vertices, merged.Loop)), .. ColourWarnings(mesh, survivor, others), .. UvWarnings(mesh, listed, survivor, mergedUvs)];
         return edit;
 
         static EditResult NotOne(string why) =>
@@ -181,6 +185,39 @@ public static class FaceMerge
             if (ml == 0 || nl == 0 || (n.X * m.X + n.Y * m.Y + n.Z * m.Z) / (nl * ml) < 1e-6)
                 yield return MeshEdits.Invariant($"faces[{f}]: its normal is 90 degrees or more from the merged faces[{survivor}]'s, so the merged face folds back over it");
         }
+    }
+
+    // The merged face keeps UVs only when every listed face is mapped and they agree bit for bit at every vertex of the
+    // merged face that more than one of them uses (the person's ruling 3c, 2026-11-13); otherwise it is unmapped.
+    private static Vector2[]? MergedUvs(PolygonMesh mesh, IEnumerable<int> listed, Face merged)
+    {
+        if (mesh.Uvs is not { } uvs || listed.Any(f => !uvs.IsMapped(f))) return null;
+        var corners = new Vector2[merged.Corners.Count];
+        for (var c = 0; c < corners.Length; c++)
+        {
+            var v = merged.Corners[c];
+            Vector2? at = null;
+            foreach (var f in listed)
+            {
+                var face = mesh.Faces[f];
+                if (!face.Corners.Contains(v)) continue;
+                var uv = uvs.Of(f)![face.CornerOf(v)];
+                if (at is { } had && (BitConverter.SingleToInt32Bits(had.X) != BitConverter.SingleToInt32Bits(uv.X)
+                    || BitConverter.SingleToInt32Bits(had.Y) != BitConverter.SingleToInt32Bits(uv.Y))) return null;
+                at = uv;
+            }
+            corners[c] = at!.Value;
+        }
+        return corners;
+    }
+
+    private static IEnumerable<string> UvWarnings(PolygonMesh mesh, IEnumerable<int> listed, int survivor, Vector2[]? merged)
+    {
+        if (merged is not null || mesh.Uvs is not { } uvs || !listed.Any(uvs.IsMapped)) yield break;
+        var unmapped = listed.Where(f => !uvs.IsMapped(f)).ToArray();
+        yield return unmapped.Length > 0
+            ? MeshEdits.Invariant($"faces[{unmapped[0]}]: it has no UVs, so the merged faces[{survivor}]'s UVs are dropped")
+            : MeshEdits.Invariant($"faces[{survivor}]: its UVs and those of the faces merged with it differ at a shared vertex, so the merged face's UVs are dropped");
     }
 
     private static IReadOnlyList<string> ColourWarnings(PolygonMesh mesh, int survivor, IEnumerable<int> others)

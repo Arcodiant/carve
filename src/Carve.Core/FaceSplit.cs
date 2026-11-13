@@ -248,7 +248,7 @@ public static class FaceSplit
         var result = mesh.Edit(reshapedFaces: reshaped, addedVertices: added, addedFaces: newFaces);
         if (!result.Succeeded) return new FaceSplitResult(EditResult.Refused(result.Errors), []);
 
-        var edited = Carry(mesh, result.Mesh!, chains, stencils, made);
+        var edited = Carry(mesh, result.Mesh!, chains, stencils, made, reshaped.Keys);
         var newVertexIds = Enumerable.Range(verts.Count, added.Count).ToArray();
         var newFaceIds = Enumerable.Range(mesh.Faces.Count, newFaces.Count).ToArray();
         return new FaceSplitResult(EditResult.Made(edited, [], newVertexIds, newFaceIds, split: split), segments);
@@ -550,8 +550,50 @@ public static class FaceSplit
         return false;
     }
 
-    /// <summary>Colours, groups, weights and hard edges carried onto the split mesh.</summary>
+    /// <summary>Colours, groups, weights, hard edges, UVs and seams carried onto the split mesh.</summary>
     private static PolygonMesh Carry(PolygonMesh source, PolygonMesh edited, Dictionary<(int Lo, int Hi), List<int>> chains,
+        List<Subdivision.Stencil> stencils, List<(int Face, IReadOnlyList<int> Added)> made, IEnumerable<int> reshaped)
+        => CarryUvs(source, CarryRest(source, edited, chains, stencils, made), chains, stencils, made, reshaped);
+
+    /// <summary>
+    /// UVs and seams carried onto the split mesh (T-53, the person's rulings 3a and 4): every reshaped face and every piece
+    /// takes its UVs from its source face, if that was mapped. A kept corner keeps the source face's UV at that vertex; a new
+    /// vertex takes its stencil over the source face's own UVs (linear by fraction on an edge, barycentric inside a face),
+    /// worked in each face apart, so a split in the texture stays split. A split seam's pieces stay seams, and the segments'
+    /// new edges are not seams, as hard edges carry.
+    /// </summary>
+    private static PolygonMesh CarryUvs(PolygonMesh source, PolygonMesh mesh, Dictionary<(int Lo, int Hi), List<int>> chains,
+        List<Subdivision.Stencil> stencils, List<(int Face, IReadOnlyList<int> Added)> made, IEnumerable<int> reshaped)
+    {
+        if (source.Uvs is not { } uvs) return mesh;
+        var from = reshaped.Select(f => (Id: f, Source: f)).Concat(made.SelectMany(m => m.Added.Select(a => (Id: a, Source: m.Face))));
+        var faces = new List<KeyValuePair<int, IReadOnlyList<Vector2>?>>();
+        foreach (var (id, f) in from)
+        {
+            if (uvs.Of(f) is not { } own) continue;
+            var sourceFace = source.Faces[f];
+            Vector2? At(int v) => v < source.Vertices.Count
+                ? sourceFace.Corners.Contains(v) ? own[sourceFace.CornerOf(v)] : null
+                : stencils[v - source.Vertices.Count].Apply(At);
+            var corners = mesh.Faces[id].Corners.Select(At).ToArray();
+            // A corner whose stencil reaches outside the source face has no UV there: the face is left unmapped rather than guessed.
+            faces.Add(KeyValuePair.Create(id, corners.All(c => c.HasValue) ? (IReadOnlyList<Vector2>?)corners.Select(c => c!.Value).ToArray() : null));
+        }
+        var carried = uvs.WithFaces(faces);
+        var halves = new List<(int, int)>();
+        var whole = new List<(int, int)>();
+        foreach (var ((lo, hi), chain) in chains)
+        {
+            if (!uvs.IsSeam(lo, hi)) continue;
+            whole.Add((lo, hi));
+            var path = chain.Prepend(lo).Append(hi).ToArray();
+            for (var i = 0; i + 1 < path.Length; i++) halves.Add((path[i], path[i + 1]));
+        }
+        return mesh.WithUvs(whole.Count == 0 ? carried : carried.WithSeams(whole, false).WithSeams(halves, true));
+    }
+
+    /// <summary>Colours, groups, weights and hard edges carried onto the split mesh.</summary>
+    private static PolygonMesh CarryRest(PolygonMesh source, PolygonMesh edited, Dictionary<(int Lo, int Hi), List<int>> chains,
         List<Subdivision.Stencil> stencils, List<(int Face, IReadOnlyList<int> Added)> made)
     {
         var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(made)) : edited;
