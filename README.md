@@ -63,3 +63,16 @@ An agent can question a mesh instead of reading every id out of `get_mesh`.
 - `render` with `labels` (`vertices`, `faces`, `both`) draws the ids on the image, and `highlight` marks named elements. With `views` (a list of the axis views `+x`, `-x`, `+y`, `-y`, `+z`, `-z`, or `front`, `back` and the rest) it returns one contact sheet, e.g. `{"views":["+x","-x","+y","-y","+z","-z"],"labels":"faces","mode":"normals"}`. `mode` also takes `wireframe`.
 
 `samples/leaky-shed.carve` is a broken shed to try them on.
+
+## Cutting
+
+Each of these edits the mesh in place and appends new ids at the end; the examples are on `define_mesh`'s unit cube. A cut is refused, with the point and its distance, when a knife point is off the surface.
+
+- `plane_cut` slices through a plane, keeping a side and capping it: `{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}`. Two cuts with tilted normals make a gable.
+- `loop_cut` runs a ring of new edges round a band of faces, from one edge, at fractions along it: `{"edge":[0,3],"at":[0.5]}`.
+- `knife` draws a path on a face, splitting it; a closed path cuts out a piece with its own id: `{"points":[[0.25,0.25,1],[0.75,0.25,1],[0.75,0.75,1],[0.25,0.75,1]],"closed":true}`.
+- `merge_faces` joins neighbouring coplanar faces into one: `{"faces":[2,3]}`.
+- `delete` removes faces or vertices; their ids stay as `null` (tombstones) in `get_mesh`: `{"faces":[3]}`.
+- `bridge` joins two loops of vertices with a band of faces, which closes an opening left by `delete`: `{"loops":[[0,1,2,3],[4,5,6,7]]}`.
+
+A window through a wall is `knife` on the front and the back, `delete` of both pieces, then `bridge` of the two loops.
