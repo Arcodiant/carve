@@ -77,10 +77,8 @@ internal sealed class LoopCutStage : ICutsStage
         Look(wire, camera, whole, BoxProbes, _ => Fill, lines, "the box with two loops, in the wireframe");
 
         // The edges on the faces turned to the camera are in sight: the loop edges orange, the others not.
-        var dir = Vector3.Normalize(ToVector(Front));
-        var facing = Enumerable.Range(0, whole.Faces.Length).Where(f => !whole.IsDeleted(f) && Vector3.Dot(whole.Normal(f), dir) > 0.2f).ToArray();
-        var seen = AllEdges(whole, facing);
-        Equal("the loop edges in sight", 4, seen.Count(loops.Contains));
+        var seen = whole.FacingEdges(ToVector(Front));
+        Equal("the loop edges in sight", CutsCounts.LoopEdgesInSight, seen.Count(loops.Contains));
         foreach (var (lo, hi) in seen)
         {
             var (a, b) = (whole.Vertices[lo], whole.Vertices[hi]);
@@ -185,10 +183,7 @@ internal sealed class LoopCutStage : ICutsStage
         return null;
     }
 
-    private static (int Lo, int Hi)[] AllEdges(Solid solid, IEnumerable<int>? only = null) =>
-        (only ?? Enumerable.Range(0, solid.Faces.Length).Where(f => !solid.IsDeleted(f)))
-            .SelectMany(f => solid.Faces[f].Loop.Select((v, k) => (A: v, B: solid.Faces[f].Loop[(k + 1) % solid.Faces[f].Loop.Length])))
-            .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
+    private static (int Lo, int Hi)[] AllEdges(Solid solid) => solid.AllEdges();
 
     /// <summary>Each face's shade, read at the first probe that surely shows it.</summary>
     private static Func<int, Rgb?> Shades(ScenarioFrame frame, Camera camera, Solid solid, (string Name, Vector3 At)[] all)

@@ -119,6 +119,20 @@ internal static class GatehousePlan
         })).Select(e => e.Key).OrderBy(e => e).ToArray();
     }
 
+    /// <summary>gate-7-reveal-labels: the reveal faces the front camera is sure of at their middles. Worked in Core by <c>GatehouseGeometry</c>.</summary>
+    public const int RevealsSeenFromFront = 2;
+
+    /// <summary>The window's reveal: each quad with two corners on each of the walls' planes, inside the window (x 0.3..1.1).</summary>
+    public static int[] Reveal(Solid solid) => Enumerable.Range(0, solid.Faces.Length).Where(f => !solid.IsDeleted(f)
+        && solid.Faces[f].Loop.Length == 4
+        && solid.Faces[f].Loop.Count(v => MathF.Abs(solid.Vertices[v].Z - 0.15f) < 1e-4f) == 2
+        && solid.Faces[f].Loop.Count(v => MathF.Abs(solid.Vertices[v].Z + 0.15f) < 1e-4f) == 2
+        && solid.Faces[f].Loop.All(v => solid.Vertices[v].X is >= 0.3f - 1e-4f and <= 1.1f + 1e-4f && solid.Vertices[v].Y is >= 0.8f - 1e-4f and <= 1.75f + 1e-4f)).ToArray();
+
+    /// <summary>The reveal faces <paramref name="camera"/> is sure of at their middle probe: the ones the labels frame labels.</summary>
+    public static int[] RevealSeen(Solid solid, Camera camera) =>
+        Reveal(solid).Where(f => Seen(solid, camera, Probes(solid).First(p => p.Face == f && p.Name == "middle")) == f).ToArray();
+
     public static IEnumerable<Probe> Probes(Solid solid)
     {
         for (var f = 0; f < solid.Faces.Length; f++)

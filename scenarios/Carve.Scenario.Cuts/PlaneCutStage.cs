@@ -98,12 +98,9 @@ internal sealed class PlaneCutStage : ICutsStage
         Look(wire, front, whole, Probes, _ => Fill, lines, "the cube split by the plane, in the wireframe");
 
         // The edges on the faces turned to the camera (front, top, right) are in sight: the cut ones orange, the others not.
-        var dir = Vector3.Normalize(ToVector(Front));
-        var facing = Enumerable.Range(0, whole.Faces.Length).Where(f => !whole.IsDeleted(f) && Vector3.Dot(whole.Normal(f), dir) > 0.2f).ToArray();
-        var seen = facing.SelectMany(f => whole.Faces[f].Loop.Select((v, k) => (A: v, B: whole.Faces[f].Loop[(k + 1) % whole.Faces[f].Loop.Length])))
-            .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
+        var seen = whole.FacingEdges(ToVector(Front));
         var seenCut = seen.Where(cut.Contains).ToArray();
-        Equal("the cut edges in sight", 3, seenCut.Length);
+        Equal("the cut edges in sight", CutsCounts.PlaneCutEdgesInSight, seenCut.Length);
         foreach (var (lo, hi) in seen)
         {
             var (a, b) = (whole.Vertices[lo], whole.Vertices[hi]);
