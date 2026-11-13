@@ -17,9 +17,6 @@ internal static class CrateLabels
     private const int Tile = 256;
     private const int Gutter = 2;
 
-    /// <summary>The backing darkens a face by at least this.</summary>
-    private const int Backing = 60;
-
     /// <summary>An engine text or dot pixel reads this or more on every channel; nothing under a backing does.</summary>
     private const int White = 250;
 
@@ -226,7 +223,7 @@ internal static class CrateLabels
         return ((int)MathF.Round(from.X), (int)MathF.Round(from.Y), width, 16);
     }
 
-    private static void CheckFaceLabel(ScenarioDriver driver, ScenarioFrame labelled, ScenarioFrame plain, Func<Vector3, Vector2> pixel, Shape shape, int face, string what, int darkenBy = Backing)
+    private static void CheckFaceLabel(ScenarioDriver driver, ScenarioFrame labelled, ScenarioFrame plain, Func<Vector3, Vector2> pixel, Shape shape, int face, string what, int? darkenBy = null)
     {
         var at = pixel(shape.Centre(face));
         var box = IdBox(at, face, centred: true);
@@ -241,10 +238,15 @@ internal static class CrateLabels
             driver.Fail($"{labelled.Name}: {what}'s centre at ({x}, {y}) is a letter's pixel, so it says nothing of the backing");
         }
 
+        // The least darkening, unless a caller sets it: worked from the face's own shade (T-82, the person's ruling of 2026-11-13), the
+        // 0.6 black backing's own darkening less the 10 allowed below. It was a fixed 60, which held while LitMesh lit the lid brighter;
+        // under the PBR material the lid is 157 and 166, which the backing takes to 103 and 109 (darker by 54 and 57, a margin of 44
+        // and 47). A label drawn with no backing darkens by 0 and fails.
         var expected = Backed(shade.G);
-        if (shade.G - seen.G < darkenBy || Math.Abs(seen.G - expected) > 10)
+        var least = darkenBy ?? shade.G - expected - 10;
+        if (shade.G - seen.G < least || Math.Abs(seen.G - expected) > 10)
         {
-            driver.Fail($"{labelled.Name}: {what}'s centre at ({x}, {y}) is {seen} over {shade}: the backing should give {expected}, darker by {darkenBy} or more");
+            driver.Fail($"{labelled.Name}: {what}'s centre at ({x}, {y}) is {seen} over {shade}: the backing should give {expected}, darker by {least} or more");
         }
     }
 

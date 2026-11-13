@@ -39,7 +39,7 @@ Carve's preview looks as the game will. T-47 found `render_glb` frames uniformly
 
 ### Hand-off
 
-Second agent, on Opus 5.5 (the first was Opus 5.5 too). Stopped on a question: under the person's ruling of 2026-11-13 the margins it names now hold, but seven other checks fail, which the ruling says to bring back rather than loosen.
+Second agent, on Opus 5.5 (the first was Opus 5.5 too). Stopped twice on questions; the second is open (below).
 
 **The rulings of 2026-11-13** (recorded word for word from the options chosen):
 1. "Keep light, lower margins": "Keep the scene's light as it is. MinimumStep goes from 10 to about 6, and the soft facet and crease thresholds are re-derived for PBR. Loosens checks, by your ruling."
@@ -52,22 +52,18 @@ Second agent, on Opus 5.5 (the first was Opus 5.5 too). Stopped on a question: u
 
 **Checked:** a local run of every scenario on this commit, then cube, crate and soft again with `ScenarioDriver.Fail` made non-fatal for one uncommitted local run (reverted), so every failing check showed, not only the first. shed, rig, export, character and viewer-cube pass. The crate's colour check passes.
 
-**The question: seven checks outside the ruling fail.** Values after (PBR):
+**Third ruling, 2026-11-13, on the checks outside the first ruling**, "Re-pick points, else lower", word for word as offered: "Where a check samples points, move them to facets or spans far enough apart in n·l that the existing margin holds (cylinder ends, cylinder grade, torso run). Where it can't (the cap's off-by-one, the label backing), lower it, worked from PBR: the cap allows 1, and the backing margin is worked from the face's shade. Each still shown failing on its break." If a re-picked point cannot hold its existing margin either, stop and ask again rather than lower it.
 
-| Scenario | Frame | Check | Seen | Needs |
-|---|---|---|---|---|
-| cube | cylinder-flat, cylinder-smooth, cylinder-subdivided-smooth (ortho, dir 2,2,1) | the cap is one shade (exact pixel equality) | (164,164,161) vs (164,164,162): blue differs by 1 | equal |
-| cube | cylinder-flat, -smooth, -subdivided-smooth, -subdivided-soft-rims | the side at its two ends across the image (`MinimumStep`, the mirror guard) | 127 vs 131 (126 vs 130 soft rims): 4 | 6 |
-| cube | cylinder-smooth | the smooth side grades across one facet (`least: 3`) | 136 vs 134: 2 | 3 |
-| crate | crate-labels-both-front-1024, crate-labels-faces-dir-0.4-2-0.8 | the label backing darkens the lid by 60 or more | 157 to 103 (54), 166 to 109 (57); the backing's own rule, 0.4 of the linear value, gives exactly 103 and 109 | 60 |
-| soft | soft-smooth-rest-front | the smooth torso is a ramp: a run of equal shades of 5 or fewer | 7 (the ramp is shallower under PBR, so it holds a shade longer) | 5 or fewer; flat 10 or more |
+**Done under it (committed with this hand-off):**
+- The light model, checked: the scene light turned with the camera (`ViewFraming.LightOrientation`, light along its -Z), worked in Python, gives the cube front n.l 0.783 / 0.513 / 0.351 and the cylinder (view 2,2,1) cap 0.937, predicted 164 (measured 164); facets 3 and 14 predicted 131 and 127 (measured 131 and 127). Per facet k (centre angle (k + 0.5) x 22.5 degrees), n.l: 0 0.33, 1 0.35, 2 0.31, 3 0.23, 4 0.11, 13 0.03, 14 0.16, 15 0.27; 5 to 12 face away.
+- `CubeScenario.cs`: the side's two ends are now facet 13 (n.l 0.03, 119) against facet 3 (131), 12 apart under `MinimumStep` 6; the smooth grade is taken on facet 14 (t 0.2 against 0.8, n.l 0.09 to 0.21, about 5 apart against `least: 3`), with a flat plateau check added on the same facet; the three cap checks go through `CheckCapOneShade`, within 1 per channel.
+- `CrateLabels.cs`: the backing's least darkening is worked from the face's shade, `shade - Backed(shade) - 10` (44 and 47 for the lid at 157 and 166), unless a caller sets it (the +Z frame keeps 0).
+- `SoftScenario.cs`: the torso's ramp span moves to -0.195 to -0.115 m, by the -X silhouette, where the normal turns fastest per pixel and n.l = 0.35 sin + 0.51 cos changes fastest: the smooth ramp holds a shade 3 pixels at most (5 allowed), flat holds 14 (10 needed).
+- Local run of this tree: **crate passes, soft passes; cube fails** on the one point below.
 
-None is a break: each frame looks as PBR predicts, and the order of shades holds in every one. Ways out, for the person to choose per check:
-1. **Lower these too**, worked from PBR as the ones above were: the cylinder's end-to-end step to about 3 (or `MinimumStep` to 3 there only), the facet grade to 1 or 2, the cap's one-shade check to compare green only or allow 1, the backing to "darker by 45 or more" or a margin worked from the face's own shade (the 0.4-of-linear rule already holds exactly), the smooth torso's run to 7 or fewer (against flat's 10). The cylinder's 4 and the grade's 2 are well below the ruling's "about 6", so this is beyond it.
-2. **Move the cylinder's sampled points** to facets farther apart in n.l, so the end-to-end step comes back above 6 with the check's intent (a mirrored camera draws other facets) kept; and measure the torso's ramp over a span where the PBR gradient still steps every few pixels. Keeps the margins, changes what is sampled.
-3. **Raise the scene's directional light** (about pi times), which the ruling of 2026-11-13 declined; it would bring every margin back.
+**The new question (cube, `cylinder-subdivided-soft-rims-dir-2-2-1-ortho`):** the twice-subdivided soft cylinder rounds in, so facet 13's point (384, 267) is background there ("the soft cylinder's side, on one side of the image at (384, 267) is the background, expected the mesh"). Along that row the pillow's shade runs 130 at x 376, 126 at 378, 123 at 380, then the edge (92 at 382): no point at the image's right end on that row is 6 or more below the other end (130) with any headroom. The other three cylinder frames hold with facet 13. Ways out: (1) for the soft-rims frame only, sample the mirror point lower on the side, where the pillow is upright, and show it holds 6 (not yet tried, needs a run); (2) compare facet 14 against a facet nearer the image's centre (facet 1, about 137) in that frame, which keeps 6 but not "the two ends"; (3) lower that one check to 3 or 4, which the ruling says to ask about.
 
-**Left:** the person's answer; then the remaining checks, each changed check shown failing on its break (a table: `MinimumStep` 6 fails two faces drawn in one shade; the facet 9 fails a smooth torso, the smooth 5 a flat one; the rim break 9 fails an uncreased rim), `verify`, the waystone review of the new baselines (round-1, before and after), As built (the render vs render_glb table is in the first agent's notes below), remove `artifacts/base-src`, `finish`.
+**Left:** the answer and that one check; then the shown-failing table for every changed check (`MinimumStep` 6, facet 9 / smooth 5, rim stage 4 / break 9, the cylinder ends and grade, the cap's 1, the backing, the torso span), a full local run with hashes against `artifacts/review/T-82/hashes-before.txt` (every `.glb`, `.carve` and non-colour look byte-identical), `verify`, the waystone review (round-1, before and after), As built, remove `artifacts/base-src`, `finish`. Second agent stopped at the 60-call checkpoint.
 
 **First agent's hand-off, kept for its figures:**
 

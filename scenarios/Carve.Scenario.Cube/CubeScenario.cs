@@ -260,15 +260,22 @@ public sealed class CubeScenario : IScenario
         var capPoint = CylAt(Facet(1, 0.5f, 1) * new Vector3(0.85f, 1, 0.85f));
         var capOther = CylAt(new Vector3(-0.3f, 1, -0.2f));
         var belowRim = CylAt(Facet(1, 0.5f, 0.85f));
-        var sideMirror = CylAt(Facet(14, 0.5f, 0));              // facing (+x, -z): the one side of the image
+        // The side's two ends across the image, far enough apart in n.l that MinimumStep holds under the PBR material (T-82, the person's
+        // ruling of 2026-11-13: re-pick, else lower). The light turned with this camera gives facet 13 an n.l of 0.03 and facet 3 one of
+        // 0.23, so 119 against 131 (grey 0.72, ambient 0.25, light 0.9 / pi, sRGB); facets 14 and 3 were 127 against 131, 4 apart.
+        var sideMirror = CylAt(Facet(13, 0.5f, 0));              // facing (+x, -z), at the image's right edge: the one side of the image
         var sideOther = CylAt(Facet(3, 0.5f, 0));                // facing (+z): the other side
+        // One smooth facet's grade, taken on facet 14, where n.l climbs fastest among the lit facets (0.09 at its 315 degree end to 0.21 at its
+        // 337.5 degree one): t 0.2 against 0.8 is about 5 apart under PBR. Facet 2, near the light's peak, grades by 2 (T-82).
+        var gradeLow = CylAt(Facet(14, 0.2f, 0));
+        var gradeHigh = CylAt(Facet(14, 0.8f, 0));
 
         var cylFlat = await driver.CaptureAsync("cylinder-flat-dir-2-2-1-ortho", cylView);
         CheckNotBackground(driver, cylFlat, capPoint, "the flat cylinder's top cap");
         CheckNotBackground(driver, cylFlat, belowRim, "the flat cylinder's side, below the rim");
         CheckNotBackground(driver, cylFlat, sideMirror, "the flat cylinder's side, on one side of the image");
         CheckNotBackground(driver, cylFlat, sideOther, "the flat cylinder's side, on the other side of the image");
-        CheckSame(driver, cylFlat, capPoint, capOther, "the flat cap is one shade");
+        CheckCapOneShade(driver, cylFlat, capPoint, capOther, "the flat cap is one shade");
         CheckSame(driver, cylFlat, CylAt(Facet(2, 0.2f, 0)), CylAt(Facet(2, 0.8f, 0)), "the flat side facet is one shade, a plateau");
         CheckDiffers(driver, cylFlat, capPoint, belowRim, "the flat cap against the side below the rim");
         CheckDiffers(driver, cylFlat, sideMirror, sideOther, "the flat side, at its two ends across the image (a mirrored camera draws other facets)");
@@ -283,10 +290,11 @@ public sealed class CubeScenario : IScenario
         Ok(driver, await driver.CallAsync("mark_edges", new { edges = rim }));
 
         var cylSmooth = await driver.CaptureAsync("cylinder-smooth-dir-2-2-1-ortho", cylView);
-        CheckSame(driver, cylSmooth, capPoint, capOther, "the cap keeps one shade, its rim being hard");
+        CheckCapOneShade(driver, cylSmooth, capPoint, capOther, "the cap keeps one shade, its rim being hard");
         if (cylSmooth.Pixel(capPoint.X, capPoint.Y) != cylFlat.Pixel(capPoint.X, capPoint.Y)) driver.Fail($"{cylSmooth.Name}: the hard-rimmed cap should keep its flat shade");
         CheckClose(driver, cylSmooth, edgeLeft, edgeRight, "the smooth side runs on across a facet edge", 2);
-        CheckDiffers(driver, cylSmooth, CylAt(Facet(2, 0.2f, 0)), CylAt(Facet(2, 0.8f, 0)), "the smooth side grades across one facet, where flat is a plateau", 3);
+        CheckSame(driver, cylFlat, gradeLow, gradeHigh, "the flat side facet 14 is one shade, a plateau");
+        CheckDiffers(driver, cylSmooth, gradeLow, gradeHigh, "the smooth side grades across one facet, where flat is a plateau", 3);
         CheckDiffers(driver, cylSmooth, capPoint, belowRim, "the crease where the cap meets the side");
         CheckDiffers(driver, cylSmooth, sideMirror, sideOther, "the smooth side, at its two ends across the image (a mirrored camera draws other facets)");
         CheckBrightestOf(driver, cylSmooth, capPoint, "the cap is the brightest part, so a flipped camera (cap below) fails", sideMirror, sideOther, belowRim);
@@ -307,7 +315,7 @@ public sealed class CubeScenario : IScenario
         Ok(driver, await driver.CallAsync("subdivide", new { levels = 2 }));
         var subSmooth = await driver.CaptureAsync("cylinder-subdivided-smooth-dir-2-2-1-ortho", cylView);
         CheckNotBackground(driver, subSmooth, farRim, "the subdivided cylinder just inside its far top rim, the rim being hard");
-        CheckSame(driver, subSmooth, capPoint, capOther, "the subdivided cap keeps one shade, its rim being hard");
+        CheckCapOneShade(driver, subSmooth, capPoint, capOther, "the subdivided cap keeps one shade, its rim being hard");
         if (subSmooth.Pixel(capPoint.X, capPoint.Y) != cylSmooth.Pixel(capPoint.X, capPoint.Y)) driver.Fail($"{subSmooth.Name}: the hard-rimmed cap should keep the shade it had before subdividing");
         CheckDiffers(driver, subSmooth, capPoint, belowRim, "the crease where the subdivided cap meets the side");
         CheckClose(driver, subSmooth, edgeLeft, edgeRight, "the subdivided side runs on across the old facet edge", 2);
@@ -519,6 +527,15 @@ public sealed class CubeScenario : IScenario
     {
         if (frame.Pixel(a.X, a.Y) != frame.Pixel(b.X, b.Y)) driver.Fail($"{frame.Name}: {what}: {frame.Pixel(a.X, a.Y)} against {frame.Pixel(b.X, b.Y)}");
     }
+
+    /// <summary>
+    /// A flat cap is one shade, to 1 in a channel. Under LitMesh it was equal to the bit; the engine's PBR material adds a specular term
+    /// that follows the view vector, and the orthographic frame keeps the perspective eye, so the cylinder's cap reads (164, 164, 161)
+    /// at one point and (164, 164, 162) at another. Allowed by the person's ruling of 2026-11-13 (T-82): "the cap allows 1". A cap drawn
+    /// smooth through a soft rim grades by far more.
+    /// </summary>
+    private static void CheckCapOneShade(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) a, (int X, int Y) b, string what) =>
+        CheckClose(driver, frame, a, b, what, 1);
 
     /// <summary>Two pixels within <paramref name="most"/> of each other in every channel: a continuous run.</summary>
     private static void CheckClose(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y) a, (int X, int Y) b, string what, int most = 4)

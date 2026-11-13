@@ -271,10 +271,14 @@ public sealed class SoftScenario : IScenario
             }
         }
 
-        // Between the facet edge and the lit centre the shade is a ramp when smooth, however many facets the mesh has (a run of equal
-        // shades of at most 5 pixels), and a plateau per facet when not (flat: 17 or more; flat and subdivided: about 11).
-        var (from, row) = Holding(project(new Vector3(-0.16f, 0.80f, 0.17f)));
-        var (to, _) = Holding(project(new Vector3(-0.08f, 0.80f, 0.17f)));
+        // Across the side facet edge, toward the lit centre, the shade is a ramp when smooth, however many facets the mesh has (a run of
+        // equal shades of at most 5 pixels), and a plateau per facet when not (10 or more). The span starts near the torso's -X silhouette
+        // (T-82, the person's ruling of 2026-11-13: re-pick, else lower): there the surface turns from the camera, so a pixel spans more of
+        // the normal's turn, and its normal (about 56 degrees off +Z toward -X) is where n.l = 0.35 sin + 0.51 cos changes fastest. Under the
+        // PBR material the old span, -0.16 to -0.08, ramped too gently and held a shade for 7 pixels; from -0.195 to -0.115 the smooth ramp
+        // holds one for 3 at most, and flat crosses the facet edge onto a plateau of 14.
+        var (from, row) = Holding(project(new Vector3(-0.195f, 0.80f, 0.17f)));
+        var (to, _) = Holding(project(new Vector3(-0.115f, 0.80f, 0.17f)));
         int run = 1, longest = 1;
         for (var x = from + 1; x <= to; x++)
         {
