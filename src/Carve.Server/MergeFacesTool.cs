@@ -24,7 +24,7 @@ public sealed class MergeFacesTool(ModelStore store)
         + "The lowest listed id survives, reshaped; the others are deleted as tombstones, and so is every vertex of theirs that no live face uses afterwards (a vertex no face used before is kept). "
         + "Every vertex still on the outline stays, even where the outline runs straight through it: no vertex is dissolved. "
         + "The merged face keeps the surviving face's colour and groups; a merged face of another colour is a warning naming it, not an error. A hard edge mark on a dissolved edge goes with the edge. A non-planar result is a warning, as define_mesh's is. "
-        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[ids], faces:[ids]}}. "
+        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[ids], faces:[ids]}, split:[]}. "
         + "Bad input (fewer than two faces, an unknown, deleted or repeated id, faces not connected, mixed winding, a result that is not one face, such as faces touching at a vertex only or closing a shell) "
         + "is a tool error that lists every problem by element; the mesh is left unchanged and nothing is added to undo. One merge is one undo step. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to merge in. "
