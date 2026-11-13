@@ -132,6 +132,21 @@ public class AutoWeightsTests
     }
 
     [Fact]
+    public void A_deleted_vertex_is_neither_weighed_nor_counted_unweighted()
+    {
+        // M-5's delete leaves a tombstone, and drops its weights; weigh must not give it weights again.
+        var s = TwoBones();
+        var lone = Points(new Vector3(0, 0.2f, 0));
+        var mesh = PolygonMesh.Create([.. lone.Vertices, new Vector3(0, 1.3f, 0)], [[1, 2, 3]]).Mesh!;
+        var deleted = MeshDelete.Delete(mesh, [4], null).Mesh!;
+        Assert.True(deleted.IsVertexDeleted(4));
+
+        var w = AutoWeights.Weigh(deleted, s, null, false, out var outcome);
+        Assert.False(w.Has(4));
+        Assert.Equal(new WeighOutcome(4, 0, 0), outcome);
+    }
+
+    [Fact]
     public void Named_bones_weigh_only_the_vertices_nearest_them_and_among_them_alone()
     {
         var s = TwoBones();

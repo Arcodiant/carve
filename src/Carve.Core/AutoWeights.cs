@@ -103,7 +103,7 @@ public static class AutoWeights
         foreach (var v in existing.Vertices) result[v] = [.. existing.Of(v)];
 
         int weighed = 0, kept = 0;
-        for (var v = 0; v < mesh.Vertices.Count; v++)
+        foreach (var v in mesh.LiveVertices)
         {
             var p = Vector3D.From(mesh.Vertices[v]);
             if (bones is not null && Array.BinarySearch(named, Nearest(p, segments)) < 0) continue;
@@ -116,7 +116,7 @@ public static class AutoWeights
             weighed++;
         }
         var weights = VertexWeights.Of(result);
-        outcome = new WeighOutcome(weighed, kept, mesh.Vertices.Count - weights.Count);
+        outcome = new WeighOutcome(weighed, kept, mesh.LiveVertexCount - weights.Count);
         return weights;
     }
 
