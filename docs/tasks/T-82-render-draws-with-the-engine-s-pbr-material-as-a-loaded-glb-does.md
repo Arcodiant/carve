@@ -39,7 +39,7 @@ Carve's preview looks as the game will. T-47 found `render_glb` frames uniformly
 
 ### As built
 
-Three agents, all on Opus 5.5: the first built the PBR path and the unit and regression tests, the second the margins under the person's first and third rulings, the third (this section) the last cube point, the derivations, the shown-failing table, the full run and the review.
+Four agents, all on Opus 5.5: the first built the PBR path and the unit and regression tests, the second the margins under the person's first and third rulings, the third the last cube point, the derivations, the shown-failing table, the full run and the review, the fourth the two `server-regression` tests the scenarios do not cover (the last two rows of the table) and the finish.
 
 **What changed.** `src/Carve.Server/SurfaceMaterial.cs`: `SurfaceMaterial.Of(colour)` is `Material.Pbr(base colour, GlbExport.Metallic, GlbExport.Roughness, doubleSided: false)`, the base colour the exported one; `RenderSystem` uses it for the shaded fill, each colour's submesh and a glb with no material. Wireframe, normals and weights keep `Material.SolidColor`; lines, bones and labels are untouched; a highlighted face in the shaded look is a vertex tint through PBR. D-1, D-6 and `CLAUDE.md` record the ruling.
 
@@ -58,6 +58,8 @@ Three agents, all on Opus 5.5: the first built the PBR path and the unit and reg
 | Cylinder grade: facet 2 to facet 14, `least: 3` | facet 14's n.l runs 0.09 to 0.21 across it, about 5 at t 0.2 and 0.8 | smooth 125 / 129 | smooth drawn flat (the flat frame at the same points): 127 / 127, fails |
 | Cap one shade, within 1 (was exact) | ruling 3 | 164 / 164 on the three hard-rimmed frames (blue 161 / 162) | the rim not hard (the soft-rims frame): 165 against 149, 16, fails |
 | Label backing: least darkening `shade - Backed(shade) - 10`, was 60 | the 0.6 black backing leaves 0.4 of the face's linear light (`Backed`), less the 10 the backed value may be off; a top face at the model's 158 goes to 103, least 45 | lid labels pass | a label with no backing darkens by 0 (the plain frame), fails |
+| `RenderTests.MinimumStep` 10 to 6 (fourth agent; the cube in `server-regression`, ruling 1) | the same cube and views as the scenario's: front +Z n.l 0.513 (147) over +X 0.351 (139), 8 apart; back 159 / 148 / 118 measured, 11 and 30; the darkest face 118 or more stays past `53 + 6` | front 157 / 145 / 137 (the failing run under 10) | the front frame mirrored: +Z 137 against +X 145, fails; flipped: 145 / 145, fails |
+| `NamedMeshTests.IsOrange`: red 150 to 120, red over green 40 to 20, blue under 90 kept (fourth agent, ruling 2) | the tint (1, 0.55, 0.1) as UNORM vertex colour, which the engine's shader multiplies in after lighting, over the lit base (0.72, 0.72, 0.70): the tall box's front face (n.l 0.513) is (145, 110, 47), at the darkest n.l 0.351 (137, 103, 44); the untinted face is (145, 145, 143). Before, red 145 and red over green 35 failed the LitMesh-era rule | `verify` passes; the pixel is in the assertion's message now | the face not highlighted (the cube's front, or the tall box with no tint): red over green 0 and blue 143, fails both; so the cube's face fails `IsOrange`, which the test's second assertion requires |
 
 The break column was worked on this run's frames (a frame mirrored or flipped, or the scenario's own frame of the other shading or crease) and in the light model, not by breaking the product and rerunning.
 
@@ -68,12 +70,3 @@ The break column was worked on this run's frames (a frame mirrored or flipped, o
 **Review:** the person approved both sets (round 1, `C:\Users\andre\artifacts\carve\M-19\T-82\round-1`), with a note on the first: "These all look good - do we get a sky texture to show reflections?" Not done here: the scene has no environment map, and at metallic 0, roughness 1 the material reflects little; left to the person as a question.
 
 **Not checked:** the brim thresholds over the hat's own geometry; the break column by product breaks.
-
-### Hand-off
-
-Third agent, on Opus 5.5, stopped at the 60-call checkpoint. Everything in As built above is done and committed: the soft-rims point (cube passes), the torso span and backing re-derived from the model, the full local run with hashes (all `.glb` and `.carve` byte-identical), both review sets approved, `artifacts/base-src` removed, `cairn lint` clean. The person's note on review set 1, "do we get a sky texture to show reflections?", is unanswered; put it to them (not in scope here).
-
-**Left: `verify` fails on `server-regression`**, two unit-of-render tests the scenarios do not cover (log `C:\Users\andre\AppData\Local\Temp\cairn-test\T-82-J-20261113-090138-459480-20261113-041134-12416.log`):
-- `RenderTests.A_cube_shows_three_faces_in_the_expected_order_on_the_background` (front): "(145, 145, 143) then (137, 137, 136)". `RenderTests.cs` line 12 has its own `MinimumStep = 10`; the person's first ruling ("MinimumStep goes from 10 to about 6") names this constant, and the model's cube front steps by 8 (158 / 147 / 139), so 6 looks within the ruling; check the back view's figures too (cube-back 159 / 148 / 118 measured) and that `low.G >= 53 + MinimumStep` still holds.
-- `NamedMeshTests.Render_labels_and_highlights_the_named_mesh_alone_by_its_own_ids`, line 336: "the tall box's front face is not orange". The highlight is now a PBR-shaded tint (ruling 2), so `IsOrange`'s rule must be re-worked from the model for that face (its n.l under the test's camera, the orange tint as albedo). If the rule has to loosen beyond what ruling 2 covers, ask.
-Then `verify` again, add these two to As built's table (derivation and break), `finish`.
