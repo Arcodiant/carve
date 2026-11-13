@@ -255,7 +255,8 @@ public sealed class SoftScenario : IScenario
     /// shade steps across each; soft, it runs on across them. Under LitMesh the steps were 30 and 31 flat and 5 to 9 soft on a 6 pixel
     /// span, against 20 and 12. Since T-82 the material is the engine's PBR one, whose directional light reaches a face as albedo / pi with
     /// the ambient floor unchanged, so a step the light makes is about 0.43 of LitMesh's (the cube's faces, worked from their n.l): flat
-    /// about 13, soft 2 to 4. The bounds scale with it, by the person's ruling of 2026-11-13: 9 or more flat, 5 or less soft.
+    /// about 13, soft 2 to 4. The bounds scale with it, by the person's ruling of 2026-11-13: 9 or more flat, 5 or less soft. The light
+    /// model worked over the samples' geometry (see the span below) gives flat steps of 13 and 14 and soft ones of 5 and 5.
     /// </summary>
     private static void CheckTorso(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, bool flat)
     {
@@ -273,10 +274,12 @@ public sealed class SoftScenario : IScenario
 
         // Across the side facet edge, toward the lit centre, the shade is a ramp when smooth, however many facets the mesh has (a run of
         // equal shades of at most 5 pixels), and a plateau per facet when not (10 or more). The span starts near the torso's -X silhouette
-        // (T-82, the person's ruling of 2026-11-13: re-pick, else lower): there the surface turns from the camera, so a pixel spans more of
-        // the normal's turn, and its normal (about 56 degrees off +Z toward -X) is where n.l = 0.35 sin + 0.51 cos changes fastest. Under the
-        // PBR material the old span, -0.16 to -0.08, ramped too gently and held a shade for 7 pixels; from -0.195 to -0.115 the smooth ramp
-        // holds one for 3 at most, and flat crosses the facet edge onto a plateau of 14.
+        // (T-82, the person's ruling of 2026-11-13: re-pick, else lower), where the surface turns from the camera fastest per pixel. Worked
+        // from the samples' geometry and the light model (the +z camera's light toward (-0.02, 0.47, 0.89); the shirt's linear colour times
+        // ambient 0.25 plus 0.9 n.l / pi; sRGB; a ray cast per pixel, the soft mesh's corner normals interpolated): flat, the row crosses the
+        // facet edge onto the front facet, one shade for the 16 pixels to the span's end; smooth, it ramps 89 to 101 and holds a shade for 5
+        // pixels at most, where it nears the lit centre. The old span, -0.16 to -0.08, lies wholly in that gentler part. Spans tried further
+        // out leave the soft torso (it is background past about -0.21) or cut the flat plateau to 10.
         var (from, row) = Holding(project(new Vector3(-0.195f, 0.80f, 0.17f)));
         var (to, _) = Holding(project(new Vector3(-0.115f, 0.80f, 0.17f)));
         int run = 1, longest = 1;

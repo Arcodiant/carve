@@ -238,10 +238,10 @@ internal static class CrateLabels
             driver.Fail($"{labelled.Name}: {what}'s centre at ({x}, {y}) is a letter's pixel, so it says nothing of the backing");
         }
 
-        // The least darkening, unless a caller sets it: worked from the face's own shade (T-82, the person's ruling of 2026-11-13), the
-        // 0.6 black backing's own darkening less the 10 allowed below. It was a fixed 60, which held while LitMesh lit the lid brighter;
-        // under the PBR material the lid is 157 and 166, which the backing takes to 103 and 109 (darker by 54 and 57, a margin of 44
-        // and 47). A label drawn with no backing darkens by 0 and fails.
+        // The least darkening, unless a caller sets it, is worked from the face's own shade (T-82, the person's ruling of 2026-11-13): the
+        // 0.6 black backing leaves 0.4 of the face's linear light (Backed), less the 10 the backed value is allowed below. It was a fixed 60,
+        // which held while LitMesh lit the lid brighter. Under the PBR material a face lit as the cube's top (n.l 0.783, grey 0.72) is 158,
+        // which the backing takes to 103, darker by 55, so the least is 45. A label drawn with no backing darkens by 0 and fails.
         var expected = Backed(shade.G);
         var least = darkenBy ?? shade.G - expected - 10;
         if (shade.G - seen.G < least || Math.Abs(seen.G - expected) > 10)
