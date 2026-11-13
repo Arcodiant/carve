@@ -18,15 +18,15 @@ description: >-
 
 ## Cause
 
-`MeshEdits.UnknownElements` in Carve.Core, the one check `move` and `render`'s highlight share for listed elements, wrote the non-edge message as the fault alone (`the 1st listed edge, [3, 9], is not an edge of the mesh`). Pointing to `select` lived only in `MoveTool`'s description, which an agent holding the error does not reread. `loop_cut`, added later (T-66), already ends its own non-edge message with the pointer, so the two disagreed.
+`MeshEdits.UnknownElements` in Carve.Core, the check for listed elements that every edit and `render`'s highlight go through (only `move` and the highlight pass edges), wrote the non-edge message as the fault alone (`the 1st listed edge, [3, 9], is not an edge of the mesh`). Pointing to `select` lived only in `MoveTool`'s description, which an agent holding the error does not reread. `loop_cut`, added later (T-66), already ends its own non-edge message with the pointer, so the two disagreed.
 
 ## Fix
 
-`UnknownElements` now appends `; select with kind edges lists the real edges` to the non-edge message, the same words `loop_cut` uses, facts only as ruled in RV-20 (2026-11-07). The edges at the pair's vertices are not named: the bug's Fix offered that as a "perhaps", and the pointer alone matches the ruling and `loop_cut`. Every caller of the check, `move` and `render`'s highlight, gets the new text.
+`UnknownElements` now appends `; select with kind edges lists the real edges` to the non-edge message, the same words `loop_cut` uses, facts only as ruled in RV-20 (2026-11-07). The edges at the pair's vertices are not named: the bug's Fix offered that as a "perhaps", and the pointer alone matches the ruling and `loop_cut`. Of the check's callers, only `move` and `render`'s highlight pass edges, so they are the two that show the new text; `merge_faces`, `delete` and `plane_cut` call it with no edges.
 
 ## Verified by
 
 - `MoveTests.RefusesAPairThatIsNotAnEdge` now asserts the message ends with the pointer; it failed before the fix (message ended at `is not an edge of the mesh`) and passes after.
 - `RenderTests.A_bad_highlight_is_a_tool_error_and_the_mesh_is_untouched` (the `[[0,6]]` case) asserts the full new text through the real `carve`.
-- The shed scenario's error path (`ShedScenario.cs`, `[3, 9]` and `is not an edge`) still holds; it is text-only, so no frames changed.
+- `EditToolTests` asserts the pointer on `move`'s own tool error through the real `carve` (`[[0,6]]`), and the shed scenario's error path (`ShedScenario.cs`, the symptom's own `[3, 9]`) now expects it too. The change is to error text only; the scenario's frames were not looked at.
 - `cairn bug B-2 verify`.
