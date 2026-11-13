@@ -78,6 +78,39 @@ public sealed class GetWeightsToolTests
     }
 
     [Fact]
+    public async Task A_cuts_blended_weights_read_back_and_a_plain_weigh_keeps_them()
+    {
+        // M-5's cuts blend new vertices' weights from their edge's ends (T-67); M-17's get_weights must read them back and a
+        // weigh without replace must keep them, as it keeps any existing weight (D-6).
+        using var carve = await StartAsync();
+        Ok(await carve.CallToolAsync("set_weights", """{"vertices":[0,1,4,5],"weights":{"Hips":1}}"""));
+        Ok(await carve.CallToolAsync("set_weights", """{"vertices":[2,3,6,7],"weights":{"Head":1}}"""));
+        var cut = Body(await carve.CallToolAsync("loop_cut", """{"edge":[0,3],"at":[0.25]}"""));
+        var created = cut.GetProperty("created").GetProperty("vertices").EnumerateArray().Select(v => v.GetInt32()).ToArray();
+        Assert.Equal([8, 9, 10, 11], created);
+
+        void Blended(JsonElement read)
+        {
+            Assert.Equal(12, read.GetProperty("summary").GetProperty("vertices").GetInt32());
+            Assert.Equal(0, read.GetProperty("summary").GetProperty("unweighted").GetInt32());
+            var byId = read.GetProperty("vertices").EnumerateArray().ToDictionary(v => v.GetProperty("vertex").GetInt32(), v => v.GetProperty("weights"));
+            foreach (var v in created)
+            {
+                Assert.Equal(0.75, byId[v].GetProperty("Hips").GetDouble(), 12);
+                Assert.Equal(0.25, byId[v].GetProperty("Head").GetDouble(), 12);
+            }
+        }
+
+        Blended(Body(await carve.CallToolAsync("get_weights", "{}")));
+        var weighed = Body(await carve.CallToolAsync("weigh", "{}"));
+        Assert.Equal((0, 12, 0), (weighed.GetProperty("weighed").GetInt32(), weighed.GetProperty("kept").GetInt32(), weighed.GetProperty("unweighted").GetInt32()));
+        Blended(Body(await carve.CallToolAsync("get_weights", "{}")));
+
+        var named = Body(await carve.CallToolAsync("get_weights", """{"vertices":[8]}"""));
+        Assert.Equal(0.75, named.GetProperty("vertices")[0].GetProperty("weights").GetProperty("Hips").GetDouble(), 12);
+    }
+
+    [Fact]
     public async Task A_group_override_after_weigh_reads_back_as_set_and_the_rest_as_weighed_with_no_warnings()
     {
         using var carve = await StartAsync();
