@@ -12,11 +12,12 @@
     <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
   </ItemGroup>
 
-  <!-- The shed's checks and camera, the Cuts scenario's ray test (Solid), and the Crate scenario's colour rule (T-30). -->
+  <!-- The shed's checks and camera, the Cuts scenario's ray test (Solid) and shared checks, and the Crate scenario's colour rule (T-30). -->
   <ItemGroup>
     <Compile Include="../Carve.Scenario.Shed/ShedChecks.cs" Link="ShedChecks.cs" />
     <Compile Include="../Carve.Scenario.Shed/ShedGeometry.cs" Link="ShedGeometry.cs" />
     <Compile Include="../Carve.Scenario.Cuts/CutsGeometry.cs" Link="CutsGeometry.cs" />
+    <Compile Include="../Carve.Scenario.Cuts/CutsChecks.cs" Link="CutsChecks.cs" />
     <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
   </ItemGroup>
 

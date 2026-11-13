@@ -5,6 +5,7 @@ using Carve.Extensibility;
 using Carve.Scenario.Cuts;
 using Microsoft.Extensions.DependencyInjection;
 using static Carve.Scenario.Shed.Checks;
+using static Carve.Scenario.Cuts.CutsChecks;
 
 namespace Carve.Scenario.Gatehouse;
 
@@ -191,12 +192,5 @@ public sealed class GatehouseScenario : IScenario
         var found = Enumerable.Range(0, s.Faces.Length).Where(f => !s.IsDeleted(f) && match(f)).ToArray();
         Equal($"{what}: one face", 1, found.Length);
         return found.Length == 1 ? found[0] : -1;
-    }
-
-    private static void Summary(string what, JsonElement result, int vertices, int faces, bool closed)
-    {
-        Equal($"{what}: vertices", vertices, result.GetProperty("vertices").GetInt32());
-        Equal($"{what}: faces", faces, result.GetProperty("faces").GetInt32());
-        Equal($"{what}: closed", closed, result.GetProperty("closed").GetBoolean());
     }
 }

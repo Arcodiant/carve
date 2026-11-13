@@ -3,6 +3,7 @@ using System.Text.Json;
 using Carve.Debug;
 using Carve.Scenario.Shed;
 using static Carve.Scenario.Shed.Checks;
+using static Carve.Scenario.Cuts.CutsChecks;
 
 namespace Carve.Scenario.Cuts;
 
@@ -64,10 +65,6 @@ internal sealed class MergeBridgeStage : ICutsStage
         .. Signs().Select(s => ("outside the plate, by its corner", new Vector3(1.15f * s.X, 1.15f * s.Y, 0))),
         .. Sides().Select(s => ("outside the plate, by its side", new Vector3(1.15f * s.X, 1.15f * s.Y, 0))),
     ];
-
-    private static (float X, float Y)[] Signs() => [(-1, -1), (1, -1), (1, 1), (-1, 1)];
-
-    private static (float X, float Y)[] Sides() => [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
     public async Task RunAsync(ScenarioDriver driver)
     {
@@ -145,15 +142,6 @@ internal sealed class MergeBridgeStage : ICutsStage
                 var (x, y) = flat.Pixel(Vector3.Lerp(centre, ToVector(PlateVertices[other]), t));
                 Colour(wire, (x, y), Fill, Exact, $"the dissolved edge 4-{other}, {t:0.0} along it");
             }
-    }
-
-    private static Vector3 ToVector(double[] d) => new((float)d[0], (float)d[1], (float)d[2]);
-
-    private static void Summary(string what, JsonElement result, int vertices, int faces, bool closed)
-    {
-        Equal($"{what}: vertices", vertices, result.GetProperty("vertices").GetInt32());
-        Equal($"{what}: faces", faces, result.GetProperty("faces").GetInt32());
-        Equal($"{what}: closed", closed, result.GetProperty("closed").GetBoolean());
     }
 
     /// <summary>The ray test itself must give <paramref name="face"/> at every probe named <paramref name="name"/>, so no probe the checks rest on is left out as uncertain.</summary>

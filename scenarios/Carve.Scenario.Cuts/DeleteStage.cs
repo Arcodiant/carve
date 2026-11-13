@@ -3,6 +3,7 @@ using System.Text.Json;
 using Carve.Debug;
 using Carve.Scenario.Shed;
 using static Carve.Scenario.Shed.Checks;
+using static Carve.Scenario.Cuts.CutsChecks;
 
 namespace Carve.Scenario.Cuts;
 
@@ -24,19 +25,18 @@ internal sealed class DeleteStage : ICutsStage
     private static readonly int[][] Faces = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [3, 7, 6, 2], [0, 4, 7, 3], [1, 2, 6, 5]];
 
     /// <summary>A 4 x 4 grid of points on each of the cube's six planes, named by the plane.</summary>
+    private static readonly float[] Steps = [0.12f, 0.37f, 0.63f, 0.88f];
+
     private static readonly (string Name, Vector3 At)[] Probes =
     [
-        .. Grid("the back (z = 0)", (u, v) => new Vector3(u, v, 0)),
-        .. Grid("the front (z = 1)", (u, v) => new Vector3(u, v, 1)),
-        .. Grid("the bottom (y = 0)", (u, v) => new Vector3(u, 0, v)),
-        .. Grid("the top (y = 1)", (u, v) => new Vector3(u, 1, v)),
-        .. Grid("the left (x = 0)", (u, v) => new Vector3(0, u, v)),
-        .. Grid("the right (x = 1)", (u, v) => new Vector3(1, u, v)),
+        .. Grid("the back (z = 0)", Steps, (u, v) => new Vector3(u, v, 0)),
+        .. Grid("the front (z = 1)", Steps, (u, v) => new Vector3(u, v, 1)),
+        .. Grid("the bottom (y = 0)", Steps, (u, v) => new Vector3(u, 0, v)),
+        .. Grid("the top (y = 1)", Steps, (u, v) => new Vector3(u, 1, v)),
+        .. Grid("the left (x = 0)", Steps, (u, v) => new Vector3(0, u, v)),
+        .. Grid("the right (x = 1)", Steps, (u, v) => new Vector3(1, u, v)),
         .. new[] { -0.15f, 1.15f }.SelectMany(x => new[] { -0.15f, 0.5f, 1.15f }.Select(y => ("outside the cube", new Vector3(x, y, 0.5f)))),
     ];
-
-    private static IEnumerable<(string, Vector3)> Grid(string name, Func<float, float, Vector3> at) =>
-        new[] { 0.12f, 0.37f, 0.63f, 0.88f }.SelectMany(u => new[] { 0.12f, 0.37f, 0.63f, 0.88f }.Select(v => (name, at(u, v))));
 
     public async Task RunAsync(ScenarioDriver driver)
     {
@@ -51,9 +51,9 @@ internal sealed class DeleteStage : ICutsStage
         var open = await Solid.ReadAsync(driver);
         var shaded = await driver.CaptureAsync("delete-top", new { direction = Direction });
         Caption(shaded, "512x512, direction (0.6, 0.35, 1), 8 vertices, 5 faces");
-        Expect(shaded, camera, open, "the top (y = 1)", -1, 12);
-        Expect(shaded, camera, open, "the front (z = 1)", 1, 12);
-        Expect(shaded, camera, open, "the right (x = 1)", 5, 12);
+        Expect(shaded, camera, open, Probes, "the top (y = 1)", -1, 12);
+        Expect(shaded, camera, open, Probes, "the front (z = 1)", 1, 12);
+        Expect(shaded, camera, open, Probes, "the right (x = 1)", 5, 12);
         var shades = new Dictionary<int, Rgb> { [1] = Shade(shaded, camera, open, "the front (z = 1)", 1), [5] = Shade(shaded, camera, open, "the right (x = 1)", 5) };
         Look(shaded, camera, open, f => shades.TryGetValue(f, out var c) ? c : null, [], "the cube with its top deleted");
 
@@ -71,9 +71,9 @@ internal sealed class DeleteStage : ICutsStage
         var edges = live.SelectMany(f => corner.Faces[f].Loop.Select((v, k) => (A: v, B: corner.Faces[f].Loop[(k + 1) % corner.Faces[f].Loop.Length])))
             .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
         Equal("the cornerless cube's edges", 9, edges.Length);
-        Expect(wire, camera, corner, "the top (y = 1)", -1, 12);
-        Expect(wire, camera, corner, "the front (z = 1)", -1, 12);
-        Expect(wire, camera, corner, "the right (x = 1)", -1, 12);
+        Expect(wire, camera, corner, Probes, "the top (y = 1)", -1, 12);
+        Expect(wire, camera, corner, Probes, "the front (z = 1)", -1, 12);
+        Expect(wire, camera, corner, Probes, "the right (x = 1)", -1, 12);
         var lines = edges.Select(e => (camera.Project(corner.Vertices[e.Lo]), camera.Project(corner.Vertices[e.Hi]))).ToArray();
         Look(wire, camera, corner, _ => Fill, lines, "the cornerless cube's wireframe");
         foreach (var (lo, hi) in edges)
@@ -124,15 +124,6 @@ internal sealed class DeleteStage : ICutsStage
         }
     }
 
-    private static Vector3 ToVector(double[] d) => new((float)d[0], (float)d[1], (float)d[2]);
-
-    private static void Summary(string what, JsonElement result, int vertices, int faces, bool closed)
-    {
-        Equal($"{what}: vertices", vertices, result.GetProperty("vertices").GetInt32());
-        Equal($"{what}: faces", faces, result.GetProperty("faces").GetInt32());
-        Equal($"{what}: closed", closed, result.GetProperty("closed").GetBoolean());
-    }
-
     /// <summary>get_mesh keeps every slot, and writes null in exactly the deleted ones.</summary>
     private static async Task Nulls(ScenarioDriver driver, string what, int vertexSlots, string[] vertices, int faceSlots, string[] faces)
     {
@@ -150,32 +141,6 @@ internal sealed class DeleteStage : ICutsStage
         var deleted = result.GetProperty("deleted");
         SameList($"{what}: deleted.vertices", vertices, deleted.GetProperty("vertices").EnumerateArray().Select(v => $"{v.GetInt32()}"));
         SameList($"{what}: deleted.faces", faces, deleted.GetProperty("faces").EnumerateArray().Select(f => $"{f.GetInt32()}"));
-    }
-
-    /// <summary>
-    /// The ray test must give <paramref name="face"/> at every probe named <paramref name="name"/> it is sure of, and be
-    /// sure of at least <paramref name="least"/> of them, so the checks do not rest on probes left out as uncertain.
-    /// </summary>
-    private static void Expect(ScenarioFrame frame, Camera camera, Solid solid, string name, int face, int least)
-    {
-        var sure = 0;
-        foreach (var (_, at) in Probes.Where(p => p.Name == name))
-        {
-            var (x, y) = camera.Pixel(at);
-            var seen = solid.Seen(camera, frame.Width, x, y);
-            if (seen == -2)
-            {
-                continue;
-            }
-
-            sure++;
-            Equal($"{frame.Name}: what the geometry shows at {name} {at} (pixel ({x}, {y}))", face, seen);
-        }
-
-        if (sure < least)
-        {
-            Note($"{frame.Name}: only {sure} probes on {name} were sure, fewer than {least}");
-        }
     }
 
     /// <summary>A face's shade, read at the first probe on <paramref name="name"/> that surely shows it, not the background.</summary>
