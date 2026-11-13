@@ -119,7 +119,7 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - The person approved every new frame set: T-63's 4, T-64's 2, T-68's 3, T-65's 3, T-66's 2, T-67's 2 (on the second try), T-69's 20, and T-70's final sheet.
 - `GatehouseGeometry` came first, before any frame, as planned. The one planned count it could not meet (an edge hidden under the cornice) was a stop, not a change.
 - The acceptance run passed in round 2. A fresh `claude -p` session (claude-fable-5-2, the default) cut the gable with two `plane_cut`s, the window with a closed `knife` on each face, then `delete` and `bridge`, and the door with a `knife`. It ended with a closed `check` and no warnings, a brown door, and background through the window. No description changed.
-- The milestone's `verify` passes every check but `review`: 8/8 members merged and 12 suites passing.
+- The milestone's `verify` passes every check but `review`: 8/8 members merged and 13 suites passing (`scenario-rig` came with M-17 in the rebase onto `main`).
 - **Models and agents per member:**
 
   | Member | Model | Agents |
@@ -159,6 +159,14 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - **One slow-runner failure.** `HoledFaceToolTests.A_bad_hole_is_a_tool_error_naming_it` timed out at server start-up (30 s) in a 20-minute `server-regression` run on Xellotath. It passed on the re-run, and no timeout was changed.
 - **Rebased onto main after M-17 (Rig) landed (7d957b4).** The conflicts (the `CLAUDE.md` layout table, `Carve.slnx`, `Program.cs`'s tool list) were resolved by keeping both sides. Three fixes were needed where the two milestones met, each a separate commit. First, one `Vector3D`: M-17's public `Carve.Core.Vector3D` clashed with the cuts' nested copy in `FaceSplit`, and main's has the same fields and operators, so the cuts' copy was dropped. Second, `weigh` skips deleted vertices: it walked every slot, so after M-5's `delete` it gave a tombstone weights again and counted it unweighted. Third, `get_weights` counts live vertices only: it counted, listed and accepted tombstones, and a deleted id asked for is now the tool error "deleted", as with `set_weights`. M-17 was written before tombstones existed, which is why the last two were needed. A regression test now covers the case between them: a cut's blended weights read back through `get_weights`, and a plain `weigh` keeps them. The rebased frames were compared by hash and are byte-identical: all 163 of M-5's from before the rebase, and all 124 of main's at 7d957b4 (character, crate, cube, export, rig). main's shed and soft at 7d957b4 had no run to compare against, so those two are checked against M-5's only (`artifacts/review/rebase-main/REBASE.md`).
 
+- **B-3, the person's ruling after T-66 ("refuse it, fix later"), was fixed before `finish`.** `loop_cut` now refuses a ring that closes on itself reversed (a Mobius band), on a hand-built band of eight planar quads, with a break shown failing (Sonnet 5.5, two agents). Pushing it needed the rebased milestone branch on origin first, which the person allowed with `--force-with-lease`.
+- **The refactor pass** (Opus 5.5) moved the helpers the cut stages had copied into `CutsChecks.cs` (`dc27cde`) and the geometry Knife and PlaneCut borrowed from `FaceSplit` into `PlaneGeometry.cs` (`6322324`). All 187 frames stayed byte-identical.
+- **Review round 1 (RV-31)** had five Opus reviewers: Core topology, cut algorithms, server tools, scenarios, and the whole diff. It raised 30 findings, 6 of them Major: the knife cutting nothing along a boundary, `subdivide`'s report after a delete (found by three reviewers), two frames whose checks could not fail, the y-axis tiles with no geometric check, and suite inputs missing linked files. The person ruled three:
+  - the knife cuts boundary-touching segments as `plane_cut` does;
+  - a face in a plane cut's plane stays untouched;
+  - a merged fold warns.
+  The orchestrator ruled the README's merge example onto the ids `loop_cut` really leaves. Two Opus fixers fixed all 30, each with a break, and all 187 frames stayed byte-identical.
+
 **Never verified.**
 
 - **The knife's off-surface error was never met by an agent.** It is covered by tests and the Cuts scenario only. `loop_cut`, `merge_faces` and `undo` were used by no acceptance agent.
@@ -171,14 +179,12 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - **Carried passes:**
   - `viewer-cube` was carried from `99c846e` (T-63) through most members, though it ran fresh in the milestone's `verify`.
   - T-63 to T-68 each hashed frames from the run of their last code commit, not from their final notes-only commit.
-- **A Mobius ring for `loop_cut`.** The person ruled it refused; it is filed as B-3 under M-5, for the fix round before `finish`, and is not done.
 - **Machines:** any GPU but Mantorok's and Xellotath's (both RTX 5070), and any client but `claude -p`.
 - **The installed carve:** `C:\tools\carve` has not been republished.
 - The orchestrator opened no frame. Every look above is a member's or the person's.
 
 **Known and left.**
 
-- B-3: `loop_cut` does not refuse a ring that closes on itself reversed. It is under M-5, open.
 - `CLAUDE.md` and `README.md` are inputs of no suite (a `verify` warning).
 - `branches/task/T-63` to `T-70` remain on disk, unregistered from git: `finish` ran from inside each one and could not remove it.
 - `%TEMP%\carve-m5-acceptance\` (two rounds and a Release publish of `carve`) and the members' scratch folders in `%TEMP%` (`t63` to `t70`) are not cleared.
