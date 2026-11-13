@@ -18,7 +18,7 @@ description: >-
 
 ## Cause
 
-`MeshEdits.UnknownElements` in Carve.Core, the check for listed elements that every edit and `render`'s highlight go through (only `move` and the highlight pass edges), wrote the non-edge message as the fault alone (`the 1st listed edge, [3, 9], is not an edge of the mesh`). Pointing to `select` lived only in `MoveTool`'s description, which an agent holding the error does not reread. `loop_cut`, added later (T-66), already ends its own non-edge message with the pointer, so the two disagreed.
+`MeshEdits.UnknownElements` in Carve.Core, the check for listed elements that `move`, `merge_faces`, `delete`, `plane_cut` and `render`'s highlight call (only `move` and the highlight pass edges), wrote the non-edge message as the fault alone (`the 1st listed edge, [3, 9], is not an edge of the mesh`). Pointing to `select` lived only in `MoveTool`'s description, which an agent holding the error does not reread. `loop_cut`, added later (T-66), already ends its own non-edge message with the pointer, so the two disagreed.
 
 ## Fix
 
