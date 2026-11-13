@@ -19,7 +19,7 @@ public sealed class ExtrudeTool(ModelStore store)
         + "inset (default 0, never negative) first shrinks the face towards its inside, measured in the face's own plane as a distance from each side; "
         + "with distance 0 and an inset the face is only shrunk, leaving a border ring of walls. "
         + "All the faces are done in one call; list each at most once. "
-        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[new vertex ids],faces:[new face ids]}, "
+        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[new vertex ids],faces:[new face ids]}, deleted:{vertices:[], faces:[]}, split:[], "
         + "extruded:[{face, cap, walls:[face ids], vertices:[ring vertex ids]}]}, one extruded entry per listed face in the order listed (cap equals face). "
         + "Bad input (an unknown face id, a face listed twice, no faces, a negative or non-finite inset, a non-finite distance, distance and inset both 0, an argument extrude does not take, an inset too large for the face so it collapses or crosses itself) "
         + "is a tool error that lists every problem by element, e.g. faces[6]; the mesh is left unchanged and nothing is added to undo. "

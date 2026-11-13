@@ -15,7 +15,7 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
     {
         static string N(float x) => x.ToString("R", CultureInfo.InvariantCulture);
         var vertices = string.Join(",", mesh.Vertices.Select(v => $"[{N(v.X)},{N(v.Y)},{N(v.Z)}]"));
-        var faces = string.Join(",", mesh.Faces.Select(f => "[" + string.Join(",", f) + "]"));
+        var faces = string.Join(",", mesh.Faces.Select(f => "[" + string.Join(",", f.Loop) + "]"));
         return $$"""{"vertices":[{{vertices}}],"faces":[{{faces}}]}""";
     }
 
@@ -181,7 +181,7 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
         await NothingChanged(carve, before);
 
         File.WriteAllText(Path.Combine(Root, "future.carve"), """{"carve": 9, "vertices": [], "faces": []}""");
-        Assert.Contains("carve: version 9 is not one this build reads; it reads versions 1, 2 and 3", Refused(await carve.CallToolAsync("open", """{"path":"future.carve"}""")));
+        Assert.Contains("carve: version 9 is not one this build reads; it reads versions 1, 2, 3 and 4", Refused(await carve.CallToolAsync("open", """{"path":"future.carve"}""")));
         await NothingChanged(carve, before);
 
         File.WriteAllText(Path.Combine(Root, "face.carve"), """{"carve": 1, "vertices": [[0,0,0],[1,0,0],[0,1,0]], "faces": [[0,1,5]]}""");

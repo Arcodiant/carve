@@ -106,6 +106,24 @@ public class LookMeshesTests
         }
     }
 
+    [Fact]
+    public void A_holed_face_s_spike_stands_on_the_face_not_in_its_hole()
+    {
+        // A unit square with a centred square hole: the outer loop's centre, (0.5, 0.5), is in the hole.
+        Vector3[] v = [new(0, 0, 0), new(1, 0, 0), new(1, 1, 0), new(0, 1, 0),
+            new(0.25f, 0.25f, 0), new(0.25f, 0.75f, 0), new(0.75f, 0.75f, 0), new(0.75f, 0.25f, 0)];
+        var mesh = PolygonMesh.Create(v, [new Face([0, 1, 2, 3], [[4, 5, 6, 7]])]).Mesh!;
+        var space = SpaceOf(mesh);
+
+        var ends = Ends(LookMeshes.Spikes(mesh, space));
+
+        Assert.Equal(2, ends.Length);
+        var foot = mesh.FaceLabelPoint(0);
+        Assert.False(foot.X is > 0.25f and < 0.75f && foot.Y is > 0.25f and < 0.75f, $"{foot} is in the hole");
+        AssertClose(space.Apply(foot), ends[0]);
+        AssertClose(mesh.FaceNormal(0) * 0.1f, ends[1] - ends[0]);
+    }
+
     [Theory]
     [InlineData(1, 0, 0, 255, 128, 128)]
     [InlineData(-1, 0, 0, 0, 128, 128)]
@@ -148,7 +166,7 @@ public class LookMeshesTests
         }
 
         Assert.Contains(scene.VertexColours, c => c != LookMeshes.NormalColour(mesh.FaceNormal(0)) && c != LookMeshes.NormalColour(mesh.FaceNormal(1)));
-        Assert.Equal(2 * mesh.Faces.Sum(f => f.Count), Ends(scene.EdgeLines).Length);
+        Assert.Equal(2 * mesh.Faces.Sum(f => f.Loop.Count), Ends(scene.EdgeLines).Length);
     }
 
     [Fact]
@@ -195,7 +213,7 @@ public class LookMeshesTests
         var scene = LookMeshes.Compose(mesh, space, Look.Normals, Highlight.Of([], [], [3]));
 
         Assert.Equal(plain.VertexColours, scene.VertexColours);
-        Assert.Equal(2 * mesh.Faces[3].Count, Ends(scene.OrangeLines).Length);
+        Assert.Equal(2 * mesh.Faces[3].Loop.Count, Ends(scene.OrangeLines).Length);
     }
 
     [Theory]

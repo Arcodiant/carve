@@ -79,6 +79,9 @@ public sealed class VertexWeights
     public static string? VertexProblem(int vertexCount, int vertex) =>
         vertex < 0 || vertex >= vertexCount ? $"there is no vertex {vertex}: ids run 0..{vertexCount - 1}" : null;
 
+    /// <summary>Why <paramref name="vertex"/> names no live vertex of <paramref name="mesh"/>, or null when it does: a deleted one is <c>deleted</c> (T-64).</summary>
+    public static string? VertexProblem(PolygonMesh mesh, int vertex) => mesh.VertexProblem(vertex);
+
     /// <summary>
     /// The tolerance on a sum of weights within which <see cref="Kept"/> takes them as already normalised: far above the
     /// rounding of <see cref="Normalise"/>'s own output (a few parts in 10^16), far below any weight a person writes.
@@ -107,6 +110,15 @@ public sealed class VertexWeights
         var all = new SortedDictionary<int, Influence[]>();
         foreach (var (v, i) in byVertex) all[v] = i;
         return all.Count == 0 ? None : new VertexWeights(all);
+    }
+
+    /// <summary>These weights with none on <paramref name="vertices"/> (a deleted vertex leaves its weights, T-64).</summary>
+    public VertexWeights Without(IEnumerable<int> vertices)
+    {
+        var next = new SortedDictionary<int, Influence[]>(_byVertex);
+        var changed = false;
+        foreach (var v in vertices) changed |= next.Remove(v);
+        return !changed ? this : next.Count == 0 ? None : new VertexWeights(next);
     }
 
     /// <summary>These weights with <paramref name="influences"/> (already normalised) on every vertex of <paramref name="vertices"/>.</summary>

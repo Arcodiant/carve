@@ -74,7 +74,7 @@ public static class LabelLayout
         Vector2 Pixel(Vector3 point) => ScreenProjection.ToPixel(space.Apply(point), frame.View, frame.Projection, size);
 
         var faces = window is { } w ? Enumerable.Range(w.FirstFace, w.FaceCount) : Enumerable.Range(0, mesh.Faces.Count);
-        var facing = faces.Where(f =>
+        var facing = faces.Where(f => !mesh.IsFaceDeleted(f) &&
             Vector3.Dot(mesh.FaceNormal(f), projection == Projection.Orthographic ? direction : frame.Eye - space.Apply(mesh.FaceCentre(f))) > 0).ToList();
 
         if (labels is LabelSet.Faces or LabelSet.Both)
@@ -83,7 +83,7 @@ public static class LabelLayout
             {
                 var text = (face - (window?.FirstFace ?? 0)).ToString(CultureInfo.InvariantCulture);
                 var extent = measure(text);
-                var label = At(text, Whole(Pixel(mesh.FaceCentre(face)) - extent / 2), extent);
+                var label = At(text, Whole(Pixel(mesh.FaceLabelPoint(face)) - extent / 2), extent);
                 if (OnImage(label.Backing, size))
                 {
                     plan.Add(label);
@@ -93,7 +93,7 @@ public static class LabelLayout
 
         if (labels is LabelSet.Vertices or LabelSet.Both)
         {
-            foreach (var vertex in facing.SelectMany(f => mesh.Faces[f]).Distinct().Order())
+            foreach (var vertex in facing.SelectMany(f => mesh.Faces[f].Corners).Distinct().Order())
             {
                 var text = (vertex - (window?.FirstVertex ?? 0)).ToString(CultureInfo.InvariantCulture);
                 var dot = Pixel(mesh.Vertices[vertex]);

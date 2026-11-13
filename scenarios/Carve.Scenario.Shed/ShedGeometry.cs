@@ -114,13 +114,15 @@ internal sealed class Camera
     private readonly int _size;
     private readonly Matrix4x4 _rotation, _camera;
 
-    public Camera(Vector3 min, Vector3 max, Vector3 direction, int size, bool orthographic = false)
+    /// <param name="up">The view's up; <see cref="Vector3.UnitY"/> unless given. <c>render</c> takes -Z for a view along Y
+    /// (the gatehouse's +y and -y tiles), where Y cannot be up.</param>
+    public Camera(Vector3 min, Vector3 max, Vector3 direction, int size, bool orthographic = false, Vector3? up = null)
     {
         (_size, _orthographic) = (size, orthographic);
         _centre = (min + max) / 2;
         _radius = (max - min).Length() / 2;
         _unit = Vector3.Normalize(direction);
-        _rotation = Matrix4x4.CreateLookAt(_unit, Vector3.Zero, Vector3.UnitY) with { M41 = 0, M42 = 0, M43 = 0 };
+        _rotation = Matrix4x4.CreateLookAt(_unit, Vector3.Zero, up ?? Vector3.UnitY) with { M41 = 0, M42 = 0, M43 = 0 };
         var tangent = MathF.Tan(FieldOfViewY / 2) * (1 - 2 * Margin);
         var (distance, reach) = (1.2f, 0f);
         foreach (var x in new[] { min.X, max.X })
@@ -134,7 +136,7 @@ internal sealed class Camera
 
         _distance = distance;
         _height = reach / (1 - 2 * Margin);
-        var view = Matrix4x4.CreateLookAt(_unit * distance, Vector3.Zero, Vector3.UnitY);
+        var view = Matrix4x4.CreateLookAt(_unit * distance, Vector3.Zero, up ?? Vector3.UnitY);
         _camera = view * Matrix4x4.CreatePerspectiveFieldOfView(FieldOfViewY, 1, 0.01f, 100f);
     }
 

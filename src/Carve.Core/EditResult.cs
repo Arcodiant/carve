@@ -1,11 +1,24 @@
 namespace Carve.Core;
 
 /// <summary>
-/// What one extruded face became: <see cref="Cap"/> is the face itself, which keeps its id with the new ring as its loop;
-/// <see cref="Walls"/> are the quads appended for it, one per edge in loop order (wall <c>k</c> runs from corner <c>k</c> to
-/// <c>k + 1</c>); <see cref="NewVertices"/> is the ring, in the face's loop order (new vertex <c>k</c> stands over corner <c>k</c>).
+/// What one extruded face became: <see cref="Cap"/> is the face itself, which keeps its id with the new rings as its loop
+/// and holes; <see cref="Walls"/> are the quads appended for it, one per edge in corner order (<see cref="Face.Corners"/>:
+/// the outer loop, then each hole), wall <c>k</c> running from corner <c>k</c> to the next corner of its loop;
+/// <see cref="NewVertices"/> are the rings in the same corner order (new vertex <c>k</c> stands over corner <c>k</c>).
 /// </summary>
 public sealed record ExtrudedFace(int Face, int Cap, IReadOnlyList<int> Walls, IReadOnlyList<int> NewVertices);
+
+/// <summary>
+/// What an edit deleted (T-64): vertex and face ids, each ascending. Their slots are tombstones in the edited mesh
+/// (<see cref="PolygonMesh.IsVertexDeleted"/>, <see cref="PolygonMesh.IsFaceDeleted"/>), never given out again.
+/// </summary>
+public sealed record DeletedElements(IReadOnlyList<int> Vertices, IReadOnlyList<int> Faces)
+{
+    /// <summary>Nothing deleted: what every edit but a delete reports, unless it removes elements itself.</summary>
+    public static DeletedElements None { get; } = new([], []);
+
+    public bool IsEmpty => Vertices.Count == 0 && Faces.Count == 0;
+}
 
 /// <summary>
 /// The outcome of an edit in <see cref="MeshEdits"/>: the new mesh and what the edit made, or every error that stopped it.
@@ -14,9 +27,12 @@ public sealed record ExtrudedFace(int Face, int Cap, IReadOnlyList<int> Walls, I
 public sealed class EditResult
 {
     private EditResult(PolygonMesh? mesh, IReadOnlyList<MeshError> errors, IReadOnlyList<int> movedVertices,
-        IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded)
+        IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded,
+        DeletedElements? deleted = null, IReadOnlyList<SplitFace>? split = null)
     {
         Mesh = mesh;
+        Deleted = deleted ?? DeletedElements.None;
+        Split = split ?? [];
         Errors = errors;
         MovedVertices = movedVertices;
         NewVertices = newVertices;
@@ -44,16 +60,36 @@ public sealed class EditResult
     /// <summary>For an extrude, one record per listed face, in the order listed; empty for a move.</summary>
     public IReadOnlyList<ExtrudedFace> Extruded { get; }
 
+    /// <summary>
+    /// The vertices and faces the edit deleted, ascending (<see cref="DeletedElements.None"/> when none, and on failure):
+    /// the field every edit that removes elements reports, as <c>deleted</c> in the server's report.
+    /// </summary>
+    public DeletedElements Deleted { get; }
+
+    /// <summary>
+    /// The faces the edit split (T-65), one entry per face in id order, each with its pieces, the kept id first and the
+    /// appended ones after it ascending (<see cref="SplitFace"/>); empty for every edit that splits nothing, and on
+    /// failure: the field every edit reports, as <c>split</c> in the server's report.
+    /// </summary>
+    public IReadOnlyList<SplitFace> Split { get; }
+
     internal static EditResult Refused(IReadOnlyList<MeshError> errors) => new(null, errors, [], [], [], []);
 
     /// <summary>The result of an edit that has already carried colours, groups, weights and shading onto <paramref name="mesh"/>.</summary>
     internal static EditResult Made(PolygonMesh mesh, IReadOnlyList<int> movedVertices, IReadOnlyList<int> newVertices,
-        IReadOnlyList<int> newFaces) => new(mesh, [], movedVertices, newVertices, newFaces, []);
+        IReadOnlyList<int> newFaces, DeletedElements? deleted = null, IReadOnlyList<SplitFace>? split = null)
+        => new(mesh, [], movedVertices, newVertices, newFaces, [], deleted, split);
 
-    private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<ExtrudedFace> extruded)
+    private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<(int Face, IReadOnlyList<int> Added)> made)
     {
-        var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(extruded)) : edited;
+        var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(made)) : edited;
         mesh = source.Weights is { } weights ? mesh.WithWeights(weights) : mesh;
+        // A tombstoned face leaves its colour and its groups, and a tombstoned vertex its weights (T-64).
+        if (mesh.HasTombstones)
+        {
+            if (mesh.Style is { } kept) mesh = mesh.WithStyle(kept.Without(Enumerable.Range(0, mesh.Faces.Count).Where(mesh.IsFaceDeleted)));
+            if (mesh.Weights is { } held) mesh = mesh.WithWeights(held.Without(Enumerable.Range(0, mesh.Vertices.Count).Where(mesh.IsVertexDeleted)));
+        }
         // The mode and the hard edges carry; a hard edge the edit no longer has is dropped (T-42).
         if (source.Shade is not { } shade) return mesh;
         var gone = shade.Hard.Where(e => !mesh.Topology.TryGetEdge(e.Lo, e.Hi, out _)).ToArray();
@@ -62,9 +98,20 @@ public sealed class EditResult
 
     /// <summary>The result of an edit of <paramref name="source"/>: the new mesh keeps the source's face colours and groups, and walls take their source face's.</summary>
     internal static EditResult From(PolygonMesh source, MeshResult result, IReadOnlyList<int> movedVertices,
-        IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded)
+        IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded,
+        DeletedElements? deleted = null)
         => result.Succeeded
-            ? new EditResult(Carried(source, result.Mesh!, extruded),
-                result.Errors, movedVertices, newVertices, newFaces, extruded)
+            ? new EditResult(Carried(source, result.Mesh!, extruded.Select(x => (x.Face, x.Walls)).ToList()),
+                result.Errors, movedVertices, newVertices, newFaces, extruded, deleted)
+            : Refused(result.Errors);
+
+    /// <summary>
+    /// The result of an edit of <paramref name="source"/> that appends faces taking another face's colour and groups
+    /// (<c>bridge</c>, T-68): each <c>Added</c> face takes its <c>Face</c>'s, as extrude's walls take theirs.
+    /// </summary>
+    internal static EditResult From(PolygonMesh source, MeshResult result, IReadOnlyList<int> newFaces,
+        IReadOnlyList<(int Face, IReadOnlyList<int> Added)> styledFrom)
+        => result.Succeeded
+            ? new EditResult(Carried(source, result.Mesh!, styledFrom), result.Errors, [], [], newFaces, [])
             : Refused(result.Errors);
 }

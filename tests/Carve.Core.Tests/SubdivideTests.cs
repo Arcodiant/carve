@@ -23,7 +23,7 @@ public class SubdivideTests
         Assert.Equal(faces, mesh.Faces.Count);
         Assert.Equal(edges, mesh.Topology.Edges.Count);
         Assert.True(MeshReport.Create(mesh).Closed);
-        Assert.All(mesh.Faces, f => Assert.Equal(4, f.Count));
+        Assert.All(mesh.Faces, f => Assert.Equal(4, f.Loop.Count));
         Assert.Equal(Enumerable.Range(8, vertices - 8), result.NewVertices);
         Assert.Equal(Enumerable.Range(6, faces - 6), result.NewFaces);
         Assert.Equal(Enumerable.Range(0, 8), result.MovedVertices);
@@ -56,12 +56,12 @@ public class SubdivideTests
         int EdgePoint(int a, int b) => 14 + edges.ToList().FindIndex(x => x.Lo == Math.Min(a, b) && x.Hi == Math.Max(a, b));
         for (var f = 0; f < 6; f++)
         {
-            var loop = cube.Faces[f];
+            var loop = cube.Faces[f].Loop;
             for (var k = 0; k < 4; k++)
             {
                 // Child 0 is the face itself; children 1..3 follow face by face after the six old ids.
                 var id = k == 0 ? f : 6 + f * 3 + (k - 1);
-                Assert.Equal([loop[k], EdgePoint(loop[k], loop[(k + 1) % 4]), 8 + f, EdgePoint(loop[(k + 3) % 4], loop[k])], mesh.Faces[id]);
+                Assert.Equal([loop[k], EdgePoint(loop[k], loop[(k + 1) % 4]), 8 + f, EdgePoint(loop[(k + 3) % 4], loop[k])], mesh.Faces[id].Loop);
             }
         }
 
@@ -78,7 +78,7 @@ public class SubdivideTests
         var sum = (double)n * n * new Vector3D(mesh.Vertices[v]);
         foreach (var f in faces)
         {
-            var loop = mesh.Faces[f];
+            var loop = mesh.Faces[f].Loop;
             var k = loop.ToList().IndexOf(v);
             sum += 4 * new Vector3D(mesh.Vertices[loop[(k + 1) % 4]]) + new Vector3D(mesh.Vertices[loop[(k + 2) % 4]]);
         }
@@ -231,7 +231,7 @@ public class SubdivideTests
         foreach (var other in new[] { Sub(cube, 2), Sub(cube, 2) })
         {
             Assert.Equal(twice.Vertices, other.Vertices);
-            Assert.Equal(twice.Faces.Select(f => f.ToArray()), other.Faces.Select(f => f.ToArray()));
+            Assert.Equal(twice.Faces.Select(f => f.Loop.ToArray()), other.Faces.Select(f => f.Loop.ToArray()));
             Assert.Equal(twice.HardEdges, other.HardEdges);
             Assert.Equal(twice.Style!.Colours, other.Style!.Colours);
             foreach (var v in twice.Weights!.Vertices) Assert.Equal(twice.Weights.Of(v), other.Weights!.Of(v));
@@ -258,7 +258,7 @@ public class SubdivideTests
         var mesh = Sub(hexagon, 1);
 
         Assert.Equal(6, mesh.Faces.Count);
-        Assert.All(mesh.Faces, f => Assert.Contains(6, f));
+        Assert.All(mesh.Faces, f => Assert.Contains(6, f.Loop));
         Assert.True(Vector3.Distance(Vector3.Zero, mesh.Vertices[6]) < 1e-6f);
         Assert.All(mesh.Vertices, p => Assert.Equal(0f, p.Z));
     }
@@ -320,11 +320,11 @@ public class SubdivideTests
 
         Assert.Equal(4 + 4 + 6, mesh.Vertices.Count);
         Assert.Equal(12, mesh.Faces.Count);
-        Assert.All(mesh.Faces, f => Assert.Equal(4, f.Count));
+        Assert.All(mesh.Faces, f => Assert.Equal(4, f.Loop.Count));
         Assert.All(mesh.Topology.Edges, e => Assert.Equal(2, e.Faces.Count));
         var centre = (tetra.Vertices[0] + tetra.Vertices[1] + tetra.Vertices[2]) / 3;
         Assert.True(Vector3.Distance(centre, mesh.Vertices[4]) < 1e-6f, $"{mesh.Vertices[4]} against {centre}");
-        Assert.Contains(4, mesh.Faces[0]);
-        Assert.Equal(3, mesh.Faces.Count(f => f.Contains(4)));
+        Assert.Contains(4, mesh.Faces[0].Loop);
+        Assert.Equal(3, mesh.Faces.Count(f => f.Loop.Contains(4)));
     }
 }

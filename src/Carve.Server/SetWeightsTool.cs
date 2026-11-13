@@ -79,7 +79,7 @@ public sealed class SetWeightsTool(ModelStore store)
             if (ids is not null)
             {
                 foreach (var v in ids.Distinct())
-                    if (VertexWeights.VertexProblem(m.Vertices.Count, v) is { } bad)
+                    if (VertexWeights.VertexProblem(m, v) is { } bad)
                         problems.Add($"vertices[{v}]: {bad}");
                 return (problems.Count > 0 ? null : ids, problems);
             }
@@ -89,7 +89,7 @@ public sealed class SetWeightsTool(ModelStore store)
                 problems.Add(NoGroup(m.Style, groupName!));
                 return (null, problems);
             }
-            return (faces.SelectMany(f => m.Faces[f]).Distinct().Order().ToArray(), problems);
+            return (faces.SelectMany(f => m.Faces[f].Corners).Distinct().Order().ToArray(), problems);
         }, given, out var change, out var refused);
         if (refused.Count > 0) return Failed("set_weights", refused);
         if (snapshot is null || change is null) return Error("set_weights: " + NoMesh);

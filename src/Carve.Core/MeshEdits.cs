@@ -32,7 +32,7 @@ public static class MeshEdits
             errors.Add(new MeshError("by", "the move is zero: nothing would change"));
 
         errors.AddRange(UnknownElements(mesh, vertexList, edgeList, faceList));
-        moved.UnionWith(vertexList.Where(v => v >= 0 && v < mesh.Vertices.Count));
+        moved.UnionWith(vertexList.Where(v => mesh.VertexProblem(v) is null));
         foreach (var (a, b) in edgeList)
         {
             if (mesh.Topology.TryGetEdge(a, b, out var edge))
@@ -43,7 +43,7 @@ public static class MeshEdits
         }
 
         foreach (var f in faceList.Where(f => HasFace(mesh, f)))
-            moved.UnionWith(mesh.Faces[f]);
+            moved.UnionWith(mesh.Faces[f].Corners);
 
         // A bad or missing by is a problem with the whole call, and with it no move is tried. Otherwise the listed ids that
         // exist are moved, so that what Create would refuse in the result is named beside any unknown id.
@@ -105,15 +105,21 @@ public static class MeshEdits
         // A bad inset or distance is already named; with one, no face's ring is tried.
         var ringsCanBeTried = float.IsFinite(inset) && float.IsFinite(distance) && inset >= 0;
         var addedVertices = new List<Vector3>();
-        var addedFaces = new List<int[]>();
-        var reshaped = new List<KeyValuePair<int, IEnumerable<int>>>();
+        var addedFaces = new List<Face>();
+        var reshaped = new List<KeyValuePair<int, Face>>();
         var extruded = new List<ExtrudedFace>();
 
         for (var i = 0; i < faceList.Length; i++)
         {
             var f = faceList[i];
             if (!ringsCanBeTried || !HasFace(mesh, f) || firstListed[f] != i) continue;
-            var loop = mesh.Faces[f];
+            var face = mesh.Faces[f];
+            var loop = face.Loop;
+            if (face.HasHoles && inset > 0)
+            {
+                errors.Add(new MeshError($"faces[{f}]", Invariant($"the inset {inset:G6} cannot be taken on this face: it has holes, and a holed face extrudes only straight, as a tube (inset 0)")));
+                continue;
+            }
 
             if (!TryRing(mesh.Vertices, loop, distance, inset, out var ring, out var why))
             {
@@ -124,12 +130,21 @@ public static class MeshEdits
 
             var firstVertex = mesh.Vertices.Count + addedVertices.Count;
             var firstWall = mesh.Faces.Count + addedFaces.Count;
-            var n = loop.Count;
+            var n = face.Corners.Count;
             var ids = Enumerable.Range(firstVertex, n).ToArray();
             addedVertices.AddRange(ring);
-            for (var k = 0; k < n; k++)
-                addedFaces.Add([loop[k], loop[(k + 1) % n], ids[(k + 1) % n], ids[k]]);
-            reshaped.Add(KeyValuePair.Create(f, (IEnumerable<int>)ids));
+            // A hole's corners are lifted along the face's (outer loop's) normal, as TryRing lifts the outer loop's.
+            addedVertices.AddRange(Lift(mesh.Vertices, loop, face.Corners.Skip(loop.Count), distance));
+            var hole = face.Holes.Select((h, k) => ids.Skip(face.CornerAt(k, 0)).Take(h.Count).ToArray()).ToArray();
+            for (var h = -1; h < face.Holes.Count; h++)
+            {
+                // One wall per edge, old k to k + 1 then new k + 1 to new k; a hole runs clockwise, so its walls face into the hole.
+                var old = face.LoopAt(h);
+                var lifted = h < 0 ? ids[..loop.Count] : hole[h];
+                for (var k = 0; k < old.Count; k++)
+                    addedFaces.Add(new[] { old[k], old[(k + 1) % old.Count], lifted[(k + 1) % old.Count], lifted[k] });
+            }
+            reshaped.Add(KeyValuePair.Create(f, new Face(ids[..loop.Count], hole)));
             extruded.Add(new ExtrudedFace(f, f, Enumerable.Range(firstWall, n).ToArray(), ids));
         }
 
@@ -231,13 +246,13 @@ public static class MeshEdits
                 if (error.Element == $"faces[{x.Walls[k]}]")
                 {
                     wallEdge = k;
-                    what = $"its new wall faces[{x.Walls[k]}], over the edge from corner {k} to corner {(k + 1) % x.Walls.Count}";
+                    what = $"its new wall faces[{x.Walls[k]}], over the edge from {CornerText(mesh.Faces[x.Face], k)} to {CornerText(mesh.Faces[x.Face], NextCorner(mesh.Faces[x.Face], k))}";
                 }
             }
             for (var k = 0; k < x.NewVertices.Count && what is null; k++)
             {
                 if (error.Element == $"vertices[{x.NewVertices[k]}]")
-                    what = $"its new vertex vertices[{x.NewVertices[k]}], over corner {k}";
+                    what = $"its new vertex vertices[{x.NewVertices[k]}], over {CornerText(mesh.Faces[x.Face], k)}";
             }
             if (what is null) continue;
 
@@ -247,9 +262,9 @@ public static class MeshEdits
             var scale = "large";
             if (wallEdge is int wall)
             {
-                var loop = mesh.Faces[x.Face];
-                var p = mesh.Vertices[loop[wall]];
-                var q = mesh.Vertices[loop[(wall + 1) % loop.Count]];
+                var face = mesh.Faces[x.Face];
+                var p = mesh.Vertices[face.Corners[wall]];
+                var q = mesh.Vertices[face.Neighbours(wall).Next];
                 double dx = (double)q.X - p.X, dy = (double)q.Y - p.Y, dz = (double)q.Z - p.Z;
                 var edge = Math.Sqrt(dx * dx + dy * dy + dz * dz);
                 scale = Math.Abs((double)value) <= edge ? "small" : "large";
@@ -258,6 +273,35 @@ public static class MeshEdits
                 Invariant($"the {name} {value:G6} is too {scale} for this face: {what}, is refused: {error.Message}"));
         }
         return error;
+    }
+
+    /// <summary><c>corner k</c> for an outer corner, as before holes; <c>corner k of hole h</c> for a hole's.</summary>
+    private static string CornerText(Face face, int corner)
+    {
+        var (hole, i) = face.Locate(corner);
+        return hole < 0 ? Invariant($"corner {i}") : Invariant($"corner {i} of hole {hole}");
+    }
+
+    /// <summary>The corner after <paramref name="corner"/> in its own loop.</summary>
+    private static int NextCorner(Face face, int corner)
+    {
+        var (hole, i) = face.Locate(corner);
+        return face.CornerAt(hole, (i + 1) % face.LoopAt(hole).Count);
+    }
+
+    /// <summary>
+    /// The corners <paramref name="ids"/> moved <paramref name="distance"/> along the unit Newell normal of
+    /// <paramref name="loop"/>, worked relative to the loop's first vertex in double, as <see cref="TryRing"/> works its ring.
+    /// </summary>
+    private static IEnumerable<Vector3> Lift(IReadOnlyList<Vector3> verts, IReadOnlyList<int> loop, IEnumerable<int> ids, float distance)
+    {
+        var normal = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, loop));
+        var o = verts[loop[0]];
+        foreach (var i in ids)
+        {
+            var q = Add(((double)verts[i].X - o.X, (double)verts[i].Y - o.Y, (double)verts[i].Z - o.Z), Scale(normal, distance));
+            yield return new Vector3((float)(o.X + q.X), (float)(o.Y + q.Y), (float)(o.Z + q.Z));
+        }
     }
 
     /// <summary>The most levels one <see cref="Subdivide"/> takes.</summary>
@@ -276,16 +320,27 @@ public static class MeshEdits
         if (levels < 1 || levels > MaxSubdivideLevels)
             return EditResult.Refused([new MeshError("levels", Invariant($"levels is {levels}; it must be 1 to {MaxSubdivideLevels}"))]);
 
-        var level = new Subdivision.Level(mesh.Vertices.ToArray(), mesh.Faces.Select(f => f.ToArray()).ToArray(),
+        // Catmull-Clark of a face with holes has no one answer (a hole's face point, its quads), so it is refused by face.
+        var holed = Enumerable.Range(0, mesh.Faces.Count).Where(f => mesh.Faces[f].HasHoles).ToArray();
+        if (holed.Length > 0)
+            return EditResult.Refused(holed.Select(f => new MeshError($"faces[{f}]",
+                "this face has holes, and subdivide does not take a face with holes")).ToList());
+
+        var level = new Subdivision.Level(mesh.Vertices.ToArray(), mesh.Faces.Select(f => f.Loop.ToArray()).ToArray(),
             mesh.Style, mesh.Weights, mesh.Shade);
         for (var i = 0; i < levels; i++) level = Subdivision.Once(level);
 
-        var result = PolygonMesh.Create(level.Vertices, level.Faces);
+        // Tombstones stay tombstones: a deleted face's slot, and the face point each level makes for it, which no face uses.
+        var used = new bool[level.Vertices.Length];
+        foreach (var f in level.Faces) foreach (var v in f) used[v] = true;
+        var gone = Enumerable.Range(0, level.Vertices.Length)
+            .Where(v => mesh.IsVertexDeleted(v) || (v >= mesh.Vertices.Count && !used[v])).ToArray();
+        var result = PolygonMesh.Create(level.Vertices, level.Faces.Select(f => f.Length == 0 ? Face.Deleted : (Face)f), gone);
         if (!result.Succeeded) return EditResult.Refused(result.Errors);
         var made = result.Mesh!.WithStyle(level.Style).WithWeights(level.Weights).WithShade(level.Shade);
-        var moved = Enumerable.Range(0, mesh.Vertices.Count).Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
+        var moved = mesh.LiveVertices.Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
         return EditResult.Made(made, moved,
-            Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).ToArray(),
+            Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).Where(v => !made.IsVertexDeleted(v)).ToArray(),
             Enumerable.Range(mesh.Faces.Count, made.Faces.Count - mesh.Faces.Count).ToArray());
     }
 
@@ -298,6 +353,8 @@ public static class MeshEdits
         {
             if (v < 0 || v >= mesh.Vertices.Count)
                 errors.Add(new MeshError(Invariant($"vertices[{v}]"), Invariant($"the {Ordinal(i)} listed vertex: there is no vertex {v}: ids run 0..{mesh.Vertices.Count - 1}")));
+            else if (mesh.IsVertexDeleted(v))
+                errors.Add(new MeshError(Invariant($"vertices[{v}]"), PolygonMesh.DeletedMessage));
         }
 
         foreach (var ((a, b), i) in edges.Select((e, i) => (e, i)))
@@ -315,15 +372,18 @@ public static class MeshEdits
         return errors;
     }
 
-    private static bool HasFace(PolygonMesh mesh, int f) => f >= 0 && f < mesh.Faces.Count;
+    /// <summary>Whether <paramref name="f"/> names a live face: an id out of range or a tombstone does not.</summary>
+    private static bool HasFace(PolygonMesh mesh, int f) => mesh.FaceProblem(f) is null;
 
     private static MeshError UnknownFace(PolygonMesh mesh, int index, int f) =>
-        new(Invariant($"faces[{f}]"), Invariant($"the {Ordinal(index)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}"));
+        mesh.IsFaceDeleted(f)
+            ? new(Invariant($"faces[{f}]"), PolygonMesh.DeletedMessage)
+            : new(Invariant($"faces[{f}]"), Invariant($"the {Ordinal(index)} listed face: there is no face {f}: ids run 0..{mesh.Faces.Count - 1}"));
 
     /// <summary>Agent-facing text is the same on every host: numbers (a negative id's sign among them) in the invariant culture.</summary>
     internal static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 
-    private static string Ordinal(int index)
+    internal static string Ordinal(int index)
     {
         var n = index + 1;
         var suffix = (n % 100) is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };

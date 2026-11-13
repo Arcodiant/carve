@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The gatehouse (T-69): M-5's sample wall built by cuts alone, one frame set per stage, run by run-scenario.ps1 gatehouse. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Gatehouse</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <!-- The shed's checks and camera, the Cuts scenario's ray test (Solid) and shared checks, and the Crate scenario's colour rule (T-30). -->
+  <ItemGroup>
+    <Compile Include="../Carve.Scenario.Shed/ShedChecks.cs" Link="ShedChecks.cs" />
+    <Compile Include="../Carve.Scenario.Shed/ShedGeometry.cs" Link="ShedGeometry.cs" />
+    <Compile Include="../Carve.Scenario.Cuts/CutsGeometry.cs" Link="CutsGeometry.cs" />
+    <Compile Include="../Carve.Scenario.Cuts/CutsChecks.cs" Link="CutsChecks.cs" />
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
+  </ItemGroup>
+
+</Project>

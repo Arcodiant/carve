@@ -72,7 +72,7 @@ public sealed class MeshHealth
         var stats = new HealthStats(
             report.VertexCount, report.FaceCount, report.EdgeCount, triangles.Count, shells.Count, report.Closed,
             report.BoundsMin, report.BoundsMax, size,
-            Enumerable.Range(0, mesh.Faces.Count).Sum(f => PolygonMesh.Length(PolygonMesh.NewellVector(mesh.Vertices, mesh.Faces[f])) / 2),
+            mesh.LiveFaces.Sum(mesh.FaceArea),
             shells.All(s => s.SignedVolume is not null) ? shells.Sum(s => s.SignedVolume!.Value) : null);
 
         return new MeshHealth(shells, problems, report.Warnings, BuildNotes(report, size, shells.Count), stats);
@@ -110,7 +110,7 @@ public sealed class MeshHealth
         }
 
         var byFace = triangles.ToLookup(t => t.Face);
-        return Enumerable.Range(0, mesh.Faces.Count)
+        return mesh.LiveFaces
             .GroupBy(Find)
             .OrderBy(g => g.Key)
             .Select(g =>
@@ -130,7 +130,7 @@ public sealed class MeshHealth
     private static bool IsInsideOut(PolygonMesh mesh, MeshShell shell)
     {
         if (shell.SignedVolume is not { } volume || volume >= 0) return false;
-        var used = shell.Faces.SelectMany(f => mesh.Faces[f]).Select(i => mesh.Vertices[i]).ToList();
+        var used = shell.Faces.SelectMany(f => mesh.Faces[f].Loop).Select(i => mesh.Vertices[i]).ToList();
         var min = used.Aggregate(Vector3.Min);
         var max = used.Aggregate(Vector3.Max);
         var diagonal = Math.Sqrt(Math.Pow((double)max.X - min.X, 2) + Math.Pow((double)max.Y - min.Y, 2) + Math.Pow((double)max.Z - min.Z, 2));
@@ -144,7 +144,7 @@ public sealed class MeshHealth
     private static double SignedVolume(PolygonMesh mesh, IReadOnlyList<int> faces, ILookup<int, MeshTriangle> byFace)
     {
         var verts = mesh.Vertices;
-        var o = verts[mesh.Faces[faces[0]][0]];
+        var o = verts[mesh.Faces[faces[0]].Loop[0]];
         (double X, double Y, double Z) From(int i) => ((double)verts[i].X - o.X, (double)verts[i].Y - o.Y, (double)verts[i].Z - o.Z);
 
         var sum = 0.0;
@@ -178,7 +178,7 @@ public sealed class MeshHealth
         var first = new Dictionary<(int, int, int), int>();
         // Adding +0 turns -0 into 0 and changes no other float, so equal floats have equal bits.
         static int Bits(float f) => BitConverter.SingleToInt32Bits(f + 0f);
-        for (var j = 0; j < mesh.Vertices.Count; j++)
+        foreach (var j in mesh.LiveVertices)
         {
             var v = mesh.Vertices[j];
             var key = (Bits(v.X), Bits(v.Y), Bits(v.Z));
@@ -193,9 +193,9 @@ public sealed class MeshHealth
     private static void AddDuplicateFaces(PolygonMesh mesh, List<HealthProblem> problems)
     {
         var first = new Dictionary<string, int>();
-        for (var j = 0; j < mesh.Faces.Count; j++)
+        foreach (var j in mesh.LiveFaces)
         {
-            var key = string.Join(',', mesh.Faces[j].Order());
+            var key = string.Join(',', mesh.Faces[j].Corners.Order());
             if (first.TryGetValue(key, out var i))
                 problems.Add(new HealthProblem("duplicate-face", $"faces[{j}]", $"face has the same vertices as faces[{i}]"));
             else

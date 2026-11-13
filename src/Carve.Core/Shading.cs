@@ -107,15 +107,15 @@ public static class Shading
                 result[t] = new ShadedTriangle(a, b, c, normal, normal, normal, normal, triangle.Face);
                 continue;
             }
-            var loop = mesh.Faces[triangle.Face];
+            var face = mesh.Faces[triangle.Face];
             var at = corners[triangle.Face];
-            result[t] = new ShadedTriangle(a, b, c, at[CornerOf(loop, triangle.A)], at[CornerOf(loop, triangle.B)],
-                at[CornerOf(loop, triangle.C)], normal, triangle.Face);
+            result[t] = new ShadedTriangle(a, b, c, at[face.CornerOf(triangle.A)], at[face.CornerOf(triangle.B)],
+                at[face.CornerOf(triangle.C)], normal, triangle.Face);
         }
         return result;
     }
 
-    /// <summary>The normal at each corner of each face (face id, then position in its loop): a posed copy's own when it has them, else <see cref="Corners"/>.</summary>
+    /// <summary>The normal at each corner of each face (face id, then corner, <see cref="Face.Corners"/>: outer loop first, then each hole): a posed copy's own when it has them, else <see cref="Corners"/>.</summary>
     public static Vector3[][] CornersOf(PolygonMesh mesh) => mesh.PosedCorners ?? Corners(mesh);
 
     /// <summary>The normal at each corner of each face, worked from the mesh's positions, its mode and its hard edges.</summary>
@@ -125,14 +125,15 @@ public static class Shading
         var result = new Vector3[faces.Count][];
         for (var f = 0; f < faces.Count; f++)
         {
+            if (faces[f].IsDeleted) { result[f] = []; continue; }
             var n = mesh.FaceNormal(f);
-            result[f] = Enumerable.Repeat(n, faces[f].Count).ToArray();
+            result[f] = Enumerable.Repeat(n, faces[f].Corners.Count).ToArray();
         }
         if (mesh.ShadingMode != ShadingMode.Smooth) return result;
 
         var topology = mesh.Topology;
         var shade = mesh.Shade!;
-        var faceNormals = result.Select(r => r[0]).ToArray();
+        var faceNormals = result.Select(r => r.Length > 0 ? r[0] : Vector3.Zero).ToArray();
         for (var v = 0; v < mesh.Vertices.Count; v++)
         {
             var around = topology.VertexFaces(v);
@@ -148,9 +149,9 @@ public static class Shading
 
             for (var i = 0; i < around.Count; i++)
             {
-                var loop = faces[around[i]];
-                var k = CornerOf(loop, v);
-                foreach (var other in new[] { loop[(k + 1) % loop.Count], loop[(k + loop.Count - 1) % loop.Count] })
+                // A hole corner joins its neighbours along its own loop, like any corner.
+                var (previous, next) = faces[around[i]].Neighbours(faces[around[i]].CornerOf(v));
+                foreach (var other in new[] { next, previous })
                 {
                     if (!topology.TryGetEdge(v, other, out var edge) || !edge.IsManifold || shade.IsHard(v, other)) continue;
                     foreach (var use in edge.Faces)
@@ -166,9 +167,8 @@ public static class Shading
                 foreach (var i in members)
                 {
                     var f = around[i];
-                    var loop = faces[f];
-                    var k = CornerOf(loop, v);
-                    var w = Angle(mesh.Vertices[v], mesh.Vertices[loop[(k + 1) % loop.Count]], mesh.Vertices[loop[(k + loop.Count - 1) % loop.Count]]);
+                    var (previous, next) = faces[f].Neighbours(faces[f].CornerOf(v));
+                    var w = Angle(mesh.Vertices[v], mesh.Vertices[next], mesh.Vertices[previous]);
                     var n = faceNormals[f];
                     x += w * n.X; y += w * n.Y; z += w * n.Z;
                 }
@@ -176,7 +176,7 @@ public static class Shading
                 foreach (var i in members)
                 {
                     var f = around[i];
-                    result[f][CornerOf(faces[f], v)] = len > 0 ? new Vector3((float)(x / len), (float)(y / len), (float)(z / len)) : faceNormals[f];
+                    result[f][faces[f].CornerOf(v)] = len > 0 ? new Vector3((float)(x / len), (float)(y / len), (float)(z / len)) : faceNormals[f];
                 }
             }
         }
@@ -192,12 +192,5 @@ public static class Shading
         var cy = az * bx - ax * bz;
         var cz = ax * by - ay * bx;
         return Math.Atan2(Math.Sqrt(cx * cx + cy * cy + cz * cz), ax * bx + ay * by + az * bz);
-    }
-
-    /// <summary>The position of <paramref name="vertex"/> in a face's <paramref name="loop"/>: the index of its corner in <see cref="Corners"/>.</summary>
-    public static int CornerOf(IReadOnlyList<int> loop, int vertex)
-    {
-        for (var i = 0; i < loop.Count; i++) if (loop[i] == vertex) return i;
-        throw new ArgumentException("the vertex is not in the face", nameof(vertex));
     }
 }

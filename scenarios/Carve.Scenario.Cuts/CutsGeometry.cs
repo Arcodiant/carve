@@ -1,0 +1,212 @@
+using System.Numerics;
+using System.Text.Json;
+using Carve.Debug;
+using Carve.Scenario.Shed;
+
+namespace Carve.Scenario.Cuts;
+
+/// <summary>
+/// The mesh as get_mesh gives it, holes and all, with the rules the renderer follows, worked here apart from the
+/// product: a face's normal is its outer loop's Newell normal, a face is culled from behind, and a ray meets a face where
+/// it crosses the face's plane inside the outer loop and inside none of its holes. A deleted face (null in get_mesh) has
+/// an empty loop and is met by no ray; a deleted vertex (null) sits at the origin, used by no live face.
+/// </summary>
+internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] Faces)
+{
+    public bool IsDeleted(int face) => Faces[face].Loop.Length == 0;
+
+    /// <summary>The edges of the live faces, each once, lower id first.</summary>
+    public (int Lo, int Hi)[] AllEdges(IEnumerable<int>? only = null) =>
+        (only ?? Enumerable.Range(0, Faces.Length).Where(f => !IsDeleted(f)))
+            .SelectMany(f => Faces[f].Loop.Select((v, k) => (A: v, B: Faces[f].Loop[(k + 1) % Faces[f].Loop.Length])))
+            .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
+
+    /// <summary>
+    /// The edges in sight in a Cuts stage's wireframe: those of the live faces turned to the eye, a normal whose dot with
+    /// the direction toward the eye is over 0.2. The stages count their highlighted edges among them; the counts are
+    /// <see cref="CutsCounts"/>, worked in Core by <c>GatehouseGeometry</c>.
+    /// </summary>
+    public (int Lo, int Hi)[] FacingEdges(Vector3 toEye)
+    {
+        var dir = Vector3.Normalize(toEye);
+        return AllEdges(Enumerable.Range(0, Faces.Length).Where(f => !IsDeleted(f) && Vector3.Dot(Normal(f), dir) > 0.2f));
+    }
+
+    /// <summary>
+    /// Every edge of the live faces among <paramref name="faces"/> (every face when left out), outer loops and holes, each
+    /// once as (lo, hi), ascending.
+    /// </summary>
+    public (int Lo, int Hi)[] Edges(IEnumerable<int>? faces = null) =>
+        (faces ?? Enumerable.Range(0, Faces.Length)).Where(f => !IsDeleted(f))
+            .SelectMany(f => Faces[f].Holes.Prepend(Faces[f].Loop))
+            .SelectMany(l => l.Select((v, k) => (A: v, B: l[(k + 1) % l.Length])))
+            .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
+
+    /// <summary>The distance from <paramref name="p"/> to the segment from <paramref name="a"/> to <paramref name="b"/>.</summary>
+    public static float SegmentDistance(Vector3 p, Vector3 a, Vector3 b)
+    {
+        var t = Math.Clamp(Vector3.Dot(p - a, b - a) / Vector3.Dot(b - a, b - a), 0, 1);
+        return Vector3.Distance(p, a + (t * (b - a)));
+    }
+
+    public Vector3 Normal(int face)
+    {
+        var loop = Faces[face].Loop;
+        var n = Vector3.Zero;
+        for (var k = 0; k < loop.Length; k++)
+        {
+            var (a, b) = (Vertices[loop[k]], Vertices[loop[(k + 1) % loop.Length]]);
+            n += new Vector3((a.Y - b.Y) * (a.Z + b.Z), (a.Z - b.Z) * (a.X + b.X), (a.X - b.X) * (a.Y + b.Y));
+        }
+
+        return Vector3.Normalize(n);
+    }
+
+    /// <summary>The face a ray meets first among those whose front is toward the ray, or -1.</summary>
+    public int FirstHit(Vector3 origin, Vector3 direction)
+    {
+        var (best, nearest) = (-1, float.MaxValue);
+        for (var f = 0; f < Faces.Length; f++)
+        {
+            if (IsDeleted(f))
+            {
+                continue;
+            }
+
+            var n = Normal(f);
+            var facing = Vector3.Dot(n, direction);
+            if (facing >= 0)
+            {
+                continue;
+            }
+
+            var t = Vector3.Dot(Vertices[Faces[f].Loop[0]] - origin, n) / facing;
+            if (t <= 0 || t >= nearest - 1e-4f)
+            {
+                continue;
+            }
+
+            var p = origin + t * direction;
+            if (Inside(Faces[f].Loop, p, n) && !Faces[f].Holes.Any(h => Inside(h, p, n)))
+            {
+                (best, nearest) = (f, t);
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Even-odd: is <paramref name="p"/>, on the loop's plane, inside the loop, seen along the normal's largest axis.</summary>
+    private bool Inside(int[] loop, Vector3 p, Vector3 n)
+    {
+        var (ax, ay, az) = (Math.Abs(n.X), Math.Abs(n.Y), Math.Abs(n.Z));
+        Vector2 Flat(Vector3 v) => az >= ax && az >= ay ? new(v.X, v.Y) : ay >= ax ? new(v.Z, v.X) : new(v.Y, v.Z);
+        var q = Flat(p);
+        var inside = false;
+        for (var k = 0; k < loop.Length; k++)
+        {
+            var (a, b) = (Flat(Vertices[loop[k]]), Flat(Vertices[loop[(k + 1) % loop.Length]]));
+            if ((a.Y > q.Y) != (b.Y > q.Y) && q.X < a.X + (q.Y - a.Y) / (b.Y - a.Y) * (b.X - a.X))
+            {
+                inside = !inside;
+            }
+        }
+
+        return inside;
+    }
+
+    /// <summary>
+    /// What a pixel shows: the face it holds, or -1 for background, and -2 when it is not certain: the pixels two to
+    /// three across do not agree, so it sits on an edge or a silhouette (as the shed's camera does it).
+    /// </summary>
+    public int Seen(Camera camera, int size, int x, int y)
+    {
+        if (x < 4 || y < 4 || x >= size - 4 || y >= size - 4)
+        {
+            return -2;
+        }
+
+        var first = Cast(camera, x, y);
+        foreach (var (dx, dy) in new[] { (3, 0), (-3, 0), (0, 3), (0, -3), (2, 2), (-2, -2), (2, -2), (-2, 2) })
+        {
+            if (Cast(camera, x + dx, y + dy) != first)
+            {
+                return -2;
+            }
+        }
+
+        return first;
+    }
+
+    /// <summary>
+    /// As <see cref="Seen"/>, but sure when the pixel's eight neighbours agree: for a face only a few pixels across (a
+    /// pocket's wall, the edge-on top of a slab), which the three pixels round of <see cref="Seen"/> always leave.
+    /// </summary>
+    public int SeenNarrow(Camera camera, int size, int x, int y)
+    {
+        if (x < 4 || y < 4 || x >= size - 4 || y >= size - 4)
+        {
+            return -2;
+        }
+
+        var first = Cast(camera, x, y);
+        foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1) })
+        {
+            if (Cast(camera, x + dx, y + dy) != first)
+            {
+                return -2;
+            }
+        }
+
+        return first;
+    }
+
+    private int Cast(Camera camera, int x, int y)
+    {
+        var (o, d) = camera.Ray(x, y);
+        return FirstHit(o, d);
+    }
+
+    /// <summary>
+    /// The current mesh from get_mesh: a face's <c>vertices</c> is its loop, or <c>{loop, holes}</c> for a holed face; a
+    /// deleted slot is null.
+    /// </summary>
+    public static async Task<Solid> ReadAsync(ScenarioDriver driver)
+    {
+        var mesh = JsonDocument.Parse(await Checks.CallTextAsync(driver, "get_mesh", new { })).RootElement;
+        var vertices = mesh.GetProperty("vertices").EnumerateArray().Select(v =>
+        {
+            if (v.ValueKind == JsonValueKind.Null)
+            {
+                return Vector3.Zero;
+            }
+
+            var at = v.GetProperty("at");
+            return new Vector3(at[0].GetSingle(), at[1].GetSingle(), at[2].GetSingle());
+        }).ToArray();
+        static int[] Ids(JsonElement e) => e.EnumerateArray().Select(x => x.GetInt32()).ToArray();
+        var faces = mesh.GetProperty("faces").EnumerateArray().Select(f =>
+        {
+            if (f.ValueKind == JsonValueKind.Null)
+            {
+                return (Array.Empty<int>(), Array.Empty<int[]>());
+            }
+
+            var v = f.GetProperty("vertices");
+            return v.ValueKind == JsonValueKind.Object
+                ? (Ids(v.GetProperty("loop")), v.GetProperty("holes").EnumerateArray().Select(Ids).ToArray())
+                : (Ids(v), Array.Empty<int[]>());
+        }).ToArray();
+        return new Solid(vertices, faces);
+    }
+}
+
+/// <summary>The counts of the Cuts stages' wireframes that depend on the in-sight rule (<see cref="Solid.FacingEdges"/>), worked in Core by <c>GatehouseGeometry</c>.</summary>
+internal static class CutsCounts
+{
+    /// <summary>loop-cut-wireframe: the loop edges in sight from (0.6, 0.35, 1).</summary>
+    public const int LoopEdgesInSight = 4;
+
+    /// <summary>plane-cut-both-wireframe: the cut edges in sight from (0.6, 0.35, 1).</summary>
+    public const int PlaneCutEdgesInSight = 3;
+}

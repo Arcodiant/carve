@@ -4,7 +4,7 @@ description: >-
 ---
 # M-5 — Cut
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *An agent cuts into a mesh: plane cuts, loop cuts, knife paths, face merge and delete*
 
@@ -47,7 +47,7 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
   - Pieces take their face's colour and groups.
   - Both pieces of a split hard edge stay hard, and new edges are soft, except a plane cut's fill border on a smooth mesh, which is hard.
   - New vertices blend weights: by fraction on an edge, or barycentrically inside a face, renormalised and capped at 4. UVs blend the same way if M-6 has landed; how seams carry goes back to the person.
-- **The file version.** One new Carve file version, owned by T-63 and taken as the next free one at dispatch: 4 after T-42's 3, unless M-6's UVs took it first. It holds holed faces and the `null` tombstones.
+- **The file version.** One new Carve file version, owned by T-63 and taken as the next free one at dispatch: 4 after T-42's 3, unless M-6's UVs took it first. It holds holed faces and the `null` tombstones. `CarveFile.Write` writes the lowest version that holds the model: this one only when the model needs it (a holed face, a tombstone), otherwise 2 or 3 byte for byte as T-42's tests require (ruled by the person, 2026-11-11).
 - **The sample**, as agreed: a gatehouse wall, built by T-69, coordinates in metres.
 
   ```text
@@ -110,3 +110,133 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - [ ] [T-70](../tasks/T-70-cut-acceptance-run.md) — Fresh agents cut a wall into a gable with a see-through window from the descriptions alone, recovering from a knife point off the surface
 
 ## Retrospective
+
+**As planned.**
+
+- The order held: T-63, then T-64, then T-65 beside T-68, then T-66 beside T-67, then T-69 and T-70. Every rebase conflict between siblings was the planned one, adds only in `Program.cs`'s tool list and `CutsStages.cs`, and each member resolved its own with both sides kept. None needed the person.
+- Carve file version 4 was free and T-63 took it. Faces with holes, tombstones, `plane_cut`, `loop_cut`, `knife`, `merge_faces`, `delete` and `bridge` are all reachable through the product's own MCP tools.
+- The guard held: every existing frame stayed byte-identical by hash through every member. That is 121 frames at T-63, 127 at T-64, 130 at T-68, 133 at T-65, 135 at T-66 and T-67, and 137 at T-69, with the 26 gatehouse frames identical across two runs.
+- The person approved every new frame set: T-63's 4, T-64's 2, T-68's 3, T-65's 3, T-66's 2, T-67's 2 (on the second try), T-69's 20, and T-70's final sheet.
+- `GatehouseGeometry` came first, before any frame, as planned. The one planned count it could not meet (an edge hidden under the cornice) was a stop, not a change.
+- The acceptance run passed in round 2. A fresh `claude -p` session (claude-fable-5-2, the default) cut the gable with two `plane_cut`s, the window with a closed `knife` on each face, then `delete` and `bridge`, and the door with a `knife`. It ended with a closed `check` and no warnings, a brown door, and background through the window. No description changed.
+- The milestone's `verify` passes every check but `review`: 8/8 members merged and 13 suites passing (`scenario-rig` came with M-17 in the rebase onto `main`).
+- **Models and agents per member:**
+
+  | Member | Model | Agents |
+  |---|---|---|
+  | T-63 | Opus 5.5 | 5 |
+  | T-64 | Opus 5.5 | 3 |
+  | T-65 | Opus 5.5 | 4 |
+  | T-68 | Opus 5.5 | 2 |
+  | T-67 | Opus 5.5 | 6 |
+  | T-66 | Sonnet 5.5 | 1 |
+  | T-69 | Sonnet 5.5 | 4 |
+  | T-70 | Sonnet 5.5 | 2 |
+
+  No rework was traced to the cheaper tier. T-66, on Sonnet, was the only member done by one agent. T-69's stops were spec faults, found from the geometry.
+
+**Not as planned.**
+
+- **Hand-offs dominated.** The eight members took 27 agents. Most hand-offs came at "code committed, a real run still to come": the GPU queue was shared with Empyrean, voidmarches, waystone and M-17's Carve members, and a queued `verify` often waited an hour or more. T-63 alone took 5 agents and about 6 hours, mostly in the queue. Twice the orchestrator stopped an agent sitting in a `verify` wait so it could not wake and write beside its continuation. Once it watched the queue itself rather than paying an agent to wait.
+- **M-17 ran at the same time.** It was Active on `main` with no worktree on this machine. The orchestrator flagged this in the opening table but did not ask, since no ordering ruling covered it. T-63's first frame baseline came from M-17's queued runs, so it held 15 bone and weight frames this branch does not make.
+- **The person ruled 25 times during the milestone.** Each ruling is in its member's As built. The rulings by member: T-63 3, T-64 2, T-65 5, T-68 2, T-66 2, T-67 6, T-69 2, T-70 3. All but two took the recommended option:
+  - T-68's bridge example: the spec said "an open-ended box", but two quads facing each other bridge into a closed box facing inward. The person kept it as built, and the spec text was corrected.
+  - T-67's recess frame: the person rejected it ("the cuts don't appear to be visible") and asked for the cut faces to be coloured.
+- **Two stops came from the orchestrator's own briefs:**
+  - T-67's shade prediction: Cuts' ray test predicts which face a pixel shows, not its shade, but the brief said it did. That cost a stop and two more rulings.
+  - T-69's "in sight": a pixel rule failed on rounding, and the person chose a 3D ray test. The orchestrator set its nudge, 1e-3 of the bounds diagonal, without asking.
+- **Readings landed without asking:**
+  - T-66 landed a provisional refusal for a non-manifold ring although its spec said to stop and ask. The person kept it after the fact.
+  - T-64 landed its own `Drawn` pixel check. The person kept it after the fact.
+  - The orchestrator ruled two things itself: that T-67 owns the additive change to `FaceSplit` (both members' Notes sent a `FaceSplit` need to the orchestrator), and the colours of T-67's knifed faces (`#4a7a9b` for the hexagon).
+- **New shared check rules, each ruled by the person:**
+  - `Drawn`, for edges over the background (T-64);
+  - `SeenNarrow`, for faces a few pixels wide (T-67);
+  - the Crate colour rule, shared as `ColourRule.cs` and used in Cuts at 2 steps (T-67);
+  - the geometric "in sight" test, local to the gatehouse (T-69).
+- **The acceptance prompt changed.** Round 1 found "4 m tall" clashing with the apex at y = 3.4. The agent built a 3.4 m prism in `define_mesh` and cut no gable. The person had the first two sentences reworded to "a slab ... then cut a gable top into it", worded by the orchestrator. They also accepted `--output-format stream-json --verbose` into the run conditions, for the transcript.
+- **The plant never fired.** In both rounds the agent worked out from the prompt's own numbers that the front is at z = 0.15, before any call. The person ruled that recovery by understanding counts, as in M-4.
+- **One slow-runner failure.** `HoledFaceToolTests.A_bad_hole_is_a_tool_error_naming_it` timed out at server start-up (30 s) in a 20-minute `server-regression` run on Xellotath. It passed on the re-run, and no timeout was changed.
+- **Rebased onto main after M-17 (Rig) landed (7d957b4).** The conflicts (the `CLAUDE.md` layout table, `Carve.slnx`, `Program.cs`'s tool list) were resolved by keeping both sides. Three fixes were needed where the two milestones met, each a separate commit. First, one `Vector3D`: M-17's public `Carve.Core.Vector3D` clashed with the cuts' nested copy in `FaceSplit`, and main's has the same fields and operators, so the cuts' copy was dropped. Second, `weigh` skips deleted vertices: it walked every slot, so after M-5's `delete` it gave a tombstone weights again and counted it unweighted. Third, `get_weights` counts live vertices only: it counted, listed and accepted tombstones, and a deleted id asked for is now the tool error "deleted", as with `set_weights`. M-17 was written before tombstones existed, which is why the last two were needed. A regression test now covers the case between them: a cut's blended weights read back through `get_weights`, and a plain `weigh` keeps them. The rebased frames were compared by hash and are byte-identical: all 163 of M-5's from before the rebase, and all 124 of main's at 7d957b4 (character, crate, cube, export, rig). main's shed and soft at 7d957b4 had no run to compare against, so those two are checked against M-5's only (`artifacts/review/rebase-main/REBASE.md`).
+
+- **B-3, the person's ruling after T-66 ("refuse it, fix later"), was fixed before `finish`.** `loop_cut` now refuses a ring that closes on itself reversed (a Mobius band), on a hand-built band of eight planar quads, with a break shown failing (Sonnet 5.5, two agents). Pushing it needed the rebased milestone branch on origin first, which the person allowed with `--force-with-lease`.
+- **The refactor pass** (Opus 5.5) moved the helpers the cut stages had copied into `CutsChecks.cs` (`dc27cde`) and the geometry Knife and PlaneCut borrowed from `FaceSplit` into `PlaneGeometry.cs` (`6322324`). All 187 frames stayed byte-identical.
+- **Review round 1 (RV-31)** had five Opus reviewers: Core topology, cut algorithms, server tools, scenarios, and the whole diff. It raised 30 findings, 6 of them Major, covering five defects:
+  - the knife cutting nothing along a boundary;
+  - `subdivide`'s report after a delete (rated Major by two reviewers and Minor by a third);
+  - `loop-cut-band-extruded`, whose checks could not see the extrude;
+  - the y-axis tiles with no check worked from the geometry;
+  - suite inputs missing linked files.
+
+  The person ruled three:
+  - the knife cuts boundary-touching segments as `plane_cut` does;
+  - a face in a plane cut's plane stays untouched;
+  - a merged fold warns.
+  The orchestrator ruled the README's merge example onto the ids `loop_cut` really leaves. All 30 were fixed:
+  - fixer A (Opus, three agents) took 20, in the product;
+  - fixer B (Opus, two agents) took 9, in the scenarios;
+  - the orchestrator took the Retrospective.
+
+  Every code fix has a test or check shown failing without it. Five fixes are text or configuration with no break: D-1, `CLAUDE.md`'s Layout, `tests.json`'s inputs, a test rename, and the Retrospective. All 187 frames stayed byte-identical.
+- **Review round 2 (RV-32)** had two Opus reviewers, on the fix diff and the answers. 28 of the 31 answers checked held, and it raised 7 findings, none Major. The person ruled two:
+  - `loop_cut` refuses a cut that would run along a quad's edge, and `FaceSplit` never skips a cut silently;
+  - the -y tile's orientation is recorded as a known limit.
+
+  An Opus fixer fixed five. Four had a break shown failing; the fifth removed an assert that could not fail, so it had none (`artifacts/review/RV-32/breaks.log`). The orchestrator answered the Retrospective and the -y tile.
+- **Review round 3 (RV-33)** had one Opus reviewer. 5 of RV-32's 7 answers held, and it raised 6 findings: 1 Major, 1 Minor and 4 Nit.
+  - **The Major:** round 2's `loop_cut` fix tested every edge with an exact sign and no tolerance, so it refused ordinary cuts across any quad that wasn't axis-aligned. Every test and frame used axis-aligned quads, so none caught it.
+  - **The Minor:** the Retrospective overclaimed breaks a second time. Because it had survived two rounds, it went to the person, who chose to fix it and run round 4.
+
+  An Opus fixer fixed the four code findings. The `loop_cut` check and the description got breaks, and the removed unreachable refusal and a stale doc comment got none. It also found and fixed the same exact-sign defect in the knife's corner splitting from round 1, with rotated-input tests shown failing. `PlaneCut` and code older than round 1 were not searched for it. All 187 frames stayed byte-identical.
+
+- **Review round 4 (RV-34)** had one Opus reviewer. All 6 of RV-33's answers held, and it probed `PlaneCut` on a cube and on a cube subdivided twice, under 200 rotations, finding no exact-sign defect. It raised 2 findings:
+  - **Minor:** RV-33's `loop_cut` fix lets real crossings of a concave quad's side edge reach `FaceSplit` when an end of the cut is within the tolerance of that edge: near the reflex corner, or along a thin arm. On RV-34's test quads that was 0.9996 to 0.9997 on the dart (in all 300 rotations), 258 and 1276 of 1999 fractions on two thin darts, and 0.9975 to 0.9997 on one that is not thin. These cuts reach `FaceSplit`, which refuses them as `cuts[0]` rather than in `loop_cut`'s words. No cut is made wrongly.
+  - **Nit:** this Retrospective said a wrong-up +y tile is caught, which no break showed.
+
+  The person ruled to file the Minor as B-4 and finish. The orchestrator fixed the Nit.
+- **Review round 5 (RV-35)** read the documents only, with one Opus reviewer. Both of RV-34's answers held, and it found 2 Nits in this Retrospective (B-4's extent understated, and `PlaneCut` called unsearched after RV-34 had probed it). The orchestrator fixed both.
+
+**Never verified.**
+
+- **The knife's off-surface error was never met by an agent.** It is covered by tests and the Cuts scenario only. `loop_cut`, `merge_faces` and `undo` were used by no acceptance agent.
+- **Checks shown failing only indirectly:**
+  - T-69's `NotLine` on old edges has no break of its own.
+  - Two of T-64's Cuts breaks are caught only as a failed run (`get_mesh` erroring, the stage throwing), not by their own check.
+  - T-64 has no break for export bounds or wireframe face loops, since a tombstone at the origin cannot move either.
+  - T-66's "walk order" break failed nothing; its id order rests on `FaceSplit`'s own rule.
+  - T-67's slanted pocket walls are caught only by R5, and the lower-left wall clears the floor by only 3 to 4 steps against the 2-step rule.
+- **Carried passes:**
+  - `viewer-cube` was carried from `99c846e` (T-63) through most members, though it ran fresh in the milestone's `verify`.
+  - T-63 to T-68 each hashed frames from the run of their last code commit, not from their final notes-only commit.
+- **The gatehouse's -y axis tile, seen from below,** shows only two downward faces of one shade inside a plain rectangle. A -y view drawn mirrored or with the wrong up passes; only a swap with +y is caught. The person kept the approved frame and recorded this as a known limit (RV-32). Likewise, a +y tile mirrored in x passes, and only a swap with -y was shown failing. RV-32's reviewer reasoned that a 180-degree wrong up is caught too, but no break showed it (RV-32, recorded in RV-33 and RV-34).
+- **The exact-sign pattern behind RV-33's Major** was searched for and fixed only in the code rounds 1 and 2 added (`loop_cut`, the knife's corner splitting, `FaceSplit`). The round-3 fixer did not search `PlaneCut`. RV-34 then probed it on a cube and on a cube subdivided twice, under 200 rotations, and found no such defect; concave input was not probed. Code older than round 1 was not searched.
+- **Machines:** any GPU but Mantorok's and Xellotath's (both RTX 5070), and any client but `claude -p`.
+- **The installed carve:** `C:\tools\carve` has not been republished.
+- The orchestrator opened no frame. Every look above is a member's or the person's.
+
+**Known and left.**
+
+- B-4: `loop_cut` names `cuts[0]` instead of refusing in its own words when a cut across a concave quad really crosses a side edge that an end of the cut is within the tolerance of (from RV-34; the failing inputs are in B-4). It is off-milestone and Minor: no cut is made wrongly, only the wording is wrong.
+- `CLAUDE.md` and `README.md` are inputs of no suite (a `verify` warning).
+- `branches/task/T-63` to `T-70` remain on disk, unregistered from git: `finish` ran from inside each one and could not remove it.
+- `%TEMP%\carve-m5-acceptance\` (two rounds and a Release publish of `carve`) and the members' scratch folders in `%TEMP%` (`t63` to `t70`) are not cleared.
+- Evidence is in this worktree's ignored `artifacts/review/T-63` to `T-69` and `artifacts/m5-acceptance/round-1` and `round-2`.
+
+**The test report** (`cairn test report --since 2d`) covers M-5's and M-17's jobs together, since both share Carve's suites. It shows no flakes:
+
+| Suite | Slot-seconds a week | Failures | Unique catches | cnr |
+|---|---|---|---|---|
+| `server-regression` | about 79,000 | 7 | 5 | 1 |
+| `scenario-crate` | about 2,800 | 1 | — | — |
+
+Four suites have one never-ran job each. The start-up timeout above was a slow runner, not a test fault. Nothing was filed. Whether a 30 s start-up timeout needs a margin under load is for the person.
+
+**For the next plan.**
+
+- **Plan for the GPU queue.** A member's hand-off at "a real run still to come" cost a whole agent each time the queue was long. Let a member submit its GPU suites early and keep working, or let the orchestrator hold a `verify` wait itself, instead of handing off.
+- **Name the shared check rules at planning:** the colour rule, narrow faces, edges over the background, and "in sight" with occlusion. Four were invented mid-milestone, each a stop.
+- **Work an acceptance prompt's numbers for clashes at planning.** "4 m tall" against the apex cost a round.
+- **Plant something the prompt's own numbers cannot reveal.** A coordinate one subtraction away from the truth is solved before any call, as in M-4. The off-surface error is still unexercised.
+- **Say in a brief what a check can predict before asking for a check against it.** The orchestrator's T-67 brief asked for "the shade the ray test predicts", which Cuts did not have.
+- **Ask before running two milestones at once on shared suites,** as with M-17 here.
+- Re-publish `C:\tools\carve` after `main` moves.

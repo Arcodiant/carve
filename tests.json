@@ -14,7 +14,12 @@
         {
           "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
         },
-        "samples/leaky-shed.carve"
+        "samples/leaky-shed.carve",
+        "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
+        "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs",
+        "samples/gatehouse.carve"
       ],
       "resources": "cpu",
       "est-seconds": 30
@@ -29,6 +34,7 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/**/*.csproj",
         "spikes/**/*.csproj"
       ],
@@ -45,6 +51,7 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "samples/leaky-shed.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
@@ -250,6 +257,62 @@
         "vulkan"
       ],
       "est-seconds": 90
+    },
+    {
+      "id": "scenario-cuts",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 cuts -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Cuts/Carve.Scenario.Cuts.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
+    },
+    {
+      "id": "scenario-gatehouse",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-gatehouse-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Gatehouse/Carve.Scenario.Gatehouse.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.GatehouseLoad.Tests/Carve.GatehouseLoad.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsChecks.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "samples/gatehouse.carve",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-gatehouse-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 60
     }
   ],
   "todo": []

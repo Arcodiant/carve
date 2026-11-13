@@ -98,7 +98,7 @@ public class DefineMeshTests
         var tool = await ToolAsync(carve);
 
         var description = tool.GetProperty("description").GetString()!;
-        foreach (var phrase in new[] { "1 unit = 1 m", "Y is up", "counter-clockwise", "any number of sides", "REPLACES", "A face has no holes; build an opening from several faces around it." })
+        foreach (var phrase in new[] { "1 unit = 1 m", "Y is up", "counter-clockwise", "any number of sides", "REPLACES", "A face may have holes", "CLOCKWISE seen from outside", "a hole no face fills shows as open edges" })
         {
             Assert.Contains(phrase, description);
         }
@@ -109,7 +109,7 @@ public class DefineMeshTests
         Assert.Equal(3, vertex.GetProperty("minItems").GetInt32());
         Assert.Equal(3, vertex.GetProperty("maxItems").GetInt32());
         Assert.Equal("number", vertex.GetProperty("items").GetProperty("type").GetString());
-        Assert.Equal("integer", properties.GetProperty("faces").GetProperty("items").GetProperty("items").GetProperty("type").GetString());
+        Assert.Equal("integer", properties.GetProperty("faces").GetProperty("items").GetProperty("anyOf")[0].GetProperty("items").GetProperty("type").GetString());
     }
 
     private const string Tri = """[[0,0,0],[1,0,0],[0,1,0]]""";
@@ -217,7 +217,7 @@ public class DefineMeshTests
         var schema = (await ToolAsync(carve)).GetProperty("inputSchema").GetRawText();
 
         Assert.Equal(
-            """{"type":"object","properties":{"name":{"description":"The name of the mesh, non-empty and without a colon (a skinned export names materials mesh:group, so such a name is refused); left out, it is mesh. An existing name replaces that mesh in its place; a new one adds a mesh after the others.","type":"string"},"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside.","type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["vertices","faces"],"additionalProperties":false}""",
+            """{"type":"object","properties":{"name":{"description":"The name of the mesh, non-empty and without a colon (a skinned export names materials mesh:group, so such a name is refused); left out, it is mesh. An existing name replaces that mesh in its place; a new one adds a mesh after the others.","type":"string"},"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside; or, for a face with holes, {loop: [...], holes: [[...], ...]}: the outer loop counter-clockwise and each hole clockwise, seen from outside.","type":"array","items":{"anyOf":[{"type":"array","items":{"type":"integer"}},{"type":"object","properties":{"loop":{"type":"array","items":{"type":"integer"}},"holes":{"type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["loop","holes"],"additionalProperties":false}]}}},"required":["vertices","faces"],"additionalProperties":false}""",
             schema);
     }
 }

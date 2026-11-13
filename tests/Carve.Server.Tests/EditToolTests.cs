@@ -50,6 +50,45 @@ public class EditToolTests
     }
 
     [Fact]
+    public async Task Every_edit_report_shape_in_a_description_names_deleted_and_split()
+    {
+        // Every edit's body carries deleted and split (MeshToolSupport.Edit, define_mesh, subdivide), so every
+        // description whose "Returns JSON" is an edit report, {vertices, faces, edges, ...}, names both.
+        var (carve, tools) = await StartAsync(define: false);
+        using var _ = carve;
+        var reports = tools.EnumerateArray()
+            .Select(t => (Name: t.GetProperty("name").GetString()!, Text: t.GetProperty("description").GetString()!))
+            .Where(t => t.Text.Contains("Returns JSON {vertices, faces, edges,", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Superset(new HashSet<string> { "define_mesh", "move", "extrude", "subdivide", "delete", "merge_faces", "bridge", "plane_cut", "loop_cut", "knife" },
+            reports.Select(t => t.Name).ToHashSet());
+        foreach (var (name, text) in reports)
+        {
+            var shape = text[text.IndexOf("Returns JSON {vertices, faces, edges,", StringComparison.Ordinal)..];
+            Assert.True(shape.Contains("deleted:{vertices:", StringComparison.Ordinal), name + ": " + shape);
+            Assert.True(shape.Contains("split:[", StringComparison.Ordinal), name + ": " + shape);
+        }
+    }
+
+    [Fact]
+    public async Task Render_names_every_edit_and_get_mesh_s_shape_reads_in_one_piece()
+    {
+        var (carve, tools) = await StartAsync(define: false);
+        using var _ = carve;
+        var render = Description(tools, "render");
+        var first = render[..render.IndexOf(". ", StringComparison.Ordinal)];
+        foreach (var edit in new[] { "move", "extrude", "subdivide", "delete", "merge_faces", "bridge", "plane_cut", "loop_cut", "knife", "undo" })
+            Assert.Contains(edit, first);
+
+        var getMesh = Description(tools, "get_mesh");
+        var start = getMesh.IndexOf("Returns JSON {", StringComparison.Ordinal);
+        var shape = getMesh[start..(getMesh.IndexOf("(from define_group)}", start, StringComparison.Ordinal) + 1)];
+        Assert.Contains("edges:[{vertices:[a,b]", shape);
+        Assert.DoesNotContain("null in its slot", shape);
+        Assert.Contains("null in its slot", getMesh);
+    }
+
+    [Fact]
     public async Task The_undo_example_undoes_an_extrude()
     {
         var (carve, tools) = await StartAsync();
