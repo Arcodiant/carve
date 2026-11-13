@@ -37,61 +37,34 @@ Carve's preview looks as the game will. T-47 found `render_glb` frames uniformly
 - **Open rules: stop and ask.** Anything D-6 does not settle, any loosened check, and any change to a D-6 decision.
 - Run `finish` from inside the worktree and leave the folder.
 
-### Hand-off
+### As built
 
-Second agent, on Opus 5.5 (the first was Opus 5.5 too). Stopped twice on questions; the second is open (below).
+Three agents, all on Opus 5.5: the first built the PBR path and the unit and regression tests, the second the margins under the person's first and third rulings, the third (this section) the last cube point, the derivations, the shown-failing table, the full run and the review.
 
-**The rulings of 2026-11-13** (recorded word for word from the options chosen):
-1. "Keep light, lower margins": "Keep the scene's light as it is. MinimumStep goes from 10 to about 6, and the soft facet and crease thresholds are re-derived for PBR. Loosens checks, by your ruling."
-2. On the highlight, "Yes, PBR-shaded tint": a highlighted face in the shaded look follows the surface's PBR shading, as the first agent built it.
+**What changed.** `src/Carve.Server/SurfaceMaterial.cs`: `SurfaceMaterial.Of(colour)` is `Material.Pbr(base colour, GlbExport.Metallic, GlbExport.Roughness, doubleSided: false)`, the base colour the exported one; `RenderSystem` uses it for the shaded fill, each colour's submesh and a glb with no material. Wireframe, normals and weights keep `Material.SolidColor`; lines, bones and labels are untouched; a highlighted face in the shaded look is a vertex tint through PBR. D-1, D-6 and `CLAUDE.md` record the ruling.
 
-**Done since (committed):**
-- `MinimumStep` 10 to 6 in `CubeScenario.cs` and `CrateBuild.cs`, worked from the faces' n.l. The PBR model (grey 0.72, ambient 0.25 unchanged, directional 0.9 reaching a face as albedo / pi, sRGB-encoded readback) predicts the cube-front faces at 158 / 147 / 139 (measured 157 / 145 / 137; under LitMesh 216 / 190 / 171). The closest pair, +Z over +X, steps by 8, so 6 keeps 2 of headroom.
-- The soft thresholds scaled by the same factor (a step from the light is about 0.43 of LitMesh's): torso facet step flat 20 to 9 or more, smooth 12 to 5 or less; brim rim stage 10 to 4, break 20 to 9. On a local run these all pass (flat rest, smooth rest, hat creased and uncreased).
-- D-1 (*C# on Empyrean*), D-6 (*Two samplers, on purpose*) and `CLAUDE.md` (*Renders are Empyrean's*) record the ruling: the model's colours are drawn with the PBR material the loader makes from the export, the scene light unchanged, other looks keep their own materials, the highlight is a PBR-shaded tint.
+**Rulings (2026-11-13), word for word.** 1. "Keep the scene's light as it is. MinimumStep goes from 10 to about 6, and the soft facet and crease thresholds are re-derived for PBR. Loosens checks, by your ruling." 2. On the highlight, "Yes, PBR-shaded tint". 3. "Re-pick points, else lower": "Where a check samples points, move them to facets or spans far enough apart in n·l that the existing margin holds (cylinder ends, cylinder grade, torso run). Where it can't (the cap's off-by-one, the label backing), lower it, worked from PBR: the cap allows 1, and the backing margin is worked from the face's shade. Each still shown failing on its break."
 
-**Checked:** a local run of every scenario on this commit, then cube, crate and soft again with `ScenarioDriver.Fail` made non-fatal for one uncommitted local run (reverted), so every failing check showed, not only the first. shed, rig, export, character and viewer-cube pass. The crate's colour check passes.
+**The light model** the thresholds are worked from: the scene light turned with the camera (`ViewFraming.LightOrientation`, light along its -Z); a face's linear light is albedo x (ambient 0.25 + 0.9 n.l / pi), sRGB-encoded. Checked against the frames, not fitted to them: the cylinder cap (n.l 0.937) 164, facets 3 and 14 131 and 127, the cube front 158 / 147 / 139 (measured 157 / 145 / 137), the torso row within 1 luma.
 
-**Third ruling, 2026-11-13, on the checks outside the first ruling**, "Re-pick points, else lower", word for word as offered: "Where a check samples points, move them to facets or spans far enough apart in n·l that the existing margin holds (cylinder ends, cylinder grade, torso run). Where it can't (the cap's off-by-one, the label backing), lower it, worked from PBR: the cap allows 1, and the backing margin is worked from the face's shade. Each still shown failing on its break." If a re-picked point cannot hold its existing margin either, stop and ask again rather than lower it.
+| Changed check | How it was derived | Passes on (measured) | Its break, and the result there |
+|---|---|---|---|
+| `MinimumStep` 10 to 6 (cube and crate face order) | cube front n.l 0.783 / 0.513 / 0.351, predicted 158 / 147 / 139; the closest pair steps by 8 | cube-front 157 / 145 / 137 | mirrored camera (frame mirrored): +Z 137 against +X 145, fails; flipped: 145 / 145, fails |
+| Torso facet step: flat 9 or more, soft 5 or less | ruling 1 (scaled 0.43, a step from the light under PBR against LitMesh); the model over the samples' geometry gives flat 13 and 14, soft 5 and 5 | flat 13, 13; soft 4, 5 | each frame against the other's rule (smooth drawn flat, flat drawn smooth): the flat frame's 13 fails "5 or less", the soft frame's 4 and 5 fail "9 or more" |
+| Torso ramp span, -0.16..-0.08 to -0.195..-0.115 (runs: flat 10 or more, smooth 5 or fewer, unchanged) | a ray cast per pixel through `samples/gardener.carve` and `gardener-soft.carve` with the model: flat crosses the facet edge onto one shade for 16 pixels; smooth ramps 89 to 101, longest run 5 (at the bound, no headroom). Spans further out leave the soft torso (background past about -0.21) or cut the flat plateau to 10 | flat 16, smooth 4 | the flat frame's 16 fails "5 or fewer"; the smooth frame's 4 fails "10 or more" |
+| Brim rim: stage 10 to 4, break 20 to 9 | ruling 1, scaled 0.43 as above; not re-worked over the hat's geometry | creased and uncreased frames pass, each with its own rule | the scenario applies the uncreased rule (no step of 9) to the uncreased frame and the creased rule (a step of 9 or more) to the creased one, so each frame fails the other's |
+| Cylinder ends (`MinimumStep`), facet 14 / 3 to 13 / 3 | n.l 0.03 (119) against 0.23 (131), 12 apart | flat 10, smooth 11, subdivided 10 | the side drawn one shade (no directional light): both 118, 0, fails. A mirrored camera ((1,2,2), worked in the model) still differs by 7 flat and 11 smooth, so this check alone does not catch a mirror; the normals-look channel checks on the same cylinder do |
+| Soft-rims frame's far end (third agent): facet 13 at mid height to the cage's vertex 14 at y -0.3, at 0.9 of the radius | with no hard rim the subdivided cylinder rounds in and facet 13's point is background; lower and inside, the normal faces away from the light (n.l at or below 0), ambient alone: 0.72 x 0.25 = 0.18, sRGB 118, against facet 3's 131 | 118 against 130, 12 | one shade, as above, fails |
+| Cylinder grade: facet 2 to facet 14, `least: 3` | facet 14's n.l runs 0.09 to 0.21 across it, about 5 at t 0.2 and 0.8 | smooth 125 / 129 | smooth drawn flat (the flat frame at the same points): 127 / 127, fails |
+| Cap one shade, within 1 (was exact) | ruling 3 | 164 / 164 on the three hard-rimmed frames (blue 161 / 162) | the rim not hard (the soft-rims frame): 165 against 149, 16, fails |
+| Label backing: least darkening `shade - Backed(shade) - 10`, was 60 | the 0.6 black backing leaves 0.4 of the face's linear light (`Backed`), less the 10 the backed value may be off; a top face at the model's 158 goes to 103, least 45 | lid labels pass | a label with no backing darkens by 0 (the plain frame), fails |
 
-**Done under it (committed with this hand-off):**
-- The light model, checked: the scene light turned with the camera (`ViewFraming.LightOrientation`, light along its -Z), worked in Python, gives the cube front n.l 0.783 / 0.513 / 0.351 and the cylinder (view 2,2,1) cap 0.937, predicted 164 (measured 164); facets 3 and 14 predicted 131 and 127 (measured 131 and 127). Per facet k (centre angle (k + 0.5) x 22.5 degrees), n.l: 0 0.33, 1 0.35, 2 0.31, 3 0.23, 4 0.11, 13 0.03, 14 0.16, 15 0.27; 5 to 12 face away.
-- `CubeScenario.cs`: the side's two ends are now facet 13 (n.l 0.03, 119) against facet 3 (131), 12 apart under `MinimumStep` 6; the smooth grade is taken on facet 14 (t 0.2 against 0.8, n.l 0.09 to 0.21, about 5 apart against `least: 3`), with a flat plateau check added on the same facet; the three cap checks go through `CheckCapOneShade`, within 1 per channel.
-- `CrateLabels.cs`: the backing's least darkening is worked from the face's shade, `shade - Backed(shade) - 10` (44 and 47 for the lid at 157 and 166), unless a caller sets it (the +Z frame keeps 0).
-- `SoftScenario.cs`: the torso's ramp span moves to -0.195 to -0.115 m, by the -X silhouette, where the normal turns fastest per pixel and n.l = 0.35 sin + 0.51 cos changes fastest: the smooth ramp holds a shade 3 pixels at most (5 allowed), flat holds 14 (10 needed).
-- Local run of this tree: **crate passes, soft passes; cube fails** on the one point below.
+The break column was worked on this run's frames (a frame mirrored or flipped, or the scenario's own frame of the other shading or crease) and in the light model, not by breaking the product and rerunning.
 
-**The new question (cube, `cylinder-subdivided-soft-rims-dir-2-2-1-ortho`):** the twice-subdivided soft cylinder rounds in, so facet 13's point (384, 267) is background there ("the soft cylinder's side, on one side of the image at (384, 267) is the background, expected the mesh"). Along that row the pillow's shade runs 130 at x 376, 126 at 378, 123 at 380, then the edge (92 at 382): no point at the image's right end on that row is 6 or more below the other end (130) with any headroom. The other three cylinder frames hold with facet 13. Ways out: (1) for the soft-rims frame only, sample the mirror point lower on the side, where the pillow is upright, and show it holds 6 (not yet tried, needs a run); (2) compare facet 14 against a facet nearer the image's centre (facet 1, about 137) in that frame, which keeps 6 but not "the two ends"; (3) lower that one check to 3 or 4, which the ruling says to ask about.
+**Measured, render against render_glb** (D-6's rule, 8/255 and 0.5 %): rest front 39,409 px (15.03 %) under LitMesh, 0 px under PBR; Walk 0.5 s side 31,784 px (12.12 %), 0 px. `RenderGlbTests.Render_and_render_glb_of_the_gardener_agree_in_shading` keeps it; `FaceColourTests.Render_draws_each_colour_with_the_PBR_material_the_loader_makes_from_the_export` holds the material to the parsed export.
 
-**Left:** the answer and that one check; then the shown-failing table for every changed check (`MinimumStep` 6, facet 9 / smooth 5, rim stage 4 / break 9, the cylinder ends and grade, the cap's 1, the backing, the torso span), a full local run with hashes against `artifacts/review/T-82/hashes-before.txt` (every `.glb`, `.carve` and non-colour look byte-identical), `verify`, the waystone review (round-1, before and after), As built, remove `artifacts/base-src`, `finish`. Second agent stopped at the 60-call checkpoint.
+**Full local run** (every scenario and viewer-cube, all passing) hashed against the milestone head eded55f's (`artifacts/review/T-82/hashes-before.txt`, `hashes-final.txt`): 157 files, 35 byte-identical (all 12 `.glb` and `.carve`, the viewer's two frames of the exported crate, and every normals, wireframe and weights frame), 122 frames changed, each one that draws the model's colours. In the bones, labels and highlight frames the changed pixels are the surface: no white text or orange line pixel changed but a few edge-blended ones.
 
-**First agent's hand-off, kept for its figures:**
+**Review:** the person approved both sets (round 1, `C:\Users\andre\artifacts\carve\M-19\T-82\round-1`), with a note on the first: "These all look good - do we get a sky texture to show reflections?" Not done here: the scene has no environment map, and at metallic 0, roughness 1 the material reflects little; left to the person as a question.
 
-First agent, on Opus 5.5. Stopped on a question (below); nothing about the frames is decided.
-
-**Done (committed):**
-- `src/Carve.Server/SurfaceMaterial.cs`: `SurfaceMaterial.Of(colour)` is `Material.Pbr(base colour, GlbExport.Metallic, GlbExport.Roughness, doubleSided: false)`, the base colour the exported one (grey, or the linear form of the hex). `RenderSystem` uses it for the shaded fill, each colour's submesh, and a glb with no material. Wireframe, normals and weights keep `Material.SolidColor`; the orange lines, bones and labels are not touched. A highlighted face in the shaded look is still a vertex tint on the fill, so it is now shaded through PBR. I read that as the model's own surface, not as the highlight's own material.
-- Unit test `FaceColourTests.Render_draws_each_colour_with_the_PBR_material_the_loader_makes_from_the_export`: each of render's submesh colours, in render's order, against the `ParsedMaterial` the engine's glTF parser reads from the exported file (Pbr set, base colour, metallic, roughness, emissive, occlusion, double-sided, no maps). Shown failing with `LitMesh` ("grey: SolidColor, Lit, LitWithVertexNormals is not lit PBR") and with roughness 0.5 ("Expected 1, Actual 0.5").
-- Regression test `RenderGlbTests.Render_and_render_glb_of_the_gardener_agree_in_shading` (D-6's rule: past 8/255, at most 0.5 %). The figures come from a local run:
-
-| Frame | LitMesh (before) | PBR (now) |
-|---|---|---|
-| rest, front (+z) | 39,409 px (15.03 %), brightness 0.755 of render's | 0 px (0.00 %), 1.000 |
-| Walk 0.5 s, side (+x) | 31,784 px (12.12 %), 0.755 | 0 px (0.00 %), 1.000 |
-
-**Baselines:** from a local run of the milestone head eded55f, in a detached worktree at `artifacts/base-src`, run by `artifacts/run-frames.sh`. The hashes are in `artifacts/review/T-82/hashes-before.txt` and `hashes-after.txt`. On the T-82 commit, character, rig and shed ran to the end. Every `.glb` and `.carve` is byte-identical, and so are the shed's normals and wireframe frames and rig's seven weights frames. Every shaded frame changed: character 21, rig 2, shed 8.
-
-**The question: the PBR path compresses the light, and four checks' fixed margins no longer hold.** Under PBR the directional light's share of a lit face is much smaller (roughly divided by pi, as Cook-Torrance's diffuse term is), while a face lit by ambient alone is unchanged. The cube's face pixels (G):
-
-| Frame | top / +Z / +X (or -Z / -X / underside) before | after |
-|---|---|---|
-| cube-front | 216 / 190 / 171 | 157 / 145 / 137 |
-| cube-back | 219 / 196 / 118 | 159 / 148 / 118 |
-
-The face order still holds, but `CubeScenario.CheckOrder`'s step of 10 does not: "cube-front: +Z (145) should be at least 10 brighter than +X (137)". cube, crate and export stop on it. soft stops on "soft-flat-rest-front: across the torso's facet edge at (224, 242) the shade steps by 13; a flat mesh steps by 20 or more". Each scenario stops at its first failure, so the checks after these are not yet known (cube, crate, export, soft).
-
-Two ways out. Neither is settled by the spec or D-6:
-1. **Keep the scene's light and lower the margins**: `MinimumStep` 10 down to about 6, and the soft facet steps (flat 20 or more, smooth 12 or less, the 10 at the brim crease) re-derived for PBR. Each of those loosens a check, so it needs the person's ruling.
-2. **Raise the scene's directional light** (about pi times), so that PBR's lit faces come back near their old brightness and contrast. `render_glb` draws in the same scene, so the two still agree, and the margins can stay. This changes how the preview is lit, which is a D-6/D-1 decision.
-
-**Left:** after the ruling, re-measure every colour-reading check (the crate colour check's grey-ratio rule assumes a pure Lambert factor and may not hold with PBR's albedo-independent specular), run `verify`, the review through `mcp__waystone__review`, and the D-6 / `CLAUDE.md` wording, then As built.
+**Not checked:** the brim thresholds over the hat's own geometry; the break column by product breaks.
