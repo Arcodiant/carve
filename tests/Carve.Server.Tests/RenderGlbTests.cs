@@ -186,6 +186,50 @@ public class RenderGlbTests
         Assert.True(Classify(front, head) == "skin", $"rest: the head at {head} is {Classify(front, head)}, expected skin");
     }
 
+    /// <summary>
+    /// T-82: render draws with the PBR material the loader makes from the exported file, so a render and a render_glb of the
+    /// gardener at the same pose agree in shading under D-6's rule (a pixel differs past 8 of 255 in R, G or B; a frame fails
+    /// past 0.5 % of its pixels). T-48 owns the full comparison; this keeps the shading gap T-47 measured (0.73 of the
+    /// brightness, about 12 % of the pixels) from coming back.
+    /// </summary>
+    [Fact]
+    public async Task Render_and_render_glb_of_the_gardener_agree_in_shading()
+    {
+        using var carve = await StartAsync();
+        Assert.False(IsError(await carve.CallToolAsync("open", JsonSerializer.Serialize(new { path = Sample }))));
+        Assert.False(IsError(await carve.CallToolAsync("export", """{"path":"agree-gardener.glb"}""")));
+        var poses = new (string Name, string Glb, string Render)[]
+        {
+            ("rest-front", """{"path":"agree-gardener.glb","view":"+z"}""", """{"view":"+z"}"""),
+            ("walk-0.5-side", """{"path":"agree-gardener.glb","clip":"Walk","time":0.5,"view":"+x"}""", """{"clip":"Walk","time":0.5,"view":"+x"}"""),
+        };
+        foreach (var (name, glbArgs, renderArgs) in poses)
+        {
+            var loaded = Image(await carve.CallToolAsync("render_glb", glbArgs), $"agree-{name}-glb");
+            var preview = Image(await carve.CallToolAsync("render", renderArgs), $"agree-{name}-render");
+            var (differing, ratio) = Agreement(loaded, preview);
+            var share = 100.0 * differing / (Size * Size);
+            Assert.True(share <= 0.5, $"{name}: {differing} pixels ({share:0.00} %) differ past 8/255; brightness on the model {ratio:0.000} of render's");
+        }
+    }
+
+    /// <summary>The pixels that differ past 8/255 in R, G or B, and the glb's brightness on the pixels both draw the model on, over render's.</summary>
+    private static (int Differing, double Ratio) Agreement(ImageResult glb, ImageResult render)
+    {
+        var (differing, glbSum, renderSum) = (0, 0L, 0L);
+        for (var y = 0; y < Size; y++)
+        for (var x = 0; x < Size; x++)
+        {
+            var i = (y * Size + x) * 4;
+            if (Enumerable.Range(0, 3).Any(c => Math.Abs(glb.Data[i + c] - render.Data[i + c]) > 8)) differing++;
+            if (IsBackground(glb, x, y) || IsBackground(render, x, y)) continue;
+            glbSum += glb.Data[i] + glb.Data[i + 1] + glb.Data[i + 2];
+            renderSum += render.Data[i] + render.Data[i + 1] + render.Data[i + 2];
+        }
+
+        return (differing, (double)glbSum / renderSum);
+    }
+
     [Fact]
     public async Task Errors_name_the_argument_and_list_the_clips()
     {

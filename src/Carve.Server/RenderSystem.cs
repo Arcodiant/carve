@@ -28,9 +28,6 @@ internal sealed class RenderSystem(
 {
     private const string Scene = "carve";
 
-    /// <summary>The colour of the model's surface: the one value, <see cref="GlbExport.BaseColor"/>, so the game sees what render shows.</summary>
-    private static readonly Vector4 Surface = GlbExport.BaseColor;
-
     private Entity _light;
     private readonly List<Entity> _cameras = [];
     private Entity? _meshEntity;
@@ -172,7 +169,8 @@ internal sealed class RenderSystem(
         var scene = LookMeshes.Compose(mesh, space, look == Look.Weights && _weights is null ? Look.Shaded : look, highlight, _weights);
         // The fill's material, put on its entity by Install with the meshes made here. A mesh with coloured faces drawn
         // in the shaded look is a submesh and a material per colour (D-6); anything else is the one mesh it always was.
-        _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
+        // The model's own colours draw with the PBR material the engine's loader makes from the exported .glb (T-82).
+        _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : SurfaceMaterial.Of(null);
         _nextSubmeshMaterials = null;
         _nextDrawn = [];
         MeshData<PositionUvNormalVertex> data;
@@ -184,13 +182,13 @@ internal sealed class RenderSystem(
         }
         else if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 } or { Materials.Count: > 0 })
         {
-            // A material face is the engine's PBR material the game's loader makes of it (T-78), a colour face LitMesh as ever.
+            // A material face is the engine's PBR material the game's loader makes of it (T-78), a colour face the PBR material the loader makes of its exported colour (T-82).
             data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours, out var materials);
             var drawn = materials.Select(m => m is null ? null
                 : _materials.FirstOrDefault(d => d.Name == m) ?? throw new InvalidOperationException($"a face uses the material '{m}', which is not defined")).ToArray();
             _nextSubmeshMaterials = colours.Zip(drawn, (c, m) => m is not null
                     ? Pbr.Of(m)
-                    : Material.LitMesh(c is null ? Surface : FaceStyle.ToLinear(c)))
+                    : SurfaceMaterial.Of(c))
                 .ToArray();
             _nextDrawn = drawn.OfType<Carve.Core.Material>().ToArray();
         }
@@ -263,7 +261,7 @@ internal sealed class RenderSystem(
         entities.AddComponent(entity, new MeshInstance
         {
             Mesh = model.Mesh,
-            Material = model.Material ?? Material.LitMesh(Surface),
+            Material = model.Material ?? SurfaceMaterial.Of(null),
             SubmeshMaterials = model.SubmeshMaterials!,
             Mode = RenderMode.Mode3D,
             RenderLayerMask = RenderLayerMask.All,
