@@ -360,7 +360,7 @@ public static class MeshEdits
         foreach (var ((a, b), i) in edges.Select((e, i) => (e, i)))
         {
             if (!mesh.Topology.TryGetEdge(a, b, out _))
-                errors.Add(new MeshError(Invariant($"edges[{Math.Min(a, b)}-{Math.Max(a, b)}]"), Invariant($"the {Ordinal(i)} listed edge, [{a}, {b}], is not an edge of the mesh")));
+                errors.Add(new MeshError(Invariant($"edges[{Math.Min(a, b)}-{Math.Max(a, b)}]"), Invariant($"the {Ordinal(i)} listed edge, [{a}, {b}], is not an edge of the mesh; select with kind edges lists the real edges")));
         }
 
         foreach (var (f, i) in faces.Select((f, i) => (f, i)))

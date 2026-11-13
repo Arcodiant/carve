@@ -557,7 +557,7 @@ public class RenderTests
     [InlineData("""{"highlight":{"edges":[1]}}""", "highlight.edges: the 1st listed entry: expected a pair [a, b]")]
     [InlineData("""{"highlight":{"faces":[0,99]}}""", "faces[99]: the 2nd listed face: there is no face 99: ids run 0..5")]
     [InlineData("""{"highlight":{"vertices":[8]}}""", "vertices[8]: the 1st listed vertex: there is no vertex 8: ids run 0..7")]
-    [InlineData("""{"highlight":{"edges":[[0,6]]}}""", "edges[0-6]: the 1st listed edge, [0, 6], is not an edge of the mesh")]
+    [InlineData("""{"highlight":{"edges":[[0,6]]}}""", "edges[0-6]: the 1st listed edge, [0, 6], is not an edge of the mesh; select with kind edges lists the real edges")]
     public async Task A_bad_highlight_is_a_tool_error_and_the_mesh_is_untouched(string arguments, string expected)
     {
         using var carve = new CarveProcess([]);
