@@ -31,8 +31,17 @@ public sealed record GameLimits(int? MaxTriangles, int? MaxSubmeshes, float? Min
         MaxTriangles ?? fill.MaxTriangles, MaxSubmeshes ?? fill.MaxSubmeshes, MinHeight ?? fill.MinHeight, MaxHeight ?? fill.MaxHeight);
 
     /// <summary>The keys that are set, in file order.</summary>
-    public IReadOnlyList<string> SetKeys =>
-        [.. Keys.Where((_, i) => i switch { 0 => MaxTriangles is not null, 1 => MaxSubmeshes is not null, 2 => MinHeight is not null, _ => MaxHeight is not null })];
+    public IReadOnlyList<string> SetKeys => [.. Set.Select(e => e.Key)];
+
+    /// <summary>Each key that is set with its value as the file writes it, in <see cref="Keys"/> order.</summary>
+    private IEnumerable<(string Key, string Value)> Set =>
+        new (string Key, string? Value)[]
+        {
+            ("max_triangles", MaxTriangles?.ToString(CultureInfo.InvariantCulture)),
+            ("max_submeshes", MaxSubmeshes?.ToString(CultureInfo.InvariantCulture)),
+            ("min_height", MinHeight?.ToString(CultureInfo.InvariantCulture)),
+            ("max_height", MaxHeight?.ToString(CultureInfo.InvariantCulture)),
+        }.Where(e => e.Value is not null).Select(e => (e.Key, e.Value!));
 
     /// <summary>
     /// The warnings for a model past these limits, each past its limit and never at it: the triangles of the whole model;
@@ -114,11 +123,7 @@ public sealed record GameLimits(int? MaxTriangles, int? MaxSubmeshes, float? Min
     /// <summary>The file's text: the keys that are set, in <see cref="Keys"/> order, indented, LF line ends.</summary>
     public string ToFileText()
     {
-        var lines = new List<string>();
-        if (MaxTriangles is { } t) lines.Add($"  \"max_triangles\": {t.ToString(CultureInfo.InvariantCulture)}");
-        if (MaxSubmeshes is { } s) lines.Add($"  \"max_submeshes\": {s.ToString(CultureInfo.InvariantCulture)}");
-        if (MinHeight is { } lo) lines.Add($"  \"min_height\": {lo.ToString(CultureInfo.InvariantCulture)}");
-        if (MaxHeight is { } hi) lines.Add($"  \"max_height\": {hi.ToString(CultureInfo.InvariantCulture)}");
+        var lines = Set.Select(e => $"  \"{e.Key}\": {e.Value}").ToList();
         return lines.Count == 0 ? "{}\n" : "{\n" + string.Join(",\n", lines) + "\n}\n";
     }
 
