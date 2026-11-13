@@ -21,7 +21,7 @@ using Rgb = (int R, int G, int B);
 /// </summary>
 internal sealed class GatehouseFrames(ScenarioDriver driver)
 {
-    private const int Tile = 256;
+    private const int Tile = GatehousePlan.TileSize;
     private const int Gutter = 2;
 
     /// <summary>For the wireframe stages: the stage's new edges, and how many of them are on faces toward the camera. Worked in Core.</summary>
@@ -230,7 +230,8 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
     /// Every probe the ray test is sure of, and more than 4 pixels from a drawn line: the background where the ray meets nothing,
     /// else a face, never the background, in the shade of the first sure probe on a grey face of the same normal (T-67's rule;
     /// the door's is predicted from the front face's, and is its own when the front is not sure).
-    /// The faces shown and, in a shaded frame, the number of sure probes are the ones worked in Core (<see cref="GatehousePlan.Expected"/>).
+    /// The faces shown and, in a shaded frame, the number of sure probes are the ones worked in Core (<see cref="GatehousePlan.Expected"/>,
+    /// and <see cref="GatehousePlan.ExpectedTiles"/> for the sheet's Y tiles).
     /// </summary>
     private static void Look(ScenarioFrame frame, Solid solid, Camera camera, IEnumerable<Probe> probes, int stage, string view, int doorFace,
         (Vector2 From, Vector2 To)[] lines, int size = GatehousePlan.Size)
@@ -289,7 +290,9 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
             }
         }
 
-        if (lines.Length == 0 && size == GatehousePlan.Size && GatehousePlan.Expected.TryGetValue((stage, view), out var expected))
+        // The planned frames are held to Expected, the sheet's Y tiles to ExpectedTiles, each at the size it was worked at.
+        var table = size == GatehousePlan.Size ? GatehousePlan.Expected : size == GatehousePlan.TileSize ? GatehousePlan.ExpectedTiles : null;
+        if (lines.Length == 0 && table is not null && table.TryGetValue((stage, view), out var expected))
         {
             // Every probe in the window's hole must be sure: one the ray test is not sure of is a failure, not a probe left out.
             var window = all.Count(t => t.p.Face == -1);
