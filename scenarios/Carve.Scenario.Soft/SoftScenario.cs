@@ -175,26 +175,22 @@ public sealed class SoftScenario : IScenario
             driver.Fail($"export: expected 22 bones, 2 clips and {triangles} triangles, got {exported}");
         }
 
-        // Every warning is a face that is not planar (what subdivide makes of a quad, which the export still lists face by face); a limit
-        // (triangles, primitives, height) must not be one. Their count is select's non_planar faces over both meshes, so a
-        // regression that adds some is caught (the person, 2026-11-10, until T-72 lands). select's results are kept in the run
-        // folder for SoftLoad.Tests.
-        var nonPlanar = 0;
+        // Every warning is a face that is not planar (what subdivide makes of a quad); a limit (triangles, primitives, height) must not
+        // be one. By T-72's rule (the person, 2026-11-13) each mesh names its first 10 and folds the rest into one line, and the named
+        // lines and the folded count add up to select's non_planar faces of that mesh, so a regression that adds a warning or loses a
+        // face is caught. select's results are kept in the run folder for SoftLoad.Tests.
+        var counts = new Dictionary<string, int>();
         foreach (var name in new[] { "Body", "Hat" })
         {
             var selected = await CallTextAsync(driver, "select", new { kind = "faces", where = "non_planar", mesh = name });
             await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, $"select-non-planar-{name}.txt"), selected);
-            nonPlanar += JsonDocument.Parse(selected).RootElement.GetProperty("count").GetInt32();
+            counts[name] = JsonDocument.Parse(selected).RootElement.GetProperty("count").GetInt32();
         }
         var warned = exported.IndexOf("warning(s): ", StringComparison.Ordinal);
-        var warnings = warned < 0 ? [] : exported[(warned + "warning(s): ".Length)..].Split("; ");
-        if (warnings.Any(w => !w.Contains("face is not planar")))
+        var problem = warned < 0 ? "no warnings" : NotPlanarFold.Check(exported[(warned + "warning(s): ".Length)..], counts);
+        if (problem is not null)
         {
-            driver.Fail($"export: a warning that is not about a face being non-planar: {warnings.First(w => !w.Contains("face is not planar"))}");
-        }
-        if (nonPlanar == 0 || warnings.Length != nonPlanar)
-        {
-            driver.Fail($"export: expected one warning per face select finds non_planar ({nonPlanar}), got {warnings.Length}");
+            driver.Fail($"export: {problem}");
         }
 
         if (flatExport.Contains("warning(s)"))

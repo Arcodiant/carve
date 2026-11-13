@@ -145,7 +145,7 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
     }
 
     [Fact]
-    public async Task The_result_folds_not_planar_warnings_into_one_line_and_check_still_lists_each_face()
+    public async Task The_result_folds_not_planar_warnings_into_one_line_and_check_folds_by_its_own_rule()
     {
         var (carve, _) = await StartAsync();
         using var __ = carve;
@@ -163,9 +163,11 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
         Assert.True(count > 1, $"only {count} non-planar faces");
         Assert.Equal($"{count} faces are not planar (expected after subdivide)", folded);
 
-        // The ruling folds subdivide's own result only: check still names each face.
+        // Subdivide keeps its own fold (T-43); check folds by T-72's rule: 10 named, the rest one line, adding up to select's count.
         var check = Ok(await carve.CallToolAsync("check", """{"mesh":"Body"}"""));
-        Assert.Equal(count, check.GetProperty("warnings").EnumerateArray().Count(w => w.GetString()!.Contains("face is not planar:")));
+        var lines = check.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToList();
+        Assert.Equal(10, lines.Count(w => w.Contains("face is not planar:")));
+        Assert.Contains($"and {count - 10} more faces are not planar; select faces where non_planar names them", lines);
     }
 
     [Theory]

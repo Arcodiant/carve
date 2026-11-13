@@ -149,7 +149,7 @@ internal static class MeshToolSupport
             ["edges"] = report.EdgeCount,
             ["closed"] = report.Closed,
             ["bounds"] = new { min = Array(report.BoundsMin), max = Array(report.BoundsMax) },
-            ["warnings"] = report.Warnings.Select(w => w.ToString()).ToArray(),
+            ["warnings"] = MeshWarningFold.Lines(report.Warnings).ToArray(),
         };
     }
 
