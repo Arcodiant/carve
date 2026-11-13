@@ -148,6 +148,20 @@ public class UvExportTests : IDisposable
     }
 
     [Fact]
+    public void A_static_model_of_two_meshes_with_UVs_reads_back_each_corners_UV_in_mesh_order_and_warns_per_piece()
+    {
+        var a = WithUvs(TestMeshes.Cube(), 0, 1, 2, 3, 4, 5);
+        var b = WithUvs(TestMeshes.Make(TestMeshes.CubeVertices.Select(v => v + new Vector3(3, 0, 0)), TestMeshes.CubeFaces), 0, 2);
+        var model = Model.Of("a", a).With("b", b);
+        var combined = model.Combined!;
+
+        var parsed = Load(GlbExport.Write(combined, Shading.Triangles(combined), "m"));
+        // Mesh a's corners come first, then b's, each as that piece alone writes them.
+        AssertRead(parsed, [.. Expected(a), .. Expected(b)]);
+        Assert.Equal(["b: 4 faces have no UVs; their corners are written as (0, 0) (faces 1, 3, 4, 5)"], GlbExport.UvWarnings(model));
+    }
+
+    [Fact]
     public void No_warning_when_every_face_is_mapped_or_none_is()
     {
         Assert.Empty(GlbExport.UvWarnings(Model.Of("a", WithUvs(TestMeshes.Cube(), 0, 1, 2, 3, 4, 5))));
