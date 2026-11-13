@@ -358,4 +358,46 @@ public class KnifeTests
             "points[0], points[1]: the segment from points[0] to points[1] leaves faces[0] at [1, 3, 0]",
             Refusal(u, false, V(0, 3, 0), V(3, 3, 0)));
     }
+
+    /// <summary>Seeded random rotations (RV-33: an exact sign on rotated input is rounding noise).</summary>
+    private static IEnumerable<Quaternion> Rotations(int seed, int count)
+    {
+        var rng = new Random(seed);
+        for (var i = 0; i < count; i++)
+            yield return Quaternion.Normalize(new Quaternion((float)(rng.NextDouble() * 2 - 1), (float)(rng.NextDouble() * 2 - 1),
+                (float)(rng.NextDouble() * 2 - 1), (float)(rng.NextDouble() * 2 - 1)));
+    }
+
+    [Theory]
+    [MemberData(nameof(BoundaryMeetings))]
+    public void ASegmentMeetingTheBoundaryBetweenItsEndsIsCutTheSameWayRotated(string name, float[] xy, float y, float x0, float x1, int pieces)
+    {
+        var failed = new List<string>();
+        foreach (var q in Rotations(3302, 100))
+        {
+            var mesh = TestMeshes.Make(Enumerable.Range(0, xy.Length / 2).Select(i => Vector3.Transform(V(xy[2 * i], xy[2 * i + 1], 0), q)),
+                [Enumerable.Range(0, xy.Length / 2).ToArray()]);
+            var r = Knife.Cut(mesh, [Vector3.Transform(V(x0, y, 0), q), Vector3.Transform(V(x1, y, 0), q)]);
+            if (!r.Edit.Succeeded) failed.Add($"{q}: {string.Join("; ", r.Edit.Errors)}");
+            else if (r.Edit.Split.Single().Pieces.Count != pieces) failed.Add($"{q}: {r.Edit.Split.Single().Pieces.Count} pieces");
+        }
+        Assert.True(failed.Count == 0, $"{name}: {failed.Count} of 100 differ, first: {failed.FirstOrDefault()}");
+    }
+
+    [Fact]
+    public void AClosedPathGrazingACornerIsRefusedTheSameWayRotated()
+    {
+        var failed = new List<string>();
+        foreach (var q in Rotations(3303, 100))
+        {
+            var notch = TestMeshes.Make(
+                new[] { V(0, 0, 0), V(4, 0, 0), V(4, 4, 0), V(3, 4, 0), V(2.5f, 2.5f, 0), V(2, 4, 0), V(0, 4, 0) }.Select(p => Vector3.Transform(p, q)),
+                [[0, 1, 2, 3, 4, 5, 6]]);
+            var r = Knife.Cut(notch, new[] { V(1, 2.5f, 0), V(3.5f, 2.5f, 0), V(2.5f, 1, 0) }.Select(p => Vector3.Transform(p, q)).ToList(), true);
+            var message = string.Join("; ", r.Edit.Errors.Select(e => $"{e.Element}: {e.Message}"));
+            if (!message.StartsWith("points[0], points[1]: the closed path touches the face's boundary at one point only", StringComparison.Ordinal))
+                failed.Add($"{q}: {(r.Edit.Succeeded ? "succeeded" : message)}");
+        }
+        Assert.True(failed.Count == 0, $"{failed.Count} of 100 differ, first: {failed.FirstOrDefault()}");
+    }
 }
