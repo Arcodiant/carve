@@ -46,6 +46,31 @@ public class ModelStoreTests
     }
 
     [Fact]
+    public void Undoing_a_delete_then_a_new_edit_gives_out_the_undone_ids_again()
+    {
+        // T-64's "undo then a new edit reusing the undone ids": extrude the cube's top (vertices 8..11, faces 6..9),
+        // delete what it made, undo both, and a new extrude of another face takes 8..11 and 6..9 again.
+        var store = new ModelStore();
+        store.Push(TestMeshes.Cube(), "define_mesh");
+        store.Edit("extrude", m => MeshEdits.Extrude(m, [1], 1), out var extruded);
+        Assert.Equal([8, 9, 10, 11], extruded!.NewVertices);
+        store.Edit("delete", m => MeshDelete.Delete(m, [8, 9, 10, 11], null), out var deleted);
+        Assert.True(deleted!.Succeeded);
+        Assert.True(store.Current.Mesh!.HasTombstones);
+
+        Assert.Equal("delete", store.Undo()!.Undone);
+        Assert.Equal("extrude", store.Undo()!.Undone);
+        Assert.False(store.Current.Mesh!.HasTombstones);
+        Assert.Equal(8, store.Current.Mesh.Vertices.Count);
+        Assert.Equal(6, store.Current.Mesh.Faces.Count);
+
+        store.Edit("extrude", m => MeshEdits.Extrude(m, [0], 1), out var again);
+        Assert.Equal([8, 9, 10, 11], again!.NewVertices);
+        Assert.Equal([6, 7, 8, 9], again.NewFaces);
+        Assert.False(store.Current.Mesh!.HasTombstones);
+    }
+
+    [Fact]
     public void Keeps_the_current_mesh_and_the_last_hundred_older_ones()
     {
         var store = new ModelStore();
