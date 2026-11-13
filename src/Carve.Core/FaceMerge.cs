@@ -26,7 +26,7 @@ public static class FaceMerge
     /// same way (mixed winding), and a result that is not one face (faces touching at a vertex only, a closed shell, two
     /// outlines). The result is also refused by <see cref="PolygonMesh.Edit"/>'s validation, as define_mesh would be.
     /// </summary>
-    /// <param name="warnings">The colour warnings (<c>faces[n]: ...</c>), empty when every merged face has the survivor's colour.</param>
+    /// <param name="warnings">The fold warnings, for each listed face whose normal is 90 degrees or more from the merged face's, then the colour warnings (<c>faces[n]: ...</c>); empty when neither applies.</param>
     public static EditResult Merge(PolygonMesh mesh, IEnumerable<int> faces, out IReadOnlyList<string> warnings)
     {
         warnings = [];
@@ -160,7 +160,7 @@ public static class FaceMerge
 
         var result = mesh.Edit(reshapedFaces: [KeyValuePair.Create(survivor, merged)], deletedVertices: gone, deletedFaces: others);
         var edit = EditResult.From(mesh, result, [], [], [], [], new DeletedElements(gone, others));
-        if (edit.Succeeded) warnings = ColourWarnings(mesh, survivor, others);
+        if (edit.Succeeded) warnings = [.. FoldWarnings(mesh, listed, survivor, PolygonMesh.NewellVector(mesh.Vertices, merged.Loop)), .. ColourWarnings(mesh, survivor, others)];
         return edit;
 
         static EditResult NotOne(string why) =>
@@ -168,6 +168,20 @@ public static class FaceMerge
     }
 
     private static List<int> Rotated(List<int> loop, int start) => [.. loop.Skip(start), .. loop.Take(start)];
+
+    // A merged face folds over a listed face whose normal turns 90 degrees or more from the merged face's (ruled 2026-11-13:
+    // merge and warn). The outline can be planar all the same, as when every face of a cube but one is merged.
+    private static IEnumerable<string> FoldWarnings(PolygonMesh mesh, IEnumerable<int> listed, int survivor, (double X, double Y, double Z) m)
+    {
+        var ml = Math.Sqrt(m.X * m.X + m.Y * m.Y + m.Z * m.Z);
+        foreach (var f in listed.Order())
+        {
+            var n = PolygonMesh.NewellVector(mesh.Vertices, mesh.Faces[f].Loop);
+            var nl = Math.Sqrt(n.X * n.X + n.Y * n.Y + n.Z * n.Z);
+            if (ml == 0 || nl == 0 || (n.X * m.X + n.Y * m.Y + n.Z * m.Z) / (nl * ml) < 1e-6)
+                yield return MeshEdits.Invariant($"faces[{f}]: its normal is 90 degrees or more from the merged faces[{survivor}]'s, so the merged face folds back over it");
+        }
+    }
 
     private static IReadOnlyList<string> ColourWarnings(PolygonMesh mesh, int survivor, IEnumerable<int> others)
     {
