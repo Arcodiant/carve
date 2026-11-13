@@ -16,7 +16,7 @@ public sealed class DeleteTool(ModelStore store)
         + "Ids never change and are never reused: a deleted vertex or face keeps its slot as a tombstone, null in get_mesh and in the saved file, and new elements are still appended after the last slot. "
         + "Counts in every report are live counts; render, select, check and export skip tombstones, and export writes the live elements only. "
         + "Naming a deleted id in any later edit is a tool error saying it was deleted, e.g. faces[3]: deleted. undo restores what a delete removed. "
-        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[ids], faces:[ids]}}, everything removed listed in deleted, ids ascending. "
+        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[ids], faces:[ids]}, split:[]}, everything removed listed in deleted, ids ascending. "
         + "Bad input (no vertices and no faces, an unknown or already deleted id, a delete that would take every face, since a mesh keeps at least one face as define_mesh requires, an argument delete does not take) "
         + "is a tool error that lists every problem by element; the mesh is left unchanged and nothing is added to undo. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to delete from. "

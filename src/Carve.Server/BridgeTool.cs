@@ -22,7 +22,7 @@ public sealed class BridgeTool(ModelStore store)
         + "One quad is appended per pair of consecutive pairs, in the first loop's order, each wound so that its edge on each loop runs opposite to the face already there, so the surface closes; "
         + "loops whose faces wind so that no quad can agree with both (the two faces facing the same way) are refused. "
         + "No vertex is created. Each new face takes the colour and groups of the face on the first loop's edge it comes from, as extrude's walls do. "
-        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[ids]}, deleted:{vertices:[], faces:[]}}. "
+        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[ids]}, deleted:{vertices:[], faces:[]}, split:[]}. "
         + "Bad input (a loop that is not a cycle of open edges, loops of unequal count, a vertex in both loops, windings no quad agrees with) "
         + "is a tool error that lists every problem by element; the mesh is left unchanged and nothing is added to undo. One bridge is one undo step. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to bridge in. "

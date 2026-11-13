@@ -30,7 +30,7 @@ public sealed class DefineMeshTool(ModelStore store)
         + "wound the other way, CLOCKWISE seen from outside, lying strictly inside the loop (not touching it) and apart from the other holes, "
         + "and no vertex is used twice in one face. A hole is an opening: the face is the loop less its holes, and nothing is drawn in a hole unless another face fills it. "
         + "Its edges are edges like any other: a hole no face fills shows as open edges. "
-        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[]}; the geometry is not echoed back. "
+        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], deleted:{vertices:[], faces:[]}, split:[]}, deleted and split always empty and no created, as nothing was there before; the geometry is not echoed back. "
         + "closed is true when every edge is shared by exactly two faces. Warnings (open edges, edges shared by more than two faces, "
         + "inconsistent winding, non-planar faces, unused vertices) mean the mesh was accepted but is probably not what you meant. "
         + "Bad input (a missing or out-of-range index, a face with fewer than 3 vertices, a repeated index, a zero-area face, "
