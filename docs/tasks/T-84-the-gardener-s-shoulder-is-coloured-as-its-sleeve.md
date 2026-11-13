@@ -4,7 +4,7 @@ description: >-
 ---
 # T-84 — The gardener's shoulder is coloured as its sleeve
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
