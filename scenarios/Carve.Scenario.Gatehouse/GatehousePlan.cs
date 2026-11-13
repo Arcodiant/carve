@@ -38,6 +38,19 @@ internal static class GatehousePlan
         [(7, "front")] = (78, "1 5 8 9 14 26 28 31 35"), [(7, "back")] = (90, "0 4 16 27 34 35"), [(7, "straight")] = (29, "1 8 9 28"),
     };
 
+    /// <summary>The size of the stage 7 six-view sheet's tiles, each also captured alone.</summary>
+    public const int TileSize = 256;
+
+    /// <summary>
+    /// What the ray test is sure of in the sheet's +y and -y tiles (<see cref="TileSize"/>, orthographic, up -Z as <c>render</c>
+    /// has it for a view along Y): the sure probes and the faces they show, as <see cref="Expected"/> has them for the planned
+    /// frames. Worked in Core by <c>GatehouseGeometry</c>, and held by the tiles' frames (RV-32).
+    /// </summary>
+    public static readonly IReadOnlyDictionary<(int Stage, string View), (int Sure, string Faces)> ExpectedTiles = new Dictionary<(int, string), (int, string)>
+    {
+        [(7, "+y")] = (46, "15 26 27"), [(7, "-y")] = (46, "2 17"),
+    };
+
     /// <summary>A face whose shortest edge is under this is narrow on screen (the cornice's ends, the window's reveal).</summary>
     private const float NarrowEdge = 0.35f;
 
