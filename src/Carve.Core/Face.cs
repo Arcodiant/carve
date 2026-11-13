@@ -55,6 +55,9 @@ public sealed class Face : IEquatable<Face>
     /// <summary>Every corner's vertex id: the outer loop, then each hole in order. A plain face's is its loop.</summary>
     public IReadOnlyList<int> Corners { get; }
 
+    /// <summary>How many triangles the face makes: two fewer than its corners, and two more for each hole; a tombstone makes none.</summary>
+    public int TriangleCount => IsDeleted ? 0 : Corners.Count - 2 + 2 * Holes.Count;
+
     /// <summary>The loop <c>hole</c> names: the outer loop for -1, else <see cref="Holes"/>[hole].</summary>
     public IReadOnlyList<int> LoopAt(int hole) => hole < 0 ? Loop : Holes[hole];
 
