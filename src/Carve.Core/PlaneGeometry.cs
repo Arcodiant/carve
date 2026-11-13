@@ -42,6 +42,17 @@ internal static class PlaneGeometry
 
     internal static double Orient(Vector2D a, Vector2D b, Vector2D c) => (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
 
+    /// <summary>Whether segments a-b and c-d run along each other for more than <paramref name="tol"/>: two of their four
+    /// ends lie within the tolerance of both segments and farther apart than it (RV-32).</summary>
+    internal static bool Overlaps(Vector3D a, Vector3D b, Vector3D c, Vector3D d, double tol)
+    {
+        var shared = new[] { a, b, c, d }.Where(p => SegmentDistance(p, a, b) <= tol && SegmentDistance(p, c, d) <= tol).ToArray();
+        for (var i = 0; i < shared.Length; i++)
+            for (var j = i + 1; j < shared.Length; j++)
+                if (Length(shared[i] - shared[j]) > tol) return true;
+        return false;
+    }
+
     /// <summary>Whether segments p-q and r-s cross properly (each strictly separates the other's ends).</summary>
     internal static bool Crosses(Vector2D p, Vector2D q, Vector2D r, Vector2D s)
         => Math.Sign(Orient(p, q, r)) * Math.Sign(Orient(p, q, s)) < 0 && Math.Sign(Orient(r, s, p)) * Math.Sign(Orient(r, s, q)) < 0;

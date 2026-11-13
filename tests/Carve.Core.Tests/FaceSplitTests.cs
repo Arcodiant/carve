@@ -292,6 +292,16 @@ public class FaceSplitTests
         Assert.Equal("cuts[0]: the segment 6-5 crosses an edge of faces[0]",
             Assert.Single(Split(l, new FaceCut(0, E(2, 3, 0.5), V(5))).Edit.Errors).ToString());
 
+        // RV-32: a segment along part of an edge and on across the face is refused, never skipped as if along the edge.
+        var dart = TestMeshes.Make([new(0, 0, 0), new(4, 0, 0), new(1, 1, 0), new(0, 4, 0)], [[0, 1, 2, 3]]);
+        var partly = Split(dart, new FaceCut(0, E(1, 2, 1.0 / 3), E(0, 3, 1.0 / 3)));
+        Assert.Equal("cuts[0]: the segment 5-4 runs along part of edge 5-2 of faces[0] and on across the face: a cut segment runs wholly along the face's boundary or wholly across it",
+            Assert.Single(partly.Edit.Errors).ToString());
+        // A segment wholly along an edge still splits nothing, and says so by an empty split.
+        var whole = Split(dart, new FaceCut(0, E(1, 2, 1.0 / 3), V(2)));
+        Assert.True(whole.Edit.Succeeded);
+        Assert.Empty(whole.Edit.Split);
+
         // Two segments crossing inside the face.
         var x = Split(Square(), new FaceCut(0, V(0), V(2)), new FaceCut(0, V(1), V(3)));
         Assert.Contains(x.Edit.Errors, e => e.ToString() == "cuts[0]: the segment 0-2 crosses another segment inside faces[0]");
