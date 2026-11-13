@@ -43,12 +43,20 @@ public class GatehouseLoadTests
         Assert.True(mesh.HasTombstones, "the saved gatehouse should keep its tombstones");
         var model = RunContent.Loader(RunFolder).Load(new ContentPath("models/gatehouse.glb"));
         Assert.Empty(model.Warnings);
-        var expected = CarveShading.Triangles(mesh);
+        // Worked from the faces, not from the product's triangulation: a live face of n corners (its holes' included) and
+        // h holes is n - 2 + 2h triangles, and a deleted face is none.
+        var faces = mesh.LiveFaces.ToArray();
+        Assert.Equal(19, faces.Length);
+        var triangles = faces.Sum(f => mesh.Faces[f].Loop.Count + mesh.Faces[f].Holes.Sum(h => h.Count) - 2 + 2 * mesh.Faces[f].Holes.Count);
         var data = model.MeshData;
-        Assert.Equal(expected.Count * 3, data.Indices!.Length);
-        // Every corner the file gives is one of the live triangles' corners: a deleted vertex (at the origin) draws nothing.
-        var live = expected.SelectMany(t => new[] { Key(t.A), Key(t.B), Key(t.C) }).ToHashSet();
+        Assert.Equal(triangles * 3, data.Indices!.Length);
+        // Every corner the file gives is a corner of a live face; none is where only a deleted vertex is.
+        var live = faces.SelectMany(f => mesh.Faces[f].Loop.Concat(mesh.Faces[f].Holes.SelectMany(h => h))).Select(v => Key(mesh.Vertices[v])).ToHashSet();
+        var deletedOnly = Enumerable.Range(0, mesh.Vertices.Count).Where(mesh.IsVertexDeleted).Select(v => Key(mesh.Vertices[v])).Where(k => !live.Contains(k)).ToHashSet();
         Assert.All(data.Indices!, i => Assert.Contains(Key(data.Vertices[(int)i].Position), live));
+        Assert.All(data.Indices!, i => Assert.DoesNotContain(Key(data.Vertices[(int)i].Position), deletedOnly));
+        // The product's triangulation, which the export draws with, agrees with the count.
+        Assert.Equal(triangles, CarveShading.Triangles(mesh).Count);
     }
 
     [SkippableOrRun]
