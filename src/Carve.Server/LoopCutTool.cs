@@ -20,7 +20,7 @@ public sealed class LoopCutTool(ModelStore store)
         + "Each quad of the ring is split into pieces, one more than the fractions; a split quad keeps its id for the piece holding its first corner (or the next corner off the cut) and the other pieces are appended; new vertices are appended by edge, low id then high. "
         + "Pieces take the face's colour and groups, split hard edges stay hard, new edges are soft, and a new vertex blends its edge's ends' weights. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[{face, pieces}]}: split lists each quad of the ring with its pieces, its own id first. "
-        + "Bad input (a pair that is not an edge of the mesh, an edge with no quad on it, a bad at, an argument loop_cut does not take) is a tool error that lists every problem; select with kind edges lists the real edges. "
+        + "Bad input (a pair that is not an edge of the mesh, an edge with no quad on it, a ring that closes on itself reversed (a Mobius band), a bad at, an argument loop_cut does not take) is a tool error that lists every problem; select with kind edges lists the real edges. "
         + "The mesh is left unchanged and nothing is added to undo; one undo step undoes the whole cut. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to cut. "
         + "Worked example on define_mesh's unit cube: one loop at 0.5 round the four sides, starting on the vertical edge 0-3, gives 12 vertices and 10 faces:\n"

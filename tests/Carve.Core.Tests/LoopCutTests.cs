@@ -22,6 +22,52 @@ public class LoopCutTests
         return TestMeshes.Make(v, faces);
     }
 
+    /// <summary>B-3: a band of <paramref name="n"/> planar quads round a circle of radius 1, each rung turned a further half
+    /// turn / n about the ring's tangent, so the last quad meets the first reversed. Rung k is vertices 2k and 2k+1. The
+    /// half-width is small so each quad stays planar within <see cref="PolygonMesh.PlanarityTolerance"/> (the warp is about
+    /// a quarter of it).</summary>
+    private static PolygonMesh Mobius(int n = 8, double halfWidth = 3.5e-4)
+    {
+        var v = new List<Vector3>();
+        for (var k = 0; k < n; k++)
+        {
+            double th = 2 * Math.PI * k / n, ph = Math.PI * k / n;
+            var c = new Vector3((float)Math.Cos(th), (float)Math.Sin(th), 0);
+            var d = new Vector3((float)(Math.Cos(ph) * Math.Cos(th)), (float)(Math.Cos(ph) * Math.Sin(th)), (float)Math.Sin(ph));
+            v.Add(c - (float)halfWidth * d);
+            v.Add(c + (float)halfWidth * d);
+        }
+        var faces = Enumerable.Range(0, n - 1).Select(k => new[] { 2 * k, 2 * k + 1, 2 * k + 3, 2 * k + 2 }).ToList();
+        faces.Add([2 * n - 2, 2 * n - 1, 0, 1]); // the last rung meets the first with its ends swapped
+        return TestMeshes.Make(v, faces);
+    }
+
+    [Fact]
+    public void ARingThatClosesOnItselfReversedIsRefusedNamingTheStartEdge()
+    {
+        var m = Mobius();
+        foreach (var edge in new[] { (0, 1), (1, 0), (6, 7) })
+        {
+            var r = LoopCut.Cut(m, edge, [0.5]);
+
+            Assert.False(r.Edit.Succeeded);
+            Assert.Empty(r.Ring);
+            var e = Assert.Single(r.Edit.Errors);
+            Assert.Equal("edge", e.Element);
+            Assert.Equal($"the ring from edge [{edge.Item1}, {edge.Item2}] comes back to it with its ends swapped: loop_cut does not cut a ring that closes on itself reversed", e.Message);
+        }
+    }
+
+    [Fact]
+    public void AnOrdinaryClosedRingStillCutsUnchanged()
+    {
+        var r = LoopCut.Cut(TestMeshes.Cube(), (0, 3), [0.5]);
+        Assert.True(r.Edit.Succeeded);
+        Assert.Equal(4, r.Ring.Count);
+        Assert.Equal(12, Ok(r).LiveVertexCount);
+        Assert.Equal(10, Ok(r).LiveFaceCount);
+    }
+
     [Fact]
     public void ARingRoundACubesSidesIsClosed()
     {
