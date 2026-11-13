@@ -56,11 +56,6 @@ Written by Sonnet 5.5.
 - **Static export** pairs `Shading.Triangles` with `Triangulator.Triangulate` (same order) to get each triangle corner's vertex id; `ShadedTriangle` is unchanged. **Skinned export** uses each piece's own mesh, so it needed nothing from `Combined`; a model with UVs on any piece writes `TEXCOORD_0` on every primitive.
 - **Warning**, one per piece with unmapped live faces, only when some piece has UVs: `<mesh>: N faces have no UVs; their corners are written as (0, 0) (faces a, b, c, d, e and K more)`, the first five ids; one face reads `<mesh>: 1 face has no UVs; its corners are written as (0, 0) (face a)`. `<mesh>` is the piece's name (`mesh` for a default model). In the static result it joins the report's warnings in `N warning(s)`; in the skinned one it is in `SkinnedGlb.Warnings`. `GlbExport.UvWarnings(Model)` builds it.
 - **For T-61:** an export of a model with UVs writes `TEXCOORD_0` as Carve holds them (glTF axes); read it back with `IModelGeometryLoader.Load`, vertex field `TexCoord`. The description of `export` says what is written.
-- **Model run on:** Sonnet 5.5. Checked on the unit and regression fixtures (cube, smooth cube, a two-bone chain) and through the `set_uvs` and `export` tools; not on a real character.
-
-### Hand-off
-
-HANDOFF at verify. Done and committed: the writers, the warning, the description, the tests, and `cairn task T-59 verify` is `VERIFY PASS` (server-unit, scenario-export, scenario-character, server-regression). Planted-break table: `artifacts/review/T-59/planted-breaks.md` in the milestone worktree. No-UV hashes are identical before and after in both scenarios.
-
-Left: `origin/task/T-57` (commit 1cadd61, `Model.Combined` carries UVs) has not reached `origin/milestone/M-6`. A static export of a model of several meshes with UVs goes through `Combined`, so it is unverified: add a test (two meshes with UVs, read back through `Load`, UVs per corner in mesh order; the warning per piece) once T-57 is on the milestone, `git rebase origin/milestone/M-6`, rerun `verify`, then `finish`. The code needs no change for it: `HasUvs`/`UvAt` read `Combined.Uvs`, which T-57's diff fills with the offset faces.
-
+- **Ruling (the person, 2026-11-13):** the warning's singular form `<mesh>: 1 face has no UVs; its corners are written as (0, 0) (face a)` is kept as built.
+- **Multi-mesh static export** goes through `Model.Combined`, which T-57 now fills with the offset faces' UVs (`Combined` unchanged here). A test writes a model of two meshes with UVs, reads it back through `Load` and checks each corner's UV bit for bit in mesh order, plus the warning per piece (only the second piece has unmapped faces). The code needed no change.
+- **Model run on:** Sonnet 5.5 (both sessions; the second rebased onto T-57 and added the multi-mesh test). Checked on the unit and regression fixtures (cube, smooth cube, a two-bone chain) and through the `set_uvs` and `export` tools; not on a real character.
