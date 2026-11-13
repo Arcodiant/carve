@@ -176,7 +176,7 @@ internal static class RenderTool
     }
 
     private const string Text =
-        "Renders the current mesh, as set by define_mesh or open and changed by move, extrude or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
+        "Renders the current mesh, as set by define_mesh or open and changed by the edits (move, extrude, subdivide, delete, merge_faces, bridge, plane_cut, loop_cut, knife) or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
         + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh, and the look's lines and spikes, the highlight's orange lines and stars, and the labels and tile captions you ask for: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
