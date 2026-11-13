@@ -147,10 +147,12 @@ Bone names, order and shape are the caller's. Nothing in Carve requires a humano
 
 **Certainty:** Leaning · **Strictness:** Guideline
 
-`export` warns, and never refuses, on Orcward's starting numbers: above 5,000 triangles for the whole character, above 8 colours or submeshes, and a height outside 1.4 to 2.4 m. Height is the rest bounds of all meshes, and applies only to a skeleton holding every bone the Synty preset requires, so a dragon on its own rig is not warned. The numbers are constants, to be revisited once several characters are on screen.
+The limits are the game's, not Carve's (T-51, ruled 2026-11-13). They live in `carve-limits.json` in the game's content folder: `export` looks in the `.glb`'s folder and then each folder above it and uses the first it finds, or `limits` (a folder, or a `.json` file) names it. The file is a JSON object of optional keys `max_triangles` (the whole model), `max_submeshes` (submeshes, or distinct colours), and `min_height` and `max_height` in metres. With no file there are no limit warnings, and the result says no game limits were found; a key left out never warns. `export` warns, and never refuses, past a limit and never at it. Static exports warn on triangles and submeshes too; height is the rest bounds of all meshes, and applies only to a skeleton holding every bone the Synty preset requires, so a dragon on its own rig is not warned. A file that is not those keys with sane values is a tool error that writes nothing.
 
-**Alternatives:** an argument saying a model is humanoid, which is one more thing to remember; warning every model, which is noise on a dragon.
-**Would change if:** a game uses other bone names or wants its own limits, which would make these per-model settings.
+`write_limits: true` fills the keys a file is missing with Orcward's starting numbers (5,000 triangles, 8 submeshes or colours, 1.4 to 2.4 m), creating the file beside the `.glb` when none was named or found; it never changes a key already set, and is written only after the `.glb` is. Those numbers are a starting point to edit, never a default. `subdivide` no longer warns on triangles, since it cannot know the game.
+
+**Alternatives:** Orcward's numbers as constants on skinned exports only, as T-34 shipped them, which are not general to every game; `export` arguments alone, which an agent must repeat on every call; limits stored in the Carve file, which belong to the game rather than the model.
+**Would change if:** one game needs different limits for different kinds of model (characters and props), which would make the file hold named profiles.
 
 ### A loaded frame against the preview
 

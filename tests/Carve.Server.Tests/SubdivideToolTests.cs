@@ -97,7 +97,7 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
     }
 
     [Fact]
-    public async Task Past_5000_triangles_the_result_warns_and_still_subdivides()
+    public async Task Past_5000_triangles_the_result_gives_the_count_and_no_limit_warning()
     {
         var (carve, _) = await StartAsync();
         using var __ = carve;
@@ -112,14 +112,14 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
 
         Assert.Equal(2688, body.GetProperty("faces").GetInt32());
         Assert.Equal(5376, body.GetProperty("triangles").GetInt32());
-        Assert.Equal("the model has 5376 triangles, above the 5000 a game character should keep to",
-            body.GetProperty("warnings")[0].GetString());
+        // T-51: limits are the game's, which subdivide cannot know, so only export warns on them.
+        Assert.DoesNotContain(body.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.Contains("triangles"));
     }
 
     [Theory]
     [InlineData(false, 5000)]
     [InlineData(true, 5001)]
-    public async Task The_triangles_count_every_mesh_and_only_past_5000_warn(bool extra, int triangles)
+    public async Task The_triangles_count_every_mesh(bool extra, int triangles)
     {
         var (carve, _) = await StartAsync();
         using var __ = carve;
@@ -141,7 +141,7 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
 
         Assert.Equal(4, body.GetProperty("faces").GetInt32());
         Assert.Equal(triangles, body.GetProperty("triangles").GetInt32());
-        Assert.Equal(extra, body.GetProperty("warnings").EnumerateArray().Any(w => w.GetString()!.Contains("triangles")));
+        Assert.DoesNotContain(body.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.Contains("triangles"));
     }
 
     [Fact]

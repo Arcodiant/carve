@@ -29,7 +29,7 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
     private static void Ok(JsonElement result) => Assert.False(IsError(result), TextOf(result));
 
     /// <summary>Two boxes on a two-bone chain; the upper box weighted only when <paramref name="weighUpper"/>; two clips.</summary>
-    private static async Task<CarveProcess> StartChainAsync(string folder, bool weighUpper = true)
+    internal static async Task<CarveProcess> StartChainAsync(string folder, bool weighUpper = true)
     {
         var carve = new CarveProcess([], workingDirectory: folder);
         await carve.InitializeAsync();
