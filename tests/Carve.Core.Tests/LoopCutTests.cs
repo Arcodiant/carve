@@ -311,4 +311,19 @@ public class LoopCutTests
         Assert.Contains(r.Edit.Errors, e => e.Element == element && e.Message.Contains(message, StringComparison.Ordinal));
         Assert.Empty(r.Ring);
     }
+
+    [Fact]
+    public void ACutAlongOrOverAnEdgeOfAConcaveQuadIsRefusedInLoopCutsOwnWords()
+    {
+        // RV-32 and the person's ruling (2026-11-13). Vertex 2 is reflex. At 1/3 from edge 1-2 the cut runs from (3, 1/3)
+        // along edge 1-2 to vertex 2, then inside: once FaceSplit skipped it and loop_cut succeeded with split [].
+        var dart = TestMeshes.Make([new(0, 0, 0), new(4, 0, 0), new(1, 1, 0), new(0, 4, 0)], [[0, 1, 2, 3]]);
+        var along = LoopCut.Cut(dart, (1, 2), [1.0 / 3]);
+        Assert.Equal("edge: the cut at 0.333333 across faces[0] runs along its edge [1, 2]; loop_cut cuts only across a quad",
+            Assert.Single(along.Edit.Errors).ToString());
+        Assert.Empty(along.Ring);
+        // At 0.5 from edge 0-1 the cut leaves over edge 1-2 and comes back in at edge 2-3's middle: never cuts[0].
+        Assert.Equal("edge: the cut at 0.5 across faces[0] crosses its edge [1, 2]; loop_cut cuts only across a quad",
+            Assert.Single(LoopCut.Cut(dart, (0, 1), [0.5]).Edit.Errors).ToString());
+    }
 }

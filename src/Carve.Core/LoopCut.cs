@@ -1,4 +1,5 @@
 using static Carve.Core.FaceSplit;
+using static Carve.Core.PlaneGeometry;
 
 namespace Carve.Core;
 
@@ -21,7 +22,9 @@ public sealed record LoopCutResult(EditResult Edit, IReadOnlyList<int> Ring);
 /// Refused: a pair that is not an edge of the mesh, an edge with no quad on it, an edge on more than two faces (a
 /// non-manifold edge: an open rule, provisional), a ring that closes on itself reversed (a Mobius band, B-3), and a bad <c>at</c> (empty, not
 /// strictly ascending, a fraction not strictly between 0 and 1, or one too near an end of the shortest ring edge by
-/// <see cref="FaceSplit.Tolerance"/>).
+/// <see cref="FaceSplit.Tolerance"/>). A cut across a quad that would run along one of its edges, cross one, or pass
+/// through a corner (a concave quad can make any of these) is refused naming the fraction, the face and the edge or corner
+/// (the person's ruling, 2026-11-13), never as a <see cref="FaceSplit"/> <c>cuts[k]</c>.
 /// </remarks>
 public static class LoopCut
 {
@@ -115,12 +118,45 @@ public static class LoopCut
         }
         if (errors.Count > 0) return new LoopCutResult(EditResult.Refused(errors), []);
 
+        // Each cut must run across its quad: one along an edge, over an edge or through a corner is refused in loop_cut's
+        // own words (the person's ruling, 2026-11-13).
+        foreach (var s in steps.OrderBy(s => s.Face))
+            foreach (var t in at)
+                if (Across(mesh, s.Face, s.In, s.Out, t, tol) is { } why)
+                    errors.Add(new MeshError("edge", MeshEdits.Invariant($"the cut at {t:G6} across faces[{s.Face}] {why}; loop_cut cuts only across a quad")));
+        if (errors.Count > 0) return new LoopCutResult(EditResult.Refused(errors), []);
+
         var cuts = new List<FaceCut>();
         foreach (var s in steps.OrderBy(s => s.Face))
             foreach (var t in at)
                 cuts.Add(new FaceCut(s.Face, CutPoint.OnEdge(s.In.S, s.In.T, t), CutPoint.OnEdge(s.Out.S, s.Out.T, t)));
         var r = Split(mesh, cuts);
         return new LoopCutResult(r.Edit, r.Edit.Succeeded ? [.. steps.Select(s => s.Face)] : []);
+    }
+
+    /// <summary>Why the cut at <paramref name="t"/> from <paramref name="entry"/> to <paramref name="exit"/> does not run
+    /// across quad <paramref name="f"/>, or null when it does.</summary>
+    private static string? Across(PolygonMesh mesh, int f, (int S, int T) entry, (int S, int T) exit, double t, double tol)
+    {
+        var verts = mesh.Vertices;
+        var loop = mesh.Faces[f].Loop;
+        Vector3D At(int v) => D(verts[v]);
+        var p = At(entry.S) + (At(entry.T) - At(entry.S)) * t;
+        var q = At(exit.S) + (At(exit.T) - At(exit.S)) * t;
+        for (var k = 0; k < 4; k++)
+            if (Overlaps(p, q, At(loop[k]), At(loop[(k + 1) % 4]), tol))
+                return MeshEdits.Invariant($"runs along its edge [{loop[k]}, {loop[(k + 1) % 4]}]");
+        foreach (var c in loop)
+            if (SegmentDistance(At(c), p, q) <= tol && Length(At(c) - p) > tol && Length(At(c) - q) > tol)
+                return MeshEdits.Invariant($"passes through its corner {c}");
+        var n = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, loop));
+        var (u, w) = Basis(n);
+        var origin = At(loop[0]);
+        Vector2D Q(Vector3D x) => new(Dot(x - origin, u), Dot(x - origin, w));
+        for (var k = 0; k < 4; k++)
+            if (Crosses(Q(p), Q(q), Q(At(loop[k])), Q(At(loop[(k + 1) % 4]))))
+                return MeshEdits.Invariant($"crosses its edge [{loop[k]}, {loop[(k + 1) % 4]}]");
+        return null;
     }
 
     private static (int, int) Key(int a, int b) => a < b ? (a, b) : (b, a);

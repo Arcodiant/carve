@@ -80,8 +80,9 @@ public sealed record FaceSplitResult(EditResult Edit, IReadOnlyList<(int From, i
 /// lies in, barycentrically, renormalised and capped at four.</item>
 /// </list>
 /// Refused, naming <c>cuts[i]</c>: a face that is not live, a point whose vertex or edge is not the face's, a fraction
-/// not in 0..1, a segment that leaves the face or crosses its boundary or another segment, and segments that leave a
-/// face in one piece (a segment with the same piece on both sides).
+/// not in 0..1, a segment that leaves the face or crosses its boundary or another segment, a segment that runs along part
+/// of an edge and on across the face (RV-32: never skipped; only a segment wholly along the boundary splits nothing), and
+/// segments that leave a face in one piece (a segment with the same piece on both sides).
 /// </remarks>
 public static class FaceSplit
 {
@@ -209,9 +210,18 @@ public static class FaceSplit
             var f = cuts[i].Face;
             var face = updated.GetValueOrDefault(f) ?? mesh.Faces[f];
             if (a == b || AlongBoundary(all, face, a, b, tol)) continue;
+            // A segment that runs along part of an edge and on across the face is refused, never skipped (RV-32).
+            if (PartlyAlong(all, face, a, b, tol) is { } edge)
+            {
+                errors.Add(new MeshError(MeshEdits.Invariant($"cuts[{i}]"), MeshEdits.Invariant(
+                    $"the segment {a}-{b} runs along part of edge {edge.C}-{edge.D} of faces[{f}] and on across the face: a cut segment runs wholly along the face's boundary or wholly across it")));
+                continue;
+            }
             if (!byFace.TryGetValue(f, out var list)) byFace[f] = list = [];
             if (!list.Any(s => (s.A == a && s.B == b) || (s.A == b && s.B == a))) list.Add((a, b, i));
         }
+
+        if (errors.Count > 0) return Refused(errors);
 
         var reshaped = new SortedDictionary<int, Face>(updated);
         var newFaces = new List<Face>();
@@ -324,13 +334,49 @@ public static class FaceSplit
     }
 
     /// <summary>Whether segment a-b runs along the face's boundary (its midpoint within tolerance of a boundary edge).</summary>
+    /// <summary>Whether segment a-b lies wholly along a loop of <paramref name="face"/>: a path of the loop from a to b,
+    /// either way round, every vertex between them on the segment (so a segment along an existing edge, which splits
+    /// nothing). A segment only partly along the boundary is not (<see cref="PartlyAlong"/>).</summary>
     private static bool AlongBoundary(Vector3[] all, Face face, int a, int b, double tol)
     {
-        var mid = (D(all[a]) + D(all[b])) * 0.5;
+        foreach (var loop in face.Holes.Prepend(face.Loop))
+        {
+            var i = IndexOf(loop, a);
+            if (i < 0 || IndexOf(loop, b) < 0) continue;
+            foreach (var step in new[] { 1, loop.Count - 1 })
+            {
+                var dir = D(all[b]) - D(all[a]);
+                var length = Length(dir);
+                for (var k = (i + step) % loop.Count; ; k = (k + step) % loop.Count)
+                {
+                    if (loop[k] == b) return true;
+                    // A vertex between them must lie on the segment, further along it than the one before.
+                    var x = D(all[loop[k]]) - D(all[a]);
+                    var off = x - dir * (Dot(x, dir) / (length * length));
+                    if (Length(off) > tol || Dot(x, dir) <= 0 || Dot(x, dir) >= length * length) break;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static int IndexOf(IReadOnlyList<int> loop, int v)
+    {
+        for (var i = 0; i < loop.Count; i++) if (loop[i] == v) return i;
+        return -1;
+    }
+
+    /// <summary>The first edge of <paramref name="face"/>'s loops that segment a-b runs along for more than the tolerance,
+    /// or null.</summary>
+    private static (int C, int D)? PartlyAlong(Vector3[] all, Face face, int a, int b, double tol)
+    {
         foreach (var loop in face.Holes.Prepend(face.Loop))
             for (var i = 0; i < loop.Count; i++)
-                if (SegmentDistance(mid, D(all[loop[i]]), D(all[loop[(i + 1) % loop.Count]])) <= tol) return true;
-        return false;
+            {
+                var (c, d) = (loop[i], loop[(i + 1) % loop.Count]);
+                if (Overlaps(D(all[a]), D(all[b]), D(all[c]), D(all[d]), tol)) return (c, d);
+            }
+        return null;
     }
 
     /// <summary>
