@@ -123,3 +123,7 @@ Per frame at least: front: white at the +Z side's top-left, violet at its top-ri
 9. **`Model.Combined`'s carrying and T-59:** T-57 lands it as its first commit, pushed early, and T-59 rebases on it *(recommended)*; or T-59 owns it, since export needs it.
 10. **Hue tolerance:** nearest of the eight, no angle bound *(recommended)*; or nearest and within ±15°; the white and magenta thresholds set from the probe frame and shown before use.
 11. **The checker's colours** (the planner's, open to objection), including the eight dark values above.
+
+### Rulings (the person, 2026-11-13)
+
+All eleven as recommended. On rule 9 in particular: T-57 lands UVs through `Model.Combined` as its first commit, pushed early to `milestone/M-6`, and T-59, running beside it, rebases onto that commit and does not change `Combined` itself. On rule 10: the white and magenta thresholds are shown to the person, from the probe frame, before they are used.
