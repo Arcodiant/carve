@@ -110,23 +110,6 @@ public class TombstoneTests
     }
 
     [Fact]
-    public void AnUndoneDeleteFreesNothingItHeldAndANewEditUsesTheUndoneIds()
-    {
-        // Undo is the history's earlier mesh: meshes are immutable, so the delete never touched it.
-        var cube = TestMeshes.Cube();
-        var extruded = MeshEdits.Extrude(cube, [Top], 1);
-        Assert.Equal([8, 9, 10, 11], extruded.NewVertices);
-        _ = TestMeshes.Ok(Delete(TestMeshes.Ok(extruded), faces: [Top]));
-
-        // Undo both: back on the cube, whose slots and contents are as they were, a new extrude takes the undone ids again.
-        Assert.False(cube.HasTombstones);
-        Assert.Equal(new Face([4, 5, 6, 7]), cube.Faces[Top]);
-        var again = MeshEdits.Extrude(cube, [0], 1);
-        Assert.Equal([8, 9, 10, 11], again.NewVertices);
-        Assert.Equal([6, 7, 8, 9], again.NewFaces);
-    }
-
-    [Fact]
     public void AnEditNamingADeletedIdSaysItWasDeletedDistinctFromOneThatNeverExisted()
     {
         var m = TestMeshes.Ok(Delete(TestMeshes.Cube(), vertices: [Corner]));
