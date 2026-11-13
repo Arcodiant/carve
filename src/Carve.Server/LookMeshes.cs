@@ -219,7 +219,8 @@ public static class LookMeshes
                     var at = space.Apply(mesh.Vertices[v]);
                     return new[] { at, at + corners[f][k] * SpikeLength };
                 });
-            var centre = space.Apply(mesh.FaceCentre(f));
+            // On the face itself, as its label is: a holed face's centre can lie in a hole.
+            var centre = space.Apply(mesh.FaceLabelPoint(f));
             return new[] { centre, centre + mesh.FaceNormal(f) * SpikeLength };
         }));
     }
