@@ -541,13 +541,6 @@ public static class FaceSplit
         public static Vector2D operator *(Vector2D a, double s) => new(a.X * s, a.Y * s);
     }
 
-    internal readonly record struct Vector3D(double X, double Y, double Z)
-    {
-        public static Vector3D operator +(Vector3D a, Vector3D b) => new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
-        public static Vector3D operator -(Vector3D a, Vector3D b) => new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
-        public static Vector3D operator *(Vector3D a, double s) => new(a.X * s, a.Y * s, a.Z * s);
-    }
-
     internal static Vector3D D(Vector3 v) => new(v.X, v.Y, v.Z);
 
     internal static double Dot(Vector3D a, Vector3D b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
