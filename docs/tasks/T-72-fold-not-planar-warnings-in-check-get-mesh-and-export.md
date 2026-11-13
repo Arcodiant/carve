@@ -4,7 +4,7 @@ description: >-
 ---
 # T-72 — Fold not-planar warnings in check, get_mesh, export, open and move
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 

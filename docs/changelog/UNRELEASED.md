@@ -8,3 +8,4 @@
 - T-82: render draws with the engine's PBR material, as a loaded .glb does
 - T-48: One suite proves the request's done-when: both exports, Load, LoadAnimationSet, and a loaded frame matching Carve's preview
 - T-49: Fresh agents build, rig, animate and export an original character from the tool descriptions alone, across two sessions
+- T-72: Fold not-planar warnings in check, get_mesh, export, open and move
