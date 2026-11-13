@@ -4,7 +4,7 @@ description: >-
 ---
 # T-60 — UV faults in check
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
