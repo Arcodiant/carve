@@ -4,7 +4,7 @@ description: >-
 ---
 # M-6 — UVs
 
-**Status:** Planned
+**Status:** Active
 
 **One-liner:** *An agent authors and unwraps UVs, carries them through file and export, and checks them by eye*
 
