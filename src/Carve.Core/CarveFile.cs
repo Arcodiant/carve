@@ -43,7 +43,7 @@ public sealed class CarveFileResult
 /// skeleton and the clips), read back bit-exact with every vertex, face and bone at its id. Undo history is not saved.
 /// </summary>
 /// <remarks>
-/// <para><see cref="Write"/> gives version 4 (T-63) for a model with a holed face, and otherwise what earlier builds gave
+/// <para><see cref="Write"/> gives version 4 (T-63) for a model with a holed face or a tombstone, and otherwise what earlier builds gave
 /// (version 3 with a smooth mesh or a hard edge, else version 2, byte for byte): the lowest version that holds the model,
 /// as the person ruled (2026-11-11). Version 4 is version 3 with faces that may have holes: a face is
 /// either a plain array of vertex ids, its outer loop, or the object <c>{"loop": [...], "holes": [[...], ...]}</c>, as
