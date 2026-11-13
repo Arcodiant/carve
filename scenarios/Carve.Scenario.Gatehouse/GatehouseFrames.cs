@@ -304,7 +304,9 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
 
         if (lines.Length == 0 && size == GatehousePlan.Size && GatehousePlan.Expected.TryGetValue((stage, view), out var expected))
         {
+            // Every probe in the window's hole must be sure: one the ray test is not sure of is a failure, not a probe left out.
             var window = all.Count(t => t.p.Face == -1);
+            Equal($"{frame.Name}: sure probes in the window's hole", probes.Count(p => p.Face == -1), window);
             Equal($"{frame.Name}: sure probes", expected.Sure + window, tested);
             Equal($"{frame.Name}: faces shown", expected.Faces, string.Join(" ", shown));
         }
