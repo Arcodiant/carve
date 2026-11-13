@@ -131,3 +131,7 @@ Planned by Claude Opus 5.5 (`claude-opus-5-5`), 2026-11-13, on `milestone/M-6` a
 8. **Fill.** *Recommend:* UV triangle area over `into`'s area. *Alternative:* the islands' rectangles' area.
 9. **Tolerances** (not yet seen): grid `1e-9` (double) and `1e-6` (float), bent strip `1 + 1e-6`, CG `1e-10` / 10 000, degenerate triangle `1e-12 L^2`, rectangle ties `1e-9`, sample as exact text. *Recommend:* as listed. *Alternative:* a looser grid tolerance (`1e-5`) and the sample compared within `1e-6` per UV.
 10. **Result fields beyond the Scope:** `scale` and `flipped`. *Recommend:* include both. *Alternative:* the Scope's fields only.
+
+### Rulings (the person, 2026-11-13)
+
+All ten as recommended. Rule 1: extra boundary loops are allowed when they are one face's hole loops, and any other island that is not a disc is refused. Rules 2 to 10 as written above.
