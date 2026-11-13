@@ -4,7 +4,7 @@ description: >-
 ---
 # T-53 — UVs and seams in the kernel and the file
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
