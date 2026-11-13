@@ -66,13 +66,13 @@ An agent can question a mesh instead of reading every id out of `get_mesh`.
 
 ## Cutting
 
-Each of these edits the mesh in place and appends new ids at the end; the examples are on `define_mesh`'s unit cube. A cut is refused, with the point and its distance, when a knife point is off the surface.
+Each of these edits the mesh in place and appends new ids at the end; each example is on a fresh `define_mesh` unit cube unless it says otherwise. A cut is refused, with the point and its distance, when a knife point is off the surface.
 
-- `plane_cut` slices through a plane, keeping a side and capping it: `{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}`. Two cuts with tilted normals make a gable.
+- `plane_cut` slices through a plane; with `keep` it keeps one side and caps it (the default, `both`, only splits): `{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}`. Two cuts with tilted normals make a gable.
 - `loop_cut` runs a ring of new edges round a band of faces, from one edge, at fractions along it: `{"edge":[0,3],"at":[0.5]}`.
 - `knife` draws a path on a face, splitting it; a closed path cuts out a piece with its own id: `{"points":[[0.25,0.25,1],[0.75,0.25,1],[0.75,0.75,1],[0.25,0.75,1]],"closed":true}`.
-- `merge_faces` joins neighbouring coplanar faces into one: `{"faces":[2,3]}`.
+- `merge_faces` joins connected faces into one, a non-planar result being a warning; after the `loop_cut` above, this puts the front's two halves back together, faces 1 and 7, into face 1: `{"faces":[1,7]}`.
 - `delete` removes faces or vertices; their ids stay as `null` (tombstones) in `get_mesh`: `{"faces":[3]}`.
-- `bridge` joins two loops of vertices with a band of faces, which closes an opening left by `delete`: `{"loops":[[0,1,2,3],[4,5,6,7]]}`.
+- `bridge` joins two open loops of vertices with a band of faces, which closes an opening left by `delete`; on `bridge`'s own example, two unit squares facing each other, this makes a box: `{"loops":[[0,1,2,3],[4,5,6,7]]}`.
 
 A window through a wall is `knife` on the front and the back, `delete` of both pieces, then `bridge` of the two loops.

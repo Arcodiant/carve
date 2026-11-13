@@ -10,10 +10,10 @@ namespace Carve.Server;
 /// <summary>The <c>merge_faces</c> tool: <see cref="FaceMerge.Merge"/> on the store's mesh, reported as every edit is.</summary>
 public sealed class MergeFacesTool(ModelStore store)
 {
-    /// <summary>The worked example's input, a unit cube split round its middle (y = 0.5) into ten faces, as <c>loop_cut</c> leaves it.</summary>
+    /// <summary>The worked example's input, a unit cube split round its middle (y = 0.5) into ten faces: exactly what <c>loop_cut {"edge":[0,3],"at":[0.5]}</c> leaves of define_mesh's unit cube.</summary>
     public const string CutCube =
-        """{"vertices":[[0,0,0],[1,0,0],[1,0,1],[0,0,1],[0,0.5,0],[1,0.5,0],[1,0.5,1],[0,0.5,1],[0,1,0],[1,1,0],[1,1,1],[0,1,1]],"""
-        + "\"faces\":[[0,1,2,3],[8,11,10,9],[3,2,6,7],[7,6,10,11],[1,0,4,5],[5,4,8,9],[2,1,5,6],[6,5,9,10],[0,3,7,4],[4,7,11,8]]}";
+        """{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1],[0,0.5,0],[1,0.5,0],[0,0.5,1],[1,0.5,1]],"""
+        + "\"faces\":[[0,8,9,1],[4,5,11,10],[0,1,5,4],[3,7,6,2],[0,4,10,8],[1,9,11,5],[8,3,2,9],[11,6,7,10],[10,7,3,8],[9,2,6,11]]}";
 
     /// <summary>The line of a worked example that gives the define_mesh call to make first.</summary>
     public const string DefineMarker = "define_mesh input: ";
@@ -28,9 +28,9 @@ public sealed class MergeFacesTool(ModelStore store)
         + "Bad input (fewer than two faces, an unknown, deleted or repeated id, faces not connected, mixed winding, a result that is not one face, such as faces touching at a vertex only or closing a shell) "
         + "is a tool error that lists every problem by element; the mesh is left unchanged and nothing is added to undo. One merge is one undo step. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to merge in. "
-        + "Worked example: a unit cube split round its middle (y = 0.5), as loop_cut leaves it, merging the two pieces of its front (+Z, faces 2 and 3) back into face 2, deleted:{vertices:[], faces:[3]}:\n"
+        + "Worked example: a unit cube split round its middle (y = 0.5), exactly as loop_cut's own worked example leaves define_mesh's cube, merging the two pieces of its front (+Z, faces 1 and 7) back into face 1, deleted:{vertices:[], faces:[7]}:\n"
         + DefineMarker + CutCube + "\n"
-        + ExampleMarker + """{"faces":[2,3]}""";
+        + ExampleMarker + """{"faces":[1,7]}""";
 
     public static McpServerTool Create() => MeshToolSupport.Create<MergeFacesTool>("merge_faces", Text, WithMesh(new JsonObject
     {
