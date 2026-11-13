@@ -60,8 +60,11 @@ public sealed class LoopCutTool(ModelStore store)
         if (Absent(edge)) errors.Add("edge: required but missing");
         else
         {
+            var before = errors.Count;
             var ids = Ids("edge", edge, errors);
-            if (ids is not null && ids.Count != 2) errors.Add($"edge: expected a pair [a, b] of vertex ids, got {ids.Count} entr{(ids.Count == 1 ? "y" : "ies")}");
+            // An entry Ids refused is left out of ids, so the pair's length is only checked when every entry was read.
+            if (errors.Count > before) { }
+            else if (ids is not null && ids.Count != 2) errors.Add($"edge: expected a pair [a, b] of vertex ids, got {ids.Count} entr{(ids.Count == 1 ? "y" : "ies")}");
             else if (ids is not null) pair = (ids[0], ids[1]);
         }
 

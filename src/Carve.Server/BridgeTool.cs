@@ -66,8 +66,10 @@ public sealed class BridgeTool(ModelStore store)
         else
             for (var k = 0; k < 2; k++)
             {
+                var before = errors.Count;
                 read[k] = Ids($"loops[{k}]", loops.Value[k], errors);
-                if (read[k] is null) errors.Add($"loops[{k}]: expected an array of vertex ids, got null");
+                // Ids names a loop that is not an array itself; only a null loop is left to name here.
+                if (read[k] is null && errors.Count == before) errors.Add($"loops[{k}]: expected an array of vertex ids, got null");
             }
         if (errors.Count > 0) return Failed("bridge", errors);
 

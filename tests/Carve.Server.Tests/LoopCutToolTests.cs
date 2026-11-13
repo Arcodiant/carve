@@ -78,6 +78,11 @@ public sealed class LoopCutToolTests() : TempFolderTests("carve-loop-cut")
             Assert.Contains(mention, TextOf(r));
         }
 
+        // An entry that is not an id is the one problem: the pair had two entries, so its length is not refused too.
+        var notId = TextOf(await carve.CallToolAsync("loop_cut", """{"edge":[0,3.5],"at":[0.5]}"""));
+        Assert.Contains("the 2nd listed entry: expected an integer id, got 3.5", notId);
+        Assert.DoesNotContain("entry", notId.Replace("listed entry", ""));
+
         var after = Ok(await carve.CallToolAsync("get_mesh", "{}"));
         Assert.Equal(8, after.GetProperty("vertices").GetArrayLength());
         Assert.Equal(6, after.GetProperty("faces").GetArrayLength());
