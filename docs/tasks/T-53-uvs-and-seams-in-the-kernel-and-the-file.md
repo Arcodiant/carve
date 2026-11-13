@@ -196,3 +196,13 @@ Written 2026-11-13 by the research agent (Opus 5.5) against `milestone/M-6` at `
 5. **Where seams live.** *Recommended:* in the same `MeshUvs` object as the face UVs (`PolygonMesh.Uvs`, with `Seams` as a convenience, as `HardEdges` is over `Shade`). Both are UV data, edited by the same T-54/T-56 tools, and untouched by shading. *Alternative:* a separate `EdgeSet`-style type held on its own (`PolygonMesh.SeamEdges`, `WithSeams`), which adds a second constructor parameter and a second carry line at each site.
 6. **Interpolation precision.** *Recommended:* sum in double and round once to float, as positions and the `Stencil` already do, so values such as 0.5 and 0.25 are exact. *Alternative:* float arithmetic, which is not bit-stable across a re-order.
 7. **Copies that are not edits.** *Recommended:* a posed copy (`WithVertices`, skinning) keeps `Uvs`, as it keeps `Style`, and `Model.Combined` (render) carrying UVs offset by face id is left to T-57, which first needs it. *Alternative:* add `Combined`'s UV carrying here so that T-57 only draws.
+
+### Rulings (the person, 2026-11-13)
+
+All seven as recommended:
+
+1. Version 5, written only when some mesh has UVs or seams. Every other model writes 2, 3 or 4 exactly as now.
+2. One UV per `Face.Corners` entry: the outer loop, then each hole. "A tombstone can never be mapped" means a deleted face's slot (`Face.Deleted`, no corners) holds no UVs while it is deleted, as it holds no colour or groups. `undo` restores the face with its UVs. The file refuses a `uvs` entry naming a tombstone.
+3. The cuts: a, split pieces interpolated (linear by fraction on an edge, barycentric for an interior knife point); b, caps unmapped; c, merge_faces keeps UVs only when they agree bit-for-bit at every shared vertex, otherwise unmapped with a warning; d, bridge quads unmapped; e, deleted faces lose theirs.
+4. Seams carry as hard edges do, and the plane-cut cap border is not seamed.
+5. to 7. As recommended: seams in `MeshUvs`, double arithmetic rounded once, posed copies keep UVs, `Model.Combined` left to T-57. These three were taken without objection rather than put as questions.
