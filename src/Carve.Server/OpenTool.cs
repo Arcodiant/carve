@@ -28,7 +28,6 @@ public sealed class OpenTool(ModelStore store)
         + "and carve keeps no current file: give the path to open and to save every time. "
         + "The .carve file is the one to keep working in; the .glb that export writes is only for the game and cannot be opened. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; the path must end in .carve, in any case. "
-        + "On a subdivided model the report lists a not-planar warning for each curved quad, which can run to tens of thousands of characters and be cut by the client (the file is open all the same); get_clips and get_skeleton are short. "
         + "Returns define_mesh's JSON report ({vertices, faces, edges, closed, bounds, warnings}) preceded by path, the absolute path read; when the whole model has several meshes, {meshes:[{name, and that report}]} instead, and meshes:[] for a file of a skeleton and clips with no mesh (a clip library); "
         + "and when the model now has a skeleton, bones (how many) and clips (their names). "
         + "Errors, each a tool error that leaves the model, its ids and undo as they were: an empty path; a path holding a character a file path may not; "

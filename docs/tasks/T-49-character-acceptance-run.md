@@ -62,7 +62,7 @@ Run on **Claude Sonnet 5.5** (`claude-sonnet-5-5`). Every `claude -p` session ra
 
 **What stumbled.** One thing, in both rounds: the result of `move`, `check`, `open` and `export` on the subdivided character was 74 to 120 thousand characters (one "face is not planar" warning per curved quad, which `subdivide` says to expect but folds into one line only in its own result), over what the client will show, so the agent got "result exceeds maximum allowed tokens" and no confirmation. The calls had worked. Each time the agent coped: it checked with `get_weights`, `get_clips`, `render_glb` or `select` instead (and tried `Bash`, which was refused; the file tools are removed). Round 1 session 2 never saw the model export's result and confirmed the file with `render_glb`.
 
-**What changed.** Round 1 to 2: a note on `subdivide`, `open` and `export` that the lists are long, the result may be cut though the call ran, and which short tools answer instead. Description text only. It did not change what the agents did (round 2 flooded the same, coped the same), as expected: the cause is the result's size. **For the person (not decided here): the warning list could be capped or folded in `open`, `move`, `check` and `export` as `subdivide` folds it, a code change that would make this stumble go.** No third round: both rounds pass.
+**What changed.** Round 1 to 2: description notes on `subdivide`, `open` and `export` about the long lists. They did not change what the agents did (round 2 flooded the same, coped the same), so by the person's ruling of 2026-11-13 they are reverted. **T-72 owns the fix** (fold the not-planar warnings in `check`, `get_mesh`, `export`, `open` and `move`), pulled into M-19. No third round: both rounds pass.
 
 **Shown failing** (`run-acceptance-negatives.ps1` on round 2, with round 1's files as "another character"):
 
@@ -78,20 +78,10 @@ Run on **Claude Sonnet 5.5** (`claude-sonnet-5-5`). Every `claude -p` session ra
 
 **Review.** The person approved round 2's session-1 renders and four `render | render_glb | difference` triptychs (rest front and side, Walk 0.333 side, Idle 0.667 front), through `mcp__waystone__review`.
 
-**Hash guard.** See Hand-off below if absent.
+**Rulings (2026-11-13).** (1) The planted wrong bone never produced an error: the agent read `get_clips` and `get_skeleton` first and corrected the name from their output. Recorded as a pass, it recovered, with that reading noted. (2) The warning flood goes to T-72, and the three description notes are reverted. (3) No `tests.json` suite for the two acceptance projects; their `CLAUDE.md` rows say they run only on an acceptance run's folder, by its script.
+
+**Models.** The acceptance agents of both rounds ran on Sonnet 5.5 (the first agent of this member too). The finishing agent ran on Sonnet 5.5.
+
+**Hash guard.** HASHPLACEHOLDER
 
 **Not checked:** a real game loading the files (the engine's loaders only); round 1's session-1 `.carve` file itself.
-
-### Hand-off
-
-Sonnet 5.5 stopped at the tool-call checkpoint (about 60 calls passed while waiting on the queue).
-
-**Done and committed (9d816aa and the commit after it):** both rounds run and passing (see As built); scenario, checks, scripts and the negatives table; layout rows in `CLAUDE.md`; the description notes on `subdivide`, `open` and `export`; the person approved the review set.
-
-**Left:**
-1. `cairn task T-49 verify` was started at 9d816aa (2 h limit) and was in the queue when this stopped: `scenario-character` running, `scenario-soft`, `scenario-orcward` and `server-regression` queued (jobs J-20261113-120134-9ad7be and the three after it). It may need starting again (`cairn task T-49 verify`, background limit up to 2 h); rerun a timeout once. A first attempt used the default 30 min background limit and was killed.
-2. The description tests: `server-regression` (and the unit tier verify runs) must pass with the three edited descriptions; fix any expected-description test they touch.
-3. The hash guard: after verify, compare every frame and `.glb` of scenarios cube, rig, crate, shed, export, character, soft and orcward from this branch's queued runs (`cairn test artifacts <suite>`) with the latest on `origin/milestone/M-19` (same SHA-256 per file). A description change should move none. Fill in the "Hash guard" line of As built.
-4. Then `cairn lint`, commit, `cairn task T-49 finish` from inside the worktree, quote the `Merge task/T-49` line.
-
-**Surprising:** a client cuts results of 74 to 120 thousand characters on a subdivided character (the not-planar warning list), in both rounds; descriptions did not change the agents' behaviour. Suggested for the person: cap or fold that list in `open`, `move`, `check` and `export`.
