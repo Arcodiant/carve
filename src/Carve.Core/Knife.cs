@@ -20,7 +20,10 @@ public sealed record KnifeResult(EditResult Edit, IReadOnlyList<(int From, int T
 /// otherwise it is inside a face, projected onto its plane. A point off the surface is refused with its distance and the
 /// nearest surface point; one inside two faces is refused naming both.</item>
 /// <item><b>Segments.</b> Consecutive points (and with <c>closed</c> the last and the first) must share a face, and the
-/// segment between them must run across it: one that leaves it, or passes through one of its holes, is refused.</item>
+/// segment between them must run across it: one that leaves it, or passes through one of its holes, is refused. A
+/// segment that meets the face's boundary between its ends is split at each corner it passes through, as
+/// <see cref="PlaneCut"/> splits its line (ruled 2026-11-13): each part across the face is a cut, a part along an edge
+/// keeps that edge, and a part outside the face is refused, naming the corner it leaves at.</item>
 /// <item><b>The path.</b> An open path must end on edges or vertices; a closed path wholly inside a face cuts out an
 /// inner face and leaves the face a hole (<see cref="FaceSplit"/>).</item>
 /// </list>
@@ -61,13 +64,22 @@ public static class Knife
                         $"{Show(points[i])} is inside faces[{snaps[i].Faces[0]}], not on an edge or a vertex, and an open path must end on one: a cut that stops inside a face is not a face")));
         if (errors.Count > 0) return Refused(errors);
 
+        // Each segment is cut in parts, split where it meets the face's boundary between its ends, as plane_cut cuts
+        // (the person's ruling, 2026-11-13): a part across the face cuts it, a part along an edge reuses that edge.
         var count = closed ? points.Count : points.Count - 1;
         var cuts = new List<FaceCut>();
+        var segmentOf = new List<int>();
+        var firstPart = new int[count];
         for (var k = 0; k < count; k++)
         {
             var (i, j) = (k, (k + 1) % points.Count);
-            if (Segment(mesh, snaps[i], snaps[j], i, j, tol, errors) is { } face)
-                cuts.Add(new FaceCut(face, snaps[i].Point, snaps[j].Point));
+            firstPart[k] = cuts.Count;
+            if (Segment(mesh, snaps[i], snaps[j], i, j, tol, errors) is { } found)
+                foreach (var (a, b) in found.Parts)
+                {
+                    cuts.Add(new FaceCut(found.Face, a, b));
+                    segmentOf.Add(k);
+                }
         }
         if (errors.Count > 0) return Refused(errors);
 
@@ -86,16 +98,21 @@ public static class Knife
 
         var r = Split(mesh, cuts);
         if (!r.Edit.Succeeded)
-            return Refused(r.Edit.Errors.Select(e => new MeshError(Segments(e.Element, points.Count), e.Message)).ToArray());
-        return new KnifeResult(r.Edit, r.Segments);
+            return Refused(r.Edit.Errors.Select(e => new MeshError(Segments(e.Element, segmentOf, points.Count), e.Message)).ToArray());
+        var edges = Enumerable.Range(0, count)
+            .Select(k => (r.Segments[firstPart[k]].From, r.Segments[(k + 1 < count ? firstPart[k + 1] : cuts.Count) - 1].To))
+            .ToArray();
+        return new KnifeResult(r.Edit, edges);
     }
 
     private static KnifeResult Refused(IReadOnlyList<MeshError> errors) => new(EditResult.Refused(errors), []);
 
-    /// <summary><c>cuts[k]</c>, in <see cref="FaceSplit"/>'s errors, named as the knife's segment from points[k].</summary>
-    private static string Segments(string element, int n)
+    /// <summary><c>cuts[c]</c>, in <see cref="FaceSplit"/>'s errors, named as the knife's segment the part c is of.</summary>
+    private static string Segments(string element, IReadOnlyList<int> segmentOf, int n)
     {
-        if (!element.StartsWith("cuts[", StringComparison.Ordinal) || !int.TryParse(element[5..^1], out var k)) return element;
+        if (!element.StartsWith("cuts[", StringComparison.Ordinal) || !int.TryParse(element[5..^1], out var c)
+            || c < 0 || c >= segmentOf.Count) return element;
+        var k = segmentOf[c];
         return MeshEdits.Invariant($"points[{k}], points[{(k + 1) % n}]");
     }
 
@@ -212,8 +229,8 @@ public static class Knife
         return (best.Point, false);
     }
 
-    /// <summary>The face segment i-j runs across, or null with an error.</summary>
-    private static int? Segment(PolygonMesh mesh, Snap from, Snap to, int i, int j, double tol, List<MeshError> errors)
+    /// <summary>The face segment i-j runs across and its parts there, or null with an error.</summary>
+    private static (int Face, List<(CutPoint, CutPoint)> Parts)? Segment(PolygonMesh mesh, Snap from, Snap to, int i, int j, double tol, List<MeshError> errors)
     {
         var at = MeshEdits.Invariant($"points[{i}], points[{j}]");
         var common = from.Faces.Intersect(to.Faces).Order().ToArray();
@@ -224,42 +241,47 @@ public static class Knife
         }
         var across = new List<int>();
         var along = new List<int>();
+        var parts = new Dictionary<int, List<(CutPoint, CutPoint)>>();
         string? why = null;
         foreach (var f in common)
         {
-            switch (Runs(mesh, f, from.At, to.At, tol))
+            var (run, ps, where) = Runs(mesh, f, from, to, tol);
+            parts[f] = ps;
+            var place = where is { } w ? " at " + Show(w) : "";
+            switch (run)
             {
                 case Run.Along: along.Add(f); break;
                 case Run.Across: across.Add(f); break;
-                case Run.Leaves: why ??= MeshEdits.Invariant($"the segment from points[{i}] to points[{j}] leaves faces[{f}]"); break;
-                case var hole: why ??= MeshEdits.Invariant($"the segment from points[{i}] to points[{j}] passes through hole {(int)hole - (int)Run.Hole} of faces[{f}]"); break;
+                case Run.Leaves: why ??= MeshEdits.Invariant($"the segment from points[{i}] to points[{j}] leaves faces[{f}]{place}"); break;
+                case var hole: why ??= MeshEdits.Invariant($"the segment from points[{i}] to points[{j}] passes through hole {(int)hole - (int)Run.Hole} of faces[{f}]{place}"); break;
             }
         }
-        if (across.Count == 1) return across[0];
+        if (across.Count == 1) return (across[0], parts[across[0]]);
         if (across.Count > 1)
         {
             errors.Add(new MeshError(at, MeshEdits.Invariant(
                 $"the segment from points[{i}] to points[{j}] runs across {string.Join(" and ", across.Select(f => MeshEdits.Invariant($"faces[{f}]")))}, which overlap there")));
             return null;
         }
-        if (along.Count > 0) return along[0];
+        if (along.Count > 0) return (along[0], parts[along[0]]);
         errors.Add(new MeshError(at, why!));
         return null;
     }
 
     private enum Run { Across, Along, Leaves, Hole }
 
-    /// <summary>How segment a-b lies on face f: across it, along its boundary, leaving it, or through hole k (Hole + k).</summary>
-    private static Run Runs(PolygonMesh mesh, int f, Vector3 a, Vector3 b, double tol)
+    /// <summary>
+    /// How segment a-b lies on face f: across it, along its boundary, leaving it, or through hole k (Hole + k); with its
+    /// parts, split at each boundary vertex it passes through between its ends, and where it leaves (null if it does not).
+    /// The run is Across when some part crosses the face's inside and none leaves it, Along when every part runs along an
+    /// edge.
+    /// </summary>
+    private static (Run Run, List<(CutPoint, CutPoint)> Parts, Vector3? Where) Runs(PolygonMesh mesh, int f, Snap a, Snap b, double tol)
     {
         var verts = mesh.Vertices;
         var face = mesh.Faces[f];
-        var (pa, pb) = (D(a), D(b));
-        var mid = (pa + pb) * 0.5;
+        var (pa, pb) = (D(a.At), D(b.At));
         var loops = face.Holes.Prepend(face.Loop).ToArray();
-        foreach (var loop in loops)
-            for (var k = 0; k < loop.Count; k++)
-                if (SegmentDistance(mid, D(verts[loop[k]]), D(verts[loop[(k + 1) % loop.Count]])) <= tol) return Run.Along;
 
         var n = PolygonMesh.Unit(PolygonMesh.NewellVector(verts, face.Loop));
         var origin = D(verts[face.Loop[0]]);
@@ -267,21 +289,52 @@ public static class Knife
         Vector2D Q(Vector3D x) => new(Dot(x - origin, u), Dot(x - origin, v));
         Vector2D P(int vertex) => Q(D(verts[vertex]));
         var (qa, qb) = (Q(pa), Q(pb));
+
+        // A proper crossing of a boundary edge: the segment leaves the face, or enters a hole.
         for (var h = 0; h < loops.Length; h++)
         {
             var loop = loops[h];
-            var crosses = false;
-            for (var k = 0; k < loop.Count && !crosses; k++)
+            for (var k = 0; k < loop.Count; k++)
             {
                 var (c, d) = (D(verts[loop[k]]), D(verts[loop[(k + 1) % loop.Count]]));
                 // An edge the segment's ends lie on does not cross it.
                 if (SegmentDistance(pa, c, d) <= tol || SegmentDistance(pb, c, d) <= tol) continue;
-                crosses = Crosses(qa, qb, Q(c), Q(d));
+                if (Crosses(qa, qb, Q(c), Q(d))) return (h == 0 ? Run.Leaves : Run.Hole + (h - 1), [], null);
             }
-            var inHole = h > 0 && InPolygon(loop, P, Q(mid));
-            if (crosses || inHole) return h == 0 ? Run.Leaves : Run.Hole + (h - 1);
         }
-        return InPolygon(loops[0], P, Q(mid)) ? Run.Across : Run.Leaves;
+
+        // The boundary vertices the segment passes through between its ends, in order along it.
+        var ab = pb - pa;
+        var length = Length(ab);
+        var stops = new List<(double T, int Vertex)>();
+        if (length > tol)
+            foreach (var vertex in face.Corners.Distinct())
+            {
+                var x = D(verts[vertex]);
+                var t = Dot(x - pa, ab) / (length * length);
+                if (t * length > tol && (1 - t) * length > tol && SegmentDistance(x, pa, pb) <= tol) stops.Add((t, vertex));
+            }
+        var cut = new List<(CutPoint Point, Vector3D At)> { (a.Point, pa) };
+        cut.AddRange(stops.OrderBy(s => s.T).Select(s => (CutPoint.AtVertex(s.Vertex), D(verts[s.Vertex]))));
+        cut.Add((b.Point, pb));
+
+        var parts = new List<(CutPoint, CutPoint)>();
+        var anyAcross = false;
+        for (var k = 0; k + 1 < cut.Count; k++)
+        {
+            parts.Add((cut[k].Point, cut[k + 1].Point));
+            var mid = (cut[k].At + cut[k + 1].At) * 0.5;
+            var onEdge = loops.Any(loop => Enumerable.Range(0, loop.Count)
+                .Any(e => SegmentDistance(mid, D(verts[loop[e]]), D(verts[loop[(e + 1) % loop.Count]])) <= tol));
+            if (onEdge) continue;
+            // Where it leaves, when that is a boundary vertex between its ends; otherwise it leaves from its start.
+            Vector3? where = k == 0 ? null : new Vector3((float)cut[k].At.X, (float)cut[k].At.Y, (float)cut[k].At.Z);
+            if (!InPolygon(loops[0], P, Q(mid))) return (Run.Leaves, [], where);
+            for (var h = 1; h < loops.Length; h++)
+                if (InPolygon(loops[h], P, Q(mid))) return (Run.Hole + (h - 1), [], where);
+            anyAcross = true;
+        }
+        return (anyAcross ? Run.Across : Run.Along, parts, null);
     }
 
 }
