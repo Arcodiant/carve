@@ -97,7 +97,7 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
     }
 
     [Fact]
-    public async Task Past_5000_triangles_the_result_gives_the_count_and_warns_on_no_limit()
+    public async Task Past_5000_triangles_the_result_gives_the_count_and_no_limit_warning()
     {
         var (carve, _) = await StartAsync();
         using var __ = carve;

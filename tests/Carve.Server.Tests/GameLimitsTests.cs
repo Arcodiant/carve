@@ -121,6 +121,33 @@ public sealed class GameLimitsTests() : TempFolderTests("carve-limits")
     }
 
     [Fact]
+    public void A_limits_argument_no_file_could_be_at_is_refused_even_with_write_limits()
+    {
+        File.WriteAllText(Path.Combine(Root, "notes.txt"), "x");
+        Directory.CreateDirectory(Path.Combine(Root, "odd", GameLimits.FileName));
+        foreach (var (argument, expected) in new[]
+        {
+            ("   ", "export: limits is empty"),
+            (Path.Combine(Root, "lim?ts.json"), "holds"),
+            (Path.Combine(Root, "notes.txt"), "is a file but not a .json one"),
+            (Path.Combine(Root, "odd"), "is a folder, not a limits file"),
+        })
+        {
+            Assert.Null(LimitsSource.Find("export", argument, true, Glb("game"), out var error));
+            Assert.Contains(expected, error);
+            Assert.StartsWith("export: limits", error);
+            Assert.EndsWith("Nothing was written.", error);
+        }
+    }
+
+    [Fact]
+    public void A_comment_is_refused_since_write_limits_would_lose_it()
+    {
+        Assert.Null(GameLimits.Parse("""{ /* the orc budget */ "max_triangles": 5000 }""", out var error));
+        Assert.StartsWith("not valid JSON", error);
+    }
+
+    [Fact]
     public void A_bad_file_found_is_a_tool_error_naming_it()
     {
         Put("game", """{"max_triangles": -3}""");

@@ -341,14 +341,14 @@ public class SkinnedExportTests
     }
 
     [Theory]
-    [InlineData(1.4f, false)]
-    [InlineData(2.4f, false)]
-    [InlineData(1.39f, true)]
-    [InlineData(2.41f, true)]
-    public void Height_warns_outside_1_4_to_2_4_m_on_the_Synty_bones(float height, bool warns)
+    [InlineData(1.4f, null)]
+    [InlineData(2.4f, null)]
+    [InlineData(1.39f, "m tall, below the game's min_height 1.4 m")]
+    [InlineData(2.41f, "m tall, above the game's max_height 2.4 m")]
+    public void Height_warns_outside_1_4_to_2_4_m_on_the_Synty_bones(float height, string? expected)
     {
         var warnings = GameLimits.Starting.Warnings(Humanoid(height), 1, 1);
-        if (warns) Assert.Matches(@"m tall, (below the game's min_height 1\.4|above the game's max_height 2\.4) m", Assert.Single(warnings));
+        if (expected is not null) Assert.Contains(expected, Assert.Single(warnings));
         else Assert.Empty(warnings);
     }
 

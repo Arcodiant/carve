@@ -79,7 +79,7 @@ public sealed record GameLimits(int? MaxTriangles, int? MaxSubmeshes, float? Min
     }
 
     /// <summary>
-    /// Reads a limits file's text. Null, with <paramref name="error"/> set, when it is not a JSON object, holds a key
+    /// Reads a limits file's text, plain JSON with no comments (write_limits rewrites the file, so a comment would be lost). Null, with <paramref name="error"/> set, when it is not a JSON object, holds a key
     /// that is not one of <see cref="Keys"/>, a count that is not a whole number of at least 1, a height that is not a
     /// number above 0, or a min_height above its max_height.
     /// </summary>
@@ -87,7 +87,7 @@ public sealed record GameLimits(int? MaxTriangles, int? MaxSubmeshes, float? Min
     {
         error = null;
         JsonDocument document;
-        try { document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }); }
+        try { document = JsonDocument.Parse(text); }
         catch (JsonException e) { error = "not valid JSON: " + e.Message; return null; }
 
         using (document)
@@ -168,15 +168,33 @@ public sealed record LimitsSource(GameLimits Limits, string? Path, bool Found, I
         string? path = null;
         if (argument is not null)
         {
-            if (argument.Length == 0 || argument.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+            // The path rules export's own path keeps (ToolPaths.Resolve), so a limits argument that could never be read or
+            // written is refused here, before the .glb is written.
+            if (string.IsNullOrWhiteSpace(argument))
             {
-                error = $"{tool}: limits: expected a folder or a .json file, got \"{argument}\". Nothing was written.";
+                error = $"{tool}: limits is empty; give a folder holding {GameLimits.FileName} or a .json file. Nothing was written.";
                 return null;
             }
-            var full = System.IO.Path.GetFullPath(argument);
-            path = full.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && !Directory.Exists(full)
-                ? full
-                : System.IO.Path.Combine(full, GameLimits.FileName);
+            var trimmed = argument.TrimEnd('/', '\\');
+            if (File.Exists(argument) && !argument.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                error = $"{tool}: limits: \"{argument}\" is a file but not a .json one; give a folder holding {GameLimits.FileName} or a .json file. Nothing was written.";
+                return null;
+            }
+            var candidate = trimmed.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && !Directory.Exists(trimmed)
+                ? argument
+                : System.IO.Path.Combine(argument, GameLimits.FileName);
+            if (ToolPaths.Resolve($"{tool}: limits", candidate, ".json", out var pathError, verb: "reads") is not { } resolved)
+            {
+                error = $"{pathError}. Nothing was written.";
+                return null;
+            }
+            path = resolved.FullPath;
+            if (Directory.Exists(path))
+            {
+                error = $"{tool}: limits: {path} is a folder, not a limits file. Nothing was written.";
+                return null;
+            }
             if (!File.Exists(path) && !write)
             {
                 error = $"{tool}: limits: no limits file at {path}; write_limits: true creates it with the starting numbers. Nothing was written.";
