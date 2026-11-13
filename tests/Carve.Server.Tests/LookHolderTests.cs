@@ -23,7 +23,7 @@ public class LookHolderTests
 
         public HashSet<string> Live { get; } = [];
 
-        public IReadOnlyList<Func<string?>> Make(PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight) =>
+        public IReadOnlyList<Func<string?>> Make(PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight, ElementWindow? faces) =>
             [.. new[] { "fill", "edges", "orange" }.Select((part, k) => (Func<string?>)(() => Create(part, k, look, highlight)))];
 
         private string? Create(string part, int k, Look look, Highlight highlight)
@@ -45,7 +45,7 @@ public class LookHolderTests
             return name;
         }
 
-        public void Install(string fill, string? edges, string? orange) => Log.Add($"install {fill}, {edges ?? "-"}, {orange ?? "-"}");
+        public void Install(string fill, string? edges, string? orange, string? seams) => Log.Add($"install {fill}, {edges ?? "-"}, {orange ?? "-"}");
 
         public void Destroy(string mesh)
         {

@@ -402,7 +402,7 @@ public class RenderTests
     [InlineData("""{"size":300}""", "size: 300 is not a size; use 256, 512 or 1024")]
     [InlineData("""{"size":2048}""", "size: 2048 is not a size; use 256, 512 or 1024")]
     [InlineData("""{"size":512.5}""", "size: 512.5 is not a size; use 256, 512 or 1024")]
-    [InlineData("""{"mode":"xray"}""", "mode: 'xray' is not a mode; use 'shaded', 'wireframe', 'normals' or 'checker'.")]
+    [InlineData("""{"mode":"xray"}""", "mode: 'xray' is not a mode; use 'shaded', 'wireframe', 'normals', 'checker' or 'uvs'.")]
     public async Task A_bad_camera_is_a_tool_error_and_the_mesh_still_renders(string arguments, string mentions)
     {
         using var carve = new CarveProcess([]);

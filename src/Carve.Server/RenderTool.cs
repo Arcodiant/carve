@@ -198,7 +198,7 @@ internal static class RenderTool
         + "The caption says so after the view: '512x512, view +x, orthographic, 8 vertices, 6 faces'. "
         + "'size' is the image's width and height: 256 for a quick look or a sheet tile, 512 (the default), 1024 for a dense mesh with labels. "
         + "The caption opens with it: '256x256, view front, 8 vertices, 6 faces'. "
-        + "'mode' is the look: 'shaded' (the default), 'wireframe', 'normals' or 'checker'. Neither wireframe nor normals depends on the light. "
+        + "'mode' is the look: 'shaded' (the default), 'wireframe', 'normals', 'checker' or 'uvs'. Neither wireframe nor normals depends on the light. "
         + "'wireframe' draws every edge in light grey over faces filled near black: use it to count and place edges and see the face loops. It is hidden-line, not see-through: "
         + "an edge behind a face is hidden, so look from another side to see it. "
         + "'normals' colours each face by the way it faces and stands a light grey spike on it along its normal, at its centre, or for a face with holes at a point on the face clear of the holes: use it to find a face pointing the wrong way, or a non-planar face, whose spike is off. On a smooth mesh (set_shading) it shows the corner normals instead: the colour blends across a soft edge and breaks at a hard one, and a spike stands on each corner along its normal. "
@@ -227,8 +227,9 @@ internal static class RenderTool
         + "Stretched or squashed cells mean stretched UVs; hues running violet to red along u, or the white cell at the wrong corner of an island, mean it is mirrored or turned; magenta is a face with no UVs. UVs outside 0 to 1 repeat the checker. Face colours are not drawn; a highlighted face is the checker in orange. "
         + "Example: a cube face given [[0,0],[1,0],[1,1],[0,1]] from its top-left corner round shows the 64 cells with white at its top-left; given [[1,0],[0,0],[0,1],[1,1]] it shows violet there and white at the top-right: mirrored. "
         + "The caption names the mode, and says when no face has UVs: '512x512, view front, checker, no face has UVs, 8 vertices, 6 faces'. "
+        + "'uvs' draws one mesh's UV layout flat, as the texture is laid out: u right, v down, (0,0) top-left, the unit square outlined in white with its corners labelled (0,0), (1,0), (0,1) and (1,1), the window grown, square, to take in UVs outside it, with a margin of a sixteenth of the window each side. The checker is tiled dimmed (40%) across the window; each mapped face is the checker at full brightness where its UVs lie, so bright is texture in use and dim is empty. Every face edge is white and a seam (mark_edges seam) yellow, on both islands it divides. Faces sharing texture overlap exactly, so an overlap shows as edges crossing inside a bright area, not as a colour (check reports overlaps). A face with no UVs is not drawn, and the caption counts them. labels 'faces' writes each face's id at the centre of its UV outline; 'vertices' and 'both' are refused. A highlighted face is solid orange; highlight takes faces only. 'mesh' is required when the model has several meshes. Refused in this mode, each named: view, direction, zoom, target, projection, views, columns, pose, clip, time, bones, bone_labels and weights. A mesh with no UVs is a tool error naming set_uvs, project_uvs and unwrap. Example: a cube after project_uvs box shows six bright squares in a 3 x 2 grid with dim gaps; labels 'faces' names each; a square with the white cell at its top-right rather than its top-left is mirrored. The caption: '512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 72 vertices, 70 faces', the counts the named mesh's. "
         + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a view that is not one of the eight names; a direction of zero or not three finite numbers; "
-        + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; a mode other than 'shaded', 'wireframe', 'normals' or 'checker'; a highlight that is not an object, or whose lists are not lists of ids and [a, b] pairs; "
+        + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; a mode other than 'shaded', 'wireframe', 'normals', 'checker' or 'uvs'; a highlight that is not an object, or whose lists are not lists of ids and [a, b] pairs; "
         + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; labels other than 'none', 'faces', 'vertices' or 'both'; "
         + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns other than 1, 2 or 3; an argument render does not take; a sheet whose tiles would show different meshes, because the mesh changed while it was drawn on each of 3 tries (\"The mesh changed while the sheet was drawn, on each of 3 tries, so its tiles would show different meshes; call render again once the edits have settled.\"); labels or highlight given with 'mesh' among several meshes, when an edit lands while the frame is drawn, since their ids may then name other elements (\"The model changed while the frame was drawn, so the ids given for mesh '<name>' may name other elements; call render again once the edits have settled.\"). "
         + "'pose' draws the model posed by its skeleton: an object of bone name to {rotation: [x, y, z, w], translation: [x, y, z]}, each part optional and absolute (local to the parent, replacing the rest value; a bone or part left out rests), skinned by the weights set_weights or weigh gave. A vertex with no weight stays where it is. The camera frames the REST pose, so the frame does not move between poses and a pose that swings far can leave it. Errors: a bone the skeleton lacks, a rotation that is not a unit quaternion, no skeleton. "
@@ -242,7 +243,7 @@ internal static class RenderTool
     private const string MeshArgumentText =
         "The mesh labels and highlight apply to, as named to define_mesh; ids are that mesh's own, as its edit tools take them. "
         + "Every mesh is drawn either way. May be left out when the model has one mesh, or when neither labels nor highlight is asked for; "
-        + "left out while there are several and they are asked for, the call is a tool error that lists the names.";
+        + "left out while there are several and they are asked for, the call is a tool error that lists the names. In mode 'uvs', the one mesh drawn, required when there are several.";
 
     [McpServerTool(Name = "render"), Description(Text)]
     public static async Task<CallToolResult> Run(
@@ -256,7 +257,7 @@ internal static class RenderTool
         [Description("[x, y, z] in the mesh's coordinates, inside its bounds: the point to look at. Default: the centre.")] double[]? target = null,
         [Description("'perspective' (the default), what a game shows, or 'orthographic': parallel edges stay parallel, true proportions."), AllowedValues("perspective", "orthographic")] string? projection = null,
         [Description("The image's width and height: 256, 512 (the default) or 1024."), AllowedValues(256, 512, 1024)] double size = RenderSpec.DefaultSize,
-        [Description("The look: 'shaded' (the default), 'wireframe' (every visible edge over a flat fill) , 'normals' (faces coloured by facing, with spikes) or 'checker' (lit, a hued checker at each face's UVs, white cell at uv (0,0), magenta where a face has none)."), AllowedValues("shaded", "wireframe", "normals", "checker")] string? mode = null,
+        [Description("The look: 'shaded' (the default), 'wireframe' (every visible edge over a flat fill) , 'normals' (faces coloured by facing, with spikes), 'checker' (lit, a hued checker at each face's UVs, white cell at uv (0,0), magenta where a face has none) or 'uvs' (one mesh's UV layout flat: u right, v down, bright where faces use the texture, dim where empty, white edges, yellow seams)."), AllowedValues("shaded", "wireframe", "normals", "checker", "uvs")] string? mode = null,
         JsonElement? highlight = null,
         [Description("Element ids to write on the image: 'none' (the default), 'faces', 'vertices' or 'both'. Only what faces the camera."), AllowedValues("none", "faces", "vertices", "both")] string? labels = null,
         JsonElement? views = null,
@@ -273,6 +274,11 @@ internal static class RenderTool
         if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "bones", "bone_labels", "weights") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
+        }
+
+        if (mode == "uvs")
+        {
+            return await RunUvs(context, status, store, queue, size, labels, highlight, mesh, cancellationToken);
         }
 
         var sheet = !Absent(views);
@@ -315,7 +321,7 @@ internal static class RenderTool
 
         if (mode is not (null or "shaded" or "wireframe" or "normals" or "checker"))
         {
-            return Error($"mode: '{mode}' is not a mode; use 'shaded', 'wireframe', 'normals' or 'checker'.");
+            return Error($"mode: '{mode}' is not a mode; use 'shaded', 'wireframe', 'normals', 'checker' or 'uvs'.");
         }
 
         if (labels is not (null or "none" or "faces" or "vertices" or "both"))
@@ -488,6 +494,140 @@ internal static class RenderTool
                 new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs) },
             ],
         };
+    }
+
+    /// <summary>The arguments <c>mode: "uvs"</c> refuses, each with why: the layout has no camera, pose or skeleton.</summary>
+    private static readonly (string Name, string Why)[] UvRefused =
+    [
+        ("view", "the layout is always seen flat, from above the texture"),
+        ("direction", "the layout is always seen flat, from above the texture"),
+        ("zoom", "the layout always shows the whole window"),
+        ("target", "the layout always shows the whole window"),
+        ("projection", "the layout is always flat, u right and v down"),
+        ("views", "the layout is one image of one mesh"),
+        ("columns", "the layout is one image of one mesh"),
+        ("pose", "UVs do not move with a pose"),
+        ("clip", "UVs do not move with a clip"),
+        ("time", "UVs do not move with a clip"),
+        ("bones", "the layout draws no skeleton"),
+        ("bone_labels", "the layout draws no skeleton"),
+        ("weights", "the layout draws the checker, not weights"),
+    ];
+
+    /// <summary>
+    /// <c>mode: "uvs"</c> (T-58): one mesh's UV layout, flat. Every argument it cannot use is refused by name, all at once;
+    /// then the mesh is picked (required among several) and must have a mapped face.
+    /// </summary>
+    private static async Task<CallToolResult> RunUvs(
+        RequestContext<CallToolRequestParams> context, EngineStatus status, ModelStore store, RenderQueue queue,
+        double size, string? labels, JsonElement? highlight, JsonElement? mesh, CancellationToken cancellationToken)
+    {
+        var given = context.Params?.Arguments;
+        bool Given(string name) =>
+            given is not null && given.TryGetValue(name, out var value) && !Absent(value)
+            && !(name == "zoom" && value.ValueKind == JsonValueKind.Number && value.GetDouble() == 1);
+        var problems = UvRefused.Where(r => Given(r.Name)).Select(r => $"{r.Name}: not with mode 'uvs'; {r.Why}").ToList();
+        if (!RenderComposition.Sizes.Any(s => s == size))
+        {
+            problems.Add($"size: {Join([size])} is not a size; use 256, 512 or 1024");
+        }
+
+        if (labels is "vertices" or "both")
+        {
+            problems.Add($"labels: '{labels}' is not drawn in mode 'uvs'; use 'faces' or 'none'");
+        }
+        else if (labels is not (null or "none" or "faces"))
+        {
+            problems.Add($"labels: '{labels}' is not a label set; in mode 'uvs' use 'faces' or 'none'");
+        }
+
+        var meshName = MeshName(mesh, problems);
+        var listed = HighlightLists(highlight, problems);
+        if (listed.Vertices.Count > 0 || listed.Edges.Count > 0)
+        {
+            problems.Add("highlight: only faces in mode 'uvs'; a vertex or an edge can lie in several places on the layout");
+        }
+
+        if (problems.Count > 0)
+        {
+            return Failed("render", problems);
+        }
+
+        await status.WhenSettled.WaitAsync(cancellationToken);
+        if (status.FaultMessage is { } fault)
+        {
+            return Error(fault);
+        }
+
+        var current = store.Current;
+        if (current.Mesh is null)
+        {
+            return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
+        }
+
+        if (current.Model.Target(meshName, out var aimed) is not { } named)
+        {
+            return Failed("render", [meshName is null ? aimed + "; mode 'uvs' draws one mesh's layout" : aimed!]);
+        }
+
+        if (named.Mesh.Uvs is not { MappedFaces.Count: > 0 })
+        {
+            return Error($"mesh '{named.Name}' has no UVs; give it some with set_uvs, project_uvs or unwrap");
+        }
+
+        if (MeshEdits.UnknownElements(named.Mesh, [], [], listed.Faces) is { Count: > 0 } missing)
+        {
+            return Failed("render", missing.Select(e => e.ToString()));
+        }
+
+        var offset = current.Model.OffsetOf(named.Name)!.Value;
+        var faces = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
+        var labelled = labels == "faces" ? LabelSet.Faces : LabelSet.None;
+        var picked = Highlight.Of([], [], listed.Faces.Select(f => f + offset.Faces));
+        var spec = new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, (int)size, Look.Uvs, labelled) { Highlight = picked, UvFaces = faces };
+
+        var rendering = queue.Post(spec);
+        await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
+        if (!rendering.IsCompleted)
+        {
+            return Error(status.FaultMessage ?? "The engine has stopped, so nothing can be rendered.");
+        }
+
+        if (!rendering.IsCompletedSuccessfully)
+        {
+            return Error($"The render failed: {rendering.Exception?.GetBaseException().Message}");
+        }
+
+        var frame = rendering.Result;
+        // The face range is the checked snapshot's; a frame drawn on a later model may hold other faces there.
+        if (current.Model.Meshes.Count > 1 && SheetVersions.ShiftedIdsRefusal(named.Name, current.Version, frame.Version) is { } stale)
+        {
+            return Error(stale);
+        }
+
+        var report = MeshReport.Create(named.Mesh);
+        var unmapped = named.Mesh.LiveFaces.Count(f => !named.Mesh.Uvs!.IsMapped(f));
+        var image = frame.Pixels.ToDecodedImage();
+        return new CallToolResult
+        {
+            Content =
+            [
+                ImageContentBlock.FromBytes(EncodePng(image.Pixels, image.Width, image.Height), "image/png"),
+                new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount) },
+            ],
+        };
+    }
+
+    /// <summary>The <c>uvs</c> caption: <c>512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 8 vertices, 6 faces</c>, the named mesh's counts.</summary>
+    internal static string UvCaption(int size, string mesh, LabelSet labels, Highlight highlight, int unmapped, int vertices, int faces)
+    {
+        var parts = new List<string> { $"{size}x{size}", $"uvs {mesh}" };
+        if (labels == LabelSet.Faces) parts.Add("labels faces");
+        if (!highlight.IsEmpty) parts.Add($"highlight {highlight.Counts()}");
+        if (unmapped > 0) parts.Add(unmapped == 1 ? "1 face unmapped" : $"{unmapped} faces unmapped");
+        parts.Add(vertices == 1 ? "1 vertex" : $"{vertices} vertices");
+        parts.Add(faces == 1 ? "1 face" : $"{faces} faces");
+        return string.Join(", ", parts);
     }
 
     /// <summary>How many times a sheet is drawn before an edit racing every try is reported.</summary>

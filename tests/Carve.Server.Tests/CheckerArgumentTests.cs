@@ -176,7 +176,7 @@ public sealed class CheckerArgumentTests() : FileToolTests("carve-checker-args")
         var shadedAfter = await carve.CallToolAsync("render", """{"view":"front"}""");
         Assert.Equal(Png(shadedBefore), Png(shadedAfter));
 
-        Assert.Equal("mode: 'xray' is not a mode; use 'shaded', 'wireframe', 'normals' or 'checker'.", Refused(await carve.CallToolAsync("render", """{"mode":"xray"}""")));
+        Assert.Equal("mode: 'xray' is not a mode; use 'shaded', 'wireframe', 'normals', 'checker' or 'uvs'.", Refused(await carve.CallToolAsync("render", """{"mode":"xray"}""")));
         Ok(await carve.CallToolAsync("define_skeleton", """{"bones":[{"name":"base","parent":null,"position":[0,0,0],"rotation":[0,0,0,1]}]}"""));
         Assert.Contains("checker", Refused(await carve.CallToolAsync("render", """{"weights":"base","mode":"checker"}""")));
     }
