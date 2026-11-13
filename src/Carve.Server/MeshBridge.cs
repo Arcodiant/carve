@@ -32,7 +32,9 @@ public readonly record struct DrawnSpace(double X, double Y, double Z, double Ra
 /// </summary>
 public static class MeshBridge
 {
-    public static MeshData<PositionUvNormalVertex> ToMeshData(PolygonMesh mesh, DrawnSpace space)
+    /// <param name="uvs">One UV per vertex written, in this order (A, C, B per triangle), from <see cref="LookMeshes"/>'s checker
+    /// look; null leaves every <c>TexCoord</c> zero, the buffer every other look has always had.</param>
+    public static MeshData<PositionUvNormalVertex> ToMeshData(PolygonMesh mesh, DrawnSpace space, Vector2[]? uvs = null)
     {
         var triangles = Shading.Triangles(mesh);
         var vertices = new PositionUvNormalVertex[triangles.Count * 3];
@@ -48,6 +50,12 @@ public static class MeshBridge
             indices[at] = (uint)at;
             indices[at + 1] = (uint)(at + 1);
             indices[at + 2] = (uint)(at + 2);
+            if (uvs is not null)
+            {
+                vertices[at].TexCoord = uvs[at];
+                vertices[at + 1].TexCoord = uvs[at + 1];
+                vertices[at + 2].TexCoord = uvs[at + 2];
+            }
         }
 
         return new MeshData<PositionUvNormalVertex>(vertices, indices);
