@@ -154,8 +154,14 @@ public static class LoopCut
         var origin = At(loop[0]);
         Vector2D Q(Vector3D x) => new(Dot(x - origin, u), Dot(x - origin, w));
         for (var k = 0; k < 4; k++)
-            if (Crosses(Q(p), Q(q), Q(At(loop[k])), Q(At(loop[(k + 1) % 4]))))
+        {
+            var (c, d) = (At(loop[k]), At(loop[(k + 1) % 4]));
+            // An edge the cut starts or ends on (its entry and exit edges) is not crossed by it: projected, the cut's own
+            // end is rounding noise of either sign against it (RV-33). Within the tolerance is on it, as in FaceSplit.
+            if (SegmentDistance(p, c, d) <= tol || SegmentDistance(q, c, d) <= tol) continue;
+            if (Crosses(Q(p), Q(q), Q(c), Q(d)))
                 return MeshEdits.Invariant($"crosses its edge [{loop[k]}, {loop[(k + 1) % 4]}]");
+        }
         return null;
     }
 

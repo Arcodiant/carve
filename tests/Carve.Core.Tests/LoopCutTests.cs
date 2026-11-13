@@ -326,4 +326,59 @@ public class LoopCutTests
         Assert.Equal("edge: the cut at 0.5 across faces[0] crosses its edge [1, 2]; loop_cut cuts only across a quad",
             Assert.Single(LoopCut.Cut(dart, (0, 1), [0.5]).Edit.Errors).ToString());
     }
+
+    /// <summary>A 2 x 1 rectangle on z = 0, rotated by <paramref name="q"/>.</summary>
+    private static PolygonMesh Rectangle(Quaternion q) =>
+        TestMeshes.Make(new Vector3[] { new(0, 0, 0), new(2, 0, 0), new(2, 1, 0), new(0, 1, 0) }.Select(p => Vector3.Transform(p, q)),
+            [[0, 1, 2, 3]]);
+
+    [Theory]
+    [InlineData(0.5)]
+    [InlineData(1.0 / 3)]
+    [InlineData(0.3)]
+    public void ACutAcrossARotatedRectangleSucceeds(double t)
+    {
+        // RV-33: the crossing test ran on the entry and exit edges too, where the cut's own ends lie, with exact signs; on a
+        // quad that is not axis-aligned rounding refused these as "crosses its edge [2, 3]".
+        var rect = Rectangle(Quaternion.Normalize(new Quaternion(0.3f, 0.5f, 0.2f, 0.8f)));
+        var r = LoopCut.Cut(rect, (0, 1), [t]);
+        Assert.True(r.Edit.Succeeded, string.Join("; ", r.Edit.Errors));
+        Assert.Equal(2, Ok(r).LiveFaces.Count());
+    }
+
+    [Fact]
+    public void CutsAcrossRandomlyRotatedRectanglesAllSucceed()
+    {
+        var rng = new Random(3301);
+        var refused = new List<string>();
+        for (var i = 0; i < 500; i++)
+        {
+            var q = Quaternion.Normalize(new Quaternion((float)(rng.NextDouble() * 2 - 1), (float)(rng.NextDouble() * 2 - 1),
+                (float)(rng.NextDouble() * 2 - 1), (float)(rng.NextDouble() * 2 - 1)));
+            var t = 0.05 + rng.NextDouble() * 0.9;
+            var edge = rng.Next(2) == 0 ? (0, 1) : (1, 2);
+            var r = LoopCut.Cut(Rectangle(q), edge, [t]);
+            if (!r.Edit.Succeeded) refused.Add($"{i}: {string.Join("; ", r.Edit.Errors)}");
+        }
+        Assert.True(refused.Count == 0, $"{refused.Count} refused, first: {refused.FirstOrDefault()}");
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void EveryLoopCutOnASubdividedCubeSucceeds(int levels)
+    {
+        var mesh = TestMeshes.Ok(MeshEdits.Subdivide(TestMeshes.Cube(), levels));
+        var edges = mesh.LiveFaces.SelectMany(f => mesh.Faces[f].Loop.Select((v, i) => (v, w: mesh.Faces[f].Loop[(i + 1) % 4])))
+            .Select(e => e.v < e.w ? e : (e.w, e.v)).Distinct().ToList();
+        var refused = new List<string>();
+        foreach (var e in edges)
+            foreach (var t in new[] { 0.3, 0.5, 1.0 / 3 })
+            {
+                var r = LoopCut.Cut(mesh, e, [t]);
+                if (!r.Edit.Succeeded) refused.Add($"[{e.Item1}, {e.Item2}] at {t}: {string.Join("; ", r.Edit.Errors)}");
+                else IsClosed(Ok(r));
+            }
+        Assert.True(refused.Count == 0, $"{refused.Count} of {edges.Count * 3} refused, first: {refused.FirstOrDefault()}");
+    }
 }
