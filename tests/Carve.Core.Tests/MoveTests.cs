@@ -99,6 +99,7 @@ public class MoveTests
         var error = Refused(MeshEdits.Move(TestMeshes.Cube(), null, [(0, 1), (2, 0)], null, Up));
         Assert.Equal("edges[0-2]", error.Element);
         Assert.Contains("2nd listed edge, [2, 0], is not an edge", error.Message);
+        Assert.EndsWith("is not an edge of the mesh; select with kind edges lists the real edges", error.Message);
     }
 
     [Fact]

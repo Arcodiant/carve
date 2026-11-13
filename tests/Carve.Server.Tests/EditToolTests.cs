@@ -177,7 +177,7 @@ public class EditToolTests
     [Theory]
     [InlineData("move", """{"faces":[9],"by":[0,1,0]}""", "faces[9]")]
     [InlineData("move", """{"vertices":[0],"by":[0,0,0]}""", "by")]
-    [InlineData("move", """{"edges":[[0,6]],"by":[0,1,0]}""", "edges[0-6]")]
+    [InlineData("move", """{"edges":[[0,6]],"by":[0,1,0]}""", "edges[0-6]: the 1st listed edge, [0, 6], is not an edge of the mesh; select with kind edges lists the real edges")]
     [InlineData("move", """{"vertices":[0]}""", "by")]
     [InlineData("move", """{"vertices":[0],"by":[1,2]}""", "by")]
     [InlineData("move", """{"by":[1,0,0]}""", "vertices, edges, faces")]

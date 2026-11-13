@@ -95,7 +95,7 @@ public sealed class ShedScenario : IScenario
         ChimneyRose(shaded, camera, shed, movedFrame, movedCamera, movedShed);
 
         // 6. Error path: a pair that is not an edge, and the next render is the one before.
-        await ExpectToolErrorAsync(driver, "move", new { edges = new[] { new[] { 3, 9 } }, by = new[] { 0.0, 0.5, 0.0 } }, "[3, 9]", "is not an edge");
+        await ExpectToolErrorAsync(driver, "move", new { edges = new[] { new[] { 3, 9 } }, by = new[] { 0.0, 0.5, 0.0 } }, "[3, 9]", "is not an edge", "select with kind edges lists the real edges");
         var afterError = await driver.CaptureAsync("shed-front-after-error", new { view = "front" });
         driver.AssertBytesEqual("shed-front after the failed move, and after the move", movedFrame.Pixels, afterError.Pixels);
 
