@@ -27,3 +27,5 @@ As done: `LoopCut`'s walk now checks, when it returns to a visited quad, that it
 ## Verified by
 
 Run on Sonnet (claude-sonnet-5-5). `LoopCutTests.ARingThatClosesOnItselfReversedIsRefusedNamingTheStartEdge` (asserts the refusal text from edges 0-1, 1-0 and 6-7) and `AnOrdinaryClosedRingStillCutsUnchanged`; the break (check removed) fails the first test, the band being cut instead of refused, logged in `artifacts/review/B-3/breaks.log` on M-5. Core-only change plus one description sentence: no frame touched.
+
+Suites run by `cairn bug B-3 verify` on the rebased branch (on origin/milestone/M-5 34eae44): tests:core-unit and tests:server-unit, both PASS, none carried. No scenario suite is an input of the changed files, so none ran and no frame was produced or compared; the change touches no frame path. No test or doc pinned the `loop_cut` description text.
