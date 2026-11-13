@@ -72,10 +72,14 @@ public static class LoopCut
             {
                 if (!seen.Add(face))
                 {
-                    // Back at a visited quad: a ring that comes home across the start edge the same way round has closed;
-                    // one that arrives with the edge's ends swapped has half a twist in it, and a loop would meet itself.
-                    if (cur != (a, b))
+                    // Back at a visited quad. A ring that comes home to this walk's first quad across the start edge the same
+                    // way round has closed; one that arrives with the edge's ends swapped has half a twist in it, and a loop
+                    // would meet itself. Any other revisit enters a quad already crossed, by another side: the ring crosses itself.
+                    if (face == first && cur == (a, b)) return true;
+                    if (face == first && cur == (b, a))
                         problem ??= MeshEdits.Invariant($"the ring from edge [{a}, {b}] comes back to it with its ends swapped: loop_cut does not cut a ring that closes on itself reversed");
+                    else
+                        problem ??= MeshEdits.Invariant($"the ring from edge [{a}, {b}] comes back into face {face}, which it has already crossed, across edge [{cur.S}, {cur.T}]: loop_cut does not cut a ring that crosses itself");
                     return true;
                 }
                 var next = Across(mesh, face, cur);
