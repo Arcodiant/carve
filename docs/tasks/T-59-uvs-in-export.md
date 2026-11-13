@@ -4,7 +4,7 @@ description: >-
 ---
 # T-59 — UVs in export
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 

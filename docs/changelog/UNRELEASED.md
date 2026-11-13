@@ -6,3 +6,4 @@
 - T-55: project_uvs lays chosen faces' UVs by planar, box or cylindrical projection into a rectangle
 - T-56: unwrap cuts at seams and open edges, flattens each island by LSCM and packs them, shown on the barrel sample
 - T-57: render mode checker draws the model lit with a generated checker texture, and unmapped faces magenta
+- T-59: export writes each corner's UV as TEXCOORD_0, splitting vertices where UVs differ, and warns of unmapped faces
