@@ -110,3 +110,94 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - [ ] [T-70](../tasks/T-70-cut-acceptance-run.md) — Fresh agents cut a wall into a gable with a see-through window from the descriptions alone, recovering from a knife point off the surface
 
 ## Retrospective
+
+**As planned.**
+
+- The order held: T-63, then T-64, then T-65 beside T-68, then T-66 beside T-67, then T-69 and T-70. Every rebase conflict between siblings was the planned one, adds only in `Program.cs`'s tool list and `CutsStages.cs`, and each member resolved its own with both sides kept. None needed the person.
+- Carve file version 4 was free and T-63 took it. Faces with holes, tombstones, `plane_cut`, `loop_cut`, `knife`, `merge_faces`, `delete` and `bridge` are all reachable through the product's own MCP tools.
+- The guard held: every existing frame stayed byte-identical by hash through every member. That is 121 frames at T-63, 127 at T-64, 130 at T-68, 133 at T-65, 135 at T-66 and T-67, and 137 at T-69, with the 26 gatehouse frames identical across two runs.
+- The person approved every new frame set: T-63's 4, T-64's 2, T-68's 3, T-65's 3, T-66's 2, T-67's 2 (on the second try), T-69's 20, and T-70's final sheet.
+- `GatehouseGeometry` came first, before any frame, as planned. The one planned count it could not meet (an edge hidden under the cornice) was a stop, not a change.
+- The acceptance run passed in round 2. A fresh `claude -p` session (claude-fable-5-2, the default) cut the gable with two `plane_cut`s, the window with a closed `knife` on each face, then `delete` and `bridge`, and the door with a `knife`. It ended with a closed `check` and no warnings, a brown door, and background through the window. No description changed.
+- The milestone's `verify` passes every check but `review`: 8/8 members merged and 12 suites passing.
+- **Models and agents per member:**
+
+  | Member | Model | Agents |
+  |---|---|---|
+  | T-63 | Opus 5.5 | 5 |
+  | T-64 | Opus 5.5 | 3 |
+  | T-65 | Opus 5.5 | 4 |
+  | T-68 | Opus 5.5 | 2 |
+  | T-67 | Opus 5.5 | 6 |
+  | T-66 | Sonnet 5.5 | 1 |
+  | T-69 | Sonnet 5.5 | 4 |
+  | T-70 | Sonnet 5.5 | 2 |
+
+  No rework was traced to the cheaper tier. T-66, on Sonnet, was the only member done by one agent. T-69's stops were spec faults, found from the geometry.
+
+**Not as planned.**
+
+- **Hand-offs dominated.** The eight members took 27 agents. Most hand-offs came at "code committed, a real run still to come": the GPU queue was shared with Empyrean, voidmarches, waystone and M-17's Carve members, and a queued `verify` often waited an hour or more. T-63 alone took 5 agents and about 6 hours, mostly in the queue. Twice the orchestrator stopped an agent sitting in a `verify` wait so it could not wake and write beside its continuation. Once it watched the queue itself rather than paying an agent to wait.
+- **M-17 ran at the same time.** It was Active on `main` with no worktree on this machine. The orchestrator flagged this in the opening table but did not ask, since no ordering ruling covered it. T-63's first frame baseline came from M-17's queued runs, so it held 15 bone and weight frames this branch does not make.
+- **The person ruled 25 times during the milestone.** Each ruling is in its member's As built. The rulings by member: T-63 3, T-64 2, T-65 5, T-68 2, T-66 2, T-67 6, T-69 2, T-70 3. All but two took the recommended option:
+  - T-68's bridge example: the spec said "an open-ended box", but two quads facing each other bridge into a closed box facing inward. The person kept it as built, and the spec text was corrected.
+  - T-67's recess frame: the person rejected it ("the cuts don't appear to be visible") and asked for the cut faces to be coloured.
+- **Two stops came from the orchestrator's own briefs:**
+  - T-67's shade prediction: Cuts' ray test predicts which face a pixel shows, not its shade, but the brief said it did. That cost a stop and two more rulings.
+  - T-69's "in sight": a pixel rule failed on rounding, and the person chose a 3D ray test. The orchestrator set its nudge, 1e-3 of the bounds diagonal, without asking.
+- **Readings landed without asking:**
+  - T-66 landed a provisional refusal for a non-manifold ring although its spec said to stop and ask. The person kept it after the fact.
+  - T-64 landed its own `Drawn` pixel check. The person kept it after the fact.
+  - The orchestrator ruled two things itself: that T-67 owns the additive change to `FaceSplit` (both members' Notes sent a `FaceSplit` need to the orchestrator), and the colours of T-67's knifed faces (`#4a7a9b` for the hexagon).
+- **New shared check rules, each ruled by the person:**
+  - `Drawn`, for edges over the background (T-64);
+  - `SeenNarrow`, for faces a few pixels wide (T-67);
+  - the Crate colour rule, shared as `ColourRule.cs` and used in Cuts at 2 steps (T-67);
+  - the geometric "in sight" test, local to the gatehouse (T-69).
+- **The acceptance prompt changed.** Round 1 found "4 m tall" clashing with the apex at y = 3.4. The agent built a 3.4 m prism in `define_mesh` and cut no gable. The person had the first two sentences reworded to "a slab ... then cut a gable top into it", worded by the orchestrator. They also accepted `--output-format stream-json --verbose` into the run conditions, for the transcript.
+- **The plant never fired.** In both rounds the agent worked out from the prompt's own numbers that the front is at z = 0.15, before any call. The person ruled that recovery by understanding counts, as in M-4.
+- **One slow-runner failure.** `HoledFaceToolTests.A_bad_hole_is_a_tool_error_naming_it` timed out at server start-up (30 s) in a 20-minute `server-regression` run on Xellotath. It passed on the re-run, and no timeout was changed.
+
+**Never verified.**
+
+- **The knife's off-surface error was never met by an agent.** It is covered by tests and the Cuts scenario only. `loop_cut`, `merge_faces` and `undo` were used by no acceptance agent.
+- **Checks shown failing only indirectly:**
+  - T-69's `NotLine` on old edges has no break of its own.
+  - Two of T-64's Cuts breaks are caught only as a failed run (`get_mesh` erroring, the stage throwing), not by their own check.
+  - T-64 has no break for export bounds or wireframe face loops, since a tombstone at the origin cannot move either.
+  - T-66's "walk order" break failed nothing; its id order rests on `FaceSplit`'s own rule.
+  - T-67's slanted pocket walls are caught only by R5, and the lower-left wall clears the floor by only 3 to 4 steps against the 2-step rule.
+- **Carried passes:**
+  - `viewer-cube` was carried from `99c846e` (T-63) through most members, though it ran fresh in the milestone's `verify`.
+  - T-63 to T-68 each hashed frames from the run of their last code commit, not from their final notes-only commit.
+- **A Mobius ring for `loop_cut`.** The person ruled it refused; it is filed as B-3 under M-5, for the fix round before `finish`, and is not done.
+- **Machines:** any GPU but Mantorok's and Xellotath's (both RTX 5070), and any client but `claude -p`.
+- **The installed carve:** `C:\tools\carve` has not been republished.
+- The orchestrator opened no frame. Every look above is a member's or the person's.
+
+**Known and left.**
+
+- B-3: `loop_cut` does not refuse a ring that closes on itself reversed. It is under M-5, open.
+- `CLAUDE.md` and `README.md` are inputs of no suite (a `verify` warning).
+- `branches/task/T-63` to `T-70` remain on disk, unregistered from git: `finish` ran from inside each one and could not remove it.
+- `%TEMP%\carve-m5-acceptance\` (two rounds and a Release publish of `carve`) and the members' scratch folders in `%TEMP%` (`t63` to `t70`) are not cleared.
+- Evidence is in this worktree's ignored `artifacts/review/T-63` to `T-69` and `artifacts/m5-acceptance/round-1` and `round-2`.
+
+**The test report** (`cairn test report --since 2d`) covers M-5's and M-17's jobs together, since both share Carve's suites. It shows no flakes:
+
+| Suite | Slot-seconds a week | Failures | Unique catches | cnr |
+|---|---|---|---|---|
+| `server-regression` | about 79,000 | 7 | 5 | 1 |
+| `scenario-crate` | about 2,800 | 1 | — | — |
+
+Four suites have one never-ran job each. The start-up timeout above was a slow runner, not a test fault. Nothing was filed. Whether a 30 s start-up timeout needs a margin under load is for the person.
+
+**For the next plan.**
+
+- **Plan for the GPU queue.** A member's hand-off at "a real run still to come" cost a whole agent each time the queue was long. Let a member submit its GPU suites early and keep working, or let the orchestrator hold a `verify` wait itself, instead of handing off.
+- **Name the shared check rules at planning:** the colour rule, narrow faces, edges over the background, and "in sight" with occlusion. Four were invented mid-milestone, each a stop.
+- **Work an acceptance prompt's numbers for clashes at planning.** "4 m tall" against the apex cost a round.
+- **Plant something the prompt's own numbers cannot reveal.** A coordinate one subtraction away from the truth is solved before any call, as in M-4. The off-surface error is still unexercised.
+- **Say in a brief what a check can predict before asking for a check against it.** The orchestrator's T-67 brief asked for "the shade the ray test predicts", which Cuts did not have.
+- **Ask before running two milestones at once on shared suites,** as with M-17 here.
+- Re-publish `C:\tools\carve` after `main` moves.
