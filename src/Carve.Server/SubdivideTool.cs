@@ -21,7 +21,7 @@ public sealed class SubdivideTool(ModelStore store)
         + "New faces take their face's colour and groups; new vertices take bone weights blended from the vertices they are made from, at most four bones each. The shading mode is kept: set_shading smooth to see a soft surface. "
         + "The new quads are generally not flat, which is expected here, so this result folds the not-planar warnings into one line, \"N faces are not planar (expected after subdivide)\", after the other warnings; get_mesh, check and export still list each face, and select faces where non_planar names them. "
         + "Returns JSON {vertices, faces, edges, triangles, closed, bounds:{min,max}, warnings:[], levels, created:{vertices:{first, count}, faces:{first, count}}, deleted:{vertices:[], faces:[]}, split:[]}, triangles counting the whole model; created.vertices is the block of slots appended after the existing vertices, and when the mesh has a deleted face each level makes a face point for it, so the block holds one deleted slot (null in get_mesh) per deleted face per level; "
-        + "a warning is added when the model has more than 5000 triangles, the most a game character should keep to. "
+        + "triangles is for weighing against a game's budget, which export warns on from the game's carve-limits.json; subdivide itself warns on no limit. "
         + "Bad input (levels missing, not a whole number or outside 1 to 3, an argument subdivide does not take) is a tool error; the mesh is left unchanged and nothing is added to undo. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to subdivide. "
         + "Worked example on define_mesh's unit cube, one level:\n"
@@ -62,9 +62,6 @@ public sealed class SubdivideTool(ModelStore store)
         var triangles = snapshot.Model.Meshes.Sum(m => m.Mesh.Faces.Sum(f => f.TriangleCount));
         var report = MeshReport.Create(edited);
         var warnings = Warnings(report);
-        if (triangles > SkinnedExport.MaxTriangles)
-            warnings.Insert(0, string.Create(CultureInfo.InvariantCulture,
-                $"the model has {triangles} triangles, above the {SkinnedExport.MaxTriangles} a game character should keep to"));
         var ordered = new Dictionary<string, object>
         {
             ["vertices"] = report.VertexCount,

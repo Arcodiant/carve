@@ -79,7 +79,6 @@ public class SkinnedExportTests
         Assert.Equal(["walk", "idle"], parsed.Skin.Animations.Select(a => a.Name));
         Assert.Equal([1.5f, 2f], parsed.Skin.Animations.Select(a => a.Duration));
         Assert.All(parsed.Skin.Animations, a => Assert.Equal(BoneNames.Length, a.Bones.Length));
-        Assert.Empty(glb.Warnings);
         Assert.Equal(0, glb.BoundToRoot);
     }
 
@@ -294,22 +293,22 @@ public class SkinnedExportTests
         Assert.Equal(0.75f, parsed.Skin.Animations[2].Duration);
     }
 
-    // ---- D-6, Warnings for a game's limits: at the limit nothing, just past it a warning.
+    // ---- D-6, Warnings for a game's limits (T-51): Orcward's starting numbers as a game's limits; at the limit nothing, just past it a warning.
 
     [Fact]
     public void Triangles_warn_past_5000_and_not_at_it()
     {
         var model = Character();
-        Assert.Empty(SkinnedExport.Warnings(model, SkinnedExport.MaxTriangles, 1));
-        Assert.Contains("5001 triangles, above the 5000", Assert.Single(SkinnedExport.Warnings(model, SkinnedExport.MaxTriangles + 1, 1)));
+        Assert.Empty(GameLimits.Starting.Warnings(model, GameLimits.Starting.MaxTriangles!.Value, 1));
+        Assert.Contains("5001 triangles, above the game's max_triangles 5000", Assert.Single(GameLimits.Starting.Warnings(model, GameLimits.Starting.MaxTriangles!.Value + 1, 1)));
     }
 
     [Fact]
     public void Submeshes_warn_past_8_and_not_at_it()
     {
         var model = Character();
-        Assert.Empty(SkinnedExport.Warnings(model, 1, SkinnedExport.MaxSubmeshes));
-        Assert.Contains("9 submeshes", Assert.Single(SkinnedExport.Warnings(model, 1, SkinnedExport.MaxSubmeshes + 1)));
+        Assert.Empty(GameLimits.Starting.Warnings(model, 1, GameLimits.Starting.MaxSubmeshes!.Value));
+        Assert.Contains("9 submeshes", Assert.Single(GameLimits.Starting.Warnings(model, 1, GameLimits.Starting.MaxSubmeshes!.Value + 1)));
     }
 
     [Fact]
@@ -326,10 +325,10 @@ public class SkinnedExportTests
         }
 
         // Submeshes passed as 1 so only the colours speak.
-        Assert.Empty(SkinnedExport.Warnings(Coloured(8), 1, 1));
-        Assert.Contains("9 colours", Assert.Single(SkinnedExport.Warnings(Coloured(9), 1, 1)));
+        Assert.Empty(GameLimits.Starting.Warnings(Coloured(8), 1, 1));
+        Assert.Contains("9 colours", Assert.Single(GameLimits.Starting.Warnings(Coloured(9), 1, 1)));
         var glb = SkinnedExport.Write(Coloured(9), "orc");
-        Assert.Contains(glb.Warnings, w => w.Contains("10 submeshes", StringComparison.Ordinal));
+        Assert.Contains("10 submeshes", Assert.Single(GameLimits.Starting.Warnings(Coloured(9), glb.Triangles, glb.Materials.Count)));
     }
 
     private static Model Humanoid(float height, bool synty = true)
@@ -348,21 +347,21 @@ public class SkinnedExportTests
     [InlineData(2.41f, true)]
     public void Height_warns_outside_1_4_to_2_4_m_on_the_Synty_bones(float height, bool warns)
     {
-        var warnings = SkinnedExport.Warnings(Humanoid(height), 1, 1);
-        if (warns) Assert.Contains("m tall, outside the 1.4 to 2.4 m", Assert.Single(warnings));
+        var warnings = GameLimits.Starting.Warnings(Humanoid(height), 1, 1);
+        if (warns) Assert.Matches(@"m tall, (below the game's min_height 1\.4|above the game's max_height 2\.4) m", Assert.Single(warnings));
         else Assert.Empty(warnings);
     }
 
     [Fact]
     public void A_rig_without_the_Synty_bones_gets_no_height_warning()
     {
-        Assert.Empty(SkinnedExport.Warnings(Humanoid(0.5f, synty: false), 1, 1));
-        Assert.Empty(SkinnedExport.Warnings(Humanoid(4f, synty: false), 1, 1));
+        Assert.Empty(GameLimits.Starting.Warnings(Humanoid(0.5f, synty: false), 1, 1));
+        Assert.Empty(GameLimits.Starting.Warnings(Humanoid(4f, synty: false), 1, 1));
         // One required bone short of the preset is not a humanoid either.
         var model = Humanoid(0.5f);
-        Assert.Single(SkinnedExport.Warnings(model, 1, 1));
+        Assert.Single(GameLimits.Starting.Warnings(model, 1, 1));
         var specs = model.Skeleton!.Bones.Where(b => b.Name != "Ankle_R").Select(b => new BoneSpec(b.Name, b.Parent < 0 ? null : "Hips", b.Position, b.Rotation)).ToArray();
-        Assert.Empty(SkinnedExport.Warnings(model.WithSkeleton(Skeleton.Create(specs).Skeleton!), 1, 1));
+        Assert.Empty(GameLimits.Starting.Warnings(model.WithSkeleton(Skeleton.Create(specs).Skeleton!), 1, 1));
     }
 
     [Fact]

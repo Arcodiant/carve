@@ -32,18 +32,21 @@ public sealed class ExportTool(ModelStore store)
         + "positions in the rest pose with JOINTS_0 and WEIGHTS_0 from set_weights; a node 'Armature' (identity, not a bone) with the bones under it in your order; skins[0] over every bone, "
         + "its inverse bind matrices the inverse of each bone's rest world transform; and one animation per clip (define_clip), LINEAR or STEP, every animated channel keyed at 0 and at the clip's duration. "
         + "A vertex with no weight is refused, the vertices listed and nothing written; allow_unweighted: true exports anyway, binding them to the first root bone, and the result says so. "
-        + "A skinned export warns, and still writes, above 5000 triangles, above 8 submeshes or colours, and, for a skeleton with the Synty humanoid bones (Hips, Spine_01, Head, Shoulder/Elbow/Hand and UpperLeg/LowerLeg/Ankle _L and _R), a rest height outside 1.4 to 2.4 m. "
+        + "Game limits: export warns, and still writes, past the limits of the game it exports for, read from carve-limits.json in the game's content folder: export looks in the .glb's folder and then each folder above it, and uses the first it finds; limits (a folder holding carve-limits.json, or a .json file) names it instead. "
+        + "The file is a JSON object of optional keys: max_triangles (the whole model), max_submeshes (submeshes, or distinct colours), and min_height and max_height in metres (the rest height of every mesh, only for a skeleton with the Synty humanoid bones: Hips, Spine_01, Head, Shoulder/Elbow/Hand and UpperLeg/LowerLeg/Ankle _L and _R); each warns past its value and never at it, a key left out never warns, and with no file there are no limit warnings, which the result says. "
+        + "write_limits: true fills in the keys the file is missing with Orcward's starting numbers (max_triangles 5000, max_submeshes 8, min_height 1.4, max_height 2.4), creating the file beside the .glb when none was named or found, and never changes a key already set; it is written after the .glb, and the result says what it filled. Edit the numbers to the game's own. "
+        + "A limits file that is not a JSON object of those keys (a count a whole number of at least 1, a height a number above 0, min_height not above max_height), or a limits argument naming no file without write_limits, is a tool error that writes nothing. "
         + "A mesh with warnings still exports, and the result repeats them. export changes nothing: not the mesh, its ids, or what undo steps back to. "
         + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve' (or each material, when there are several), size <x> x <y> x <z> m, "
-        + "bounds (<min x, y, z>) to (<max x, y, z>), then any warnings; a skinned export's line names its pieces, materials, bones and clips instead of the one material. "
+        + "bounds (<min x, y, z>) to (<max x, y, z>), then where the limits came from (limits from <file>, or no game limits), then any warnings; a skinned export's line names its pieces, materials, bones and clips instead of the one material. "
         + "mode: 'model' (the default) writes all of the above; 'clips' writes the armature, skins[0] and the animations with no mesh, no node holding a mesh and no material, "
         + "which is one file of clips for every character that shares the skeleton: a game loads it with IModelGeometryLoader.LoadAnimationSet (the same bones in the same order and the same clips as the model file) and retargets it, "
         + "and the model loader refuses it as 'glTF contains no meshes.'. The skin stays in a clips file because without it the loader reorders bones and the tracks line up with the wrong ones. "
         + "Clips mode needs no mesh: a skeleton and clips alone (a clip library) export. It is refused, writing nothing, for a model with no skeleton or no clips. "
-        + "A role map (*.humanoid.json) and clip events (*.events.json) are sidecars the game writes beside the file; carve writes none. Clips mode repeats no mesh limits as it has no mesh. "
+        + "A role map (*.humanoid.json) and clip events (*.events.json) are sidecars the game writes beside the file; carve writes none. Clips mode has no mesh, so no limit warnings, though it reads and writes the limits file as model mode does. "
         + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
         + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
-        + "Worked example, writing into a game's content folder (put the game's folder for <game>); the game then loads it as "
+        + "Worked example, writing into a game's content folder (put the game's folder for <game>; the first export for a game can add limits: \"<game>/Content\" and write_limits: true to start <game>/Content/carve-limits.json); the game then loads it as "
         + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
         + ExampleMarker + SaveTool.WorkedExport;
 
@@ -54,6 +57,11 @@ public sealed class ExportTool(ModelStore store)
         {
             ["description"] = "With a skeleton: export even when some vertices have no weight, binding them wholly to the first root bone, for work in progress. Default false.",
             ["type"] = "boolean",
+        };
+        schema["properties"]!.AsObject()["limits"] = new JsonObject
+        {
+            ["description"] = "The game's limits file: a .json file, or a folder holding carve-limits.json, absolute or relative to carve's working directory. Left out, the first carve-limits.json in the .glb's folder or a folder above it.",
+            ["type"] = "string",
         };
         schema["properties"]!.AsObject()["mode"] = new JsonObject
         {
@@ -66,15 +74,27 @@ public sealed class ExportTool(ModelStore store)
             ["description"] = "Replace the file if it already exists. Default false: an existing file is a tool error and is left unchanged.",
             ["type"] = "boolean",
         };
+        schema["properties"]!.AsObject()["write_limits"] = new JsonObject
+        {
+            ["description"] = "Fill the keys the limits file is missing with Orcward's starting numbers (5000 triangles, 8 submeshes, 1.4 to 2.4 m), creating it beside the .glb when none was named or found. Keys already set are kept. Default false.",
+            ["type"] = "boolean",
+        };
         return MeshToolSupport.Create<ExportTool>("export", Text, schema);
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? mode = null, JsonElement? overwrite = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? limits = null, JsonElement? mode = null, JsonElement? overwrite = null, JsonElement? write_limits = null)
     {
-        var errors = UnknownArguments("export", context, "path", "allow_unweighted", "mode", "overwrite");
+        var errors = UnknownArguments("export", context, "path", "allow_unweighted", "limits", "mode", "overwrite", "write_limits");
         var text = RequiredString("path", path, errors);
         var allowUnweighted = OptionalBool("allow_unweighted", allow_unweighted, errors);
         var replace = OptionalBool("overwrite", overwrite, errors);
+        var writeLimits = OptionalBool("write_limits", write_limits, errors);
+        string? limitsPath = null;
+        if (!Absent(limits))
+        {
+            if (limits!.Value.ValueKind == JsonValueKind.String) limitsPath = limits.Value.GetString();
+            else errors.Add($"limits: expected a folder or a .json file as a string, got {Describe(limits.Value)}");
+        }
         var clips = false;
         if (!Absent(mode))
         {
@@ -91,19 +111,36 @@ public sealed class ExportTool(ModelStore store)
         var target = ToolPaths.Resolve("export", text, Extension, out var pathError);
         if (target is null) return Error(pathError!);
 
-        if (clips) return Clips(model, target, replace);
-        if (mesh is null) return Error("export: " + NoMesh); // not reached: model mode was refused above
-        if (model.Skeleton is not null) return Skinned(model, target, allowUnweighted, replace);
+        // T-51: the game's limits, read and checked before anything is written.
+        var source = LimitsSource.Find("export", limitsPath, writeLimits, target.FullPath, out var limitsError);
+        if (source is null) return Error(limitsError!);
 
+        var written = clips ? Clips(model, target, replace, source)
+            : model.Skeleton is not null ? Skinned(model, target, allowUnweighted, replace, source)
+            : Static(model, mesh!, target, replace, source);
+        if (written.IsError == true || !source.NeedsWrite) return written;
+
+        // The .glb is written; the limits file follows it, so a refused export writes neither.
+        if (!source.Write("export", out var writeLimitsError))
+            return Error($"{writeLimitsError} The .glb was written: {TextOf(written)}");
+        return Line(TextOf(written).Replace(source.Describe(written: false), source.Describe(written: true), StringComparison.Ordinal));
+    }
+
+    private static string TextOf(CallToolResult result) => ((TextContentBlock)result.Content[0]).Text;
+
+    /// <summary>A model with no skeleton: every mesh merged into one, as T-30 writes it, warned on the game's limits.</summary>
+    private static CallToolResult Static(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source)
+    {
         var triangles = Shading.Triangles(mesh);
         var bytes = GlbExport.Write(mesh, triangles, target.Stem);
-        if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, replace)) return Error(writeError!);
+        if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
-        return Line(Summary(mesh, target, replaced, triangles.Count));
+        var warnings = source.Limits.Warnings(model, triangles.Count, GlbExport.MaterialNames(mesh).Length);
+        return Line(Summary(mesh, target, replaced, triangles.Count, source.Describe(written: false), warnings));
     }
 
     /// <summary>Clips mode: the armature, skin and animations with no mesh, or a refusal that writes nothing.</summary>
-    private static CallToolResult Clips(Model model, ToolPath target, bool overwrite)
+    private static CallToolResult Clips(Model model, ToolPath target, bool overwrite, LimitsSource source)
     {
         if (ClipsExport.Refusal(model) is { } refusal) return Error($"export: mode clips: {refusal}. Nothing was written.");
         var bytes = ClipsExport.Write(model, target.Stem);
@@ -112,11 +149,12 @@ public sealed class ExportTool(ModelStore store)
         var skeleton = model.Skeleton!;
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
         return Line($"exported {target.Written(replaced)} as clips, with no mesh: "
-            + $"{N(skeleton.Bones.Count)} bone(s) {NameList.Quoted(skeleton.Names)}, {N(model.Clips.Count)} clip(s) {NameList.Quoted(model.Clips.Select(c => c.Name))}");
+            + $"{N(skeleton.Bones.Count)} bone(s) {NameList.Quoted(skeleton.Names)}, {N(model.Clips.Count)} clip(s) {NameList.Quoted(model.Clips.Select(c => c.Name))}"
+            + source.Describe(written: false));
     }
 
     /// <summary>A model with a skeleton: the skinned file, or a refusal listing unweighted vertices that writes nothing.</summary>
-    private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted, bool overwrite)
+    private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source)
     {
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
         var unweighted = SkinnedExport.Unweighted(model);
@@ -146,7 +184,8 @@ public sealed class ExportTool(ModelStore store)
         if (glb.BoundToRoot > 0)
             line += $"; allow_unweighted: {N(glb.BoundToRoot)} vertices with no weight were bound to the first root bone '{skeleton.Bones[0].Name}'";
 
-        var warnings = glb.Warnings.ToList();
+        line += source.Describe(written: false);
+        var warnings = source.Limits.Warnings(model, glb.Triangles, glb.Materials.Count).ToList();
         foreach (var piece in model.Meshes)
             warnings.AddRange(MeshReport.Create(piece.Mesh).Warnings.Select(w => $"mesh '{piece.Name}': " + w.ToString().ReplaceLineEndings(" ")));
         if (warnings.Count > 0)
@@ -163,7 +202,7 @@ public sealed class ExportTool(ModelStore store)
             : $"{names.Length.ToString(CultureInfo.InvariantCulture)} materials {NameList.Quoted(names)}";
     }
 
-    private static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles)
+    private static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles, string limits, IReadOnlyList<string> limitWarnings)
     {
         var report = MeshReport.Create(mesh);
         var (min, max) = (report.BoundsMin, report.BoundsMax);
@@ -173,10 +212,11 @@ public sealed class ExportTool(ModelStore store)
 
         var line = $"exported {target.Written(replaced)}: "
             + $"{triangles.ToString(CultureInfo.InvariantCulture)} triangles, {Materials(mesh)}, "
-            + $"size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}";
-        if (report.Warnings.Count > 0)
-            line += $"; {report.Warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): "
-                + string.Join("; ", report.Warnings.Select(w => w.ToString().ReplaceLineEndings(" ")));
+            + $"size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}"
+            + limits;
+        var warnings = limitWarnings.Concat(report.Warnings.Select(w => w.ToString().ReplaceLineEndings(" "))).ToList();
+        if (warnings.Count > 0)
+            line += $"; {warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): " + string.Join("; ", warnings);
         return line;
     }
 }

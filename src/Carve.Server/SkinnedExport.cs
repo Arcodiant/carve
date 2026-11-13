@@ -11,7 +11,7 @@ namespace Carve.Server;
 /// <summary>What a skinned export wrote, for the result line.</summary>
 public sealed record SkinnedGlb(
     byte[] Bytes, IReadOnlyList<string> Pieces, IReadOnlyList<string> Materials, int Triangles,
-    IReadOnlyList<string> Warnings, int BoundToRoot);
+    int BoundToRoot);
 
 /// <summary>
 /// A model with a skeleton as one self-contained binary glTF (D-6, A skinned export is one glTF mesh; The rest pose is
@@ -30,17 +30,6 @@ public sealed record SkinnedGlb(
 public static class SkinnedExport
 {
     // Interim until engine need 4: a skinned file keeps only its first skinned mesh, so every piece is a primitive of one mesh.
-
-    // D-6, Warnings for a game's limits: Orcward's numbers, not general ones; T-51 makes them per game.
-
-    /// <summary>D-6, Warnings for a game's limits: Orcward's starting numbers.</summary>
-    public const int MaxTriangles = 5000;
-
-    public const int MaxSubmeshes = 8;
-
-    public const float MinHeight = 1.4f;
-
-    public const float MaxHeight = 2.4f;
 
     /// <summary>
     /// The bones the engine's Synty preset needs for its required roles (hips, spine root, head, both arms to the hand,
@@ -103,32 +92,7 @@ public static class SkinnedExport
         GlbRig.WriteClips(root, skeleton, joints, model.Clips);
 
         var pieces = model.Names.ToList();
-        return new SkinnedGlb(root.WriteGLB().ToArray(), pieces, materials, triangleCount,
-            Warnings(model, triangleCount, materials.Count), boundToRoot);
-    }
-
-    /// <summary>The warnings of D-6's game limits, each past its constant and never at it.</summary>
-    public static IReadOnlyList<string> Warnings(Model model, int triangles, int submeshes)
-    {
-        static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
-        static string F(float x) => x.ToString(CultureInfo.InvariantCulture);
-        var warnings = new List<string>();
-        if (triangles > MaxTriangles)
-            warnings.Add($"{N(triangles)} triangles, above the {N(MaxTriangles)} a game character should keep to");
-        var colours = model.Meshes.SelectMany(m => m.Mesh.Style?.Colours.Values.Select(c => c.ToUpperInvariant()) ?? []).Distinct().Count();
-        if (submeshes > MaxSubmeshes || colours > MaxSubmeshes)
-            warnings.Add($"{N(submeshes)} submeshes and {N(colours)} colours, above the {N(MaxSubmeshes)} a game character should keep to; share colours between pieces where you can");
-        if (model.Skeleton is { } skeleton && SyntyRequiredBones.All(skeleton.Names.Contains))
-        {
-            var ys = model.Meshes.SelectMany(m => m.Mesh.LiveVertices.Select(v => m.Mesh.Vertices[v])).Select(v => v.Y).ToList();
-            if (ys.Count > 0)
-            {
-                var height = (float)((double)ys.Max() - ys.Min());
-                if (height < MinHeight || height > MaxHeight)
-                    warnings.Add($"the rest pose is {F(height)} m tall, outside the {F(MinHeight)} to {F(MaxHeight)} m a humanoid on the Synty bones should be");
-            }
-        }
-        return warnings;
+        return new SkinnedGlb(root.WriteGLB().ToArray(), pieces, materials, triangleCount, boundToRoot);
     }
 
     /// <summary>The piece's primitives in order of first use by face: (material name, colour or null for uncoloured).</summary>

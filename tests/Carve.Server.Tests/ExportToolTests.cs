@@ -23,7 +23,8 @@ public sealed class ExportToolTests() : FileToolTests("carve-export")
         var full = Path.Combine(Root, "out", "cube.glb");
 
         var first = Line(await carve.CallToolAsync("export", """{"path":"out/cube.glb"}"""));
-        Assert.Equal($"exported cube.glb to {full}: 12 triangles, 1 material 'carve', size 1 x 1 x 1 m, bounds (0, 0, 0) to (1, 1, 1)", first);
+        Assert.Equal($"exported cube.glb to {full}: 12 triangles, 1 material 'carve', size 1 x 1 x 1 m, bounds (0, 0, 0) to (1, 1, 1)"
+            + $"; no game limits: no carve-limits.json in {Path.GetDirectoryName(full)} or a folder above it (write_limits: true starts one there)", first);
         var bytes = File.ReadAllBytes(full);
         Assert.Equal("glTF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
 
@@ -109,7 +110,7 @@ public sealed class ExportToolTests() : FileToolTests("carve-export")
         using var _carve = carve;
         var schema = Tool(tools, "export").GetProperty("inputSchema");
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal(["path", "allow_unweighted", "mode", "overwrite"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
-        Assert.Contains("unknown: not an argument of export; its arguments are path, allow_unweighted, mode, overwrite", Refused(await carve.CallToolAsync("export", """{"path":"a.glb","unknown":1}""")));
+        Assert.Equal(["path", "allow_unweighted", "limits", "mode", "overwrite", "write_limits"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Contains("unknown: not an argument of export; its arguments are path, allow_unweighted, limits, mode, overwrite, write_limits", Refused(await carve.CallToolAsync("export", """{"path":"a.glb","unknown":1}""")));
     }
 }
