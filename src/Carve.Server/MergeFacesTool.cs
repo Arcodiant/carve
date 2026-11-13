@@ -23,7 +23,7 @@ public sealed class MergeFacesTool(ModelStore store)
         + "The listed faces must be live and connected, each sharing at least one edge with another listed face, and wound alike (two of them running a shared edge the same way is mixed winding, refused). "
         + "The lowest listed id survives, reshaped; the others are deleted as tombstones, and so is every vertex of theirs that no live face uses afterwards (a vertex no face used before is kept). "
         + "Every vertex still on the outline stays, even where the outline runs straight through it: no vertex is dissolved. "
-        + "The merged face keeps the surviving face's colour and groups; a merged face of another colour is a warning naming it, not an error. A hard edge mark on a dissolved edge goes with the edge. A non-planar result is a warning, as define_mesh's is. "
+        + "The merged face keeps the surviving face's colour and groups; a merged face of another colour is a warning naming it, not an error. A hard edge mark on a dissolved edge goes with the edge. A non-planar result is a warning, as define_mesh's is, and so is each merged face whose normal is 90 degrees or more from the result's, the result folding back over it. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[ids], faces:[ids]}, split:[]}. "
         + "Bad input (fewer than two faces, an unknown, deleted or repeated id, faces not connected, mixed winding, a result that is not one face, such as faces touching at a vertex only or closing a shell) "
         + "is a tool error that lists every problem by element; the mesh is left unchanged and nothing is added to undo. One merge is one undo step. "

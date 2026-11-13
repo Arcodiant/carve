@@ -99,6 +99,20 @@ public class MergeBridgeTests
     }
 
     [Fact]
+    public void AMergeThatFoldsOverAFaceMergesAndWarnsNamingIt()
+    {
+        // Every cube face but +z: the outline is the planar square round face 1, wound as -z, so the four sides fold.
+        var r = FaceMerge.Merge(TestMeshes.Cube(), [0, 2, 3, 4, 5], out var warnings);
+        TestMeshes.Ok(r);
+        Assert.Equal(
+            new[] { 2, 3, 4, 5 }.Select(f => $"faces[{f}]: its normal is 90 degrees or more from the merged faces[0]'s, so the merged face folds back over it"),
+            warnings);
+
+        FaceMerge.Merge(TestMeshes.Cube(), [1, 2], out var bent); // +z and -y: bent, not folded
+        Assert.Empty(bent);
+    }
+
+    [Fact]
     public void AMergeKeepsTheSurvivorsStyleAndWarnsOfAnotherColour()
     {
         var mesh = Grid(3, 1).WithStyle(FaceStyle.None.WithColour([0, 2], Red).WithColour([1], Blue).WithGroup("left", [0]).WithGroup("right", [2]));
