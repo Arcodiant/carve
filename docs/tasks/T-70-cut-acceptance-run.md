@@ -4,7 +4,7 @@ description: >-
 ---
 # T-70 — Cut acceptance run
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
@@ -82,7 +82,8 @@ How many calls it took, which tools it chose, and whether it used `undo`, `merge
 
 ### As built
 
-Finished by an agent on **Sonnet 5.5** (claude-sonnet-5-5); round 1 was run by an earlier Sonnet 5.5 agent. Each round's session model is the `claude -p` default, **claude-fable-5-2**. No description, tool or code changed: no round showed hesitation, a wrong guess or a misused tool. Evidence is in `%TEMP%\carve-m5-acceptanceound-N\` and `artifacts/m5-acceptance/round-N/` of the milestone worktree (transcript, images, final `check` and `get_mesh`, `wall.carve`).
+Finished by an agent on **Sonnet 5.5** (claude-sonnet-5-5); round 1 was run by an earlier Sonnet 5.5 agent. Each round's session model is the `claude -p` default, **claude-fable-5-2**. No description, tool or code changed: no round showed hesitation, a wrong guess or a misused tool. Evidence is in `%TEMP%\carve-m5-acceptance
+ound-N\` and `artifacts/m5-acceptance/round-N/` of the milestone worktree (transcript, images, final `check` and `get_mesh`, `wall.carve`).
 
 **Rulings (the person, 2026-11-12), written into Scope:** the stream-json flags are accepted; the prompt is reworded (slab, then gable cut into it); round 2 runs fresh with the plant as is, and an agent that works out z = 0.15 and says why counts as recovery by understanding.
 
