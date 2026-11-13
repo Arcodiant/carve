@@ -18,7 +18,10 @@ public sealed record MeshShell(IReadOnlyList<int> Faces, bool Closed, bool Consi
 /// </summary>
 public sealed record HealthStats(
     int Vertices, int Faces, int Edges, int Triangles, int Shells, bool Closed,
-    Vector3 BoundsMin, Vector3 BoundsMax, Vector3 Size, double Area, double? Volume);
+    Vector3 BoundsMin, Vector3 BoundsMax, Vector3 Size, double Area, double? Volume, UvStats? Uvs = null);
+
+/// <summary>How many live faces are mapped (have UVs) and how many are not; <see cref="HealthStats.Uvs"/> is null for a mesh with no UVs.</summary>
+public sealed record UvStats(int Mapped, int Unmapped);
 
 /// <summary>A mesh's health: what is wrong with it by element id, what it measures, and what a game will make of it.</summary>
 public sealed class MeshHealth
@@ -41,7 +44,7 @@ public sealed class MeshHealth
     /// <summary><c>inside-out</c>, then <c>coincident-vertices</c>, then <c>duplicate-face</c>.</summary>
     public IReadOnlyList<HealthProblem> Problems { get; }
 
-    /// <summary><see cref="MeshReport"/>'s warnings, as they are.</summary>
+    /// <summary><see cref="MeshReport"/>'s warnings, as they are, then a mapped mesh's UV warnings: unmapped, flipped and zero-area faces by id, then each overlapping pair.</summary>
     public IReadOnlyList<MeshWarning> Warnings { get; }
 
     /// <summary>Informational, never a problem: size, base, origin and shell count.</summary>
@@ -75,7 +78,11 @@ public sealed class MeshHealth
             mesh.LiveFaces.Sum(mesh.FaceArea),
             shells.All(s => s.SignedVolume is not null) ? shells.Sum(s => s.SignedVolume!.Value) : null);
 
-        return new MeshHealth(shells, problems, report.Warnings, BuildNotes(report, size, shells.Count), stats);
+        var (uvWarnings, uvStats) = MeshUvHealth.Create(mesh);
+        if (uvStats is not null) stats = stats with { Uvs = uvStats };
+        IReadOnlyList<MeshWarning> warnings = uvWarnings.Count == 0 ? report.Warnings : [.. report.Warnings, .. uvWarnings];
+
+        return new MeshHealth(shells, problems, warnings, BuildNotes(report, size, shells.Count), stats);
     }
 
     private static List<MeshShell> FindShells(PolygonMesh mesh, IReadOnlyList<MeshTriangle> triangles)
