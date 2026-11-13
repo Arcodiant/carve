@@ -57,31 +57,18 @@ internal static class GatehousePlan
         new[] { (0.7f, 1.15f), (0.45f, 0.95f), (0.95f, 0.95f), (0.95f, 1.35f), (0.45f, 1.35f), (0.7f, 1.55f) }
             .Select(p => new Probe(-1, $"window ({p.Item1}, {p.Item2})", new Vector3(p.Item1, p.Item2, 0.15f), false));
 
-    /// <summary>Every edge of the live faces, holes included, as a sorted pair of vertex ids; of <paramref name="faces"/> only if given.</summary>
-    public static (int Lo, int Hi)[] Edges(Solid solid, IEnumerable<int>? faces = null) =>
-        (faces ?? Enumerable.Range(0, solid.Faces.Length)).Where(f => !solid.IsDeleted(f))
-            .SelectMany(f => solid.Faces[f].Holes.Prepend(solid.Faces[f].Loop))
-            .SelectMany(l => l.Select((v, k) => (A: v, B: l[(k + 1) % l.Length])))
-            .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
-
     /// <summary>
     /// The edges a stage added: those of its mesh whose middle is on no edge of the stage before. An edge cut short or in two
     /// (a ring cut through a vertical edge, a plane cut across a face) lies along an old edge and is not new.
     /// </summary>
     public static (int Lo, int Hi)[] NewEdges(Solid before, Solid after)
     {
-        var old = Edges(before);
-        return Edges(after).Where(e =>
+        var old = before.Edges();
+        return after.Edges().Where(e =>
         {
             var middle = (after.Vertices[e.Lo] + after.Vertices[e.Hi]) / 2;
-            return !old.Any(o => Distance(middle, before.Vertices[o.Lo], before.Vertices[o.Hi]) < 1e-4f);
+            return !old.Any(o => Solid.SegmentDistance(middle, before.Vertices[o.Lo], before.Vertices[o.Hi]) < 1e-4f);
         }).ToArray();
-    }
-
-    private static float Distance(Vector3 p, Vector3 a, Vector3 b)
-    {
-        var t = Math.Clamp(Vector3.Dot(p - a, b - a) / Vector3.Dot(b - a, b - a), 0, 1);
-        return Vector3.Distance(p, a + (t * (b - a)));
     }
 
     /// <summary>The nudge of the in-sight rule, as a fraction of the mesh's bounds diagonal.</summary>

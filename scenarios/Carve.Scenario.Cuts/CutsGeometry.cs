@@ -15,6 +15,23 @@ internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] F
 {
     public bool IsDeleted(int face) => Faces[face].Loop.Length == 0;
 
+    /// <summary>
+    /// Every edge of the live faces among <paramref name="faces"/> (every face when left out), outer loops and holes, each
+    /// once as (lo, hi), ascending.
+    /// </summary>
+    public (int Lo, int Hi)[] Edges(IEnumerable<int>? faces = null) =>
+        (faces ?? Enumerable.Range(0, Faces.Length)).Where(f => !IsDeleted(f))
+            .SelectMany(f => Faces[f].Holes.Prepend(Faces[f].Loop))
+            .SelectMany(l => l.Select((v, k) => (A: v, B: l[(k + 1) % l.Length])))
+            .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
+
+    /// <summary>The distance from <paramref name="p"/> to the segment from <paramref name="a"/> to <paramref name="b"/>.</summary>
+    public static float SegmentDistance(Vector3 p, Vector3 a, Vector3 b)
+    {
+        var t = Math.Clamp(Vector3.Dot(p - a, b - a) / Vector3.Dot(b - a, b - a), 0, 1);
+        return Vector3.Distance(p, a + (t * (b - a)));
+    }
+
     public Vector3 Normal(int face)
     {
         var loop = Faces[face].Loop;

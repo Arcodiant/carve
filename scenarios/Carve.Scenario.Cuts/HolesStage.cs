@@ -3,6 +3,7 @@ using System.Text.Json;
 using Carve.Debug;
 using Carve.Scenario.Shed;
 using static Carve.Scenario.Shed.Checks;
+using static Carve.Scenario.Cuts.CutsChecks;
 
 namespace Carve.Scenario.Cuts;
 
@@ -45,10 +46,6 @@ internal sealed class HolesStage : ICutsStage
         .. Signs().Select(s => ("outside the plate, by its corner", new Vector3(1.1f * s.X, 1.1f * s.Y, Front))),
         .. Sides().Select(s => ("outside the plate, by its side", new Vector3(1.12f * s.X, 1.12f * s.Y, Front))),
     ];
-
-    private static (float X, float Y)[] Signs() => [(-1, -1), (1, -1), (1, 1), (-1, 1)];
-
-    private static (float X, float Y)[] Sides() => [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
     public async Task RunAsync(ScenarioDriver driver)
     {
@@ -110,8 +107,6 @@ internal sealed class HolesStage : ICutsStage
             }
         }
     }
-
-    private static Vector3 ToVector(double[] d) => new((float)d[0], (float)d[1], (float)d[2]);
 
     private static bool Facing(Solid solid, int face) => solid.Normal(face).Z > 0.99f;
 

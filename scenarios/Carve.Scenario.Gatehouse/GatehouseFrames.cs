@@ -4,6 +4,7 @@ using Carve.Scenario.Crate;
 using Carve.Scenario.Cuts;
 using Carve.Scenario.Shed;
 using static Carve.Scenario.Shed.Checks;
+using static Carve.Scenario.Cuts.CutsChecks;
 
 namespace Carve.Scenario.Gatehouse;
 
@@ -76,7 +77,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
         Equal($"{frame.Name}: the stage's new edges", added, fresh.Length);
         var seen = GatehousePlan.InSight(solid, camera, ToVector(Front));
         Equal($"{frame.Name}: the new edges in sight", inSight, seen.Count(fresh.Contains));
-        var lines = GatehousePlan.Edges(solid).Select(e => (camera.Project(solid.Vertices[e.Lo]), camera.Project(solid.Vertices[e.Hi]))).ToArray();
+        var lines = solid.Edges().Select(e => (camera.Project(solid.Vertices[e.Lo]), camera.Project(solid.Vertices[e.Hi]))).ToArray();
         Look(frame, solid, camera, GatehousePlan.Probes(solid), stage, "wire", -1, lines);
         foreach (var (lo, hi) in seen)
         {
@@ -282,15 +283,6 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
         return (p.R, p.G, p.B);
     }
 
-    /// <summary>The grey pixel times colour / grey in each channel, in linear light (<see cref="ColourRule"/>).</summary>
-    private static Rgb Predict(Rgb grey, string hex)
-    {
-        var scale = ColourRule.Scale(hex);
-        return Srgb(ColourRule.Linear(grey.R) * scale[0], ColourRule.Linear(grey.G) * scale[1], ColourRule.Linear(grey.B) * scale[2]);
-    }
-
     private static string Counts(Solid solid) =>
         $"{solid.Faces.Where((f, i) => !solid.IsDeleted(i)).SelectMany(f => f.Loop.Concat(f.Holes.SelectMany(h => h))).Distinct().Count()} vertices, {Enumerable.Range(0, solid.Faces.Length).Count(f => !solid.IsDeleted(f))} faces";
-
-    private static Vector3 ToVector(double[] d) => new((float)d[0], (float)d[1], (float)d[2]);
 }

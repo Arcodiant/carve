@@ -4,6 +4,7 @@ using Carve.Debug;
 using Carve.Scenario.Crate;
 using Carve.Scenario.Shed;
 using static Carve.Scenario.Shed.Checks;
+using static Carve.Scenario.Cuts.CutsChecks;
 
 namespace Carve.Scenario.Cuts;
 
@@ -47,9 +48,9 @@ internal sealed class KnifeStage : ICutsStage
     /// plane and on the recess's), and six points outside the slab.</summary>
     private static readonly (string Name, Vector3 At)[] Probes =
     [
-        .. Grid("the front (z = 0.2)", (u, v) => new Vector3(u, v, 0.2f)),
-        .. Grid("the top (y = 2)", (u, v) => new Vector3(u, 2, v / 10)),
-        .. Grid("the right (x = 2)", (u, v) => new Vector3(2, u, v / 10)),
+        .. Grid("the front (z = 0.2)", Steps, (u, v) => new Vector3(u, v, 0.2f)),
+        .. Grid("the top (y = 2)", Steps, (u, v) => new Vector3(u, 2, v / 10)),
+        .. Grid("the right (x = 2)", Steps, (u, v) => new Vector3(2, u, v / 10)),
         .. new[] { 0.4f, 0.5f, 0.6f }.SelectMany(x => new[] { 0.2f, 0.5f, 0.8f }.Select(y => ("the door", new Vector3(x, y, 0.2f)))),
         .. new[] { 1.3f, 1.45f, 1.6f }.SelectMany(x => new[] { 1.05f, 1.2f, 1.35f }.Select(y => ("the recess", new Vector3(x, y, 0.15f)))),
         .. new[] { -0.3f, 2.3f }.SelectMany(x => new[] { -0.3f, 1f, 2.3f }.Select(y => ("outside the slab", new Vector3(x, y, 0.1f)))),
@@ -67,9 +68,6 @@ internal sealed class KnifeStage : ICutsStage
     private static IEnumerable<(string, Vector3)> Along(string name, Vector2 a, Vector2 b) =>
         new[] { 1 / 3f, 0.5f, 2 / 3f }.Select(t => (name, new Vector3(Vector2.Lerp(a, b, t), 0.175f)));
 
-    private static IEnumerable<(string, Vector3)> Grid(string name, Func<float, float, Vector3> at) =>
-        Steps.SelectMany(u => Steps.Select(v => (name, at(u, v))));
-
     public async Task RunAsync(ScenarioDriver driver)
     {
         // 1. The hexagon, closed: the front keeps its id with a hole, the inner face appended.
@@ -84,7 +82,7 @@ internal sealed class KnifeStage : ICutsStage
         var door = await CallJsonAsync(driver, "knife", new { points = Door });
         Summary("knife the door", door, 18, 8, true);
         var cut = await Solid.ReadAsync(driver);
-        var edges = Edges(cut);
+        var edges = cut.Edges();
         var paths = new[] { (Hexagon, true), (Door, false) }
             .SelectMany(p => Enumerable.Range(0, p.Item2 ? p.Item1.Length : p.Item1.Length - 1)
                 .Select(k => (ToVector(p.Item1[k]), ToVector(p.Item1[(k + 1) % p.Item1.Length]))))
@@ -92,7 +90,7 @@ internal sealed class KnifeStage : ICutsStage
         bool Knifed((int Lo, int Hi) e)
         {
             var mid = (cut.Vertices[e.Lo] + cut.Vertices[e.Hi]) / 2;
-            return paths.Any(s => DistanceToSegment(mid, s.Item1, s.Item2) < 1e-4f);
+            return paths.Any(s => Solid.SegmentDistance(mid, s.Item1, s.Item2) < 1e-4f);
         }
 
         var knifed = edges.Where(Knifed).ToArray();
@@ -107,12 +105,12 @@ internal sealed class KnifeStage : ICutsStage
         });
         Caption(wire, "512x512, direction (0.6, 0.35, 1), wireframe, highlight 9 edges, 18 vertices, 8 faces");
         var lines = edges.Select(e => (camera.Project(cut.Vertices[e.Lo]), camera.Project(cut.Vertices[e.Hi]))).ToArray();
-        Look(wire, camera, cut, _ => Fill, lines, "the knifed slab, in the wireframe");
+        Look(wire, camera, cut, Probes, _ => Fill, lines, "the knifed slab, in the wireframe");
 
         // The edges on the faces turned to the camera (front, top, right) are in sight: the knifed ones orange, the others not.
         var dir = Vector3.Normalize(ToVector(Front));
         var facing = Enumerable.Range(0, cut.Faces.Length).Where(f => !cut.IsDeleted(f) && Vector3.Dot(cut.Normal(f), dir) > 0.2f).ToArray();
-        var seen = Edges(cut, facing);
+        var seen = cut.Edges(facing);
         Equal("the knifed edges in sight", 9, seen.Count(knifed.Contains));
         foreach (var (lo, hi) in seen)
         {
@@ -142,8 +140,8 @@ internal sealed class KnifeStage : ICutsStage
         Equal("the recessed hexagon at z = 0.15", true, pocket.Faces[6].Loop.All(v => MathF.Abs(pocket.Vertices[v].Z - 0.15f) < 1e-5f));
         var shaded = await driver.CaptureAsync("knife-slab-recess", new { direction = Front });
         Caption(shaded, "512x512, direction (0.6, 0.35, 1), 24 vertices, 14 faces");
-        Expect(shaded, camera, pocket, "the recess", 6, 5);
-        Look(shaded, camera, pocket, Shades(shaded, camera, pocket), [], "the slab with the hexagon recessed");
+        Expect(shaded, camera, pocket, Probes, "the recess", 6, 5);
+        Look(shaded, camera, pocket, Probes, Shades(shaded, camera, pocket), [], "the slab with the hexagon recessed");
         Predicted(shaded, camera, pocket, doorPiece);
     }
 
@@ -222,13 +220,6 @@ internal sealed class KnifeStage : ICutsStage
         return null;
     }
 
-    /// <summary>The grey pixel times colour / grey in each channel, in linear light (<see cref="ColourRule"/>).</summary>
-    private static Rgb Predict(Rgb grey, string hex)
-    {
-        var scale = ColourRule.Scale(hex);
-        return Srgb(ColourRule.Linear(grey.R) * scale[0], ColourRule.Linear(grey.G) * scale[1], ColourRule.Linear(grey.B) * scale[2]);
-    }
-
     /// <summary>Each probe the ray test is sure of must show <paramref name="face"/>, in <paramref name="colour"/> within <see cref="Checks.Exact"/>.</summary>
     private static void Coloured(ScenarioFrame frame, Camera camera, Solid solid, IEnumerable<(string Name, Vector3 At)> probes, int face, Rgb colour, string what, bool narrow)
     {
@@ -274,55 +265,6 @@ internal sealed class KnifeStage : ICutsStage
         }
     }
 
-    private static (int Lo, int Hi)[] Edges(Solid solid, IEnumerable<int>? faces = null) =>
-        (faces ?? Enumerable.Range(0, solid.Faces.Length)).Where(f => !solid.IsDeleted(f))
-            .SelectMany(f => solid.Faces[f].Holes.Prepend(solid.Faces[f].Loop))
-            .SelectMany(l => l.Select((v, k) => (A: v, B: l[(k + 1) % l.Length])))
-            .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
-
-    private static float DistanceToSegment(Vector3 p, Vector3 a, Vector3 b)
-    {
-        var t = Math.Clamp(Vector3.Dot(p - a, b - a) / Vector3.Dot(b - a, b - a), 0, 1);
-        return Vector3.Distance(p, a + (t * (b - a)));
-    }
-
-    private static IEnumerable<string> Ids(IEnumerable<JsonElement> ids) => ids.Select(i => $"{i.GetInt32()}");
-
-    private static Vector3 ToVector(double[] d) => new((float)d[0], (float)d[1], (float)d[2]);
-
-    private static void Summary(string what, JsonElement result, int vertices, int faces, bool closed)
-    {
-        Equal($"{what}: vertices", vertices, result.GetProperty("vertices").GetInt32());
-        Equal($"{what}: faces", faces, result.GetProperty("faces").GetInt32());
-        Equal($"{what}: closed", closed, result.GetProperty("closed").GetBoolean());
-    }
-
-    /// <summary>
-    /// The ray test must give <paramref name="face"/> at every probe named <paramref name="name"/> it is sure of, and be
-    /// sure of at least <paramref name="least"/> of them.
-    /// </summary>
-    private static void Expect(ScenarioFrame frame, Camera camera, Solid solid, string name, int face, int least)
-    {
-        var sure = 0;
-        foreach (var (_, at) in Probes.Where(p => p.Name == name))
-        {
-            var (x, y) = camera.Pixel(at);
-            var seen = solid.Seen(camera, frame.Width, x, y);
-            if (seen == -2)
-            {
-                continue;
-            }
-
-            sure++;
-            Equal($"{frame.Name}: what the geometry shows at {name} {at} (pixel ({x}, {y}))", face, seen);
-        }
-
-        if (sure < least)
-        {
-            Note($"{frame.Name}: only {sure} probes on {name} were sure, fewer than {least}");
-        }
-    }
-
     /// <summary>Each face's shade, read at the first probe that surely shows it.</summary>
     private static Func<int, Rgb?> Shades(ScenarioFrame frame, Camera camera, Solid solid)
     {
@@ -339,43 +281,5 @@ internal sealed class KnifeStage : ICutsStage
         }
 
         return f => shades.TryGetValue(f, out var c) ? c : null;
-    }
-
-    /// <summary>
-    /// Every probe the camera surely shows as a face or the background, and more than 4 pixels from a drawn line: the
-    /// background where the ray meets nothing, else <paramref name="colourOf"/> the face it meets, and never the background.
-    /// </summary>
-    private static void Look(ScenarioFrame frame, Camera camera, Solid solid, Func<int, Rgb?> colourOf, (Vector2 From, Vector2 To)[] lines, string what)
-    {
-        Size(frame, 512, 512);
-        Corners(frame);
-        var tested = 0;
-        foreach (var (name, at) in Probes)
-        {
-            var (x, y) = camera.Pixel(at);
-            var seen = solid.Seen(camera, frame.Width, x, y);
-            if (seen == -2 || lines.Any(l => Checks.DistanceToSegment(new Vector2(x + 0.5f, y + 0.5f), l.From, l.To) < 4))
-            {
-                continue;
-            }
-
-            tested++;
-            if (seen == -1)
-            {
-                Background(frame, (x, y), $"{what}: {name} {at}, which a ray meets nowhere");
-                continue;
-            }
-
-            NotBackground(frame, (x, y), $"{what}: {name} {at}, face {seen}");
-            if (colourOf(seen) is { } colour)
-            {
-                Colour(frame, (x, y), colour, Exact, $"{what}: {name} {at}, face {seen}");
-            }
-        }
-
-        if (tested < 40)
-        {
-            Note($"{frame.Name}: only {tested} probes were surely a face or the background");
-        }
     }
 }
