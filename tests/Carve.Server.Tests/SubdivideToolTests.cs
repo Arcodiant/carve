@@ -52,6 +52,30 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
     }
 
     [Fact]
+    public async Task After_a_delete_the_report_counts_live_triangles_and_created_names_the_appended_block()
+    {
+        var (carve, tools) = await StartAsync();
+        using var _ = carve;
+        Ok(await carve.CallToolAsync("define_mesh", Cube(tools)));
+        Ok(await carve.CallToolAsync("delete", """{"faces":[3]}"""));
+
+        var body = Ok(await carve.CallToolAsync("subdivide", """{"levels":1}"""));
+
+        // Five live quads make 20 quads, 40 triangles; the deleted face's slot makes none.
+        Assert.Equal(40, body.GetProperty("triangles").GetInt32());
+        // Face points 8..13 (11 is the deleted face's, a tombstone), then 12 edge points 14..25.
+        var created = body.GetProperty("created").GetProperty("vertices");
+        Assert.Equal(8, created.GetProperty("first").GetInt32());
+        Assert.Equal(18, created.GetProperty("count").GetInt32());
+
+        var mesh = Ok(await carve.CallToolAsync("get_mesh", "{}"));
+        var slots = mesh.GetProperty("vertices").EnumerateArray().ToArray();
+        Assert.Equal(26, slots.Length);
+        Assert.Equal(JsonValueKind.Null, slots[11].ValueKind);
+        Assert.NotEqual(JsonValueKind.Null, slots[8].ValueKind);
+    }
+
+    [Fact]
     public async Task Past_5000_triangles_the_result_warns_and_still_subdivides()
     {
         var (carve, _) = await StartAsync();
