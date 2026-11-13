@@ -327,7 +327,7 @@ public static class MeshEdits
                 "this face has holes, and subdivide does not take a face with holes")).ToList());
 
         var level = new Subdivision.Level(mesh.Vertices.ToArray(), mesh.Faces.Select(f => f.Loop.ToArray()).ToArray(),
-            mesh.Style, mesh.Weights, mesh.Shade);
+            mesh.Style, mesh.Weights, mesh.Shade, mesh.Uvs);
         for (var i = 0; i < levels; i++) level = Subdivision.Once(level);
 
         // Tombstones stay tombstones: a deleted face's slot, and the face point each level makes for it, which no face uses.
@@ -337,7 +337,7 @@ public static class MeshEdits
             .Where(v => mesh.IsVertexDeleted(v) || (v >= mesh.Vertices.Count && !used[v])).ToArray();
         var result = PolygonMesh.Create(level.Vertices, level.Faces.Select(f => f.Length == 0 ? Face.Deleted : (Face)f), gone);
         if (!result.Succeeded) return EditResult.Refused(result.Errors);
-        var made = result.Mesh!.WithStyle(level.Style).WithWeights(level.Weights).WithShade(level.Shade);
+        var made = result.Mesh!.WithStyle(level.Style).WithWeights(level.Weights).WithShade(level.Shade).WithUvs(level.Uvs);
         var moved = mesh.LiveVertices.Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
         return EditResult.Made(made, moved,
             Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).Where(v => !made.IsVertexDeleted(v)).ToArray(),

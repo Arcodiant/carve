@@ -32,6 +32,32 @@ internal static class TestMeshes
     public static PolygonMesh Cube() => Make(CubeVertices, CubeFaces);
 
     /// <summary>
+    /// The barrel (T-53, M-6's UV sample): eight sides and five rings at y = 0, 0.1, 0.5, 0.9 and 1.0, radii 0.36, 0.38,
+    /// 0.42, 0.38 and 0.36. Ring i's vertex k (id 8i + k) is at angle a = 2πk/8, at (r cos a, y, -r sin a) rounded to 6
+    /// decimals; side faces 0..31 are [8i+k, 8i+(k+1)%8, 8(i+1)+(k+1)%8, 8(i+1)+k], the bottom cap (32) is [7, 6, ..., 0]
+    /// and the top cap (33) [32, 33, ..., 39]. No UVs and no seams.
+    /// </summary>
+    public static PolygonMesh Barrel()
+    {
+        double[] ys = [0, 0.1, 0.5, 0.9, 1.0];
+        double[] radii = [0.36, 0.38, 0.42, 0.38, 0.36];
+        var vertices = new List<Vector3>();
+        for (var i = 0; i < 5; i++)
+            for (var k = 0; k < 8; k++)
+            {
+                var a = 2 * Math.PI * k / 8;
+                vertices.Add(new Vector3((float)Math.Round(radii[i] * Math.Cos(a), 6), (float)ys[i], (float)Math.Round(-radii[i] * Math.Sin(a), 6)));
+            }
+        var faces = new List<int[]>();
+        for (var i = 0; i < 4; i++)
+            for (var k = 0; k < 8; k++)
+                faces.Add([8 * i + k, 8 * i + (k + 1) % 8, 8 * (i + 1) + (k + 1) % 8, 8 * (i + 1) + k]);
+        faces.Add([7, 6, 5, 4, 3, 2, 1, 0]);
+        faces.Add([32, 33, 34, 35, 36, 37, 38, 39]);
+        return Make(vertices, faces);
+    }
+
+    /// <summary>
     /// The leaky shed: a gabled house with every fault once, for check and select to find. samples/leaky-shed.carve is
     /// this mesh, kept equal by a test. T-27 and T-28 build on these ids; T-23's As built lists them.
     /// Vertices 3 and 9 are not an edge: T-28's planted mistake.
