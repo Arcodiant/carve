@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-33 — Third review of M-5
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-5
 
@@ -43,7 +43,9 @@ description: >-
 
 The same probe against Core built from 458ca57 (outside the worktree) refuses none of these, and a direct `FaceSplit.Split` of the rotated rectangle at 0.3 splits it. So the fix turns ordinary loop cuts on any tilted or subdivided surface into refusals that name a crossing that is not there. The crossing test should leave out the entry and exit edges, or use the tolerance as `Overlaps` does. No test has a loop cut on a quad that is not axis-aligned.
 
-**Outcome:** —
+**Outcome:** fixed
+
+In 38a3d87. the same exact-sign defect found in the knife's corner splitting (Knife.Runs, round 1) and fixed (a5a5d79). Both had a break (breaks.log 1, 1b). FaceSplit (AlongBoundary, PartlyAlong, Pieces) tested on rotated input: no defect, its guard test passes before and after (no break).
 
 ### The Retrospective's round-2 paragraph says every fix had a break, but the load-test fix had none
 
@@ -56,7 +58,9 @@ The same probe against Core built from 458ca57 (outside the worktree) refuses no
 - A 20, B 9, orchestrator 1;
 - three and two fixer agents.
 
-**Outcome:** —
+**Outcome:** fixed
+
+In 4c6cacf: the round-2 line now says four of five fixes had a break and the assert removal had none, as RV-32's breaks.log has it, and round 3 is added.
 
 ### `loop_cut`'s "passes through its corner" refusal cannot be reached, yet T-66's As built quotes it
 
@@ -64,7 +68,9 @@ The same probe against Core built from 458ca57 (outside the worktree) refuses no
 
 `src/Carve.Core/LoopCut.cs:149-151` and `docs/tasks/T-66-loop-cut.md:83` (new in 094714e). In a quad, every corner is an end of the entry edge or the exit edge. Say a cut passes through corner c, more than the tolerance from its ends p and q. Then the part from c to the end on c's edge lies along that edge, and the `Overlaps` test before it returns "runs along its edge" first. For example, the RV-32 dart from edge (0, 1) at 1/3 passes through corner 2, and it is reported as `runs along its edge [2, 3]`. The branch is dead. As built nevertheless gives `passes through its corner 2` as a message `loop_cut` produces, and `LoopCut`'s remarks (`:25-27`) list it. No test reaches it.
 
-**Outcome:** —
+**Outcome:** fixed
+
+In 800ca13. confirmed unreachable after fix 1, removed, LoopCut's remarks and T-66's As built corrected in place. No break: dead code removed.
 
 ### `loop_cut`'s description does not name the new refusal
 
@@ -72,7 +78,9 @@ The same probe against Core built from 458ca57 (outside the worktree) refuses no
 
 `src/Carve.Server/LoopCutTool.cs:23`. The "Bad input" list names a pair that is not an edge, no quad, a Mobius band and a bad `at`. It doesn't mention the refusal 094714e adds: a cut that runs along or crosses an edge of a concave quad. An agent reading the description is not told that a ring through a concave quad can be refused. (The list also leaves out the non-manifold and self-crossing ring refusals, from before this round.)
 
-**Outcome:** —
+**Outcome:** fixed
+
+In 3d942c8. Had a break (LoopCutToolTests failed before the change).
 
 ### `AlongBoundary` keeps its old midpoint summary above the new one
 
@@ -80,7 +88,9 @@ The same probe against Core built from 458ca57 (outside the worktree) refuses no
 
 `src/Carve.Core/FaceSplit.cs:336-339`, new in 094714e. The new `<summary>` ("lies wholly along a loop ... A segment only partly along the boundary is not") was added below the old one ("its midpoint within tolerance of a boundary edge") instead of replacing it. So the method now carries two summaries, and the first describes the midpoint test that RV-32 had removed.
 
-**Outcome:** —
+**Outcome:** fixed
+
+In 1b1581e. No break: a doc comment.
 
 ### The x-mirrored +y tile gap that RV-32 raised is not recorded with the -y known limit
 
@@ -88,7 +98,9 @@ The same probe against Core built from 458ca57 (outside the worktree) refuses no
 
 `docs/milestones/M-5-cut.md:199`. This concerns RV-32 "The -y axis tile still has no check that its camera can fail". The finding also said "The same holds for an x-mirrored +y": the roof is symmetric in x, so `FromAbove` and the shade probes pass a mirrored +y. The person's ruling and the Never-verified entry cover only the -y tile, and say "only a swap with +y is caught". That answer holds for -y. But the +y mirror gap the finding named is neither answered nor recorded.
 
-**Outcome:** —
+**Outcome:** fixed
+
+In 4c6cacf: recorded beside the -y known limit in Never verified.
 
 ## Summary
 
