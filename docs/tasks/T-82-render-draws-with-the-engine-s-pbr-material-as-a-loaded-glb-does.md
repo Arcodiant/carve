@@ -68,3 +68,12 @@ The break column was worked on this run's frames (a frame mirrored or flipped, o
 **Review:** the person approved both sets (round 1, `C:\Users\andre\artifacts\carve\M-19\T-82\round-1`), with a note on the first: "These all look good - do we get a sky texture to show reflections?" Not done here: the scene has no environment map, and at metallic 0, roughness 1 the material reflects little; left to the person as a question.
 
 **Not checked:** the brim thresholds over the hat's own geometry; the break column by product breaks.
+
+### Hand-off
+
+Third agent, on Opus 5.5, stopped at the 60-call checkpoint. Everything in As built above is done and committed: the soft-rims point (cube passes), the torso span and backing re-derived from the model, the full local run with hashes (all `.glb` and `.carve` byte-identical), both review sets approved, `artifacts/base-src` removed, `cairn lint` clean. The person's note on review set 1, "do we get a sky texture to show reflections?", is unanswered; put it to them (not in scope here).
+
+**Left: `verify` fails on `server-regression`**, two unit-of-render tests the scenarios do not cover (log `C:\Users\andre\AppData\Local\Temp\cairn-test\T-82-J-20261113-090138-459480-20261113-041134-12416.log`):
+- `RenderTests.A_cube_shows_three_faces_in_the_expected_order_on_the_background` (front): "(145, 145, 143) then (137, 137, 136)". `RenderTests.cs` line 12 has its own `MinimumStep = 10`; the person's first ruling ("MinimumStep goes from 10 to about 6") names this constant, and the model's cube front steps by 8 (158 / 147 / 139), so 6 looks within the ruling; check the back view's figures too (cube-back 159 / 148 / 118 measured) and that `low.G >= 53 + MinimumStep` still holds.
+- `NamedMeshTests.Render_labels_and_highlights_the_named_mesh_alone_by_its_own_ids`, line 336: "the tall box's front face is not orange". The highlight is now a PBR-shaded tint (ruling 2), so `IsOrange`'s rule must be re-worked from the model for that face (its n.l under the test's camera, the orange tint as albedo). If the rule has to loosen beyond what ruling 2 covers, ask.
+Then `verify` again, add these two to As built's table (derivation and break), `finish`.
