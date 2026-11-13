@@ -4,7 +4,7 @@ description: >-
 ---
 # B-3 — loop_cut does not refuse a ring that closes on itself reversed (a Mobius band of quads)
 
-**Status:** In Progress
+**Status:** Fixed
 
 **Severity:** Minor
 
