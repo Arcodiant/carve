@@ -190,10 +190,11 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
   An Opus fixer fixed the four code findings. The `loop_cut` check and the description got breaks, and the removed unreachable refusal and a stale doc comment got none. It also found and fixed the same exact-sign defect in the knife's corner splitting from round 1, with rotated-input tests shown failing. `PlaneCut` and code older than round 1 were not searched for it. All 187 frames stayed byte-identical.
 
 - **Review round 4 (RV-34)** had one Opus reviewer. All 6 of RV-33's answers held, and it probed `PlaneCut` on a cube and on a cube subdivided twice, under 200 rotations, finding no exact-sign defect. It raised 2 findings:
-  - **Minor:** RV-33's `loop_cut` fix lets a few real crossings on nearly degenerate concave quads reach `FaceSplit`, which refuses them as `cuts[0]` rather than in `loop_cut`'s words. No cut is made wrongly.
+  - **Minor:** RV-33's `loop_cut` fix lets real crossings of a concave quad's side edge reach `FaceSplit` when an end of the cut is within the tolerance of that edge: near the reflex corner, or along a thin arm. On RV-34's test quads that was 0.9996 to 0.9997 on the dart (in all 300 rotations), 258 and 1276 of 1999 fractions on two thin darts, and 0.9975 to 0.9997 on one that is not thin. These cuts reach `FaceSplit`, which refuses them as `cuts[0]` rather than in `loop_cut`'s words. No cut is made wrongly.
   - **Nit:** this Retrospective said a wrong-up +y tile is caught, which no break showed.
 
   The person ruled to file the Minor as B-4 and finish. The orchestrator fixed the Nit.
+- **Review round 5 (RV-35)** read the documents only, with one Opus reviewer. Both of RV-34's answers held, and it found 2 Nits in this Retrospective (B-4's extent understated, and `PlaneCut` called unsearched after RV-34 had probed it). The orchestrator fixed both.
 
 **Never verified.**
 
@@ -208,14 +209,14 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
   - `viewer-cube` was carried from `99c846e` (T-63) through most members, though it ran fresh in the milestone's `verify`.
   - T-63 to T-68 each hashed frames from the run of their last code commit, not from their final notes-only commit.
 - **The gatehouse's -y axis tile, seen from below,** shows only two downward faces of one shade inside a plain rectangle. A -y view drawn mirrored or with the wrong up passes; only a swap with +y is caught. The person kept the approved frame and recorded this as a known limit (RV-32). Likewise, a +y tile mirrored in x passes, and only a swap with -y was shown failing. RV-32's reviewer reasoned that a 180-degree wrong up is caught too, but no break showed it (RV-32, recorded in RV-33 and RV-34).
-- **The exact-sign pattern behind RV-33's Major** was searched for and fixed only in the code rounds 1 and 2 added (`loop_cut`, the knife's corner splitting, `FaceSplit`). `PlaneCut` and older code were not searched.
+- **The exact-sign pattern behind RV-33's Major** was searched for and fixed only in the code rounds 1 and 2 added (`loop_cut`, the knife's corner splitting, `FaceSplit`). The round-3 fixer did not search `PlaneCut`. RV-34 then probed it on a cube and on a cube subdivided twice, under 200 rotations, and found no such defect; concave input was not probed. Code older than round 1 was not searched.
 - **Machines:** any GPU but Mantorok's and Xellotath's (both RTX 5070), and any client but `claude -p`.
 - **The installed carve:** `C:\tools\carve` has not been republished.
 - The orchestrator opened no frame. Every look above is a member's or the person's.
 
 **Known and left.**
 
-- B-4: `loop_cut` names `cuts[0]` instead of refusing in its own words on nearly degenerate concave quads (from RV-34). It is off-milestone and Minor: no cut is made wrongly, only the wording is wrong.
+- B-4: `loop_cut` names `cuts[0]` instead of refusing in its own words when a cut across a concave quad really crosses a side edge that an end of the cut is within the tolerance of (from RV-34; the failing inputs are in B-4). It is off-milestone and Minor: no cut is made wrongly, only the wording is wrong.
 - `CLAUDE.md` and `README.md` are inputs of no suite (a `verify` warning).
 - `branches/task/T-63` to `T-70` remain on disk, unregistered from git: `finish` ran from inside each one and could not remove it.
 - `%TEMP%\carve-m5-acceptance\` (two rounds and a Release publish of `carve`) and the members' scratch folders in `%TEMP%` (`t63` to `t70`) are not cleared.
