@@ -87,4 +87,20 @@ public sealed class LoopCutToolTests() : TempFolderTests("carve-loop-cut")
         Assert.Equal(8, after.GetProperty("vertices").GetArrayLength());
         Assert.Equal(6, after.GetProperty("faces").GetArrayLength());
     }
+
+    [Fact]
+    public async Task The_description_names_the_refusal_of_a_cut_along_or_over_an_edge_of_a_concave_quad()
+    {
+        // RV-33: the refusal RV-32 added is a bad input the description lists, in the words the tool error uses.
+        using var carve = new CarveProcess([], workingDirectory: Root);
+        await carve.InitializeAsync();
+        var tools = await carve.ListToolsAsync();
+        Assert.Contains("a cut across a quad that runs along or crosses one of its edges (a concave quad can make one)",
+            ToolList.Description(tools, "loop_cut"));
+
+        Ok(await carve.CallToolAsync("define_mesh", """{"vertices":[[0,0,0],[4,0,0],[1,1,0],[0,4,0]],"faces":[[0,1,2,3]]}"""));
+        var refused = await carve.CallToolAsync("loop_cut", """{"edge":[0,1],"at":[0.5]}""");
+        Assert.True(IsError(refused));
+        Assert.Contains("the cut at 0.5 across faces[0] crosses its edge [1, 2]; loop_cut cuts only across a quad", TextOf(refused));
+    }
 }
