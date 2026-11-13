@@ -4,7 +4,7 @@ description: >-
 ---
 # T-82 — render draws with the engine's PBR material, as a loaded .glb does
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
