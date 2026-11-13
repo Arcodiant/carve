@@ -59,6 +59,32 @@ public class LoopCutTests
     }
 
     [Fact]
+    public void ARingThatCrossesItselfIsRefusedAsCrossingNotAsReversed()
+    {
+        // Face 0 is the unit square; the strip leaves its right side (edge 1-2), runs round the inner square 5 and comes
+        // back down into face 0 across its top (edge 3-2), the other pair of its sides.
+        var v = new Vector3[]
+        {
+            new(0, 0, 0), new(1, 0, 0), new(1, 1, 0), new(0, 1, 0), new(3, 0, 0),
+            new(2, 1, 0), new(3, 3, 0), new(2, 2, 0), new(0, 3, 0), new(1, 2, 0),
+        };
+        var faces = new[]
+        {
+            new Face([0, 1, 2, 3]), new Face([1, 4, 5, 2]), new Face([4, 6, 7, 5]),
+            new Face([6, 8, 9, 7]), new Face([8, 3, 2, 9]), new Face([2, 5, 7, 9]),
+        };
+        var made = PolygonMesh.Create(v, faces);
+        Assert.True(made.Succeeded, string.Join("; ", made.Errors));
+
+        var r = LoopCut.Cut(made.Mesh!, (1, 2), [0.5]);
+
+        Assert.False(r.Edit.Succeeded);
+        var e = Assert.Single(r.Edit.Errors);
+        Assert.Equal("edge", e.Element);
+        Assert.Equal("the ring from edge [1, 2] comes back into face 0, which it has already crossed, across edge [3, 2]: loop_cut does not cut a ring that crosses itself", e.Message);
+    }
+
+    [Fact]
     public void AnOrdinaryClosedRingStillCutsUnchanged()
     {
         var r = LoopCut.Cut(TestMeshes.Cube(), (0, 3), [0.5]);
