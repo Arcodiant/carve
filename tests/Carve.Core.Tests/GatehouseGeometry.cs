@@ -246,6 +246,24 @@ public class GatehouseGeometry
         }
     }
 
+    /// <summary>
+    /// The sheet's +y and -y tiles (256 px, orthographic, up -Z as <c>render</c> has it for a view along Y): what the ray test
+    /// is sure of, and the faces it shows. From above the roof (26, 27) and the cornice's top (15); from below the slab's bottom
+    /// (2) and the cornice's underside (17), which share a normal. The scenario holds both frames to these faces' shades.
+    /// </summary>
+    [Theory]
+    [InlineData("+y", 46, "15 26 27")]
+    [InlineData("-y", 46, "2 17")]
+    public void TheAxisTilesAlongYShowTheRoofFromAboveAndTheBottomFromBelow(string view, int sure, string faces)
+    {
+        var solid = SolidOf(Mesh(7));
+        var (min, max) = GatehousePlan.Bounds(solid);
+        var camera = new Camera(min, max, view == "+y" ? Vector3.UnitY : -Vector3.UnitY, 256, orthographic: true, up: -Vector3.UnitZ);
+        var seen = GatehousePlan.Probes(solid).Select(p => camera.Pixel(p.At) is var (x, y) && p.Narrow ? solid.SeenNarrow(camera, 256, x, y) : solid.Seen(camera, 256, x, y)).ToArray();
+        Assert.Equal((sure, faces), (seen.Count(s => s != -2), string.Join(" ", seen.Where(s => s >= 0).Distinct().Order())));
+        Assert.True(sure >= 10, "the scenario's Look needs ten sure probes in a tile");
+    }
+
     [Fact]
     public void TheDoorIsSeenFromTheFrontOnlyAndLeftOfTheWindow()
     {

@@ -179,14 +179,48 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
             RequireWhite(sheet, (left + 4, top + 4, 16, 16), $"tile {Views[tile]}'s caption");
             var single = await driver.CaptureAsync($"gate-7-axis-{(Views[tile][0] == '+' ? "plus" : "minus")}{Views[tile][1]}-ortho-256", new { view = Views[tile], projection = "orthographic", size = Tile });
             Tiled(sheet, left, top, single, Views[tile].Length, Views[tile]);
-            if (Views[tile][1] is 'y')
+            var direction = Views[tile] switch
             {
-                continue;
-            }
-
-            var direction = Views[tile] switch { "+x" => Vector3.UnitX, "-x" => -Vector3.UnitX, "+z" => Vector3.UnitZ, _ => -Vector3.UnitZ };
-            var camera = new Camera(min, max, direction, Tile, orthographic: true);
+                "+x" => Vector3.UnitX, "-x" => -Vector3.UnitX, "+y" => Vector3.UnitY, "-y" => -Vector3.UnitY, "+z" => Vector3.UnitZ, _ => -Vector3.UnitZ,
+            };
+            var camera = new Camera(min, max, direction, Tile, orthographic: true, up: Views[tile][1] is 'y' ? -Vector3.UnitZ : null);
             Look(single, solid, camera, GatehousePlan.Probes(solid), 7, Views[tile], doorFace, [], Tile);
+            if (Views[tile] == "+y")
+            {
+                FromAbove(single, solid, camera);
+            }
+        }
+    }
+
+    /// <summary>
+    /// From above, the cornice's top (+Y) has no face of its normal (the slab's top is cut away), so, as T-67 rules for the
+    /// pocket's slanted walls, each sure probe on it must differ from the roof's shade by more than <see cref="Checks.Exact"/>
+    /// in some channel. From below the cornice's underside and the slab's bottom share a normal, which <see cref="Look"/>
+    /// holds to one shade; together the two fail a +y and -y swapped, or a view along Y with the wrong up.
+    /// </summary>
+    private static void FromAbove(ScenarioFrame frame, Solid solid, Camera camera)
+    {
+        var live = Enumerable.Range(0, solid.Faces.Length).Where(f => !solid.IsDeleted(f)).ToArray();
+        var cornice = live.Single(f => solid.Normal(f).Y > 0.9999f && solid.Faces[f].Loop.All(v => solid.Vertices[v].Z > 0.15f - 1e-4f));
+        var roof = live.Where(f => solid.Normal(f) is { Y: > 0.5f and < 0.99f }).ToArray();
+        Equal($"{frame.Name}: the roof's faces", 2, roof.Length);
+        var probes = GatehousePlan.Probes(solid).Select(p => (p, at: camera.Pixel(p.At), seen: p.Narrow ? solid.SeenNarrow(camera, Tile, camera.Pixel(p.At).X, camera.Pixel(p.At).Y) : solid.Seen(camera, Tile, camera.Pixel(p.At).X, camera.Pixel(p.At).Y))).ToArray();
+        var roofShades = probes.Where(t => roof.Contains(t.seen)).Select(t => Pixel(frame, t.at.X, t.at.Y)).ToArray();
+        var sure = 0;
+        foreach (var (probe, (x, y), seen) in probes.Where(t => t.p.Face == cornice && t.seen != -2))
+        {
+            sure++;
+            Equal($"{frame.Name}: what the geometry shows at the cornice's top {probe.Name} {probe.At} (pixel ({x}, {y}))", cornice, seen);
+            var p = Pixel(frame, x, y);
+            foreach (var r in roofShades.Where(r => Math.Abs(p.R - r.R) <= Exact && Math.Abs(p.G - r.G) <= Exact && Math.Abs(p.B - r.B) <= Exact))
+            {
+                Note($"{frame.Name}: the cornice's top {probe.Name} at ({x}, {y}) is {p}, within {Exact} of the roof's {r} in every channel: not the top seen from above");
+            }
+        }
+
+        if (sure < 1 || roofShades.Length == 0)
+        {
+            Note($"{frame.Name}: {sure} sure probes on the cornice's top and {roofShades.Length} on the roof; the check needs one of each");
         }
     }
 
