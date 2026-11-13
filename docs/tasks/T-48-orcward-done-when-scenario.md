@@ -4,7 +4,7 @@ description: >-
 ---
 # T-48 — Orcward done-when scenario
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
