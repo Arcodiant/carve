@@ -130,3 +130,28 @@ All fourteen as recommended:
 - **Rule 11:** unmapped faces are left out of the layout, and the caption counts them.
 - **Rule 13:** the bright-pixel tolerance comes from a probe frame that the person sees before it is used.
 - **The rest:** as written above.
+
+### Hand-off
+
+Written 2026-11-13 by Claude Opus 5.5 (`claude-opus-5-5`) at the first checkpoint (about 55 tool calls), on `task/T-58` from `milestone/M-6` at `543f4ad`.
+
+**Done (committed, builds warnings-free, server unit tests 287/287 pass locally):**
+
+- `src/Carve.Server/UvLayout.cs` (new): `UvWindow` (`Of(mesh, faces)`, the window rule as planned: unit square ∪ mapped faces' UV bounds, holes too, side × 8/7, centred; `Pixel(uv, size)`, `World(uv, z)`); `UvLayout.Compose(mesh, ElementWindow, Highlight)` gives `UvScene` (the ground quad, its UVs the window's corners, vertex colour `GroundVertex` = byte 34; each mapped face's triangles at their UVs, wound toward the camera by signed area, white; a highlighted face's corners all at `CheckerTexture.WhiteCentre` with the orange vertex colour, so solid orange; white lines for every mapped face's loops plus the unit-square border at z 0.02; seams `#FFD800` = linear `(1, 0.6867, 0)` at z 0.03 on each side); `Lines`, `LabelPoint` (area centroid of the outer UV loop, mean on no area), `FaceLabels`, `Mapped`.
+- `Look.Uvs` (`LookMeshes.cs`); `RenderSpec.UvFaces` (`RenderQueue.cs`); `LookHolder` keyed also on the face range, with a fourth slot (seam lines) and `IParts.Make(..., faces)` / `Install(..., seams)` (`LookHolderTests`' fake updated).
+- `RenderSystem`: `Make` for `Uvs` (the unlit material `new Material(MaterialFlags.Textured, Vector4.One, Checker, ...)`, lazy); `Swap` takes each slot's colour from a per-colour material cache (white edges in `uvs`, grey otherwise; the same material object per colour as before); `ApplyLayoutView` (eye (0,0,5), up +Y, `CreateOrthographic(W, W, 1, 10)`); `DrawOverlay` always runs for `uvs`, with `LabelLayout.UvLabels` (corner labels diagonally off each corner, `CornerGap` 3 px, then face ids centred).
+- `RenderTool`: `mode: "uvs"` branches to `RunUvs` right after the unknown-argument check: thirteen refusals (`view`, `direction`, `zoom` other than 1, `target`, `projection`, `views`, `columns`, `pose`, `clip`, `time`, `bones`, `bone_labels`, `weights`), each "`<arg>: not with mode 'uvs'; <why>`", collected with size, labels (`vertices`/`both` → "labels: 'vertices' is not drawn in mode 'uvs'; use 'faces' or 'none'") and highlight edges/vertices ("highlight: only faces in mode 'uvs'; ...") into one `Failed("render", ...)`; `mesh` required among several (`Target`'s error + "; mode 'uvs' draws one mesh's layout"); no mapped face → "mesh '<name>' has no UVs; give it some with set_uvs, project_uvs or unwrap"; caption `UvCaption`: `512x512, uvs <mesh>[, labels faces][, highlight N faces][, N faces unmapped], V vertices, F faces` (the named mesh's counts). Mode error text now "use 'shaded', 'wireframe', 'normals', 'checker' or 'uvs'." (two tests updated); the descriptions (tool text, `mode`, `mesh`) carry the content paragraph and worked example.
+- `tests/Carve.Server.Tests/UvLayoutLookTests.cs` (regression): the probe only so far. Passes locally.
+
+**Probe and rule 13 (round 1, approved by the person, 2026-11-13, no notes):** unlit textured draws (no engine need). Inside the square each pixel equals its texel's byte exactly; the margin's ground equals sRGB-encode(decode(texel) × 34/255) exactly (white → 102); both differences 0 over 46 pixels. The four window corners sit under the corner labels' backings. Approved tolerance: bright = texel byte ±2 per channel, dim = predicted dimmed byte ±2. Files: `G:\My Drive\artifacts\carve\M-6\T-58\round-1\probe.png`, `probe-pixels.txt`.
+
+**Hash-guard baseline:** at base `ce991c3` the five guard suites were submitted; cube, crate, export and character were carried passes (T-57's runs, same inputs), shed queued as `J-20261113-180202-e89fc9`. Artifacts of the four carried are in the milestone worktree's `artifacts/review/T-58/baseline/<suite>/`; fetch shed's by job id. Note that the guard compares against these.
+
+**Left:**
+
+1. Unit tests (`UvWindow.Of`: unit square, grown each way, non-square kept square and centred, holes counted; composition: triangle UVs/positions, a flipped face wound toward the camera, ground UVs = window, seam lines on both sides, border; `LabelPoint`; `UvCaption`).
+2. Regression tests in `UvLayoutLookTests`: each refusal, the no-UV error, two meshes with and without `mesh`, `labels: vertices` refused, sizes 256/512/1024 by image and caption, a shaded frame byte-equal before and after a `uvs` one; and rule 2's barrel test on `samples/barrel.carve` (empty bottom-right dim, the side strip bright, seam yellow near u 0.03 and 0.96).
+3. The crate stage `scenarios/Carve.Scenario.Crate/CrateUvLayout.cs` after `CrateChecker` (rule 1: `project_uvs box`), with `UvLayoutPixels.cs` and a seam class in `CheckerColours.cs`; frames `crate-uvs`, `-256`, `-1024`, `-labels`, `-highlight`, `-grown`, `crate-front-after-uvs`; checks as the Plan, tolerance ±2 as approved.
+4. Broken-product table, hash guard, `verify`, the frames' review (round 2), `### As built`, `CLAUDE.md`'s crate row, `cairn lint`, `finish`.
+
+**Surprising:** nothing yet. Python scripts used for edits are in the milestone worktree's `artifacts/review/T-58/scripts/`.
