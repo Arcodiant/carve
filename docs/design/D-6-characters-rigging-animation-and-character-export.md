@@ -117,6 +117,8 @@ A looping clip whose channels do not end as they start is a warning, as is a cli
 
 Carve's preview poses on the CPU in `Carve.Core` and draws the result as a plain mesh. `render_glb` loads the exported file through the engine's own loader and draws it with GPU skinning. The two share no skinning code, so a frame that matches proves the export and not only a path agreeing with itself.
 
+They do share the material, by the person's ruling (2026-11-12, T-82: "render goes PBR"): the preview draws each colour with the engine's PBR material and the very parameters the loader makes from the exported file (metallic 0, roughness 1), in the same scene light, so the two agree in shading and differ only where the posing does. A highlighted face in the shaded look follows the surface's PBR shading (ruled 2026-11-13). At T-82 a `render` and a `render_glb` of the gardener at rest and in Walk at 0.5 s differed in no pixel past 8/255 (under `Material.LitMesh`: 15.0 % and 12.1 %).
+
 **Alternatives:** drawing previews through the engine's skinning, which is one path and proves less.
 **Would change if:** matching the engine's interpolation exactly costs more than it proves.
 

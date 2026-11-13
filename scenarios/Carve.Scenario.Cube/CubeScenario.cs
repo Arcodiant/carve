@@ -23,8 +23,15 @@ public sealed class CubeExtension : ICarveExtension
 /// </summary>
 public sealed class CubeScenario : IScenario
 {
-    /// <summary>Faces must differ in the green channel by at least this much, in the expected order.</summary>
-    private const int MinimumStep = 10;
+    /// <summary>
+    /// Faces must differ in the green channel by at least this much, in the expected order. 6 since T-82 (10 before), by the person's
+    /// ruling of 2026-11-13: under the engine's PBR material the directional light reaches a face as albedo / pi (Lambert's diffuse term,
+    /// the light's intensity unscaled) while the ambient floor is unchanged, so through the sRGB encoding each step the light makes is
+    /// about 0.4 to 0.45 of what it was. Worked from the faces' n.l (cube front: top 0.78, +Z 0.52, +X 0.35; the grey 0.72, ambient 0.25,
+    /// light 0.9), the closest pair, +Z over +X, now steps by 8 (19 under LitMesh), so 10 would fail a correct frame; 6 keeps 2 of headroom
+    /// and still fails two faces drawn in one shade (a step of 0) or in the wrong order.
+    /// </summary>
+    private const int MinimumStep = 6;
 
     // Fewest non-background pixels each 512 x 512 frame may show, about half its measured count:
     // L-block back 94,688, long box 28,563, flipped cube 53,660. The L-block front's 88,829 gets 56%,

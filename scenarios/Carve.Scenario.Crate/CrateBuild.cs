@@ -172,8 +172,12 @@ internal static class CrateBuild
         }
     }
 
-    /// <summary>Faces must differ in the green channel by at least this much (10/255, as in M-1).</summary>
-    public const int MinimumStep = 10;
+    /// <summary>
+    /// Faces must differ in the green channel by at least this much: 6/255 since T-82 (10 in M-1), by the person's ruling of 2026-11-13,
+    /// worked as the cube scenario's <c>MinimumStep</c> is: under the engine's PBR material a step the light makes is about 0.4 to 0.45 of
+    /// LitMesh's, and the cube's closest face pair (+Z over +X from the front) steps by 8.
+    /// </summary>
+    public const int MinimumStep = 6;
 
     // front: the top, +Z and +X frame faces in M-1's order (brightest first), each in the middle of its
     // 0.12 frame band: the top frame's left band, the +Z frame's left band, the +X frame's near band.

@@ -40,7 +40,11 @@ Every plan, for a milestone or a task, keeps these:
 - **Stdout belongs to MCP.** On the stdio transport nothing but protocol goes to
   stdout; logs go to stderr or the temp folder.
 
-- **Renders are Empyrean's**, so a screenshot shows the model as the game would.
+- **Renders are Empyrean's**, so a screenshot shows the model as the game would:
+  the model's own colours are drawn with the engine's PBR material, made with the
+  parameters the loader makes from the exported `.glb`, so `render` and
+  `render_glb` agree in shading (D-1, D-6, T-82). The other looks keep their own
+  materials.
 - **The mesh is polygons**, triangles are a derived view for render and export, never stored. Work persists in a native
   Carve file; `.glb` is what reaches a game.
 - **The product has no window.** Every look is an offscreen render.

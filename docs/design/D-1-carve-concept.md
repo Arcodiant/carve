@@ -85,6 +85,16 @@ C#/.NET 10, with renders drawn by Empyrean itself, so a screenshot shows the mod
 as the game would. The kernel, `Carve.Core`, stays engine-free. Rendering needs a
 machine with a Vulkan device, even with no window.
 
+*Ruled by the person (2026-11-12, T-82):* every look that draws the model's own
+colour draws it with the engine's PBR material, with the parameters the engine's
+loader makes from Carve's exported `.glb` (base colour, metallic 0, roughness 1,
+single-sided), so the preview is shaded as the game shades the file. The scene's
+light is unchanged (ambient 0.25, a directional light of 0.9); under PBR its share
+of a lit face is about a third of what `Material.LitMesh` gave, and the scenarios'
+shade margins were lowered to match (2026-11-13). Wireframe, normals, UVs, weights,
+bones and labels keep their own materials; a highlighted face in the shaded look
+is a tint on the surface and is shaded through PBR with it.
+
 **Alternatives:** a small software rasteriser of our own, which runs anywhere and
 is byte-repeatable, but won't match the game.
 **Would change if:** Empyrean cannot run windowless inside a long-lived server

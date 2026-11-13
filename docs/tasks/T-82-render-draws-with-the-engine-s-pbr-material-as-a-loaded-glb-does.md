@@ -39,6 +39,38 @@ Carve's preview looks as the game will. T-47 found `render_glb` frames uniformly
 
 ### Hand-off
 
+Second agent, on Opus 5.5 (the first was Opus 5.5 too). Stopped on a question: under the person's ruling of 2026-11-13 the margins it names now hold, but seven other checks fail, which the ruling says to bring back rather than loosen.
+
+**The rulings of 2026-11-13** (recorded word for word from the options chosen):
+1. "Keep light, lower margins": "Keep the scene's light as it is. MinimumStep goes from 10 to about 6, and the soft facet and crease thresholds are re-derived for PBR. Loosens checks, by your ruling."
+2. On the highlight, "Yes, PBR-shaded tint": a highlighted face in the shaded look follows the surface's PBR shading, as the first agent built it.
+
+**Done since (committed):**
+- `MinimumStep` 10 to 6 in `CubeScenario.cs` and `CrateBuild.cs`, worked from the faces' n.l. The PBR model (grey 0.72, ambient 0.25 unchanged, directional 0.9 reaching a face as albedo / pi, sRGB-encoded readback) predicts the cube-front faces at 158 / 147 / 139 (measured 157 / 145 / 137; under LitMesh 216 / 190 / 171). The closest pair, +Z over +X, steps by 8, so 6 keeps 2 of headroom.
+- The soft thresholds scaled by the same factor (a step from the light is about 0.43 of LitMesh's): torso facet step flat 20 to 9 or more, smooth 12 to 5 or less; brim rim stage 10 to 4, break 20 to 9. On a local run these all pass (flat rest, smooth rest, hat creased and uncreased).
+- D-1 (*C# on Empyrean*), D-6 (*Two samplers, on purpose*) and `CLAUDE.md` (*Renders are Empyrean's*) record the ruling: the model's colours are drawn with the PBR material the loader makes from the export, the scene light unchanged, other looks keep their own materials, the highlight is a PBR-shaded tint.
+
+**Checked:** a local run of every scenario on this commit, then cube, crate and soft again with `ScenarioDriver.Fail` made non-fatal for one uncommitted local run (reverted), so every failing check showed, not only the first. shed, rig, export, character and viewer-cube pass. The crate's colour check passes.
+
+**The question: seven checks outside the ruling fail.** Values after (PBR):
+
+| Scenario | Frame | Check | Seen | Needs |
+|---|---|---|---|---|
+| cube | cylinder-flat, cylinder-smooth, cylinder-subdivided-smooth (ortho, dir 2,2,1) | the cap is one shade (exact pixel equality) | (164,164,161) vs (164,164,162): blue differs by 1 | equal |
+| cube | cylinder-flat, -smooth, -subdivided-smooth, -subdivided-soft-rims | the side at its two ends across the image (`MinimumStep`, the mirror guard) | 127 vs 131 (126 vs 130 soft rims): 4 | 6 |
+| cube | cylinder-smooth | the smooth side grades across one facet (`least: 3`) | 136 vs 134: 2 | 3 |
+| crate | crate-labels-both-front-1024, crate-labels-faces-dir-0.4-2-0.8 | the label backing darkens the lid by 60 or more | 157 to 103 (54), 166 to 109 (57); the backing's own rule, 0.4 of the linear value, gives exactly 103 and 109 | 60 |
+| soft | soft-smooth-rest-front | the smooth torso is a ramp: a run of equal shades of 5 or fewer | 7 (the ramp is shallower under PBR, so it holds a shade longer) | 5 or fewer; flat 10 or more |
+
+None is a break: each frame looks as PBR predicts, and the order of shades holds in every one. Ways out, for the person to choose per check:
+1. **Lower these too**, worked from PBR as the ones above were: the cylinder's end-to-end step to about 3 (or `MinimumStep` to 3 there only), the facet grade to 1 or 2, the cap's one-shade check to compare green only or allow 1, the backing to "darker by 45 or more" or a margin worked from the face's own shade (the 0.4-of-linear rule already holds exactly), the smooth torso's run to 7 or fewer (against flat's 10). The cylinder's 4 and the grade's 2 are well below the ruling's "about 6", so this is beyond it.
+2. **Move the cylinder's sampled points** to facets farther apart in n.l, so the end-to-end step comes back above 6 with the check's intent (a mirrored camera draws other facets) kept; and measure the torso's ramp over a span where the PBR gradient still steps every few pixels. Keeps the margins, changes what is sampled.
+3. **Raise the scene's directional light** (about pi times), which the ruling of 2026-11-13 declined; it would bring every margin back.
+
+**Left:** the person's answer; then the remaining checks, each changed check shown failing on its break (a table: `MinimumStep` 6 fails two faces drawn in one shade; the facet 9 fails a smooth torso, the smooth 5 a flat one; the rim break 9 fails an uncreased rim), `verify`, the waystone review of the new baselines (round-1, before and after), As built (the render vs render_glb table is in the first agent's notes below), remove `artifacts/base-src`, `finish`.
+
+**First agent's hand-off, kept for its figures:**
+
 First agent, on Opus 5.5. Stopped on a question (below); nothing about the frames is decided.
 
 **Done (committed):**

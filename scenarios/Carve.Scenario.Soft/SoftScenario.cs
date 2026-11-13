@@ -247,9 +247,15 @@ public sealed class SoftScenario : IScenario
         ExpectNot(driver, frame, mx, my, "can", "the can's mirror in the world (+X)");
     }
 
+    private const int FacetStep = 9;
+    private const int SmoothStep = 5;
+
     /// <summary>
     /// The torso, from the front, at the height 0.80 m: its octagon's two side facet edges (world x of plus and minus 0.1687). Flat, the
-    /// shade steps across each (30 and 31 on a 6 pixel span); soft, it runs on across them (5 to 9 on the same span).
+    /// shade steps across each; soft, it runs on across them. Under LitMesh the steps were 30 and 31 flat and 5 to 9 soft on a 6 pixel
+    /// span, against 20 and 12. Since T-82 the material is the engine's PBR one, whose directional light reaches a face as albedo / pi with
+    /// the ambient floor unchanged, so a step the light makes is about 0.43 of LitMesh's (the cube's faces, worked from their n.l): flat
+    /// about 13, soft 2 to 4. The bounds scale with it, by the person's ruling of 2026-11-13: 9 or more flat, 5 or less soft.
     /// </summary>
     private static void CheckTorso(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, bool flat)
     {
@@ -259,9 +265,9 @@ public sealed class SoftScenario : IScenario
             ExpectGroup(driver, frame, x - 3, y, "shirt", "the torso, left of a facet edge");
             ExpectGroup(driver, frame, x + 3, y, "shirt", "the torso, right of a facet edge");
             var step = Math.Abs(Luma(frame, x + 3, y) - Luma(frame, x - 3, y));
-            if (flat ? step < 20 : step > 12)
+            if (flat ? step < FacetStep : step > SmoothStep)
             {
-                driver.Fail($"{frame.Name}: across the torso's facet edge at ({x}, {y}) the shade steps by {step}; {(flat ? "a flat mesh steps by 20 or more" : "a smooth one runs on, by 12 or less")}");
+                driver.Fail($"{frame.Name}: across the torso's facet edge at ({x}, {y}) the shade steps by {step}; {(flat ? $"a flat mesh steps by {FacetStep} or more" : $"a smooth one runs on, by {SmoothStep} or less")}");
             }
         }
 
@@ -299,6 +305,12 @@ public sealed class SoftScenario : IScenario
         ExpectNot(driver, frame, Size - 1 - x, y, "can", "where a frame mirrored in X would show the can");
     }
 
+    // The rim's steps, scaled as the torso's are (T-82, the person's ruling of 2026-11-13): under LitMesh a creased rim broke by 28 in one
+    // pixel and an uncreased one rolled off in stages of 12, against a stage of 10 and a break of 20. At about 0.43 of that under PBR the
+    // break is about 12 and a stage about 5, so a stage counts from 4 and a break from 9.
+    private const int RimStage = 4;
+    private const int RimBreak = 9;
+
     /// <summary>
     /// The brim's top face, in front of the crown. Creased, its shade holds as far as the rim (the same at 0.18 and 0.226 m from the axis, a
     /// hundredth short of the rim); uncreased, it rolls off toward the rim and no step down the rim is as big.
@@ -332,11 +344,11 @@ public sealed class SoftScenario : IScenario
             driver.Fail($"{frame.Name}: only {y - oy} straw pixels below the brim's top at ({ox}, {oy}), expected the wall under the rim");
         }
 
-        // The first step of 10 or more: one pixel's jump when creased (28 flat; the wall's own shade), a stage of the roll-off when not (12).
-        var first = Enumerable.Range(1, profile.Count - 1).Select(k => Math.Abs(profile[k] - profile[k - 1])).FirstOrDefault(d => d >= 10);
-        if (creased ? first < 20 : first >= 20)
+        // The first step of RimStage or more: one pixel's jump when creased (the wall's own shade), a stage of the roll-off when not.
+        var first = Enumerable.Range(1, profile.Count - 1).Select(k => Math.Abs(profile[k] - profile[k - 1])).FirstOrDefault(d => d >= RimStage);
+        if (creased ? first < RimBreak : first >= RimBreak)
         {
-            driver.Fail($"{frame.Name}: down the rim from ({ox}, {oy}) the shades are {string.Join(" ", profile)} (the first step of 10 or more is {first}); {(creased ? "a creased rim breaks at once, by 20 or more" : "an uncreased rim rolls off, by less than 20 at a step")}");
+            driver.Fail($"{frame.Name}: down the rim from ({ox}, {oy}) the shades are {string.Join(" ", profile)} (the first step of {RimStage} or more is {first}); {(creased ? $"a creased rim breaks at once, by {RimBreak} or more" : $"an uncreased rim rolls off, by less than {RimBreak} at a step")}");
         }
     }
     // ---- build, through the tools (as T-36's scenario built it) ----
