@@ -4,7 +4,7 @@ description: >-
 ---
 # T-53 — UVs and seams in the kernel and the file
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -206,3 +206,74 @@ All seven as recommended:
 3. The cuts: a, split pieces interpolated (linear by fraction on an edge, barycentric for an interior knife point); b, caps unmapped; c, merge_faces keeps UVs only when they agree bit-for-bit at every shared vertex, otherwise unmapped with a warning; d, bridge quads unmapped; e, deleted faces lose theirs.
 4. Seams carry as hard edges do, and the plane-cut cap border is not seamed.
 5. to 7. As recommended: seams in `MeshUvs`, double arithmetic rounded once, posed copies keep UVs, `Model.Combined` left to T-57. These three were taken without objection rather than put as questions.
+
+### As built
+
+Built by Claude Opus 5.5 (`claude-opus-5-5`), one agent, 2026-11-13, on `milestone/M-6` at `9a6d653`. Built to the Plan with all seven rulings as recommended.
+
+**The type: `MeshUvs`** (`src/Carve.Core/MeshUvs.cs`), sealed and immutable, holding both the corner UVs and the seams (ruling 5):
+
+- `static MeshUvs None`; `bool IsEmpty` (no mapped face, no seam).
+- `IReadOnlyList<int> MappedFaces` (ascending); `IReadOnlyList<Vector2>? Of(int face)` (one per `Face.Corners` entry: outer loop, then each hole; null when unmapped); `bool IsMapped(int face)`.
+- `IReadOnlyList<(int Lo, int Hi)> Seams` (sorted, lower id first); `bool IsSeam(int a, int b)`.
+- `WithFace(int face, IReadOnlyList<Vector2>? corners)` and `WithFaces(IEnumerable<KeyValuePair<int, IReadOnlyList<Vector2>?>>)`: null unmaps; unchecked. `WithSeams(IEnumerable<(int A, int B)>, bool seam)`, as `MeshShade.WithEdges`.
+- `static IReadOnlyList<MeshError> Check(PolygonMesh, MeshUvs, string at = "")`: the guard for T-54's tools. Names `{at}faces[f]` (out of range, deleted, wrong corner count), `{at}faces[f].uv[c]` (not finite), and `{at}seams[a-b]` (not an edge). `static string CornerCountMessage(Face, int given)` is the shared wording, e.g. "3 UVs given, but the face has 4 corners; write 4 UVs, one per corner", with "(its loop 4, holes 4)" for a holed face.
+- `internal Without(faces)`.
+- `System.Numerics.Vector2`, glTF axes: (0,0) top-left, u right, v down. Any finite value is legal.
+
+**On the mesh:** `PolygonMesh.Uvs` (null when empty), `PolygonMesh.Seams` (`Uvs?.Seams ?? []`) and `PolygonMesh.WithUvs(MeshUvs?)` (unchecked). `WithStyle`, `WithWeights`, `WithShade` and `WithVertices` (the posed copy, ruling 7) pass `Uvs` through, and `WithUvs` passes every other attribute through. `Assemble`, `Edit` and `Model.Combined` give none; `Combined` is T-57's.
+
+**The file: version 5.** `CarveFile.Version = 5`, `ReadableVersions = [1, 2, 3, 4, 5]`. `Write` gives 5 only when some mesh has `Uvs` (UVs or seams); otherwise 4, 3 or 2 as before, byte for byte (ruling 1). In a v5 mesh, after `hard_edges` (still always written), come:
+
+- `"uvs": [{"face": f, "uv": [[u, v], ...]}, ...]`: one per line, in face-id order;
+- `"seams": [[a, b], ...]`: one per line, as `hard_edges`.
+
+Each is left out when empty, and each float is written shortest round-trip and read bit-exact. Read errors are named by element:
+
+- `meshes[i].uvs[k].face`: out of range, a deleted face, or listed earlier;
+- `meshes[i].uvs[k].uv`: the wrong corner count;
+- `meshes[i].uvs[k].uv[c]`: not a pair of numbers ("uv item has 3 numbers; a UV is a pair of numbers, [u, v]");
+- `meshes[i].uvs[k].uv[c][j]`: not finite ("1e39 is not finite ...");
+- `meshes[i].uvs[k].<key>`: an unknown key;
+- `meshes[i].seams[k]`: not a pair, not an edge, or listed earlier.
+
+In a v4 or older file, `uvs` and `seams` are unknown keys.
+
+**How edits carry UVs and seams.** No edit reports UVs: there is no new `EditResult` field, and `NewFaces`, `Split` and `Extruded` already say which faces are new.
+
+- **`EditResult.Carried`** (`EditResult.CarriedUvs`; used by move, extrude, delete, merge_faces, bridge and plane_cut's delete/cap stage):
+  - a source face that is mapped, and still live with the same corner count, keeps its UVs by position (move, extrude's cap, every untouched face);
+  - a face whose corner count changed, a tombstoned face, and every appended face (walls, caps, bridge quads) end up unmapped;
+  - a seam the edited topology no longer has is dropped, as hard edges are.
+
+  `From` takes an optional `uvFaces` override for an edit that works out a face's UVs itself.
+- **`FaceSplit.CarryUvs`** (plane_cut's split, loop_cut, knife; ruling 3a): every reshaped face and every piece takes UVs from its source face. A kept corner keeps that face's UV at its vertex. A new vertex takes its stencil (linear by fraction on an edge, barycentric for an interior knife point) over that face's own UVs, through `Subdivision.Stencil.Apply(Func<int, Vector2?>)`: summed in double and rounded once, and exact for a single term. It is worked per face, so a texture split stays split. A seam split by new vertices stays a seam on every piece, and the segments' new edges are not seams (ruling 4). The plane-cut cap border is not seamed.
+- **`Subdivision.Once`** (`Level.Uvs`): child k of a mapped face is `[u_k, (u_k+u_k+1)/2, mean(u), (u_k-1+u_k)/2]`, in double and rounded once, and an unmapped face's children are unmapped. A seam goes to both halves through the hard edges' `edgeIndex` lookup. A seam never makes an edge sharp.
+- **`FaceMerge`** (ruling 3c): the survivor keeps UVs only when every listed face is mapped and they agree bit for bit at every vertex of the merged face. Otherwise it is unmapped, with a warning after the colour warnings, only when some listed face was mapped:
+  - "faces[n]: it has no UVs, so the merged faces[s]'s UVs are dropped";
+  - "faces[s]: its UVs and those of the faces merged with it differ at a shared vertex, so the merged face's UVs are dropped".
+- **Undo:** `ModelStore` snapshots whole meshes, so nothing was added. A server-unit test pins it.
+
+**Tests** (unit):
+
+- `tests/Carve.Core.Tests/MeshUvsTests.cs`: the type, `Check`, attribute independence, and `BarrelTests`;
+- `UvFileTests.cs`: the round trip; the pinned text; seams alone and UVs alone; a holed face; tombstones; no-UV models keep 2/3/4; every committed `.carve` reads with no UVs, and the v2-v4 samples re-write to their text; `uvs` in v4 refused; each error named;
+- `UvCarryTests.cs`: move, extrude (inset, holed), subdivide by hand, the linear rule, unmapped children and two levels, seam halves, delete, plane_cut both and above, loop_cut at 0.25 exact, knife barycentric, merge (agree, differ, unmapped), bridge, and a theory of `Check` over every edit;
+- `tests/Carve.Server.Tests/ModelStoreTests.cs`: undo.
+
+Existing tests changed only to name version 5 as readable: `CarveFileTests` (the version list, and the refused "other" version is now 6) and `SaveOpenToolTests`. `TestMeshes.Barrel()` was added as the Notes define it.
+
+**Guard:** every committed `.carve` was hashed before and after (`artifacts/review/T-53/carve-before.sha256`, `carve-after.sha256`). The verify suites (core-unit, server-unit, server-regression) render no frames, so there were no frames to compare.
+
+**Broken-product table** (each check failing on a planted break, `artifacts/review/T-53/broken-product.md`; source restored after each):
+
+| Planted break | Fails |
+|---|---|
+| drop `Uvs` in `WithShade` | `MeshUvsTests.Uvs_and_the_other_attributes_are_independent` |
+| write `uv` in reverse order | `UvFileTests.A_mapped_cube_round_trips_bit_exact`, `The_written_text_is_version_5_...` |
+| count only the outer loop (skip hole corners) | `UvFileTests.A_holed_face_has_one_uv_per_corner_...` |
+| forget the cap (carry only an unchanged loop) | `UvCarryTests.Extrude_keeps_the_caps_uvs_...` (both insets) |
+| smoothed stencil for a corner UV in subdivide | `UvCarryTests.Subdivide_a_unit_quad_...`, `Subdivide_uses_the_linear_rule_...` |
+| seam on one half only | `UvCarryTests.Subdivide_puts_a_seam_on_both_halves` |
+
+**Not checked:** nothing renders UVs yet (T-57), so no frame shows them; `Model.Combined` drops them, as ruled.
