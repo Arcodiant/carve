@@ -11,7 +11,7 @@ public sealed class CheckTool(ModelStore store)
     public const string Text =
         "Checks the current mesh's health: what is wrong by element id, what it measures, and what a game will make of it. Call it before you export or call a model done. "
         + "Takes one optional argument, mesh, the name of the mesh to check, which may be left out while the model has one mesh; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
-        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume}}. "
+        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume, uvs:{mapped, unmapped}}}. "
         + "ok is true when there are no problems and no warnings; notes never make it false. "
         + "A shell is a set of faces joined by shared edges; shells[k] counts from the shell with the lowest face id. "
         + "Problems, with what each means for a game and the fix. "
@@ -24,6 +24,11 @@ public sealed class CheckTool(ModelStore store)
         + "\"two faces cross this edge in the same direction\": inconsistent winding, so a face points the wrong way and is culled; reverse that face's loop and call define_mesh again. An edge with this warning and a non-manifold one usually means a duplicate face, not a flipped one. "
         + "\"face is not planar\": a lifted corner, so the face folds along a diagonal the game chooses; move the vertex back onto the plane with move. "
         + "\"no face uses this vertex\": a stray that a game loads for nothing; call define_mesh again without it. "
+        + "UV warnings, only for a mesh that has UVs on some face (a mesh with none gets none, and no uvs in stats; uvs counts the faces with and without UVs), each by face id. "
+        + "\"no UVs, so the face samples the texture's corner\": the face is unmapped; project_uvs or unwrap it, or set_uvs it. "
+        + "\"UVs flipped, so the texture is mirrored on the face\": its UVs wind clockwise on screen (u right, v down), the shoelace sum over (u, v) is positive; set_uvs to turn it, or project_uvs it again. "
+        + "\"UVs of zero area, so the face is one smeared texel\": its UV area is below 1e-9 times the square of its UV bounds' diagonal, as a zero-area face in space is; project_uvs or unwrap it, or set_uvs corners that span an area. A smeared face is not also called flipped. "
+        + "\"UVs overlap faces[m], so the two faces show the same texels\": two faces' UV triangles share more than 1e-6 of UV area (about a fifteenth of a texel of the 256 checker), so painting one paints the other. Each pair is listed once, under the lower id; sharing an edge is not an overlap. Mirrored halves sharing a texture area are deliberate and still warned of, so read the pair before moving anything; otherwise unwrap, which separates islands, or put a seam where islands collide and unwrap again. "
         + "There is no delete yet, so removing a vertex or a face means define_mesh with the lists you want, and the ids after it close up. "
         + "Notes. 1 unit = 1 m, so size is the model's size in metres. A prop stands on y = 0, so the base note says where this one stands. The origin is where a game places the model, so it belongs inside the bounds (on them counts). More than one shell is noted because a model is usually one, though a detached part may be meant. "
         + "Stats. bounds and size are of the vertices faces use, closed is true when every edge has exactly two faces, triangles are what a game draws, area is the sum of the face areas in square metres, and volume is in cubic metres: the sum of the shells' signed volumes, null unless every shell is closed and consistently wound, and an inside-out shell's counts as negative. "
@@ -42,25 +47,28 @@ public sealed class CheckTool(ModelStore store)
 
         var health = MeshHealth.Create(target);
         var stats = health.Stats;
+        // In this order; uvs is left out for a mesh with none, so its output is what it always was.
+        var shown = new Dictionary<string, object?>
+        {
+            ["vertices"] = stats.Vertices,
+            ["faces"] = stats.Faces,
+            ["edges"] = stats.Edges,
+            ["triangles"] = stats.Triangles,
+            ["shells"] = stats.Shells,
+            ["closed"] = stats.Closed,
+            ["bounds"] = new { min = Array(stats.BoundsMin), max = Array(stats.BoundsMax) },
+            ["size"] = Array(stats.Size),
+            ["area"] = stats.Area,
+            ["volume"] = stats.Volume,
+        };
+        if (stats.Uvs is { } uvs) shown["uvs"] = new { mapped = uvs.Mapped, unmapped = uvs.Unmapped };
         return Ok(new
         {
             ok = health.Ok,
             problems = health.Problems.Select(p => new { check = p.Check, element = p.Element, message = p.Message }).ToArray(),
             warnings = health.Warnings.Select(w => w.ToString()).ToArray(),
             notes = health.Notes,
-            stats = new
-            {
-                vertices = stats.Vertices,
-                faces = stats.Faces,
-                edges = stats.Edges,
-                triangles = stats.Triangles,
-                shells = stats.Shells,
-                closed = stats.Closed,
-                bounds = new { min = Array(stats.BoundsMin), max = Array(stats.BoundsMax) },
-                size = Array(stats.Size),
-                area = stats.Area,
-                volume = stats.Volume,
-            },
+            stats = shown,
         });
     }
 }
