@@ -189,6 +189,12 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 
   An Opus fixer fixed the four code findings. The `loop_cut` check and the description got breaks, and the removed unreachable refusal and a stale doc comment got none. It also found and fixed the same exact-sign defect in the knife's corner splitting from round 1, with rotated-input tests shown failing. `PlaneCut` and code older than round 1 were not searched for it. All 187 frames stayed byte-identical.
 
+- **Review round 4 (RV-34)** had one Opus reviewer. All 6 of RV-33's answers held, and it probed `PlaneCut` on a cube and on a cube subdivided twice, under 200 rotations, finding no exact-sign defect. It raised 2 findings:
+  - **Minor:** RV-33's `loop_cut` fix lets a few real crossings on nearly degenerate concave quads reach `FaceSplit`, which refuses them as `cuts[0]` rather than in `loop_cut`'s words. No cut is made wrongly.
+  - **Nit:** this Retrospective said a wrong-up +y tile is caught, which no break showed.
+
+  The person ruled to file the Minor as B-4 and finish. The orchestrator fixed the Nit.
+
 **Never verified.**
 
 - **The knife's off-surface error was never met by an agent.** It is covered by tests and the Cuts scenario only. `loop_cut`, `merge_faces` and `undo` were used by no acceptance agent.
@@ -201,7 +207,7 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - **Carried passes:**
   - `viewer-cube` was carried from `99c846e` (T-63) through most members, though it ran fresh in the milestone's `verify`.
   - T-63 to T-68 each hashed frames from the run of their last code commit, not from their final notes-only commit.
-- **The gatehouse's -y axis tile, seen from below,** shows only two downward faces of one shade inside a plain rectangle. A -y view drawn mirrored or with the wrong up passes; only a swap with +y is caught. The person kept the approved frame and recorded this as a known limit (RV-32). Likewise, a +y tile mirrored in x passes; a swap with -y and a 180-degree wrong up are caught (RV-32, recorded in RV-33).
+- **The gatehouse's -y axis tile, seen from below,** shows only two downward faces of one shade inside a plain rectangle. A -y view drawn mirrored or with the wrong up passes; only a swap with +y is caught. The person kept the approved frame and recorded this as a known limit (RV-32). Likewise, a +y tile mirrored in x passes, and only a swap with -y was shown failing. RV-32's reviewer reasoned that a 180-degree wrong up is caught too, but no break showed it (RV-32, recorded in RV-33 and RV-34).
 - **The exact-sign pattern behind RV-33's Major** was searched for and fixed only in the code rounds 1 and 2 added (`loop_cut`, the knife's corner splitting, `FaceSplit`). `PlaneCut` and older code were not searched.
 - **Machines:** any GPU but Mantorok's and Xellotath's (both RTX 5070), and any client but `claude -p`.
 - **The installed carve:** `C:\tools\carve` has not been republished.
@@ -209,6 +215,7 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 
 **Known and left.**
 
+- B-4: `loop_cut` names `cuts[0]` instead of refusing in its own words on nearly degenerate concave quads (from RV-34). It is off-milestone and Minor: no cut is made wrongly, only the wording is wrong.
 - `CLAUDE.md` and `README.md` are inputs of no suite (a `verify` warning).
 - `branches/task/T-63` to `T-70` remain on disk, unregistered from git: `finish` ran from inside each one and could not remove it.
 - `%TEMP%\carve-m5-acceptance\` (two rounds and a Release publish of `carve`) and the members' scratch folders in `%TEMP%` (`t63` to `t70`) are not cleared.
