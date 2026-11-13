@@ -229,10 +229,13 @@ public class GatehouseGeometry
     }
 
     [Fact]
-    public void TheFrontDirectionShowsThePlusXEndAndTheBackOneTheMinusXEnd()
+    public void ThePlanShowsThePlusXEndFromTheFrontAndTheMinusXEndFromTheBack()
     {
-        // The asymmetry a mirrored camera fails: from [0.6, 0.35, 1] the +x end (5) and never the -x end (4), from
-        // [-0.6, 0.35, -1] the -x end and never the +x end, at every stage.
+        // The plan, worked by the scenario's own camera and ray test: from [0.6, 0.35, 1] the +x end (5) and never the -x
+        // end (4), from [-0.6, 0.35, -1] the -x end and never the +x end, at every stage. It reads no pixel, so it cannot
+        // fail on a camera fault in the product, nor can the scenario's "faces shown", which compares the same ray test.
+        // A mirrored camera in the product is caught by the frames' Background and NotBackground checks at the silhouette
+        // (T-69's break B1).
         for (var stage = 1; stage <= 7; stage++)
         {
             var solid = SolidOf(Mesh(stage));
