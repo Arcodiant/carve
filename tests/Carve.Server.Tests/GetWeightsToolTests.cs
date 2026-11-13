@@ -57,6 +57,27 @@ public sealed class GetWeightsToolTests
     }
 
     [Fact]
+    public async Task A_deleted_vertex_is_left_out_of_weigh_and_get_weights_and_named_as_deleted()
+    {
+        // M-5's delete drops a vertex's weights and leaves a tombstone: weigh must not weigh it again, nor anything count it.
+        using var carve = await StartAsync();
+        Ok(await carve.CallToolAsync("weigh", "{}"));
+        Ok(await carve.CallToolAsync("delete", """{"vertices":[6]}"""));
+
+        var weighed = Body(await carve.CallToolAsync("weigh", "{}"));
+        Assert.Equal((0, 7, 0), (weighed.GetProperty("weighed").GetInt32(), weighed.GetProperty("kept").GetInt32(), weighed.GetProperty("unweighted").GetInt32()));
+
+        var read = Body(await carve.CallToolAsync("get_weights", "{}"));
+        Assert.Equal(7, read.GetProperty("summary").GetProperty("vertices").GetInt32());
+        Assert.Equal(0, read.GetProperty("summary").GetProperty("unweighted").GetInt32());
+        Assert.DoesNotContain(6, read.GetProperty("vertices").EnumerateArray().Select(v => v.GetProperty("vertex").GetInt32()));
+
+        var named = await carve.CallToolAsync("get_weights", """{"vertices":[6]}""");
+        Assert.True(IsError(named));
+        Assert.Contains("vertices[6]: deleted", TextOf(named));
+    }
+
+    [Fact]
     public async Task A_group_override_after_weigh_reads_back_as_set_and_the_rest_as_weighed_with_no_warnings()
     {
         using var carve = await StartAsync();

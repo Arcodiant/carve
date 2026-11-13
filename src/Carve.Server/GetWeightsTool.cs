@@ -76,10 +76,10 @@ public sealed class GetWeightsTool(ModelStore store)
         }
         if (ids is not null)
             foreach (var v in ids.Distinct())
-                if (VertexWeights.VertexProblem(m.Vertices.Count, v) is { } bad) problems.Add($"vertices[{v}]: {bad}");
+                if (VertexWeights.VertexProblem(m, v) is { } bad) problems.Add($"vertices[{v}]: {bad}");
         if (problems.Count > 0) return Failed("get_weights", problems);
 
-        var unweighted = Enumerable.Range(0, m.Vertices.Count).Where(v => !weights.Has(v)).ToArray();
+        var unweighted = m.LiveVertices.Where(v => !weights.Has(v)).ToArray();
         var counts = names.Select(_ => 0).ToArray();
         foreach (var v in weights.Vertices)
             foreach (var i in weights.Of(v)) counts[i.Bone]++;
@@ -93,8 +93,8 @@ public sealed class GetWeightsTool(ModelStore store)
 
         var summary = new
         {
-            vertices = m.Vertices.Count,
-            weighted = m.Vertices.Count - unweighted.Length,
+            vertices = m.LiveVertexCount,
+            weighted = m.LiveVertexCount - unweighted.Length,
             unweighted = unweighted.Length,
             unweightedVertices = unweighted,
             boneVertices = names.Select((n, i) => (n, c: counts[i])).ToDictionary(p => p.n, p => p.c),
@@ -108,7 +108,7 @@ public sealed class GetWeightsTool(ModelStore store)
             return Ok(new { mesh = target.Name, bone = boneName, followers, summary, warnings });
         }
 
-        var read = (ids?.Distinct().Order() ?? Enumerable.Range(0, m.Vertices.Count)).Select(v => new
+        var read = (ids?.Distinct().Order() ?? m.LiveVertices).Select(v => new
         {
             vertex = v,
             weights = weights.Of(v).ToDictionary(i => names[i.Bone], i => i.Weight),
