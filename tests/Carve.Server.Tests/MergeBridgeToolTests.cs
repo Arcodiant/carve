@@ -112,5 +112,9 @@ public sealed class MergeBridgeToolTests() : TempFolderTests("carve-merge-bridge
         Refused(await carve.CallToolAsync("bridge", """{"loops":[[0,1,2,3],[0,1,2,3]]}"""), "in both loops");
         Refused(await carve.CallToolAsync("bridge", """{"loops":[[0,1,2,3]]}"""), "expected two loops, got 1");
         Refused(await carve.CallToolAsync("bridge", """{"loops":[[0,2,1,3],[4,5,6,7]]}"""), "not joined by an edge");
+        // A loop that is not an array is one problem, named once with what was sent.
+        var notArray = await carve.CallToolAsync("bridge", """{"loops":[[0,1,2],5]}""");
+        Refused(notArray, "loops[1]: expected an array of integer ids, got 5");
+        Assert.DoesNotContain("got null", TextOf(notArray));
     }
 }
