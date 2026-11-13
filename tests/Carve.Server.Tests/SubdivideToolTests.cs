@@ -76,6 +76,27 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
     }
 
     [Fact]
+    public async Task After_a_delete_each_level_makes_a_deleted_face_point_and_the_description_says_so()
+    {
+        // RV-32: two levels after one deleted face leave two tombstones in the block, one per level.
+        var (carve, tools) = await StartAsync();
+        using var _ = carve;
+        Assert.Contains("one deleted slot (null in get_mesh) per deleted face per level", Description(tools, "subdivide"));
+        Ok(await carve.CallToolAsync("define_mesh", Cube(tools)));
+        Ok(await carve.CallToolAsync("delete", """{"faces":[3]}"""));
+
+        var body = Ok(await carve.CallToolAsync("subdivide", """{"levels":2}"""));
+        var created = body.GetProperty("created").GetProperty("vertices");
+        Assert.Equal(8, created.GetProperty("first").GetInt32());
+        Assert.Equal(83, created.GetProperty("count").GetInt32());
+
+        var mesh = Ok(await carve.CallToolAsync("get_mesh", "{}"));
+        var slots = mesh.GetProperty("vertices").EnumerateArray().ToArray();
+        Assert.Equal(91, slots.Length);
+        Assert.Equal([11, 29], Enumerable.Range(0, slots.Length).Where(i => slots[i].ValueKind == JsonValueKind.Null));
+    }
+
+    [Fact]
     public async Task Past_5000_triangles_the_result_warns_and_still_subdivides()
     {
         var (carve, _) = await StartAsync();
