@@ -4,7 +4,7 @@ description: >-
 ---
 # M-5 — Cut
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *An agent cuts into a mesh: plane cuts, loop cuts, knife paths, face merge and delete*
 
