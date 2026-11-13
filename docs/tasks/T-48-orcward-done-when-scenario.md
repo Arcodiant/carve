@@ -40,19 +40,35 @@ Every line of Orcward's *Done when* passes in one suite.
 - **Open rules: stop and ask.** Anything D-6 does not settle, any loosened check, and any change to a D-6 decision.
 - Run `finish` from inside the worktree and leave the folder.
 
-### Hand-off
+### As built
 
-Model: Sonnet 5.5 (claude-sonnet-5-5). Stopped at the spec's stop: **the small twisted limb passes Orcward's rule.**
+Models: the first agent and this one ran on Sonnet 5.5 (claude-sonnet-5-5).
 
-**Done and committed (verified by `scripts/run-orcward-scenario.ps1`, 6 checks passing; not yet `cairn task T-48 verify`):**
-- `scenarios/Carve.Scenario.Orcward` (`OrcwardScenario.cs`, `GlbEdit.cs`, `ComparisonPng.cs`), `tests/Carve.OrcwardLoad.Tests`, `scripts/run-orcward-scenario.ps1`, suite `scenario-orcward` in `tests.json`, both projects in `Carve.slnx`. `ScenarioDriver.CaptureToolAsync(tool, name, args)` added to the debug extension (`CaptureAsync` is `render` through it) so `render_glb` frames are captured like any other.
-- The scenario builds the gardener with both looping clips through the tools, exports model, clips and hat piece with no warnings, and compares `render` with `render_glb` of the exported file at rest (front, side), Idle 0.5/1.0/1.5 s (front) and Walk 0, 0.125, 0.25, 0.5, 0.875 s (side). 0.125 and 0.875 (Walk) and 0.5/1.5 (Idle) lie between keys. Each frame (both sides) has a positive pixel check from the framing's bounds (can face, its mirror in X and its flip in Y from the front; near hand, its flip and its mirror from the side). Table: `differences.tsv`; triptychs in `compare/`.
-- Load checks: Load (22 bones, Idle and Walk, no warnings), `LoadAnimationSet` of the clips file (same bones incl. inverse binds, same clips), the hat piece (same bones and inverse binds, no clips), no export warnings.
+**What exists.** `scenarios/Carve.Scenario.Orcward` (`OrcwardScenario.cs`, `GlbEdit.cs`, `ComparisonPng.cs`), `tests/Carve.OrcwardLoad.Tests`, `scripts/run-orcward-scenario.ps1`, suite `scenario-orcward` in `tests.json`, both projects in `Carve.slnx`, and `ScenarioDriver.CaptureToolAsync` in the debug extension (`CaptureAsync` is `render` through it). The scenario builds the gardener with Idle and Walk, exports model, clips and the hat piece with no warnings, and compares `render` with `render_glb` of the exported file at rest (front, side), Idle 0.5/1.0/1.5 s (front) and Walk 0, 0.125, 0.25, 0.5, 0.875 s (side); 0.125, 0.875 (Walk) and 0.5, 1.5 (Idle) lie between keys. Every frame, both sides, has a positive pixel check from the framing's bounds (the can face and its X mirror and Y flip from the front; the near hand and its flip and mirror from the side). The load checks: `Load` (22 bones, Idle and Walk), `LoadAnimationSet` (same bones with inverse binds, same clips), the hat piece (same bones and inverse binds, no clips).
 
-**Measured (512 x 512 = 262,144 px; fail past 1,311 px):** all ten good frames 0 px except Walk 0.25 s side, 2 px. Breaks: reversed winding 39,415 (rest), 31,622 (Walk 0.5 side), 38,184 (Walk 0.5 front); dropped piece (body only) 26,979; swapped bone order (UpperLeg_L/R in `skins[0].joints`) 0 at rest, 4,027 (side), 3,147 (front); swapped inverse binds (UpperLeg_L/R) 0 at rest, 697 (side, passes), 9,809 (front). An untouched rewrite of the file: 0.
+**The rule, as the person ruled on 2026-11-13.** Orcward's 8/255 and 0.5 % stay for shading noise; a frame also fails with a connected patch of differing pixels past 50 px. Connectivity is 8 (diagonal neighbours join): a limb's outline is diagonal, so 4-connectivity would split one patch into pieces and weaken the rule, and 8 is the stricter reading. 50 px separates with a wide margin: the largest patch in any good frame is 2 px; the smallest in any twist is 130 px. Written into D-6 *A loaded frame against the preview* with its date and the table. Second ruling, recorded there too: the suite fails on every wrong file, but which frame catches it may vary (rest frames carry no palette, so a swapped bone order or inverse bind needs a clip frame).
 
-**QUESTIONS for the person:**
-1. **The small twisted limb passes.** Hand_L turned in `render`'s pose against the clean `render_glb` frame at rest, front, the rule counting the whole frame: Y 45 deg 159 px (0.061 %), Y 90 244 (0.093 %), X 45 339 (0.129 %), Z 45 284 (0.108 %), Z 90 599 (0.229 %); the character covers about 42,200 px of that frame, so counting only the character's pixels the same twists are 0.38 %, 0.58 %, 0.80 %, 0.67 % and 1.42 % (the Y 45 one still under 0.5 %). Y 180 could not be drawn: `render` refuses the posed mesh (a quad of the hand ring cannot be triangulated). D-6 says this must fail. Options are the person's: count only the character's pixels (D-6's named alternative, which needs a threshold the person sets), or a smaller region or a lower limit. I changed nothing in the rule. The twist rows are measured and written to the table but not asserted.
-2. Rest frames carry no palette (`render_glb` with no clip draws the bind pose), so a wrong bone order or wrong inverse binds is invisible at rest by construction (0 px) and only a clip frame catches it; and seen from the side a shift in X is along the view, so the swapped inverse binds pass from the side (697 px) and fail from the front (9,809). The checks therefore require each wrong file to fail at one frame at least, not at every frame. Say if that is acceptable.
+**Measured (512 x 512 = 262,144 px, 1,311 px is 0.5 %)**
 
-**Left:** the person's answer on the twist (then assert the twisted-limb row), the review set of comparison frames (`C:\Users\andre\artifacts\carve\M-19\T-48\round-1` holds a first selection: rest, Walk 0.125 side, Idle 0.5 front, the twists Y 90 and Z 90, swapped inverse binds from the front, dropped piece), the byte-identical guard by hash of every other suite's frames and files against the milestone head (not run: the debug extension changed, but only by an added method), the `CLAUDE.md` layout rows, `cairn task T-48 verify`, `### As built`, `cairn lint`, `finish`.
+| Frame | Differing px | Largest patch |
+|---|---|---|
+| ten good frames | 0 each, Walk 0.25 s side 2 | 0 each, Walk 0.25 s 2 |
+| untouched rewrite of the file (control) | 0 | 0 |
+
+**Shown failing (each fails; a wrong file at one frame at least)**
+
+| Wrong | Frames: differing px / largest patch |
+|---|---|
+| Hand_L twisted Y45, Y90, X45, Z45, Z90 (rest, front) | 159/130, 244/135, 339/249, 284/275, 599/597 (all fail by the patch; none by count) |
+| swapped bone order | rest 0/0 (passes); Walk 0.5 side 4,027/4,027; front 3,147/2,456 |
+| swapped inverse binds | rest 0/0 (passes); Walk 0.5 side 697/268; front 9,809/5,484 |
+| reversed winding | rest 39,415/39,401; side 31,622/31,604; front 38,184/38,184 |
+| dropped piece (body only) | rest 26,979/26,589 |
+
+Y 180 of the hand could not be drawn: `render` refuses the posed mesh (a quad of the hand ring cannot be triangulated).
+
+**Hash guard.** Against `origin/milestone/M-19` (exported to a temp folder and built there), the frames and every `.glb` of scenarios cube, rig, crate, shed, export, character and soft are byte-identical (same SHA-256 on every file: 32, 10, 55, 10, 6, 25, 13 files).
+
+**Review.** Waystone round-2 (12 images: good frames, five twists, swapped bone order and inverse binds, dropped piece, reversed winding) approved; the person's notes ("what's up with these legs", "missing a hat") are the expected failures shown.
+
+**Not checked:** a fresh-agent run (T-49).
