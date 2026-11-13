@@ -14,7 +14,9 @@ using Rgb = (int R, int G, int B);
 /// The frames of each stage and their checks. Every pixel asked about is worked from get_mesh's geometry by the Cuts
 /// scenario's ray test (<see cref="Solid"/>, with T-67's <c>SeenNarrow</c> for a face only a few pixels wide), at the probes of
 /// <see cref="GatehousePlan"/>: the middle of every face and a point near each of its corners. The door is predicted by the
-/// Crate scenario's colour rule (<see cref="ColourRule"/>) from the front face of the same normal, at <see cref="Checks.Exact"/>.
+/// Crate scenario's colour rule (<see cref="ColourRule"/>) from the front face of the same normal, at <see cref="Checks.Exact"/>,
+/// and every grey face from the first grey face of the same normal in the frame (the same rule, colour / grey = 1): so the
+/// cornice's front, end walls and top are held to the slab's front, ends and top, and a cornice drawn flush fails.
 /// The pixel checks are the existing ones; there is none of this task's own design.
 /// </summary>
 internal sealed class GatehouseFrames(ScenarioDriver driver)
@@ -57,7 +59,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
         {
             await StraightAsync(stage, name, solid, min, max, counts, doorFace);
             await LabelsAsync(solid, min, max, counts, plainFront!);
-            await SheetAsync(solid, min, max, counts);
+            await SheetAsync(solid, min, max, counts, doorFace);
         }
     }
 
@@ -156,7 +158,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
         && solid.Faces[face].Loop.All(v => solid.Vertices[v].X is >= 0.3f - 1e-4f and <= 1.1f + 1e-4f && solid.Vertices[v].Y is >= 0.8f - 1e-4f and <= 1.75f + 1e-4f);
 
     /// <summary>The six-view sheet: each tile is its single view; the horizontal views are asked by the ray test too.</summary>
-    private async Task SheetAsync(Solid solid, Vector3 min, Vector3 max, string counts)
+    private async Task SheetAsync(Solid solid, Vector3 min, Vector3 max, string counts, int doorFace)
     {
         var sheet = await driver.CaptureAsync("gate-7-sheet", new { views = Views, projection = "orthographic", size = Tile, labels = "none" });
         Caption(sheet, $"3x2 tiles of 256x256, orthographic, views +x, -x, +y, -y, +z, -z, {counts}");
@@ -184,7 +186,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
 
             var direction = Views[tile] switch { "+x" => Vector3.UnitX, "-x" => -Vector3.UnitX, "+z" => Vector3.UnitZ, _ => -Vector3.UnitZ };
             var camera = new Camera(min, max, direction, Tile, orthographic: true);
-            Look(single, solid, camera, GatehousePlan.Probes(solid), 7, Views[tile], -1, [], Tile);
+            Look(single, solid, camera, GatehousePlan.Probes(solid), 7, Views[tile], doorFace, [], Tile);
         }
     }
 
@@ -205,7 +207,8 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
 
     /// <summary>
     /// Every probe the ray test is sure of, and more than 4 pixels from a drawn line: the background where the ray meets nothing,
-    /// else a face, never the background, in that face's shade (the first sure probe's; the door's is predicted from the front face's).
+    /// else a face, never the background, in the shade of the first sure probe on a grey face of the same normal (T-67's rule;
+    /// the door's is predicted from the front face's, and is its own when the front is not sure).
     /// The faces shown and, in a shaded frame, the number of sure probes are the ones worked in Core (<see cref="GatehousePlan.Expected"/>).
     /// </summary>
     private static void Look(ScenarioFrame frame, Solid solid, Camera camera, IEnumerable<Probe> probes, int stage, string view, int doorFace,
@@ -217,7 +220,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
             Corners(frame);
         }
 
-        var shades = new Dictionary<int, Rgb>();
+        var shades = new List<(Vector3 Normal, int Face, Rgb Shade)>();
         var shown = new SortedSet<int>();
         var tested = 0;
         var all = probes.Select(p =>
@@ -255,13 +258,13 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
             {
                 Colour(frame, (x, y), door, Exact, $"{frame.Name}: {probe.Name} of face {probe.Face}, the door, predicted {door}");
             }
-            else if (shades.TryGetValue(seen, out var shade))
+            else if (Shade(solid, shades, seen, doorFace) is { } shade)
             {
-                Colour(frame, (x, y), shade, Exact, $"{frame.Name}: {probe.Name} of face {probe.Face}, face {seen}");
+                Colour(frame, (x, y), shade.Shade, Exact, $"{frame.Name}: {probe.Name} of face {probe.Face}, face {seen}, predicted from face {shade.Face} of the same normal");
             }
             else
             {
-                shades[seen] = Pixel(frame, x, y);
+                shades.Add((solid.Normal(seen), seen, Pixel(frame, x, y)));
             }
         }
 
@@ -275,6 +278,21 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
         {
             Note($"{frame.Name}: only {tested} probes were surely a face or the background");
         }
+    }
+
+    /// <summary>The shade already read for a grey face of <paramref name="face"/>'s normal; the coloured door only from itself.</summary>
+    private static (Vector3 Normal, int Face, Rgb Shade)? Shade(Solid solid, List<(Vector3 Normal, int Face, Rgb Shade)> shades, int face, int doorFace)
+    {
+        var normal = solid.Normal(face);
+        foreach (var s in shades)
+        {
+            if (face == doorFace || s.Face == doorFace ? s.Face == face : Vector3.Dot(s.Normal, normal) > 0.9999f)
+            {
+                return s;
+            }
+        }
+
+        return null;
     }
 
     private static Rgb Pixel(ScenarioFrame frame, int x, int y)
