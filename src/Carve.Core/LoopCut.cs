@@ -19,7 +19,7 @@ public sealed record LoopCutResult(EditResult Edit, IReadOnlyList<int> Ring);
 /// <item>Ids, <c>split</c> and what carries follow <see cref="FaceSplit"/>.</item>
 /// </list>
 /// Refused: a pair that is not an edge of the mesh, an edge with no quad on it, an edge on more than two faces (a
-/// non-manifold edge: an open rule, provisional), and a bad <c>at</c> (empty, not
+/// non-manifold edge: an open rule, provisional), a ring that closes on itself reversed (a Mobius band, B-3), and a bad <c>at</c> (empty, not
 /// strictly ascending, a fraction not strictly between 0 and 1, or one too near an end of the shortest ring edge by
 /// <see cref="FaceSplit.Tolerance"/>).
 /// </remarks>
@@ -70,7 +70,14 @@ public static class LoopCut
             var cur = (S: a, T: b);
             while (true)
             {
-                if (!seen.Add(face)) return true;
+                if (!seen.Add(face))
+                {
+                    // Back at a visited quad: a ring that comes home across the start edge the same way round has closed;
+                    // one that arrives with the edge's ends swapped has half a twist in it, and a loop would meet itself.
+                    if (cur != (a, b))
+                        problem ??= MeshEdits.Invariant($"the ring from edge [{a}, {b}] comes back to it with its ends swapped: loop_cut does not cut a ring that closes on itself reversed");
+                    return true;
+                }
                 var next = Across(mesh, face, cur);
                 steps.Add((face, cur, next));
                 var k = Key(next.S, next.T);
