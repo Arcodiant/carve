@@ -67,10 +67,18 @@ public static class SkinnedExport
     /// </summary>
     public static SkinnedGlb Write(Model model, string name)
     {
-        var skeleton = model.Skeleton ?? throw new ArgumentException("the model has no skeleton", nameof(model));
-        var (root, scene, joints, skin) = GlbRig.Start(name, skeleton);
+        if (model.Skeleton is null) throw new ArgumentException("the model has no skeleton", nameof(model));
+        return model.Meshes.Any(m => GlbExport.HasUvs(m.Mesh))
+            ? Write<VertexTexture1>(model, name, (m, f, v) => new VertexTexture1(GlbExport.UvAt(m, f, v)))
+            : Write<VertexEmpty>(model, name, (_, _, _) => default);
+    }
 
-        var builder = new MeshBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexJoints4>(name);
+    private static SkinnedGlb Write<TvM>(Model model, string name, Func<PolygonMesh, int, int, TvM> texture)
+        where TvM : struct, IVertexMaterial
+    {
+        var skeleton = model.Skeleton!;
+        var (root, scene, joints, skin) = GlbRig.Start(name, skeleton);
+        var builder = new MeshBuilder<MaterialBuilder, VertexPositionNormal, TvM, VertexJoints4>(name);
         var materials = new List<string>();
         var triangleCount = 0;
         var boundToRoot = 0;
@@ -79,7 +87,7 @@ public static class SkinnedExport
             var mesh = piece.Mesh;
             var triangles = Triangulator.Triangulate(mesh);
             var corners = Shading.CornersOf(mesh);
-            var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexJoints4>>();
+            var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, TvM, VertexJoints4>>();
             foreach (var (materialName, colour) in Materials(piece))
             {
                 primitives[colour ?? ""] = builder.UsePrimitive(GlbExport.Material(materialName, colour));
@@ -91,7 +99,10 @@ public static class SkinnedExport
                 var face = mesh.Faces[t.Face];
                 var at = corners[t.Face];
                 var primitive = primitives[GlbExport.ColourOf(mesh, t.Face) ?? ""];
-                primitive.AddTriangle(Vertex(mesh, t.A, at[face.CornerOf(t.A)]), Vertex(mesh, t.B, at[face.CornerOf(t.B)]), Vertex(mesh, t.C, at[face.CornerOf(t.C)]));
+                primitive.AddTriangle(
+                    Vertex(mesh, t.A, at[face.CornerOf(t.A)], texture(mesh, t.Face, t.A)),
+                    Vertex(mesh, t.B, at[face.CornerOf(t.B)], texture(mesh, t.Face, t.B)),
+                    Vertex(mesh, t.C, at[face.CornerOf(t.C)], texture(mesh, t.Face, t.C)));
             }
             triangleCount += triangles.Count;
             boundToRoot += mesh.LiveVertices.Count(v => mesh.Weights?.Has(v) != true);
@@ -104,7 +115,7 @@ public static class SkinnedExport
 
         var pieces = model.Names.ToList();
         return new SkinnedGlb(root.WriteGLB().ToArray(), pieces, materials, triangleCount,
-            Warnings(model, triangleCount, materials.Count), boundToRoot);
+            [.. Warnings(model, triangleCount, materials.Count), .. GlbExport.UvWarnings(model)], boundToRoot);
     }
 
     /// <summary>The warnings of D-6's game limits, each past its constant and never at it.</summary>
@@ -162,8 +173,9 @@ public static class SkinnedExport
     private static string? GroupFor(PolygonMesh mesh, List<int> faces) =>
         mesh.Style?.Groups.FirstOrDefault(g => g.Faces.Count == faces.Count && g.Faces.Order().SequenceEqual(faces)).Name;
 
-    private static VertexBuilder<VertexPositionNormal, VertexEmpty, VertexJoints4> Vertex(PolygonMesh mesh, int vertex, Vector3 normal) =>
-        new(new VertexPositionNormal(mesh.Vertices[vertex], normal), default(VertexEmpty), Joints(mesh.Weights?.Of(vertex) ?? []));
+    private static VertexBuilder<VertexPositionNormal, TvM, VertexJoints4> Vertex<TvM>(PolygonMesh mesh, int vertex, Vector3 normal, TvM texture)
+        where TvM : struct, IVertexMaterial =>
+        new(new VertexPositionNormal(mesh.Vertices[vertex], normal), texture, Joints(mesh.Weights?.Of(vertex) ?? []));
 
     /// <summary>
     /// The vertex's influences as JOINTS_0/WEIGHTS_0, narrowed to float with the rounding put on the largest so the four
