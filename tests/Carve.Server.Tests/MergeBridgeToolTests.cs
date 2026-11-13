@@ -50,7 +50,7 @@ public sealed class MergeBridgeToolTests() : TempFolderTests("carve-merge-bridge
         using var _ = carve;
 
         var body = Ok(await carve.CallToolAsync("merge_faces", ToolList.Examples(tools, "merge_faces").Single()));
-        Assert.Equal([3], Ints(body.GetProperty("deleted").GetProperty("faces")));
+        Assert.Equal([7], Ints(body.GetProperty("deleted").GetProperty("faces")));
         Assert.Empty(Ints(body.GetProperty("deleted").GetProperty("vertices")));
         Assert.Equal(9, body.GetProperty("faces").GetInt32());
         Assert.Equal(12, body.GetProperty("vertices").GetInt32());
@@ -59,18 +59,18 @@ public sealed class MergeBridgeToolTests() : TempFolderTests("carve-merge-bridge
 
         var mesh = Ok(await carve.CallToolAsync("get_mesh", "{}"));
         var faces = mesh.GetProperty("faces").EnumerateArray().ToArray();
-        Assert.Equal(JsonValueKind.Null, faces[3].ValueKind);
-        Assert.Equal([3, 2, 6, 10, 11, 7], Ints(faces[2].GetProperty("vertices")));
+        Assert.Equal(JsonValueKind.Null, faces[7].ValueKind);
+        Assert.Equal([4, 5, 11, 6, 7, 10], Ints(faces[1].GetProperty("vertices")));
         await CheckedClean(carve, closed: true);
 
         // Refusals name the problem and leave the mesh; one undo puts the two pieces back.
         Refused(await carve.CallToolAsync("merge_faces", """{"faces":[0]}"""), "at least two faces");
         Refused(await carve.CallToolAsync("merge_faces", """{"faces":[0,1]}"""), "must be connected");
-        Refused(await carve.CallToolAsync("merge_faces", """{"faces":[2,3]}"""), "faces[3]: deleted");
+        Refused(await carve.CallToolAsync("merge_faces", """{"faces":[1,7]}"""), "faces[7]: deleted");
         Refused(await carve.CallToolAsync("merge_faces", "{}"), "faces: required but missing");
         Ok(await carve.CallToolAsync("undo", "{}"));
         mesh = Ok(await carve.CallToolAsync("get_mesh", "{}"));
-        Assert.Equal([7, 6, 10, 11], Ints(mesh.GetProperty("faces")[3].GetProperty("vertices")));
+        Assert.Equal([11, 6, 7, 10], Ints(mesh.GetProperty("faces")[7].GetProperty("vertices")));
         Assert.Equal(10, mesh.GetProperty("faces").EnumerateArray().Count(f => f.ValueKind != JsonValueKind.Null));
     }
 
@@ -79,10 +79,10 @@ public sealed class MergeBridgeToolTests() : TempFolderTests("carve-merge-bridge
     {
         var (carve, _) = await StartAsync("merge_faces");
         using var __ = carve;
-        Ok(await carve.CallToolAsync("set_colour", """{"faces":[3],"colour":"#3C78C8"}"""));
-        var body = Ok(await carve.CallToolAsync("merge_faces", """{"faces":[3,2]}"""));
+        Ok(await carve.CallToolAsync("set_colour", """{"faces":[7],"colour":"#3C78C8"}"""));
+        var body = Ok(await carve.CallToolAsync("merge_faces", """{"faces":[7,1]}"""));
         var warning = Assert.Single(body.GetProperty("warnings").EnumerateArray()).GetString()!;
-        Assert.StartsWith("faces[3]: ", warning, StringComparison.Ordinal);
+        Assert.StartsWith("faces[7]: ", warning, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -116,5 +116,76 @@ public sealed class MergeBridgeToolTests() : TempFolderTests("carve-merge-bridge
         var notArray = await carve.CallToolAsync("bridge", """{"loops":[[0,1,2],5]}""");
         Refused(notArray, "loops[1]: expected an array of integer ids, got 5");
         Assert.DoesNotContain("got null", TextOf(notArray));
+    }
+
+    /// <summary>The README's <c>Cutting</c> example for <paramref name="tool"/>: the last inline JSON on its bullet.</summary>
+    private static string ReadmeExample(string tool)
+    {
+        var lines = File.ReadAllLines(Path.Combine(Paths.RepoRoot, "README.md"));
+        var section = lines.SkipWhile(l => l != "## Cutting").Skip(1).TakeWhile(l => !l.StartsWith("## ", StringComparison.Ordinal));
+        var bullet = section.Single(l => l.StartsWith($"- `{tool}` ", StringComparison.Ordinal));
+        var end = bullet.LastIndexOf("}`", StringComparison.Ordinal);
+        var start = bullet.LastIndexOf("`{", end, StringComparison.Ordinal);
+        return bullet[(start + 1)..(end + 1)];
+    }
+
+    /// <summary>define_mesh's unit cube, from its description's worked example line.</summary>
+    private static string CubeInput(JsonElement tools)
+    {
+        const string marker = "Worked example (a unit cube): ";
+        var description = ToolList.Description(tools, "define_mesh");
+        return description[(description.IndexOf(marker, StringComparison.Ordinal) + marker.Length)..].Split('\n')[0];
+    }
+
+    [Fact]
+    public async Task Each_README_cutting_example_works_on_the_input_it_names()
+    {
+        // RV-31: each on a fresh define_mesh unit cube, merge_faces after the loop_cut, bridge on bridge's own two squares.
+        foreach (var tool in new[] { "plane_cut", "loop_cut", "knife", "delete" })
+        {
+            using var carve = new CarveProcess([], workingDirectory: Root);
+            await carve.InitializeAsync();
+            var cube = CubeInput(await carve.ListToolsAsync());
+            Ok(await carve.CallToolAsync("define_mesh", cube));
+            Ok(await carve.CallToolAsync(tool, ReadmeExample(tool)));
+        }
+
+        using (var carve = new CarveProcess([], workingDirectory: Root))
+        {
+            await carve.InitializeAsync();
+            var cube = CubeInput(await carve.ListToolsAsync());
+            Ok(await carve.CallToolAsync("define_mesh", cube));
+            Ok(await carve.CallToolAsync("loop_cut", ReadmeExample("loop_cut")));
+            var merged = Ok(await carve.CallToolAsync("merge_faces", ReadmeExample("merge_faces")));
+            Assert.Equal([7], Ints(merged.GetProperty("deleted").GetProperty("faces")));
+            Assert.Empty(merged.GetProperty("warnings").EnumerateArray());
+        }
+
+        var (bridging, _) = await StartAsync("bridge");
+        using (bridging)
+        {
+            var box = Ok(await bridging.CallToolAsync("bridge", ReadmeExample("bridge")));
+            Assert.True(box.GetProperty("closed").GetBoolean());
+        }
+    }
+
+    [Fact]
+    public async Task The_merge_examples_input_is_what_loop_cuts_own_example_leaves_of_the_cube()
+    {
+        // RV-31: the description says its define_mesh input is the cube as loop_cut leaves it; it must be, id for id.
+        using var carve = new CarveProcess([], workingDirectory: Root);
+        await carve.InitializeAsync();
+        var tools = await carve.ListToolsAsync();
+        Ok(await carve.CallToolAsync("define_mesh", CubeInput(tools)));
+        Ok(await carve.CallToolAsync("loop_cut", ToolList.Examples(tools, "loop_cut").Single()));
+        var cut = Ok(await carve.CallToolAsync("get_mesh", "{}"));
+        var input = JsonDocument.Parse(Input(tools, "merge_faces")).RootElement;
+
+        Assert.Equal(
+            input.GetProperty("vertices").EnumerateArray().Select(v => string.Join(",", v.EnumerateArray().Select(c => c.GetDouble()))).ToArray(),
+            cut.GetProperty("vertices").EnumerateArray().Select(v => string.Join(",", v.GetProperty("at").EnumerateArray().Select(c => c.GetDouble()))).ToArray());
+        Assert.Equal(
+            input.GetProperty("faces").EnumerateArray().Select(f => string.Join(",", f.EnumerateArray().Select(i => i.GetInt32()))).ToArray(),
+            cut.GetProperty("faces").EnumerateArray().Select(f => string.Join(",", Ints(f.GetProperty("vertices")))).ToArray());
     }
 }
