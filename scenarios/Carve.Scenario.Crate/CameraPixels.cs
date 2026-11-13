@@ -19,6 +19,28 @@ internal static class CameraPixels
     /// </summary>
     public static Func<Vector3, Vector2> Perspective(Vector3 min, Vector3 max, Vector3 direction, int size, float zoom = 1, Vector3? target = null)
     {
+        var (centre, radius, eye, look, up) = Place(min, max, direction, target);
+        Vector3 Drawn(Vector3 p) => (p - centre) / radius;
+        var view = Matrix4x4.CreateLookAt(eye, look, up);
+        var field = 2 * MathF.Atan(MathF.Tan(FieldOfViewY / 2) / zoom);
+        var camera = view * Matrix4x4.CreatePerspectiveFieldOfView(field, 1, 0.01f, 100f);
+        return p =>
+        {
+            var device = Vector4.Transform(new Vector4(Drawn(p), 1), camera);
+            return new Vector2((device.X / device.W + 1) / 2 * size, (1 - device.Y / device.W) / 2 * size);
+        };
+    }
+
+    /// <summary>Where the eye of <see cref="Perspective"/> is, in the mesh's coordinates: what a ray test of what is in sight starts from.</summary>
+    public static Vector3 Eye(Vector3 min, Vector3 max, Vector3 direction, Vector3? target = null)
+    {
+        var (centre, radius, eye, _, _) = Place(min, max, direction, target);
+        return centre + eye * radius;
+    }
+
+    /// <summary>The camera in the drawn coordinates (the box's centre at the origin, its half-diagonal 1): eye, point looked at, up.</summary>
+    private static (Vector3 Centre, float Radius, Vector3 Eye, Vector3 Look, Vector3 Up) Place(Vector3 min, Vector3 max, Vector3 direction, Vector3? target)
+    {
         var centre = (min + max) / 2;
         var radius = (max - min).Length() / 2;
         Vector3 Drawn(Vector3 p) => (p - centre) / radius;
@@ -39,15 +61,7 @@ internal static class CameraPixels
             distance = Math.Max(distance, Math.Max(Math.Abs(seen.X), Math.Abs(seen.Y)) / tangent + seen.Z);
         }
 
-        var eye = look + unit * (distance + look.Length());
-        var view = Matrix4x4.CreateLookAt(eye, look, up);
-        var field = 2 * MathF.Atan(MathF.Tan(FieldOfViewY / 2) / zoom);
-        var camera = view * Matrix4x4.CreatePerspectiveFieldOfView(field, 1, 0.01f, 100f);
-        return p =>
-        {
-            var device = Vector4.Transform(new Vector4(Drawn(p), 1), camera);
-            return new Vector2((device.X / device.W + 1) / 2 * size, (1 - device.Y / device.W) / 2 * size);
-        };
+        return (centre, radius, look + unit * (distance + look.Length()), look, up);
     }
 
     /// <summary>The pixel holding a projected point.</summary>
