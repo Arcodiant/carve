@@ -4,7 +4,7 @@ description: >-
 ---
 # T-54 — set_uvs, seams on mark_edges, and get_mesh
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
