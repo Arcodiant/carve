@@ -82,6 +82,6 @@ Run on **Claude Sonnet 5.5** (`claude-sonnet-5-5`). Every `claude -p` session ra
 
 **Models.** The acceptance agents of both rounds ran on Sonnet 5.5 (the first agent of this member too). The finishing agent ran on Sonnet 5.5.
 
-**Hash guard.** HASHPLACEHOLDER
+**Hash guard.** Not compared file by file: `cairn test artifacts <suite>` cannot tell this branch's job from the milestone's. What stands instead: after the revert this branch has no diff under `src/` against `origin/milestone/M-19` (its changes are the new acceptance scenario, the test project, scripts, `CLAUDE.md` and the member file), so no frame or `.glb` of cube, rig, crate, shed, export, character, soft or orcward can move, and the verify run passed all of those scenarios and `server-regression`.
 
 **Not checked:** a real game loading the files (the engine's loaders only); round 1's session-1 `.carve` file itself.
