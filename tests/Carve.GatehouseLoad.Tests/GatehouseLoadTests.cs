@@ -50,11 +50,9 @@ public class GatehouseLoadTests
         var triangles = faces.Sum(f => mesh.Faces[f].Loop.Count + mesh.Faces[f].Holes.Sum(h => h.Count) - 2 + 2 * mesh.Faces[f].Holes.Count);
         var data = model.MeshData;
         Assert.Equal(triangles * 3, data.Indices!.Length);
-        // Every corner the file gives is a corner of a live face; none is where only a deleted vertex is.
+        // Every corner the file gives is at a corner of a live face, so none is where only a deleted vertex is.
         var live = faces.SelectMany(f => mesh.Faces[f].Loop.Concat(mesh.Faces[f].Holes.SelectMany(h => h))).Select(v => Key(mesh.Vertices[v])).ToHashSet();
-        var deletedOnly = Enumerable.Range(0, mesh.Vertices.Count).Where(mesh.IsVertexDeleted).Select(v => Key(mesh.Vertices[v])).Where(k => !live.Contains(k)).ToHashSet();
         Assert.All(data.Indices!, i => Assert.Contains(Key(data.Vertices[(int)i].Position), live));
-        Assert.All(data.Indices!, i => Assert.DoesNotContain(Key(data.Vertices[(int)i].Position), deletedOnly));
         // The product's triangulation, which the export draws with, agrees with the count.
         Assert.Equal(triangles, CarveShading.Triangles(mesh).Count);
     }
