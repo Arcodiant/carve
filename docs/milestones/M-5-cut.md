@@ -182,7 +182,12 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
   - `loop_cut` refuses a cut that would run along a quad's edge, and `FaceSplit` never skips a cut silently;
   - the -y tile's orientation is recorded as a known limit.
 
-  An Opus fixer fixed five, each with a break, and the orchestrator answered the Retrospective and the -y tile.
+  An Opus fixer fixed five. Four had a break shown failing; the fifth removed an assert that could not fail, so it had none (`artifacts/review/RV-32/breaks.log`). The orchestrator answered the Retrospective and the -y tile.
+- **Review round 3 (RV-33)** had one Opus reviewer. 5 of RV-32's 7 answers held, and it raised 6 findings: 1 Major, 1 Minor and 4 Nit.
+  - **The Major:** round 2's `loop_cut` fix tested every edge with an exact sign and no tolerance, so it refused ordinary cuts across any quad that wasn't axis-aligned. Every test and frame used axis-aligned quads, so none caught it.
+  - **The Minor:** the Retrospective overclaimed breaks a second time. Because it had survived two rounds, it went to the person, who chose to fix it and run round 4.
+
+  An Opus fixer fixed the four code findings. The `loop_cut` check and the description got breaks, and the removed unreachable refusal and a stale doc comment got none. It also found and fixed the same exact-sign defect in the knife's corner splitting from round 1, with rotated-input tests shown failing. `PlaneCut` and code older than round 1 were not searched for it. All 187 frames stayed byte-identical.
 
 **Never verified.**
 
@@ -196,7 +201,8 @@ Content: a sample model that needs cuts to exist, with a scenario showing each s
 - **Carried passes:**
   - `viewer-cube` was carried from `99c846e` (T-63) through most members, though it ran fresh in the milestone's `verify`.
   - T-63 to T-68 each hashed frames from the run of their last code commit, not from their final notes-only commit.
-- **The gatehouse's -y axis tile, seen from below,** shows only two downward faces of one shade inside a plain rectangle. A -y view drawn mirrored or with the wrong up passes; only a swap with +y is caught. The person kept the approved frame and recorded this as a known limit (RV-32).
+- **The gatehouse's -y axis tile, seen from below,** shows only two downward faces of one shade inside a plain rectangle. A -y view drawn mirrored or with the wrong up passes; only a swap with +y is caught. The person kept the approved frame and recorded this as a known limit (RV-32). Likewise, a +y tile mirrored in x passes; a swap with -y and a 180-degree wrong up are caught (RV-32, recorded in RV-33).
+- **The exact-sign pattern behind RV-33's Major** was searched for and fixed only in the code rounds 1 and 2 added (`loop_cut`, the knife's corner splitting, `FaceSplit`). `PlaneCut` and older code were not searched.
 - **Machines:** any GPU but Mantorok's and Xellotath's (both RTX 5070), and any client but `claude -p`.
 - **The installed carve:** `C:\tools\carve` has not been republished.
 - The orchestrator opened no frame. Every look above is a member's or the person's.
