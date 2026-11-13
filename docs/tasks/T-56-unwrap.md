@@ -4,7 +4,7 @@ description: >-
 ---
 # T-56 — Unwrap
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -135,3 +135,51 @@ Planned by Claude Opus 5.5 (`claude-opus-5-5`), 2026-11-13, on `milestone/M-6` a
 ### Rulings (the person, 2026-11-13)
 
 All ten as recommended. Rule 1: extra boundary loops are allowed when they are one face's hole loops, and any other island that is not a disc is refused. Rules 2 to 10 as written above.
+
+### As built
+
+Built by Claude Opus 5.5 (`claude-opus-5-5`), one agent, 2026-11-13, on `task/T-56` from `milestone/M-6` at `8f3fa7b`. Built to the Plan with the ten rulings as recommended. Nothing from T-55, T-57, T-59 or T-60 had landed, so the signed-area code stays private to `Unwrap*.cs` and `into` is parsed in `UnwrapTool.cs` itself.
+
+**Core** (`src/Carve.Core/`, engine-free, no trig, no `System.Random`, plain `for` loops):
+
+- `Unwrap.Run(PolygonMesh, IReadOnlyList<int>? faces = null, (double U0, V0, U1, V1)? into = null, double? margin = null)` gives `(UnwrapResult? Result, IReadOnlyList<MeshError> Errors)`. `UnwrapResult(Mesh, Islands, Fill, Scale, Margin)`: the mesh with its new UVs (faces outside the set keep theirs, seams untouched); `UnwrapIsland(Faces, Rect (float u0, v0, u1, v1), Stretch, Flipped, Iterations)` with `LowestFace`, islands by lowest face.
+- `Unwrap.Flatten(mesh, faces)`: the islands flattened, rescaled and turned but not packed, in metres (what the grid test checks in double).
+- `UnwrapIslands.cs` (cut, corner groups, disc test by boundary pieces and Euler characteristic; a piece that is exactly one face's hole loop is allowed, ruling 1), `UnwrapLscm.cs` (frames, pins, CSR, CG), `UnwrapPack.cs` (hull, minimum-area rectangle, quarter turn, shelves, bisection).
+- **Numbers:** CG `Unwrap.Tolerance = 1e-10` (relative residual), `Unwrap.MaxIterations = 10000`, Jacobi-preconditioned, from zero; degenerate triangle `2A <= 1e-12 L^2`; rectangle ties and "taller than wide" `1e-9` relative; fit by 60 bisection steps; default margin `Unwrap.MarginFraction = 1/64` of `into`'s shorter side; UVs rounded once to float.
+- **Stretch** is computed from the two singular values as `|Q| + |R|` and `||Q| - |R||` (the similarity and anti-similarity parts of the 2x2 map). The first formula, `sqrt((q +- sqrt(q^2 - 4 det^2)) / 2)`, took the root of a cancelling difference and gave `1 + 2.1e-8` on the flat grid; it is a numerical fix, no tolerance changed (the CG tolerance was shown not to be the cause: 1e-14 gave the same).
+
+**The tool `unwrap(faces?, into?, margin?, mesh?)`** (`src/Carve.Server/UnwrapTool.cs`, registered after `set_uvs` in `Program.cs`), through `ModelStore.Rework`: one undo step, a refused call changes nothing.
+
+- Returns `{"mesh", "islands": [{"faces": count, "lowest_face", "rect": [u0, v0, u1, v1], "stretch", "flipped"}], "fill", "scale"}`; `fill` is the islands' UV triangle area over `into`'s area, `scale` UV units per metre.
+- Errors (inside `unwrap failed with N problem(s); ...`): `faces[40]: face 40 is not a face of the mesh, which has 34`; `faces[f]: face f is deleted`; `faces[3]: face 3 is listed more than once`; `faces: the list is empty; ...`; `faces: the 1st listed entry: expected an integer id, ...`; `into: expected [u0, v0, u1, v1], four numbers, ...`; `into[2]: 1e39 is not finite: ...`; `into: [0, 0, 0, 1] has no area; give [u0, v0, u1, v1] with u1 > u0 and v1 > v0`; `margin: -1 is not a margin into can take; it must be at least 0 and less than half of into's shorter side (0.5)`; `margin: n islands do not fit into into with a margin of m; ...`; `faces[0]: an island of 34 faces with 0 boundary loops is not a disc; mark a seam across it with mark_edges, cutting every closed loop until each island is a disc`; `faces[f]: the island of n faces has no extent: ...`; `faces[f]: the flattening did not converge (relative residual r after 10000 iterations; ...)`; unknown arguments as every tool.
+- The description carries what a seam must do, the cylinder, and the barrel's worked example (`mark_edges` seams, then `Example: {}`).
+
+**The barrel** (`samples/barrel.carve`, version 5, written by `CarveFile.Write` from `TestMeshes.SeamedBarrel()` unwrapped with the defaults; `UnwrapSampleTests` keeps it equal as exact text; `CARVE_WRITE_BARREL=1` rewrites it). Three islands, fill `0.49337657674170843`, scale `0.39503652775454423` UV/m, margin `0.015625`:
+
+| Island | Faces | Rect [u0, v0, u1, v1] | Stretch | Flipped | CG iterations |
+|---|---|---|---|---|---|
+| side | 32 (0-31) | [0.015625, 0.015625, 0.984375, 0.4269255] | 1.0927 | 0 | 43 |
+| bottom cap | face 32 | [0.015625, 0.4425505, 0.27840042, 0.7053259] | 1.0000 | 0 | 3 |
+| top cap | face 33 | [0.29402542, 0.4425505, 0.55680084, 0.7053259] | 1.0000 | 0 | 6 |
+
+The side is a strip across the top shelf (2.45 m x 1.04 m in 3D terms), the seam column (vertices 2, 10, 18, 26, 34) at both its ends: face 1's far edge at u ~0.03, face 2's at u ~0.96. The caps sit side by side on the second shelf; the bottom right is left empty.
+
+**For the dependants.** T-58 (layout): the rects above and the seams in the sample. T-61: the numbers above and the sample path (in `core-unit` and `server-regression` inputs). T-62: plant on `samples/barrel.carve`; a seam removed from the vertical column makes `unwrap` refuse the side as `faces[0]: an island of 32 faces with 2 boundary loops is not a disc ...` (ring seams kept) or the whole barrel with 0 loops (no seams).
+
+**Tests.** `tests/Carve.Core.Tests/UnwrapTests.cs` (grid isometry within `1e-9` x size in double and `1e-6` after the float round, stretch `<= 1 + 1e-9`; bent strip `<= 1 + 1e-6`; tube and cube refused; holed face allowed; bit-identical runs; the barrel's islands, margin gaps, unflipped faces, real-area density; partial set; refusals), `UnwrapSampleTests.cs`; `tests/Carve.Server.Tests/UnwrapToolTests.cs` (regression: the described example, `get_mesh` read-back equal to Core, undo, a partial set, ten refusals each changing nothing, a seamless barrel, the schema). `TestMeshes` gained `BarrelSeams`, `SeamedBarrel`, `Tube`, `Grid`, `BentStrip` (add only).
+
+**Guard** (`artifacts/review/T-56/`): `files-before.txt` / `files-after.txt` (blob hashes of every tracked file); only `Program.cs`, `tests.json`, `TestMeshes.cs` and this file changed, all adds. The verify suites render no frames, so no frame is compared. `broken-product.md`: each new check failing on a planted break:
+
+| Planted break | Fails |
+|---|---|
+| drop the `-y` screen map | grid, bent strip, holed face, barrel, sample |
+| pin by lowest ids, not distance | sample |
+| no margin between islands | barrel (gap), sample |
+| join across seams | barrel, partial set, outside set, given into, bit-identical, sample |
+| skip the real-area rescale | barrel (density), sample |
+| refuse a face's hole loops | holed face |
+| a mirror in the quarter turn | grid, bent strip |
+| the first singular-value formula | grid (stretch) |
+| the tool ignores `faces` | tool partial set, refusals |
+
+**Not checked:** no frame shows the UVs (T-57/T-58 draw them); no `unwrap` on a large mesh was timed (pins are O(boundary^2)).
