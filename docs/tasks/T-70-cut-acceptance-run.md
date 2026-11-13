@@ -104,3 +104,5 @@ Finished by an agent on **Sonnet 5.5** (claude-sonnet-5-5); round 1 was run by a
 - Agents reached for `define_mesh` to build the gable in round 1 and for `plane_cut` in round 2; both are fine, and both used `knife`, `delete` and `bridge` for the window with no description hesitation.
 - The window recipe (closed `knife` on both faces, `delete` of the two pieces, one `bridge`) was found unaided from the descriptions both times.
 - Engine needs: none new.
+
+**Review:** the person approved round 2's frame sheet (waystone review, 2026-11-12).
