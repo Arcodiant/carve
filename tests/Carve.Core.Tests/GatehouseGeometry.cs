@@ -311,6 +311,42 @@ public class GatehouseGeometry
     }
 
     [Fact]
+    public void TheLabelsFrameSeesTwoRevealFacesAtTheirMiddles()
+    {
+        var solid = SolidOf(Mesh(7));
+        Assert.Equal([31, 32, 33, 34, 35], GatehousePlan.Reveal(solid));
+        Assert.Equal(GatehousePlan.RevealsSeenFromFront, GatehousePlan.RevealSeen(solid, CameraFor(solid, "front")).Length);
+    }
+
+    /// <summary>
+    /// The Cuts stages' in-sight counts (<see cref="CutsCounts"/>), worked here on the same boxes and cuts through Core:
+    /// loop-cut-wireframe's loop edges (both ends new, at one height) and plane-cut-both-wireframe's cut edges (both ends on
+    /// the plane), among the edges of the faces turned to (0.6, 0.35, 1) (<see cref="Solid.FacingEdges"/>).
+    /// </summary>
+    [Fact]
+    public void TheCutsStagesEdgesInSightAreTheirPlannedCounts()
+    {
+        int[][] faces = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [3, 7, 6, 2], [0, 4, 7, 3], [1, 2, 6, 5]];
+        var toEye = GatehousePlan.FromFront;
+
+        var box = TestMeshes.Make([V(0, 0, 0), V(1, 0, 0), V(1, 2, 0), V(0, 2, 0), V(0, 0, 1), V(1, 0, 1), V(1, 2, 1), V(0, 2, 1)], faces);
+        var ring = LoopCut.Cut(box, (0, 3), [0.45, 0.55]);
+        var looped = SolidOf(TestMeshes.Ok(ring.Edit));
+        var made = ring.Edit.NewVertices.ToHashSet();
+        var loops = looped.AllEdges().Where(e => made.Contains(e.Lo) && made.Contains(e.Hi) && Near(looped.Vertices[e.Lo].Y, looped.Vertices[e.Hi].Y)).ToArray();
+        Assert.Equal(8, loops.Length);
+        Assert.Equal(CutsCounts.LoopEdgesInSight, looped.FacingEdges(toEye).Count(loops.Contains));
+
+        var cube = TestMeshes.Make([V(0, 0, 0), V(1, 0, 0), V(1, 1, 0), V(0, 1, 0), V(0, 0, 1), V(1, 0, 1), V(1, 1, 1), V(0, 1, 1)], faces);
+        var (point, normal) = (V(.5f, .6f, .5f), Vector3.Normalize(V(1, 2, -1)));
+        var split = SolidOf(TestMeshes.Ok(PlaneCut.Cut(cube, point, normal).Edit));
+        bool OnPlane(int v) => MathF.Abs(Vector3.Dot(split.Vertices[v] - point, normal)) < 1e-4f;
+        var cut = split.AllEdges().Where(e => OnPlane(e.Lo) && OnPlane(e.Hi)).ToArray();
+        Assert.Equal(5, cut.Length);
+        Assert.Equal(CutsCounts.PlaneCutEdgesInSight, split.FacingEdges(toEye).Count(cut.Contains));
+    }
+
+    [Fact]
     public void TheEdgeUnderTheCorniceIsNotInSightFromTheFront()
     {
         var after = SolidOf(Mesh(2));

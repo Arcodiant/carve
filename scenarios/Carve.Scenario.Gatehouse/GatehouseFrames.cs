@@ -113,17 +113,11 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
         Size(frame, 512, 512);
         Corners(frame);
         var camera = new Camera(min, max, ToVector(Front), GatehousePlan.Size);
-        var reveal = Enumerable.Range(0, solid.Faces.Length).Where(f => !solid.IsDeleted(f) && IsReveal(solid, f)).ToArray();
-        Equal("the reveal faces", 5, reveal.Length);
+        Equal("the reveal faces", 5, GatehousePlan.Reveal(solid).Length);
         var labelled = 0;
-        foreach (var face in reveal)
+        foreach (var face in GatehousePlan.RevealSeen(solid, camera))
         {
             var middle = GatehousePlan.Probes(solid).First(p => p.Face == face && p.Name == "middle");
-            if (GatehousePlan.Seen(solid, camera, middle) != face)
-            {
-                continue;
-            }
-
             labelled++;
             var at = camera.Project(middle.At);
             RequireWhite(frame, IdBox(at, face, centred: true), $"reveal face {face}'s label");
@@ -139,7 +133,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
             }
         }
 
-        Equal($"{frame.Name}: reveal faces the camera surely sees", 2, labelled);
+        Equal($"{frame.Name}: reveal faces the camera surely sees", GatehousePlan.RevealsSeenFromFront, labelled);
     }
 
     private static void RequireWhite(ScenarioFrame frame, (int X, int Y, int Width, int Height) box, string what)
@@ -149,13 +143,6 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
             Note($"{frame.Name}: no white pixel in {what}'s box {box}");
         }
     }
-
-    /// <summary>A reveal face: a quad with two corners on each of the walls' planes, inside the window (x 0.3..1.1).</summary>
-    private static bool IsReveal(Solid solid, int face) =>
-        solid.Faces[face].Loop.Length == 4
-        && solid.Faces[face].Loop.Count(v => MathF.Abs(solid.Vertices[v].Z - 0.15f) < 1e-4f) == 2
-        && solid.Faces[face].Loop.Count(v => MathF.Abs(solid.Vertices[v].Z + 0.15f) < 1e-4f) == 2
-        && solid.Faces[face].Loop.All(v => solid.Vertices[v].X is >= 0.3f - 1e-4f and <= 1.1f + 1e-4f && solid.Vertices[v].Y is >= 0.8f - 1e-4f and <= 1.75f + 1e-4f);
 
     /// <summary>The six-view sheet: each tile is its single view; the horizontal views are asked by the ray test too.</summary>
     private async Task SheetAsync(Solid solid, Vector3 min, Vector3 max, string counts, int doorFace)

@@ -15,6 +15,23 @@ internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] F
 {
     public bool IsDeleted(int face) => Faces[face].Loop.Length == 0;
 
+    /// <summary>The edges of the live faces, each once, lower id first.</summary>
+    public (int Lo, int Hi)[] AllEdges(IEnumerable<int>? only = null) =>
+        (only ?? Enumerable.Range(0, Faces.Length).Where(f => !IsDeleted(f)))
+            .SelectMany(f => Faces[f].Loop.Select((v, k) => (A: v, B: Faces[f].Loop[(k + 1) % Faces[f].Loop.Length])))
+            .Select(e => (Lo: Math.Min(e.A, e.B), Hi: Math.Max(e.A, e.B))).Distinct().OrderBy(e => e).ToArray();
+
+    /// <summary>
+    /// The edges in sight in a Cuts stage's wireframe: those of the live faces turned to the eye, a normal whose dot with
+    /// the direction toward the eye is over 0.2. The stages count their highlighted edges among them; the counts are
+    /// <see cref="CutsCounts"/>, worked in Core by <c>GatehouseGeometry</c>.
+    /// </summary>
+    public (int Lo, int Hi)[] FacingEdges(Vector3 toEye)
+    {
+        var dir = Vector3.Normalize(toEye);
+        return AllEdges(Enumerable.Range(0, Faces.Length).Where(f => !IsDeleted(f) && Vector3.Dot(Normal(f), dir) > 0.2f));
+    }
+
     /// <summary>
     /// Every edge of the live faces among <paramref name="faces"/> (every face when left out), outer loops and holes, each
     /// once as (lo, hi), ascending.
@@ -182,4 +199,14 @@ internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] F
         }).ToArray();
         return new Solid(vertices, faces);
     }
+}
+
+/// <summary>The counts of the Cuts stages' wireframes that depend on the in-sight rule (<see cref="Solid.FacingEdges"/>), worked in Core by <c>GatehouseGeometry</c>.</summary>
+internal static class CutsCounts
+{
+    /// <summary>loop-cut-wireframe: the loop edges in sight from (0.6, 0.35, 1).</summary>
+    public const int LoopEdgesInSight = 4;
+
+    /// <summary>plane-cut-both-wireframe: the cut edges in sight from (0.6, 0.35, 1).</summary>
+    public const int PlaneCutEdgesInSight = 3;
 }
