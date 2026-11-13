@@ -150,6 +150,8 @@ public sealed class ExportLimitsToolTests() : FileToolTests("carve-export-limits
         File.WriteAllText(Path.Combine(Root, "notes.txt"), "x");
         Assert.Contains("is a file but not a .json one",
             Refused(await carve.CallToolAsync("export", Args(new { path = glb, limits = Path.Combine(Root, "notes.txt"), write_limits = true }))));
+        Assert.Contains("the file being exported",
+            Refused(await carve.CallToolAsync("export", Args(new { path = glb, limits = glb, write_limits = true }))));
         Assert.False(File.Exists(glb));
     }
 

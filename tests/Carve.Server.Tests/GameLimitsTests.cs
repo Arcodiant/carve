@@ -140,6 +140,8 @@ public sealed class GameLimitsTests() : TempFolderTests("carve-limits")
             (Path.Combine(Root, "odd"), "is a folder, not a limits file"),
             (Path.Combine(Root, "notes.txt") + Path.DirectorySeparatorChar, "is a file, so no limits file can be at"),
             (Path.Combine(Root, "notes.txt", "game.json"), "is a file, so no limits file can be at"),
+            (Glb("game"), "the file being exported"),
+            (Path.Combine(Glb("game"), "x.json"), "the file being exported"),
         })
         {
             Assert.Null(LimitsSource.Find("export", argument, true, Glb("game"), out var error));

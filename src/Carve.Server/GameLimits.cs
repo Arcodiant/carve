@@ -195,6 +195,13 @@ public sealed record LimitsSource(GameLimits Limits, string? Path, bool Found, I
                 error = $"{tool}: limits: {path} is a folder, not a limits file. Nothing was written.";
                 return null;
             }
+            // The .glb is written first, so a limits path at or under it could not be written afterwards (RV-41).
+            if (string.Equals(path, target, StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith(target.TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                error = $"{tool}: limits: {path} is at or under {target}, the file being exported. Nothing was written.";
+                return null;
+            }
             for (var above = System.IO.Path.GetDirectoryName(path); above is not null; above = System.IO.Path.GetDirectoryName(above))
             {
                 if (File.Exists(above))
