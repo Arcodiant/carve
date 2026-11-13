@@ -333,7 +333,6 @@ public static class FaceSplit
         return [.. result];
     }
 
-    /// <summary>Whether segment a-b runs along the face's boundary (its midpoint within tolerance of a boundary edge).</summary>
     /// <summary>Whether segment a-b lies wholly along a loop of <paramref name="face"/>: a path of the loop from a to b,
     /// either way round, every vertex between them on the segment (so a segment along an existing edge, which splits
     /// nothing). A segment only partly along the boundary is not (<see cref="PartlyAlong"/>).</summary>
