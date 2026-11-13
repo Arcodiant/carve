@@ -161,7 +161,11 @@ public class MergeBridgeTests
     public void MixedWindingAcrossASharedEdgeIsRefused()
     {
         var mesh = TestMeshes.Make(Grid(2, 1).Vertices, [[0, 1, 4, 3], [4, 5, 2, 1]]);
-        Refused(Merge(mesh, 0, 1), "edges[1-4]", "mixed winding");
+        var r = Merge(mesh, 0, 1);
+        Refused(r, "edges[1-4]", "mixed winding");
+        // Facts only (M-4's ruling): what the faces do, with no instruction after it.
+        Assert.Equal("edges[1-4]: faces[0] and faces[1] both run this edge the same way (mixed winding), so they cannot be merged",
+            r.Errors.Single().ToString());
     }
 
     [Fact]

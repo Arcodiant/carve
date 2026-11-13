@@ -62,7 +62,7 @@ public static class FaceMerge
             {
                 var pair = clash.Min();
                 errors.Add(new MeshError(edge.Name, MeshEdits.Invariant(
-                    $"faces[{pair.A}] and faces[{pair.B}] both run this edge the same way (mixed winding), so they cannot be merged: make them wind alike first")));
+                    $"faces[{pair.A}] and faces[{pair.B}] both run this edge the same way (mixed winding), so they cannot be merged")));
                 continue;
             }
             if (uses.Length > 2)
