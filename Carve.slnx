@@ -8,6 +8,7 @@
   <Project Path="scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj" />
   <Project Path="scenarios/Carve.Scenario.Character/Carve.Scenario.Character.csproj" />
   <Project Path="scenarios/Carve.Scenario.Soft/Carve.Scenario.Soft.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Orcward/Carve.Scenario.Orcward.csproj" />
   <Project Path="scenarios/Carve.Scenario.Rig/Carve.Scenario.Rig.csproj" />
   <Project Path="scenarios/Carve.Scenario.Cuts/Carve.Scenario.Cuts.csproj" />
   <Project Path="scenarios/Carve.Scenario.Gatehouse/Carve.Scenario.Gatehouse.csproj" />
@@ -16,6 +17,7 @@
   <Project Path="tests/Carve.MaterialsLoad.Tests/Carve.MaterialsLoad.Tests.csproj" />
   <Project Path="tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj" />
   <Project Path="tests/Carve.GatehouseLoad.Tests/Carve.GatehouseLoad.Tests.csproj" />
+  <Project Path="tests/Carve.OrcwardLoad.Tests/Carve.OrcwardLoad.Tests.csproj" />
   <Project Path="spikes/Carve.ModelViewer/Carve.ModelViewer.csproj" />
   <Project Path="src/Carve.Core/Carve.Core.csproj" />
   <Project Path="src/Carve.Extensibility/Carve.Extensibility.csproj" />

@@ -73,7 +73,16 @@ public sealed partial class ScenarioDriver
     /// </summary>
     /// <param name="name">Letters, digits, dot, dash and underscore; one frame to a name.</param>
     /// <param name="arguments">The arguments of <c>render</c>.</param>
-    public async Task<ScenarioFrame> CaptureAsync(string name, object? arguments = null)
+    public Task<ScenarioFrame> CaptureAsync(string name, object? arguments = null) => CaptureToolAsync("render", name, arguments);
+
+    /// <summary>
+    /// <see cref="CaptureAsync"/> for another tool that answers with an image, such as <c>render_glb</c>: the same frame names,
+    /// run-folder PNG and decoded pixels.
+    /// </summary>
+    /// <param name="tool">The tool to call.</param>
+    /// <param name="name">The frame's name, one capture to a name.</param>
+    /// <param name="arguments">The tool's arguments.</param>
+    public async Task<ScenarioFrame> CaptureToolAsync(string tool, string name, object? arguments = null)
     {
         if (!FrameName().IsMatch(name))
         {
@@ -86,18 +95,18 @@ public sealed partial class ScenarioDriver
         }
 
         var json = ToJson(arguments);
-        var result = await InvokeAsync("render", json);
+        var result = await InvokeAsync(tool, json);
         var image = result.IsError is true ? null : result.Content.OfType<ImageContentBlock>().FirstOrDefault();
-        _log.ToolCalled("render", json, result, image is null ? null : $"frames/{name}.png");
+        _log.ToolCalled(tool, json, result, image is null ? null : $"frames/{name}.png");
 
         if (result.IsError is true)
         {
-            Fail($"Capturing '{name}': render returned a tool error: {Text(result)}");
+            Fail($"Capturing '{name}': {tool} returned a tool error: {Text(result)}");
         }
 
         if (image is null)
         {
-            Fail($"Capturing '{name}': render returned no image.");
+            Fail($"Capturing '{name}': {tool} returned no image.");
         }
 
         var png = image.DecodedData.ToArray();
