@@ -312,6 +312,12 @@ public sealed class CubeScenario : IScenario
         // cylinder, smooth with no hard edge, subdivided twice: its rims round off into a pillow. Points are the cylinder's own, as above.
         var farRim = CylAt(Ring(9, 0.97f) * new Vector3(0.9f, 1, 0.9f));   // just inside the far top rim, near the top of the image
         var capCentre = CylAt(new Vector3(0, 1, 0));
+        // With no hard rim the twice-subdivided cylinder rounds in, so facet 13's point at mid height is background there. Its far end is taken
+        // lower on the side and inside the silhouette instead: the cage's vertex 14 (315 degrees, between facets 13 and 14) at y -0.3, pulled in
+        // to 0.9 of the radius. The pillow's normal there has turned down and past the silhouette's, so it faces away from the light (n.l at or
+        // below 0) and is lit by the ambient alone: grey 0.72 x ambient 0.25 = 0.18, sRGB 118, against facet 3's 131, 13 apart under
+        // MinimumStep 6 (T-82, the person's ruling of 2026-11-13: re-pick, else lower).
+        var softSideMirror = CylAt(Ring(14, -0.3f) * new Vector3(0.9f, 1, 0.9f));
         Ok(driver, await driver.CallAsync("subdivide", new { levels = 2 }));
         var subSmooth = await driver.CaptureAsync("cylinder-subdivided-smooth-dir-2-2-1-ortho", cylView);
         CheckNotBackground(driver, subSmooth, farRim, "the subdivided cylinder just inside its far top rim, the rim being hard");
@@ -335,9 +341,9 @@ public sealed class CubeScenario : IScenario
         var subSoft = await driver.CaptureAsync("cylinder-subdivided-soft-rims-dir-2-2-1-ortho", cylView);
         CheckBackground(driver, subSoft, farRim, "just inside the far top rim, rounded away with no hard rim");
         CheckNotBackground(driver, subSoft, capCentre, "the soft cylinder's top");
-        CheckNotBackground(driver, subSoft, sideMirror, "the soft cylinder's side, on one side of the image");
-        CheckDiffers(driver, subSoft, sideMirror, sideOther, "the soft side, at its two ends across the image (a mirrored camera draws other parts)");
-        CheckBrightestOf(driver, subSoft, capCentre, "the soft top is the brightest part, so a flipped camera (top below) fails", sideMirror, sideOther);
+        CheckNotBackground(driver, subSoft, softSideMirror, "the soft cylinder's side, on one side of the image");
+        CheckDiffers(driver, subSoft, softSideMirror, sideOther, "the soft side, at its two ends across the image (a mirrored camera draws other parts)");
+        CheckBrightestOf(driver, subSoft, capCentre, "the soft top is the brightest part, so a flipped camera (top below) fails", softSideMirror, sideOther);
 
         // 3. The L-block: two concave hexagon caps and six quad sides.
         var (lVertices, lFaces) = LBlock();
