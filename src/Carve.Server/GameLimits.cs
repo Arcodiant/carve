@@ -195,6 +195,14 @@ public sealed record LimitsSource(GameLimits Limits, string? Path, bool Found, I
                 error = $"{tool}: limits: {path} is a folder, not a limits file. Nothing was written.";
                 return null;
             }
+            for (var above = System.IO.Path.GetDirectoryName(path); above is not null; above = System.IO.Path.GetDirectoryName(above))
+            {
+                if (File.Exists(above))
+                {
+                    error = $"{tool}: limits: {above} is a file, so no limits file can be at {path}. Nothing was written.";
+                    return null;
+                }
+            }
             if (!File.Exists(path) && !write)
             {
                 error = $"{tool}: limits: no limits file at {path}; write_limits: true creates it with the starting numbers. Nothing was written.";

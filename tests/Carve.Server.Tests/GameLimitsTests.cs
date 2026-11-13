@@ -75,6 +75,13 @@ public sealed class GameLimitsTests() : TempFolderTests("carve-limits")
 
     // ---- LimitsSource: where export finds the file.
 
+    /// <summary>The upward search runs past the temp root; a carve-limits.json above it would be read, or filled.</summary>
+    private void NoLimitsFileAboveRoot()
+    {
+        for (var folder = new DirectoryInfo(Root).Parent; folder is not null; folder = folder.Parent)
+            Assert.False(File.Exists(Path.Combine(folder.FullName, GameLimits.FileName)), $"a {GameLimits.FileName} in {folder.FullName} would be found by these tests");
+    }
+
     private string Glb(params string[] folders) => Path.Combine([Root, .. folders, "thing.glb"]);
 
     private void Put(string folder, string text)
@@ -99,9 +106,9 @@ public sealed class GameLimitsTests() : TempFolderTests("carve-limits")
     [Fact]
     public void No_file_means_no_limits_and_the_result_says_so()
     {
+        NoLimitsFileAboveRoot();
         var glb = Glb("game", "Content");
         var source = LimitsSource.Find("export", null, false, glb, out _)!;
-        // A file in some folder above the temp root would be found too; none is expected on a test machine.
         Assert.Null(source.Path);
         Assert.Equal(GameLimits.None, source.Limits);
         Assert.Contains($"no game limits: no carve-limits.json in {Path.GetDirectoryName(glb)} or a folder above it", source.Describe(false));
@@ -131,6 +138,8 @@ public sealed class GameLimitsTests() : TempFolderTests("carve-limits")
             (Path.Combine(Root, "lim?ts.json"), "holds"),
             (Path.Combine(Root, "notes.txt"), "is a file but not a .json one"),
             (Path.Combine(Root, "odd"), "is a folder, not a limits file"),
+            (Path.Combine(Root, "notes.txt") + Path.DirectorySeparatorChar, "is a file, so no limits file can be at"),
+            (Path.Combine(Root, "notes.txt", "game.json"), "is a file, so no limits file can be at"),
         })
         {
             Assert.Null(LimitsSource.Find("export", argument, true, Glb("game"), out var error));
@@ -158,6 +167,7 @@ public sealed class GameLimitsTests() : TempFolderTests("carve-limits")
     [Fact]
     public void Write_limits_creates_the_file_beside_the_glb_with_the_starting_numbers()
     {
+        NoLimitsFileAboveRoot();
         var source = LimitsSource.Find("export", null, true, Glb("game", "Content"), out _)!;
         Assert.Equal(GameLimits.Starting, source.Limits);
         Assert.True(source.NeedsWrite);

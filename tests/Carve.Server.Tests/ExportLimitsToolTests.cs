@@ -81,6 +81,26 @@ public sealed class ExportLimitsToolTests() : FileToolTests("carve-export-limits
     }
 
     [Fact]
+    public async Task With_no_file_a_model_past_every_starting_number_gets_no_limit_warning()
+    {
+        NoLimitsFileAboveRoot();
+        var (carve, _) = await StartAsync(mesh: null);
+        using var _carve = carve;
+        // A flat grid of 51 by 51 quads, 5202 triangles, and ten colours: past Orcward's 5000 and 8.
+        var vertices = new List<float[]>();
+        for (var y = 0; y <= 51; y++) for (var x = 0; x <= 51; x++) vertices.Add([x, y, 0]);
+        var faces = new List<int[]>();
+        for (var y = 0; y < 51; y++) for (var x = 0; x < 51; x++) faces.Add([y * 52 + x, y * 52 + x + 1, (y + 1) * 52 + x + 1, (y + 1) * 52 + x]);
+        Ok(await carve.CallToolAsync("define_mesh", Args(new { vertices, faces })));
+        for (var c = 0; c < 10; c++) Ok(await carve.CallToolAsync("set_colour", Args(new { faces = new[] { c }, colour = $"#0000{c:X2}" })));
+
+        var line = Ok(await carve.CallToolAsync("export", """{"path":"big.glb"}"""));
+        Assert.Contains("5202 triangles", line);
+        Assert.Contains("; no game limits: no carve-limits.json in ", line);
+        Assert.DoesNotContain("above the game's", line);
+    }
+
+    [Fact]
     public async Task Write_limits_starts_the_file_then_fills_only_what_is_missing()
     {
         var (carve, _) = await StartAsync();
