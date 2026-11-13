@@ -135,16 +135,22 @@ public sealed class OrcwardScenario : IScenario
             Record(driver, $"{name}-rest-front", "twist", twisted, good);
         }
 
-        var tsv = new StringBuilder("name\tkind\tdiffering\ttotal\tpercent\tfails\tforeground\n");
+        var tsv = new StringBuilder("name\tkind\tdiffering\ttotal\tpercent\tpatch\tfails\tforeground\n");
         foreach (var r in _results)
         {
-            tsv.Append($"{r.Name}\t{r.Kind}\t{r.Differing}\t{r.Total}\t{r.Percent:0.000}\t{(r.Fails ? "fails" : "passes")}\t{r.Foreground}\n");
+            tsv.Append($"{r.Name}\t{r.Kind}\t{r.Differing}\t{r.Total}\t{r.Percent:0.000}\t{r.LargestPatch}\t{(r.Fails ? "fails" : "passes")}\t{r.Foreground}\n");
         }
 
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "differences.tsv"), tsv.ToString());
         foreach (var r in _results.Where(r => r.Kind == "good" && r.Fails))
         {
-            driver.Fail($"{r.Name}: a good frame fails Orcward's rule, {r.Differing} px ({r.Percent:0.000} %)");
+            driver.Fail($"{r.Name}: a good frame fails Orcward's rule, {r.Differing} px ({r.Percent:0.000} %), largest patch {r.LargestPatch} px");
+        }
+
+        // Each twisted limb is a patch and must fail (the cluster rule).
+        foreach (var r in _results.Where(r => r.Kind == "twist" && !r.Fails))
+        {
+            driver.Fail($"{r.Name}: a twisted limb passes the rule, {r.Differing} px, largest patch {r.LargestPatch} px");
         }
 
         // A wrong file must fail at one frame at least; a swapped bone order or inverse bind shows only where a clip moves the bone.

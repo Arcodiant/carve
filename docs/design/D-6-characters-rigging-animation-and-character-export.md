@@ -162,10 +162,23 @@ The limits are the game's, not Carve's (T-51, ruled 2026-11-13). They live in `c
 
 **Certainty:** Leaning · **Strictness:** Rule
 
-T-48 starts from Orcward's rule: a pixel differs when R, G or B differs by more than 8 of 255, and a frame fails past 0.5 % of its pixels. It is loosened only on differences measured at T-48, and only by the person. A wrong bone, a twisted limb or a broken silhouette must always fail; shading noise need not.
+T-48 starts from Orcward's rule: a pixel differs when R, G or B differs by more than 8 of 255, and a frame fails past 0.5 % of its pixels. It is loosened only on differences measured at T-48, and only by the person.
 
-**Alternatives:** counting only pixels on the character. A 512 x 512 frame allows about 1,300 differing pixels, which may be enough to hide a small limb. T-48 shows whether it is.
-**Would change if:** a small twisted limb passes the whole-frame rule.
+**Ruling, 2026-11-13 (the person), after T-48 found a twisted hand passing the whole-frame count:** the rule keeps 8/255 and 0.5 % for shading noise, and also fails any frame with a connected patch of differing pixels larger than 50 px (8-connected, so a limb's diagonal outline stays one patch). A twisted limb is a patch; noise is scattered. 50 was kept because it separates with a wide margin: the largest patch in any good frame is 2 px, in any twist 130 px or more.
+
+| Frames (512 x 512 = 262,144 px) | Differing px | Largest patch |
+|---|---|---|
+| ten good frames (rest front and side, Idle 0.5/1.0/1.5 s, Walk 0, 0.125, 0.25, 0.5, 0.875 s) | 0 each, Walk 0.25 s: 2 | 0 each, Walk 0.25 s: 2 |
+| Hand_L twisted Y 45 / Y 90 / X 45 / Z 45 / Z 90 (rest, front) | 159 / 244 / 339 / 284 / 599 | 130 / 135 / 249 / 275 / 597 |
+| swapped bone order (Walk 0.5 side / front; rest 0) | 4,027 / 3,147 | 4,027 / 2,456 |
+| swapped inverse binds (Walk 0.5 side / front; rest 0) | 697 / 9,809 | 268 / 5,484 |
+| reversed winding (rest / Walk 0.5 side / front) | 39,415 / 31,622 / 38,184 | 39,401 / 31,604 / 38,184 |
+| dropped piece (rest) | 26,979 | 26,589 |
+
+**Ruling, 2026-11-13 (the person), on wrong files:** the suite must fail on every wrong file, but which frame catches it may vary. A rest frame is the bind pose with no palette, so a swapped bone order or swapped inverse binds are invisible at rest (0 px) and caught only in a clip frame; seen from the side a shift in X lies along the view, so the swapped inverse binds are caught from the front (the cluster rule also catches them from the side). Each wrong file therefore fails at one frame at least.
+
+**Alternatives:** counting only pixels on the character (a twist is 0.38 % to 1.42 % of the character's pixels, still under 0.5 % for the smallest); a smaller region or a lower limit. The cluster rule was chosen over both.
+**Would change if:** a good frame shows a patch near 50 px, or a twist falls below it.
 
 ### Smooth shading is per mesh, with hard edges marked
 

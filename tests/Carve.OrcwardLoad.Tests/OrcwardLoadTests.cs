@@ -61,11 +61,11 @@ public class OrcwardLoadTests
         }
     }
 
-    private sealed record Row(string Name, string Kind, int Differing, int Total, bool Fails);
+    private sealed record Row(string Name, string Kind, int Differing, int Total, bool Fails, int Patch);
 
     private static List<Row> Rows() =>
         File.ReadAllLines(Path.Combine(RunFolder, "differences.tsv")).Skip(1).Select(l => l.Split('\t'))
-            .Select(p => new Row(p[0], p[1], int.Parse(p[2], CultureInfo.InvariantCulture), int.Parse(p[3], CultureInfo.InvariantCulture), p[5] == "fails")).ToList();
+            .Select(p => new Row(p[0], p[1], int.Parse(p[2], CultureInfo.InvariantCulture), int.Parse(p[3], CultureInfo.InvariantCulture), p[6] == "fails", int.Parse(p[5], CultureInfo.InvariantCulture))).ToList();
 
     [SkippableOrRun]
     public void Every_good_frame_passes_Orcwards_rule_at_rest_and_between_keys()
@@ -75,7 +75,17 @@ public class OrcwardLoadTests
         Assert.Contains(good, r => r.Name == "rest-front");
         Assert.Contains(good, r => r.Name == "idle-0.500-front");
         Assert.Contains(good, r => r.Name == "walk-0.125-side");
-        Assert.All(good, r => Assert.False(r.Fails, $"{r.Name}: {r.Differing} of {r.Total} px"));
+        Assert.All(good, r => Assert.False(r.Fails, $"{r.Name}: {r.Differing} of {r.Total} px, largest patch {r.Patch} px"));
+    }
+
+    [SkippableOrRun]
+    public void Every_twisted_limb_fails_as_a_patch()
+    {
+        // The cluster rule (ruling of 2026-11-13): a patch of differing pixels past 50 px fails the frame, whatever the whole-frame count.
+        var twists = Rows().Where(r => r.Kind == "twist").ToList();
+        Assert.Equal(5, twists.Count);
+        Assert.All(twists, r => Assert.True(r.Fails && r.Patch > 50, $"{r.Name}: {r.Differing} px, largest patch {r.Patch} px"));
+        Assert.All(Rows().Where(r => r.Kind == "good"), r => Assert.True(r.Patch <= 50, $"{r.Name}: patch {r.Patch} px"));
     }
 
     [SkippableOrRun]

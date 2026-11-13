@@ -9,10 +9,13 @@ internal static class Comparison
     /// <summary>Orcward's rule (D-6): a pixel differs past this many of 255 in R, G or B.</summary>
     public const int PixelThreshold = 8;
 
-    public sealed record Result(string Name, string Kind, int Differing, int Total, int Foreground)
+    /// <summary>The cluster rule (the person's ruling, 2026-11-13): a frame also fails past this many pixels in one connected patch.</summary>
+    public const int PatchLimit = 50;
+
+    public sealed record Result(string Name, string Kind, int Differing, int Total, int Foreground, int LargestPatch)
     {
-        /// <summary>A frame fails past 0.5 % of its pixels.</summary>
-        public bool Fails => (long)Differing * 200 > Total;
+        /// <summary>A frame fails past 0.5 % of its pixels, or with a connected patch of differing pixels larger than <see cref="PatchLimit"/>.</summary>
+        public bool Fails => (long)Differing * 200 > Total || LargestPatch > PatchLimit;
 
         public double Percent => 100.0 * Differing / Total;
     }
@@ -29,11 +32,13 @@ internal static class Comparison
         }
 
         var count = 0;
+        var differs = new bool[a.Width * a.Height];
         for (var i = 0; i < a.Pixels.Length; i += 4)
         {
             if (Differs(a, b, i))
             {
                 count++;
+                differs[i / 4] = true;
             }
         }
 
@@ -46,7 +51,54 @@ internal static class Comparison
             }
         }
 
-        return new Result(name, kind, count, a.Width * a.Height, foreground);
+        return new Result(name, kind, count, a.Width * a.Height, foreground, LargestPatchOf(differs, a.Width, a.Height));
+    }
+
+    /// <summary>The size of the largest 8-connected patch of differing pixels (a diagonal neighbour joins: a limb's outline is diagonal).</summary>
+    public static int LargestPatchOf(bool[] differs, int w, int h)
+    {
+        var seen = new bool[differs.Length];
+        var stack = new Stack<int>();
+        var largest = 0;
+        for (var start = 0; start < differs.Length; start++)
+        {
+            if (!differs[start] || seen[start])
+            {
+                continue;
+            }
+
+            var size = 0;
+            seen[start] = true;
+            stack.Push(start);
+            while (stack.Count > 0)
+            {
+                var p = stack.Pop();
+                size++;
+                int px = p % w, py = p / w;
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = px + dx, ny = py + dy;
+                        if (nx < 0 || ny < 0 || nx >= w || ny >= h)
+                        {
+                            continue;
+                        }
+
+                        var n = ny * w + nx;
+                        if (differs[n] && !seen[n])
+                        {
+                            seen[n] = true;
+                            stack.Push(n);
+                        }
+                    }
+                }
+            }
+
+            largest = Math.Max(largest, size);
+        }
+
+        return largest;
     }
 
     /// <summary>Writes the triptych as a PNG: the two frames and the difference (the render dimmed, differing pixels red).</summary>
