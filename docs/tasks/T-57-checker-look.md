@@ -127,3 +127,29 @@ Per frame at least: front: white at the +Z side's top-left, violet at its top-ri
 ### Rulings (the person, 2026-11-13)
 
 All eleven as recommended. On rule 9 in particular: T-57 lands UVs through `Model.Combined` as its first commit, pushed early to `milestone/M-6`, and T-59, running beside it, rebases onto that commit and does not change `Combined` itself. On rule 10: the white and magenta thresholds are shown to the person, from the probe frame, before they are used.
+
+### Hand-off
+
+Claude Opus 5.5 (`claude-opus-5-5`), 2026-11-13, at the ~60-tool-call checkpoint. Worktree `branches/task/T-57`, branch `task/T-57` (pushed).
+
+**Done (committed):**
+
+- `1cadd61` (pushed to `origin/task/T-57` for T-59, ruling 9): `Model.Combine` carries each mesh's UVs (face ids offset by the faces before it) and seams (by the vertices before it); no UVs or seams anywhere gives a combined mesh without them, as before. Tests in `tests/Carve.Core.Tests/ModelTests.cs`.
+- `1948d22`: `src/Carve.Server/CheckerTexture.cs` (API as the Plan; pinned SHA-256 `27EBA66D119AAC9255DBD826EB165AE918976FF5123D226367C0CADC741B53EC`, matched by an independent Python build of the same formula); `Look.Checker`, `LookScene.Uvs`, `LookMeshes.CornerUvs`/`CheckerColours`/`Unmapped`; `MeshBridge.ToMeshData(mesh, space, uvs?)` writes `TexCoord` only when given; `RenderSystem.Checker` (internal lazy `Texture`, `Rgba8Srgb`, `PixelArt`, no mips, for T-58) and one lazy `LitTextured` material; `RenderTool` mode `checker` (validation, `AllowedValues`, error texts, description with the worked example, `weights` refused with it, caption `checker` then `no face has UVs` counted over the named mesh else the drawn whole).
+- `scenarios/Carve.Scenario.Crate/CheckerColours.cs`: the classifier (nearest hue, value, white, magenta), linked into `Carve.Server.Tests`; a unit test holds its hues equal to `CheckerTexture.Hues`.
+- Tests: `CheckerTextureTests` (unit: cells, dark formula, pinned hash, Compose A/C/B UVs, unmapped and highlight colours, other looks unchanged by UVs, `ToMeshData` unchanged) and `CheckerLookTests` (regression: the probe). All 4 pass locally.
+
+**The probe (Step 0) passed:** `LitTextured` draws the checker headless, unflipped (white at the +Z face's top-left as seen, dark red at row 7), and multiplies vertex colour (unmapped faces lit magenta: (250,0,250) on +y, (198,0,198) on +x). No engine need. Frames and the 64 sampled cells: `artifacts/checker-tests/` in the worktree and `G:\My Drive\artifacts\carve\M-6\T-57\round-1\`.
+
+**Ruling 10 thresholds, approved by the person (Waystone, round-1):** white = channel spread <= 24 and least channel >= 120; magenta = G <= 30, |R-B| <= 24, min(R,B) - G >= 100; hue = nearest of eight, no bound.
+
+**Guard baseline:** queued at base `63d5d83` (before any code), all done: scenario-cube `J-20261113-150005-42a58a`, -crate `J-20261113-150006-97245e`, -shed `J-20261113-150007-ffee34`, -export `J-20261113-150008-52c594`, -character `J-20261113-150009-23cdd6`. Not yet fetched: `cairn test artifacts <job> --out <dir>` and hash every frame (from `run.json`) and exported file, then compare with verify's run.
+
+**Left:**
+
+1. Regression tests for each argument family (Plan's list), the all-magenta mesh and its caption, `weights` + `checker` refused, the mode error text, and a `shaded` frame of a mesh with UVs byte-equal to the same mesh without.
+2. `CameraPixels`: the `UpFor` rule (-Z up when |dir.Y| > cos 1°) for the `+y` frame.
+3. `scenarios/Carve.Scenario.Crate/CrateChecker.cs` with `CrateUvs.Lay(Shape)` and the six frames + `undo` + `crate-front-after-checker`, run after `CrateLooks`; each check worked against the geometry first.
+4. Guard comparison; broken-product table (incl. a v-flipped upload); `verify`; the person's approval of the new frames (round-2); `### As built`; `cairn lint`; `finish`.
+
+**Not checked:** no scenario or `verify` run yet; no frame has been opened by an agent (the probe frames went to the person only).
