@@ -34,6 +34,7 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/**/*.csproj",
         "spikes/**/*.csproj"
       ],
@@ -50,6 +51,7 @@
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "samples/leaky-shed.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
@@ -270,6 +272,7 @@
         },
         "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],
@@ -297,6 +300,8 @@
         "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
         "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsChecks.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
         "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "samples/gatehouse.carve",
         "scripts/run-scenario.ps1",
