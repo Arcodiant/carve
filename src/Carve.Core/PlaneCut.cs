@@ -31,8 +31,9 @@ public sealed record PlaneCutResult(EditResult Edit, IReadOnlyList<string> Warni
 /// along that line, each gap between consecutive crossings whose middle is inside the face (not on its boundary) one
 /// <see cref="FaceCut"/>. A face with every corner on the plane is not split.</item>
 /// <item>With <see cref="PlaneKeep.Above"/> or <see cref="PlaneKeep.Below"/>, each face of the split mesh is on one side
-/// (every corner on that side or on the plane; a face in the plane goes with the side its normal points to), and every
-/// face on the other side is deleted with what <see cref="MeshDelete.Closure"/> takes.</item>
+/// (every corner on that side or on the plane), and every face on the other side is deleted with what
+/// <see cref="MeshDelete.Closure"/> takes. A face in the plane is the border: it stays, untouched, whichever side is kept,
+/// and no cap is laid over it (ruled 2026-11-13).</item>
 /// <item>The fill: the edges between a kept face and a deleted one, each taken the other way round, chain into loops;
 /// each closed loop is a cap wound outward on the kept side, a loop wound the other way a hole of the smallest cap around
 /// it (T-63). A chain that does not close (an open mesh) is left open, with a warning naming its ends. On a smooth mesh
@@ -89,23 +90,29 @@ public static class PlaneCut
         if (keep == PlaneKeep.Both)
             return new PlaneCutResult(split, [], [.. segments.Distinct().Order()]);
 
-        // Keeping one side: every face of the split mesh on the other side goes.
+        // Keeping one side: every face of the split mesh on the other side goes. A face in the plane stays whichever side
+        // is kept, untouched, as it is the border (ruled 2026-11-13).
         var cut = split.Mesh!;
         var above = keep == PlaneKeep.Above;
+        bool InPlane(int f) => cut.Faces[f].Corners.All(c => Math.Abs(Dist(cut, c)) <= tol);
         var gone = new List<int>();
         foreach (var f in cut.LiveFaces)
-            if (IsAbove(cut, f, v => Dist(cut, v), n, tol) != above) gone.Add(f);
+            if (!InPlane(f) && IsAbove(cut, f, v => Dist(cut, v), n, tol) != above) gone.Add(f);
         if (gone.Count == cut.LiveFaceCount)
             return Refused([new MeshError("keep", MeshEdits.Invariant($"this would leave nothing: every face is {(above ? "below" : "above")} the plane"))]);
         var deleted = MeshDelete.Closure(cut, [], gone);
 
-        // The kept side's border on the plane: each kept face's edge a deleted face has the other way round.
+        // The kept side's border on the plane: each kept face's edge a deleted face has the other way round. A kept face in
+        // the plane facing out of the kept side already closes it there, so it borders as any kept face does; one facing
+        // into the kept side is the cut-away side's surface, so for the border it counts with the deleted faces, and the
+        // cap fills only what it leaves open, never over it.
         var dead = deleted.Faces.ToHashSet();
+        var facingIn = cut.LiveFaces.Where(f => !dead.Contains(f) && InPlane(f) && Dot(D(cut.FaceNormal(f)), n) > 0 == above).ToHashSet();
         var deadEdges = new HashSet<(int, int)>();
-        foreach (var f in dead) foreach (var (a, b) in Edges(cut.Faces[f])) deadEdges.Add((a, b));
+        foreach (var f in dead.Concat(facingIn)) foreach (var (a, b) in Edges(cut.Faces[f])) deadEdges.Add((a, b));
         var border = new List<(int A, int B)>();
         foreach (var f in cut.LiveFaces)
-            if (!dead.Contains(f))
+            if (!dead.Contains(f) && !facingIn.Contains(f))
                 foreach (var (a, b) in Edges(cut.Faces[f]))
                     if (deadEdges.Contains((b, a)) && Math.Abs(Dist(cut, a)) <= tol && Math.Abs(Dist(cut, b)) <= tol)
                         border.Add((b, a));
@@ -136,13 +143,12 @@ public static class PlaneCut
     }
 
     /// <summary>Whether face <paramref name="f"/> is on the side the normal points to: every corner on that side or on
-    /// the plane, or, for a face in the plane, its normal that way.</summary>
+    /// the plane. It is not asked of a face in the plane, which stays whichever side is kept.</summary>
     private static bool IsAbove(PolygonMesh mesh, int f, Func<int, double> dist, Vector3D n, double tol)
     {
         var d = mesh.Faces[f].Corners.Select(dist).ToArray();
         var min = d.Min();
         var max = d.Max();
-        if (max <= tol && min >= -tol) return Dot(D(mesh.FaceNormal(f)), n) > 0;
         if (min >= -tol) return true;
         if (max <= tol) return false;
         return d.Sum() > 0;

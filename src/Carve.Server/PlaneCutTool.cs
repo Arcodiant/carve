@@ -15,7 +15,7 @@ public sealed class PlaneCutTool(ModelStore store)
         + "keep both (the default) only splits: every face the plane crosses is split into pieces along it, a new vertex where it crosses an edge (shared by both faces on that edge, which keep their ids). "
         + "keep above or below also deletes every face wholly on the other side, with the vertices left with no face, as delete does; with fill (default true) each closed loop of cut edges is then capped with a new face wound outward, two nested loops giving a cap with a hole. "
         + "A cut loop that is not closed (an open mesh) is left open, with a warning naming its ends. On a smooth mesh the caps' border edges are marked hard. "
-        + "A face lying in the plane is not split: with keep it goes with the side its normal points to. faces limits the cut to those faces (keep both only). "
+        + "A face lying in the plane is not split: with keep it stays, with its id and colour, whichever side is kept, and no cap is laid over it. faces limits the cut to those faces (keep both only). "
         + "A split face keeps its id for the piece holding its first corner (or the next corner off the cut); the other pieces are appended. Pieces take the face's colour and groups, split hard edges stay hard, new edges are soft, and a new vertex blends its edge's ends' weights. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[{face, pieces}]}: split lists each split face with its pieces, its own id first; "
         + "a piece the split appended and keep then removed is in both split and deleted, and created lists only what is left. "
