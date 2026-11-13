@@ -70,7 +70,7 @@ public sealed class KnifeTool(ModelStore store)
         if (Absent(value)) { errors.Add("points: required but missing"); return result; }
         if (value!.Value.ValueKind != JsonValueKind.Array)
         {
-            errors.Add($"points: expected an array of [x, y, z], got {value.Value.ValueKind.ToString().ToLowerInvariant()}");
+            errors.Add($"points: expected an array of [x, y, z], got {Describe(value.Value)}");
             return result;
         }
         var i = 0;

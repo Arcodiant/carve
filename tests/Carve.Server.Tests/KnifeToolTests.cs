@@ -70,6 +70,8 @@ public sealed class KnifeToolTests() : TempFolderTests("carve-knife")
         Assert.Contains("points[1][1]: expected a number", bad);
         Assert.Contains("closed", bad);
         Assert.Contains("edge", bad);
+        // The kind is named as every other argument error names it.
+        Assert.Contains("points: expected an array of [x, y, z], got an object", TextOf(await carve.CallToolAsync("knife", """{"points":{}}""")));
 
         // Nothing was changed or added to undo.
         var mesh = Ok(await carve.CallToolAsync("get_mesh", "{}"));
