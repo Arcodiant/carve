@@ -82,7 +82,7 @@ public class EditToolTests
 
         var getMesh = Description(tools, "get_mesh");
         var start = getMesh.IndexOf("Returns JSON {", StringComparison.Ordinal);
-        var shape = getMesh[start..(getMesh.IndexOf("(from define_group)}", start, StringComparison.Ordinal) + 1)];
+        var shape = getMesh[start..(getMesh.IndexOf("}. Here vertices", start, StringComparison.Ordinal) + 1)];
         Assert.Contains("edges:[{vertices:[a,b]", shape);
         Assert.DoesNotContain("null in its slot", shape);
         Assert.Contains("null in its slot", getMesh);

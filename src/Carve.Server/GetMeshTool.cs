@@ -13,7 +13,7 @@ public sealed class GetMeshTool(ModelStore store)
         + "Returns JSON {vertices:[{id, at:[x,y,z]}], faces:[{id, vertices:[ids, counter-clockwise seen from outside], or for a face with holes {loop:[ids], holes:[[ids], ...]} as define_mesh takes it, normal:[x,y,z] (unit, outward), centre:[x,y,z] (mean of the outer loop's corners)}], "
         + "edges:[{vertices:[a,b] (a < b), faces:[ids of the faces using the edge]}], "
         + "closed, bounds:{min,max}, warnings:[], "
-        + "colours:[{colour:\"#RRGGBB\" as given to set_colour, faces:[ids]}] (the coloured faces only), groups:[{name, faces:[ids]}] (from define_group)}. Here vertices, faces and edges are lists, where define_mesh and the edits return their counts. "
+        + "colours:[{colour:\"#RRGGBB\" as given to set_colour, faces:[ids]}] (the coloured faces only), groups:[{name, faces:[ids]}] (from define_group), and, only when the mesh has them, uvs:[{face, uv:[[u,v], ...]}] (one pair per corner in the face's loop order, outer loop then each hole; glTF axes, origin top-left, v down; the mapped faces only, as set_uvs gave them) and seams:[[a,b]...] (sorted pairs, a < b, from mark_edges seam)}. Here vertices, faces and edges are lists, where define_mesh and the edits return their counts. "
         + "A deleted vertex or face (see delete) is null in its slot of vertices or faces: its id is never given out again, so every other id keeps its place. "
         + "Coordinates are in metres (1 unit = 1 m), Y up. The output is the whole mesh, never trimmed, so it grows with the mesh. "
         + "With no mesh yet it is a tool error saying to call define_mesh or open. "
@@ -50,6 +50,9 @@ public sealed class GetMeshTool(ModelStore store)
             .GroupBy(c => c.Value)
             .Select(g => new { colour = g.Key, faces = g.Select(c => c.Key).ToArray() }).ToArray();
         body["groups"] = (style?.Groups ?? []).Select(g => new { name = g.Name, faces = g.Faces }).ToArray();
+        if (target.Uvs is { MappedFaces.Count: > 0 } uvs)
+            body["uvs"] = uvs.MappedFaces.Select(f => new { face = f, uv = uvs.Of(f)!.Select(p => new[] { p.X, p.Y }).ToArray() }).ToArray();
+        if (target.Seams.Count > 0) body["seams"] = target.Seams.Select(e => new[] { e.Lo, e.Hi }).ToArray();
         foreach (var (k, v) in Report(target))
         {
             if (k is "vertices" or "faces" or "edges") continue;

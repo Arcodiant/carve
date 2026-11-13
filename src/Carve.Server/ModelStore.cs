@@ -120,6 +120,14 @@ public sealed class ModelStore
         out List<string> refused, out string? problem) =>
         Change(tool, name, change, (mesh, shade) => mesh.WithShade(shade), out refused, out problem);
 
+    /// <summary>
+    /// Replaces the mesh <paramref name="name"/> picks with the one <paramref name="change"/> returns (or the problems that refuse it),
+    /// under the write lock and as one step for undo: for an edit that changes more than one attribute (set_uvs, mark_edges).
+    /// </summary>
+    public ModelSnapshot? Rework(string tool, string? name, Func<PolygonMesh, (PolygonMesh? Mesh, List<string> Problems)> change,
+        out List<string> refused, out string? problem) =>
+        Change(tool, name, change, (_, mesh) => mesh, out refused, out problem);
+
     private ModelSnapshot? Change<T>(string tool, string? name, Func<PolygonMesh, (T? Value, List<string> Problems)> change,
         Func<PolygonMesh, T, PolygonMesh> apply, out List<string> refused, out string? problem)
         where T : class
