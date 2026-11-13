@@ -4,7 +4,7 @@ description: >-
 ---
 # T-57 — Checker look
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
