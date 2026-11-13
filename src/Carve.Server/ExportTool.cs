@@ -18,7 +18,8 @@ public sealed class ExportTool(ModelStore store)
         + "What is written: one mesh on one node, both named after the file name without its extension (crate.glb gives crate), the node's transform the identity; "
         + "the triangles render draws, with flat normals: each face keeps its own normal, so every edge is hard; "
         + "one matte grey material named 'carve' (base colour 0.72, 0.72, 0.70, metallic 0, roughness 1, single-sided), and for faces coloured with set_colour one more opaque matte material per colour, named 'carve #RRGGBB', its baseColorFactor the linear form of the colour (metallic 0, roughness 1), a primitive for each; "
-        + "positions and normals only, with no UVs, colours or textures. "
+        + "positions and normals, and when any face has UVs a TEXCOORD_0 holding each corner's UV exactly as Carve holds it (no conversion: glTF's axes, (0, 0) at the image's top-left), a vertex split wherever its UV or normal differ; "
+        + "a model with no UVs has no TEXCOORD_0; the corners of a face without UVs are written as (0, 0), and the result warns '<mesh>: N faces have no UVs; their corners are written as (0, 0)' with the first face ids; no vertex colours or textures. "
         + "Axes and units are the mesh's own: +Y up, +Z front, 1 unit = 1 m, the origin where you authored it. Nothing is scaled, turned, recentred or converted, "
         + "so build the model at the size and place the game wants it. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
@@ -99,7 +100,7 @@ public sealed class ExportTool(ModelStore store)
         var bytes = GlbExport.Write(mesh, triangles, target.Stem);
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, replace)) return Error(writeError!);
 
-        return Line(Summary(mesh, target, replaced, triangles.Count));
+        return Line(Summary(mesh, target, replaced, triangles.Count, GlbExport.UvWarnings(model)));
     }
 
     /// <summary>Clips mode: the armature, skin and animations with no mesh, or a refusal that writes nothing.</summary>
@@ -163,7 +164,7 @@ public sealed class ExportTool(ModelStore store)
             : $"{names.Length.ToString(CultureInfo.InvariantCulture)} materials {NameList.Quoted(names)}";
     }
 
-    private static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles)
+    private static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles, IReadOnlyList<string> uvWarnings)
     {
         var report = MeshReport.Create(mesh);
         var (min, max) = (report.BoundsMin, report.BoundsMax);
@@ -174,9 +175,9 @@ public sealed class ExportTool(ModelStore store)
         var line = $"exported {target.Written(replaced)}: "
             + $"{triangles.ToString(CultureInfo.InvariantCulture)} triangles, {Materials(mesh)}, "
             + $"size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}";
-        if (report.Warnings.Count > 0)
-            line += $"; {report.Warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): "
-                + string.Join("; ", report.Warnings.Select(w => w.ToString().ReplaceLineEndings(" ")));
+        var warnings = report.Warnings.Select(w => w.ToString().ReplaceLineEndings(" ")).Concat(uvWarnings).ToList();
+        if (warnings.Count > 0)
+            line += $"; {warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): " + string.Join("; ", warnings);
         return line;
     }
 }

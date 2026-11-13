@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using Carve.Core;
 using SharpGLTF.Geometry;
@@ -49,22 +50,63 @@ public static class GlbExport
     /// <summary>One opaque matte material per colour, metallic 0 and roughness 1, its base colour the linear form of the sRGB hex (D-6).</summary>
     public static byte[] Write(IReadOnlyList<ShadedTriangle> triangles, string name) => Write(null, triangles, name);
 
-    /// <summary>As above, with the colours of <paramref name="mesh"/>.</summary>
-    public static byte[] Write(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name)
+    /// <summary>True when any live face of <paramref name="mesh"/> has UVs: only then is <c>TEXCOORD_0</c> written.</summary>
+    internal static bool HasUvs(PolygonMesh? mesh) => mesh?.Uvs is { } uvs && mesh.LiveFaces.Any(uvs.IsMapped);
+
+    /// <summary>The UV of corner <paramref name="vertex"/> of <paramref name="face"/>: its own, or (0, 0) for an unmapped face.</summary>
+    internal static Vector2 UvAt(PolygonMesh mesh, int face, int vertex) =>
+        mesh.Uvs?.Of(face) is { } uv ? uv[mesh.Faces[face].CornerOf(vertex)] : Vector2.Zero;
+
+    /// <summary>
+    /// The warning for each piece with faces that have no UVs while the export carries UVs, or none when no piece has any.
+    /// The text is <c>&lt;mesh&gt;: N faces have no UVs; their corners are written as (0, 0)</c>, then the first face ids.
+    /// </summary>
+    public static IReadOnlyList<string> UvWarnings(Model model)
     {
-        var mesh2 = new MeshBuilder<VertexPositionNormal>(name);
-        var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, VertexEmpty, VertexEmpty>>();
+        if (!model.Meshes.Any(m => HasUvs(m.Mesh))) return [];
+        var warnings = new List<string>();
+        foreach (var (name, mesh) in model.Meshes)
+        {
+            var bare = mesh.LiveFaces.Where(f => mesh.Uvs?.IsMapped(f) != true).ToList();
+            if (bare.Count == 0) continue;
+            var shown = string.Join(", ", bare.Take(UvWarningIds));
+            warnings.Add(bare.Count == 1
+                ? $"{name}: 1 face has no UVs; its corners are written as (0, 0) (face {shown})"
+                : $"{name}: {bare.Count.ToString(CultureInfo.InvariantCulture)} faces have no UVs; their corners are written as (0, 0) (faces {shown}"
+                    + (bare.Count > UvWarningIds ? $" and {(bare.Count - UvWarningIds).ToString(CultureInfo.InvariantCulture)} more)" : ")"));
+        }
+        return warnings;
+    }
+
+    private const int UvWarningIds = 5;
+
+    /// <summary>As above, with the colours of <paramref name="mesh"/>.</summary>
+    public static byte[] Write(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name) =>
+        HasUvs(mesh)
+            ? Write<VertexTexture1>(mesh, triangles, name, (m, i, v) => new VertexTexture1(UvAt(m!, i, v)), true)
+            : Write<VertexEmpty>(mesh, triangles, name, (_, _, _) => default, false);
+
+    private static byte[] Write<TvM>(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name,
+        Func<PolygonMesh?, int, int, TvM> texture, bool uvs)
+        where TvM : struct, IVertexMaterial
+    {
+        var mesh2 = new MeshBuilder<VertexPositionNormal, TvM, VertexEmpty>(name);
+        var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, TvM, VertexEmpty>>();
         foreach (var (materialName, colour) in Materials(mesh, triangles))
             primitives[materialName] = mesh2.UsePrimitive(Material(materialName, colour));
 
-        foreach (var t in triangles)
+        // Shading.Triangles is in Triangulator order, so the ids of a triangle's vertices (and so its corners) are read from there.
+        var ids = uvs ? Triangulator.Triangulate(mesh!) : null;
+        for (var i = 0; i < triangles.Count; i++)
         {
+            var t = triangles[i];
             var colour = ColourOf(mesh, t.Face);
             var primitive = primitives[colour is null ? MaterialName : $"{MaterialName} {colour}"];
+            var id = ids?[i] ?? default;
             primitive.AddTriangle(
-                new VertexPositionNormal(t.A, t.NormalA),
-                new VertexPositionNormal(t.B, t.NormalB),
-                new VertexPositionNormal(t.C, t.NormalC));
+                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.A, t.NormalA), uvs ? texture(mesh, t.Face, id.A) : default),
+                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.B, t.NormalB), uvs ? texture(mesh, t.Face, id.B) : default),
+                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.C, t.NormalC), uvs ? texture(mesh, t.Face, id.C) : default));
         }
 
         var scene = new SceneBuilder();

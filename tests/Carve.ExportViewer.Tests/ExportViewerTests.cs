@@ -207,6 +207,14 @@ public sealed class ExportViewerTests
 
     private static double[] Numbers(JsonElement array) => array.EnumerateArray().Select(v => v.GetDouble()).ToArray();
 
+    /// <summary>T-59's guard: the crate has no UVs, so its file is the bytes written before UVs existed (SHA-256, taken on milestone/M-6 before T-59).</summary>
+    [Fact]
+    public void The_exported_crate_is_byte_identical_to_the_one_written_before_UVs()
+    {
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(Path.Combine(Run, "game", "Content", "models", "crate.glb"))));
+        Assert.Equal("074FEBF3D9553EFFCF858B0C46EA286993FA5239FE27E4601413FE5DB30F15E9", hash);
+    }
+
     [Fact]
     public void View_json_matches_what_was_exported()
     {

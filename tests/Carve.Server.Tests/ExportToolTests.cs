@@ -15,6 +15,19 @@ public sealed class ExportToolTests() : FileToolTests("carve-export")
     }
 
     [Fact]
+    public async Task Export_writes_UVs_and_the_result_warns_of_unmapped_faces()
+    {
+        var (carve, _) = await StartAsync();
+        using var _carve = carve;
+        var set = await carve.CallToolAsync("set_uvs", """{"faces":[{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]},{"face":2,"uv":[[0,0],[1,0],[1,1],[0,1]]}]}""");
+        Assert.False(IsError(set), TextOf(set));
+
+        var line = Line(await carve.CallToolAsync("export", """{"path":"out/uv.glb"}"""));
+        Assert.True(line.EndsWith("; 1 warning(s): mesh: 4 faces have no UVs; their corners are written as (0, 0) (faces 1, 3, 4, 5)"), line);
+        Assert.Contains("TEXCOORD_0", System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(Path.Combine(Root, "out", "uv.glb"))));
+    }
+
+    [Fact]
     public async Task Export_writes_the_cube_resolving_a_relative_path_and_says_when_it_replaced()
     {
         var (carve, _) = await StartAsync();
