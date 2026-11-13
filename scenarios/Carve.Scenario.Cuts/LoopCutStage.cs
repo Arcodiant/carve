@@ -42,8 +42,8 @@ internal sealed class LoopCutStage : ICutsStage
     private static readonly (string Name, Vector3 At)[] BandProbes =
     [
         .. Steps.SelectMany(u => Steps.Select(v => ("the band's front", new Vector3(u, 0.9f + 0.2f * v, 1.1f)))),
-        .. Steps.SelectMany(u => new[] { 0.3f, 0.7f }.Select(v => ("the band's top", new Vector3(u, 1.1f, 1 + 0.1f * v)))),
-        .. Steps.SelectMany(u => new[] { 0.3f, 0.7f }.Select(v => ("the band's right", new Vector3(1, 0.9f + 0.2f * u, 1 + 0.1f * v)))),
+        .. Steps.SelectMany(u => new[] { 0.3f, 0.5f, 0.7f }.Select(v => ("the band's top", new Vector3(u, 1.1f, 1 + 0.1f * v)))),
+        .. Steps.SelectMany(u => new[] { 0.3f, 0.5f, 0.7f }.Select(v => ("the band's right", new Vector3(1, 0.9f + 0.2f * u, 1 + 0.1f * v)))),
     ];
 
     public async Task RunAsync(ScenarioDriver driver)
@@ -109,6 +109,80 @@ internal sealed class LoopCutStage : ICutsStage
         var probes = BoxProbes.Concat(BandProbes).ToArray();
         Expect(shaded, camera2, solid, probes, "the band's front", band, 8);
         Look(shaded, camera2, solid, probes, Shades(shaded, camera2, solid, probes), [], "the box with its band extruded");
+        Predicted(shaded, camera2, solid, band);
+    }
+
+    /// <summary>
+    /// The person's rulings on shade prediction (2026-11-12, T-67's <c>knife-slab-recess</c>): a face's pixel is predicted by
+    /// the Crate scenario's rule (<see cref="Crate.ColourRule"/>) from a grey face of the same normal in the same frame, at
+    /// <see cref="Checks.Exact"/>; for a grey face colour / grey is 1, so it is that face's grey. The band's front is
+    /// predicted from the box's front, its top wall (+Y) from the box's top (y = 2) and its right wall (+X) from the box's
+    /// right (x = 1). The walls are a few pixels across, so they are asked by <see cref="Solid.SeenNarrow"/>, and at least
+    /// one probe on each must be sure. A band drawn flush, or with no walls, shows the box's front where the walls should be.
+    /// </summary>
+    private static void Predicted(ScenarioFrame frame, Camera camera, Solid solid, int band)
+    {
+        int Wall(Func<Vector3, bool> facing, string what)
+        {
+            var walls = Enumerable.Range(0, solid.Faces.Length).Where(f => !solid.IsDeleted(f) && f != band
+                && solid.Faces[f].Loop.All(v => solid.Vertices[v] is var p && p.Z is >= 1 - 1e-5f and <= 1.1f + 1e-5f && p.Y is >= 0.9f - 1e-5f and <= 1.1f + 1e-5f)
+                && facing(solid.Normal(f))).ToArray();
+            Equal($"{what}: one face", 1, walls.Length);
+            return walls.Length == 1 ? walls[0] : -1;
+        }
+
+        var top = Wall(n => n.Y > 0.99f, "the band's top wall");
+        var right = Wall(n => n.X > 0.99f, "the band's right wall");
+        foreach (var (name, face, normal, from, narrow) in new[]
+        {
+            ("the band's front", band, Vector3.UnitZ, "the front (z = 1)", false),
+            ("the band's top", top, Vector3.UnitY, "the top (y = 2)", true),
+            ("the band's right", right, Vector3.UnitX, "the right (x = 1)", true),
+        })
+        {
+            if (Reference(frame, camera, solid, from, normal) is not { } grey)
+            {
+                continue;
+            }
+
+            var sure = 0;
+            foreach (var (_, at) in BandProbes.Where(p => p.Name == name))
+            {
+                var (x, y) = camera.Pixel(at);
+                var seen = narrow ? solid.SeenNarrow(camera, frame.Width, x, y) : solid.Seen(camera, frame.Width, x, y);
+                if (seen == -2)
+                {
+                    continue;
+                }
+
+                sure++;
+                Equal($"{frame.Name}: what the geometry shows at {name} {at} (pixel ({x}, {y}))", face, seen);
+                Colour(frame, (x, y), grey, Exact, $"{frame.Name}: {name} {at}, predicted {grey} from {from}");
+            }
+
+            if (sure < 1)
+            {
+                Note($"{frame.Name}: no probe on {name} was sure");
+            }
+        }
+    }
+
+    /// <summary>The grey pixel at the first probe named <paramref name="name"/> that surely shows a face of <paramref name="normal"/>, not the band's.</summary>
+    private static Rgb? Reference(ScenarioFrame frame, Camera camera, Solid solid, string name, Vector3 normal)
+    {
+        foreach (var (_, at) in BoxProbes.Where(p => p.Name == name))
+        {
+            var (x, y) = camera.Pixel(at);
+            var seen = solid.Seen(camera, frame.Width, x, y);
+            if (seen >= 0 && Vector3.Dot(solid.Normal(seen), normal) > 0.99f)
+            {
+                var p = frame.Pixel(x, y);
+                return (p.R, p.G, p.B);
+            }
+        }
+
+        Note($"{frame.Name}: no probe on {name} surely shows a face facing {normal}, the reference for the band");
+        return null;
     }
 
     private static (int Lo, int Hi)[] AllEdges(Solid solid, IEnumerable<int>? only = null) =>
