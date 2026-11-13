@@ -109,6 +109,14 @@ gives them out again (qualified after RV-10). A delete never renumbers either
 id is never given out again along the current chain of edits; naming one in an edit
 is refused as `deleted`. Only export compacts, and there is no `compact` tool.
 
+*Extended at M-5 (T-63):* a face is an outer loop plus hole loops. In `define_mesh`,
+`get_mesh` and the Carve file a face is a plain array of vertex ids (its outer loop,
+no hole) or `{"loop": [...], "holes": [[...], ...]}`. Seen from outside, the outer
+loop runs anticlockwise and each hole clockwise; a hole wound the other way, or
+overlapping or touching another, is refused. The edge table, triangulation, check,
+select, render and export all take the holes; none drops them. The tombstones above
+(T-64) came in the same milestone.
+
 **Alternatives:** a half-edge structure, which makes walking a manifold surface
 cheap but cannot hold the non-manifold and open input Carve accepts without special
 cases; triangles only, a simpler kernel that loses the logical faces.
@@ -130,6 +138,8 @@ game as exported `.glb`, which Empyrean's `IModelLoader` loads.
 - **The load proof** is a viewer spike that stands in for a game.
 
 *Extended by [D-6](D-6-characters-rigging-animation-and-character-export.md), 2026-11-06:* the file also holds several meshes, colours, a skeleton, weights and clips; export adds colour materials, smooth normals and skins. `export` refuses to overwrite without `overwrite: true`.
+
+*Extended at M-5 (T-63, T-64):* Carve file version 4 is version 3 with faces that may have holes, each holed face written as the `{"loop", "holes"}` object, and with tombstones: a `null` in `vertices` or `faces` for a deleted element, read back as the same tombstone, its id not given out again. `CarveFile.Write` writes the lowest version that holds the model, as the person ruled (2026-11-11): version 4 only when the model has a holed face or a tombstone, otherwise version 3 or 2 byte for byte as before. Reading takes versions 1 to 4, and refuses any other.
 
 **Alternatives:** `.glb` only, which loses the polygons on every save; server memory
 only, which loses unexported work on a restart. A list of operations as the file was rejected because a change to the kernel could change or break old files.
