@@ -141,6 +141,8 @@ public sealed class UvToolTests() : TempFolderTests("carve-uvs")
         Ok(await carve.CallToolAsync("delete", """{"faces":[5]}"""));
         Assert.Contains("faces[5]: face 5 is deleted", await Refused(carve, "set_uvs", """{"faces":[{"face":5,"uv":[[0,0],[0,1],[1,1],[1,0]]}]}"""));
         Assert.Contains("clear[5]: face 5 is deleted", await Refused(carve, "set_uvs", """{"clear":[5]}"""));
+        var set = Ok(await carve.CallToolAsync("set_uvs", Face0));
+        Assert.Equal(4, set.GetProperty("unmapped").GetInt32());
     }
 
     [Fact]
