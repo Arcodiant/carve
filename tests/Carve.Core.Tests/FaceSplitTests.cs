@@ -322,4 +322,27 @@ public class FaceSplitTests
 
     private static readonly IEqualityComparer<SplitFace> SplitEq = EqualityComparer<SplitFace>.Create(
         (a, b) => a!.Face == b!.Face && a.Pieces.SequenceEqual(b.Pieces), s => s.Face);
+
+    [Fact]
+    public void CutsAcrossRandomlyRotatedRectanglesAllSplit()
+    {
+        // RV-33: an exact sign on rotated input is rounding noise. Three parallel cuts edge to edge, and one from a corner
+        // to the far edge, on a 2 x 1 rectangle at seeded random rotations.
+        var rng = new Random(3304);
+        var failed = new List<string>();
+        for (var i = 0; i < 200; i++)
+        {
+            var q = Quaternion.Normalize(new Quaternion((float)(rng.NextDouble() * 2 - 1), (float)(rng.NextDouble() * 2 - 1),
+                (float)(rng.NextDouble() * 2 - 1), (float)(rng.NextDouble() * 2 - 1)));
+            var rect = TestMeshes.Make(new Vector3[] { new(0, 0, 0), new(2, 0, 0), new(2, 1, 0), new(0, 1, 0) }.Select(p => Vector3.Transform(p, q)),
+                [[0, 1, 2, 3]]);
+            var parallel = FaceSplit.Split(rect, [.. new[] { 0.25, 1.0 / 3, 0.5 }.Select(t => new FaceCut(0, CutPoint.OnEdge(0, 1, t), CutPoint.OnEdge(3, 2, t)))]);
+            if (!parallel.Edit.Succeeded || parallel.Edit.Split.Single().Pieces.Count != 4)
+                failed.Add($"{q} parallel: {string.Join("; ", parallel.Edit.Errors)}");
+            var corner = FaceSplit.Split(rect, [new FaceCut(0, CutPoint.AtVertex(0), CutPoint.OnEdge(3, 2, 0.5))]);
+            if (!corner.Edit.Succeeded || corner.Edit.Split.Single().Pieces.Count != 2)
+                failed.Add($"{q} corner: {string.Join("; ", corner.Edit.Errors)}");
+        }
+        Assert.True(failed.Count == 0, $"{failed.Count} differ, first: {failed.FirstOrDefault()}");
+    }
 }

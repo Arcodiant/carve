@@ -311,6 +311,9 @@ public static class Knife
                 var (c, d) = (D(verts[loop[k]]), D(verts[loop[(k + 1) % loop.Count]]));
                 // An edge the segment's ends lie on does not cross it.
                 if (SegmentDistance(pa, c, d) <= tol || SegmentDistance(pb, c, d) <= tol) continue;
+                // Nor does an edge with a corner on the segment: the segment is split there, and each part is judged by
+                // its midpoint below. Through that corner the signs are rounding noise on rotated input (RV-33).
+                if (SegmentDistance(c, pa, pb) <= tol || SegmentDistance(d, pa, pb) <= tol) continue;
                 if (Crosses(qa, qb, Q(c), Q(d))) return (h == 0 ? Run.Leaves : Run.Hole + (h - 1), [], null);
             }
         }
