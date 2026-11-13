@@ -293,4 +293,56 @@ public class KnifeTests
         Assert.Equal("cuts[0]: to: [0.5, 0.5, 0.5] is not inside faces[1], clear of its edges",
             string.Join("; ", r.Edit.Errors.Select(e => $"{e.Element}: {e.Message}")));
     }
+
+    // RV-31 (ruled 2026-11-13): a segment that meets the face's boundary between its ends is cut as plane_cut cuts.
+    private static PolygonMesh Flat(params (float X, float Y)[] corners) =>
+        TestMeshes.Make(corners.Select(c => V(c.X, c.Y, 0)), [Enumerable.Range(0, corners.Length).ToArray()]);
+
+    private static double Area(PolygonMesh m, Face f)
+    {
+        double Ring(IReadOnlyList<int> loop) => Enumerable.Range(0, loop.Count).Sum(i =>
+        {
+            var (a, b) = (m.Vertices[loop[i]], m.Vertices[loop[(i + 1) % loop.Count]]);
+            return (double)a.X * b.Y - (double)b.X * a.Y;
+        }) / 2;
+        return Ring(f.Loop) - f.Holes.Sum(h => -Ring(h));
+    }
+
+    public static TheoryData<string, float[], float, float, float, int> BoundaryMeetings => new()
+    {
+        // The U from (0,1) to (3,1): through its two inner corners, along the edge between them.
+        { "U", [0, 0, 3, 0, 3, 3, 2, 3, 2, 1, 1, 1, 1, 3, 0, 3], 1, 0, 3, 3 },
+        // Grazing reflex vertex 4.
+        { "notch", [0, 0, 4, 0, 4, 4, 3, 4, 2.5f, 2.5f, 2, 4, 0, 4], 2.5f, 0, 4, 3 },
+        // The W's top: through both its valleys.
+        { "W", [0, 0, 4, 0, 4, 4, 3, 2, 2, 4, 1, 2, 0, 4], 2, 0, 4, 4 },
+        // An off-centre notch: along edge 4-5 between two parts across.
+        { "off-centre", [0, 0, 3, 0, 3, 3, 1, 3, 1, 1, 0.5f, 1, 0.5f, 3, 0, 3], 1, 0, 3, 3 },
+    };
+
+    [Theory]
+    [MemberData(nameof(BoundaryMeetings))]
+    public void ASegmentMeetingTheBoundaryBetweenItsEndsIsCutAsPlaneCutCutsIt(string name, float[] xy, float y, float x0, float x1, int pieces)
+    {
+        var mesh = Flat(Enumerable.Range(0, xy.Length / 2).Select(i => (xy[2 * i], xy[2 * i + 1])).ToArray());
+        var (m, r) = Cut(mesh, false, V(x0, y, 0), V(x1, y, 0));
+        var plane = TestMeshes.Ok(PlaneCut.Cut(mesh, V(0, y, 0), V(0, 1, 0)).Edit);
+
+        var s = Assert.Single(r.Edit.Split);
+        Assert.Equal(pieces, s.Pieces.Count);
+        Assert.Equal(pieces, m.LiveFaceCount);
+        var areas = m.LiveFaces.Select(f => Math.Round(Area(m, m.Faces[f]), 4)).Order().ToArray();
+        var expected = plane.LiveFaces.Select(f => Math.Round(Area(plane, plane.Faces[f]), 4)).Order().ToArray();
+        Assert.True(expected.SequenceEqual(areas), $"{name}: {string.Join(", ", areas)} against plane_cut's {string.Join(", ", expected)}");
+        Assert.All(m.LiveFaces, f => Assert.True(Area(m, m.Faces[f]) > 0, $"{name}: faces[{f}]"));
+    }
+
+    [Fact]
+    public void ASegmentThatLeavesTheFaceThroughAVertexIsRefusedNamingWhere()
+    {
+        var u = Flat((0, 0), (3, 0), (3, 3), (2, 3), (2, 1), (1, 1), (1, 3), (0, 3));
+        Assert.Equal(
+            "points[0], points[1]: the segment from points[0] to points[1] leaves faces[0] at [1, 3, 0]",
+            Refusal(u, false, V(0, 3, 0), V(3, 3, 0)));
+    }
 }
