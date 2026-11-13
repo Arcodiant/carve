@@ -71,6 +71,24 @@ public class EditToolTests
     }
 
     [Fact]
+    public async Task Render_names_every_edit_and_get_mesh_s_shape_reads_in_one_piece()
+    {
+        var (carve, tools) = await StartAsync(define: false);
+        using var _ = carve;
+        var render = Description(tools, "render");
+        var first = render[..render.IndexOf(". ", StringComparison.Ordinal)];
+        foreach (var edit in new[] { "move", "extrude", "subdivide", "delete", "merge_faces", "bridge", "plane_cut", "loop_cut", "knife", "undo" })
+            Assert.Contains(edit, first);
+
+        var getMesh = Description(tools, "get_mesh");
+        var start = getMesh.IndexOf("Returns JSON {", StringComparison.Ordinal);
+        var shape = getMesh[start..(getMesh.IndexOf("(from define_group)}", start, StringComparison.Ordinal) + 1)];
+        Assert.Contains("edges:[{vertices:[a,b]", shape);
+        Assert.DoesNotContain("null in its slot", shape);
+        Assert.Contains("null in its slot", getMesh);
+    }
+
+    [Fact]
     public async Task The_undo_example_undoes_an_extrude()
     {
         var (carve, tools) = await StartAsync();
