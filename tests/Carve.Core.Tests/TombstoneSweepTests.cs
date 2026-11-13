@@ -63,9 +63,13 @@ public class TombstoneSweepTests
         Assert.Equal(3, r.FaceCount);
         Assert.False(r.Closed);
         Assert.DoesNotContain(r.Warnings, w => w.Kind == MeshWarningKind.UnusedVertex);
-        // The bounds are the live vertices', not the tombstone's zeroed slot.
-        Assert.Equal(Vector3.Zero, r.BoundsMin);
-        Assert.Equal(Vector3.One, r.BoundsMax);
+        // The bounds are the live vertices', not the tombstone's zeroed slot: on a cube moved off the origin to
+        // (2, 2, 2)..(3, 3, 3), a zeroed slot counted would pull the minimum to the origin.
+        var cube = TestMeshes.Cube();
+        var moved = TestMeshes.Make(cube.Vertices.Select(v => v + new Vector3(2)).ToArray(), cube.Faces.Select(f => f.Loop.ToArray()).ToArray());
+        var off = MeshReport.Create(TestMeshes.Ok(MeshDelete.Delete(moved, [6], null)));
+        Assert.Equal(new Vector3(2), off.BoundsMin);
+        Assert.Equal(new Vector3(3, 3, 3), off.BoundsMax);
     }
 
     [Fact]
