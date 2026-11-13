@@ -11,8 +11,12 @@ internal static class CameraPixels
 {
     private const float FieldOfViewY = 0.6f;
     private const float Margin = 0.08f;
+    private static readonly float VerticalCosine = MathF.Cos(MathF.PI / 180f);
 
-    /// <summary>The camera of <paramref name="direction"/> (from the point looked at toward the eye), up +Y.</summary>
+    /// <summary>
+    /// The camera of <paramref name="direction"/> (from the point looked at toward the eye), up +Y, or -Z when the
+    /// direction is within 1 degree of vertical (render's <c>ViewFraming.UpFor</c>).
+    /// </summary>
     public static Func<Vector3, Vector2> Perspective(Vector3 min, Vector3 max, Vector3 direction, int size, float zoom = 1, Vector3? target = null)
     {
         var centre = (min + max) / 2;
@@ -21,7 +25,8 @@ internal static class CameraPixels
 
         var unit = Vector3.Normalize(direction);
         var look = target is { } t ? Drawn(t) : Vector3.Zero;
-        var rotation = Matrix4x4.CreateLookAt(unit, Vector3.Zero, Vector3.UnitY) with { M41 = 0, M42 = 0, M43 = 0 };
+        var up = MathF.Abs(unit.Y) > VerticalCosine ? -Vector3.UnitZ : Vector3.UnitY;
+        var rotation = Matrix4x4.CreateLookAt(unit, Vector3.Zero, up) with { M41 = 0, M42 = 0, M43 = 0 };
         var tangent = MathF.Tan(FieldOfViewY / 2) * (1 - 2 * Margin);
 
         // The nearest distance at which every corner of the box is inside the margin.
@@ -35,7 +40,7 @@ internal static class CameraPixels
         }
 
         var eye = look + unit * (distance + look.Length());
-        var view = Matrix4x4.CreateLookAt(eye, look, Vector3.UnitY);
+        var view = Matrix4x4.CreateLookAt(eye, look, up);
         var field = 2 * MathF.Atan(MathF.Tan(FieldOfViewY / 2) / zoom);
         var camera = view * Matrix4x4.CreatePerspectiveFieldOfView(field, 1, 0.01f, 100f);
         return p =>
