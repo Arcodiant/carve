@@ -120,3 +120,13 @@ Written 2026-11-13 by the research agent (Opus 5.5) against `milestone/M-6` at `
 12. **Caption counts.** Recommended the named mesh's vertices and faces. Or the whole model's, as other modes give.
 13. **Bright-pixel tolerance.** Recommended the texel's byte ±2, from the probe, shown to the person before use. Or classification only, as `checker` does.
 14. **The layout's colours and window rule** (the planner's, open to objection): ground 40%, white, `#FFD800`, margin W/16, square and centred.
+
+### Rulings (the person, 2026-11-13)
+
+All fourteen as recommended:
+
+- **Rule 1:** the crate stage lays its UVs with `project_uvs` `box`, not T-57's `CrateUvs.Lay`.
+- **Rule 4:** a highlighted face is solid orange in this mode, as the Scope says, unlike T-57's tint.
+- **Rule 11:** unmapped faces are left out of the layout, and the caption counts them.
+- **Rule 13:** the bright-pixel tolerance comes from a probe frame that the person sees before it is used.
+- **The rest:** as written above.
