@@ -12,7 +12,7 @@ description: >-
 
 **Previous:** RV-40
 
-**Diff:** —
+**Diff:** 9ce8870d7e096c94bce35fbece32e2ba60633b07 against origin/main
 
 **Reviewer:** a fresh general-purpose agent on Opus 5.5 (Claude Code), not the implementer
 
@@ -31,13 +31,17 @@ description: >-
 
 The new ancestor check in `LimitsSource.Find` (`src/Carve.Server/GameLimits.cs:198-205`) looks at the disk as it is before the export, but `ExportTool.Run` calls `Find` before writing the .glb (`src/Carve.Server/ExportTool.cs:115-120`). So the one ancestor `Find` cannot see is the file the export itself is about to create. `export {"path":"big.glb","limits":"big.glb","write_limits":true}`, with no `big.glb` yet, gives the candidate `big.glb/carve-limits.json`. That resolves, is not a folder, and has no existing file above it, so `Find` succeeds. The .glb is then written, and `ToolPaths.Write` fails in `Directory.CreateDirectory` (`src/Carve.Server/ToolPaths.cs:109`) because `big.glb` is now a file. The result is the tool error "... The .glb was written" (`ExportTool.cs:125`). `limits: "big.glb/x.json"` goes the same way. With `overwrite: true` and an existing `big.glb`, the new check does catch it. This is the rule RV-40's first finding was about: a `limits` argument that no file could be written at must be refused before the .glb is written. The input is contrived, but the check is one comparison: when `write` is set, also refuse a limits path that is the export target or lies under it (`path` starts with `target` plus a separator, or any `above` equals `target`). No test covers it. Rubric 1.
 
-**Outcome:** fixed (third round on the limits path, so taken to the person, who ruled 2026-11-13 to refuse it up front with no fourth round): `LimitsSource.Find` refuses a limits path equal to or under the export target, before the .glb is written. Covered by two cases in `GameLimitsTests` and one in `ExportLimitsToolTests` (`limits` = the .glb, with `write_limits`).
+**Outcome:** fixed
+
+Answer: (third round on the limits path, so taken to the person, who ruled 2026-11-13 to refuse it up front with no fourth round): `LimitsSource.Find` refuses a limits path equal to or under the export target, before the .glb is written. Covered by two cases in `GameLimitsTests` and one in `ExportLimitsToolTests` (`limits` = the .glb, with `write_limits`).
 
 ### As built's *Code* paragraph does not list the new refusal
 
 The T-51 task file (`docs/tasks/T-51-export-limits-per-game-not-orcward-s-constants.md`, the `**Code:**` line under `### As built`) still lists the refusals as "a blank argument, a non-`.json` file or a folder where the file should be is refused before the `.glb` is written (RV-39)". 42d3ab2 updated *Tests* and *Not verified* to mention a path under a file, but *Code* does not mention the refusal it added to `Find`, so As built no longer matches the code. Rubric 7.
 
-**Outcome:** fixed: As built's *Code* paragraph lists every refusal of the `limits` argument with the round that added it, and *Tests* lists the new cases.
+**Outcome:** fixed
+
+Answer: As built's *Code* paragraph lists every refusal of the `limits` argument with the round that added it, and *Tests* lists the new cases.
 
 ## Summary
 
