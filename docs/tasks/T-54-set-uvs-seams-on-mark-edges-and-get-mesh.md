@@ -87,3 +87,5 @@ Built by Sonnet 5.5 (`claude-sonnet-5-5`), one agent, 2026-11-13, on `task/T-54`
 | `set_uvs` skips `MeshUvs.Check` | four tests incl. `A_holed_face_takes_one_pair_per_corner_...` |
 
 **Not checked:** no frame (none changed); UVs are not drawn until T-57.
+
+**Regression fix (Sonnet 5.5 finished this member).** The first `server-regression` run failed `Render_names_every_edit_and_get_mesh_s_shape_reads_in_one_piece`: it cut the `get_mesh` shape at the phrase "(from define_group)}", which T-54 extended with `uvs` and `seams`, so IndexOf returned -1. The test now cuts at "}. Here vertices"; its assertions are unchanged. Rebased onto `origin/milestone/M-6` without conflict.
