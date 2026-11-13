@@ -66,3 +66,7 @@ Run on Sonnet 5.5 (claude-sonnet-5-5).
 **Decisions to know.** Overlap tolerance and the flip rule are the planner's; unmapped is warned only when the mesh has some UV (the spec's "when a mesh has any UVs"), so the shed's `check` is unchanged. The overlap fix in the description is `unwrap` or a seam where islands collide; mirrored halves are named as deliberate.
 
 **Tests.** `tests/Carve.Core.Tests/MeshUvHealthTests.cs`, `UvAreaTests.cs` (unit) and `CheckToolTests.cs` (regression, through the tool). Planted breaks are in `artifacts/review/T-60/breaks.md`.
+
+### Ruling after the fact (the person, 2026-11-13)
+
+A zero-area UV face is warned of only as zero-area, not also as flipped: kept as built.
