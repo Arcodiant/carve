@@ -1,5 +1,6 @@
 using System.Numerics;
 using static Carve.Core.FaceSplit;
+using static Carve.Core.PlaneGeometry;
 
 namespace Carve.Core;
 
@@ -283,5 +284,4 @@ public static class Knife
         return InPolygon(loops[0], P, Q(mid)) ? Run.Across : Run.Leaves;
     }
 
-    private static double Length(Vector3D d) => Math.Sqrt(Dot(d, d));
 }

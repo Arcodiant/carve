@@ -1,5 +1,6 @@
 using System.Numerics;
 using static Carve.Core.FaceSplit;
+using static Carve.Core.PlaneGeometry;
 
 namespace Carve.Core;
 
