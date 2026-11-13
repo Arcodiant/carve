@@ -7,3 +7,4 @@
 - T-66: loop_cut adds edge loops across a ring of quads at given fractions
 - T-67: knife cuts a path of surface points through faces; a closed path inside a face cuts out an inner face and leaves a hole
 - T-69: The gatehouse wall built by cuts alone: cornice, gable, door and a see-through window, shown at each stage and kept as samples/gatehouse.carve
+- T-70: Fresh agents cut a wall into a gable with a see-through window from the descriptions alone, recovering from a knife point off the surface
