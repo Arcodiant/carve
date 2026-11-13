@@ -25,7 +25,8 @@ public sealed record KnifeResult(EditResult Edit, IReadOnlyList<(int From, int T
 /// <see cref="PlaneCut"/> splits its line (ruled 2026-11-13): each part across the face is a cut, a part along an edge
 /// keeps that edge, and a part outside the face is refused, naming the corner it leaves at.</item>
 /// <item><b>The path.</b> An open path must end on edges or vertices; a closed path wholly inside a face cuts out an
-/// inner face and leaves the face a hole (<see cref="FaceSplit"/>).</item>
+/// inner face and leaves the face a hole (<see cref="FaceSplit"/>). A closed path in one face that touches its boundary at
+/// one point only, a listed point or a corner a segment passes through, is refused naming that point or segment.</item>
 /// </list>
 /// </remarks>
 public static class Knife
@@ -84,15 +85,26 @@ public static class Knife
         if (errors.Count > 0) return Refused(errors);
 
         // A closed path in one face that touches its boundary at one point only: the face around it would pass through
-        // that point twice, which a face cannot (the person's ruling, 2026-11-12).
+        // that point twice, which a face cannot (the person's ruling, 2026-11-12). A touch is a listed point on an edge or
+        // a vertex, or a corner a segment passes through, where it is split (the person's T-67 ruling, applied in RV-32).
         if (closed && cuts.Select(c => c.Face).Distinct().Count() == 1)
         {
-            var touching = Enumerable.Range(0, points.Count).Where(i => snaps[i].Kind != Kind.Inside).ToArray();
-            if (touching.Length == 1)
+            var touches = new List<(CutPoint Point, string Element, Vector3 At)>();
+            for (var i = 0; i < points.Count; i++)
+                if (snaps[i].Kind != Kind.Inside)
+                    touches.Add((snaps[i].Point, MeshEdits.Invariant($"points[{i}]"), OnSurface(mesh, snaps[i])));
+            for (var c = 0; c < cuts.Count; c++)
+                foreach (var p in new[] { cuts[c].From, cuts[c].To })
+                    if (p.IsVertex && touches.All(t => t.Point != p))
+                    {
+                        var k = segmentOf[c];
+                        touches.Add((p, MeshEdits.Invariant($"points[{k}], points[{(k + 1) % points.Count}]"), mesh.Vertices[p.A]));
+                    }
+            if (touches.Count == 1)
             {
-                var i = touching[0];
-                return Refused([new MeshError(MeshEdits.Invariant($"points[{i}]"), MeshEdits.Invariant(
-                    $"the closed path touches the face's boundary at one point only, at {Show(OnSurface(mesh, snaps[i]))}; touch it at two points to split the face, or keep it clear of the edge to cut a hole"))]);
+                var (_, element, at) = touches[0];
+                return Refused([new MeshError(element, MeshEdits.Invariant(
+                    $"the closed path touches the face's boundary at one point only, at {Show(at)}; touch it at two points to split the face, or keep it clear of the edge to cut a hole"))]);
             }
         }
 

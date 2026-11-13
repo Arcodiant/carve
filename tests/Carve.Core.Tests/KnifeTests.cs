@@ -108,6 +108,19 @@ public class KnifeTests
     }
 
     [Fact]
+    public void AClosedPathGrazingACornerBetweenItsPointsTouchesTheBoundaryThere()
+    {
+        // RV-32, the person's T-67 ruling: the corner a segment is split at counts as a touch. Every listed point is inside
+        // the notched face; the first segment passes through reflex vertex 4. Once it reached the mesh's own refusal.
+        var notch = TestMeshes.Make(
+            [new(0, 0, 0), new(4, 0, 0), new(4, 4, 0), new(3, 4, 0), new(2.5f, 2.5f, 0), new(2, 4, 0), new(0, 4, 0)],
+            [[0, 1, 2, 3, 4, 5, 6]]);
+        Assert.Equal(
+            "points[0], points[1]: the closed path touches the face's boundary at one point only, at [2.5, 2.5, 0]; touch it at two points to split the face, or keep it clear of the edge to cut a hole",
+            Refusal(notch, true, V(1, 2.5f, 0), V(3.5f, 2.5f, 0), V(2.5f, 1, 0)));
+    }
+
+    [Fact]
     public void AClosedPathTouchingTheBoundaryAtOnePointOnlyIsRefused()
     {
         // The person's ruling (2026-11-12): the face around it would pass through that point twice.
