@@ -4,7 +4,7 @@ description: >-
 ---
 # T-49 — Character acceptance run
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
