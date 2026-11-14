@@ -75,7 +75,7 @@ public sealed class ProjectUvsTool(ModelStore store)
         if (!Absent(into))
         {
             if (into!.Value.ValueKind != JsonValueKind.Array || into.Value.GetArrayLength() != 4)
-                errors.Add($"into: expected 4 numbers [u0, v0, u1, v1], got {(into.Value.ValueKind == JsonValueKind.Array ? into.Value.GetArrayLength() + " element(s)" : Describe(into.Value))}");
+                errors.Add("into: " + UvArguments.IntoShape(into.Value.ValueKind == JsonValueKind.Array ? into.Value.GetArrayLength().ToString(System.Globalization.CultureInfo.InvariantCulture) : Describe(into.Value)));
             else
             {
                 var n = new float?[4];
@@ -83,7 +83,7 @@ public sealed class ProjectUvsTool(ModelStore store)
                 if (n.All(x => x is not null))
                 {
                     rect = new UvProjection.Rect(n[0]!.Value, n[1]!.Value, n[2]!.Value, n[3]!.Value);
-                    if (!rect.IsValid) errors.Add($"into: [{string.Join(", ", n.Select(x => x!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))}] has no area; u1 must exceed u0 and v1 exceed v0");
+                    if (UvArguments.IntoArea(n[0]!.Value, n[1]!.Value, n[2]!.Value, n[3]!.Value) is { } flat) errors.Add("into: " + flat);
                 }
             }
         }
@@ -158,8 +158,7 @@ public sealed class ProjectUvsTool(ModelStore store)
                 chosenFaces = [.. ids];
                 foreach (var f in ids)
                 {
-                    if (f < 0 || f >= m.Faces.Count) problems.Add($"faces[{f}]: face {f} is not a face of the mesh, which has {m.Faces.Count}");
-                    else if (m.Faces[f].IsDeleted) problems.Add($"faces[{f}]: face {f} is deleted, so it cannot be mapped");
+                    if (UvArguments.FaceProblem(m, f) is { } why) problems.Add($"faces[{f}]: {why}");
                 }
             }
             if (problems.Count > 0) return (null, problems);

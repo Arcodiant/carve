@@ -98,8 +98,7 @@ public sealed class MeshUvs
         foreach (var (f, corners) in uvs._faces)
         {
             var e = MeshEdits.Invariant($"{at}faces[{f}]");
-            if (f >= mesh.Faces.Count) { errors.Add(new MeshError(e, MeshEdits.Invariant($"face {f} is not a face of the mesh, which has {mesh.Faces.Count}"))); continue; }
-            if (mesh.Faces[f].IsDeleted) { errors.Add(new MeshError(e, MeshEdits.Invariant($"face {f} is deleted, and a deleted face holds no UVs"))); continue; }
+            if (UvArguments.FaceProblem(mesh, f) is { } why) { errors.Add(new MeshError(e, why)); continue; }
             if (corners.Length != mesh.Faces[f].Corners.Count) { errors.Add(new MeshError(e, CornerCountMessage(mesh.Faces[f], corners.Length))); continue; }
             for (var c = 0; c < corners.Length; c++)
                 if (!float.IsFinite(corners[c].X) || !float.IsFinite(corners[c].Y))

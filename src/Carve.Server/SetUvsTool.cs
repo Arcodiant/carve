@@ -92,12 +92,12 @@ public sealed class SetUvsTool(ModelStore store)
             var problems = new List<string>();
             foreach (var f in cleared)
             {
-                if (f < 0 || f >= m.Faces.Count) problems.Add($"clear[{f}]: face {f} is not a face of the mesh, which has {m.Faces.Count}");
-                else if (m.Faces[f].IsDeleted) problems.Add($"clear[{f}]: face {f} is deleted");
+                // clear[f] names the argument the agent passed; the wording after the colon is the shared one.
+                if (UvArguments.FaceProblem(m, f) is { } why) problems.Add($"clear[{f}]: {why}");
             }
-            // A negative id is out of range like one past the end; MeshUvs holds none, so it is refused here, before the check.
-            foreach (var g in given.Where(g => g.Face < 0))
-                problems.Add($"faces[{g.Face}]: face {g.Face} is not a face of the mesh, which has {m.Faces.Count}");
+            // Each given face is checked first (a negative id too, which MeshUvs cannot hold), then the UVs against it.
+            foreach (var g in given)
+                if (UvArguments.FaceProblem(m, g.Face) is { } why) problems.Add($"faces[{g.Face}]: {why}");
             if (problems.Count > 0) return (null, problems);
             var uvs = (m.Uvs ?? MeshUvs.None)
                 .WithFaces(given.Select(g => KeyValuePair.Create(g.Face, (IReadOnlyList<Vector2>?)g.Uv)));

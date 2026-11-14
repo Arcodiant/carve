@@ -115,7 +115,7 @@ public class MeshUvsTests
             ("meshes[0].faces[0].uv[1]", "a UV is not finite"),
             ("meshes[0].faces[0].uv[3]", "a UV is not finite"),
             ("meshes[0].faces[1]", "3 UVs given, but the face has 4 corners; write 4 UVs, one per corner"),
-            ("meshes[0].faces[5]", "face 5 is deleted, and a deleted face holds no UVs"),
+            ("meshes[0].faces[5]", "face 5 is deleted"),
             ("meshes[0].faces[9]", "face 9 is not a face of the mesh, which has 6"),
             ("meshes[0].seams[0-6]", "0-6 is not an edge of the mesh"),
         ], errors.Select(e => (e.Element, e.Message)));

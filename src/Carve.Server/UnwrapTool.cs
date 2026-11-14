@@ -90,7 +90,7 @@ public sealed class UnwrapTool(ModelStore store)
         if (Absent(value)) return null;
         if (value!.Value.ValueKind != JsonValueKind.Array || value.Value.GetArrayLength() != 4)
         {
-            errors.Add($"into: expected [u0, v0, u1, v1], four numbers, got {Describe(value.Value)}");
+            errors.Add("into: " + UvArguments.IntoShape(value.Value.ValueKind == JsonValueKind.Array ? value.Value.GetArrayLength().ToString(System.Globalization.CultureInfo.InvariantCulture) : Describe(value.Value)));
             return null;
         }
         var xs = new double[4];

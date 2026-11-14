@@ -45,8 +45,8 @@ public static class Unwrap
         var box = into ?? UnitSquare;
         if (!double.IsFinite(box.U0) || !double.IsFinite(box.V0) || !double.IsFinite(box.U1) || !double.IsFinite(box.V1))
             errors.Add(new MeshError("into", "every value must be a finite number"));
-        else if (!(box.U1 > box.U0) || !(box.V1 > box.V0))
-            errors.Add(new MeshError("into", $"[{box.U0:R}, {box.V0:R}, {box.U1:R}, {box.V1:R}] has no area; give [u0, v0, u1, v1] with u1 > u0 and v1 > v0"));
+        else if (UvArguments.IntoArea(box.U0, box.V0, box.U1, box.V1) is not null)
+            errors.Add(new MeshError("into", UvArguments.IntoArea(box.U0, box.V0, box.U1, box.V1)!));
         var shorter = Math.Min(box.U1 - box.U0, box.V1 - box.V0);
         var m = margin ?? shorter * MarginFraction;
         if (margin is { } given && errors.Count == 0 && (!double.IsFinite(given) || given < 0 || !(given < shorter / 2)))
@@ -205,8 +205,7 @@ public static class Unwrap
         var seen = new HashSet<int>();
         foreach (var f in faces)
         {
-            if (f < 0 || f >= mesh.Faces.Count) errors.Add(new MeshError($"faces[{f}]", $"face {f} is not a face of the mesh, which has {mesh.Faces.Count}"));
-            else if (mesh.Faces[f].IsDeleted) errors.Add(new MeshError($"faces[{f}]", $"face {f} is deleted"));
+            if (UvArguments.FaceProblem(mesh, f) is { } why) errors.Add(new MeshError(MeshEdits.Invariant($"faces[{f}]"), why));
             else if (!seen.Add(f)) errors.Add(new MeshError($"faces[{f}]", $"face {f} is listed more than once"));
         }
         var set = new List<int>(seen);

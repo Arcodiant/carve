@@ -147,6 +147,31 @@ public sealed class UvToolTests() : TempFolderTests("carve-uvs")
         Assert.Equal(4, set.GetProperty("unmapped").GetInt32());
     }
 
+    /// <summary>RV-43, the person's ruling (2026-11-14): set_uvs, project_uvs and unwrap word the face and into checks once, in Core.</summary>
+    [Fact]
+    public async Task The_uv_tools_word_the_face_and_into_refusals_alike()
+    {
+        using var carve = await StartAsync();
+        Ok(await carve.CallToolAsync("delete", """{"faces":[5]}"""));
+        static string Only(string text) => Assert.Single(text.Split('\n').Skip(1));
+        const string uv = "[[0,0],[0,1],[1,1],[1,0]]";
+
+        Assert.Equal("faces[5]: face 5 is deleted", Only(await Refused(carve, "set_uvs", $$"""{"faces":[{"face":5,"uv":{{uv}}}]}""")));
+        Assert.Equal("clear[5]: face 5 is deleted", Only(await Refused(carve, "set_uvs", """{"clear":[5]}""")));
+        Assert.Equal("faces[5]: face 5 is deleted", Only(await Refused(carve, "project_uvs", """{"method":"box","faces":[5]}""")));
+        Assert.Equal("faces[5]: face 5 is deleted", Only(await Refused(carve, "unwrap", """{"faces":[5]}""")));
+
+        Assert.Equal("faces[9]: face 9 is not a face of the mesh, which has 6", Only(await Refused(carve, "set_uvs", $$"""{"faces":[{"face":9,"uv":{{uv}}}]}""")));
+        Assert.Equal("clear[9]: face 9 is not a face of the mesh, which has 6", Only(await Refused(carve, "set_uvs", """{"clear":[9]}""")));
+        Assert.Equal("faces[9]: face 9 is not a face of the mesh, which has 6", Only(await Refused(carve, "project_uvs", """{"method":"box","faces":[9]}""")));
+        Assert.Equal("faces[9]: face 9 is not a face of the mesh, which has 6", Only(await Refused(carve, "unwrap", """{"faces":[9]}""")));
+
+        Assert.Equal("into: expected 4 numbers [u0, v0, u1, v1], got 3", Only(await Refused(carve, "project_uvs", """{"method":"box","into":[0,0,1]}""")));
+        Assert.Equal("into: expected 4 numbers [u0, v0, u1, v1], got 3", Only(await Refused(carve, "unwrap", """{"into":[0,0,1]}""")));
+        Assert.Equal("into: [0, 0, 0.1, 0] has no area; u1 must exceed u0 and v1 exceed v0", Only(await Refused(carve, "project_uvs", """{"method":"box","into":[0,0,0.1,0]}""")));
+        Assert.Equal("into: [0, 0, 0.1, 0] has no area; u1 must exceed u0 and v1 exceed v0", Only(await Refused(carve, "unwrap", """{"into":[0,0,0.1,0]}""")));
+    }
+
     [Fact]
     public async Task A_holed_face_takes_one_pair_per_corner_hole_corners_included()
     {

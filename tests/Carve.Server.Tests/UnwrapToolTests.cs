@@ -94,7 +94,7 @@ public sealed class UnwrapToolTests
     [InlineData("""{"faces":[3,3]}""", "faces[3]: face 3 is listed more than once")]
     [InlineData("""{"faces":[]}""", "faces: the list is empty")]
     [InlineData("""{"faces":["a"]}""", "faces: the 1st listed entry: expected an integer id")]
-    [InlineData("""{"into":[0,0,1]}""", "into: expected [u0, v0, u1, v1]")]
+    [InlineData("""{"into":[0,0,1]}""", "into: expected 4 numbers [u0, v0, u1, v1], got 3")]
     [InlineData("""{"into":[0,0,0,1]}""", "into: [0, 0, 0, 1] has no area")]
     [InlineData("""{"into":[0,0,1e39,1]}""", "into[2]: 1e39 is not finite")]
     [InlineData("""{"margin":-1}""", "margin: -1 is not a margin into can take")]
