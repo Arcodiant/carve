@@ -17,7 +17,7 @@ internal static class CrateUvLayout
     /// <summary>Pixels kept clear of a line, and the corner and face labels' places.</summary>
     private const int Clear = 4, CornerClear = 44, LabelHalfWidth = 22, LabelHalfHeight = 12;
 
-    private static readonly List<string> Log = [];
+    internal static readonly List<string> Log = [];
 
     public static async Task RunAsync(ScenarioDriver driver, ScenarioFrame shadedFront)
     {
@@ -119,7 +119,7 @@ internal static class CrateUvLayout
     /// Every 8th pixel (a quarter of that at 256) clear of every line and label: inside a face, its texel's byte (orange if it is the
     /// highlighted face alone); inside none, the dimmed byte. Returns how many orange samples there were.
     /// </summary>
-    private static int Sweep(ScenarioDriver driver, ScenarioFrame frame, UvLayoutPixels pixels, Dictionary<int, IReadOnlyList<Vector2>> layout, int? highlighted, bool labels)
+    internal static int Sweep(ScenarioDriver driver, ScenarioFrame frame, UvLayoutPixels pixels, Dictionary<int, IReadOnlyList<Vector2>> layout, int? highlighted, bool labels)
     {
         var step = Math.Max(4, pixels.Size / 64);
         var (bright, dim, orange) = (0, 0, 0);
@@ -160,7 +160,7 @@ internal static class CrateUvLayout
     }
 
     /// <summary>uv (0,0)'s white cell at the square's top-left, and the texel at its v-flip and u-mirror not white.</summary>
-    private static void Origin(ScenarioDriver driver, ScenarioFrame frame, UvLayoutPixels pixels, Dictionary<int, IReadOnlyList<Vector2>> layout)
+    internal static void Origin(ScenarioDriver driver, ScenarioFrame frame, UvLayoutPixels pixels, Dictionary<int, IReadOnlyList<Vector2>> layout)
     {
         var at = pixels.PixelOf(new Vector2(1 / 16f, 1 / 16f));
         var (x, y) = ((int)at.X, (int)at.Y);
@@ -180,7 +180,7 @@ internal static class CrateUvLayout
     }
 
     /// <summary>The seam yellow at its UV midpoint on each side it divides, and not 6 px off it.</summary>
-    private static void Seam(ScenarioDriver driver, ScenarioFrame frame, UvLayoutPixels pixels, Dictionary<int, IReadOnlyList<Vector2>> layout, int a, int b, int front, int side, Shape crate)
+    internal static void Seam(ScenarioDriver driver, ScenarioFrame frame, UvLayoutPixels pixels, Dictionary<int, IReadOnlyList<Vector2>> layout, int a, int b, int front, int side, Shape crate, double clearPx = 0)
     {
         foreach (var face in new[] { front, side })
         {
@@ -188,6 +188,20 @@ internal static class CrateUvLayout
             var (ia, ib) = (Array.IndexOf(loop, a), Array.IndexOf(loop, b));
             var (ua, ub) = (pixels.PixelOf(layout[face][ia]), pixels.PixelOf(layout[face][ib]));
             var mid = (ua + ub) / 2;
+
+            // With clearPx, a segment with another island's line nearer than that is not checked: the check reads 4 px either side of it.
+            if (clearPx > 0)
+            {
+                var near = layout.Values.SelectMany(l => l.Select((p, i) => (A: p, B: l[(i + 1) % l.Count])))
+                    .Where(t => !((t.A == layout[face][ia] && t.B == layout[face][ib]) || (t.B == layout[face][ia] && t.A == layout[face][ib])))
+                    .Min(t => UvLayoutPixels.Distance(pixels.UvAt((int)mid.X, (int)mid.Y), t.A, t.B) * pixels.Scale);
+                if (near < clearPx)
+                {
+                    Log.Add($"{frame.Name}	seam {a}-{b} on face {face}	at ({mid.X:0.0}, {mid.Y:0.0})	not checked: another line {near:0.0} px away");
+                    continue;
+                }
+            }
+
             var across = Vector2.Normalize(new Vector2(-(ub.Y - ua.Y), ub.X - ua.X));
             (int, int, int) Read(Vector2 p) { var q = frame.Pixel((int)p.X, (int)p.Y); return (q.R, q.G, q.B); }
             (int, int, int)[] beside = [Read(mid + across * 4), Read(mid - across * 4)];
