@@ -181,6 +181,31 @@ public sealed class CheckerArgumentTests() : FileToolTests("carve-checker-args")
         Assert.Contains("checker", Refused(await carve.CallToolAsync("render", """{"weights":"base","mode":"checker"}""")));
     }
 
+    /// <summary>
+    /// RV-43: render's checker example, read from its description, on define_mesh's cube: the list it calls upright makes
+    /// check report nothing on face 1, and the one it calls mirrored makes check report face 1 flipped.
+    /// </summary>
+    [Fact]
+    public async Task The_checker_examples_upright_list_is_unflipped_and_its_mirrored_one_flipped()
+    {
+        var (carve, tools) = await StartAsync();
+        using var _ = carve;
+        var text = Description(tools, "render");
+        var start = text.IndexOf("Example: on define_mesh's unit cube, face 1 is [4,5,6,7]", StringComparison.Ordinal);
+        Assert.True(start >= 0, "render's checker example is missing");
+        var sentence = text[start..text.IndexOf("The caption names the mode", start, StringComparison.Ordinal)];
+        var lists = System.Text.RegularExpressions.Regex.Matches(sentence, @"\[\[[-0-9.,\[\] ]*\]\]").Select(m => m.Value).ToArray();
+        Assert.Equal(2, lists.Length);
+
+        string[] Face1Warnings(JsonElement body) => [.. body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!)
+            .Where(w => w.StartsWith("faces[1]", StringComparison.Ordinal))];
+        Ok(await carve.CallToolAsync("set_uvs", $$"""{"faces":[{"face":1,"uv":{{lists[0]}}}]}"""));
+        Assert.Empty(Face1Warnings(JsonDocument.Parse(Ok(await carve.CallToolAsync("check", "{}"))).RootElement));
+        Ok(await carve.CallToolAsync("set_uvs", $$"""{"faces":[{"face":1,"uv":{{lists[1]}}}]}"""));
+        Assert.Equal(["faces[1]: UVs flipped, so the texture is mirrored on the face"],
+            Face1Warnings(JsonDocument.Parse(Ok(await carve.CallToolAsync("check", "{}"))).RootElement));
+    }
+
     private static int Column((int R, int G, int B) p) => CheckerColours.NearestColumn(p.R, p.G, p.B);
 
     private static string Png(JsonElement result) => result.GetProperty("content")[0].GetProperty("data").GetString()!;
