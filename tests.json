@@ -36,6 +36,7 @@
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
         "scenarios/**/*.csproj",
         "spikes/**/*.csproj"
       ],
@@ -53,6 +54,7 @@
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
         "samples/leaky-shed.carve",
         "samples/barrel.carve",
         "scripts/run-scenario.ps1",
