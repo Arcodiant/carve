@@ -192,6 +192,46 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
 - Evidence is in this worktree's ignored `artifacts/review/T-53` to `T-62` and `artifacts/m6-acceptance/round-1`, and the review rounds are under `G:\My Drive\artifacts\carve\M-6\`.
 - `C:\tools\carve` is re-published by hand after the merge to `main`.
 
+**Before `finish`** (after the person said go):
+
+- **Rebase onto `main`:** an Opus agent rebased onto `origin/main` at `fb96f44`, which had B-2 and T-51. One conflict, in export: T-51's game limits beside T-59's UV warning. The agent judged it a text collision, kept both, and fixed one test the rebase broke. A Waystone restart cut the agent off mid-run, and it was resumed with its context.
+- **Refactor pass (Opus):**
+  - one UV-number parser;
+  - dead code removed;
+  - two simplifications;
+  - one shared checker-colour rule between the Crate and Uvs scenarios;
+  - the end-to-end skinned-export UV-warning test the rebase had lost.
+- **Review:** four rounds, eight reviewers in all.
+
+  | Round | Reviewers | Findings |
+  |---|---|---|
+  | RV-43 | four Opus, by area | 16 |
+  | RV-44 | one Opus | 2 |
+  | RV-45 | one Opus | 2 |
+  | RV-46 | one Sonnet | none |
+
+  All 20 findings were fixed. RV-43's were:
+  - two descriptions that taught the wrong thing (render's checker example presented a mirrored mapping as correct; two reviewers found it independently);
+  - three error paths;
+  - one error vocabulary spread across the three UV tools;
+  - seven test gaps;
+  - a suite input;
+  - a `CLAUDE.md` row.
+
+  Rounds 2 and 3 found only what the unified wording left behind.
+- **The person ruled seven more times:**
+  - unify the UV tools' error wording in Core;
+  - a too-few-seams refusal of its own;
+  - leave the file reader's wording;
+  - clip the 256 px corner-label backing to the margin (confirmed overlapping on a real render);
+  - approval of the two changed 256 frames;
+  - predict the six glyph-top pixels as text;
+  - the earlier engine-viewer check.
+- **Orchestrator errors:**
+  - A splice briefly mangled RV-43's template comment; it was rebuilt before commit.
+  - The patch-id in RV-43's and RV-44's `Diff:` lines was computed with the wrong docs root. Both rounds were superseded, and RV-45 and RV-46 carry the value `verify` computes.
+- **Waystone's `comment` reviews returned no note** twice when a choice was asked. Questions needing a choice went through AskUserQuestion after that.
+
 **Test report** (`cairn test report --since 2d`, which includes M-19's runs in the same span): `server-regression` is about 77% of the slot time, with 8 failures (6 caught by it alone) and 1 flake. 687 passes' logs ran elsewhere and can't be read here, so the flake can't be attributed. Nothing was filed. `scenario-uvs` is cheap, about 3 s a run.
 
 **For the next plan.**
