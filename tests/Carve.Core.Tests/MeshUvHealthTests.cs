@@ -47,6 +47,23 @@ public class MeshUvHealthTests
     }
 
     [Fact]
+    public void A_shared_diagonal_edge_is_not_an_overlap_though_the_bounds_overlap()
+    {
+        // RV-43: the two faces meet on the diagonal (0.2, 0)-(0.8, 1), so their bounds (u 0..0.8 and 0.2..1) overlap and the
+        // pair reaches the clip, which must count the shared edge as no area. Both are wound as Unflipped is.
+        Vector2[] left = [new(0, 0), new(0, 1), new(0.8f, 1), new(0.2f, 0)];
+        Vector2[] right = [new(0.2f, 0), new(0.8f, 1), new(1, 1), new(1, 0)];
+        var mesh = Mapped((0, left), (1, right));
+        Assert.Empty(UvWarnings(mesh));
+        Assert.Equal(new UvStats(2, 0), MeshHealth.Create(mesh).Stats.Uvs);
+
+        // The same pair with the right face's diagonal 0.01 further left overlaps by 0.01: the clip is what tells them apart.
+        Vector2[] over = [new(0.19f, 0), new(0.79f, 1), new(1, 1), new(1, 0)];
+        Assert.Equal(["faces[0]: UVs overlap faces[1], so the two faces show the same texels; mirrored halves sharing a texture area are deliberate and still warned of"],
+            UvWarnings(Mapped((0, left), (1, over))));
+    }
+
+    [Fact]
     public void An_unmapped_face_is_warned_of_when_the_mesh_has_UVs()
     {
         var mesh = Mapped((0, Unflipped(0, 0, 1, 1)));
