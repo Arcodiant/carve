@@ -140,6 +140,34 @@ public class UvProjectionTests
         Assert.Equal(2, all.Min(p => p.X), 4);
     }
 
+    /// <summary>
+    /// T-55: arc length (at the faces' mean radius) and height share one scale (RV-43). The barrel's side is one full turn,
+    /// so its v span is (height / (2 pi mean radius)) times its u span, whichever of into's sides the fit fills: u fills the
+    /// unit square's width, and into [2, 1, 6, 3]'s width too, leaving v short of its height. The mean radius and height are
+    /// worked here from the vertices as Cylindrical works them (distance from the y axis through the bounds centre); the
+    /// UVs are floats of spans up to 4, so they agree to a relative 1e-6.
+    /// </summary>
+    [Theory]
+    [InlineData(0, 0, 1, 1)]
+    [InlineData(2, 1, 6, 3)]
+    public void Cylindrical_shares_one_scale_between_arc_length_and_height(float u0, float v0, float u1, float v1)
+    {
+        var barrel = TestMeshes.Barrel();
+        var side = Enumerable.Range(0, 32).ToArray();
+        var vertices = side.SelectMany(f => barrel.Faces[f].Corners).Distinct().Select(v => barrel.Vertices[v]).ToArray();
+        double cx = (vertices.Min(p => (double)p.X) + vertices.Max(p => (double)p.X)) / 2, cz = (vertices.Min(p => (double)p.Z) + vertices.Max(p => (double)p.Z)) / 2;
+        var meanRadius = vertices.Average(p => Math.Sqrt((p.X - cx) * (p.X - cx) + (p.Z - cz) * (p.Z - cz)));
+        var height = vertices.Max(p => (double)p.Y) - vertices.Min(p => (double)p.Y);
+
+        var all = UvProjection.Cylindrical(barrel, side, Vector3.UnitY, null, -Vector3.UnitZ, new UvProjection.Rect(u0, v0, u1, v1)).Values.SelectMany(v => v).ToArray();
+        var uSpan = all.Max(p => (double)p.X) - all.Min(p => (double)p.X);
+        var vSpan = all.Max(p => (double)p.Y) - all.Min(p => (double)p.Y);
+        Assert.Equal(u1 - u0, uSpan, 1e-5);
+        var expected = height / (2 * Math.PI * meanRadius) * uSpan;
+        Assert.True(Math.Abs(vSpan - expected) <= 1e-6 * expected, $"v span {vSpan:R}, expected {expected:R}");
+        Assert.True(vSpan < v1 - v0, "v fills into's height: it was fitted on its own");
+    }
+
     [Fact]
     public void A_seam_along_the_axis_is_refused()
     {
