@@ -47,7 +47,9 @@ Ruling 4 says a seam split by a cut keeps the mark on every piece. No test asser
 For example, with `.WithSeams(halves, true)` deleted, the loop_cut case still passes: it cuts on (0,4), which splits the seam 2-6, and the seam simply vanishes. A grep of `Seams`/`IsSeam` across both test projects finds no seam assertion for any FaceSplit edit; the only seam-carry assertions are for subdivide, delete and extrude.
 
 The code itself is correct (probed). The break could not be planted in a read-only review, so this was worked out from the test bodies.
-**Outcome:** fixed: e902f82, theory A_seam_a_cut_splits_keeps_the_mark_on_every_piece over all three cuts; all three cases fail with .WithSeams(halves, true) removed
+**Outcome:** fixed
+
+E902f82, theory A_seam_a_cut_splits_keeps_the_mark_on_every_piece over all three cuts; all three cases fail with .WithSeams(halves, true) removed
 
 ### The shared-edge overlap test never reaches the clipping code
 **Where:** `tests/Carve.Core.Tests/MeshUvHealthTests.cs:41-47`; `src/Carve.Core/MeshUvHealth.cs:54`
@@ -55,7 +57,9 @@ The code itself is correct (probed). The break could not be planted in a read-on
 T-60's Plan asks for "a shared edge not counted as overlap". The test uses two axis-aligned rectangles that meet at u = 0.5, and the bounds filter `a.MaxU <= b.MinU` (0.5 <= 0.5) skips that pair before `Intersection` runs. A clip that counted a shared edge, or the points touching it, as area would still pass.
 
 The other overlap tests (just over and just under 1e-6, the hole) do reach the clip, but none has a shared edge. The code is right today (the fan probe). The gap is that this case is not pinned; a shared diagonal edge, whose bounds overlap, would test it.
-**Outcome:** fixed: 8f13972, two faces meeting on a diagonal (bounds overlap, the clip runs) give no warning, and the same pair 0.01 apart is warned of
+**Outcome:** fixed
+
+8f13972, two faces meeting on a diagonal (bounds overlap, the clip runs) give no warning, and the same pair 0.01 apart is warned of
 
 ## Findings: projections and unwrap (claude-opus-5-5)
 
@@ -77,7 +81,9 @@ Checked against Carve.Core from a scratch console app, now deleted. These were f
 The call is then refused with `faces[0]: the island of 6 faces has no extent: its corners all lie on one point or one line, so it cannot be flattened`. That is false for a 1 m cube; the real cause is too few seams, so an agent reading this is pointed the wrong way. With 3 seams (a path) the cube unwraps with stretch 7.8, and with 7 seams it unwraps cleanly.
 
 The message, or the check, should tell an island with real 3D extent that collapsed ("mark more seams") apart from a truly degenerate one.
-**Outcome:** fixed: 9f3c8cb, a too-few-seams refusal when the island has real 3D area but its UVs collapse, and no-extent kept for a degenerate island, by the person's ruling (2026-11-14); both tested exactly, and unwrap's description lists both
+**Outcome:** fixed
+
+9f3c8cb, a too-few-seams refusal when the island has real 3D area but its UVs collapse, and no-extent kept for a degenerate island, by the person's ruling (2026-11-14); both tested exactly, and unwrap's description lists both
 
 ### Unwrap's refusals write numbers in the machine's culture
 **Where:** `src/Carve.Core/Unwrap.cs:49`, `:53`, `:68`; `src/Carve.Core/UnwrapLscm.cs:155`
@@ -87,7 +93,9 @@ These are plain `$"{x:R}"` interpolations with no `MeshEdits.Invariant`. Under d
 - an `into` of `(0, 0, 0.5, 0)` gives `into: [0, 0, 0,5, 0] has no area`.
 
 Separately, `UnwrapTool` widens `into` from float, so an `into` value of 0.1 is echoed as `0.10000000149011612`, where `project_uvs` echoes `0.1`.
-**Outcome:** fixed: 29f3a3c, every number in unwrap's refusals is invariant and into is echoed as given (0.1 stays 0.1); RefusalCultureTests runs them under de-DE
+**Outcome:** fixed
+
+29f3a3c, every number in unwrap's refusals is invariant and into is echoed as given (0.1 stays 0.1); RefusalCultureTests runs them under de-DE
 
 ### project_uvs accepts a seam that Core then throws on
 **Where:** `src/Carve.Server/ProjectUvsTool.cs:136-140` vs `src/Carve.Core/UvProjection.cs:96`
@@ -99,7 +107,9 @@ The two sides test "seam along the axis" differently:
 With `axis` [0,1,0] and `seam` [1e-6,1,0], the float cross is 1E-06, which is not below 1e-6f, so the tool accepts. Core then throws "seam lies along the axis" inside the `Rework` lambda; both steps were confirmed in the scratch app.
 
 The model's state stays safe. What the agent sees was not confirmed end to end; it would be the MCP SDK's generic tool error instead of the named `seam:` refusal.
-**Outcome:** fixed: 82db639, one double test UvProjection.SeamAlongAxis used by both the tool and Core; axis [0,1,0] with seam [1e-6,1,0] is refused by name and changes nothing, and [2e-6,1,0] is taken by both
+**Outcome:** fixed
+
+82db639, one double test UvProjection.SeamAlongAxis used by both the tool and Core; axis [0,1,0] with seam [1e-6,1,0] is refused by name and changes nothing, and [2e-6,1,0] is taken by both
 
 ### Ruled island cuts and two refusals have no test
 **Where:** `src/Carve.Core/UnwrapIslands.cs:52`; `src/Carve.Core/UnwrapLscm.cs:152-156`; `tests/Carve.Core.Tests/UnwrapTests.cs`
@@ -111,7 +121,9 @@ A search of the Unwrap tests for converge, IsManifold, mis-wound, "three or more
 - breaking the "did not converge" refusal.
 
 T-56's broken-product table covers none of them. The mis-wound behaviour itself was checked in the scratch app: two quads sharing edge 1-2 in the same direction come out as two islands, as ruled.
-**Outcome:** fixed: 5cd0ebe, tests for the mis-wound cut (fails with !IsManifold dropped), the 3-face edge (IsManifold already requires 2 faces, so the Count check is redundant and only both dropped fail it), and CG non-convergence reached through Unwrap.Run (a growing strip, fails with the refusal disabled); the no-extent refusal is tested since 9f3c8cb
+**Outcome:** fixed
+
+5cd0ebe, tests for the mis-wound cut (fails with !IsManifold dropped), the 3-face edge (IsManifold already requires 2 faces, so the Count check is redundant and only both dropped fail it), and CG non-convergence reached through Unwrap.Run (a growing strip, fails with the refusal disabled); the no-extent refusal is tested since 9f3c8cb
 
 ### Cylindrical's shared arc/height scale is untested
 **Where:** `tests/Carve.Core.Tests/UvProjectionTests.cs:101-140`
@@ -123,7 +135,9 @@ T-55 rules that arc length and height share one scale, keeping aspect. The cylin
 - y lying inside `into`.
 
 If v were fitted to `into`'s height on its own, every assertion would still hold, including the given-`into` test, which would then fill [1, 3] exactly. Nothing compares the v span with the u span, for example (height / (2π·mean r)) × u span. This comes from reading the tests; the break was not planted.
-**Outcome:** fixed: fdee5e2, the v span is asserted equal to height/(2*pi*mean r) x the u span to 1e-6 relative; a 0.1% planted skew fails it
+**Outcome:** fixed
+
+Fdee5e2, the v span is asserted equal to height/(2*pi*mean r) x the u span to 1e-6 relative; a 0.1% planted skew fails it
 
 ## Findings: the looks and export (claude-opus-5-5)
 
@@ -139,7 +153,9 @@ Carve's faces wind counter-clockwise seen from outside (define_mesh's text), so 
 The product's own probe agrees. `CheckerLookTests.FrontUvs` gives the +Z face [4,5,6,7] (bottom-left, bottom-right, top-right, top-left seen from +Z) the UVs [[0,1],[1,1],[1,0],[0,0]]; read from the top-left, that is [[0,0],[0,1],[1,1],[1,0]]. An agent copying the example gets mirrored UVs and is told they are right.
 
 Checked by working the corner order by hand against the face loop and the probe's constants; not rendered.
-**Outcome:** fixed: 968f1bb, the example now starts at face 1's vertex 4 (bottom-left seen from outside), upright list [[0,1],[1,1],[1,0],[0,0]] and mirrored [[1,1],[0,1],[0,0],[1,0]]; CheckerArgumentTests reads both from the description and asserts check gives no flip and exactly the flip warning
+**Outcome:** fixed
+
+968f1bb, the example now starts at face 1's vertex 4 (bottom-left seen from outside), upright list [[0,1],[1,1],[1,0],[0,0]] and mirrored [[1,1],[0,1],[0,0],[1,0]]; CheckerArgumentTests reads both from the description and asserts check gives no flip and exactly the flip warning
 
 ### Nothing checks that the uvs look's labels are drawn; the labels frame's sweep skips exactly where they are
 **Where:** `scenarios/Carve.Scenario.Crate/CrateUvLayout.cs:47` (and `:134-135`); `src/Carve.Server/RenderSystem.cs:322-324`
@@ -151,7 +167,9 @@ Checked by working the corner order by hand against the face loop and the probe'
 Breaking the wiring in `DrawOverlay` would pass every check. Two examples: dropping the `spec.Mode != Look.Uvs` early-out condition (no corner labels on an unlabelled layout), or routing uvs through `LabelLayout.Plan`.
 
 Found by grepping tests and scenarios for any pixel or overlay assertion on uvs labels; there is none. The person's visual approval in round 2 is the only cover.
-**Outcome:** fixed: b2108e1, UvLayoutLookTests renders the quad with and without labels and asserts text in each corner's margin box and a face id only with labels; it fails with the DrawOverlay wiring broken
+**Outcome:** fixed
+
+B2108e1, UvLayoutLookTests renders the quad with and without labels and asserts text in each corner's margin box and a face id only with labels; it fails with the DrawOverlay wiring broken
 
 ### Corner-label fit at 256 is shown only with a 12 px fake font height (not confirmed)
 **Where:** `tests/Carve.Server.Tests/UvLayoutTests.cs:205`; `src/Carve.Server/LabelLayout.cs:153-155`
@@ -159,7 +177,9 @@ Found by grepping tests and scenarios for any pixel or overlay assertion on uvs 
 At 256 the margin is 16 px. Under the test's measure the label is 12 + 2 x `Padding`(2) = 16 px tall, so the "row stays off the square" assertion passes with no room to spare.
 
 `UvLabels` clamps onto the image first. With a server font any taller than 12 px, the (0,0) and (1,0) labels would sit over the square's top rows at 256. No test uses the real `MeasureText`, and the scenario sweep skips those corners. The real font was not measured, so this is unconfirmed.
-**Outcome:** fixed: confirmed on a real render (the 8x16 font's backing covered the square's outer 4 rows at each corner at 256). By the person's ruling (2026-11-14) the backing is clipped to the margin and the text left in place (17764c4); the person approved the two changed frames, crate-uvs-256 and barrel-uvs-256, and every other frame is byte-identical. The real-font test (92bab9b) predicts the border line and, by a second ruling, the 6 glyph-top pixels on row 239 as text, from where the glyphs are laid; it fails on 442 pixels with the clip undone
+**Outcome:** fixed
+
+Confirmed on a real render (the 8x16 font's backing covered the square's outer 4 rows at each corner at 256). By the person's ruling (2026-11-14) the backing is clipped to the margin and the text left in place (17764c4); the person approved the two changed frames, crate-uvs-256 and barrel-uvs-256, and every other frame is byte-identical. The real-font test (92bab9b) predicts the border line and, by a second ruling, the 6 glyph-top pixels on row 239 as text, from where the glyphs are laid; it fails on 442 pixels with the clip undone
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -180,7 +200,9 @@ The example says a face given `[[0,0],[1,0],[1,1],[0,1]]` "from its top-left cor
 - **Against the other tools:** `set_uvs`'s own example (`SetUvsTool.cs:22-23`) goes `[[0,0],[0,1],[1,1],[1,0]]`, the opposite direction, and so does `CheckerLookTests.FrontUvs`.
 
 An agent copying render's "good" example gets a mirrored face that `check` flags. The text comes from T-57's planned wording (`docs/tasks/T-57-checker-look.md:89`).
-**Outcome:** fixed: 968f1bb, the same line as the looks reviewer's finding; see its outcome
+**Outcome:** fixed
+
+968f1bb, the same line as the looks reviewer's finding; see its outcome
 
 ### set_uvs throws on a negative face id
 **Where:** `src/Carve.Server/SetUvsTool.cs:95-99`, `src/Carve.Core/MeshUvs.cs:59`
@@ -190,13 +212,17 @@ An agent copying render's "good" example gets a mirrored face that `check` flags
 - `clear:[-1]` indexes `m.Faces[-1]`.
 
 On the product, both return only `An error occurred invoking 'set_uvs'.` with no element named, although the description promises a named error. `project_uvs` and `unwrap` check `f < 0` and answer `faces[-1]: face -1 is not a face of the mesh, which has 6`.
-**Outcome:** fixed: 105a7c6, faces[-1] and clear[-1] are refused by name, with mesh and undo unchanged (two UvToolTests cases)
+**Outcome:** fixed
+
+105a7c6, faces[-1] and clear[-1] are refused by name, with mesh and undo unchanged (two UvToolTests cases)
 
 ### server suites miss a linked scenario file
 **Where:** `tests.json:31-41` (server-unit), `tests.json:47-58` (server-regression); `tests/Carve.Server.Tests/Carve.Server.Tests.csproj:41`
 **Rubric:** 6 Tests are placed (suite inputs)
 `Carve.Server.Tests` now links `scenarios/Carve.Scenario.Crate/CheckerColours.cs`, which `CheckerTextureTests` (unit), `CheckerLookTests` and `CheckerArgumentTests` (regression) use. cairn's `dotnet-closure` follows only `ProjectReference`s, which is why `CameraPixels.cs` is listed by hand in both suites. `CheckerColours.cs` is listed in neither, so a change to it does not re-run either suite. The head commit 62a8724 changes exactly this file.
-**Outcome:** fixed: 8209b4f, CheckerColours.cs is an input of server-unit and server-regression
+**Outcome:** fixed
+
+8209b4f, CheckerColours.cs is an input of server-unit and server-regression
 
 ### CLAUDE.md's samples row leaves out barrel.carve
 **Where:** `CLAUDE.md:88`
@@ -205,7 +231,9 @@ The `samples/` row lists every sample with its file version and what keeps it eq
 - is version 5;
 - is kept equal to `TestMeshes.SeamedBarrel` unwrapped by `UnwrapSampleTests`;
 - is compared by scenario-uvs with the barrel it builds.
-**Outcome:** fixed: 00530d6
+**Outcome:** fixed
+
+00530d6
 
 ### Face and `into` errors are worded differently in each UV tool
 **Where:** `src/Carve.Server/SetUvsTool.cs:95-96`, `src/Carve.Server/ProjectUvsTool.cs:78,162`, `src/Carve.Server/UnwrapTool.cs:93`, `src/Carve.Core/Unwrap.cs:209`, `src/Carve.Core/MeshUvs.cs:102`
@@ -221,13 +249,17 @@ The same check is written once per tool, each with its own wording (all from the
   - unwrap says `into: expected [u0, v0, u1, v1], four numbers, got an array`, which doesn't say what is wrong.
 - **An `into` with no area** is worded differently by the two tools.
 - **Where validation lives:** face validation is in Core for `unwrap` but in Server for `set_uvs` and `project_uvs`.
-**Outcome:** fixed: 47559b6, one face and into check in Core (UvArguments) used by set_uvs, project_uvs and unwrap, with the person's ruled wording (2026-11-14); pinned texts moved to it as strictly; UvToolTests pins all three alike. The Carve file reader's own wording is left as it is, by the person's ruling
+**Outcome:** fixed
+
+47559b6, one face and into check in Core (UvArguments) used by set_uvs, project_uvs and unwrap, with the person's ruled wording (2026-11-14); pinned texts moved to it as strictly; UvToolTests pins all three alike. The Carve file reader's own wording is left as it is, by the person's ruling
 
 ### mark_edges says marks are "drawn in export", now true only of hard edges
 **Where:** `src/Carve.Server/ShadingTools.cs:59`
 **Rubric:** 1 Correctness (description vs behaviour)
 "Marks" in this sentence now covers seams, but a seam does nothing to export: export splits vertices only where UVs or normals differ, and M-6's rule is that a seam never changes geometry or shading. The same sentence says marks are "kept ... through move and extrude", although they are now also carried through subdivide and M-5's cuts.
-**Outcome:** fixed: 0db93ba, hard edges change shading and export normals, a seam only guides unwrap and is drawn in the layout, and marks are carried through move, extrude, subdivide and the cuts (checked first)
+**Outcome:** fixed
+
+0db93ba, hard edges change shading and export normals, a seam only guides unwrap and is drawn in the layout, and marks are carried through move, extrude, subdivide and the cuts (checked first)
 
 ## Summary
 
