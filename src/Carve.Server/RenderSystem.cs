@@ -363,7 +363,10 @@ internal sealed class RenderSystem(
             surface.Primitives.DrawCircle(dot, LabelLayout.DotRadius, LabelLayout.TextColour);
         }
 
-        surface.Primitives.DrawRect(label.Backing, LabelLayout.BackingColour);
+        foreach (var piece in label.BackingPieces ?? [label.Backing])
+        {
+            surface.Primitives.DrawRect(piece, LabelLayout.BackingColour);
+        }
         surface.Text.DrawText(label.Text, label.TextAt, LabelLayout.TextColour);
     }
 

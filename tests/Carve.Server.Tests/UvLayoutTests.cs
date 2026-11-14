@@ -214,4 +214,40 @@ public sealed class UvLayoutTests
             Assert.True(top ? b.Y + b.Height <= square.Low.Y : b.Y >= square.High.Y, $"{l.Text} at {b} overlaps the square's rows");
         }
     }
+
+    [Theory]
+    [InlineData(256)]
+    [InlineData(512)]
+    [InlineData(1024)]
+    public void A_corner_labels_backing_is_clipped_to_the_margin_and_its_text_is_not_moved(int size)
+    {
+        // RV-43: the server font's "(0,0)" is 40 x 16, its backing 44 x 20, taller than the 16 px margin at 256.
+        var labels = LabelLayout.UvLabels(UvWindow.Unit, size, [], text => new Vector2(8 * text.Length, 16));
+        var (low, high) = (UvWindow.Unit.Pixel(new Vector2(0, 0), size), UvWindow.Unit.Pixel(new Vector2(1, 1), size));
+        foreach (var l in labels)
+        {
+            var pieces = l.BackingPieces!;
+            Assert.Equal(l.TextAt - new Vector2(2, 2), new Vector2(l.Backing.X, l.Backing.Y));
+            foreach (var p in pieces)
+            {
+                // Inside the backing, and none of it over the square.
+                Assert.True(p.X >= l.Backing.X && p.Y >= l.Backing.Y && p.X + p.Width <= l.Backing.X + l.Backing.Width && p.Y + p.Height <= l.Backing.Y + l.Backing.Height, $"{l.Text}: {p} outside {l.Backing}");
+                Assert.True(p.X + p.Width <= low.X || p.X >= high.X || p.Y + p.Height <= low.Y || p.Y >= high.Y, $"{l.Text}: {p} over the square at {size}");
+            }
+
+            // The pieces cover the backing less the square exactly (they are disjoint).
+            var square = Math.Max(0, Math.Min(l.Backing.X + l.Backing.Width, high.X) - Math.Max(l.Backing.X, low.X))
+                * Math.Max(0, Math.Min(l.Backing.Y + l.Backing.Height, high.Y) - Math.Max(l.Backing.Y, low.Y));
+            Assert.Equal(l.Backing.Width * l.Backing.Height - square, pieces.Sum(p => p.Width * p.Height), 3);
+            if (size == 256)
+            {
+                // 4 rows x 28 columns of each backing reached the square; now none does.
+                Assert.Equal(4 * 28, square, 3);
+            }
+            else
+            {
+                Assert.Equal([l.Backing], pieces);
+            }
+        }
+    }
 }
