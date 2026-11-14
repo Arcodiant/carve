@@ -48,7 +48,9 @@ The fixes changed the wording of several refusals, but only T-58's As built was 
 - T-56's As built has no too-few-seams refusal (9f3c8cb) beside `no extent`.
 
 These lists are what a dependant reads for the exact texts, so they now teach the old wording. T-54's list (`faces[5]: face 5 is deleted, ...`) still fits. Found by grepping `docs/tasks` for the old texts.
-**Outcome:** —
+**Outcome:** fixed
+
+In 6a10430. Both As built sections quote the current texts, taken from the code, and T-56 lists the too-few-seams refusal beside no-extent; each notes that the wording was unified by the person's ruling in RV-43/RV-44.
 
 ## Summary
 
