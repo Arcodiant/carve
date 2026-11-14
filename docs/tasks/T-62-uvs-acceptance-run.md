@@ -4,7 +4,7 @@ description: >-
 ---
 # T-62 — UVs acceptance run
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
