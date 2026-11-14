@@ -132,6 +132,44 @@ public static class LabelLayout
         return plan;
     }
 
+    /// <summary>How far a corner label of the <c>uvs</c> look stands off its corner, diagonally outward, in pixels.</summary>
+    public const int CornerGap = 3;
+
+    /// <summary>
+    /// The <c>uvs</c> look's labels (T-58): the unit square's corners, (0,0) (1,0) (0,1) (1,1), each in the margin diagonally
+    /// off its corner, always; then each face id centred on its UV point. A label wholly off the image is dropped.
+    /// </summary>
+    public static IReadOnlyList<OverlayLabel> UvLabels(UvWindow window, int size, IEnumerable<(string Text, Vector2 Uv)> faces, Func<string, Vector2> measure)
+    {
+        var plan = new List<OverlayLabel>();
+        foreach (var (u, v) in new[] { (0, 0), (1, 0), (0, 1), (1, 1) })
+        {
+            var text = $"({u},{v})";
+            var extent = measure(text);
+            var corner = window.Pixel(new Vector2(u, v), size);
+            var at = new Vector2(
+                u == 0 ? corner.X - CornerGap - Padding - extent.X : corner.X + CornerGap + Padding,
+                v == 0 ? corner.Y - CornerGap - Padding - extent.Y : corner.Y + CornerGap + Padding);
+
+            // A margin narrower than the label (a sixteenth of the window: 32 px at 512) would cut it at the frame's edge,
+            // so it slides inward along its margin until whole; its row stays off the square.
+            at = new Vector2(
+                Math.Clamp(at.X, Padding, Math.Max(Padding, size - Padding - extent.X)),
+                Math.Clamp(at.Y, Padding, Math.Max(Padding, size - Padding - extent.Y)));
+            var label = At(text, Whole(at), extent);
+            if (OnImage(label.Backing, size)) plan.Add(label);
+        }
+
+        foreach (var (text, uv) in faces)
+        {
+            var extent = measure(text);
+            var label = At(text, Whole(window.Pixel(uv, size) - extent / 2), extent);
+            if (OnImage(label.Backing, size)) plan.Add(label);
+        }
+
+        return plan;
+    }
+
     /// <summary>A tile's caption, at its fixed place; it runs off the tile's edge if it is longer.</summary>
     public static OverlayLabel Caption(string text, Func<string, Vector2> measure) => At(text, CaptionAt, measure(text));
 

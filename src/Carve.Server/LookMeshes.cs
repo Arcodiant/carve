@@ -18,6 +18,9 @@ public enum Look
 
     /// <summary>Lit, with <see cref="CheckerTexture"/> at each face's corner UVs, an unmapped face magenta (T-57).</summary>
     Checker,
+
+    /// <summary>One mesh's UV layout drawn flat over the dimmed checker, unlit (T-58): <see cref="UvLayout"/>.</summary>
+    Uvs,
 }
 
 /// <summary>
