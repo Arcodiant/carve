@@ -4,7 +4,7 @@ description: >-
 ---
 # T-61 — Barrel scenario
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
