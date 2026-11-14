@@ -82,6 +82,20 @@ public static class UvProjection
     }
 
     /// <summary>
+    /// Whether <paramref name="seam"/> lies along <paramref name="axis"/> (its part across the axis, both made unit, is
+    /// shorter than 1e-6), worked in double: the one test project_uvs refuses by and <see cref="Cylindrical"/> throws by
+    /// (RV-43). Both must be non-zero.
+    /// </summary>
+    public static bool SeamAlongAxis(Vector3 axis, Vector3 seam) => Length(Across(axis, seam)) < 1e-6;
+
+    private static double[] Across(Vector3 axis, Vector3 seam)
+    {
+        var a = Normalise(axis);
+        var s = Normalise(seam);
+        return Sub(s, Mul(a, Dot(s, a)));
+    }
+
+    /// <summary>
     /// u is the angle round <paramref name="axis"/> from <paramref name="seam"/> (a direction across the axis), increasing to
     /// the right as seen from outside with the axis pointing up; v is the distance along the axis, downward from the faces'
     /// highest point. Arc length (at the faces' mean radius) and height share one scale, fitted into <paramref name="into"/>
@@ -90,11 +104,9 @@ public static class UvProjection
     /// </summary>
     public static IReadOnlyDictionary<int, Vector2[]> Cylindrical(PolygonMesh mesh, IReadOnlyList<int> faces, Vector3 axis, Vector3? centre, Vector3 seam, Rect into)
     {
+        if (SeamAlongAxis(axis, seam)) throw new ArgumentException("seam lies along the axis", nameof(seam));
         var a = Normalise(axis);
-        var s = Normalise(seam);
-        var across = Sub(s, Mul(a, Dot(s, a)));
-        if (Length(across) < 1e-6) throw new ArgumentException("seam lies along the axis", nameof(seam));
-        var e1 = Normalise(across);
+        var e1 = Normalise(Across(axis, seam));
         var e2 = Cross(a, e1);
 
         var vertices = faces.SelectMany(f => mesh.Faces[f].Corners).Distinct().ToArray();

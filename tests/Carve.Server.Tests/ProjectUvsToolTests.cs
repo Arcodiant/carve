@@ -102,6 +102,16 @@ public sealed class ProjectUvsToolTests
         Ok(await carve.CallToolAsync("project_uvs", """{"method":"cylindrical"}"""));
     }
 
+    [Fact]
+    public async Task A_seam_just_across_the_axis_is_taken_where_core_takes_it()
+    {
+        // RV-43: the tool and Core test "along the axis" by one check, so the seam just past the 1e-6 line is mapped (and
+        // the one on it, [1e-6, 1, 0], is refused by name in the theory above) rather than thrown on inside the edit.
+        using var carve = await StartAsync();
+        var result = Ok(await carve.CallToolAsync("project_uvs", """{"method":"cylindrical","axis":[0,1,0],"seam":[2e-6,1,0]}"""));
+        Assert.Equal(6, result.GetProperty("mapped").GetArrayLength());
+    }
+
     [Theory]
     [InlineData("""{}""", "method: required but missing")]
     [InlineData("""{"method":"spherical"}""", "method: 'spherical' is not a method")]
@@ -117,6 +127,7 @@ public sealed class ProjectUvsToolTests
     [InlineData("""{"method":"cylindrical","axis":[0,0,0]}""", "axis: must not be zero")]
     [InlineData("""{"method":"cylindrical","seam":[0,0,0]}""", "seam: must not be zero")]
     [InlineData("""{"method":"cylindrical","seam":[0,2,0]}""", "seam: lies along the axis")]
+    [InlineData("""{"method":"cylindrical","axis":[0,1,0],"seam":[1e-6,1,0]}""", "seam: lies along the axis")]
     [InlineData("""{"method":"box","into":[0,0,0,1]}""", "into: [0, 0, 0, 1] has no area")]
     [InlineData("""{"method":"box","into":[1,0,0,1]}""", "has no area")]
     [InlineData("""{"method":"box","into":[0,0,1]}""", "into: expected 4 numbers")]

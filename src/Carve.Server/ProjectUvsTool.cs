@@ -133,11 +133,8 @@ public sealed class ProjectUvsTool(ModelStore store)
                 else errors.Add("seam: must not be zero, and must be a usable size");
             }
             if (!Absent(centre)) cylinderCentre = Vec3("centre", centre, errors);
-            if (errors.Count == 0)
-            {
-                var across = Vector3.Cross(Vector3.Normalize(cylinderAxis), Vector3.Normalize(cylinderSeam));
-                if (across.Length() < 1e-6f) errors.Add("seam: lies along the axis; give a direction across it");
-            }
+            if (errors.Count == 0 && UvProjection.SeamAlongAxis(cylinderAxis, cylinderSeam))
+                errors.Add("seam: lies along the axis; give a direction across it");
         }
         if (errors.Count > 0) return Failed("project_uvs", errors);
 
