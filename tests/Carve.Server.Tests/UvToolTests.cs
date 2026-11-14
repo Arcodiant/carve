@@ -173,6 +173,15 @@ public sealed class UvToolTests() : TempFolderTests("carve-uvs")
     }
 
     [Fact]
+    public async Task The_uv_tools_word_an_into_element_out_of_range_alike()
+    {
+        using var carve = await StartAsync();
+        const string expected = "into[2]: 1e99 is out of range: an into element must be a finite number within ±3.40282347E+38";
+        Assert.Equal(expected, Assert.Single((await Refused(carve, "project_uvs", """{"method":"box","into":[0,0,1e99,1]}""")).Split('\n').Skip(1)));
+        Assert.Equal(expected, Assert.Single((await Refused(carve, "unwrap", """{"into":[0,0,1e99,1]}""")).Split('\n').Skip(1)));
+    }
+
+    [Fact]
     public async Task A_holed_face_takes_one_pair_per_corner_hole_corners_included()
     {
         using var carve = await StartAsync(Holed);

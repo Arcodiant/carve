@@ -334,6 +334,15 @@ internal static class MeshToolSupport
         return null;
     }
 
+    /// <summary>One element of <c>into</c> (project_uvs and unwrap alike): a float, or null with the error Core words once.</summary>
+    public static float? IntoNumber(string element, JsonElement x, List<string> errors)
+    {
+        if (x.ValueKind != JsonValueKind.Number) { errors.Add($"{element}: expected a number, got {Describe(x)}"); return null; }
+        if (x.TryGetDouble(out var d) && float.IsFinite((float)d)) return (float)d;
+        errors.Add(UvArguments.IntoElementRange(element, x.GetRawText()));
+        return null;
+    }
+
     /// <summary>A required [x, y, z].</summary>
     public static Vector3? Vec3(string name, JsonElement? value, List<string> errors)
     {

@@ -96,7 +96,7 @@ public sealed class UnwrapToolTests
     [InlineData("""{"faces":["a"]}""", "faces: the 1st listed entry: expected an integer id")]
     [InlineData("""{"into":[0,0,1]}""", "into: expected 4 numbers [u0, v0, u1, v1], got 3")]
     [InlineData("""{"into":[0,0,0,1]}""", "into: [0, 0, 0, 1] has no area")]
-    [InlineData("""{"into":[0,0,1e39,1]}""", "into[2]: 1e39 is not finite")]
+    [InlineData("""{"into":[0,0,1e39,1]}""", "into[2]: 1e39 is out of range: an into element must be a finite number within ±3.40282347E+38")]
     [InlineData("""{"margin":-1}""", "margin: -1 is not a margin into can take")]
     [InlineData("""{"margin":0.5}""", "margin: 0.5 is not a margin into can take")]
     [InlineData("""{"colour":1}""", "colour: not an argument of unwrap")]

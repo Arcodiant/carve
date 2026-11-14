@@ -79,7 +79,7 @@ public sealed class ProjectUvsTool(ModelStore store)
             else
             {
                 var n = new float?[4];
-                for (var k = 0; k < 4; k++) n[k] = Number($"into[{k}]", into.Value[k], errors);
+                for (var k = 0; k < 4; k++) n[k] = IntoNumber($"into[{k}]", into.Value[k], errors);
                 if (n.All(x => x is not null))
                 {
                     rect = new UvProjection.Rect(n[0]!.Value, n[1]!.Value, n[2]!.Value, n[3]!.Value);

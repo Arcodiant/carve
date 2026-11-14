@@ -22,6 +22,10 @@ public static class UvArguments
         u1 > u0 && v1 > v0 ? null
         : $"[{Number(u0)}, {Number(v0)}, {Number(u1)}, {Number(v1)}] has no area; u1 must exceed u0 and v1 exceed v0";
 
+    /// <summary>Why an <c>into</c> element, <paramref name="raw"/> as the agent wrote it, is refused: it must be a finite float.</summary>
+    public static string IntoElementRange(string element, string raw) =>
+        $"{element}: {raw} is out of range: an into element must be a finite number within ±{float.MaxValue.ToString("G9", CultureInfo.InvariantCulture)}";
+
     /// <summary>
     /// A number as the agent gave it, with a point on every machine: the shortest text that reads back to it, as a float
     /// where it is exactly one (so a 0.1 read as a float is written 0.1, not 0.10000000149011612).

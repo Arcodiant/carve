@@ -97,7 +97,7 @@ public sealed class UnwrapTool(ModelStore store)
         var ok = true;
         for (var j = 0; j < 4; j++)
         {
-            if (UvNumber($"into[{j}]", value.Value[j], errors) is { } x) xs[j] = x;
+            if (IntoNumber($"into[{j}]", value.Value[j], errors) is { } x) xs[j] = x;
             else ok = false;
         }
         return ok ? (xs[0], xs[1], xs[2], xs[3]) : null;

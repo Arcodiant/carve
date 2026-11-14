@@ -132,7 +132,7 @@ public sealed class ProjectUvsToolTests
     [InlineData("""{"method":"box","into":[1,0,0,1]}""", "has no area")]
     [InlineData("""{"method":"box","into":[0,0,1]}""", "into: expected 4 numbers")]
     [InlineData("""{"method":"box","into":[0,0,"a",1]}""", "into[2]: expected a number")]
-    [InlineData("""{"method":"box","into":[0,0,1e99,1]}""", "into[2]: 1e99 is out of range")]
+    [InlineData("""{"method":"box","into":[0,0,1e99,1]}""", "into[2]: 1e99 is out of range: an into element must be a finite number within ±3.40282347E+38")]
     [InlineData("""{"method":"box","colour":1}""", "colour: not an argument of project_uvs")]
     [InlineData("""{"method":"box","mesh":"nope"}""", "nope")]
     public async Task Every_refusal_names_its_element_and_changes_nothing(string arguments, string expected)
