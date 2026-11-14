@@ -25,26 +25,26 @@ internal static class CrateBuild
     public const int PlusXFace = 5;
 
     /// <summary>The crate in 12 calls: the example cube, then edit tools only, counts checked after each. Returns the last report.</summary>
-    public static async Task<JsonElement> BuildAsync(ScenarioDriver driver)
+    public static async Task<JsonElement> BuildAsync(ScenarioDriver driver, string? mesh = null)
     {
-        await DefineAsync(driver);
-        await EditAsync(driver, "move", new { faces = new[] { TopFace }, by = new[] { 0, -0.2, 0 } }, 8, 6);                      // 2
-        await EditAsync(driver, "extrude", new { faces = AllFaces, distance = 0, inset = 0.12 }, 32, 30);                          // 3
-        await EditAsync(driver, "extrude", new { faces = AllFaces, distance = -0.08 }, 56, 54);                                    // 4
+        await DefineAsync(driver, mesh);
+        await EditAsync(driver, "move", new { faces = new[] { TopFace }, by = new[] { 0, -0.2, 0 } }, 8, 6, mesh);                      // 2
+        await EditAsync(driver, "extrude", new { faces = AllFaces, distance = 0, inset = 0.12 }, 32, 30, mesh);                          // 3
+        await EditAsync(driver, "extrude", new { faces = AllFaces, distance = -0.08 }, 56, 54, mesh);                                    // 4
 
         // -X: the slot's edges drawn together by moving their vertices.
-        await EditAsync(driver, "extrude", new { faces = new[] { MinusXFace }, distance = 0, inset = 0.05 }, 60, 58);            // 5
-        var (top, bottom) = await TopAndBottomAsync(driver, MinusXFace);
-        await EditAsync(driver, "move", new { vertices = new[] { top.A, top.B }, by = new[] { 0, -0.17, 0 } }, 60, 58);          // 6
-        await EditAsync(driver, "move", new { vertices = new[] { bottom.A, bottom.B }, by = new[] { 0, 0.17, 0 } }, 60, 58);     // 7
-        await EditAsync(driver, "extrude", new { faces = new[] { MinusXFace }, distance = 0.1 }, 64, 62);                         // 8
+        await EditAsync(driver, "extrude", new { faces = new[] { MinusXFace }, distance = 0, inset = 0.05 }, 60, 58, mesh);            // 5
+        var (top, bottom) = await TopAndBottomAsync(driver, MinusXFace, mesh);
+        await EditAsync(driver, "move", new { vertices = new[] { top.A, top.B }, by = new[] { 0, -0.17, 0 } }, 60, 58, mesh);          // 6
+        await EditAsync(driver, "move", new { vertices = new[] { bottom.A, bottom.B }, by = new[] { 0, 0.17, 0 } }, 60, 58, mesh);     // 7
+        await EditAsync(driver, "extrude", new { faces = new[] { MinusXFace }, distance = 0.1 }, 64, 62, mesh);                         // 8
 
         // +X: the same by moving the edges.
-        await EditAsync(driver, "extrude", new { faces = new[] { PlusXFace }, distance = 0, inset = 0.05 }, 68, 66);              // 9
-        (top, bottom) = await TopAndBottomAsync(driver, PlusXFace);
-        await EditAsync(driver, "move", new { edges = new[] { new[] { top.A, top.B } }, by = new[] { 0, -0.17, 0 } }, 68, 66);   // 10
-        await EditAsync(driver, "move", new { edges = new[] { new[] { bottom.A, bottom.B } }, by = new[] { 0, 0.17, 0 } }, 68, 66); // 11
-        var crate = await EditAsync(driver, "extrude", new { faces = new[] { PlusXFace }, distance = 0.1 }, 72, 70);              // 12
+        await EditAsync(driver, "extrude", new { faces = new[] { PlusXFace }, distance = 0, inset = 0.05 }, 68, 66, mesh);              // 9
+        (top, bottom) = await TopAndBottomAsync(driver, PlusXFace, mesh);
+        await EditAsync(driver, "move", new { edges = new[] { new[] { top.A, top.B } }, by = new[] { 0, -0.17, 0 } }, 68, 66, mesh);   // 10
+        await EditAsync(driver, "move", new { edges = new[] { new[] { bottom.A, bottom.B } }, by = new[] { 0, 0.17, 0 } }, 68, 66, mesh); // 11
+        var crate = await EditAsync(driver, "extrude", new { faces = new[] { PlusXFace }, distance = 0.1 }, 72, 70, mesh);              // 12
 
         if (!crate.GetProperty("closed").GetBoolean() || crate.GetProperty("warnings").GetArrayLength() != 0)
         {
@@ -55,19 +55,27 @@ internal static class CrateBuild
         return crate;
     }
 
-    public static async Task<JsonElement> DefineAsync(ScenarioDriver driver)
+    public static async Task<JsonElement> DefineAsync(ScenarioDriver driver, string? mesh = null)
     {
-        var report = await CallJsonAsync(driver, "define_mesh", new { vertices = CubeVertices, faces = CubeFaces });
+        var report = await CallJsonAsync(driver, "define_mesh", mesh is null ? new { vertices = CubeVertices, faces = CubeFaces } : new { name = mesh, vertices = CubeVertices, faces = CubeFaces });
         CheckCounts(driver, "define_mesh", report, 8, 6);
         return report;
     }
 
     /// <summary>One edit call: no tool error, the expected counts, still closed.</summary>
-    public static async Task<JsonElement> EditAsync(ScenarioDriver driver, string tool, object arguments, int vertices, int faces)
+    public static async Task<JsonElement> EditAsync(ScenarioDriver driver, string tool, object arguments, int vertices, int faces, string? mesh = null)
     {
-        var report = await CallJsonAsync(driver, tool, arguments);
+        var report = await CallJsonAsync(driver, tool, WithMesh(arguments, mesh));
         CheckCounts(driver, tool, report, vertices, faces);
         return report;
+    }
+
+    /// <summary>The arguments with <c>mesh</c> added when a mesh is named (the crate beside another mesh); unchanged, the same object, when not.</summary>
+    public static object WithMesh(object arguments, string? mesh)
+    {
+        if (mesh is null) return arguments;
+        var all = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(JsonSerializer.Serialize(arguments))!;
+        return new Dictionary<string, object> { ["mesh"] = mesh }.Concat(all.Select(e => KeyValuePair.Create(e.Key, (object)e.Value))).ToDictionary(e => e.Key, e => e.Value);
     }
 
     public static async Task<JsonElement> CallJsonAsync(ScenarioDriver driver, string tool, object arguments) =>
@@ -109,9 +117,9 @@ internal static class CrateBuild
     }
 
     /// <summary>The face's highest and lowest edges in Y, as vertex pairs, read from get_mesh.</summary>
-    public static async Task<((int A, int B) Top, (int A, int B) Bottom)> TopAndBottomAsync(ScenarioDriver driver, int face)
+    public static async Task<((int A, int B) Top, (int A, int B) Bottom)> TopAndBottomAsync(ScenarioDriver driver, int face, string? name = null)
     {
-        var mesh = await CallJsonAsync(driver, "get_mesh", new { });
+        var mesh = await CallJsonAsync(driver, "get_mesh", WithMesh(new { }, name));
         var y = mesh.GetProperty("vertices").EnumerateArray().Select(v => v.GetProperty("at")[1].GetDouble()).ToArray();
         var loop = mesh.GetProperty("faces")[face].GetProperty("vertices").EnumerateArray().Select(x => x.GetInt32()).ToArray();
         var level = Enumerable.Range(0, loop.Length)
