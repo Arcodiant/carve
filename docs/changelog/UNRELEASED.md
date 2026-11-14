@@ -7,3 +7,4 @@
 - T-56: unwrap cuts at seams and open edges, flattens each island by LSCM and packs them, shown on the barrel sample
 - T-57: render mode checker draws the model lit with a generated checker texture, and unmapped faces magenta
 - T-59: export writes each corner's UV as TEXCOORD_0, splitting vertices where UVs differ, and warns of unmapped faces
+- T-58: render mode uvs draws a mesh's UV layout flat over the dimmed checker, with seams, labels and highlight

@@ -4,7 +4,7 @@ description: >-
 ---
 # T-58 — UV layout look
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
