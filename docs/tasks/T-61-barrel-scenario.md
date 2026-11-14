@@ -107,3 +107,7 @@ Built by Sonnet 5.5 (`claude-sonnet-5-5`), one agent, 2026-11-14, on `task/T-61`
 **For T-62.** Plant on `samples/barrel.carve` (a seam removed makes `unwrap` refuse). `checker-samples.txt` lines carry the pixel, the colour and the cell expected. The seam precondition above is the one check not made.
 
 **Review.** Round 1 (2026-11-14, Waystone, `G:\My Drive\artifacts\carve\M-6\T-61\round-1`, 16 frames): approved, no notes. I looked at three montages of the frames myself: the four barrel views read as predicted (white cell low left on the seam side), the layouts show the two caps beside the strip with yellow seams, the moved barrel bulges with stretched cells and the extruded cap shows a magenta band. Not looked at by eye: the repeats (byte-equal by hash), the sheet in its final form, the 1024 layout.
+
+### Ruling after the fact (the person, 2026-11-14)
+
+The seam-colour check skips segments that have another island's line within 7 px, and logs each as `not checked`. This is kept as built. At 256, 11 of 40 segments are skipped; at 512, 1 of 40; at 1024, none.
