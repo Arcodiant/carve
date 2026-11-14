@@ -25,6 +25,15 @@ public class CharacterLoadTests
 
     private static string SamplePath() => RunContent.SamplePath("gardener.carve");
 
+    /// <summary>T-59's guard: the gardener has no UVs, so both files are the bytes written before UVs existed (SHA-256, taken on milestone/M-6 before T-59).</summary>
+    [SkippableOrRun]
+    public void The_exported_files_are_byte_identical_to_those_written_before_UVs()
+    {
+        static string Hash(string file) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(Path.Combine(RunFolder, "game", "Content", "models", file))));
+        Assert.Equal("7C09FEA328FB611232B036517897F3FFC12816E268F25A0AF8D5C4442E71A8AD", Hash("gardener.glb"));
+        Assert.Equal("6D25ED0B3CE3E0576B23131EFD01D7BACCE987C278480E32160C4D1CBCEAF596", Hash("gardener.clips.glb"));
+    }
+
     [SkippableOrRun]
     public void The_model_loads_with_the_bones_in_order_and_the_clips_named()
     {

@@ -4,7 +4,7 @@ description: >-
 ---
 # T-59 — UVs in export
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -47,3 +47,15 @@ A model's UVs reach a game exactly: the engine reads back each corner's UV as Ca
 - **Carried from earlier plans:** as T-53's Notes (the hash guard, a break per new check as a table, `finish` read whole, artifacts by job id, report a long `verify` wait). Evidence goes in the milestone worktree's `artifacts/review/T-59/`.
 - **Open rules: stop and ask.** Anything the milestone's *Decided at planning* does not settle, any loosened check, and any change to an existing export's bytes.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Written by Sonnet 5.5.
+
+- **Corners.** `GlbExport.UvAt(mesh, face, vertex)` reads `mesh.Uvs.Of(face)[face.CornerOf(vertex)]` (hole corners included), (0, 0) for an unmapped face. `TEXCOORD_0` is written for a mesh only when some live face has UVs (`GlbExport.HasUvs`); seams alone write none. The writers are generic over the vertex material (`VertexEmpty` or `VertexTexture1`), so the no-UV path writes the same bytes as before (pinned by SHA-256 in `UvExportTests`, `ExportViewerTests` and `CharacterLoadTests`). SharpGLTF's equal-vertex merge does the splitting on (position, normal, UV).
+- **Static export** pairs `Shading.Triangles` with `Triangulator.Triangulate` (same order) to get each triangle corner's vertex id; `ShadedTriangle` is unchanged. **Skinned export** uses each piece's own mesh, so it needed nothing from `Combined`; a model with UVs on any piece writes `TEXCOORD_0` on every primitive.
+- **Warning**, one per piece with unmapped live faces, only when some piece has UVs: `<mesh>: N faces have no UVs; their corners are written as (0, 0) (faces a, b, c, d, e and K more)`, the first five ids; one face reads `<mesh>: 1 face has no UVs; its corners are written as (0, 0) (face a)`. `<mesh>` is the piece's name (`mesh` for a default model). In the static result it joins the report's warnings in `N warning(s)`; in the skinned one it is in `SkinnedGlb.Warnings`. `GlbExport.UvWarnings(Model)` builds it.
+- **For T-61:** an export of a model with UVs writes `TEXCOORD_0` as Carve holds them (glTF axes); read it back with `IModelGeometryLoader.Load`, vertex field `TexCoord`. The description of `export` says what is written.
+- **Ruling (the person, 2026-11-13):** the warning's singular form `<mesh>: 1 face has no UVs; its corners are written as (0, 0) (face a)` is kept as built.
+- **Multi-mesh static export** goes through `Model.Combined`, which T-57 now fills with the offset faces' UVs (`Combined` unchanged here). A test writes a model of two meshes with UVs, reads it back through `Load` and checks each corner's UV bit for bit in mesh order, plus the warning per piece (only the second piece has unmapped faces). The code needed no change.
+- **Model run on:** Sonnet 5.5 (both sessions; the second rebased onto T-57 and added the multi-mesh test). Checked on the unit and regression fixtures (cube, smooth cube, a two-bone chain) and through the `set_uvs` and `export` tools; not on a real character.

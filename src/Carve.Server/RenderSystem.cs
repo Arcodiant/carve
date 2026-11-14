@@ -33,6 +33,11 @@ internal sealed class RenderSystem(
     private Material[]? _nextSubmeshMaterials;
     private Entity? _edgeLines;
     private Entity? _orangeLines;
+    private Entity? _seamLines;
+    private readonly Dictionary<Vector4, Material> _lineMaterials = [];
+    private Material? _layoutMaterial;
+    private UvWindow _uvWindow = UvWindow.Unit;
+    private Vector4 _nextEdgeColour = LookMeshes.Edge;
     private LookHolder<Mesh>? _looks;
     private MeshReport? _report;
     private Vector3 _drawnHalf;
@@ -41,8 +46,28 @@ internal sealed class RenderSystem(
     private bool _composed;
     private RenderPump? _pump;
     private float[]? _weights;
+    private Texture? _checker;
+    private Material? _checkerMaterial;
 
     private LookHolder<Mesh> Looks => _looks ??= new LookHolder<Mesh>(this);
+
+    /// <summary>
+    /// The checker (<see cref="CheckerTexture"/>) as an engine texture, made on the frame thread the first time a look asks
+    /// for it, sRGB, sampled nearest with repeat and no mipmaps, and held for the process's life, as the cameras and light
+    /// are. A render that never asks for it makes nothing. T-58's layout look draws it again.
+    /// </summary>
+    internal Texture Checker => _checker ??= resources.CreateTexture(
+        CheckerTexture.Pixels.Span, CheckerTexture.Size, CheckerTexture.Size, TextureFormat.Rgba8Srgb, SamplerDescriptions.PixelArt, generateMipmaps: false);
+
+    /// <summary>The checker look's one material: lit from the mesh's normals, the checker times each vertex's colour.</summary>
+    private Material CheckerMaterial => _checkerMaterial ??= Material.LitTextured(Checker);
+
+    /// <summary>
+    /// The <c>uvs</c> look's material (T-58): the checker unlit, times each vertex's colour, made the first time that look is
+    /// drawn and held for the process's life. Without <see cref="MaterialFlags.Lit"/> the surface colour is emitted as it is.
+    /// </summary>
+    private Material LayoutMaterial => _layoutMaterial ??= new Material(
+        MaterialFlags.Textured, Vector4.One, Checker, null!, 0, 1, Vector3.Zero, 1, null!, null!, null!, 0, default, null, 0, false);
 
     public void Initialise()
     {
@@ -109,8 +134,26 @@ internal sealed class RenderSystem(
         _drawnHalf = space.Apply(framing.BoundsMax);
     }
 
-    public IReadOnlyList<Func<Mesh?>> Make(Carve.Core.PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight)
+    public IReadOnlyList<Func<Mesh?>> Make(Carve.Core.PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight, ElementWindow? faces)
     {
+        if (look == Look.Uvs)
+        {
+            // The layout replaces the model: a flat scene of its own, framed by ApplyView on the window it is drawn in.
+            var layout = UvLayout.Compose(mesh, faces ?? new ElementWindow(0, 0, mesh.Faces.Count), highlight);
+            _uvWindow = layout.Window;
+            _nextMaterial = LayoutMaterial;
+            _nextSubmeshMaterials = null;
+            _nextEdgeColour = UvLayout.Edge;
+            return
+            [
+                () => resources.CreateMesh(layout.Fill, layout.Colours),
+                () => resources.CreateMesh(layout.Edges),
+                () => null,
+                () => layout.Seams is { } seams ? resources.CreateMesh(seams) : null,
+            ];
+        }
+
+        _nextEdgeColour = LookMeshes.Edge;
         // The pump puts a mesh in under the previous look before it applies the next: with no weights to hand, draw it shaded for now.
         var scene = LookMeshes.Compose(mesh, space, look == Look.Weights && _weights is null ? Look.Shaded : look, highlight, _weights);
         // The fill's material, put on its entity by Install with the meshes made here. A mesh with coloured faces drawn
@@ -118,7 +161,13 @@ internal sealed class RenderSystem(
         _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
         _nextSubmeshMaterials = null;
         MeshData<PositionUvNormalVertex> data;
-        if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 })
+        if (scene.Uvs is { } uvs)
+        {
+            // The checker: one mesh and one material whatever the face colours, which it replaces.
+            _nextMaterial = CheckerMaterial;
+            data = MeshBridge.ToMeshData(mesh, space, uvs);
+        }
+        else if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 })
         {
             data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours);
             _nextSubmeshMaterials = colours
@@ -134,10 +183,11 @@ internal sealed class RenderSystem(
             () => scene.VertexColours is { } colours ? resources.CreateMesh(data, colours) : resources.CreateMesh(data),
             () => scene.EdgeLines is { } edgeLines ? resources.CreateMesh(edgeLines) : null,
             () => scene.OrangeLines is { } orangeLines ? resources.CreateMesh(orangeLines) : null,
+            () => null,
         ];
     }
 
-    public void Install(Mesh fill, Mesh? edges, Mesh? orange)
+    public void Install(Mesh fill, Mesh? edges, Mesh? orange, Mesh? seams)
     {
         if (_meshEntity is { } entity)
         {
@@ -152,8 +202,9 @@ internal sealed class RenderSystem(
             entities.GetComponent<MeshInstance>(_meshEntity.Value).SubmeshMaterials = _nextSubmeshMaterials!;
         }
 
-        _edgeLines = Swap(_edgeLines, edges, LookMeshes.Edge);
+        _edgeLines = Swap(_edgeLines, edges, _nextEdgeColour);
         _orangeLines = Swap(_orangeLines, orange, LookMeshes.Orange);
+        _seamLines = Swap(_seamLines, seams, UvLayout.Seam);
     }
 
     public void Destroy(Mesh mesh) => resources.Destroy(mesh);
@@ -178,7 +229,10 @@ internal sealed class RenderSystem(
         return entity;
     }
 
-    /// <summary>Puts the next lines on a slot's entity; the entity is in the scene only while the look has such lines.</summary>
+    /// <summary>
+    /// Puts the next lines on a slot's entity, in <paramref name="colour"/>; the entity is in the scene only while the look has
+    /// such lines. One material per colour, made once, so a slot keeps the very material it had while its colour stays.
+    /// </summary>
     private Entity? Swap(Entity? slot, Mesh? next, Vector4 colour)
     {
         if (next is null)
@@ -191,18 +245,30 @@ internal sealed class RenderSystem(
             return null;
         }
 
+        if (!_lineMaterials.TryGetValue(colour, out var material))
+        {
+            _lineMaterials[colour] = material = Material.SolidColor(colour);
+        }
+
         if (slot is { } entity)
         {
-            entities.GetComponent<MeshInstance>(entity).Mesh = next;
+            ref var instance = ref entities.GetComponent<MeshInstance>(entity);
+            instance.Mesh = next;
+            instance.Material = material;
             return entity;
         }
 
-        return AddInstance(next, Material.SolidColor(colour), castsShadow: false);
+        return AddInstance(next, material, castsShadow: false);
     }
 
     public void ApplyView(RenderSpec spec)
     {
-        Looks.Apply(spec.Mode, spec.Highlight, _space);
+        Looks.Apply(spec.Mode, spec.Highlight, _space, spec.Mode == Look.Uvs ? spec.UvFaces : null);
+        if (spec.Mode == Look.Uvs)
+        {
+            ApplyLayoutView();
+            return;
+        }
 
         // The target is in the mesh's own coordinates; the camera works in drawn space.
         var camera = spec.Camera;
@@ -218,10 +284,26 @@ internal sealed class RenderSystem(
         entities.GetComponent<Transform3D>(_light).Orientation = frame.LightOrientation;
     }
 
+    /// <summary>The <c>uvs</c> look's camera: straight down -Z with +Y up, orthographic over the window, which fills the frame.</summary>
+    private void ApplyLayoutView()
+    {
+        var side = (float)_uvWindow.Side;
+        var eye = new Vector3(0, 0, UvLayout.Eye);
+        var view = Matrix4x4.CreateLookAt(eye, Vector3.Zero, Vector3.UnitY);
+        Matrix4x4.Invert(view, out var world);
+        var frame = new ViewFrame(eye, world, view, Matrix4x4.CreateOrthographic(side, side, 1, 2 * UvLayout.Eye), ViewFraming.LightOrientation(RenderView.Front));
+        _frame = frame;
+        foreach (var entity in _cameras)
+        {
+            entities.GetOrAddComponent<WorldTransform>(entity) = new WorldTransform { Matrix = frame.World };
+            entities.GetComponent<Camera>(entity).ProjectionMatrix = frame.Projection;
+        }
+    }
+
     /// <summary>Queues what this frame writes on the image, for the next <c>RenderFrame</c> to draw and drain; a plain render queues nothing.</summary>
     private void DrawOverlay(RenderSpec spec)
     {
-        if (spec.Labels == LabelSet.None && spec.TileCaption is null && spec.Bones is null)
+        if (spec.Mode != Look.Uvs && spec.Labels == LabelSet.None && spec.TileCaption is null && spec.Bones is null)
         {
             return;
         }
@@ -237,7 +319,9 @@ internal sealed class RenderSystem(
         var surface = surfaces.Get(RenderComposition.LabelTag(spec.Size));
         Vector2 Measure(string text) => surface.Text.MeasureText(text, 1);
 
-        var labels = LabelLayout.Plan(Looks.Shown!, _space, _frame!, spec.Camera.Direction, spec.Projection, spec.Labels, spec.Size, Measure, spec.LabelWindow);
+        var labels = spec.Mode == Look.Uvs
+            ? LabelLayout.UvLabels(_uvWindow, spec.Size, spec.Labels == LabelSet.Faces ? UvLayout.FaceLabels(Looks.Shown!, spec.UvFaces ?? new ElementWindow(0, 0, Looks.Shown!.Faces.Count)) : [], Measure)
+            : LabelLayout.Plan(Looks.Shown!, _space, _frame!, spec.Camera.Direction, spec.Projection, spec.Labels, spec.Size, Measure, spec.LabelWindow);
         foreach (var label in labels)
         {
             Draw(surface, label);
@@ -279,7 +363,10 @@ internal sealed class RenderSystem(
             surface.Primitives.DrawCircle(dot, LabelLayout.DotRadius, LabelLayout.TextColour);
         }
 
-        surface.Primitives.DrawRect(label.Backing, LabelLayout.BackingColour);
+        foreach (var piece in label.BackingPieces ?? [label.Backing])
+        {
+            surface.Primitives.DrawRect(piece, LabelLayout.BackingColour);
+        }
         surface.Text.DrawText(label.Text, label.TextAt, LabelLayout.TextColour);
     }
 

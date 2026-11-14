@@ -56,4 +56,21 @@ public class RefusalCultureTests
         var (_, errors) = InGerman(() => Skeleton.Create([new BoneSpec("a", null, Vector3.Zero, new Quaternion(0, 0, 0, 1.5f))]));
         Assert.Equal("bones[0]: rotation is not a unit quaternion: its length is 1.5, and it must be 1 (within 0.001)", Assert.Single(errors).ToString());
     }
+
+    /// <summary>RV-43: unwrap's refusals write numbers with a point, and as given: a value read as a float is not widened.</summary>
+    [Fact]
+    public void Unwraps_margin_and_into_refusals_are_written_with_a_point_and_as_given()
+    {
+        var (_, margin) = InGerman(() => Unwrap.Run(TestMeshes.SeamedBarrel(), margin: -0.5));
+        Assert.Equal("margin: -0.5 is not a margin into can take; it must be at least 0 and less than half of into's shorter side (0.5)",
+            Assert.Single(margin).ToString());
+        var (_, flat) = InGerman(() => Unwrap.Run(TestMeshes.SeamedBarrel(), into: (0, 0, 0.5, 0)));
+        Assert.Equal("into: [0, 0, 0.5, 0] has no area; u1 must exceed u0 and v1 exceed v0", Assert.Single(flat).ToString());
+        // The tool reads into and margin as floats: 0.1f widened is written 0.1, not 0.10000000149011612.
+        var (_, widened) = InGerman(() => Unwrap.Run(TestMeshes.SeamedBarrel(), into: (0, 0, (double)0.1f, 0), margin: (double)-0.1f));
+        Assert.Equal("into: [0, 0, 0.1, 0] has no area; u1 must exceed u0 and v1 exceed v0", Assert.Single(widened).ToString());
+        var (_, small) = InGerman(() => Unwrap.Run(TestMeshes.SeamedBarrel(), into: (0, 0, (double)0.3f, (double)0.3f), margin: (double)-0.1f));
+        Assert.Equal("margin: -0.1 is not a margin into can take; it must be at least 0 and less than half of into's shorter side (0.15)",
+            Assert.Single(small).ToString());
+    }
 }

@@ -111,6 +111,12 @@ public sealed class CrateScenario : IScenario
         // 5. The looks, last, so that every frame above stays as it was; the cube's frame closes the run.
         await CrateLooks.RunAsync(driver, front, tilted);
 
+        // 5a. The checker look (T-57) on a crate built again, its UVs undone after, so the stages below see the crate as before.
+        await CrateChecker.RunAsync(driver, front);
+
+        // 5b. The UV layout look (T-58) on that crate laid with project_uvs box, undone after likewise.
+        await CrateUvLayout.RunAsync(driver, front);
+
         // 6. The crate coloured (T-30), after every frame above so that none of them changes.
         await CrateColours.RunAsync(driver, front, tilted);
 

@@ -15,6 +15,12 @@ public enum Look
 
     /// <summary>One bone's weights as heat, unlit (T-40).</summary>
     Weights,
+
+    /// <summary>Lit, with <see cref="CheckerTexture"/> at each face's corner UVs, an unmapped face magenta (T-57).</summary>
+    Checker,
+
+    /// <summary>One mesh's UV layout drawn flat over the dimmed checker, unlit (T-58): <see cref="UvLayout"/>.</summary>
+    Uvs,
 }
 
 /// <summary>
@@ -80,11 +86,13 @@ public sealed class Highlight : IEquatable<Highlight>
 /// <param name="VertexColours">One per vertex of the triangles, or null for a mesh carrying none.</param>
 /// <param name="EdgeLines">The lines in <see cref="LookMeshes.Edge"/>, or null for none.</param>
 /// <param name="OrangeLines">The lines in <see cref="LookMeshes.Orange"/>, or null for none.</param>
+/// <param name="Uvs">One UV per vertex of the triangles (A, C, B), for the textured checker look; null for every other look.</param>
 public sealed record LookScene(
     Vector4? FlatColour,
     Rgba8[]? VertexColours,
     MeshData<PositionVertex>? EdgeLines,
-    MeshData<PositionVertex>? OrangeLines);
+    MeshData<PositionVertex>? OrangeLines,
+    Vector2[]? Uvs = null);
 
 /// <summary>
 /// Pure CPU: what the looks of <c>render</c> draw, all in drawn space. Nothing here touches a device,
@@ -129,8 +137,47 @@ public static class LookMeshes
             Look.Wireframe => new LookScene(picked ? Vector4.One : Fill, picked ? Picked(FillVertex) : null, WireframeLines(mesh, space, highlight), orange),
             Look.Normals => new LookScene(Vector4.One, CornerColours(mesh), Spikes(mesh, space), orange),
             Look.Weights => new LookScene(Vector4.One, HeatColours(mesh, weights ?? throw new InvalidOperationException("The weights look needs a weight for each vertex.")), null, orange),
+            Look.Checker => new LookScene(null, CheckerColours(mesh, highlight), null, orange, CornerUvs(mesh)),
             _ => new LookScene(null, picked ? Picked(Rgba8.White) : null, null, orange),
         };
+    }
+
+    /// <summary>A face with no UVs in the checker look, linear.</summary>
+    public static readonly Vector3 Unmapped = new(1, 0, 1);
+
+    private static readonly Rgba8 UnmappedVertex = Rgba8.FromVector(Unmapped);
+
+    /// <summary>
+    /// The checker look's vertex colours, which the texture is multiplied by: white on a mapped face, magenta on an
+    /// unmapped one (whose corners sample the white cell, so it is plain magenta), orange on a highlighted face, as shaded.
+    /// </summary>
+    private static Rgba8[] CheckerColours(PolygonMesh mesh, Highlight highlight) =>
+        FaceColours(mesh, f => highlight.Faces.Contains(f) ? OrangeVertex : mesh.Uvs?.IsMapped(f) == true ? Rgba8.White : UnmappedVertex);
+
+    /// <summary>
+    /// Each triangle vertex's UV in <see cref="MeshBridge.ToMeshData"/>'s order (A, C, B): its corner's UV on its face,
+    /// a hole's corners included; every corner of an unmapped face at <see cref="CheckerTexture.WhiteCentre"/>.
+    /// </summary>
+    public static Vector2[] CornerUvs(PolygonMesh mesh)
+    {
+        var triangles = Triangulator.Triangulate(mesh);
+        var uvs = new Vector2[triangles.Count * 3];
+        for (var t = 0; t < triangles.Count; t++)
+        {
+            var (a, b, c, face) = triangles[t];
+            if (mesh.Uvs?.Of(face) is not { } corners)
+            {
+                uvs[t * 3] = uvs[t * 3 + 1] = uvs[t * 3 + 2] = CheckerTexture.WhiteCentre;
+                continue;
+            }
+
+            var loop = mesh.Faces[face];
+            uvs[t * 3] = corners[loop.CornerOf(a)];
+            uvs[t * 3 + 1] = corners[loop.CornerOf(c)];
+            uvs[t * 3 + 2] = corners[loop.CornerOf(b)];
+        }
+
+        return uvs;
     }
 
     /// <summary>An unweighted vertex in the weights look, linear.</summary>

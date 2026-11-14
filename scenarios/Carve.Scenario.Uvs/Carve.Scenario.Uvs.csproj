@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The UVs: the barrel seamed, unwrapped and seen in both UV looks, and the crate box-projected, saved, reopened and exported. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Uvs</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <!-- Linked from the Crate scenario, never copied: its build, camera, colour rule and layout checks. -->
+  <ItemGroup>
+    <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CheckerColours.cs" Link="CheckerColours.cs" />
+    <Compile Include="../Carve.Scenario.Crate/UvLayoutPixels.cs" Link="UvLayoutPixels.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CrateLooks.cs" Link="CrateLooks.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CrateChecker.cs" Link="CrateChecker.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CrateLabels.cs" Link="CrateLabels.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CrateUvLayout.cs" Link="CrateUvLayout.cs" />
+    <Content Include="../../samples/barrel.carve" Link="barrel.carve" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

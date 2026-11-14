@@ -9,6 +9,10 @@ public enum MeshWarningKind
     InconsistentWinding,
     NonPlanarFace,
     UnusedVertex,
+    UvUnmapped,
+    UvFlipped,
+    UvZeroArea,
+    UvOverlap,
 }
 
 /// <summary>A legal-but-suspicious feature of a mesh. <see cref="Element"/> names it, e.g. <c>faces[2]</c>, <c>vertices[7]</c> or <c>edges[0-1]</c>.</summary>

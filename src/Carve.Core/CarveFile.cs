@@ -43,13 +43,17 @@ public sealed class CarveFileResult
 /// skeleton and the clips), read back bit-exact with every vertex, face and bone at its id. Undo history is not saved.
 /// </summary>
 /// <remarks>
-/// <para><see cref="Write"/> gives version 4 (T-63) for a model with a holed face or a tombstone, and otherwise what earlier builds gave
+/// <para><see cref="Write"/> gives version 5 (T-53) for a model with UVs or seams on some mesh, else version 4 (T-63) for a model with a holed face or a tombstone, and otherwise what earlier builds gave
 /// (version 3 with a smooth mesh or a hard edge, else version 2, byte for byte): the lowest version that holds the model,
 /// as the person ruled (2026-11-11). Version 4 is version 3 with faces that may have holes: a face is
 /// either a plain array of vertex ids, its outer loop, or the object <c>{"loop": [...], "holes": [[...], ...]}</c>, as
 /// <c>define_mesh</c> takes it; a face with no hole is always written as the plain array, a holed one as the object on one
 /// line. Version 4 also holds tombstones (T-64): a <c>null</c> in <c>vertices</c> or <c>faces</c> standing
 /// for a deleted element whose id is not reused, read back to the same tombstone; a live face using a null vertex is refused at its corner.
+/// Version 5 (T-53) is version 4 with, after <c>hard_edges</c> in a mesh, <c>uvs</c>
+/// (<c>[{"face": f, "uv": [[u, v], ...]}, ...]</c>, one per mapped face in face-id order, one UV per <see cref="Face.Corners"/>
+/// entry: the outer loop, then each hole) and <c>seams</c> (vertex-id pairs as <c>hard_edges</c>), each left out when empty;
+/// UVs are written and read bit-exact, as vertices are, and follow glTF ((0, 0) top-left, v down).
 /// Version 3 (T-42) added, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or <c>"smooth"</c>) and
 /// <c>hard_edges</c> (vertex-id pairs, lower id first, in order).
 /// Version 2: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
@@ -67,10 +71,10 @@ public sealed class CarveFileResult
 public static class CarveFile
 {
     /// <summary>The version <see cref="Write"/> writes.</summary>
-    public const int Version = 4;
+    public const int Version = 5;
 
     /// <summary>The versions <see cref="Read"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4];
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5];
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
@@ -79,6 +83,8 @@ public static class CarveFile
     private static readonly string[] FileKeys = [VersionKey, "meshes", "skeleton", "clips"];
     private static readonly string[] MeshKeys = ["name", VerticesKey, FacesKey, "colours", "groups", "weights"];
     private static readonly string[] MeshKeysV3 = [.. MeshKeys, "shading", "hard_edges"];
+    private static readonly string[] MeshKeysV5 = [.. MeshKeysV3, "uvs", "seams"];
+    private static readonly string[] UvKeys = ["face", "uv"];
     private static readonly string[] ColourKeys = ["colour", "faces"];
     private static readonly string[] GroupKeys = ["name", "faces"];
     private static readonly string[] WeightKeys = ["vertex", "bones"];
@@ -107,7 +113,9 @@ public static class CarveFile
         w.Line(0, "{");
         // The lowest version that holds the model (the person's ruling, 2026-11-11): version 4 only when a face has holes or a slot is a
         // tombstone (T-64), so a model a version 2 or 3 file can hold is still written as before, byte for byte (T-42's rule and its tests).
-        var version = model.Meshes.Any(m => m.Mesh.HasTombstones || m.Mesh.Faces.Any(f => f.HasHoles)) ? Version
+        // Version 5 only when a mesh has UVs or seams (T-53, the person's ruling 2026-11-13).
+        var version = model.Meshes.Any(m => m.Mesh.Uvs is not null) ? Version
+            : model.Meshes.Any(m => m.Mesh.HasTombstones || m.Mesh.Faces.Any(f => f.HasHoles)) ? 4
             : model.Meshes.Any(m => m.Mesh.Shade is not null) ? 3 : 2;
         w.Line(1, $"\"{VersionKey}\": {version.ToString(CultureInfo.InvariantCulture)},");
         w.Open(1, "\"meshes\": [", model.Meshes.Count == 0, ",");
@@ -173,8 +181,18 @@ public static class CarveFile
         if (version < 3) return;
         w.Line(3, $"\"shading\": {Text(mesh.ShadingMode == ShadingMode.Smooth ? "smooth" : "flat")},");
         var hard = mesh.HardEdges;
-        w.List(3, "hard_edges", hard.Count, i => Ids([hard[i].Lo, hard[i].Hi]), "");
+        var uvs = mesh.Uvs ?? MeshUvs.None;
+        var mapped = uvs.MappedFaces;
+        var seams = uvs.Seams;
+        w.List(3, "hard_edges", hard.Count, i => Ids([hard[i].Lo, hard[i].Hi]), mapped.Count > 0 || seams.Count > 0 ? "," : "");
+        // Version 5 (T-53): "uvs" and "seams", each left out when empty.
+        if (mapped.Count > 0)
+            w.List(3, "uvs", mapped.Count, i => $"{{\"face\": {mapped[i].ToString(CultureInfo.InvariantCulture)}, \"uv\": [{string.Join(", ", uvs.Of(mapped[i])!.Select(Uv))}]}}",
+                seams.Count > 0 ? "," : "");
+        if (seams.Count > 0) w.List(3, "seams", seams.Count, i => Ids([seams[i].Lo, seams[i].Hi]), "");
     }
+
+    private static string Uv(Vector2 uv) => $"[{Number(uv.X)}, {Number(uv.Y)}]";
 
     private static void WriteClip(Writer w, Clip clip)
     {
@@ -290,7 +308,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) is (2 or 3 or 4) and { } version ? ReadVersion2(root, version) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3 or 4 or 5) and { } version ? ReadVersion2(root, version) : ReadVersion1(root);
         }
     }
 
@@ -437,7 +455,7 @@ public static class CarveFile
     private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, int version, List<MeshError> errors)
     {
         var before = errors.Count;
-        if (Fields(item, at, "a mesh", version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
+        if (Fields(item, at, "a mesh", version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
         var name = Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         f.TryGetValue(VerticesKey, out var vs);
         f.TryGetValue(FacesKey, out var fs);
@@ -530,9 +548,83 @@ public static class CarveFile
 
         MeshShade? shade = null;
         if (version >= 3) shade = ReadShade(f, at, mesh, errors);
+        MeshUvs? uvs = null;
+        if (version >= 5) uvs = ReadUvs(f, at, mesh, errors);
 
         if (errors.Count > before || name is null) return null;
-        return new NamedMesh(name, mesh.WithStyle(style).WithWeights(VertexWeights.Of(weights)).WithShade(shade));
+        return new NamedMesh(name, mesh.WithStyle(style).WithWeights(VertexWeights.Of(weights)).WithShade(shade).WithUvs(uvs));
+    }
+
+    /// <summary>Version 5's <c>uvs</c> and <c>seams</c> (T-53), each optional; every fault named by element.</summary>
+    private static MeshUvs ReadUvs(Dictionary<string, JsonElement> f, string at, PolygonMesh mesh, List<MeshError> errors)
+    {
+        var faces = new List<KeyValuePair<int, IReadOnlyList<Vector2>?>>();
+        if (f.TryGetValue("uvs", out var us) && List(us, $"{at}.uvs", errors) is { } list)
+        {
+            var seen = new HashSet<int>();
+            var k = 0;
+            foreach (var entry in list.EnumerateArray())
+            {
+                var e = Invariant($"{at}.uvs[{k++}]");
+                if (Fields(entry, e, "a face's UVs", UvKeys, errors) is not { } fields) continue;
+                var faceAt = Required(fields, e, "face", "a face id", errors);
+                var uvAt = Required(fields, e, "uv", "a list of [u, v] pairs", errors);
+                if (faceAt is not { } fe || Int(fe, $"{e}.face", "face id", errors) is not { } face) continue;
+                if (face < 0 || face >= mesh.Faces.Count)
+                {
+                    errors.Add(new MeshError($"{e}.face", Invariant($"face {face} is not a face of the mesh, which has {mesh.Faces.Count}")));
+                    continue;
+                }
+                if (mesh.Faces[face].IsDeleted)
+                {
+                    errors.Add(new MeshError($"{e}.face", Invariant($"face {face} is deleted, and a deleted face holds no UVs")));
+                    continue;
+                }
+                if (!seen.Add(face))
+                {
+                    errors.Add(new MeshError($"{e}.face", Invariant($"face {face} is listed earlier; list each face once")));
+                    continue;
+                }
+                if (uvAt is not { } ue || List(ue, $"{e}.uv", errors) is not { } corners) continue;
+                if (corners.GetArrayLength() != mesh.Faces[face].Corners.Count)
+                {
+                    errors.Add(new MeshError($"{e}.uv", MeshUvs.CornerCountMessage(mesh.Faces[face], corners.GetArrayLength())));
+                    continue;
+                }
+                var values = new Vector2[corners.GetArrayLength()];
+                var good = true;
+                var c = 0;
+                foreach (var corner in corners.EnumerateArray())
+                {
+                    if (Floats(corner, Invariant($"{e}.uv[{c}]"), 2, "a UV is a pair of numbers, [u, v]", errors) is { } uv) values[c] = new Vector2(uv[0], uv[1]);
+                    else good = false;
+                    c++;
+                }
+                if (good) faces.Add(KeyValuePair.Create(face, (IReadOnlyList<Vector2>?)values));
+            }
+        }
+        var seams = new List<(int, int)>();
+        if (f.TryGetValue("seams", out var se) && List(se, $"{at}.seams", errors) is { } pairs)
+        {
+            var seen = new HashSet<(int, int)>();
+            var i = 0;
+            foreach (var entry in pairs.EnumerateArray())
+            {
+                var e = Invariant($"{at}.seams[{i++}]");
+                if (entry.ValueKind != JsonValueKind.Array || entry.GetArrayLength() != 2)
+                {
+                    errors.Add(new MeshError(e, $"{Describe(entry)} is not an edge: write two vertex ids, [a, b]"));
+                    continue;
+                }
+                var a = Int(entry[0], e + "[0]", "vertex id", errors);
+                var b = Int(entry[1], e + "[1]", "vertex id", errors);
+                if (a is not { } x || b is not { } y) continue;
+                if (!mesh.Topology.TryGetEdge(x, y, out _)) errors.Add(new MeshError(e, Invariant($"{x}-{y} is not an edge of the mesh")));
+                else if (!seen.Add(x < y ? (x, y) : (y, x))) errors.Add(new MeshError(e, Invariant($"edge {x}-{y} is listed earlier; list each edge once")));
+                else seams.Add((x, y));
+            }
+        }
+        return MeshUvs.None.WithFaces(faces).WithSeams(seams, true);
     }
 
     private static MeshShade? ReadShade(Dictionary<string, JsonElement> f, string at, PolygonMesh mesh, List<MeshError> errors)

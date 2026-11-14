@@ -17,9 +17,10 @@ public enum LabelSet
 
 /// <summary>
 /// One thing written on an image: <paramref name="Text"/> with its top left at <paramref name="TextAt"/>,
-/// on the backing <paramref name="Backing"/>, and for a vertex the centre of its dot.
+/// on the backing <paramref name="Backing"/>, and for a vertex the centre of its dot. When <paramref name="BackingPieces"/> is
+/// set, the backing is drawn as those rectangles instead: a <c>uvs</c> corner label's backing clipped to the margin.
 /// </summary>
-public readonly record struct OverlayLabel(string Text, Vector2 TextAt, ScreenRect Backing, Vector2? Dot = null);
+public readonly record struct OverlayLabel(string Text, Vector2 TextAt, ScreenRect Backing, Vector2? Dot = null, ScreenRect[]? BackingPieces = null);
 
 /// <summary>
 /// One mesh's run of ids within the drawn model: labels are written for it alone, each id counted from its start,
@@ -132,11 +133,78 @@ public static class LabelLayout
         return plan;
     }
 
+    /// <summary>How far a corner label of the <c>uvs</c> look stands off its corner, diagonally outward, in pixels.</summary>
+    public const int CornerGap = 3;
+
+    /// <summary>
+    /// The <c>uvs</c> look's labels (T-58): the unit square's corners, (0,0) (1,0) (0,1) (1,1), each in the margin diagonally
+    /// off its corner, always; then each face id centred on its UV point. A label wholly off the image is dropped.
+    /// </summary>
+    public static IReadOnlyList<OverlayLabel> UvLabels(UvWindow window, int size, IEnumerable<(string Text, Vector2 Uv)> faces, Func<string, Vector2> measure)
+    {
+        var plan = new List<OverlayLabel>();
+        var (low, high) = (window.Pixel(new Vector2(0, 0), size), window.Pixel(new Vector2(1, 1), size));
+        var square = (Left: MathF.Min(low.X, high.X), Top: MathF.Min(low.Y, high.Y), Right: MathF.Max(low.X, high.X), Bottom: MathF.Max(low.Y, high.Y));
+        foreach (var (u, v) in new[] { (0, 0), (1, 0), (0, 1), (1, 1) })
+        {
+            var text = $"({u},{v})";
+            var extent = measure(text);
+            var corner = window.Pixel(new Vector2(u, v), size);
+            var at = new Vector2(
+                u == 0 ? corner.X - CornerGap - Padding - extent.X : corner.X + CornerGap + Padding,
+                v == 0 ? corner.Y - CornerGap - Padding - extent.Y : corner.Y + CornerGap + Padding);
+
+            // A margin narrower than the label (a sixteenth of the window: 32 px at 512) would cut it at the frame's edge,
+            // so it slides inward along its margin until whole; its row stays off the square.
+            at = new Vector2(
+                Math.Clamp(at.X, Padding, Math.Max(Padding, size - Padding - extent.X)),
+                Math.Clamp(at.Y, Padding, Math.Max(Padding, size - Padding - extent.Y)));
+            var label = At(text, Whole(at), extent);
+
+            // RV-43 (the person, 2026-11-14): where the slid label's backing reaches the square (at 256, 4 rows), it is clipped
+            // to the margin; the text is unchanged.
+            label = label with { BackingPieces = Outside(label.Backing, square) };
+            if (OnImage(label.Backing, size)) plan.Add(label);
+        }
+
+        foreach (var (text, uv) in faces)
+        {
+            var extent = measure(text);
+            var label = At(text, Whole(window.Pixel(uv, size) - extent / 2), extent);
+            if (OnImage(label.Backing, size)) plan.Add(label);
+        }
+
+        return plan;
+    }
+
     /// <summary>A tile's caption, at its fixed place; it runs off the tile's edge if it is longer.</summary>
     public static OverlayLabel Caption(string text, Func<string, Vector2> measure) => At(text, CaptionAt, measure(text));
 
     private static OverlayLabel At(string text, Vector2 at, Vector2 extent) =>
         new(text, at, new ScreenRect(at.X - Padding, at.Y - Padding, extent.X + 2 * Padding, extent.Y + 2 * Padding));
+
+    /// <summary>The parts of <paramref name="box"/> outside <paramref name="square"/>, disjoint; the box alone when they do not meet.</summary>
+    internal static ScreenRect[] Outside(ScreenRect box, (float Left, float Top, float Right, float Bottom) square)
+    {
+        var (left, top, right, bottom) = (box.X, box.Y, box.X + box.Width, box.Y + box.Height);
+        if (right <= square.Left || left >= square.Right || bottom <= square.Top || top >= square.Bottom)
+        {
+            return [box];
+        }
+
+        var pieces = new List<ScreenRect>();
+        void Add(float x0, float y0, float x1, float y1)
+        {
+            if (x1 > x0 && y1 > y0) pieces.Add(new ScreenRect(x0, y0, x1 - x0, y1 - y0));
+        }
+
+        var (bandTop, bandBottom) = (MathF.Max(top, square.Top), MathF.Min(bottom, square.Bottom));
+        Add(left, top, right, MathF.Min(bottom, square.Top));
+        Add(left, bandTop, MathF.Min(right, square.Left), bandBottom);
+        Add(MathF.Max(left, square.Right), bandTop, right, bandBottom);
+        Add(left, MathF.Max(top, square.Bottom), right, bottom);
+        return [.. pieces];
+    }
 
     private static Vector2 Whole(Vector2 at) => new(MathF.Round(at.X), MathF.Round(at.Y));
 

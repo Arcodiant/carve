@@ -19,7 +19,8 @@
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
         "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
         "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs",
-        "samples/gatehouse.carve"
+        "samples/gatehouse.carve",
+        "samples/barrel.carve"
       ],
       "resources": "cpu",
       "est-seconds": 30
@@ -35,6 +36,7 @@
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
         "scenarios/**/*.csproj",
         "spikes/**/*.csproj"
       ],
@@ -52,7 +54,9 @@
         },
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
         "samples/leaky-shed.carve",
+        "samples/barrel.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],
@@ -127,6 +131,36 @@
         "vulkan"
       ],
       "est-seconds": 15
+    },
+    {
+      "id": "scenario-uvs",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 uvs -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Uvs/Carve.Scenario.Uvs.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "samples/barrel.carve",
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
+        "scenarios/Carve.Scenario.Crate/UvLayoutPixels.cs",
+        "scenarios/Carve.Scenario.Crate/CrateLooks.cs",
+        "scenarios/Carve.Scenario.Crate/CrateChecker.cs",
+        "scenarios/Carve.Scenario.Crate/CrateLabels.cs",
+        "scenarios/Carve.Scenario.Crate/CrateUvLayout.cs",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 60
     },
     {
       "id": "scenario-shed",

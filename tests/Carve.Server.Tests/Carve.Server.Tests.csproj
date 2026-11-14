@@ -36,6 +36,9 @@
     <Compile Include="../../src/Carve.Server/RenderPump.cs" Link="RenderPump.cs" />
     <Compile Include="../../src/Carve.Server/WeightHeat.cs" Link="WeightHeat.cs" />
     <Compile Include="../../src/Carve.Server/LookMeshes.cs" Link="LookMeshes.cs" />
+    <Compile Include="../../src/Carve.Server/CheckerTexture.cs" Link="CheckerTexture.cs" />
+    <Compile Include="../../src/Carve.Server/UvLayout.cs" Link="UvLayout.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Crate/CheckerColours.cs" Link="CheckerColours.cs" />
     <Compile Include="../../src/Carve.Server/LookHolder.cs" Link="LookHolder.cs" />
     <Compile Include="../../src/Carve.Server/SheetVersions.cs" Link="SheetVersions.cs" />
     <Compile Include="../../src/Carve.Server/LabelLayout.cs" Link="LabelLayout.cs" />
