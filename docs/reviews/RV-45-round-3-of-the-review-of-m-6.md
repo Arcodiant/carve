@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-45 — Round 3 of the review of M-6
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-6
 
@@ -31,13 +31,17 @@ description: >-
 **Where:** `docs/tasks/T-54-set-uvs-seams-on-mark-edges-and-get-mesh.md:70`
 **Rubric:** 7 Tracker hygiene (As built matches what the diff does)
 T-54's set_uvs error list gives `faces[5]: face 5 is deleted, ...`. That was the old `MeshUvs.Check` text, `face 5 is deleted, and a deleted face holds no UVs`. 47559b6 removed it (`git diff 91ececc^ HEAD -- src/Carve.Core/MeshUvs.cs`). set_uvs now words the face through `UvArguments.FaceProblem` (`SetUvsTool.cs:100`), and the whole text is `faces[5]: face 5 is deleted`. `UvToolTests.cs:159` pins it with `Assert.Equal`. The `, ...` tells a dependant that a clause follows, but none does. RV-44 called this list "still fits", and 6a10430 left T-54 alone. T-54 has not changed since `6f3adce cairn: finish T-54`. Found by grepping the code for each face text quoted in the T-53 to T-62 As builts. This is the only stale quote I found. T-53:236's `1e39 is not finite ...` belongs to the Carve file reader, which keeps its own text as ruled.
-**Outcome:** —
+**Outcome:** fixed
+
+In 8efa918. The quote is now `faces[5]: face 5 is deleted`, what `UvArguments.FaceProblem` emits and `UvToolTests.cs:159` pins; the rest of the list was checked against the code.
 
 ### UvNumber's summary still names unwrap's into
 **Where:** `src/Carve.Server/MeshToolSupport.cs:328`
 **Rubric:** 1 Correctness (anything the change breaks elsewhere)
 The summary reads `One number of a UV (set_uvs, unwrap's into)`. Since da43862, unwrap's `into` goes through `IntoNumber`. `UvNumber`'s only caller is now `SetUvsTool.cs:154`, a UV pair element. Someone who believes the comment and changes `UvNumber`'s text expecting unwrap to follow would split the into wording again. Found by grepping for `UvNumber(` callers.
-**Outcome:** —
+**Outcome:** fixed
+
+In bef7a05. The summary now reads "One number of a set_uvs UV pair", its only caller being `SetUvsTool.cs:154`; comment only.
 
 ## Summary
 
