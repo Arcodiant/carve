@@ -132,7 +132,6 @@ public static class LabelLayout
         return plan;
     }
 
-    /// <summary>A tile's caption, at its fixed place; it runs off the tile's edge if it is longer.</summary>
     /// <summary>How far a corner label of the <c>uvs</c> look stands off its corner, diagonally outward, in pixels.</summary>
     public const int CornerGap = 3;
 
@@ -151,6 +150,12 @@ public static class LabelLayout
             var at = new Vector2(
                 u == 0 ? corner.X - CornerGap - Padding - extent.X : corner.X + CornerGap + Padding,
                 v == 0 ? corner.Y - CornerGap - Padding - extent.Y : corner.Y + CornerGap + Padding);
+
+            // A margin narrower than the label (a sixteenth of the window: 32 px at 512) would cut it at the frame's edge,
+            // so it slides inward along its margin until whole; its row stays off the square.
+            at = new Vector2(
+                Math.Clamp(at.X, Padding, Math.Max(Padding, size - Padding - extent.X)),
+                Math.Clamp(at.Y, Padding, Math.Max(Padding, size - Padding - extent.Y)));
             var label = At(text, Whole(at), extent);
             if (OnImage(label.Backing, size)) plan.Add(label);
         }
@@ -165,6 +170,7 @@ public static class LabelLayout
         return plan;
     }
 
+    /// <summary>A tile's caption, at its fixed place; it runs off the tile's edge if it is longer.</summary>
     public static OverlayLabel Caption(string text, Func<string, Vector2> measure) => At(text, CaptionAt, measure(text));
 
     private static OverlayLabel At(string text, Vector2 at, Vector2 extent) =>

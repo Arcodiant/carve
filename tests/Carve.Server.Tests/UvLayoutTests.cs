@@ -194,4 +194,24 @@ public sealed class UvLayoutTests
         Assert.Equal(0.75f, labels[0].Uv.X, 5);
         Assert.Equal(0.5f, labels[0].Uv.Y, 5);
     }
+
+    [Theory]
+    [InlineData(256)]
+    [InlineData(512)]
+    [InlineData(1024)]
+    public void The_corner_labels_are_whole_on_the_image_in_the_margin_off_their_corners(int size)
+    {
+        // About the server font's extent of "(0,0)": wider than the 16 or 32 px margin, so each must slide inward.
+        var labels = LabelLayout.UvLabels(UvWindow.Unit, size, [], text => new Vector2(7 * text.Length, 12));
+        Assert.Equal(["(0,0)", "(1,0)", "(0,1)", "(1,1)"], labels.Select(l => l.Text));
+        var square = (Low: UvWindow.Unit.Pixel(new Vector2(0, 0), size), High: UvWindow.Unit.Pixel(new Vector2(1, 1), size));
+        foreach (var l in labels)
+        {
+            var b = l.Backing;
+            Assert.True(b.X >= 0 && b.Y >= 0 && b.X + b.Width <= size && b.Y + b.Height <= size, $"{l.Text} at {b} runs off a {size} frame");
+            // Its row is in the margin above or below the square, never over it.
+            var top = l.Text.EndsWith("0)");
+            Assert.True(top ? b.Y + b.Height <= square.Low.Y : b.Y >= square.High.Y, $"{l.Text} at {b} overlaps the square's rows");
+        }
+    }
 }
