@@ -148,7 +148,7 @@ Written 2026-11-13 by Claude Opus 5.5 (`claude-opus-5-5`) at the second checkpoi
 
 **Hash-guard baseline:** at base `ce991c3` the five guard suites were submitted; cube, crate, export and character were carried passes (T-57's runs, same inputs), shed queued as `J-20261113-180202-e89fc9`. Artifacts of the four carried are in the milestone worktree's `artifacts/review/T-58/baseline/<suite>/`; fetch shed's by job id. Note that the guard compares against these.
 
-**Verify:** `cairn task T-58 verify` was started at `7359a9d`; its result is below if it came in before this hand-off, otherwise run it again (it carries passes).
+**Verify:** `cairn task T-58 verify` at `7359a9d` ran 6 suites: `VERIFY FAIL - tests:server-regression` (job `J-20261114-000857-4d642b`), one failure, `RenderTests.The_tool_describes_its_looks` expecting the mode enum without `uvs`; that list now includes `uvs` (committed, not yet re-verified). The other five suites passed in that run; read their job ids from the next `verify`'s output for the hash guard.
 
 **Left:**
 
