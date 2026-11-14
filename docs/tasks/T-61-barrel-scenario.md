@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-55, T-56, T-58, T-59, T-60
 
-**Verify:** server-regression, scenario-cube, scenario-crate, scenario-shed, scenario-export, scenario-character
+**Verify:** server-regression, scenario-cube, scenario-crate, scenario-shed, scenario-export, scenario-character, scenario-uvs
 
 **Perf:** skip: Carve declares no heavy suites
 
