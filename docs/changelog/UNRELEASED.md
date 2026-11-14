@@ -9,3 +9,4 @@
 - T-59: export writes each corner's UV as TEXCOORD_0, splitting vertices where UVs differ, and warns of unmapped faces
 - T-58: render mode uvs draws a mesh's UV layout flat over the dimmed checker, with seams, labels and highlight
 - T-61: The barrel is seamed, unwrapped and seen in both UV looks, and the crate box-projected, saved, reopened and exported, in suite scenario-uvs
+- T-62: Fresh agents unwrap a model from the tool descriptions alone and find and fix a planted unmapped extrusion
