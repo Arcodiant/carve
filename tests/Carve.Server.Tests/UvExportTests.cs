@@ -130,7 +130,7 @@ public class UvExportTests : IDisposable
 
         var glb = SkinnedExport.Write(model, "m");
         AssertRead(Load(glb.Bytes), Expected(mesh));
-        Assert.Contains("chain: 2 faces have no UVs; their corners are written as (0, 0) (faces 1, 3)", glb.Warnings);
+        Assert.Contains("chain: 2 faces have no UVs; their corners are written as (0, 0) (faces 1, 3)", GlbExport.UvWarnings(model));
     }
 
     [Fact]
