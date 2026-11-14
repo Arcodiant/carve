@@ -177,10 +177,10 @@ internal sealed class KnifeStage : ICutsStage
             return;
         }
 
-        var floor = Predict(f, HexagonBlue);
-        Coloured(frame, camera, solid, Probes.Where(p => p.Name == "the door"), doorPiece, Predict(f, DoorBrown), "the door piece, brown, from the front", false);
+        var floor = Predict(f, HexagonBlue, solid.Normal(1), camera.Direction);
+        Coloured(frame, camera, solid, Probes.Where(p => p.Name == "the door"), doorPiece, Predict(f, DoorBrown, solid.Normal(1), camera.Direction), "the door piece, brown, from the front", false);
         Coloured(frame, camera, solid, Probes.Where(p => p.Name == "the recess"), 6, floor, "the pocket floor, blue, from the front", false);
-        Coloured(frame, camera, solid, Walls.Where(p => p.Name == "the bottom wall"), bottom, Predict(t, HexagonBlue), "the bottom wall, blue, from the top", true);
+        Coloured(frame, camera, solid, Walls.Where(p => p.Name == "the bottom wall"), bottom, Predict(t, HexagonBlue, solid.Normal(3), camera.Direction), "the bottom wall, blue, from the top", true);
         foreach (var (wall, name) in new[] { (lowerLeft, "the lower left wall"), (upperLeft, "the upper left wall") })
         {
             var sure = 0;

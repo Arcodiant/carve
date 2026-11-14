@@ -252,7 +252,7 @@ internal sealed class GatehouseFrames(ScenarioDriver driver)
             return (p, x, y, seen);
         }).Where(t => t.seen != -2 && !lines.Any(l => DistanceToSegment(new Vector2(t.x + 0.5f, t.y + 0.5f), l.From, l.To) < 4)).ToArray();
         var predicted = doorFace >= 0 && all.FirstOrDefault(t => t.seen == 1) is { seen: 1 } reference
-            ? Predict(Pixel(frame, reference.x, reference.y), GatehouseScenario.DoorBrown)
+            ? Predict(Pixel(frame, reference.x, reference.y), GatehouseScenario.DoorBrown, solid.Normal(1), camera.Direction)
             : ((Rgb?)null);
         foreach (var (probe, x, y, seen) in all)
         {

@@ -71,13 +71,13 @@ internal static class CrateColours
         const float Near = 0.001f;
         var plusZBand = crate.Find(p => p.Z > 1 - Near && p.Y > 0.68f - Near);
         var plusXBand = crate.Find(p => Math.Abs(p.X - 1) < Near && p.Y > 0.68f - Near);
-        CheckSurface(driver, front, greyFront, frontPixel, PanelSeenFromFront, Blue, "the lid panel, blue");
-        CheckSurface(driver, front, greyFront, frontPixel, crate.Samples(plusZBand), Wood, "the +Z band, wood");
-        CheckSurface(driver, front, greyFront, frontPixel, crate.Samples(plusXBand), Wood, "the +X band, wood");
+        CheckSurface(driver, front, greyFront, frontPixel, Front, Vector3.UnitY, PanelSeenFromFront, Blue, "the lid panel, blue");
+        CheckSurface(driver, front, greyFront, frontPixel, Front, Vector3.UnitZ, crate.Samples(plusZBand), Wood, "the +Z band, wood");
+        CheckSurface(driver, front, greyFront, frontPixel, Front, Vector3.UnitX, crate.Samples(plusXBand), Wood, "the +X band, wood");
 
         // From above the lid's panel and the +Z band are both in plain view.
-        CheckSurface(driver, tilted, greyTilted, tiltedPixel, crate.Samples(TopFace).Where(p => p.X is > 0.2f and < 0.8f && p.Z is > 0.3f and < 0.8f), Blue, "the lid panel from above, blue");
-        CheckSurface(driver, tilted, greyTilted, tiltedPixel, [new Vector3(0.5f, 0.8f, 0.98f), new Vector3(0.3f, 0.8f, 0.98f)], Wood, "the lid's front rim from above, wood");
+        CheckSurface(driver, tilted, greyTilted, tiltedPixel, Tilted, Vector3.UnitY, crate.Samples(TopFace).Where(p => p.X is > 0.2f and < 0.8f && p.Z is > 0.3f and < 0.8f), Blue, "the lid panel from above, blue");
+        CheckSurface(driver, tilted, greyTilted, tiltedPixel, Tilted, Vector3.UnitY, [new Vector3(0.5f, 0.8f, 0.98f), new Vector3(0.3f, 0.8f, 0.98f)], Wood, "the lid's front rim from above, wood");
 
         // A frame this colour is not the grey one anywhere the mesh is, and the corners are still background.
         CheckCorners(driver, front);
@@ -88,11 +88,16 @@ internal static class CrateColours
         }
     }
 
-    /// <summary>Each point's pixel, in linear light, is the grey frame's pixel there times the colour over the grey surface.</summary>
+    /// <summary>
+    /// Each point's pixel, in linear light, is predicted from the grey frame's pixel there by <see cref="ColourRule.Predict"/>:
+    /// T-82's diffuse times the colour over the grey surface, plus the PBR specular of a face of <paramref name="normal"/>
+    /// seen along <paramref name="direction"/>.
+    /// </summary>
     private static void CheckSurface(ScenarioDriver driver, ScenarioFrame coloured, ScenarioFrame grey, Func<Vector3, Vector2> pixel,
-        IEnumerable<Vector3> points, string hex, string what)
+        Vector3 direction, Vector3 normal, IEnumerable<Vector3> points, string hex, string what)
     {
         var scale = ColourRule.Scale(hex);
+        var specular = ColourRule.Specular(normal, direction);
         var checkedPoints = 0;
         foreach (var point in points)
         {
@@ -101,14 +106,15 @@ internal static class CrateColours
             var k = grey.Pixel(x, y);
             double[] got = [Linear(c.R), Linear(c.G), Linear(c.B)];
             double[] lit = [Linear(k.R), Linear(k.G), Linear(k.B)];
+            var predicted = ColourRule.Predict(lit, hex, normal, direction);
             for (var ch = 0; ch < 3; ch++)
             {
-                var expected = lit[ch] * scale[ch];
+                var expected = predicted[ch];
                 if (expected < Floor && got[ch] < Floor) continue;
                 if (Math.Abs(got[ch] - expected) > Relative * expected + Floor)
                 {
                     driver.Fail($"{coloured.Name}: {what} at ({x}, {y}) channel {"RGB"[ch]} is {got[ch]:F4} in linear light, expected {expected:F4} "
-                        + $"(the grey frame's {lit[ch]:F4} x {scale[ch]:F3}); pixel {c}, grey pixel {k}");
+                        + $"((the grey frame's {lit[ch]:F4} - specular {specular:F4}) x {scale[ch]:F3} + specular); pixel {c}, grey pixel {k}");
                 }
             }
 
