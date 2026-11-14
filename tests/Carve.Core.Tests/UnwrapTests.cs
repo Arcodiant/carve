@@ -195,6 +195,31 @@ public class UnwrapTests
         Assert.False(result.Mesh.Uvs!.IsMapped(32));
     }
 
+    /// <summary>RV-43, the person's ruling (2026-11-14): a 1 m cube slit along one edge passes the disc test but collapses.</summary>
+    [Fact]
+    public void A_cube_with_one_seam_is_refused_as_having_too_few_seams_not_no_extent()
+    {
+        var (result, errors) = Unwrap.Run(TestMeshes.Cube().WithUvs(MeshUvs.None.WithSeams([(0, 1)], true)));
+        Assert.Null(result);
+        Assert.Equal("faces[0]: the island of 6 faces has too few seams to lay flat; mark more with mark_edges seam, e.g. a path round it",
+            Assert.Single(errors).ToString());
+    }
+
+    /// <summary>
+    /// A truly degenerate island, its corners on one line, keeps the no-extent refusal. define_mesh refuses a face of zero
+    /// area, so the triangle is made whole and then laid on a line with the unchecked <see cref="PolygonMesh.WithVertices(IReadOnlyList{Vector3})"/>.
+    /// </summary>
+    [Fact]
+    public void An_island_on_one_line_is_refused_as_having_no_extent()
+    {
+        var line = TestMeshes.Make([new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(2, 1, 0)], [[0, 1, 2]])
+            .WithVertices([new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(2, 0, 0)]);
+        var (result, errors) = Unwrap.Run(line);
+        Assert.Null(result);
+        Assert.Equal("faces[0]: the island of 1 face has no extent: its corners all lie on one point or one line, so it cannot be flattened",
+            Assert.Single(errors).ToString());
+    }
+
     [Theory]
     [InlineData(new[] { 40 }, "faces[40]", "face 40 is not a face of the mesh, which has 34")]
     [InlineData(new[] { 3, 3 }, "faces[3]", "face 3 is listed more than once")]

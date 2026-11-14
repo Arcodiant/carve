@@ -151,7 +151,9 @@ public static class Unwrap
             }
             if (!(areaUv > 0) || !double.IsFinite(areaUv))
             {
-                errors.Add(NoExtent(patch));
+                // Real area in 3D that flattened to none: the pins are the island's only boundary (too few seams), not a
+                // degenerate island. A truly flat one has (to rounding) no area against its pins' distance squared.
+                errors.Add(area3 > d * d * 1e-9 ? TooFewSeams(patch) : NoExtent(patch));
                 continue;
             }
             var scale = Math.Sqrt(area3 / areaUv);
@@ -212,6 +214,9 @@ public static class Unwrap
         set.Sort();
         return set;
     }
+
+    private static MeshError TooFewSeams(UnwrapPatch patch) => new(MeshEdits.Invariant($"faces[{patch.LowestFace}]"),
+        MeshEdits.Invariant($"the island of {UnwrapIslands.Plural(patch.Faces.Length, "face")} has too few seams to lay flat; mark more with mark_edges seam, e.g. a path round it"));
 
     private static MeshError NoExtent(UnwrapPatch patch) => new(MeshEdits.Invariant($"faces[{patch.LowestFace}]"),
         MeshEdits.Invariant($"the island of {UnwrapIslands.Plural(patch.Faces.Length, "face")} has no extent: its corners all lie on one point or one line, so it cannot be flattened"));
