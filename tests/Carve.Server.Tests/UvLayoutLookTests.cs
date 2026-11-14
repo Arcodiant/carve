@@ -253,6 +253,58 @@ public sealed class UvLayoutLookTests() : TempFolderTests("carve-uv-layout")
         Assert.Equal(before.GetProperty("content")[0].GetProperty("data").GetString(), after.GetProperty("content")[0].GetProperty("data").GetString());
     }
 
+    /// <summary>The pixels of a box, x in [x0, x1) and y in [y0, y1), that are white text: the dimmed ground and the quad's checker near its centre have none.</summary>
+    private static int WhiteIn(ImageResult image, int x0, int y0, int x1, int y1)
+    {
+        var n = 0;
+        for (var y = y0; y < y1; y++)
+        {
+            for (var x = x0; x < x1; x++)
+            {
+                if (Whiteish(Px(image, x, y))) n++;
+            }
+        }
+
+        return n;
+    }
+
+    /// <summary>
+    /// RV-43: the labels reach the frame. The four corner labels are drawn in the margin off their corners on every layout,
+    /// labelled or not; the face's id is drawn on its UV centre with <c>labels: faces</c> and nothing is there without it.
+    /// </summary>
+    [Fact]
+    public async Task The_corner_labels_are_drawn_on_every_layout_and_the_face_id_only_with_labels_faces()
+    {
+        using var carve = new CarveProcess([], workingDirectory: Root);
+        await carve.InitializeAsync();
+        Ok(await carve.CallToolAsync("define_mesh", Quad));
+        Ok(await carve.CallToolAsync("set_uvs", QuadUvs));
+        var plain = Image(await carve.CallToolAsync("render", """{"mode":"uvs"}"""), "labels-none");
+        var labelled = Image(await carve.CallToolAsync("render", """{"mode":"uvs","labels":"faces"}"""), "labels-faces");
+
+        // The margin is 32 px at 512 (the square is rows and columns 32-480); each corner's label lies in the margin band
+        // beside its corner, which is the dimmed ground (no channel near 240) wherever no label is.
+        var corners = new (string Name, int X0, int Y0)[] { ("(0,0)", 0, 0), ("(1,0)", 432, 0), ("(0,1)", 0, 480), ("(1,1)", 432, 480) };
+        foreach (var (image, which) in new[] { (plain, "unlabelled"), (labelled, "labelled") })
+        {
+            foreach (var (name, x0, y0) in corners)
+            {
+                Assert.True(WhiteIn(image, x0, y0, x0 + 80, y0 + 32) >= 20, $"{which}: no text in {name}'s margin box at ({x0}, {y0})");
+            }
+        }
+
+        // The quad's id "0" at uv (0.5, 0.5), pixel (256, 256): white text on its backing when labelled, and the checker
+        // as worked from the UVs, with no text, when not.
+        Assert.True(WhiteIn(labelled, 244, 244, 268, 268) >= 10, "labelled: no text in the face id's box round (256, 256)");
+        for (var y = 244; y < 268; y++)
+        {
+            for (var x = 244; x < 268; x++)
+            {
+                Assert.True(Near(Px(plain, x, y), Bright(x, y)), $"unlabelled: ({x}, {y}) is {Px(plain, x, y)}, the checker {Bright(x, y)}");
+            }
+        }
+    }
+
     /// <summary>
     /// Rule 2: T-56's barrel (<c>samples/barrel.carve</c>), every pixel worked from its UVs read here with <see cref="Carve.Core.CarveFile"/>:
     /// the empty bottom-right dim, the side faces' interiors bright, and every seam yellow on its UV segment.
