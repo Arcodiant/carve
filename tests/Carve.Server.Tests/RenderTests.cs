@@ -689,7 +689,7 @@ public class RenderTests
         }
 
         var schema = render.GetProperty("inputSchema").GetProperty("properties");
-        Assert.Equal(["shaded", "wireframe", "normals", "checker"], schema.GetProperty("mode").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        Assert.Equal(["shaded", "wireframe", "normals", "checker", "uvs"], schema.GetProperty("mode").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
         Assert.Equal("object", schema.GetProperty("highlight").GetProperty("type").GetString());
         Assert.Equal(["vertices", "edges", "faces"], schema.GetProperty("highlight").GetProperty("properties").EnumerateObject().Select(p => p.Name));
     }
