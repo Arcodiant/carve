@@ -195,6 +195,66 @@ public class UnwrapTests
         Assert.False(result.Mesh.Uvs!.IsMapped(32));
     }
 
+    // Two unit quads in z = 0 either side of the edge 1-2 at x = 1, and a third standing up on it at z 0..1.
+    private static readonly Vector3[] Fin =
+    [
+        new(0, 0, 0), new(1, 0, 0), new(1, 1, 0), new(0, 1, 0), new(2, 1, 0), new(2, 0, 0), new(1, 0, 1), new(1, 1, 1),
+    ];
+
+    /// <summary>
+    /// Ruling 2 (RV-43): an edge whose two faces run it the same way (one of them mis-wound) is cut, so the two quads are two
+    /// islands; wound to agree, the same quads are one.
+    /// </summary>
+    [Fact]
+    public void A_mis_wound_edge_is_cut_into_two_islands()
+    {
+        var agreeing = Ok(Unwrap.Run(TestMeshes.Make(Fin, [[0, 1, 2, 3], [5, 4, 2, 1]])));
+        Assert.Equal([0, 1], Assert.Single(agreeing.Islands).Faces);
+
+        var misWound = TestMeshes.Make(Fin, [[0, 1, 2, 3], [1, 2, 4, 5]]);
+        Assert.True(misWound.Topology.TryGetEdge(1, 2, out var edge) && edge.Faces.Count == 2 && !edge.IsManifold);
+        var result = Ok(Unwrap.Run(misWound));
+        Assert.Equal([[0], [1]], result.Islands.Select(i => i.Faces.ToArray()));
+    }
+
+    /// <summary>Ruling 2 (RV-43): an edge of three or more faces is cut, so a fin of three quads on one edge is three islands.</summary>
+    [Fact]
+    public void An_edge_of_three_faces_is_cut_into_an_island_each()
+    {
+        var fin = TestMeshes.Make(Fin, [[0, 1, 2, 3], [5, 4, 2, 1], [1, 6, 7, 2]]);
+        Assert.True(fin.Topology.TryGetEdge(1, 2, out var edge) && edge.Faces.Count == 3);
+        var result = Ok(Unwrap.Run(fin));
+        Assert.Equal([[0], [1], [2]], result.Islands.Select(i => i.Faces.ToArray()));
+    }
+
+    /// <summary>
+    /// The did-not-converge refusal (RV-43), reached through unwrap itself: a strip of 150 unit-high quads whose widths grow by
+    /// 5% each is ill-conditioned enough that CG is still at a relative residual of about 1.7e-8 (against 1e-10) when it
+    /// reaches <see cref="Unwrap.MaxIterations"/>. The cap and tolerance are constants with no seam to lower them, so the
+    /// mesh is built to need more; it was found by trying strips (one of 1000 equal quads fails too, but takes seconds).
+    /// </summary>
+    [Fact]
+    public void An_island_cg_cannot_settle_is_refused_as_not_converging()
+    {
+        const int n = 150;
+        var vertices = new List<Vector3>();
+        double x = 0, width = 1;
+        for (var i = 0; i <= n; i++)
+        {
+            vertices.Add(new((float)x, 0, 0));
+            vertices.Add(new((float)x, 1, 0));
+            x += width;
+            width *= 1.05;
+        }
+        var faces = Enumerable.Range(0, n).Select(i => new[] { 2 * i, 2 * i + 2, 2 * i + 3, 2 * i + 1 });
+        var (result, errors) = Unwrap.Run(TestMeshes.Make(vertices, faces));
+        Assert.Null(result);
+        var error = Assert.Single(errors);
+        Assert.Equal("faces[0]", error.Element);
+        Assert.StartsWith("the flattening did not converge (relative residual ", error.Message);
+        Assert.EndsWith(" after 10000 iterations; the limit is 1E-10 within 10000); mark seams to cut the island into smaller ones", error.Message);
+    }
+
     /// <summary>RV-43, the person's ruling (2026-11-14): a 1 m cube slit along one edge passes the disc test but collapses.</summary>
     [Fact]
     public void A_cube_with_one_seam_is_refused_as_having_too_few_seams_not_no_extent()
