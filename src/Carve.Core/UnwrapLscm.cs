@@ -151,8 +151,8 @@ internal static class UnwrapLscm
         var iterations = Cg(start, cols, vals, diag, rhs, x, out var residual, out var converged);
         if (!converged)
         {
-            errors.Add(new MeshError($"faces[{patch.LowestFace}]",
-                $"the flattening did not converge (relative residual {residual:R} after {iterations} iterations; the limit is {Unwrap.Tolerance:R} within {Unwrap.MaxIterations}); mark seams to cut the island into smaller ones"));
+            errors.Add(new MeshError(MeshEdits.Invariant($"faces[{patch.LowestFace}]"),
+                MeshEdits.Invariant($"the flattening did not converge (relative residual {residual:R} after {iterations} iterations; the limit is {Unwrap.Tolerance:R} within {Unwrap.MaxIterations}); mark seams to cut the island into smaller ones")));
             return null;
         }
 

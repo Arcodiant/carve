@@ -50,7 +50,7 @@ public static class Unwrap
         var shorter = Math.Min(box.U1 - box.U0, box.V1 - box.V0);
         var m = margin ?? shorter * MarginFraction;
         if (margin is { } given && errors.Count == 0 && (!double.IsFinite(given) || given < 0 || !(given < shorter / 2)))
-            errors.Add(new MeshError("margin", $"{given:R} is not a margin into can take; it must be at least 0 and less than half of into's shorter side ({shorter / 2:R})"));
+            errors.Add(new MeshError("margin", $"{UvArguments.Number(given)} is not a margin into can take; it must be at least 0 and less than half of into's shorter side ({UvArguments.Number(shorter / 2)})"));
 
         var set = Faces(mesh, faces, errors);
         if (errors.Count > 0) return (null, errors);
@@ -65,7 +65,7 @@ public static class Unwrap
         Array.Sort(order, (a, b) => sizes[a].H != sizes[b].H ? sizes[b].H.CompareTo(sizes[a].H) : patches[a].LowestFace.CompareTo(patches[b].LowestFace));
         var fit = UnwrapPack.Fit(sizes, order, box, m);
         if (fit is null)
-            return (null, [new MeshError("margin", $"{UnwrapIslands.Plural(count, "island")} do not fit into into with a margin of {m:R}; give a smaller margin")]);
+            return (null, [new MeshError("margin", $"{UnwrapIslands.Plural(count, "island")} do not fit into into with a margin of {UvArguments.Number(m)}; give a smaller margin")]);
         var (s, offU, offV) = fit.Value;
 
         // Place, round once to float, and measure.
@@ -206,15 +206,15 @@ public static class Unwrap
         foreach (var f in faces)
         {
             if (UvArguments.FaceProblem(mesh, f) is { } why) errors.Add(new MeshError(MeshEdits.Invariant($"faces[{f}]"), why));
-            else if (!seen.Add(f)) errors.Add(new MeshError($"faces[{f}]", $"face {f} is listed more than once"));
+            else if (!seen.Add(f)) errors.Add(new MeshError(MeshEdits.Invariant($"faces[{f}]"), MeshEdits.Invariant($"face {f} is listed more than once")));
         }
         var set = new List<int>(seen);
         set.Sort();
         return set;
     }
 
-    private static MeshError NoExtent(UnwrapPatch patch) => new($"faces[{patch.LowestFace}]",
-        $"the island of {UnwrapIslands.Plural(patch.Faces.Length, "face")} has no extent: its corners all lie on one point or one line, so it cannot be flattened");
+    private static MeshError NoExtent(UnwrapPatch patch) => new(MeshEdits.Invariant($"faces[{patch.LowestFace}]"),
+        MeshEdits.Invariant($"the island of {UnwrapIslands.Plural(patch.Faces.Length, "face")} has no extent: its corners all lie on one point or one line, so it cannot be flattened"));
 
     /// <summary>Twice the signed area (the shoelace sum) of a triangle in (u, v); negative is unflipped in screen axes.</summary>
     internal static double TwiceArea((int A, int B, int C) t, double[] u, double[] v) =>

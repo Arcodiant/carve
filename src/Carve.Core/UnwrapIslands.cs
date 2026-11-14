@@ -150,15 +150,15 @@ internal static class UnwrapIslands
         var chi = sides % 2 == 0 ? meshVertex.Count - sides / 2 + triangles.Count : int.MinValue;
         if (loops - holeLoops != 1 || chi != 1 - holeLoops)
         {
-            errors.Add(new MeshError($"faces[{faces[0]}]",
-                $"an island of {Plural(faces.Length, "face")} with {Plural(loops, "boundary loop")} is not a disc; mark a seam across it with mark_edges, cutting every closed loop until each island is a disc"));
+            errors.Add(new MeshError(MeshEdits.Invariant($"faces[{faces[0]}]"),
+                MeshEdits.Invariant($"an island of {Plural(faces.Length, "face")} with {Plural(loops, "boundary loop")} is not a disc; mark a seam across it with mark_edges, cutting every closed loop until each island is a disc")));
             return null;
         }
 
         return new UnwrapPatch { Faces = faces, MeshVertex = meshVertex, Corners = corners, Triangles = triangles, OnBoundary = onBoundary };
     }
 
-    internal static string Plural(int n, string what) => n == 1 ? $"1 {what}" : $"{n} {what}s";
+    internal static string Plural(int n, string what) => n == 1 ? $"1 {what}" : MeshEdits.Invariant($"{n} {what}s");
 
     private static int Find(int[] root, int x)
     {
