@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-44 — Re-review of M-6
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-6
 
@@ -35,7 +35,9 @@ description: >-
 - unwrap `"into":[0,0,1e39,1]` gives `into[2]: 1e39 is not finite: a UV must lie within ±3.40282347E+38`.
 
 Both texts are pinned by the tests named above, so the same fault in the same argument still reads two ways across the two tools. `UvToolTests.The_uv_tools_word_the_face_and_into_refusals_alike` pins the shape and the area only. Found by reading the two `Into` parsers; not run end to end. A non-number element agrees (`into[2]: expected a number, got ...` in both).
-**Outcome:** —
+**Outcome:** fixed
+
+In da43862. One Core wording, `UvArguments.IntoElementRange`, through `MeshToolSupport.IntoNumber`, is used by both `project_uvs` and `unwrap`: `into[2]: 1e99 is out of range: an into element must be a finite number within ±3.40282347E+38`. Both pinned texts moved to it, still exact-prefix pins, and `UvToolTests.The_uv_tools_word_an_into_element_out_of_range_alike` gives both tools the same input and asserts the same full text.
 
 ### T-55's and T-56's As built still list the error texts the fixes replaced
 **Where:** `docs/tasks/T-55-projections.md:71`; `docs/tasks/T-56-unwrap.md:154`
