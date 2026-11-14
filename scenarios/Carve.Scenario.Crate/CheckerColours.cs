@@ -57,4 +57,17 @@ internal static class CheckerColours
     /// <summary>Magenta: green near 0, red and blue close and well above it.</summary>
     public static bool IsMagenta(int r, int g, int b) =>
         g <= MagentaGreen && Math.Abs(r - b) <= MagentaRedBlue && Math.Min(r, b) - g >= MagentaAboveGreen;
+
+    /// <summary>
+    /// Whether a pixel shows the checker cell a sample expects: magenta where the face is unmapped, white at cell (0, 0),
+    /// else column <paramref name="column"/>'s hue; with what was expected, in words, and the pixel's nearest column.
+    /// </summary>
+    public static (bool Ok, string Expected, int Nearest) Judge(int r, int g, int b, bool mapped, int column, int row)
+    {
+        var (white, magenta, nearest) = (IsWhite(r, g, b), IsMagenta(r, g, b), NearestColumn(r, g, b));
+        var (ok, expected) = !mapped ? (magenta, "magenta (unmapped)")
+            : (column, row) == (0, 0) ? (white, "white (uv 0,0)")
+            : (!white && !magenta && nearest == column, $"column {column}'s hue");
+        return (ok, expected, nearest);
+    }
 }

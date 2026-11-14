@@ -104,10 +104,7 @@ internal static class UvsChecker
     private static void Check(ScenarioDriver driver, ScenarioFrame frame, string what, Sample s)
     {
         var p = frame.Pixel(s.Pixel.X, s.Pixel.Y);
-        var (white, magenta, column) = (CheckerColours.IsWhite(p.R, p.G, p.B), CheckerColours.IsMagenta(p.R, p.G, p.B), CheckerColours.NearestColumn(p.R, p.G, p.B));
-        var (ok, expected) = !s.Mapped ? (magenta, "magenta (unmapped)")
-            : (s.Column, s.Row) == (0, 0) ? (white, "white (uv 0,0)")
-            : (!white && !magenta && column == s.Column, $"column {s.Column}'s hue");
+        var (ok, expected, column) = CheckerColours.Judge(p.R, p.G, p.B, s.Mapped, s.Column, s.Row);
         if (!ok || Log.Count < 6000) Log.Add($"{frame.Name}\t{what}\t{s.Mesh} face {s.Face}\tcell ({s.Column}, {s.Row})\tat {s.Pixel}\t{p}\texpected {expected}\t{(ok ? "ok" : "FAIL")}");
         if (!ok) driver.Fail($"{frame.Name}: {what}: {s.Mesh} face {s.Face} cell ({s.Column}, {s.Row}) at {s.Pixel} is {p}, expected {expected}; nearest column {column}");
     }

@@ -235,10 +235,7 @@ internal static class CrateChecker
     private static void Check(ScenarioDriver driver, ScenarioFrame frame, string what, Sample s)
     {
         var p = frame.Pixel(s.Pixel.X, s.Pixel.Y);
-        var (white, magenta, column) = (CheckerColours.IsWhite(p.R, p.G, p.B), CheckerColours.IsMagenta(p.R, p.G, p.B), CheckerColours.NearestColumn(p.R, p.G, p.B));
-        var (ok, expected) = s.Face == TopFace ? (magenta, "magenta (unmapped)")
-            : (s.Column, s.Row) == (0, 0) ? (white, "white (uv 0,0)")
-            : (!white && !magenta && column == s.Column, $"column {s.Column}'s hue");
+        var (ok, expected, column) = CheckerColours.Judge(p.R, p.G, p.B, s.Face != TopFace, s.Column, s.Row);
         Log.Add($"{frame.Name}	{what}	face {s.Face}	{s.Side}	cell ({s.Column}, {s.Row})	at {s.Pixel}	{p}	expected {expected}	{(ok ? "ok" : "FAIL")}");
         if (!ok)
         {
