@@ -306,6 +306,79 @@ public sealed class UvLayoutLookTests() : TempFolderTests("carve-uv-layout")
     }
 
     /// <summary>
+    /// RV-43: at 256 the margin is 16 px (the square is rows 16-240), and a corner label slides inward along its margin row
+    /// until whole (T-58); its backing is clipped to the margin (the person, 2026-11-14), so with the server's own font the
+    /// square's top and bottom rows near each corner are the checker as worked from the UVs. Rows 16 and 239 and columns 16
+    /// and 239 carry the square's white border (and the quad's edges on it), a 1 px line on the pixel boundary, so half of
+    /// each such pixel: white blended over the texel at 0.5 in linear light, 0.75 where the two lines cross. The text is not
+    /// moved (the person, 2026-11-14), so the tops of the bottom labels' glyphs reach row 239: where a glyph is laid, the pixel
+    /// is the label's text, pure white. The glyphs' ink is read from the same labels at 512, laid whole in the margin on their
+    /// backing, and placed at 256 where <see cref="LabelLayout.UvLabels"/> lays the text (the server's 8 x 16 font).
+    /// </summary>
+    [Fact]
+    public async Task At_256_the_corner_labels_with_the_real_font_stay_off_the_square()
+    {
+        using var carve = new CarveProcess([], workingDirectory: Root);
+        await carve.InitializeAsync();
+        Ok(await carve.CallToolAsync("define_mesh", Quad));
+        Ok(await carve.CallToolAsync("set_uvs", QuadUvs));
+        var image = Image(await carve.CallToolAsync("render", """{"mode":"uvs","size":256,"labels":"faces"}"""), "labels-256", 256);
+        var whole = Image(await carve.CallToolAsync("render", """{"mode":"uvs","size":512}"""), "labels-512", 512);
+
+        static System.Numerics.Vector2 Font(string text) => new(8 * text.Length, 16);
+        var at512 = LabelLayout.UvLabels(UvWindow.Unit, 512, [], Font).ToDictionary(l => l.Text, l => l.TextAt);
+        var ink = new HashSet<(int X, int Y)>();
+        foreach (var label in LabelLayout.UvLabels(UvWindow.Unit, 256, [], Font))
+        {
+            var (from, size) = (at512[label.Text], Font(label.Text));
+            for (var dy = 0; dy < size.Y; dy++)
+            {
+                for (var dx = 0; dx < size.X; dx++)
+                {
+                    if (Near(Px(whole, (int)from.X + dx, (int)from.Y + dy), (255, 255, 255))) ink.Add(((int)label.TextAt.X + dx, (int)label.TextAt.Y + dy));
+                }
+            }
+        }
+
+        var text = new List<string>();
+
+        var wrong = new List<string>();
+        foreach (var rows in new[] { (16, 20), (236, 240) })
+        {
+            foreach (var cols in new[] { (16, 72), (184, 240) })
+            {
+                for (var y = rows.Item1; y < rows.Item2; y++)
+                {
+                    for (var x = cols.Item1; x < cols.Item2; x++)
+                    {
+                        var lines = (y is 16 or 239 ? 1 : 0) + (x is 16 or 239 ? 1 : 0);
+                        var want = ink.Contains((x, y)) ? (255, 255, 255) : WhiteOver(Rgb(Texel(UvAt(x, 256), UvAt(y, 256))), lines switch { 0 => 0, 1 => 0.5, _ => 0.75 });
+                        if (ink.Contains((x, y))) text.Add($"({x}, {y})");
+                        if (!Near(Px(image, x, y), want)) wrong.Add($"({x}, {y}) {Px(image, x, y)} want {want}");
+                    }
+                }
+            }
+        }
+
+        File.WriteAllLines(Path.Combine(Frames, "labels-256-wrong.txt"), wrong);
+        File.WriteAllLines(Path.Combine(Frames, "labels-256-text-on-square.txt"), text);
+        Assert.True(wrong.Count == 0, $"{wrong.Count} square pixels off the checker, first {string.Join("; ", wrong.Take(8))}");
+    }
+
+    /// <summary>White blended over <paramref name="under"/> at <paramref name="share"/> in linear light, then encoded.</summary>
+    private static (int R, int G, int B) WhiteOver((int R, int G, int B) under, double share)
+    {
+        static int One(int c, double share)
+        {
+            var x = c / 255.0;
+            var l = (x <= 0.04045 ? x / 12.92 : Math.Pow((x + 0.055) / 1.055, 2.4)) * (1 - share) + share;
+            return (int)Math.Round((l <= 0.0031308 ? l * 12.92 : 1.055 * Math.Pow(l, 1 / 2.4) - 0.055) * 255);
+        }
+
+        return (One(under.R, share), One(under.G, share), One(under.B, share));
+    }
+
+    /// <summary>
     /// Rule 2: T-56's barrel (<c>samples/barrel.carve</c>), every pixel worked from its UVs read here with <see cref="Carve.Core.CarveFile"/>:
     /// the empty bottom-right dim, the side faces' interiors bright, and every seam yellow on its UV segment.
     /// </summary>
