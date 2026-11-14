@@ -115,3 +115,90 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
 - [ ] [T-62](../tasks/T-62-uvs-acceptance-run.md) — Fresh agents unwrap a model from the tool descriptions alone and find and fix a planted unmapped extrusion
 
 ## Retrospective
+
+**As planned.**
+
+- The order held: T-53, then T-54, then T-55, T-56, T-57, T-59 and T-60 side by side, then T-58, T-61 and T-62. Every rebase clash between siblings was additive (`Program.cs`'s tool list), and each member resolved its own.
+- File ownership was set at dispatch and held:
+  - T-57 owned `Model.Combined` and the render files.
+  - T-59 owned export and built on T-57's `Combined` commit.
+  - T-60 owned `check` and the shared `UvArea` helper.
+- The research agents for T-56, T-57 and T-58 ran ahead of their dependencies (T-56 and T-57 beside T-54, T-58 beside T-57), so their open rules reached the person before implementation started.
+- Everything is reachable through the product's own MCP tools:
+  - UVs per face corner, hole corners included;
+  - seams;
+  - Carve file version 5, written only when a mesh has UVs or seams;
+  - `set_uvs`, `mark_edges(seam)`, `project_uvs`, `unwrap` (LSCM by CG in double, shelf packer);
+  - `render` modes `checker` and `uvs`;
+  - `TEXCOORD_0` in export;
+  - the four UV warnings in `check`.
+- No engine need. T-57's probe confirmed that `LitTextured` multiplies vertex colour. T-58's probe confirmed that an unlit textured `Material` draws.
+- The guard held: every existing frame and committed file stayed byte-identical by hash through every member that renders (T-57, T-58, T-61), and a model with no UVs exports byte-identical.
+- The person approved every new frame set: T-57's 6, T-58's 8 and T-61's 16, all with no notes needing a change. T-58's reviewing agent found and fixed clipped corner labels itself before sending.
+- The acceptance run (T-62) passed in round 1, with no description edit. A fresh `claude -p` (Opus 5.5) found the 8 unmapped walls with `check`, named the cause, seamed and unwrapped again, and fixed the stretch `unwrap` reported by seaming the middle rings. It finished with a clean `check`, 7 islands, stretch 1.0 and 0 flipped, and used both looks.
+- The milestone's `verify` passes every check but `review`: 10/10 members merged and 14 suites passing, including the new `scenario-uvs`.
+- **Models and agents per member:**
+
+  | Member | Model | Agents |
+  |---|---|---|
+  | T-53 | Opus 5.5 | 2 (research, implementation) |
+  | T-54 | Sonnet 5.5 | 2 |
+  | T-55 | Sonnet 5.5 | 1 |
+  | T-56 | Opus 5.5 | 2 (research, implementation) |
+  | T-57 | Opus 5.5 | 4 (research, three implementation) |
+  | T-58 | Opus 5.5 | 4 (research, three implementation) |
+  | T-59 | Sonnet 5.5 | 2 |
+  | T-60 | Sonnet 5.5 | 1 |
+  | T-61 | Sonnet 5.5 | 1 |
+  | T-62 | Sonnet 5.5 | 1, plus a Sonnet check in the engine viewer |
+
+  Sonnet held up on every member given to it: no Sonnet member needed rework from a review. Every hand-off came from Opus members with frames (T-57, T-58) or from waiting on a sibling (T-59).
+
+**Not as planned.**
+
+- **M-6 ran beside M-19.** At first the orchestrator stopped on M-5's "ask first" lesson. The person said milestones may run in parallel unless they depend on or interfere with each other. M-19's remaining work (T-49, an acceptance run) touched none of M-6's files.
+- **The plan predated M-5's landing.** T-53's Scope assumed file version 4 was free and that M-5's cuts would plan their own UV carrying. T-53's research agent found that neither held, and the person ruled version 5, UVs on hole corners, and a carrying rule for each of the six cuts.
+- **The person ruled about 60 times**, most in batches of open rules: T-53 4 asked and 3 taken as recommended; T-54 1; T-56 10; T-57 11, then the thresholds, then 2 frame rules; T-58 14, then the tolerance and the seam blend fit; T-59 1; T-61 2; T-62 the run conditions and the engine-viewer check. Every one took the recommended option.
+- **Three readings landed without asking, and each was ruled on after the fact:**
+  - T-60 warns of a zero-area face only as zero-area, not also as flipped;
+  - T-61 skips the seam-colour check on segments within 7 px of another island's line (11 of 40 at 256, 1 at 512, none at 1024);
+  - T-61 chose its own thresholds for the checker's orange highlight tint.
+
+  The person kept all three.
+- **T-54's first run failed** server-regression: a test cut `get_mesh`'s description at a phrase T-54's addition moved. The fix moved the cut, and both assertions are unchanged.
+- **T-54 handed off with a `verify` running in the background.** The orchestrator stopped the agent and waited on the queued jobs itself, as M-5 advised.
+- **The orchestrator found two gaps in T-62's report:**
+  - The `.glb` was checked in F3D, not in the project's viewer. On the person's ruling, a Sonnet agent ran `run-viewer.ps1` on it: exit 0, 92 triangles, drawn untextured (no material texture is exported).
+  - The round's evidence was said to be merged to the milestone, but `artifacts/` is ignored, so only `%TEMP%` held it. The orchestrator copied it to `artifacts/m6-acceptance/round-1/`.
+
+**Never verified.**
+
+- **A real game.** The barrel's `.glb` has been loaded by the engine's viewer and by F3D, not in Orcward or another game, and never with a texture bound in a material (materials are M-7).
+- **Weak or partial checks:**
+  - T-61 does not check the seam colour on 12 of 120 segments (logged `not checked`).
+  - T-57's and T-59's broken-product tables ran before their last rebase or last test. T-58's ran before its label fix, which touches none of the table's checks.
+  - T-58's barrel frame hash comes from a local run, not a queued job.
+  - `Combined` dropping UVs is caught only by T-57's two-mesh regression test, not by the one-mesh crate scenario.
+  - T-62 re-derived no overlap or flip itself; it took `unwrap`'s and `check`'s word.
+- **Scale:** `unwrap` was not timed on a large mesh. Choosing its pins is quadratic in an island's boundary vertices.
+- **A real character with UVs** was not exported; T-59 used fixtures.
+- **The orchestrator opened no frame.** Every look above is a member's or the person's.
+
+**Known and left.**
+
+- `CLAUDE.md` is an input of no suite (a `verify` warning, as in M-5).
+- Worktree folders that `finish` could not remove remain on disk, unregistered from git: `branches/task/T-53`, `T-54`, `T-55`, `T-58`, `T-59`, `T-60`, `T-61` and `T-62`, beside the older ones. T-58's agent tried to delete its folder, was blocked by the permission check, and the orchestrator did not override the check.
+- Scratch is not cleared: `%TEMP%\carve-m6-acceptance\` (with a Release publish of `carve`), `%TEMP%\carve-m6-tools\`, and the members' `%TEMP%\t57\` and similar.
+- Evidence is in this worktree's ignored `artifacts/review/T-53` to `T-62` and `artifacts/m6-acceptance/round-1`, and the review rounds are under `G:\My Drive\artifacts\carve\M-6\`.
+- `C:\tools\carve` is re-published by hand after the merge to `main`.
+
+**Test report** (`cairn test report --since 2d`, which includes M-19's runs in the same span): `server-regression` is about 77% of the slot time, with 8 failures (6 caught by it alone) and 1 flake. 687 passes' logs ran elsewhere and can't be read here, so the flake can't be attributed. Nothing was filed. `scenario-uvs` is cheap, about 3 s a run.
+
+**For the next plan.**
+
+- **Re-read a plan's assumptions against what has landed since it was made**, at dispatch rather than in the first member. M-6's plan assumed M-5 had not run, which cost a research pass and seven rulings. Planning had not caught it.
+- **Let research agents run ahead of their dependencies.** Planning only needs the dependency's spec and As built. Doing it beside the implementation saved a round trip each for T-56, T-57 and T-58.
+- **Name shared check rules at planning.** Four arrived mid-milestone: the checker's white and magenta thresholds, the 3 px ring across coplanar faces, the seam blend fit, and the close-seam skip. All came from anti-aliasing and small frames, so the next look-heavy milestone should plan for them.
+- **Say in an acceptance brief where evidence must live.** `artifacts/` is ignored, so "merged into the milestone" cannot carry it, and the member must write it at the milestone's absolute path.
+- **Opus look members took four agents each.** Plan the frame review as its own agent from the start rather than counting on one implementer to reach it.
+- **Clean up `finish`'s leftover folders** at the end of each milestone. That needs the person's leave where a delete is permission-blocked.
