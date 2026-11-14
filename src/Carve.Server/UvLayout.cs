@@ -171,11 +171,7 @@ public static class UvLayout
             y += (a.Y + (double)b.Y) * cross;
         }
 
-        if (Math.Abs(area) < 1e-12)
-        {
-            var mean = loop.Aggregate(Vector2.Zero, (s, p) => s + p) / loop.Count;
-            return mean;
-        }
+        if (Math.Abs(area) < 1e-12) return loop.Aggregate(Vector2.Zero, (s, p) => s + p) / loop.Count;
 
         return new Vector2((float)(x / (3 * area)), (float)(y / (3 * area)));
     }
@@ -185,8 +181,7 @@ public static class UvLayout
         Mapped(mesh, faces).Select(f =>
         {
             var corners = mesh.Uvs!.Of(f)!;
-            var shape = mesh.Faces[f];
-            var outer = Enumerable.Range(0, shape.Loop.Count).Select(i => corners[shape.CornerAt(-1, i)]).ToList();
+            var outer = corners.Take(mesh.Faces[f].Loop.Count).ToList();
             return ((f - faces.FirstFace).ToString(CultureInfo.InvariantCulture), LabelPoint(outer));
         });
 

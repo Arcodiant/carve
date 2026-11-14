@@ -107,9 +107,9 @@ public sealed class SetUvsTool(ModelStore store)
         if (refused.Count > 0) return Failed("set_uvs", refused);
         if (snapshot is null) return Error("set_uvs: " + NoMesh);
 
-        var target = snapshot.Model.Target(meshName, out _)!.Mesh;
-        var unmapped = Enumerable.Range(0, target.Faces.Count).Count(f => !target.Faces[f].IsDeleted && !(target.Uvs?.IsMapped(f) ?? false));
-        return Ok(new { mesh = snapshot.Model.Target(meshName, out _)!.Name, set = given.Count, cleared = cleared.Count, unmapped });
+        var target = snapshot.Model.Target(meshName, out _)!;
+        var unmapped = target.Mesh.LiveFaces.Count(f => target.Mesh.Uvs?.IsMapped(f) != true);
+        return Ok(new { mesh = target.Name, set = given.Count, cleared = cleared.Count, unmapped });
     }
 
     private static void ParseEntry(JsonElement entry, int k, List<(int Face, Vector2[] Uv)> given, HashSet<int> seen, List<string> errors)
