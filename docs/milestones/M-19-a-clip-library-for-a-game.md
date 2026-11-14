@@ -156,3 +156,16 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - Expect a first fresh-agent run to find product problems, not only description problems. T-49's fix was code (T-72); its description notes changed nothing.
 - Keep naming the long `verify` limit and the `test-artifacts/` trap in every brief.
 - Clean up the worktree folders `finish` leaves behind.
+
+### Hand-off
+
+The rebase onto `origin/main` at fb96f44 (0.8.2: M-5, B-2 and T-51) is done locally and not pushed; it stopped for the person.
+
+- **Done.** Conflicts resolved in T-45, T-50, T-47, T-48, T-49 (twice) and T-72, keeping both sides:
+  - export reads the game's limits in every mode, piece mode included;
+  - a piece warns on the game's `max_triangles` and `max_submeshes` but not on height (`GameLimits.Warnings(..., wholeBody: false)`);
+  - clip warnings and the not-planar fold come after the limit warnings.
+- **One fix on top**, 356b578: T-72's leaky-shed test sends each face's `Loop` (main's T-63 made faces objects). Checked by running `NotPlanarFoldToolTests` (4/4).
+- **Verify at 147bb3c** failed `review` (expected), `scenario-cuts` (12 checks), `scenario-gatehouse` (43 checks) and `server-regression` (the test fixed above).
+- **For the person.** The cuts and gatehouse failures are main's M-5 shade predictions: `ColourRule` from a grey face at `Checks.Exact`, under M-5's rulings of 2026-11-12. With T-82's PBR render they read 1 to 5 levels brighter than predicted, for example the door at (72, 46, 25) against (71, 43, 20). Making them pass would mean loosening the tolerance or re-modelling the prediction for PBR. Which rule wins is the person's call.
+- **Left.** After that ruling: the fix, verify again, `git push --force-with-lease origin milestone/M-19`, then `cairn lint`.
