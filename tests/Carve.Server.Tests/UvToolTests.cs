@@ -104,6 +104,8 @@ public sealed class UvToolTests() : TempFolderTests("carve-uvs")
     [InlineData("""{"faces":[{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]}],"clear":[0]}""", "faces[0]: face 0 is both set and cleared")]
     [InlineData("""{"faces":[{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]},{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]}]}""", "faces[0]: face 0 is listed more than once")]
     [InlineData("""{"clear":[12]}""", "clear[12]: face 12 is not a face of the mesh")]
+    [InlineData("""{"faces":[{"face":-1,"uv":[[0,0],[0,1],[1,1],[1,0]]}]}""", "faces[-1]: face -1 is not a face of the mesh, which has 6")]
+    [InlineData("""{"clear":[-1]}""", "clear[-1]: face -1 is not a face of the mesh, which has 6")]
     [InlineData("""{"faces":[{"face":0}]}""", "faces[0].uv: required but missing")]
     [InlineData("""{"faces":[{"uv":[]}]}""", "face: required but missing")]
     [InlineData("""{"faces":[{"face":0,"uv":[],"extra":1}]}""", "extra: not a key of an entry")]

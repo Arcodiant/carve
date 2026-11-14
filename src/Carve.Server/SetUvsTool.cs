@@ -92,9 +92,13 @@ public sealed class SetUvsTool(ModelStore store)
             var problems = new List<string>();
             foreach (var f in cleared)
             {
-                if (f >= m.Faces.Count) problems.Add($"clear[{f}]: face {f} is not a face of the mesh, which has {m.Faces.Count}");
+                if (f < 0 || f >= m.Faces.Count) problems.Add($"clear[{f}]: face {f} is not a face of the mesh, which has {m.Faces.Count}");
                 else if (m.Faces[f].IsDeleted) problems.Add($"clear[{f}]: face {f} is deleted");
             }
+            // A negative id is out of range like one past the end; MeshUvs holds none, so it is refused here, before the check.
+            foreach (var g in given.Where(g => g.Face < 0))
+                problems.Add($"faces[{g.Face}]: face {g.Face} is not a face of the mesh, which has {m.Faces.Count}");
+            if (problems.Count > 0) return (null, problems);
             var uvs = (m.Uvs ?? MeshUvs.None)
                 .WithFaces(given.Select(g => KeyValuePair.Create(g.Face, (IReadOnlyList<Vector2>?)g.Uv)));
             problems.AddRange(MeshUvs.Check(m, uvs).Where(e => given.Any(g => e.Element.StartsWith($"faces[{g.Face}]", StringComparison.Ordinal)))
