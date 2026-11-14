@@ -85,7 +85,7 @@ public sealed class NotPlanarFoldToolTests() : FileToolTests("carve-fold")
     public async Task The_leaky_sheds_planted_faults_stay_named()
     {
         var shed = Core.Tests.TestMeshes.LeakyShed();
-        var (carve, _) = await StartAsync(JsonSerializer.Serialize(new { vertices = shed.Vertices.Select(v => new[] { v.X, v.Y, v.Z }), faces = shed.Faces }));
+        var (carve, _) = await StartAsync(JsonSerializer.Serialize(new { vertices = shed.Vertices.Select(v => new[] { v.X, v.Y, v.Z }), faces = shed.Faces.Select(f => f.Loop) }));
         using var _ = carve;
         var warnings = Warnings(Ok(await carve.CallToolAsync("check", "{}")));
         Assert.Equal(Core.Tests.TestMeshes.LeakyShedWarnings, warnings);
