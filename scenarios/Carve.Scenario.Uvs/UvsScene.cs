@@ -32,10 +32,6 @@ internal sealed class Scene(SceneMesh[] meshes)
 
     public SceneMesh this[string name] => Meshes.Single(m => m.Name == name);
 
-    public int Vertices => Meshes.Sum(m => m.Vertices.Length);
-
-    public int Faces => Meshes.Sum(m => m.Faces.Length);
-
     public static async Task<Scene> ReadAsync(ScenarioDriver driver, params string[] names)
     {
         var meshes = new List<SceneMesh>();
