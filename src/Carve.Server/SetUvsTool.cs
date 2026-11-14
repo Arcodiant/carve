@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -148,14 +147,8 @@ public sealed class SetUvsTool(ModelStore store)
                 var xy = new float[2];
                 for (var j = 0; j < 2; j++)
                 {
-                    var x = pair[j];
-                    if (x.ValueKind != JsonValueKind.Number) { errors.Add($"{cname}[{j}]: expected a number, got {Describe(x)}"); ok = false; }
-                    else if (!x.TryGetDouble(out var d) || !float.IsFinite((float)d))
-                    {
-                        errors.Add($"{cname}[{j}]: {x.GetRawText()} is not finite: a UV must lie within ±{float.MaxValue.ToString("G9", CultureInfo.InvariantCulture)}");
-                        ok = false;
-                    }
-                    else xy[j] = (float)d;
+                    if (UvNumber($"{cname}[{j}]", pair[j], errors) is { } x) xy[j] = x;
+                    else ok = false;
                 }
                 corners.Add(new Vector2(xy[0], xy[1]));
             }

@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Carve.Core;
@@ -98,14 +97,8 @@ public sealed class UnwrapTool(ModelStore store)
         var ok = true;
         for (var j = 0; j < 4; j++)
         {
-            var x = value.Value[j];
-            if (x.ValueKind != JsonValueKind.Number) { errors.Add($"into[{j}]: expected a number, got {Describe(x)}"); ok = false; }
-            else if (!x.TryGetDouble(out var d) || !float.IsFinite((float)d))
-            {
-                errors.Add($"into[{j}]: {x.GetRawText()} is not finite: a UV must lie within ±{float.MaxValue.ToString("G9", CultureInfo.InvariantCulture)}");
-                ok = false;
-            }
-            else xs[j] = (float)d;
+            if (UvNumber($"into[{j}]", value.Value[j], errors) is { } x) xs[j] = x;
+            else ok = false;
         }
         return ok ? (xs[0], xs[1], xs[2], xs[3]) : null;
     }

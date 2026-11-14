@@ -325,6 +325,15 @@ internal static class MeshToolSupport
         return null;
     }
 
+    /// <summary>One number of a UV (set_uvs, unwrap's into): a float, or null with an error naming <paramref name="element"/>.</summary>
+    public static float? UvNumber(string element, JsonElement x, List<string> errors)
+    {
+        if (x.ValueKind != JsonValueKind.Number) { errors.Add($"{element}: expected a number, got {Describe(x)}"); return null; }
+        if (x.TryGetDouble(out var d) && float.IsFinite((float)d)) return (float)d;
+        errors.Add($"{element}: {x.GetRawText()} is not finite: a UV must lie within ±{float.MaxValue.ToString("G9", CultureInfo.InvariantCulture)}");
+        return null;
+    }
+
     /// <summary>A required [x, y, z].</summary>
     public static Vector3? Vec3(string name, JsonElement? value, List<string> errors)
     {
