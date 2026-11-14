@@ -197,6 +197,42 @@ public class UvCarryTests
         Assert.Equal([0, 1], m.Uvs!.MappedFaces);
     }
 
+    public static TheoryData<string> SeamCuts => new() { "plane_cut", "loop_cut", "knife" };
+
+    /// <summary>
+    /// Ruling 4 (RV-43): a seam a cut splits keeps the mark on every piece. Each cut crosses one of the mapped cube's two
+    /// seams, 0-1 or 2-6; the crossed seam's whole edge is gone and every piece of it between its two ends is a seam, and the
+    /// seam the cut misses is kept as it was.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(SeamCuts))]
+    public void A_seam_a_cut_splits_keeps_the_mark_on_every_piece(string cut)
+    {
+        var cube = MappedCube();
+        var (m, crossed, missed) = cut switch
+        {
+            "plane_cut" => (Ok(PlaneCut.Cut(cube, new Vector3(0.4f, 0, 0), Vector3.UnitX).Edit), (0, 1), (2, 6)),
+            "loop_cut" => (Ok(LoopCut.Cut(cube, (0, 4), [0.3]).Edit), (2, 6), (0, 1)),
+            _ => (Ok(Knife.Cut(cube, [new(0.4f, 0, 0), new(0.4f, 0, 1)]).Edit), (0, 1), (2, 6)),
+        };
+        Assert.Contains(missed, m.Seams);
+        Assert.DoesNotContain(crossed, m.Seams);
+        var (a, b) = (m.Vertices[crossed.Item1], m.Vertices[crossed.Item2]);
+        // The pieces: the new vertices on the open segment a-b, in order from a.
+        var inner = Enumerable.Range(8, m.Vertices.Count - 8)
+            .Where(v => Vector3.Cross(m.Vertices[v] - a, b - a).Length() < 1e-6f && Vector3.Dot(m.Vertices[v] - a, b - a) > 0 && Vector3.Dot(m.Vertices[v] - b, a - b) > 0)
+            .OrderBy(v => Vector3.Distance(m.Vertices[v], a)).ToArray();
+        Assert.NotEmpty(inner);
+        var path = inner.Prepend(crossed.Item1).Append(crossed.Item2).ToArray();
+        for (var i = 0; i + 1 < path.Length; i++)
+        {
+            var piece = (Math.Min(path[i], path[i + 1]), Math.Max(path[i], path[i + 1]));
+            Assert.True(m.Topology.TryGetEdge(piece.Item1, piece.Item2, out _), $"{cut}: {piece} is not an edge");
+            Assert.Contains(piece, m.Seams);
+        }
+        Assert.Equal(path.Length, m.Seams.Count); // the pieces and the missed seam, nothing else
+    }
+
     public static TheoryData<string> Edits => new() { "move", "extrude", "subdivide", "delete", "plane_cut", "loop_cut", "knife", "merge_faces", "bridge" };
 
     [Theory]
