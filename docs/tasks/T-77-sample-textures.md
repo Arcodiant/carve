@@ -4,7 +4,7 @@ description: >-
 ---
 # T-77 — Sample textures
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -73,3 +73,32 @@ The barrel's textures, the content of this milestone's mechanic, exist as commit
   - report a long `verify` wait;
   - evidence in the milestone worktree's `artifacts/review/T-77/`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`), one agent, 2026-11-16, on `task/T-77` from `milestone/M-7`. The person approved all eight textures and the contact image in round 1 with no notes (colours, 2-texel gap, rust, glyph unchanged).
+
+**Remake:** `dotnet run --project tools/Carve.SampleTextures` (optional output folder argument; default `samples/textures`). Code: `tools/Carve.SampleTextures/TextureSet.cs`. Test: `tests/Carve.Core.Tests/SampleTexturesTests.cs` (committed PNGs equal the generator by pixel, 256 square, opaque, under 64 KB, glyph white on black inside the rune rectangle, rectangle equals faces 14 and 22 bounds from `UvProjection.Cylindrical`). Sizes: 3 to 42 KB each.
+
+**Channels** (row 0 is the top, v = 0; alpha 255 everywhere):
+
+| File | Space | Channels |
+|---|---|---|
+| `staves-base.png` | sRGB | RGB colour; stave s = x / 32, own tone; gap texels x % 32 = 0 and 31 are (28, 18, 11) |
+| `staves-normal.png` | linear | RGB tangent normal, flat (128, 128, 255); within 4 texels of an edge nx tilts up to 0.6 toward the gap |
+| `staves-occlusion.png` | linear | R = occlusion (255 down to 140 at the gap); G and B equal R |
+| `iron-base.png` | sRGB | dark grey (~58, 61, 66) with rust (~176, 84, 34) |
+| `iron-mr.png` | linear | R 255 (unused), G roughness (0.35 clean to 0.9 rust), B metallic (1 clean to 0 rust), from the same mask |
+| `end-grain-base.png` | sRGB | rings round (128, 128), period 9 texels, wobbled |
+| `end-grain-normal.png` | linear | ring ridges, tilt up to about 0.18 / 0.42 |
+| `rune-emissive.png` | sRGB | black, white Fehu-like glyph (stem and two arms) |
+
+**Surprise for T-80:** `cylindrical` keeps aspect, so the barrel's side (arc length at mean radius 0.38 m, height 1 m) fills the full width of u but only the middle 0.4188 of v (v 0.2906 to 0.7094), centred; one texel is about 9.3 mm both ways. The Scope's hoop "bands of v" are therefore thin: top hoop (faces 24 to 31) rows 74 to 85, bottom hoop (faces 0 to 7) rows 171 to 182. Rust noise is stretched along u so patches show in those bands; the rest of each texture is unused by the side.
+
+**Rune UV rectangle** (u0, v0, u1, v1) = (0.5, 0.3325, 0.625, 0.6675), texels x 128..160, y 85..171 (stave 4, column k = 6). `TextureSet.RuneRect` holds it; the test works it from the Core. Caps: `planar` +y / -y into [0,0,1,1], end grain centred at (128, 128).
+
+**Quantising:** iron and end-grain colours are rounded to steps of 6 to 8 so each PNG stays under 64 KB (unquantised they were 65 to 93 KB).
+
+**Checks shown failing:** glyph moved one column (RuneRect shifted to u 0.375 to 0.5): the rectangle test, the glyph test and the rune pixel-equality case fail (3). Generator writing v-flipped: pixel equality fails for 6 of 8 textures (the symmetric staves-normal and staves-occlusion cannot differ).
+
+**Not done:** evidence under `artifacts/review/T-77/` was not made; review images are in `G:\My Drive\artifacts\carve\M-7\T-77\round-1\` (outside the worktree).
