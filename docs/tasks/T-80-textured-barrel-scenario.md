@@ -131,12 +131,26 @@ Checked against the barrel spec, `UvProjection.Cylindrical` and T-78's plan. The
 
 6. **Cap overlap ruled (2026-11-16, the person).** The two caps get separate UV regions so `check` is silent: end-grain textures hold two discs, face 33 `planar` `+y` into `[0, 0, 0.5, 1]` (centre texel (64, 128)) and face 32 `planar` `-y` into `[0.5, 0, 1, 1]` (centre (192, 128)); each disc is 128 texels across with the ring period still 9 texels, the discs differing in wobble seed. T-77's generator and As built changed; the person approved the new textures beside the old. `check` gives no warning, asserted.
 
+### As built (2026-11-16, Claude Sonnet 5.5, `claude-sonnet-5-5`, agents 1 and 2; the frame review is the next agent's)
+
+- **Product change:** `MeshUvHealth` skips the overlap warning for a pair whose faces both have a material and the materials differ; `check`'s description says so; three unit tests, each shown failing when the skip is removed or forced.
+- **Textures changed (T-77's generator, approved by the person):** clean iron is about (210, 214, 222); the end-grain textures hold two discs (face 33 `planar` `+y` into `[0, 0, 0.5, 1]`, centre texel (64, 128); face 32 `-y` into `[0.5, 0, 1, 1]`, centre (192, 128)), so `check` is silent, asserted.
+- **Iron margin, measured:** the dimmest clean-iron sample's brightest channel under the sky is 118 at `front` (T = 80), 120 at 256 px, 160 in `hoop-close`; with the sky removed (a temporary edit of `RenderLights.cs`, restored) the scenario fails "clean iron at (151, 130) is (9, 9, 10), near-black".
+- **Break table** (`CARVE_MATERIALS_BREAK`, the scenario must fail; each run in `artifacts/scenarios/materials/`):
+
+  | Break | Fails at |
+  |---|---|
+  | `vflip` (rune and iron-mr uploaded v-flipped) | barrel-front: rune texel on face 22 is (209, 129, 74), not glowing orange |
+  | `rune-column` (rune on faces 13, 21) | the rune faces' UV rectangle is [0.375, ...], the texture's is [0.5, ...] |
+  | `metallic` (staves metallic 1) | barrel-front: stave on face 23 is (79, 53, 31), not lit and warm |
+  | `mirror` (checks worked from a mirrored camera) | barrel-front: rune texel on face 22 is (101, 69, 46), not glowing orange |
+  | sky removed | clean iron near-black, above |
+
+- **Sample counts:** `barrel-front-256` and the sheet's front tile have 18 RuneOn samples (at least 3 that a flip or mirror would change: all 18), over P6's floor; `barrel-top` checks only "pale ring: lit and warm" (4446 samples). No count is below the floor of 8. Samples log: `pixel-samples.txt` in each run folder.
+- **The saved file is `samples/barrel-textured.carve`,** committed beside `samples/textures/` with its paths as `textures/<file>`; nothing is copied.
+- **Not done by this member:** the byte-identical hash guard on every existing frame (the other suites' checks pass in `verify`, but no before and after hashes were taken); the frame review.
+- Verify: `VERIFY PASS` (15 suites, `scenario-materials` 58 s).
+
 ### Hand-off (2026-11-16, Claude Sonnet 5.5, `claude-sonnet-5-5`, agent 2)
 
-**Stopped on one rule the spec and rulings do not settle.** About 18 tool calls, no image opened beyond the person's iron review (approved).
-
-**Done (committed):** rulings 1 and 2 and the check/gap/small-detail changes of 3 and 4 in code: `MeshUvHealth` skips a pair of different materials (description, three unit tests, breaks shown failing), iron-base.png lightened and regenerated (approved by the person), `Pool.Rings` checks only lit and warm, `RuneGlows(3)` at 256 px with samples logged below the floor of 8.
-
-**Question:** the textured barrel's `check` still warns once: `faces[32]: UVs overlap faces[33]`. Both caps are `end-grain` (same material) with planar UVs into `[0, 0, 1, 1]`, so ruling 1's "same material warns as today" keeps it, while the ruling also says `check` gives no warning. Recommendation: the scenario asserts `check` gives exactly that one warning (top and bottom caps share one end-grain texture on purpose) and As built says so. Alternatives: a second end-grain material for the bottom cap (changes the Scope's four-material table), or a different UV region for the cap (changes T-77's layout).
-
-**Not done:** everything else in the earlier Hand-off's Not done list; the scenario has not yet run past `check`, so the frame checks after ruling 4's changes are unrun.
+Done and verified, committed; at the checkpoint (code verified, the review still to come). **Left:** (1) the hash guard: hash every PNG of the existing scenarios' frames on `origin/milestone/M-7` and on this branch (only the barrel's textures and `check`'s overlap rule changed, so none should differ) and record in `artifacts/review/T-80/` of the milestone worktree; (2) the person's review of the eight frames (`barrel-front`, `barrel-back`, `barrel-top`, `barrel-hoop-close`, `barrel-sheet`, `barrel-front-256`, `barrel-front-1024`, `barrel-mixed`, and the viewer's `viewer-front`, `viewer-angle` in the run folder's `viewer/`) with `mcp__waystone__review`; none opened by the scenario's author; (3) remove this section, `cairn lint`, `cairn task T-80 finish`. Surprise: `check` also catches the `rune-column` break only through the UV-rectangle check, before any pixel is read. Frames were not opened by the checks' author.
