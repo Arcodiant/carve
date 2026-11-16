@@ -105,7 +105,7 @@ Per T-76, base colour is the linear `baseColorFactor`, `occlusion` is the streng
 
 No existing frame changed by loading with mipmaps.
 
-**Tests** (`tests/Carve.ModelViewer.Tests/TexturedCubeTests.cs`, fixture `TexturedCubeFixture.cs`, a metallic 1 / roughness 0.35 cube written with SharpGLTF, all five slots at distinct sizes): every field and slot size reported with and without `--sky`; an untextured cube reports every slot unset; the +Z and top faces are at least 60 (max channel) lighter with the sky than without (measured: +Z (102,63,4)-class emissive-free values were near-black without it, (158,141,120) with it at an earlier emissive; T-78 measured 11 against 150); the corners stay the same dark background. Each shown failing:
+**Tests** (`tests/Carve.ModelViewer.Tests/TexturedCubeTests.cs`, fixture `TexturedCubeFixture.cs`, a metallic 1 / roughness 0.35 cube written with SharpGLTF, all five slots at distinct sizes): every field and slot size reported with and without `--sky`; an untextured cube reports every slot unset; the +Z and top faces are at least 60 (max channel) lighter with the sky than without (measured with the fixture's near-black emissive: +Z (158,141,120) with the sky; T-78's probe saw 11 against 150); the corners stay the same dark background. Each shown failing:
 
 | Broken on purpose | Tests that failed |
 |---|---|
