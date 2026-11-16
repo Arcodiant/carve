@@ -6,23 +6,32 @@ namespace Carve.Core;
 /// <summary>
 /// The colours and named groups of one mesh's faces (D-6, Colour is a material). Immutable. A colour is sRGB hex,
 /// <c>#RRGGBB</c>, kept as given; <see cref="ToLinear"/> converts it for drawing and export. A face without a colour is
-/// Carve's surface colour. Groups are named, ordered lists of face ids; a face may be in several.
+/// Carve's surface colour. Groups are named, ordered lists of face ids; a face may be in several. A face may instead use a
+/// material of the model by name (M-7, T-74): a face has a colour or a material, not both, and setting one clears the other.
 /// </summary>
 public sealed class FaceStyle
 {
     private readonly SortedDictionary<int, string> _colours;
     private readonly List<(string Name, int[] Faces)> _groups;
+    private readonly SortedDictionary<int, string> _materials;
 
-    private FaceStyle(SortedDictionary<int, string> colours, List<(string Name, int[] Faces)> groups)
+    private FaceStyle(SortedDictionary<int, string> colours, List<(string Name, int[] Faces)> groups, SortedDictionary<int, string> materials)
     {
         _colours = colours;
         _groups = groups;
+        _materials = materials;
     }
 
-    /// <summary>The style with no colours and no groups.</summary>
-    public static FaceStyle None { get; } = new([], []);
+    /// <summary>The style with no colours, no groups and no materials.</summary>
+    public static FaceStyle None { get; } = new([], [], []);
 
-    public bool IsEmpty => _colours.Count == 0 && _groups.Count == 0;
+    public bool IsEmpty => _colours.Count == 0 && _groups.Count == 0 && _materials.Count == 0;
+
+    /// <summary>Face id to the name of its material (one of the model's), for the faces given one only, in id order (T-74).</summary>
+    public IReadOnlyDictionary<int, string> Materials => _materials;
+
+    /// <summary>The name of <paramref name="face"/>'s material, or null when it has none; the model's <see cref="Model.FindMaterial"/> gives the record.</summary>
+    public string? MaterialOf(int face) => _materials.GetValueOrDefault(face);
 
     /// <summary>Face id to its colour as given, for the coloured faces only, in id order.</summary>
     public IReadOnlyDictionary<int, string> Colours => _colours;
@@ -80,12 +89,32 @@ public sealed class FaceStyle
         return new Vector4(SrgbToLinear(r / 255f), SrgbToLinear(g / 255f), SrgbToLinear(b / 255f), 1f);
     }
 
-    /// <summary>This style with <paramref name="faces"/> given <paramref name="hex"/>.</summary>
+    /// <summary>This style with <paramref name="faces"/> given <paramref name="hex"/>; any material they had is cleared (T-74).</summary>
     public FaceStyle WithColour(IEnumerable<int> faces, string hex)
     {
         var colours = new SortedDictionary<int, string>(_colours);
-        foreach (var f in faces) colours[f] = hex;
-        return new FaceStyle(colours, _groups);
+        var materials = _materials.Count == 0 ? _materials : new SortedDictionary<int, string>(_materials);
+        foreach (var f in faces)
+        {
+            colours[f] = hex;
+            if (materials.Count > 0) materials.Remove(f);
+        }
+        return new FaceStyle(colours, _groups, materials);
+    }
+
+    /// <summary>This style with <paramref name="faces"/> using the material <paramref name="name"/>; any colour they had is cleared (T-74).</summary>
+    public FaceStyle WithMaterial(IEnumerable<int> faces, string name)
+    {
+        ArgumentNullException.ThrowIfNull(faces);
+        if (Material.NameProblem(name) is { } problem) throw new ArgumentException(problem, nameof(name));
+        var colours = new SortedDictionary<int, string>(_colours);
+        var materials = new SortedDictionary<int, string>(_materials);
+        foreach (var f in faces)
+        {
+            materials[f] = name;
+            colours.Remove(f);
+        }
+        return new FaceStyle(colours, _groups, materials);
     }
 
     /// <summary>This style with the group <paramref name="name"/> set to <paramref name="faces"/> (replacing a group of that name in place, or added last).</summary>
@@ -95,7 +124,7 @@ public sealed class FaceStyle
         var groups = new List<(string Name, int[] Faces)>(_groups);
         var at = groups.FindIndex(g => g.Name == name);
         if (at >= 0) groups[at] = (name, members); else groups.Add((name, members));
-        return new FaceStyle(_colours, groups);
+        return new FaceStyle(_colours, groups, _materials);
     }
 
     /// <summary>
@@ -107,24 +136,27 @@ public sealed class FaceStyle
 
     /// <summary>
     /// The style after an edit that appends faces made from existing ones (an extrude's walls, a subdivided face's other
-    /// children): each added face takes its source face's colour and joins its groups. Faces keep their ids, so nothing else changes.
+    /// children): each added face takes its source face's colour or material and joins its groups. Faces keep their ids, so nothing else changes.
     /// </summary>
     internal FaceStyle Carry(IReadOnlyList<(int Face, IReadOnlyList<int> Added)> made)
     {
         if (made.Count == 0) return this;
         var colours = new SortedDictionary<int, string>(_colours);
+        var materials = _materials.Count == 0 ? _materials : new SortedDictionary<int, string>(_materials);
         var groups = _groups.Select(g => (g.Name, Members: new HashSet<int>(g.Faces), Faces: g.Faces.ToList())).ToList();
         foreach (var (face, added) in made)
         {
             if (_colours.TryGetValue(face, out var hex))
                 foreach (var w in added) colours[w] = hex;
+            if (_materials.TryGetValue(face, out var material))
+                foreach (var w in added) materials[w] = material;
             foreach (var g in groups)
                 if (g.Members.Contains(face)) g.Faces.AddRange(added);
         }
-        return new FaceStyle(colours, groups.Select(g => (g.Name, g.Faces.Order().ToArray())).ToList());
+        return new FaceStyle(colours, groups.Select(g => (g.Name, g.Faces.Order().ToArray())).ToList(), materials);
     }
 
-    /// <summary>This style with <paramref name="faces"/> in no colour and no group (a deleted face leaves both, T-64); a group left empty goes.</summary>
+    /// <summary>This style with <paramref name="faces"/> in no colour, material or group (a deleted face leaves all, T-64); a group left empty goes.</summary>
     internal FaceStyle Without(IEnumerable<int> faces)
     {
         var gone = faces.ToHashSet();
@@ -132,18 +164,23 @@ public sealed class FaceStyle
         var colours = new SortedDictionary<int, string>(_colours.Where(c => !gone.Contains(c.Key)).ToDictionary());
         var groups = _groups.Select(g => (g.Name, Faces: g.Faces.Where(f => !gone.Contains(f)).ToArray()))
             .Where(g => g.Faces.Length > 0).ToList();
-        return new FaceStyle(colours, groups);
+        var materials = _materials.Count == 0 ? _materials
+            : new SortedDictionary<int, string>(_materials.Where(m => !gone.Contains(m.Key)).ToDictionary());
+        return new FaceStyle(colours, groups, materials);
     }
 
-    /// <summary>The colours alone, with every face id moved up by <paramref name="faceOffset"/> (groups are not carried).</summary>
-    internal IEnumerable<KeyValuePair<int, string>> ColoursOffset(int faceOffset) =>
-        _colours.Select(c => KeyValuePair.Create(c.Key + faceOffset, c.Value));
+    /// <summary>The colours and the materials alone, with every face id moved up by <paramref name="faceOffset"/> (groups are not carried).</summary>
+    internal (IEnumerable<KeyValuePair<int, string>> Colours, IEnumerable<KeyValuePair<int, string>> Materials) LooksOffset(int faceOffset) =>
+        (_colours.Select(c => KeyValuePair.Create(c.Key + faceOffset, c.Value)),
+         _materials.Select(m => KeyValuePair.Create(m.Key + faceOffset, m.Value)));
 
-    /// <summary>A style of these colours and no groups.</summary>
-    internal static FaceStyle OfColours(IEnumerable<KeyValuePair<int, string>> colours)
+    /// <summary>A style of these colours and materials and no groups.</summary>
+    internal static FaceStyle OfLooks(IEnumerable<KeyValuePair<int, string>> colours, IEnumerable<KeyValuePair<int, string>> materials)
     {
         var all = new SortedDictionary<int, string>();
         foreach (var (face, hex) in colours) all[face] = hex;
-        return new FaceStyle(all, []);
+        var used = new SortedDictionary<int, string>();
+        foreach (var (face, name) in materials) used[face] = name;
+        return new FaceStyle(all, [], used);
     }
 }
