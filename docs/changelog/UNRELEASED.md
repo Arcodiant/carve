@@ -7,3 +7,4 @@
 - T-78: render draws a face with a material through Material.Pbr, the same material the engine's loader makes of the export, lit with a fixed sky so metal reads
 - T-79: The model viewer takes --sky to light a model with Carve's fixed sky, and view.json reports every PBR field and texture of each material
 - T-80: The barrel is given wood, iron, end-grain and rune materials, seen in eight frames, saved, reopened, exported and shown in the viewer, in suite scenario-materials
+- T-81: Fresh agents texture a model from the tool descriptions alone and recover from a planted missing texture path
