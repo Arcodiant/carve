@@ -116,10 +116,11 @@ internal sealed class Pool
     }
 
     /// <summary>The rune glows and is brighter than the plain wood of the same face (P4), and the glyph's strokes tell a flipped texture.</summary>
-    public void RuneGlows()
+    public void RuneGlows(int floor = 8)
     {
-        Need(Look.RuneOn);
-        Need(Look.RuneOff);
+        // At 256 px the glyph's strokes resolve at few pixels: as many as exist, at least 3 (ruling 4); the count is in the log.
+        Need(Look.RuneOn, floor);
+        if (floor >= 8) Need(Look.RuneOff);
         foreach (var on in _by[Look.RuneOn])
         {
             var p = Pixel(on);
@@ -132,6 +133,7 @@ internal sealed class Pool
         }
 
         Orientation(Look.RuneOn);
+        if (floor < 8 && _by[Look.RuneOn].Count < 8) Log.Add($"{_what}	below P6's floor of 8	RuneOn {_by[Look.RuneOn].Count}");
     }
 
     /// <summary>No P2 sample of the frame glows, and more than a floor of them are lit wood or iron, so it is not empty.</summary>
@@ -185,7 +187,7 @@ internal sealed class Pool
         }
     }
 
-    /// <summary>The cap's pale rings: lit and warm.</summary>
+    /// <summary>The cap's pale rings: lit and warm. The rings are not resolved at +y (P2), so nothing finer is checked there (ruling 4).</summary>
     public void Rings()
     {
         Need(Look.RingLight);
@@ -194,8 +196,6 @@ internal sealed class Pool
             var p = Pixel(s);
             if (Max(p) < T || !Warm(p)) Fail($"end grain at ({s.Hit.X}, {s.Hit.Y}) is {p}, not lit and warm (R > G > B by {M})");
         }
-
-        Orientation(Look.RingLight);
     }
 
     /// <summary>The colour faces' samples: #C8503C is red over green and blue.</summary>
