@@ -112,7 +112,7 @@ internal sealed class ViewerSystem(
             }
 
             content.Mount(ContentSources.Directory(options.Content));
-            model = models.LoadModel(new ContentPath(options.Model));
+            model = models.LoadModel(new ContentPath(options.Model), generateMipmaps: true);
         }
         catch (Exception e)
         {
@@ -142,6 +142,12 @@ internal sealed class ViewerSystem(
 
         var ambient = scenes.CreateEntity(Scene);
         entities.AddComponent(ambient, new AmbientLight { Color = Vector3.One, Intensity = ViewerLook.AmbientIntensity });
+
+        if (options.Sky)
+        {
+            // The same fixed sky as Carve's render (RenderSky.Sky in src/Carve.Server is this expression; the viewer links no Carve code, so it is repeated here), unchanged: its own sun, baked once, and it does not follow the viewer's sun below.
+            entities.AddComponent(scenes.CreateEntity(Scene), ProceduralSky.Default);
+        }
 
         var sun = scenes.CreateEntity(Scene);
         entities.AddComponent(sun, new DirectionalLight { Color = Vector3.One, Intensity = ViewerLook.SunIntensity });
@@ -204,7 +210,19 @@ internal sealed class ViewerSystem(
                     baseColor = new[] { m.Color.X, m.Color.Y, m.Color.Z, m.Color.W },
                     metallic = m.Metallic,
                     roughness = m.Roughness,
+                    emissive = Numbers(m.EmissiveColor),
+                    occlusion = m.Occlusion,
+                    doubleSided = m.DoubleSided,
                     pbr = m.Flags.HasFlag(MaterialFlags.Pbr),
+                    flags = m.Flags.ToString(),
+                    textures = new
+                    {
+                        baseColour = Slot(m.Texture),
+                        metallicRoughness = Slot(m.MetallicRoughnessTexture),
+                        normal = Slot(m.NormalTexture),
+                        emissive = Slot(m.EmissiveTexture),
+                        occlusion = Slot(m.OcclusionTexture),
+                    },
                 }),
                 views = _frames.Select(f => new
                 {
@@ -212,6 +230,7 @@ internal sealed class ViewerSystem(
                     direction = Numbers(f.View.Direction),
                     eye = Numbers(f.Eye),
                 }),
+                sky = options.Sky,
                 sun = new
                 {
                     toSun = Numbers(ViewerLook.ToSun),
@@ -221,6 +240,11 @@ internal sealed class ViewerSystem(
             },
             new JsonSerializerOptions { WriteIndented = true });
     }
+
+    /// <summary>Whether a texture slot is set, and if so its size and format.</summary>
+    private static object Slot(Texture? texture) => texture is null
+        ? new { set = false, width = 0, height = 0, format = (string?)null }
+        : new { set = true, width = (int)texture.Width, height = (int)texture.Height, format = (string?)texture.Format.ToString() };
 
     private static float[] Numbers(Vector3 v) => [v.X, v.Y, v.Z];
 }

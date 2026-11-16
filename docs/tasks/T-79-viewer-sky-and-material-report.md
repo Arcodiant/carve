@@ -4,7 +4,7 @@ description: >-
 ---
 # T-79 — Viewer sky and material report
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -68,3 +68,50 @@ The Scope holds, with these details:
 1. **Mipmaps on.** The viewer loads with `generateMipmaps: true`, as Carve's render and the equality test do. Export writes no sampler.
 2. **One fixed sky.** The viewer's `--sky` is T-78's sky: `ProceduralSky.Default` with its own sun direction, unchanged, baked once, with no rebake. It does not follow the viewer's sun.
 3. **Engine need 8 (D-1), Low.** The `.glb`'s glTF sampler does not decide sampling: 0.119.0 ignores it. Whoever loads a Carve `.glb` must pass `generateMipmaps: true` to get the mipmapped, trilinear textures Carve's render shows. Without it, the engine draws them nearest-sampled with no mips. Carve's render, the viewer and the tests pass the flag, and a game must pass it too.
+
+4. **No link to `RenderSky.cs` (2026-11-16, the person).** The viewer uses `ProceduralSky.Default` directly, with a comment tying it to `RenderSky.Sky`; the guard `The_viewer_references_no_Carve_code` stays untouched, since it forbids a linked Carve source file.
+
+### As built (2026-11-16, Claude Sonnet 5.5)
+
+**The switch.** `--sky` (no value) in `ViewerOptions` (`ViewerOptions.Sky`, default false). It adds one entity carrying `ProceduralSky.Default` unchanged, with its own sun, baked once: the same value as `RenderSky.Sky`, written out in `ViewerSystem` because the viewer links no Carve code (ruling 4). The viewer's own `DirectionalLight` and ambient stay as they are; the sky does not follow them, and no sky is drawn behind the model. The viewer now loads with `LoadModel(path, generateMipmaps: true)` (ruling 1, engine need 8).
+
+**How T-80 calls it**, with the barrel's export as the content folder:
+
+```
+pwsh scripts/run-viewer.ps1 <content folder> <model path in it, e.g. models/barrel.glb> <out folder> front=1.6,1.2,2.2 --sky
+```
+
+`run-viewer.ps1` passes any `--` word through as before (an example is in its header). The out folder gets `<view>.png` per view and `view.json`; exit 0 is a pass.
+
+**`view.json`.** The old keys are unchanged (`model`, `triangles`, `bounds`, `views`, `sun`); added are top-level `sky` (bool) and, per entry of `materials` (no name: engine need 3), beside `baseColor` [r,g,b,a, linear], `metallic`, `roughness`, `pbr`:
+
+| key | holds |
+|---|---|
+| `emissive` | [r,g,b], `Material.EmissiveColor` (linear) |
+| `occlusion` | `Material.Occlusion` (1 when the file has no occlusion map) |
+| `doubleSided` | bool |
+| `flags` | `MaterialFlags` as the engine prints it, e.g. `Textured, SolidColor, NormalMapped, Lit, LitWithVertexNormals, Pbr` |
+| `textures` | object with the slots `baseColour`, `metallicRoughness`, `normal`, `emissive`, `occlusion`, each `{ set, width, height, format }` (`set` false gives 0, 0 and `format` null; `format` is the engine's `TextureFormat`, `Rgba8Srgb` for base and emissive, `Rgba8Unorm` for the rest) |
+
+Per T-76, base colour is the linear `baseColorFactor`, `occlusion` is the strength written only with an occlusion map, and `emissive` is zero when the factor was black. `materials` lists one entry per submesh material, or the base one.
+
+**Hashes** (SHA-256 of every PNG, before and after, mipmaps on and `--sky` off; `artifacts/review/T-79/hashes-before.txt` and `hashes-after.txt`, compared with no difference):
+
+| frame | SHA-256, first 12 |
+|---|---|
+| viewer-cube `first/front.png`, `second/front.png` | 96c9265cf60f |
+| viewer-cube `minus-x/minus-x.png` | de4f30489fab |
+| scenario-export `viewer/front.png` | fa9ca6a9ade7 |
+| scenario-export `viewer/minus-x.png` | ff9ca6d9f4cb |
+| scenario-export Carve frames (5, `front*.png`) | bf8ecf04ae27 |
+
+No existing frame changed by loading with mipmaps.
+
+**Tests** (`tests/Carve.ModelViewer.Tests/TexturedCubeTests.cs`, fixture `TexturedCubeFixture.cs`, a metallic 1 / roughness 0.35 cube written with SharpGLTF, all five slots at distinct sizes): every field and slot size reported with and without `--sky`; an untextured cube reports every slot unset; the +Z and top faces are at least 60 (max channel) lighter with the sky than without (measured with the fixture's near-black emissive: +Z (158,141,120) with the sky; T-78's probe saw 11 against 150); the corners stay the same dark background. Each shown failing:
+
+| Broken on purpose | Tests that failed |
+|---|---|
+| the sky entity never added | A_metallic_face_is_lighter_with_the_sky_than_without |
+| baseColour slot read from the normal texture | View_json_reports_every_field_and_texture_of_the_material (both cases) |
+
+A review of the plain and `--sky` frames of the fixture cube went to the person (round-1); it came back with no notes. Not checked: a real textured (non-flat) model under `--sky`, which is T-80.

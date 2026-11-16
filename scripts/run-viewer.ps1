@@ -5,9 +5,12 @@
     Writes <view>.png per view and view.json to the out folder, and exits with the viewer's code: 0
     passed, non-zero failed, 124 if it was stopped for running out of time. Each of Views is
     <name>=<x,y,z>; a word beginning -- goes to the viewer as it is, so
-    --Empyrean:Graphics:VirtualSurface=false opens a window. With no view the viewer uses front.
+    --Empyrean:Graphics:VirtualSurface=false opens a window, and
+    --sky lights the model with Carve's fixed sky as well as the viewer's sun. With no view the viewer uses front.
 .EXAMPLE
     pwsh scripts/run-viewer.ps1 game/Content models/crate.glb out front=1.6,1.2,2.2 minus-x=-2.2,1.2,1.6
+.EXAMPLE
+    pwsh scripts/run-viewer.ps1 game/Content models/barrel.glb out front=1.6,1.2,2.2 --sky
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(

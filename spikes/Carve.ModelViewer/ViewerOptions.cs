@@ -8,10 +8,10 @@ namespace Carve.ModelViewer;
 internal sealed record ViewSpec(string Name, Vector3 Direction);
 
 /// <summary>The viewer's own command line. Anything under <c>--Empyrean:</c> belongs to the engine.</summary>
-internal sealed partial record ViewerOptions(string Content, string Model, string Out, IReadOnlyList<ViewSpec> Views)
+internal sealed partial record ViewerOptions(string Content, string Model, string Out, IReadOnlyList<ViewSpec> Views, bool Sky = false)
 {
     public const string Usage =
-        "usage: Carve.ModelViewer --content <folder> --model <content path> --out <folder> [--view <name>=<x,y,z>]...";
+        "usage: Carve.ModelViewer --content <folder> --model <content path> --out <folder> [--view <name>=<x,y,z>]... [--sky]";
 
     private static readonly ViewSpec DefaultView = new("front", new Vector3(1.6f, 1.2f, 2.2f));
 
@@ -28,6 +28,7 @@ internal sealed partial record ViewerOptions(string Content, string Model, strin
         string? content = null, model = null, output = null;
         var views = new List<ViewSpec>();
         var engine = new List<string>();
+        var sky = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -40,6 +41,13 @@ internal sealed partial record ViewerOptions(string Content, string Model, strin
                     engine.Add(args[++i]);
                 }
 
+                continue;
+            }
+
+            if (arg == "--sky")
+            {
+                // The one switch with no value: Carve's fixed sky, lighting the model as render does.
+                sky = true;
                 continue;
             }
 
@@ -70,7 +78,7 @@ internal sealed partial record ViewerOptions(string Content, string Model, strin
 
         engineArgs = engine.ToArray();
         return new ViewerOptions(
-            Path.GetFullPath(content), model, Path.GetFullPath(output), views.Count > 0 ? views : [DefaultView]);
+            Path.GetFullPath(content), model, Path.GetFullPath(output), views.Count > 0 ? views : [DefaultView], sky);
     }
 
     private static ViewSpec ParseView(string text, List<ViewSpec> seen)
