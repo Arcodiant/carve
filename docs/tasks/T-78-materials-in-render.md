@@ -272,3 +272,5 @@ Every break fails at least one test. Worth knowing: uploading base colour linear
 - White under the sky is bluish, about `(221, 233, 252)`, so the tests' class rule takes "white" first, when every channel is at least T, before channel order.
 - With Repeat and linear filtering a textured face's edges pick up a thin line of the texture's opposite edge (visible on the marker frames).
 
+
+**Frame review** (agent 3, round 1): 8 sheets built from `artifacts/material-tests/` (equality, marker at front and zoom 3, metal before/sky removed/under the sky, emissive, beside colour, double-sided, argument families, other looks), copied to `G:\My Drivertifacts\carve\M-7\T-78ound-1\` and kept in `artifacts/review/T-78/round-1/`. The person was told about the bluish white, the four-texel blend on unmapped faces and the edge lines. **Approved, no notes.** The sky-removed metal frame is `metal-sky-off.png`, kept from the break-table run.
