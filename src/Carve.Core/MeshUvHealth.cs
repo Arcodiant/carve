@@ -8,13 +8,17 @@ internal static class MeshUvHealth
     /// <summary>Two faces overlap in UV space when their triangles' common area is more than this (about a fifteenth of a texel of the 256 checker). The planner's, T-60.</summary>
     internal const double OverlapTolerance = 1e-6;
 
+    private static MeshWarning TexturedUnmapped(int face, string material) =>
+        new(MeshWarningKind.UvUnmapped, $"faces[{face}]", $"material '{material}' has a texture but the face has no UVs, so it samples the texture's corner");
+
     private readonly record struct Tri(double Ax, double Ay, double Bx, double By, double Cx, double Cy);
 
     /// <summary>Unmapped, flipped and zero-area faces by face id, then each overlapping pair once, the lower id first.</summary>
-    internal static (List<MeshWarning> Warnings, UvStats? Stats) Create(PolygonMesh mesh)
+    internal static (List<MeshWarning> Warnings, UvStats? Stats) Create(PolygonMesh mesh, IReadOnlyDictionary<int, string>? textured = null)
     {
         var uvs = mesh.Uvs;
-        if (uvs is null || uvs.MappedFaces.Count == 0) return ([], null);
+        if (uvs is null || uvs.MappedFaces.Count == 0)
+            return (textured is null ? [] : mesh.LiveFaces.Where(textured.ContainsKey).Select(f => TexturedUnmapped(f, textured[f])).ToList(), null);
 
         var warnings = new List<MeshWarning>();
         var live = mesh.LiveFaces.ToArray();
@@ -25,7 +29,10 @@ internal static class MeshUvHealth
         {
             if (uvs.Of(f) is not { } uv)
             {
-                warnings.Add(new(MeshWarningKind.UvUnmapped, $"faces[{f}]", "no UVs, so the face samples the texture's corner"));
+                // A face whose material has a texture says so, and that one warning replaces the generic one (T-75).
+                warnings.Add(textured is not null && textured.TryGetValue(f, out var material)
+                    ? TexturedUnmapped(f, material)
+                    : new(MeshWarningKind.UvUnmapped, $"faces[{f}]", "no UVs, so the face samples the texture's corner"));
                 continue;
             }
             mapped++;

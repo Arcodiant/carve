@@ -61,6 +61,8 @@ public sealed class SaveTool(ModelStore store)
         + "The .carve file is the one to keep working in: it holds the polygons exactly, every vertex and face in its id order and every number to the bit, so after open the ids you used before still name the same vertices and faces. "
         + "It does not hold the undo history (open starts from the file as one step), a current file name (carve remembers none: give the path every time) or any render setting. "
         + "The .glb that export writes is only for the game, and has no faces to edit. "
+        + "Materials (define_material) are saved too, as a version 6 file's materials list and each mesh's face materials; a model with none is written as it always was. A texture is saved as a path relative to the .carve file's folder, so keep the PNG files with the file or below it; save does not copy them, and open reads them again from those paths. "
+        + "With mesh, only the materials that mesh's faces use are written. A texture that has no relative path from the file's folder (on another drive) refuses the save, naming the material and the field. "
         + "The file is versioned JSON (version 2), keys always in one order, one vertex, face, colour, group, weighted vertex, bone or clip key per line, so the same model always gives the same bytes and a diff shows what changed: "
         + "meshes [{name, vertices, faces, colours [{colour, faces}], groups [{name, faces}], weights [{vertex, bones {bone: weight}}]}], skeleton [{name, parent, position, rotation}] or null, "
         + "and clips [{name, duration, loop, channels {bone: {rotation, translation: {interpolation, keys [{time, value}]}}}}], as define_skeleton and define_clip take them. "
@@ -100,7 +102,9 @@ public sealed class SaveTool(ModelStore store)
         var target = ToolPaths.Resolve("save", text, Extension, out var pathError);
         if (target is null) return Error(pathError!);
 
-        var bytes = new UTF8Encoding(false).GetBytes(CarveFile.Write(model));
+        var folder = Path.GetDirectoryName(target.FullPath)!;
+        if (CarveFile.TextureProblem(model, folder) is { } textureProblem) return Error("save: " + textureProblem);
+        var bytes = new UTF8Encoding(false).GetBytes(CarveFile.Write(model, folder));
         if (!ToolPaths.Write("save", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
 
         return Line($"saved {target.Written(replaced)}: {Summary(model)}");

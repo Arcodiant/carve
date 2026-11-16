@@ -223,8 +223,17 @@ public static class FaceMerge
     private static IReadOnlyList<string> ColourWarnings(PolygonMesh mesh, int survivor, IEnumerable<int> others)
     {
         var keep = mesh.Style?.ColourOf(survivor);
-        return others.Where(f => mesh.Style?.ColourOf(f) != keep)
-            .Select(f => MeshEdits.Invariant($"faces[{f}]: merged with colour {mesh.Style?.ColourOf(f) ?? "none"}, and the merged face keeps faces[{survivor}]'s colour, {keep ?? "none"}"))
+        var keepMaterial = mesh.Style?.MaterialOf(survivor);
+        return others.Where(f => mesh.Style?.ColourOf(f) != keep || mesh.Style?.MaterialOf(f) != keepMaterial)
+            .Select(f =>
+            {
+                var material = mesh.Style?.MaterialOf(f);
+                // A face with a material is named by it, not by "colour none"; faces with colours only keep the older text.
+                if (material is null && keepMaterial is null)
+                    return MeshEdits.Invariant($"faces[{f}]: merged with colour {mesh.Style?.ColourOf(f) ?? "none"}, and the merged face keeps faces[{survivor}]'s colour, {keep ?? "none"}");
+                static string Look(string? m, string? c) => m is not null ? $"material '{m}'" : c is not null ? $"colour {c}" : "no colour or material";
+                return MeshEdits.Invariant($"faces[{f}]: merged with {Look(material, mesh.Style?.ColourOf(f))}, and the merged face keeps faces[{survivor}]'s look, {Look(keepMaterial, keep)}");
+            })
             .ToArray();
     }
 }

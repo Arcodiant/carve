@@ -88,7 +88,7 @@ public sealed class SetColourTool(ModelStore store)
 {
     public const string Text =
         "Colours faces of a mesh: set_colour(colour, and either faces or group). colour is sRGB hex, #RRGGBB (digits in either case), kept as given and converted to linear light for drawing and export. "
-        + "Give exactly one of faces (face ids) or group (a name from define_group). A face has one colour; the last call wins. Faces never coloured keep Carve's grey. "
+        + "Give exactly one of faces (face ids) or group (a name from define_group). A face has one colour; the last call wins. Faces never coloured keep Carve's grey. A face has a colour or a material, never both: this clears the material of the faces it colours (set_material clears a colour the same way). "
         + "Colours follow a face through extrude: the walls take the colour of the face they came from. "
         + "render shows the colours in the shaded look (the wireframe and normals looks are unlit and ignore them); export writes one opaque matte material per colour, metallic 0 and roughness 1, as baseColorFactor. "
         + "get_mesh reports the colours and groups. A new define_mesh of the same name starts again uncoloured. "
