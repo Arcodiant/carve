@@ -31,6 +31,29 @@ internal static class CameraPixels
         };
     }
 
+    /// <summary>
+    /// The inverse of <see cref="Perspective"/>: the ray (origin, unit direction), in the mesh's coordinates, through the centre of the pixel
+    /// <c>(x + 0.5, y + 0.5)</c> of the frame of <paramref name="size"/> pixels.
+    /// </summary>
+    public static Func<float, float, (Vector3 Origin, Vector3 Direction)> Unproject(Vector3 min, Vector3 max, Vector3 direction, int size, float zoom = 1, Vector3? target = null)
+    {
+        var (centre, radius, eye, look, up) = Place(min, max, direction, target);
+        var view = Matrix4x4.CreateLookAt(eye, look, up);
+        var field = 2 * MathF.Atan(MathF.Tan(FieldOfViewY / 2) / zoom);
+        Matrix4x4.Invert(view * Matrix4x4.CreatePerspectiveFieldOfView(field, 1, 0.01f, 100f), out var inverse);
+        Vector3 At(float x, float y, float depth)
+        {
+            var p = Vector4.Transform(new Vector4(x / size * 2 - 1, 1 - y / size * 2, depth, 1), inverse);
+            return centre + new Vector3(p.X, p.Y, p.Z) / p.W * radius;
+        }
+
+        return (x, y) =>
+        {
+            var (near, far) = (At(x, y, 0), At(x, y, 0.5f));
+            return (near, Vector3.Normalize(far - near));
+        };
+    }
+
     /// <summary>Where the eye of <see cref="Perspective"/> is, in the mesh's coordinates: what a ray test of what is in sight starts from.</summary>
     public static Vector3 Eye(Vector3 min, Vector3 max, Vector3 direction, Vector3? target = null)
     {
