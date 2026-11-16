@@ -234,27 +234,41 @@ The sun is up and toward -Z, behind the model as `front` sees it, and fixed; Car
 
 **The guard (Agent 1's commit).** Every Verify suite run `--fresh` twice on this worktree (reason: T-78 baseline hashes, then the sky's guard): first at the milestone head after T-74 and T-76 merged (`5986ceb`, the sky change held outside the tree), then with the sky. All 12 passed both times. The SHA-256 of every PNG was taken: each scenario suite's frames from `cairn test artifacts <suite>`, and the PNGs `server-regression` writes under `artifacts/checker-tests`, `render-tests` and `uv-layout-tests` (cleared between the two runs so each set is that run's own). 310 PNGs (223 scenario frames, 87 test frames); **the two lists are identical**. The tables are `artifacts/review/T-78/hashes-before.tsv` and `hashes-after.tsv` in the task worktree (ignored), and copies stay in `%TEMP%\t78`. Not yet copied to the milestone worktree's `artifacts/review/T-78/`: a write there was refused to this agent, so the continuation or `finish` should carry them.
 
-### Hand-off (2026-11-16, Claude Opus 5.5, agent 2)
+### As built (2026-11-16, Claude Opus 5.5, agents 2 and 3)
 
-Agent 1's hand-off is folded away: its probe, sky and guard are in As built above.
+**The material function and render** (agent 2).
+- `src/Carve.Server/PbrMaterials.cs`: `Build(Carve.Core.Material, Func<MaterialTexture, bool, Texture>)` calls `Material.Pbr` with every field: base colour `FaceStyle.ToLinear` with alpha 1, emissive linear, occlusion strength `OcclusionTexture is null ? 1 : Occlusion` (ruling 4), `DoubleSided`. An instance caches textures by (SHA-256 of the PNG, sRGB), decoded by `ITextureLoader.DecodeCpu` and uploaded by `CreateTexture` as `Rgba8Srgb` (base, emissive) or `Rgba8Unorm` (the other maps), with `generateMipmaps: true` and `Sampler` = Linear/Linear/Linear, Repeat x3, anisotropy 1, `NoLodClamp` (ruling 1). Engine materials are cached by the Carve record (every field, texture bytes included) for the process.
+- `src/Carve.Server/RenderLights.cs`: ambient 0.25, `RenderSky.Sky`, directional 0.9, factored out of `RenderSystem.BuildScene` in the same order, and linked by the tests.
+- `MeshBridge.ToSubmeshedMeshData(mesh, space, out colours, out materials)`: export's primitive order (uncoloured, colours by first use, materials by first use). Corner UVs (`LookMeshes.CornerUvs(mesh, Vector2.Zero)`, the export's (0, 0) rule) only when a drawn face has a material, so a mesh of colours only gets exactly the buffer it always had.
+- `IRenderScene.ShowMaterials` (default no-op), called by `RenderPump.ShowMesh` with the model's materials before every mesh, posed too. `RenderSystem.Make`'s submesh branch runs on colours or materials: material submeshes from `PbrMaterials`, the others `LitMesh` as before. `RenderSystem` now takes `ITextureLoader`. The tool description gains one sentence after the `'mode'` line.
+- Tests: `MaterialSubmeshTests` (unit, 2), `MaterialRenderTests` (regression, 6: argument families with the marker's P2/P5 samples, `mesh`/`pose`/`clip`, locality beside colour and uncoloured faces, double-sided, metal >= T 80 and emissive P4, the five other looks byte-identical before and after `set_material`), `PbrEqualityTests` (regression, 1: in-process `EngineHost`; six materials covering every field and slot, exported by `GlbExport.Write` and loaded with `generateMipmaps: true`; fields and texture Width/Height/Format/MipLevels equal; raw readback **0 differing bytes** at `front` and `back`; the host's frames equal real `carve render` pixel for pixel). Frames go to `artifacts/material-tests/`.
 
-**Done (committed, not yet verified as a whole):**
-- `src/Carve.Server/PbrMaterials.cs`: `Build(Carve.Core.Material, Func<MaterialTexture, bool, Texture>)` calls `Material.Pbr` with every field (base `ToLinear` W 1, emissive linear, occlusion `OcclusionTexture is null ? 1 : Occlusion`); an instance caches textures by (SHA-256 of PNG, sRGB) through `ITextureLoader.DecodeCpu` + `CreateTexture(..., Rgba8Srgb|Rgba8Unorm, Sampler, generateMipmaps: true)`, `Sampler` = Linear/Linear/Linear, Repeat x3, anisotropy 1, `NoLodClamp`, 0, 0; and engine materials keyed by the Carve record (every field, texture bytes included). Held for the process.
-- `src/Carve.Server/RenderLights.cs`: ambient 0.25, `RenderSky.Sky`, directional 0.9, factored out of `BuildScene` (same order as agent 1's commit), linked by the tests.
-- `MeshBridge.ToSubmeshedMeshData(mesh, space, out colours, out materials)`: export's primitive order (uncoloured, colours by first use, materials by first use); corner UVs (`LookMeshes.CornerUvs(mesh, Vector2.Zero)`, the export's (0, 0) rule) only when a drawn face has a material.
-- `IRenderScene.ShowMaterials(materials)` (default no-op), called by `RenderPump.ShowMesh(ModelSnapshot)` with `snapshot.Model.Materials` before every mesh (posed too); `RenderSystem.Make`'s submesh branch runs on colours or materials, material submeshes from `PbrMaterials.Of`, others `LitMesh` as before. `RenderSystem` now takes `ITextureLoader`.
-- Description sentence in `RenderTool.cs` after the `'mode'` line.
-- Tests: `MaterialSubmeshTests` (unit, 2: colour-only buffers equal `ToMeshData`'s with zero UVs; order and names match `GlbExport.MaterialNames`, UVs equal the export rule). `MaterialRenderTests` (regression, 6: every argument family with the marker's 16 P2/P5 samples incl. highlight orange, `mesh`, `pose`, `clip`; locality beside colour and uncoloured faces, 32 exact samples; double-sided from behind vs single-sided = background; metal >= T 80 at 24 samples; emissive P4 and absent on a dull face; wireframe, normals, checker, uvs and weights PNGs byte-identical before and after `set_material`). `PbrEqualityTests` (regression, 1: in-process `EngineHost`; six materials covering every field and slot, exported by `GlbExport.Write`, `LoadModel(glb, ModelFormat.Gltf, generateMipmaps: true)`; every field and each texture's Width/Height/Format/MipLevels equal, not the same objects; raw readback byte-identical at front and back; then the host's frames equal real `carve` `render` pixel for pixel). All 9 new tests pass run directly (`dotnet test --filter`); the equality test passed first time: **0 differing bytes at front and back, and host == render**. Frames and `equality.txt` go to `artifacts/material-tests/` (a new folder, so the guard's `*-tests` lists of the old folders are unaffected).
+**Verify and the guard** (agent 3). `cairn task T-78 verify`: all 12 suites PASS (suites spread over Mantorok and Xellotath). The guard: every scenario suite's frames from `cairn test artifacts`, and, because the verify's `server-regression` ran on the other machine, `server-regression` rerun `--fresh` here with `artifacts/{checker,render,uv-layout,material}-tests` cleared first. 310 PNGs, **byte-identical to `hashes-before.tsv`** (`artifacts/review/T-78/hashes-after-agent3.tsv`). No existing frame changed. Scenario frames hash the same on both machines.
 
-**Left:**
-1. `cairn task T-78 verify` (all 12 suites), and **the guard again**: SHA-256 of every scenario frame and of every PNG under `artifacts/checker-tests`, `render-tests`, `uv-layout-tests` against `artifacts/review/T-78/hashes-before.tsv` (310 PNGs; exclude the new `material-tests`). Any difference: stop and ask.
-2. The mutation table (each new check shown failing): e.g. occlusion rule dropped (strength always passed), base/emissive uploaded linear, UVs v-flipped in `MeshBridge`, unmapped corners at `WhiteCentre`, materials not passed (`ShowMaterials` skipped), material order reversed, `double_sided` dropped, sky removed (metal check).
-3. The `back` render in the argument-family test only checks it succeeds; add a positive sample or note it. `labels`, `views` and `mesh` are covered by the marker check only where the face is in sight.
-4. `### As built` for agent 2 (with hashes before/after), the person's frame review (Plan's list 1 to 8; frames already written to `artifacts/material-tests/`: `equality-{front,back}-{loader,function,render}.png`, `view-front`, `zoom-3`, `metal`, `metal-before`, `emissive`, `beside-before/after`, `double-sided-behind`, `single-sided-behind`, `look-0..4`, each family), copy evidence to the milestone worktree's `artifacts/review/T-78/` (agent 1's write there was refused), `cairn lint`, `finish`.
+**Break table** (agent 3; each change alone, solution rebuilt, the 9 new tests run, source restored; script `%TEMP%\t78\mut.py`):
 
-**Checked:** server and test builds clean (0 warnings on the server); the 9 new tests and the unit suites touched (`FaceColourTests`, `LookMeshesTests`, `MaterialExportTests`) pass. **Not checked:** the full Verify run and the guard; no frame was opened (0 of 12 images used).
+| break | fails |
+|---|---|
+| occlusion strength passed without a map | equality (fields differ) |
+| base and emissive uploaded `Rgba8Unorm` | equality (format) |
+| `generateMipmaps: false` | equality (MipLevels) |
+| UVs v-flipped in `MeshBridge` | argument families, mesh/pose/clip, beside, submesh UVs ("cell (0, 0) is (23, 25, 252), blue, not red") |
+| unmapped corners at `CheckerTexture.WhiteCentre` | submesh UVs (export rule) |
+| corner UVs on colour-only meshes too | colour-only buffers unchanged |
+| material submeshes first | submesh order |
+| `ShowMaterials` not called | all 7 render and equality tests ("the material 'leaf', which is not defined") |
+| `double_sided` dropped | double-sided, equality |
+| sky removed | metal ("metal cell (0, 7) is (51, 51, 51), near-black") |
+| emissive dropped | emissive, equality |
+| colour faces lose their colour when a material is present | beside (exact samples) |
+| the `FlatColour is null` guard dropped | other looks ("wireframe changed when the faces took a material") |
 
-**Surprising:**
-- An unmapped face's (0, 0) samples the corner where four texels meet under Repeat, so with the marker it is a blend of all four quadrants, not red. That is what the game does; the equality test's positive check counts drawn pixels instead.
-- White under the sky is bluish (`(221, 233, 252)`), so the test's class rule takes "white" first when every channel is at least T, before channel order.
-- `render`'s `mesh` argument does not frame on that mesh: every mesh is drawn, framed on them all.
+Every break fails at least one test. Worth knowing: uploading base colour linear is caught only by the equality test; the marker's class samples still pass it.
+
+**Known, not fixed here:**
+- `render`'s `mesh` argument does not frame on the named mesh: every mesh is drawn, framed on them all (the `mesh` frame shows both cubes). Not T-78's.
+- The `back` render in the argument-family test only checks it succeeds: the marker face is not in sight from `back`. `labels`, `views` and `mesh` are checked by the marker samples only where the face is in sight.
+- An unmapped textured face samples (0, 0), where four texels meet under Repeat, so with the marker it is a blend of all four quadrants, not red. The game does the same; the equality test counts drawn pixels instead.
+- White under the sky is bluish, about `(221, 233, 252)`, so the tests' class rule takes "white" first, when every channel is at least T, before channel order.
+- With Repeat and linear filtering a textured face's edges pick up a thin line of the texture's opposite edge (visible on the marker frames).
+
