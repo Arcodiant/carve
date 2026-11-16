@@ -4,7 +4,7 @@ description: >-
 ---
 # T-77 — Sample textures
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
