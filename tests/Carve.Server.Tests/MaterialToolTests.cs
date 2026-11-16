@@ -279,4 +279,17 @@ public class MaterialToolTests : FileToolTests
         Ok(await carve.CallToolAsync("open", """{"path":"piece.carve","mesh":"mesh"}"""));
         Assert.Equal(["red", "unused"], Body(Ok(await carve.CallToolAsync("get_mesh", "{}"))).GetProperty("materials").EnumerateArray().Select(m => m.GetProperty("name").GetString()!));
     }
+
+    [Fact]
+    public async Task An_emissive_texture_turns_the_default_emissive_white_unless_a_colour_is_given()
+    {
+        Texture("glow.png");
+        var (carve, _) = await StartAsync();
+        using var scope = carve;
+        string Emissive(string json) => Body(json).GetProperty("material").GetProperty("emissive").GetString()!;
+        Assert.Equal("#FFFFFF", Emissive(Ok(await carve.CallToolAsync("define_material", """{"name":"a","emissive_texture":"glow.png"}"""))));
+        Assert.Equal("#000000", Emissive(Ok(await carve.CallToolAsync("define_material", """{"name":"b","emissive":"#000000","emissive_texture":"glow.png"}"""))));
+        Assert.Equal("#102030", Emissive(Ok(await carve.CallToolAsync("define_material", """{"name":"c","emissive":"#102030","emissive_texture":"glow.png"}"""))));
+        Assert.Equal("#000000", Emissive(Ok(await carve.CallToolAsync("define_material", """{"name":"d"}"""))));
+    }
 }

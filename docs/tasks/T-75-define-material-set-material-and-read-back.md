@@ -91,6 +91,7 @@ An agent gives faces materials through MCP: it defines a named material from PNG
 - In `check`, the material warning for a textured face with no UVs replaces the generic unmapped-face warning on that face: one warning per face.
 - `save mesh=` writes only the materials that mesh uses; `open mesh=` refuses a same-named material defined differently; a texture with no relative path from the save folder refuses the save (all three in T-74's Rulings).
 - Occlusion strength set without an occlusion map has no effect (glTF scales only the map); render and export ignore it, and `define_material` or `check` warns that it has no effect (the person, 2026-11-16, from T-78's research).
+- `define_material` sets the emissive colour to #FFFFFF when an emissive texture is given and no emissive colour is set (in glTF the glow is emissive colour times emissive texture, so black never glows); an explicitly given colour still wins (the person, 2026-11-16, from T-76's work).
 
 ### As built (2026-11-16, Claude Sonnet 5.5)
 
@@ -112,6 +113,8 @@ The Scope with the Rulings. Differences are called out.
 - `check` gives `ok:false` for either, as it does for any warning.
 
 **`merge_faces` wording** (`FaceMerge.ColourWarnings`): colours only is as before, byte for byte. When either face has a material: `faces[1]: merged with material 'wood', and the merged face keeps faces[0]'s look, no colour or material` (looks are `material 'x'`, `colour #RRGGBB` or `no colour or material`), and two faces with the same material and colour do not warn. The tool description says so.
+
+**Emissive ruling.** Built as ruled: `emissive_texture` with no `emissive` stores `#FFFFFF`, shown in the result; the description says so. Test: `An_emissive_texture_turns_the_default_emissive_white_unless_a_colour_is_given`.
 
 **Differences from the Scope.**
 
