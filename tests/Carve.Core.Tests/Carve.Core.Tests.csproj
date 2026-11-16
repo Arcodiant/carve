@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
+    <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
     <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
     <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
   </ItemGroup>
@@ -15,6 +16,8 @@
     <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
     <!-- GatehouseGeometry works the gatehouse's pixel checks with the scenario's own camera, ray test and plan (T-69). -->
     <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+    <!-- The sample textures: the committed PNGs are checked against the generator (T-77). -->
+    <ProjectReference Include="../../tools/Carve.SampleTextures/Carve.SampleTextures.csproj" />
   </ItemGroup>
 
   <ItemGroup>
