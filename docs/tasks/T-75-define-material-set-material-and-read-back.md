@@ -90,3 +90,4 @@ An agent gives faces materials through MCP: it defines a named material from PNG
 - `merge_faces`' warning names a face's material rather than saying "colour none".
 - In `check`, the material warning for a textured face with no UVs replaces the generic unmapped-face warning on that face: one warning per face.
 - `save mesh=` writes only the materials that mesh uses; `open mesh=` refuses a same-named material defined differently; a texture with no relative path from the save folder refuses the save (all three in T-74's Rulings).
+- Occlusion strength set without an occlusion map has no effect (glTF scales only the map); render and export ignore it, and `define_material` or `check` warns that it has no effect (the person, 2026-11-16, from T-78's research).

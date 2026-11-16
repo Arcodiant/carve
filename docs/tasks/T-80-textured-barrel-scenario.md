@@ -90,3 +90,35 @@ The whole of M-7 through the real tools on the real `carve`: the barrel textured
   - report a long `verify` wait;
   - evidence, frames and the break table in the milestone worktree's `artifacts/review/T-80/`, not this worktree's.
 - Run `finish` from inside the worktree and leave the folder.
+
+### Checked against landed code (2026-11-16)
+
+Checked against the barrel spec, `UvProjection.Cylindrical` and T-78's plan. The pixel checks use T-78's shared rules P1 to P7.
+
+- **The side UVs fill only a band of v.** `cylindrical` into `[0, 0, 1, 1]` keeps aspect: the circumference is 2π × 0.38 = 2.39 m against a height of 1 m, so the scale is 0.419. u runs 0 to 1, but v runs only from 0.291 to 0.709, centred:
+  - top hoop row, faces 24 to 31: v 0.291 to 0.332, about 11 texels tall;
+  - stave rows: about 43 texels each;
+  - bottom hoop row, faces 0 to 7: v 0.668 to 0.709.
+
+  Column `k = 6` is u 0.5 to 0.625. The sampling has to use these numbers. T-77's rune test already works the glyph out from the same projection.
+- **Stave gaps lie on polygon edges.** The gaps are at u = k/8, exactly the face boundaries, where MSAA mixes neighbours and the edge clearance (rule P2) excludes pixels. A gap sample is only possible where a gap is wider on screen than the clearance plus one pixel. At `front`, 512, the most head-on columns get about 3 to 4 px per texel, which is tight. Plan the gap check on `barrel-hoop-close` or a head-on column, and work it out first.
+- **"Clean iron lighter than rust" will probably fail.**
+  - Clean iron is metallic 1, so its reflectance is its base colour, which T-77 makes dark iron grey. It reflects the sky dimly.
+  - Rust is a rough, orange dielectric, lit diffusely by the sun, the ambient and the sky.
+
+  Ruled (below): the brightness comparison is replaced by
+  - rust and clean iron told apart by hue (rule P3: rust R > G > B by margin, clean iron near-neutral);
+  - clean iron "lit, not near-black" (rule P3's threshold T), which the break "sky removed" fails.
+- **Clipping and sky tint.** Carve's frames have no tonemap and clamp at readback, so the rune clips to R = 255; rule P4 allows for that. Material faces also take the sky's blue-zenith and warm-ground ambient, which colour faces do not.
+  - `barrel-mixed`'s colour faces will look flatter than their neighbours.
+  - Their interior pixels are checkable exactly by rule P1's locality: they equal the same faces in a render where only other faces differ.
+- **The sky is fixed.** By T-78's ruling 2 it is `ProceduralSky.Default`, baked once. No view waits for a rebake. "Frames 1 and 3 byte-identical after reopening" relies on T-78's history-independence check.
+- **Textures are mipmapped and trilinear** (ruling 1), so texels blend when minified. Rule P2's footprint (the larger of 2 texels and 3 s) decides where a class can be sampled. Small features such as the 2-texel stave gaps and rust specks will mostly need zoomed frames.
+- **Verify line.** `scenario-uvs` is already on it; only `scenario-materials` remains to add.
+
+### Rulings (2026-11-16, the person)
+
+1. **Mipmaps on.** Carve's render and the viewer load textures with `generateMipmaps: true` (trilinear). Rule P2's footprint is the larger of 2 texels and 3 s, where s is the mip-0 texels one screen pixel spans.
+2. **A fixed sky:** `ProceduralSky.Default`, sun included, baked once, with no rebake. The same sky is in the viewer with `--sky`.
+3. **The iron check.** Rust is told from clean iron by hue, plus a "not near-black" check on clean iron, which fails when the sky is removed. This replaces "a clean iron texel lighter than a rust texel's metal response". The threshold is P3's T, from T-78's probe step 2d.
+4. **P1 to P7 are accepted** (T-78's Plan), with P2 widened as in ruling 1.

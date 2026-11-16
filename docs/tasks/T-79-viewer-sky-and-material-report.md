@@ -51,3 +51,20 @@ The game stand-in lights a model as Carve's render does when asked, and reports 
   - report a long `verify` wait;
   - evidence in the milestone worktree's `artifacts/review/T-79/`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### Checked against landed code (2026-11-16)
+
+The Scope holds, with these details:
+
+- **`--sky` is a new kind of argument.** `ViewerOptions` throws on any `--` word other than `--Empyrean:*` and its four valued options, and it expects a value after each of those. `--sky` has no value. `run-viewer.ps1` already passes a `--` word through, but only inside its view list.
+- **The sky is the same fixed sky as Carve's.** Under ruling 2, `RenderSky.Sky` is `ProceduralSky.Default` with its own sun, and it uses engine types only. The viewer adds it unchanged and does not point it at `ViewerLook.ToSun`. The viewer's `DirectionalLight` stays where it is. The sky's specular probe is baked once, on the first frame, with no rebake. This replaces the Scope's "with the sun along the viewer's own sun".
+- **The viewer must load with mipmaps on.** `LoadModel(ContentPath)` today defaults `generateMipmaps` to false, which gives nearest sampling with no mips (`PixelArt`). Under ruling 1 the viewer calls `LoadModel(path, generateMipmaps: true)`.
+  - That changes how textured models draw, so check that `viewer-cube` and the export scenario's viewer frames are still byte-identical. Their models have no textures, so they should be. If any frame changes, stop.
+- **`Texture` exposes `Width`, `Height` and `Format`,** so each slot's size can be reported, and its colour space too if wanted.
+- **The viewer draws no sky.** `StandardHdr` composes no `SkyboxStage`, so `--sky` lights the model but draws no sky behind it.
+
+### Rulings (2026-11-16, the person)
+
+1. **Mipmaps on.** The viewer loads with `generateMipmaps: true`, as Carve's render and the equality test do. Export writes no sampler.
+2. **One fixed sky.** The viewer's `--sky` is T-78's sky: `ProceduralSky.Default` with its own sun direction, unchanged, baked once, with no rebake. It does not follow the viewer's sun.
+3. **Engine need 8 (D-1), Low.** The `.glb`'s glTF sampler does not decide sampling: 0.119.0 ignores it. Whoever loads a Carve `.glb` must pass `generateMipmaps: true` to get the mipmapped, trilinear textures Carve's render shows. Without it, the engine draws them nearest-sampled with no mips. Carve's render, the viewer and the tests pass the flag, and a game must pass it too.
