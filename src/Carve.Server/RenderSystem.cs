@@ -18,6 +18,7 @@ internal sealed class RenderSystem(
     IOffscreenRenderer renderer,
     IRenderTargetReadback readback,
     IImmediateSurfaceRegistry surfaces,
+    ITextureLoader textures,
     RenderComposition composition,
     RenderQueue queue,
     ModelStore store,
@@ -50,6 +51,14 @@ internal sealed class RenderSystem(
     private float[]? _weights;
     private Texture? _checker;
     private Material? _checkerMaterial;
+    private PbrMaterials? _pbr;
+    private IReadOnlyList<Carve.Core.Material> _materials = [];
+
+    /// <summary>The engine materials of the model's materials, made on the frame thread and held for the process (T-78).</summary>
+    private PbrMaterials Pbr => _pbr ??= new PbrMaterials(resources, textures);
+
+    /// <summary>The model's materials, for the faces of the next mesh shown that use one (T-78).</summary>
+    public void ShowMaterials(IReadOnlyList<Carve.Core.Material> materials) => _materials = materials;
 
     private LookHolder<Mesh> Looks => _looks ??= new LookHolder<Mesh>(this);
 
@@ -97,21 +106,7 @@ internal sealed class RenderSystem(
     {
         scenes.CreateScene(Scene);
 
-        var ambient = scenes.CreateEntity(Scene);
-        entities.AddComponent(ambient, new AmbientLight { Color = Vector3.One, Intensity = 0.25f });
-
-        // The fixed sky (T-78): it lights PBR material faces only, baked once, and is never drawn.
-        var sky = scenes.CreateEntity(Scene);
-        entities.AddComponent(sky, RenderSky.Sky);
-
-        _light = scenes.CreateEntity(Scene);
-        entities.AddComponent(_light, new DirectionalLight { Color = Vector3.One, Intensity = 0.9f });
-        entities.AddComponent(_light, new Transform3D
-        {
-            Position = Vector3.Zero,
-            Scale = Vector3.One,
-            Orientation = ViewFraming.LightOrientation(RenderView.Front),
-        });
+        _light = RenderLights.Add(scenes, entities, Scene);
 
         // The near and far here are placeholders: each view sets the whole projection by hand,
         // because the headless host does not apply a camera's projection.
@@ -173,11 +168,14 @@ internal sealed class RenderSystem(
             _nextMaterial = CheckerMaterial;
             data = MeshBridge.ToMeshData(mesh, space, uvs);
         }
-        else if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 })
+        else if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 } or { Materials.Count: > 0 })
         {
-            data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours);
-            _nextSubmeshMaterials = colours
-                .Select(c => Material.LitMesh(c is null ? Surface : FaceStyle.ToLinear(c))).ToArray();
+            // A material face is the engine's PBR material the game's loader makes of it (T-78), a colour face LitMesh as ever.
+            data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours, out var materials);
+            _nextSubmeshMaterials = colours.Zip(materials, (c, m) => m is not null
+                    ? Pbr.Of(_materials.FirstOrDefault(d => d.Name == m) ?? throw new InvalidOperationException($"a face uses the material '{m}', which is not defined"))
+                    : Material.LitMesh(c is null ? Surface : FaceStyle.ToLinear(c)))
+                .ToArray();
         }
         else
         {
