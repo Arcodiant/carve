@@ -26,9 +26,12 @@ internal static class MaterialsSpec
         ["staves-base.png", "staves-normal.png", "staves-occlusion.png", "iron-base.png", "iron-mr.png", "end-grain-base.png", "end-grain-normal.png", "rune-emissive.png"];
 
     public static readonly int[] Hoops = [.. Enumerable.Range(0, 8), .. Enumerable.Range(24, 8)];
-    public static readonly int[] Rune = [14, 22];
+    /// <summary>The break table's switch (T-80): <c>vflip</c>, <c>rune-column</c>, <c>metallic</c> or <c>mirror</c> make the scenario wrong on purpose, and it must then fail; unset it is the scenario.</summary>
+    public static readonly string? Break = Environment.GetEnvironmentVariable("CARVE_MATERIALS_BREAK") is { Length: > 0 } b ? b : null;
+
+    public static readonly int[] Rune = Break == "rune-column" ? [13, 21] : [14, 22];
     public static readonly int[] Coloured = [15, 23];
-    public static readonly int[] Staves = [.. Enumerable.Range(8, 16).Where(f => f != 14 && f != 22)];
+    public static readonly int[] Staves = [.. Enumerable.Range(8, 16).Where(f => !Rune.Contains(f))];
     public static readonly int[] Caps = [32, 33];
 
     /// <summary>The four <c>define_material</c> calls, texture paths in <paramref name="textures"/>.</summary>
@@ -37,7 +40,9 @@ internal static class MaterialsSpec
         string T(string file) => Path.Combine(textures, file);
         return
         [
-            ("staves", new { name = "staves", base_colour_texture = T("staves-base.png"), normal_texture = T("staves-normal.png"), occlusion_texture = T("staves-occlusion.png") }),
+            ("staves", Break == "metallic"
+                ? new { name = "staves", base_colour_texture = T("staves-base.png"), normal_texture = T("staves-normal.png"), occlusion_texture = T("staves-occlusion.png"), metallic = (double?)1.0 }
+                : new { name = "staves", base_colour_texture = T("staves-base.png"), normal_texture = T("staves-normal.png"), occlusion_texture = T("staves-occlusion.png"), metallic = (double?)null }),
             ("iron", new { name = "iron", base_colour_texture = T("iron-base.png"), metallic_roughness_texture = T("iron-mr.png"), metallic = 1.0, roughness = 1.0 }),
             ("end-grain", new { name = "end-grain", base_colour_texture = T("end-grain-base.png"), normal_texture = T("end-grain-normal.png") }),
             ("rune-stave", new { name = "rune-stave", base_colour_texture = T("staves-base.png"), normal_texture = T("staves-normal.png"), occlusion_texture = T("staves-occlusion.png"), emissive_texture = T("rune-emissive.png"), emissive = "#FF8020" }),
@@ -62,12 +67,13 @@ public sealed class MaterialsScenario : IScenario
         var textures = Path.Combine(driver.RunFolder, "textures");
         Directory.CreateDirectory(textures);
         foreach (var file in MaterialsSpec.Textures) File.Copy(Path.Combine(here, "textures", file), Path.Combine(textures, file), true);
+        if (MaterialsSpec.Break == "vflip") FlipV(textures, "rune-emissive.png", "iron-mr.png");
 
         // 1. The barrel, its UVs and its materials.
         await CallJsonAsync(driver, "open", new { path = Path.Combine(here, "barrel.carve") });
         await CallJsonAsync(driver, "project_uvs", new { method = "cylindrical", faces = Enumerable.Range(0, 32).ToArray(), into = new[] { 0, 0, 1, 1 } });
-        await CallJsonAsync(driver, "project_uvs", new { method = "planar", view = "+y", faces = new[] { 33 }, into = new[] { 0, 0, 1, 1 } });
-        await CallJsonAsync(driver, "project_uvs", new { method = "planar", view = "-y", faces = new[] { 32 }, into = new[] { 0, 0, 1, 1 } });
+        await CallJsonAsync(driver, "project_uvs", new { method = "planar", view = "+y", faces = new[] { 33 }, into = new[] { 0f, 0f, 0.5f, 1f } });
+        await CallJsonAsync(driver, "project_uvs", new { method = "planar", view = "-y", faces = new[] { 32 }, into = new[] { 0.5f, 0f, 1f, 1f } });
         foreach (var (name, args) in MaterialsSpec.Materials(textures))
         {
             var defined = await CallJsonAsync(driver, "define_material", args);
@@ -96,7 +102,7 @@ public sealed class MaterialsScenario : IScenario
 
         // 2. Frames 1 to 3: front, back, top.
         var front = await CaptureAsync(driver, frames, "barrel-front", new { view = "front", size = Size, mode = "shaded" });
-        var frontShot = new Shot(faces, min, max, Front, Size);
+        var frontShot = new Shot(faces, min, max, MaterialsSpec.Break == "mirror" ? new Vector3(-Front.X, Front.Y, Front.Z) : Front, Size);
         var frontPool = new Pool(driver, front, frontShot, "front", materials, none);
         frontPool.RuneGlows();
         frontPool.IronAndRust();
@@ -200,6 +206,19 @@ public sealed class MaterialsScenario : IScenario
         File.WriteAllLines(Path.Combine(driver.RunFolder, "pixel-samples.txt"), Pool.Log);
     }
 
+    /// <summary>The break table's "uploaded v-flipped": these textures are rewritten with their rows reversed.</summary>
+    private static void FlipV(string folder, params string[] files)
+    {
+        var all = Carve.SampleTextures.TextureSet.Build().ToDictionary(t => t.Name, t => t.Rgba);
+        foreach (var file in files)
+        {
+            var (rgba, n) = (all[file], Carve.SampleTextures.TextureSet.Size);
+            var flipped = new byte[rgba.Length];
+            for (var y = 0; y < n; y++) Array.Copy(rgba, y * n * 4, flipped, (n - 1 - y) * n * 4, n * 4);
+            File.WriteAllBytes(Path.Combine(folder, file), Carve.SampleTextures.Png.Encode(flipped, n, n));
+        }
+    }
+
     private static async Task<ScenarioFrame> CaptureAsync(ScenarioDriver driver, Dictionary<string, ScenarioFrame> frames, string name, object args) => frames[name] = await driver.CaptureAsync(name, args);
 
     private static Dictionary<int, string> FaceMaterials(ScenarioDriver driver, SceneMesh mesh)
@@ -230,8 +249,11 @@ public sealed class MaterialsScenario : IScenario
         float[] got = [uv.Min(p => p.X), uv.Min(p => p.Y), uv.Max(p => p.X), uv.Max(p => p.Y)];
         double[] want = [u0, v0, u1, v1];
         if (got.Zip(want).Any(p => Math.Abs(p.First - p.Second) > 0.0002)) driver.Fail($"the rune faces' UV rectangle is [{string.Join(", ", got)}], the rune texture's is [{string.Join(", ", want)}]");
-        var centre = barrel.Uvs[33].Aggregate(Vector2.Zero, (s, p) => s + p) / barrel.Uvs[33].Length * Shot.TextureSize;
-        if (Vector2.Distance(centre, new Vector2(128, 128)) > 1) driver.Fail($"face 33's centre has UV texel {centre}, not the rings' centre (128, 128)");
+        foreach (var (face, want128) in new[] { (33, new Vector2(64, 128)), (32, new Vector2(192, 128)) })
+        {
+            var centre = barrel.Uvs[face].Aggregate(Vector2.Zero, (s, p) => s + p) / barrel.Uvs[face].Length * Shot.TextureSize;
+            if (Vector2.Distance(centre, want128) > 1) driver.Fail($"face {face}'s centre has UV texel {centre}, not its disc's centre {want128}");
+        }
     }
 
     /// <summary>

@@ -36,7 +36,7 @@ The barrel's textures, the content of this milestone's mechanic, exist as commit
   | `staves-occlusion.png` | linear, R | 255, falling to about 140 at the stave gaps |
   | `iron-base.png` | sRGB | light iron grey with rust-orange patches from a hash-noise mask |
   | `iron-mr.png` | linear | from the same mask: clean is G (roughness) 0.35 and B (metallic) 1; rust is G 0.9 and B 0 |
-  | `end-grain-base.png` | sRGB | growth rings round the centre (128, 128) |
+  | `end-grain-base.png` | sRGB | two discs of growth rings, centres (64, 128) and (192, 128) |
   | `end-grain-normal.png` | linear | the rings as slight ridges |
   | `rune-emissive.png` | sRGB | black, with one white rune glyph of simple strokes, placed where faces 14 and 22 fall (below) |
 
@@ -44,7 +44,7 @@ The barrel's textures, the content of this milestone's mechanic, exist as commit
   - The side faces 0 to 31 get `project_uvs` `cylindrical` with the defaults (axis +Y, seam at -Z, through vertices 2, 10, 18, 26 and 34), into `[0, 0, 1, 1]`.
   - So each of the 8 side columns is 1/8 of u, which is why the staves are 1/8 wide. The hoop rows (faces 0 to 7, y 0 to 0.1, and faces 24 to 31, y 0.9 to 1.0) are bands of v.
   - The rune glyph sits inside the u and v rectangle of faces 14 and 22, column `k = 6` (vertex angles 270° to 315°, facing +Z and +X, toward `front`'s eye at (1.6, 1.2, 2.2)). Work that rectangle out from T-55's landed rule for the direction u rises from the seam, and the v rule.
-  - The caps get `planar` from `+y` (face 33, the top) and from `-y` (face 32, the bottom), each into `[0, 0, 1, 1]`, so the rings are centred.
+  - The caps get `planar` from `+y` (face 33, the top) and from `-y` (face 32, the bottom), into `[0, 0, 0.5, 1]` and `[0.5, 0, 1, 1]` respectively (T-80; was `[0, 0, 1, 1]` for both), so each disc is centred in its half.
 - **Tests (`unit`):**
   - The committed PNGs decode to exactly the generator's pixels, compared by pixel, not by file bytes, since a compressor may change between runtimes.
   - The rune's rectangle equals the UV bounds of faces 14 and 22 under `project_uvs` `cylindrical` on `TestMeshes.Barrel()`, through the Core's projection. If the glyph is moved by hand, this test fails.
@@ -89,13 +89,13 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`), one agent, 2026-11-16, on `tas
 | `staves-occlusion.png` | linear | R = occlusion (255 down to 140 at the gap); G and B equal R |
 | `iron-base.png` | sRGB | light grey (~210, 214, 222; was ~58, 61, 66 until T-80 lightened it so clean iron reads lit under the sky) with rust (~176, 84, 34) |
 | `iron-mr.png` | linear | R 255 (unused), G roughness (0.35 clean to 0.9 rust), B metallic (1 clean to 0 rust), from the same mask |
-| `end-grain-base.png` | sRGB | rings round (128, 128), period 9 texels, wobbled |
+| `end-grain-base.png` | sRGB | two discs, centres (64, 128) (top cap, left half) and (192, 128) (bottom cap, right half), period 9 texels, wobbled, a different wobble seed in each (T-80 changed this from one disc at (128, 128), so the caps' UVs no longer overlap) |
 | `end-grain-normal.png` | linear | ring ridges, tilt up to about 0.18 / 0.42 |
 | `rune-emissive.png` | sRGB | black, white Fehu-like glyph (stem and two arms) |
 
 **Surprise for T-80:** `cylindrical` keeps aspect, so the barrel's side (arc length at mean radius 0.38 m, height 1 m) fills the full width of u but only the middle 0.4188 of v (v 0.2906 to 0.7094), centred; one texel is about 9.3 mm both ways. The Scope's hoop "bands of v" are therefore thin: top hoop (faces 24 to 31) rows 74 to 85, bottom hoop (faces 0 to 7) rows 171 to 182. Rust noise is stretched along u so patches show in those bands; the rest of each texture is unused by the side.
 
-**Rune UV rectangle** (u0, v0, u1, v1) = (0.5, 0.3325, 0.625, 0.6675), texels x 128..160, y 85..171 (stave 4, column k = 6). `TextureSet.RuneRect` holds it; the test works it from the Core. Caps: `planar` +y / -y into [0,0,1,1], end grain centred at (128, 128).
+**Rune UV rectangle** (u0, v0, u1, v1) = (0.5, 0.3325, 0.625, 0.6675), texels x 128..160, y 85..171 (stave 4, column k = 6). `TextureSet.RuneRect` holds it; the test works it from the Core. Caps: `planar` +y into [0,0,0.5,1] (face 33) and -y into [0.5,0,1,1] (face 32), each disc centred in its half (planar keeps aspect, so each uses a 0.5 x 0.5 square, v 0.25 to 0.75).
 
 **Quantising:** iron and end-grain colours are rounded to steps of 6 to 8 so each PNG stays under 64 KB (unquantised they were 65 to 93 KB).
 
