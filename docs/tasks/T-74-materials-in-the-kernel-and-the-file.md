@@ -4,7 +4,7 @@ description: >-
 ---
 # T-74 — Materials in the kernel and the file
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
