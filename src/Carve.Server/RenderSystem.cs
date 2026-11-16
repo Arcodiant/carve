@@ -2,6 +2,8 @@ using System.Numerics;
 using Carve.Core;
 using Empyrean;
 using Microsoft.Extensions.Logging;
+// Carve.Core has its own Material (T-74); the render one is the engine's.
+using Material = Empyrean.Material;
 
 namespace Carve.Server;
 
