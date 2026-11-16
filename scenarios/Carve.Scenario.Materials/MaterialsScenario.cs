@@ -134,7 +134,7 @@ public sealed class MaterialsScenario : IScenario
             var tile = new Pool(driver, sheet, shot, $"sheet tile {views[k].View}", materials, none);
             switch (views[k].View)
             {
-                case "front": tile.RuneGlows(); tile.IronAndRust(); break;
+                case "front": tile.RuneGlows(3); tile.IronAndRust(); break;
                 case "back": tile.NoRune(); tile.IronAndRust(); break;
                 case "+y": tile.Rings(); break;
                 default: tile.Wood(); tile.IronAndRust(); break;
@@ -146,7 +146,7 @@ public sealed class MaterialsScenario : IScenario
         {
             var frame = await CaptureAsync(driver, frames, $"barrel-front-{size}", new { view = "front", size, mode = "shaded" });
             var pool = new Pool(driver, frame, new Shot(faces, min, max, Front, size), $"front {size}", materials, none);
-            pool.RuneGlows();
+            pool.RuneGlows(size < 512 ? 3 : 8);
             pool.IronAndRust();
             pool.Wood();
         }
