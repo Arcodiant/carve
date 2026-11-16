@@ -123,6 +123,12 @@ Checked against the barrel spec, `UvProjection.Cylindrical` and T-78's plan. The
 3. **The iron check.** Rust is told from clean iron by hue, plus a "not near-black" check on clean iron, which fails when the sky is removed. This replaces "a clean iron texel lighter than a rust texel's metal response". The threshold is P3's T, from T-78's probe step 2d.
 4. **P1 to P7 are accepted** (T-78's Plan), with P2 widened as in ruling 1.
 
+5. **Hand-off questions ruled (2026-11-16, the person).**
+   - `check` skips a cross-material overlap: no "UVs overlap" for a pair of faces that both have a material when the materials differ. Same material, or a colour-only or uncoloured face, warns as before. The textured barrel's `check` gives no warning, asserted.
+   - Lighten the iron: T-77's generator makes clean iron about (210, 214, 222), so it reads above T = 80 under the sky (margin measured in the run); the "not near-black" check fails with the sky removed. Rust and `iron-mr.png` unchanged. The person approved the new `iron-base.png` beside the old.
+   - Drop the stave-gap check; keep "stave middle (6 or more texels from a gap) is lit and warm".
+   - Small detail: at `barrel-top` check only "pale ring: lit and warm"; at 256 px check the rune with as many P2 samples as exist (at least 3, one a flip or mirror would change). Anything under P6's floor of 8 goes in As built, for the person's frame review.
+
 ### Hand-off (2026-11-16, Claude Sonnet 5.5, `claude-sonnet-5-5`, agent 1)
 
 **Stopped on three rules the Scope, Notes and Rulings do not settle. Nothing was loosened; the scenario fails at the first of them, as the spec is written.** About 45 tool calls, no image opened.

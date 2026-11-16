@@ -106,6 +106,29 @@ public class MeshUvHealthTests
         Assert.Empty(UvWarnings(under));
     }
 
+    private const string OverlapWarning = "faces[0]: UVs overlap faces[1], so the two faces show the same texels; mirrored halves sharing a texture area are deliberate and still warned of";
+
+    private static PolygonMesh Overlapping(Func<FaceStyle, FaceStyle> style)
+        => Mapped((0, Unflipped(0, 0, 1, 1)), (1, Unflipped(0, 0, 1, 1))).WithStyle(style(FaceStyle.None));
+
+    // T-80: faces with different materials sample different textures, so sharing a UV area is no fault.
+    [Fact]
+    public void An_overlap_between_two_different_materials_is_not_warned_of()
+        => Assert.Empty(UvWarnings(Overlapping(s => s.WithMaterial([0], "wood").WithMaterial([1], "iron"))));
+
+    [Fact]
+    public void An_overlap_within_one_material_is_still_warned_of()
+        => Assert.Equal([OverlapWarning], UvWarnings(Overlapping(s => s.WithMaterial([0, 1], "wood"))));
+
+    [Fact]
+    public void An_overlap_with_a_colour_only_or_uncoloured_face_is_still_warned_of()
+    {
+        Assert.Equal([OverlapWarning], UvWarnings(Overlapping(s => s.WithMaterial([0], "wood").WithColour([1], "#C8503C"))));
+        Assert.Equal([OverlapWarning], UvWarnings(Overlapping(s => s.WithMaterial([0], "wood"))));
+        Assert.Equal([OverlapWarning], UvWarnings(Overlapping(s => s.WithColour([0, 1], "#C8503C"))));
+        Assert.Equal([OverlapWarning], UvWarnings(Overlapping(s => s)));
+    }
+
     [Fact]
     public void Mirrored_halves_on_the_same_area_overlap_and_the_pair_is_listed_once()
     {
