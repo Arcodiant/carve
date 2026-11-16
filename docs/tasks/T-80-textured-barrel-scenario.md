@@ -4,7 +4,7 @@ description: >-
 ---
 # T-80 — Textured barrel scenario
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
