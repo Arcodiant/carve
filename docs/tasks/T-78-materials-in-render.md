@@ -193,3 +193,56 @@ These override the Scope and the Plan where they differ.
 5. **The equality test** runs in an in-process engine host in the tests now, plus a check that the harness's frame equals the real `render`'s.
 6. **T-80's iron:** rust is told from iron by hue, plus a "not near-black" check that fails without the sky. This is T-80's, and it uses P3's threshold T from probe step 2d.
 7. **P1 to P7 are accepted,** with P2 widened as in ruling 1.
+
+### As built (2026-11-16, Claude Opus 5.5, agent 1)
+
+**The probe** (`%TEMP%\t78\probe`, not in the repo). A headless host built as `Program.cs` builds it (`AddEmpyreanCore`, `AddEmpyreanGraphicsHeadlessCore`, `UseRenderPipeline<RenderComposition>`, the same fixed-step settings), compiling the product's own `RenderComposition.cs`, `ViewFraming.cs` and `MeshBridge.cs` by link, with a system that builds the scene exactly as `RenderSystem.BuildScene` does (ambient 0.25, directional 0.9 turned by `frame.LightOrientation`, one tagged camera per size) and, like `RenderPump`, applies a view in one update and renders and reads back the 512 target in the next. The mesh is Carve's unit cube through `MeshBridge.ToMeshData` with probe box UVs. Raw readback hashed (first 16 hex of SHA-256), pixels after `ToDecodedImage`.
+
+- **Step 1, `Material.Pbr` with `CreateTexture` textures draws on Carve's pipeline: passes.** A 64 x 64 four-quadrant base colour (`Rgba8Srgb`) drew its quadrants (front face centre `[8,168,8]` sky off, the green quadrant); all five slots at once (base and emissive `Rgba8Srgb`, metallic-roughness, normal and occlusion `Rgba8Unorm`) drew with no error, the emissive orange glowing at `[255,205,32]` (sky off). No engine need.
+- **Step 1b, highlight colours multiply into `Pbr`: passes.** The shaded look's orange vertex colour `(255,115,13)` on a matte white Pbr face: `[152,152,152]` becomes `[152,105,34]` (sky off), `[201,211,229]` becomes `[201,147,56]` (sky on); on metal `[145,147,150]` becomes `[145,101,33]`. The colour multiplies as it does on `LitMesh`.
+- **Step 2e, a mipmapped trilinear texture draws: passes.** `CreateTexture(..., sampler: new SamplerDescription(Linear, Linear, Linear, Repeat, Repeat, Repeat, 1, NoLodClamp, 0, 0), generateMipmaps: true)` gives `MipLevels` 7 at 64 and 5 at 16, `IsReady` true, and draws.
+- **Step 2 and 2d, the sky lights metal: passes.** Metallic 1, roughness 0.35, base `(0.8,0.8,0.8)`, front face of the cube from `front`, 8-bit sRGB after encode:
+
+  | sample | sky off | sky on |
+  |---|---|---|
+  | front face centre (256,256) | `[11,11,11]` | `[145,147,150]` |
+  | (200,300) | `[10,10,10]` | `[142,143,145]` |
+  | (320,300), the right face | `[9,9,9]` | `[138,139,141]` |
+  | (256,180), the top face | `[17,17,17]` | `[129,152,186]` |
+
+  **P3's T = 80**, halfway between the front-face centre's max channel without the sky (11) and with it (150), rounded down. A matte white Pbr face (metallic 0, roughness 1) goes from `[152,152,152]` to `[201,211,229]` with the sky, brighter and bluer, as the Plan says (the sky's SH ambient reaches Pbr, not `Lit`).
+- **Step 2c, history: passes.** With the sky, `front`, `back`, `front` of the metal cube gave `F96FDD846B09FFA8`, `7423595A78454391`, `F96FDD846B09FFA8`, and `back` first in a fresh process gave `7423595A78454391`. Without the sky the same held (`7D32E40BF67C01F0`, `CD620E0D2D81E6B3`, `7D32E40BF67C01F0`). **Found on the way:** a view applied and rendered in the *same* update renders with the previous view's light (the transform is published a loop iteration later); `RenderPump` already ends the step on a view change, so the product is not affected, but the equality-test host must do the same (apply, then render in a later update).
+- **`LitMesh` with and without the sky:** the same raw bytes in the probe (`C85BDF24D20C6168` at `front`), before the product guard below.
+
+**The sky** (`src/Carve.Server/RenderSky.cs`, `public static ProceduralSky Sky => ProceduralSky.Default;`, added on one entity in `RenderSystem.BuildScene` after the ambient light; nothing else changed). `ProceduralSky.Default` in 0.119.0, read in the probe:
+
+| field | value |
+|---|---|
+| `ZenithColor` | (0.18, 0.36, 0.72) |
+| `HorizonColor` | (0.7, 0.8, 0.92) |
+| `GroundColor` | (0.3, 0.28, 0.26) |
+| `HorizonSharpness` | 4 |
+| `SunDirection` | (0.30304578, 0.5050762, -0.80812204) |
+| `SunFromDirectionalLight` | false |
+| `SunAngularRadius`, `SunEdgeSoftness` | 0.0093, 0.3 |
+| `SunColor`, `SunIntensity` | (1, 0.95, 0.85), 20 |
+| `HaloStrength` / `HaloExponent` | 0.4 / 256 |
+| `GlowStrength` / `GlowExponent` | 0.15 / 8 |
+| `RenderLayerMask` | All |
+
+The sun is up and toward -Z, behind the model as `front` sees it, and fixed; Carve's directional light still turns with each view, and the sky reads none of it.
+
+**The guard (Agent 1's commit).** Every Verify suite run `--fresh` twice on this worktree (reason: T-78 baseline hashes, then the sky's guard): first at the milestone head after T-74 and T-76 merged (`5986ceb`, the sky change held outside the tree), then with the sky. All 12 passed both times. The SHA-256 of every PNG was taken: each scenario suite's frames from `cairn test artifacts <suite>`, and the PNGs `server-regression` writes under `artifacts/checker-tests`, `render-tests` and `uv-layout-tests` (cleared between the two runs so each set is that run's own). 310 PNGs (223 scenario frames, 87 test frames); **the two lists are identical**. The tables are `artifacts/review/T-78/hashes-before.tsv` and `hashes-after.tsv` in the task worktree (ignored), and copies stay in `%TEMP%\t78`. Not yet copied to the milestone worktree's `artifacts/review/T-78/`: a write there was refused to this agent, so the continuation or `finish` should carry them.
+
+### Hand-off (2026-11-16, Claude Opus 5.5, agent 1)
+
+**Done:** Agent 1's whole part. The probe (steps 1, 1b, 2, 2c, 2d, 2e) all pass; nothing to stop on, no engine need. `RenderSky.cs` and the one sky entity in `BuildScene` are committed; the guard shows every existing frame byte-identical (310 PNGs). P3's T = 80.
+
+**Left (Agent 2, commits 2 and 3):** `PbrMaterials.cs`, `MeshBridge.ToSubmeshedMeshData` keyed by colour or material (with corner UVs only when a live face has a material), passing the model's materials from `RenderPump.ShowMesh(ModelSnapshot)` to `RenderSystem`, the `Make` branch, the description, `PbrEqualityTests` (with the `RenderLights` factoring), the other tests and pixel rules, the guard again, then the person's frame review (a checkpoint: hand off before it).
+
+**Checked:** the probe numbers above; the guard. **Not checked:** the loader's actual `SamplerDescription` (the probe used the documented Linear/Linear/Linear, Repeat, anisotropy 1, `NoLodClamp`, 0, 0; `Texture` documents no sampler property, so the equality test may need another way to compare it, e.g. frames alone); no frame was opened.
+
+**Surprising:**
+- A view applied and rendered in one update renders with the *previous* view's light (the transform publishes a loop iteration later). `RenderPump` already ends the step on a view change. The equality-test host must apply, then render in a later update, or its frames will not match `render`'s.
+- The probe host at `%TEMP%\t78\probe` (csproj linking `RenderComposition.cs`, `ViewFraming.cs`, `MeshBridge.cs`, a stub `RenderSpec.DefaultSize`) is a working starting point for the equality test's in-process host.
+- Each scenario suite took seconds once it had the GPU; most of the wait was other projects holding the shared GPU slots (about 25 minutes for the baseline).
