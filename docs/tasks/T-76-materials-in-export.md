@@ -87,7 +87,7 @@ A model's materials reach the game inside the one `.glb`: every PBR field and te
 - A material may share a mesh's name. Skinned export renames the uncoloured primitive's material only when the names clash.
 - Export writes `TEXCOORD_0` whenever a material in use has a texture (faces without UVs get (0, 0) and are warned of already).
 
-### As built (draft, 2026-11-16, Claude Sonnet 5.5; verify, the regression test and finish are still to come, see Hand-off)
+### As built (2026-11-16, Claude Sonnet 5.5)
 
 **How a material is written** (`GlbExport.Material(Carve.Core.Material, Images)`, shared by static and skinned export), as read back by the engine's `ParsedMaterial`:
 
@@ -105,7 +105,7 @@ A model's materials reach the game inside the one `.glb`: every PBR field and te
 | `OcclusionTexture` | `occlusionTexture` | `OcclusionTexture.Bytes` |
 
 - Each texture is the PNG bytes held in `MaterialTexture.Png`, embedded unchanged; one image per distinct byte set (SharpGLTF writes identical images once, `Images` keys them by SHA-256 as well). The loader hands every reference to one image the same `Bytes` array. No `sampler`, no `alphaMode` or `alphaCutoff` (engine needs 7 and 8).
-- **An emissive texture shows only with a non-black `Emissive`**: the factor is left out when black (the Scope) and the loader then reads `EmissiveColor` as zero, so a texture with the default black emissive does not glow. T-75's `define_material` text should say so (this export's description does). Question for the person if that is not wanted: write a white factor when an emissive texture is set with black emissive.
+- **An emissive texture glows only with a non-black `Emissive`**: the factor is left out when black (the Scope). T-75's `define_material` sets the colour to white when an emissive texture is given and none is set (ruling, 2026-11-16), so export needs no change; the regression test reads a textured emissive material back with a non-zero `EmissiveColor`.
 - `TEXCOORD_0` is written whenever a face has UVs or any material in use (on a live face) has any texture; unmapped corners are (0, 0), as before. The UV of each corner is Carve's, unflipped.
 
 **Static file** (`GlbExport.Write(mesh, triangles, name, materials)`; the old overloads call it with no materials, so every existing byte is unchanged): primitives are today's colour primitives (`carve` first when any face has neither colour nor material, then `carve #RRGGBB` in order of first use), then one per material in order of first use by face, named for the material (the glTF material's name is the primitive's). `GlbExport.MaterialNames(mesh, materials)` lists them. `ExportTool` passes `model.Materials` and `Combined`.
@@ -126,10 +126,4 @@ A model's materials reach the game inside the one `.glb`: every PBR field and te
 | emissive factor always written | none: SharpGLTF omits an all-zero emissive factor itself |
 | skinned always renames the uncoloured primitive | A_material_named_like_a_mesh_renames_that_pieces_uncoloured_primitive_only_when_they_clash,A_skinned_model_writes_primitives_per_piece_and_a_material_shared_between_pieces_is_one_primitive |
 | TEXCOORD_0 only when a face has UVs | A_textured_material_writes_TEXCOORD_0_even_when_no_face_has_UVs_and_an_untextured_one_does_not |
- `MaterialExportToolTests.cs` (regression) is written against T-75's tool names and arguments (`define_material`, `set_material`).
-
-### Hand-off (Claude Sonnet 5.5, 2026-11-16)
-
-- **Done:** all the code (`GlbExport.cs`, `SkinnedExport.cs`, `ExportTool.cs` and description, `GameLimits.cs`), the 14 unit tests (pass; the whole `Tier=unit` Server suite passes), the byte-identical hashes, the mutation table. Code committed as `4aae6cd`.
-- **Left:** (1) `MaterialExportToolTests` (the real-`carve` regression test) calls `define_material` and `set_material`, which T-75 has not landed. It cannot pass until T-75 lands, and `open` still reads a `.carve` without its folder, so no existing tool can give carve a textured material. After T-75 lands: `git rebase origin/milestone/M-7`, check the test's argument names against T-75's (`faces`, `material`, `name`, `*_texture`, `double_sided`) and that `set_uvs` still takes that shape, then run it. (2) `cairn task T-76 verify` has not been run. (3) Finalise the As built, commit with the `Co-Authored-By` trailer, `cairn lint`, `finish`.
-- **Surprising:** the mesh builder merges two pieces' uses of one material into a single primitive (recorded above). The untracked `tests/Carve.Server.Tests/ZzHashHarness.cs` is a throwaway hash harness (env `HASH_OUT`, `HASH_ROOT`); delete it before the final commit.
+ `MaterialExportToolTests.cs` (regression, 1): through the real `carve`, `define_material`, `set_uvs`, `set_material` and `export` of a textured cube plus a glow material with only an emissive texture; the loader reads every field back, the texture bytes, a non-zero emissive factor, and the export line carries the per-material UV warning.
