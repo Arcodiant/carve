@@ -86,3 +86,50 @@ A model's materials reach the game inside the one `.glb`: every PBR field and te
 
 - A material may share a mesh's name. Skinned export renames the uncoloured primitive's material only when the names clash.
 - Export writes `TEXCOORD_0` whenever a material in use has a texture (faces without UVs get (0, 0) and are warned of already).
+
+### As built (draft, 2026-11-16, Claude Sonnet 5.5; verify, the regression test and finish are still to come, see Hand-off)
+
+**How a material is written** (`GlbExport.Material(Carve.Core.Material, Images)`, shared by static and skinned export), as read back by the engine's `ParsedMaterial`:
+
+| Carve field | glTF | `ParsedMaterial` |
+|---|---|---|
+| `BaseColour` | `pbrMetallicRoughness.baseColorFactor` = `FaceStyle.ToLinear(hex)`, alpha 1 | `BaseColor` (same Vector4) |
+| `Metallic`, `Roughness` | `metallicFactor`, `roughnessFactor`, always written | `Metallic`, `Roughness`; `Pbr` true |
+| `Emissive` | `emissiveFactor` = linear RGB, written only when not black | `EmissiveColor` (zero when absent) |
+| `Occlusion` | `occlusionTexture.strength`, written only with `OcclusionTexture` (without a map it is not written) | `Occlusion` (1 when no map) |
+| `DoubleSided` | `doubleSided` | `DoubleSided` |
+| `BaseColourTexture` | `pbrMetallicRoughness.baseColorTexture` | `TextureBytes` (flat) |
+| `MetallicRoughnessTexture` | `pbrMetallicRoughness.metallicRoughnessTexture` | `MetallicRoughnessTexture.Bytes` |
+| `NormalTexture` | `normalTexture` | `NormalTexture.Bytes` |
+| `EmissiveTexture` | `emissiveTexture` | `EmissiveTexture.Bytes` |
+| `OcclusionTexture` | `occlusionTexture` | `OcclusionTexture.Bytes` |
+
+- Each texture is the PNG bytes held in `MaterialTexture.Png`, embedded unchanged; one image per distinct byte set (SharpGLTF writes identical images once, `Images` keys them by SHA-256 as well). The loader hands every reference to one image the same `Bytes` array. No `sampler`, no `alphaMode` or `alphaCutoff` (engine needs 7 and 8).
+- **An emissive texture shows only with a non-black `Emissive`**: the factor is left out when black (the Scope) and the loader then reads `EmissiveColor` as zero, so a texture with the default black emissive does not glow. T-75's `define_material` text should say so (this export's description does). Question for the person if that is not wanted: write a white factor when an emissive texture is set with black emissive.
+- `TEXCOORD_0` is written whenever a face has UVs or any material in use (on a live face) has any texture; unmapped corners are (0, 0), as before. The UV of each corner is Carve's, unflipped.
+
+**Static file** (`GlbExport.Write(mesh, triangles, name, materials)`; the old overloads call it with no materials, so every existing byte is unchanged): primitives are today's colour primitives (`carve` first when any face has neither colour nor material, then `carve #RRGGBB` in order of first use), then one per material in order of first use by face, named for the material (the glTF material's name is the primitive's). `GlbExport.MaterialNames(mesh, materials)` lists them. `ExportTool` passes `model.Materials` and `Combined`.
+
+**Skinned file** (`SkinnedExport.Primitives(piece, taken)`): per piece, today's primitives (uncoloured and colours in order of first use), then the piece's materials in order of first use, named for the material. A material used by several pieces is one glTF material and one primitive, at the place of the first piece using it, holding every piece's faces of it (the mesh builder keeps one primitive per material). The uncoloured primitive's material is `<mesh>`, renamed `<mesh>:uncoloured` (with `_` added while a group of the piece or a colour hex has that name) only when a material in use anywhere in the model has the mesh's name; a material name holds no `:` so nothing else can clash. `SkinnedGlb.Materials` lists each glTF material once (in order written) and the new `SkinnedGlb.Primitives` is the submesh count that `GameLimits.Warnings` now takes (`ExportTool` passes it; with no materials it equals `Materials.Count`, as before). `SkinnedExport.Materials(piece)` still returns the colour primitives only.
+
+**Warnings.** `GlbExport.MaterialUvWarnings(model)`: `material 'wood' has a texture, but N faces using it have no UVs; their corners are written as (0, 0) (box faces 1, 2, ...)` (faces per mesh, the first five of each then `and K more`; `1 face ... its corners` for one), after the limit and UV warnings in both modes. The generic `UvWarnings` no longer names a face whose material has a texture (the same rule the person gave `check`: the material's warning replaces the generic one on that face); with no material every warning is as before. `GameLimits.Warnings`: unchanged text when no material is used; otherwise `N submeshes, M colours and K materials, above the game's max_submeshes X; share colours and materials between pieces where you can`. Clips mode writes no materials or images. The tool description is updated (materials, TEXCOORD_0, the `<mesh>:uncoloured` rule, a worked example).
+
+**Byte-identical guard.** A throwaway harness (not committed) exported the five committed samples (barrel, gatehouse, leaky-shed static; gardener and gardener-soft static, skinned and clips) before and after: the SHA-256 lists are identical. The scenario suites in Verify are the frame and committed-output check.
+
+**Tests.** `tests/Carve.Server.Tests/MaterialExportTests.cs` (unit, 14): primitive order and names, every field and texture through `IModelGeometryLoader.Parse`, defaults, shared texture once, no alpha/sampler/strength-without-map, TEXCOORD_0 rules, UV bits unflipped, warnings, skinned order, sharing and the name clash, clips, determinism, the limit warning. Each new check failing on a broken product (the table is also in the ignored `artifacts/review/T-76/mutation-table.md` of the task worktree):
+
+| Broken on purpose | Tests that failed |
+|---|---|
+| UV v flipped (1 - v) | Each_corners_UV_is_written_as_Carve_holds_it_so_a_texture_lands_unflipped |
+| metallic left at glTF's default | A_material_at_its_defaults_is_matte_white_single_sided_with_no_emissive_or_occlusion_written,Every_field_and_texture_is_read_back_by_the_engines_parser,A_skinned_model_writes_primitives_per_piece_and_a_material_shared_between_pieces_is_one_primitive |
+| a texture embedded once per use (my cache bypassed) | none: SharpGLTF writes identical image bytes once itself, so the test guards the output, not the cache |
+| emissive factor always written | none: SharpGLTF omits an all-zero emissive factor itself |
+| skinned always renames the uncoloured primitive | A_material_named_like_a_mesh_renames_that_pieces_uncoloured_primitive_only_when_they_clash,A_skinned_model_writes_primitives_per_piece_and_a_material_shared_between_pieces_is_one_primitive |
+| TEXCOORD_0 only when a face has UVs | A_textured_material_writes_TEXCOORD_0_even_when_no_face_has_UVs_and_an_untextured_one_does_not |
+ `MaterialExportToolTests.cs` (regression) is written against T-75's tool names and arguments (`define_material`, `set_material`).
+
+### Hand-off (Claude Sonnet 5.5, 2026-11-16)
+
+- **Done:** all the code (`GlbExport.cs`, `SkinnedExport.cs`, `ExportTool.cs` and description, `GameLimits.cs`), the 14 unit tests (pass; the whole `Tier=unit` Server suite passes), the byte-identical hashes, the mutation table. Code committed as `4aae6cd`.
+- **Left:** (1) `MaterialExportToolTests` (the real-`carve` regression test) calls `define_material` and `set_material`, which T-75 has not landed. It cannot pass until T-75 lands, and `open` still reads a `.carve` without its folder, so no existing tool can give carve a textured material. After T-75 lands: `git rebase origin/milestone/M-7`, check the test's argument names against T-75's (`faces`, `material`, `name`, `*_texture`, `double_sided`) and that `set_uvs` still takes that shape, then run it. (2) `cairn task T-76 verify` has not been run. (3) Finalise the As built, commit with the `Co-Authored-By` trailer, `cairn lint`, `finish`.
+- **Surprising:** the mesh builder merges two pieces' uses of one material into a single primitive (recorded above). The untracked `tests/Carve.Server.Tests/ZzHashHarness.cs` is a throwaway hash harness (env `HASH_OUT`, `HASH_ROOT`); delete it before the final commit.
