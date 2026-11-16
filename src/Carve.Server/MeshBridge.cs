@@ -63,27 +63,37 @@ public static class MeshBridge
 
     /// <summary>
     /// The same triangles and vertices as <see cref="ToMeshData"/>, with the index buffer cut into one submesh per colour
-    /// (D-6, Colour is a material): the uncoloured faces first when there are any, then each colour in the order its first
-    /// face appears. <paramref name="colours"/> is each submesh's colour as <c>#RRGGBB</c>, null for the uncoloured one.
-    /// Vertices stay in triangle order, so per-vertex data made for <see cref="ToMeshData"/> still lines up.
+    /// (D-6, Colour is a material) or material (M-7, T-78), in the export's primitive order so that submesh <c>i</c> is the
+    /// game's primitive <c>i</c>: the uncoloured faces first when there are any, then each colour in the order its first face
+    /// appears, then each material in the order its first face appears (a face has a colour or a material, not both).
+    /// <paramref name="colours"/> is each submesh's colour as <c>#RRGGBB</c>, null for the uncoloured one and for a material's;
+    /// <paramref name="materials"/> is each submesh's material name, null for a colour's. Vertices stay in triangle order, so
+    /// per-vertex data made for <see cref="ToMeshData"/> still lines up. Only when some face drawn has a material does the
+    /// vertex buffer carry UVs, each corner's own as the export writes it, (0, 0) on an unmapped face
+    /// (<see cref="LookMeshes.CornerUvs(PolygonMesh, Vector2)"/>); a mesh of colours only gets exactly the buffer it always had.
     /// </summary>
-    public static MeshData<PositionUvNormalVertex> ToSubmeshedMeshData(PolygonMesh mesh, DrawnSpace space, out string?[] colours)
+    public static MeshData<PositionUvNormalVertex> ToSubmeshedMeshData(
+        PolygonMesh mesh, DrawnSpace space, out string?[] colours, out string?[] materials)
     {
-        var plain = ToMeshData(mesh, space);
         var triangles = Shading.Triangles(mesh);
-        var keys = new List<string?>();
+        var keys = new List<(string? Colour, string? Material)>();
         var ranges = new List<List<uint>>();
         var style = mesh.Style;
         for (var t = 0; t < triangles.Count; t++)
         {
-            var key = style?.ColourOf(triangles[t].Face)?.ToUpperInvariant();
+            var material = style?.MaterialOf(triangles[t].Face);
+            var key = material is null ? (style?.ColourOf(triangles[t].Face)?.ToUpperInvariant(), null) : ((string?)null, material);
             var at = keys.IndexOf(key);
             if (at < 0) { keys.Add(key); ranges.Add([]); at = keys.Count - 1; }
             ranges[at].AddRange([(uint)(t * 3), (uint)(t * 3 + 1), (uint)(t * 3 + 2)]);
         }
 
-        var order = Enumerable.Range(0, keys.Count).OrderBy(i => keys[i] is null ? 0 : 1).ThenBy(i => i).ToArray();
-        colours = order.Select(i => keys[i]).ToArray();
+        var textured = keys.Any(k => k.Material is not null);
+        var plain = ToMeshData(mesh, space, textured ? LookMeshes.CornerUvs(mesh, Vector2.Zero) : null);
+        var order = Enumerable.Range(0, keys.Count)
+            .OrderBy(i => keys[i].Material is not null ? 2 : keys[i].Colour is null ? 0 : 1).ThenBy(i => i).ToArray();
+        colours = order.Select(i => keys[i].Colour).ToArray();
+        materials = order.Select(i => keys[i].Material).ToArray();
         var indices = new List<uint>(triangles.Count * 3);
         var submeshes = new Submesh[order.Length];
         for (var s = 0; s < order.Length; s++)

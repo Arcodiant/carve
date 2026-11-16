@@ -15,6 +15,11 @@ internal interface IRenderScene
     /// <summary>As above, with the weight of one bone at each vertex of <paramref name="mesh"/> (NaN where unweighted), for the weights look.</summary>
     void ShowMesh(PolygonMesh mesh, PolygonMesh frameOn, float[] weights) => ShowMesh(mesh, frameOn);
 
+    /// <summary>The model's materials (T-78), given before each mesh of that model is shown, for its faces that use one.</summary>
+    void ShowMaterials(IReadOnlyList<Material> materials)
+    {
+    }
+
     /// <summary>Points the cameras and the light for this spec of the mesh shown, and draws its look if that changed.</summary>
     void ApplyView(RenderSpec spec);
 
@@ -133,6 +138,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         try
         {
             var drawn = snapshot.Mesh!;
+            scene.ShowMaterials(snapshot.Model.Materials);
             // The bone of the last weights look may be gone from a newer model (an undo, open or renaming define_skeleton):
             // then the mesh is shown shaded, and only a weights request for that bone fails, at the head of the queue.
             var heat = _shownWeights is null || WeightHeat.Refusal(snapshot.Model, _shownWeights) is not null
