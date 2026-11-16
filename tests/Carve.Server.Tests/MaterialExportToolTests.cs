@@ -17,17 +17,17 @@ public sealed class MaterialExportToolTests() : FileToolTests("carve-export-mate
         var rough = MaterialExportTests.Png(44);
         File.WriteAllBytes(Path.Combine(Root, "wood-mr.png"), rough);
 
-        Ok(await carve.CallToolAsync("define_material", """
-            {"name":"wood","base_colour":"#C8A06E","metallic":0.25,"roughness":0.6,"emissive":"#201000","double_sided":true,
-             "base_colour_texture":"wood.png","metallic_roughness_texture":"wood-mr.png"}
-            """));
+        Ok(await carve.CallToolAsync("define_material", """{"name":"wood","base_colour":"#C8A06E","metallic":0.25,"roughness":0.6,"emissive":"#201000","double_sided":true,"base_colour_texture":"wood.png","metallic_roughness_texture":"wood-mr.png"}"""));
         Ok(await carve.CallToolAsync("set_uvs", """{"faces":[{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]},{"face":2,"uv":[[0,0],[1,0],[1,1],[0,1]]}]}"""));
+        File.WriteAllBytes(Path.Combine(Root, "glow.png"), MaterialExportTests.Png(55));
+        Ok(await carve.CallToolAsync("define_material", """{"name":"glow","emissive_texture":"glow.png"}"""));
         Ok(await carve.CallToolAsync("set_material", """{"faces":[0,1,2],"material":"wood"}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"faces":[3],"material":"glow"}"""));
 
         var line = Ok(await carve.CallToolAsync("export", """{"path":"out/wood.glb"}"""));
         Assert.DoesNotContain('\n', line);
-        Assert.Contains("2 materials 'carve', 'wood'", line);
-        Assert.Contains("material 'wood' has a texture, but 1 face using it has no UVs; its corners are written as (0, 0) (mesh faces 1)", line);
+        Assert.Contains("3 materials 'carve', 'wood', 'glow'", line);
+        Assert.Contains("material 'wood' has a texture, but 1 face using it has no UVs; its corners are written as (0, 0) (mesh face 1)", line);
 
         var parsed = GlbExportTests.Parser.Parse(File.ReadAllBytes(Path.Combine(Root, "out", "wood.glb")), ModelFormat.Gltf);
         Assert.Empty(parsed.Warnings);
@@ -38,6 +38,9 @@ public sealed class MaterialExportToolTests() : FileToolTests("carve-export-mate
         Assert.True(wood.DoubleSided);
         Assert.Equal(png, wood.TextureBytes);
         Assert.Equal(rough, wood.MetallicRoughnessTexture!.Bytes);
-        Assert.Equal(2, parsed.SubmeshMaterials.Length);
+        // An emissive texture with no emissive colour given: T-75 makes the colour white, so the factor reads back non-zero.
+        Assert.NotEqual(System.Numerics.Vector3.Zero, parsed.SubmeshMaterials[2]!.EmissiveColor);
+        Assert.NotNull(parsed.SubmeshMaterials[2]!.EmissiveTexture);
+        Assert.Equal(3, parsed.SubmeshMaterials.Length);
     }
 }
