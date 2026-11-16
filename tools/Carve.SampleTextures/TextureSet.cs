@@ -117,7 +117,7 @@ public static class TextureSet
     {
         var m = Rust(x, y);
         var speck = Math.Floor(Noise(x, y, 4, 4, 23) * 3) / 2 * 6;
-        return (Q(Lerp(58 + speck, 176 + speck * 2, m), 6), Q(Lerp(61 + speck, 84 + speck, m), 6), Q(Lerp(66 + speck, 34, m), 6));
+        return (Q(Lerp(210 + speck, 176 + speck * 2, m), 6), Q(Lerp(214 + speck, 84 + speck, m), 6), Q(Lerp(222 + speck, 34, m), 6));
     });
 
     static byte[] IronMr() => Make((x, y) =>
@@ -132,8 +132,11 @@ public static class TextureSet
 
     static (double Phase, double R, double Dx, double Dy) Ring(int x, int y)
     {
-        double dx = x - 128, dy = y - 128, r = Math.Sqrt(dx * dx + dy * dy);
-        var wobble = 3 * Noise(x, y, 48, 48, 31);
+        // Two discs side by side: the top cap's (face 33) in the left half, centre (64, 128), and the bottom cap's (face 32) in the right half,
+        // centre (192, 128). The second has its own wobble, so the two ends are not copies.
+        var disc = x < Size / 2 ? 0 : 1;
+        double dx = x - (64 + 128 * disc), dy = y - 128, r = Math.Sqrt(dx * dx + dy * dy);
+        var wobble = 3 * Noise(x, y, 48, 48, (uint)(31 + disc));
         var p = (r + wobble) / RingPeriod;
         return (p - Math.Floor(p), r, dx, dy);
     }

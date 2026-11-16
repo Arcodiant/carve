@@ -13,7 +13,7 @@ internal static class MeshUvHealth
 
     private readonly record struct Tri(double Ax, double Ay, double Bx, double By, double Cx, double Cy);
 
-    /// <summary>Unmapped, flipped and zero-area faces by face id, then each overlapping pair once, the lower id first.</summary>
+    /// <summary>Unmapped, flipped and zero-area faces by face id, then each overlapping pair once, the lower id first, except a pair whose faces both have a material and the materials differ.</summary>
     internal static (List<MeshWarning> Warnings, UvStats? Stats) Create(PolygonMesh mesh, IReadOnlyDictionary<int, string>? textured = null)
     {
         var uvs = mesh.Uvs;
@@ -58,6 +58,9 @@ internal static class MeshUvHealth
             for (var j = i + 1; j < ids.Length; j++)
             {
                 var b = boxes[ids[j]];
+                // Two faces with different materials sample different textures, so sharing a UV area is no fault (T-80);
+                // the same material, or a face with no material, still warns.
+                if (mesh.Style?.MaterialOf(ids[i]) is { } ma && mesh.Style.MaterialOf(ids[j]) is { } mb && ma != mb) continue;
                 if (a.MaxU <= b.MinU || b.MaxU <= a.MinU || a.MaxV <= b.MinV || b.MaxV <= a.MinV) continue;
                 var common = 0.0;
                 foreach (var s in triangles[ids[i]])

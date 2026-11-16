@@ -4,7 +4,7 @@ description: >-
 ---
 # T-80 — Textured barrel scenario
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-75, T-77, T-78, T-79
 
-**Verify:** server-regression, scenario-cube, scenario-crate, scenario-shed, scenario-export, scenario-character, scenario-soft, scenario-uvs, scenario-cuts, scenario-gatehouse, scenario-rig, viewer-cube
+**Verify:** server-regression, scenario-cube, scenario-crate, scenario-shed, scenario-export, scenario-character, scenario-soft, scenario-uvs, scenario-materials, scenario-cuts, scenario-gatehouse, scenario-rig, viewer-cube
 
 **Perf:** skip: Carve declares no heavy suites
 
@@ -30,7 +30,7 @@ The whole of M-7 through the real tools on the real `carve`: the barrel textured
   - Once the suite is in `tests.json`, add `scenario-materials` (and `scenario-uvs`) to this file's `**Verify:**` line. Lint refuses them before then.
 - **The barrel**, from a spec class in the scenario, the one source for its calls:
   - `open` `samples/barrel.carve` (M-6's).
-  - `project_uvs`: `cylindrical` with the defaults on faces 0 to 31 into `[0, 0, 1, 1]`; `planar` from `+y` on face 33 and from `-y` on face 32, each into `[0, 0, 1, 1]`. These are the UVs T-77's textures were laid out for.
+  - `project_uvs`: `cylindrical` with the defaults on faces 0 to 31 into `[0, 0, 1, 1]`; `planar` from `+y` on face 33 into `[0, 0, 0.5, 1]` and from `-y` on face 32 into `[0.5, 0, 1, 1]` (two discs in one end-grain texture, ruling 6). These are the UVs T-77's textures were laid out for.
   - `define_material`, with the textures from `samples/textures/`:
 
     | Material | Fields |
@@ -66,7 +66,7 @@ The whole of M-7 through the real tools on the real `carve`: the barrel textured
   - Rune texels emissive-bright and orange in `front`, and absent in `back`.
   - A clean iron texel lighter than a rust texel's metal response in `barrel-hoop-close`, sampled where T-77's mask puts each.
   - A stave gap darker than the stave's middle.
-  - The end-grain rings' centre where face 33's centre projects.
+  - The end-grain rings' centre where each cap's centre projects: texel (64, 128) for face 33 and (192, 128) for face 32.
   - In the viewer frames, the rune and the hoops as in Carve's frames, compared by hue and order rather than bytes (the viewer's pipeline is `StandardHdr`).
 
   Every frame gets a positive check and one that a mirrored camera or a v-flipped texture would fail. Sample near face corners as well as middles.
@@ -122,3 +122,32 @@ Checked against the barrel spec, `UvProjection.Cylindrical` and T-78's plan. The
 2. **A fixed sky:** `ProceduralSky.Default`, sun included, baked once, with no rebake. The same sky is in the viewer with `--sky`.
 3. **The iron check.** Rust is told from clean iron by hue, plus a "not near-black" check on clean iron, which fails when the sky is removed. This replaces "a clean iron texel lighter than a rust texel's metal response". The threshold is P3's T, from T-78's probe step 2d.
 4. **P1 to P7 are accepted** (T-78's Plan), with P2 widened as in ruling 1.
+
+5. **Hand-off questions ruled (2026-11-16, the person).**
+   - `check` skips a cross-material overlap: no "UVs overlap" for a pair of faces that both have a material when the materials differ. Same material, or a colour-only or uncoloured face, warns as before. The textured barrel's `check` gives no warning, asserted.
+   - Lighten the iron: T-77's generator makes clean iron about (210, 214, 222), so it reads above T = 80 under the sky (margin measured in the run); the "not near-black" check fails with the sky removed. Rust and `iron-mr.png` unchanged. The person approved the new `iron-base.png` beside the old.
+   - Drop the stave-gap check; keep "stave middle (6 or more texels from a gap) is lit and warm".
+   - Small detail: at `barrel-top` check only "pale ring: lit and warm"; at 256 px check the rune with as many P2 samples as exist (at least 3, one a flip or mirror would change). Anything under P6's floor of 8 goes in As built, for the person's frame review.
+
+6. **Cap overlap ruled (2026-11-16, the person).** The two caps get separate UV regions so `check` is silent: end-grain textures hold two discs, face 33 `planar` `+y` into `[0, 0, 0.5, 1]` (centre texel (64, 128)) and face 32 `planar` `-y` into `[0.5, 0, 1, 1]` (centre (192, 128)); each disc is 128 texels across with the ring period still 9 texels, the discs differing in wobble seed. T-77's generator and As built changed; the person approved the new textures beside the old. `check` gives no warning, asserted.
+
+### As built (2026-11-16, Claude Sonnet 5.5, `claude-sonnet-5-5`, agents 1 to 3)
+
+- **Product change:** `MeshUvHealth` skips the overlap warning for a pair whose faces both have a material and the materials differ; `check`'s description says so; three unit tests, each shown failing when the skip is removed or forced.
+- **Textures changed (T-77's generator, approved by the person):** clean iron is about (210, 214, 222); the end-grain textures hold two discs (face 33 `planar` `+y` into `[0, 0, 0.5, 1]`, centre texel (64, 128); face 32 `-y` into `[0.5, 0, 1, 1]`, centre (192, 128)), so `check` is silent, asserted.
+- **Iron margin, measured:** the dimmest clean-iron sample's brightest channel under the sky is 118 at `front` (T = 80), 120 at 256 px, 160 in `hoop-close`; with the sky removed (a temporary edit of `RenderLights.cs`, restored) the scenario fails "clean iron at (151, 130) is (9, 9, 10), near-black".
+- **Break table** (`CARVE_MATERIALS_BREAK`, the scenario must fail; each run in `artifacts/scenarios/materials/`):
+
+  | Break | Fails at |
+  |---|---|
+  | `vflip` (rune and iron-mr uploaded v-flipped) | barrel-front: rune texel on face 22 is (209, 129, 74), not glowing orange |
+  | `rune-column` (rune on faces 13, 21) | the rune faces' UV rectangle is [0.375, ...], the texture's is [0.5, ...] |
+  | `metallic` (staves metallic 1) | barrel-front: stave on face 23 is (79, 53, 31), not lit and warm |
+  | `mirror` (checks worked from a mirrored camera) | barrel-front: rune texel on face 22 is (101, 69, 46), not glowing orange |
+  | sky removed | clean iron near-black, above |
+
+- **Sample counts:** `barrel-front-256` and the sheet's front tile have 18 RuneOn samples (at least 3 that a flip or mirror would change: all 18), over P6's floor; `barrel-top` checks only "pale ring: lit and warm" (4446 samples). No count is below the floor of 8. Samples log: `pixel-samples.txt` in each run folder.
+- **The saved file is `samples/barrel-textured.carve`,** committed beside `samples/textures/` with its paths as `textures/<file>`; nothing is copied.
+- **Hash guard (agent 3, Claude Sonnet 5.5, `claude-sonnet-5-5`):** the frames of every suite but scenario-materials (12 suites, 229 PNGs) from the queue on 71fa146 (the milestone tip without T-80) and on this branch's verify jobs are byte-identical by SHA-256; tables in `artifacts/review/T-80/base.sha256` and `new.sha256`.
+- **Frame review (round 1, the person):** the eight scenario frames and `viewer-front`, `viewer-angle` sent to Waystone from `G:/My Drive/artifacts/carve/M-7/T-80/round-1/`; outcome Commented, no per-frame notes, overall note "Looks good", taken as approval (the question tool was unavailable to ask again). No frame change. Frames were not opened by this agent. No sample count under P6's floor.
+- Verify: `VERIFY PASS` (15 suites, `scenario-materials` 58 s).
