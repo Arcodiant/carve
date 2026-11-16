@@ -117,7 +117,7 @@ public static class TextureSet
     {
         var m = Rust(x, y);
         var speck = Math.Floor(Noise(x, y, 4, 4, 23) * 3) / 2 * 6;
-        return (Q(Lerp(58 + speck, 176 + speck * 2, m), 6), Q(Lerp(61 + speck, 84 + speck, m), 6), Q(Lerp(66 + speck, 34, m), 6));
+        return (Q(Lerp(210 + speck, 176 + speck * 2, m), 6), Q(Lerp(214 + speck, 84 + speck, m), 6), Q(Lerp(222 + speck, 34, m), 6));
     });
 
     static byte[] IronMr() => Make((x, y) =>

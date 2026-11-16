@@ -34,7 +34,7 @@ The barrel's textures, the content of this milestone's mechanic, exist as commit
   | `staves-base.png` | sRGB | 8 wood staves as columns of u, each 1/8 wide, each a slightly different tone, grain running along v, and a dark 2-texel gap at each stave edge |
   | `staves-normal.png` | linear | flat (128, 128, 255), with a groove at each stave edge (normals tilted toward the gap) |
   | `staves-occlusion.png` | linear, R | 255, falling to about 140 at the stave gaps |
-  | `iron-base.png` | sRGB | dark iron grey with rust-orange patches from a hash-noise mask |
+  | `iron-base.png` | sRGB | light iron grey with rust-orange patches from a hash-noise mask |
   | `iron-mr.png` | linear | from the same mask: clean is G (roughness) 0.35 and B (metallic) 1; rust is G 0.9 and B 0 |
   | `end-grain-base.png` | sRGB | growth rings round the centre (128, 128) |
   | `end-grain-normal.png` | linear | the rings as slight ridges |
@@ -87,7 +87,7 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`), one agent, 2026-11-16, on `tas
 | `staves-base.png` | sRGB | RGB colour; stave s = x / 32, own tone; gap texels x % 32 = 0 and 31 are (28, 18, 11) |
 | `staves-normal.png` | linear | RGB tangent normal, flat (128, 128, 255); within 4 texels of an edge nx tilts up to 0.6 toward the gap |
 | `staves-occlusion.png` | linear | R = occlusion (255 down to 140 at the gap); G and B equal R |
-| `iron-base.png` | sRGB | dark grey (~58, 61, 66) with rust (~176, 84, 34) |
+| `iron-base.png` | sRGB | light grey (~210, 214, 222; was ~58, 61, 66 until T-80 lightened it so clean iron reads lit under the sky) with rust (~176, 84, 34) |
 | `iron-mr.png` | linear | R 255 (unused), G roughness (0.35 clean to 0.9 rust), B metallic (1 clean to 0 rust), from the same mask |
 | `end-grain-base.png` | sRGB | rings round (128, 128), period 9 texels, wobbled |
 | `end-grain-normal.png` | linear | ring ridges, tilt up to about 0.18 / 0.42 |
