@@ -148,13 +148,13 @@ public static class Skinning
     }
 
     /// <summary>
-    /// The model with every weighted mesh at its posed vertex positions, colours and groups kept, weights dropped (the
+    /// The model with every weighted mesh at its posed vertex positions, colours, materials and groups kept, weights dropped (the
     /// result is a plain mesh to draw). A model with no skeleton comes back unchanged.
     /// </summary>
     public static Model Posed(Model model, Pose pose)
     {
         if (model.Skeleton is not { } skeleton) return model;
-        var result = Model.Empty;
+        var result = Model.Empty.WithMaterials(model.Materials);
         foreach (var (name, mesh) in model.Meshes)
         {
             result = result.With(name, mesh.Weights is null ? mesh
