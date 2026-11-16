@@ -44,7 +44,7 @@ public sealed class DefineMaterialTool(ModelStore store)
         + "base_colour is the surface colour, sRGB hex #RRGGBB, default #FFFFFF, multiplied with base_colour_texture when there is one. "
         + "metallic, 0 to 1, default 0: 1 is a metal, which shows only by reflecting its surroundings and has no diffuse colour of its own; 0 is a dielectric such as wood or plastic. "
         + "roughness, 0 to 1, default 1: 1 is matte, 0 is a mirror. "
-        + "emissive is light the surface gives off, sRGB hex, default #000000 (none); it is not lit or shaded. "
+        + "emissive is light the surface gives off, sRGB hex, default #000000 (none); it is not lit or shaded. The glow is emissive times emissive_texture, so a default black emissive would hide the texture: when you give an emissive_texture and no emissive, emissive becomes #FFFFFF (the texture shows as it is); an emissive you give, even #000000, is kept. "
         + "occlusion, 0 to 1, default 1, is how strongly the occlusion map darkens crevices; with no occlusion_texture it has no effect and the result warns of that. "
         + "double_sided, default false, draws the back of a face too; leave it false for a closed solid. "
         + "Textures are PNG files (a file that is not a PNG, or is larger than 4096 pixels a side, is refused), given as a path relative to carve's working folder or absolute, read and checked when you call this, so a later change to the file does not reach the model until you define the material again. "
@@ -128,7 +128,7 @@ public sealed class DefineMaterialTool(ModelStore store)
         if (errors.Count > 0) return Failed("define_material", errors);
 
         var material = new Material(materialName!, baseColour ?? Material.DefaultBaseColour, metal ?? 0f, rough ?? 1f,
-            emissiveColour ?? Material.DefaultEmissive, occ ?? 1f, twoSided,
+            emissiveColour ?? (loaded.ContainsKey("emissive_texture") ? "#FFFFFF" : Material.DefaultEmissive), occ ?? 1f, twoSided,
             loaded.GetValueOrDefault("base_colour_texture"), loaded.GetValueOrDefault("metallic_roughness_texture"),
             loaded.GetValueOrDefault("normal_texture"), loaded.GetValueOrDefault("emissive_texture"), loaded.GetValueOrDefault("occlusion_texture"));
 
