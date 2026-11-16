@@ -10,6 +10,7 @@
     <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
     <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
     <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+    <PackageReference Include="StbImageWriteSharp" Version="$(StbImageWriteSharpVersion)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -47,6 +48,11 @@
     <Compile Include="../../src/Carve.Server/SheetComposer.cs" Link="SheetComposer.cs" />
     <Compile Include="../../src/Carve.Server/TargetCheck.cs" Link="TargetCheck.cs" />
     <Compile Include="../../src/Carve.Server/GlbExport.cs" Link="GlbExport.cs" />
+    <!-- T-78's equality test hosts the engine in this process with Carve's own composition, lights, sky and material function. -->
+    <Compile Include="../../src/Carve.Server/RenderComposition.cs" Link="RenderComposition.cs" />
+    <Compile Include="../../src/Carve.Server/RenderSky.cs" Link="RenderSky.cs" />
+    <Compile Include="../../src/Carve.Server/RenderLights.cs" Link="RenderLights.cs" />
+    <Compile Include="../../src/Carve.Server/PbrMaterials.cs" Link="PbrMaterials.cs" />
     <Compile Include="../../src/Carve.Server/GlbRig.cs" Link="GlbRig.cs" />
     <Compile Include="../../src/Carve.Server/SkinnedExport.cs" Link="SkinnedExport.cs" />
     <Compile Include="../../src/Carve.Server/ClipsExport.cs" Link="ClipsExport.cs" />

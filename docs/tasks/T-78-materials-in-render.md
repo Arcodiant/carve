@@ -4,7 +4,7 @@ description: >-
 ---
 # T-78 — Materials in render
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -193,3 +193,84 @@ These override the Scope and the Plan where they differ.
 5. **The equality test** runs in an in-process engine host in the tests now, plus a check that the harness's frame equals the real `render`'s.
 6. **T-80's iron:** rust is told from iron by hue, plus a "not near-black" check that fails without the sky. This is T-80's, and it uses P3's threshold T from probe step 2d.
 7. **P1 to P7 are accepted,** with P2 widened as in ruling 1.
+
+### As built (2026-11-16, Claude Opus 5.5, agent 1)
+
+**The probe** (`%TEMP%\t78\probe`, not in the repo). A headless host built as `Program.cs` builds it (`AddEmpyreanCore`, `AddEmpyreanGraphicsHeadlessCore`, `UseRenderPipeline<RenderComposition>`, the same fixed-step settings), compiling the product's own `RenderComposition.cs`, `ViewFraming.cs` and `MeshBridge.cs` by link, with a system that builds the scene exactly as `RenderSystem.BuildScene` does (ambient 0.25, directional 0.9 turned by `frame.LightOrientation`, one tagged camera per size) and, like `RenderPump`, applies a view in one update and renders and reads back the 512 target in the next. The mesh is Carve's unit cube through `MeshBridge.ToMeshData` with probe box UVs. Raw readback hashed (first 16 hex of SHA-256), pixels after `ToDecodedImage`.
+
+- **Step 1, `Material.Pbr` with `CreateTexture` textures draws on Carve's pipeline: passes.** A 64 x 64 four-quadrant base colour (`Rgba8Srgb`) drew its quadrants (front face centre `[8,168,8]` sky off, the green quadrant); all five slots at once (base and emissive `Rgba8Srgb`, metallic-roughness, normal and occlusion `Rgba8Unorm`) drew with no error, the emissive orange glowing at `[255,205,32]` (sky off). No engine need.
+- **Step 1b, highlight colours multiply into `Pbr`: passes.** The shaded look's orange vertex colour `(255,115,13)` on a matte white Pbr face: `[152,152,152]` becomes `[152,105,34]` (sky off), `[201,211,229]` becomes `[201,147,56]` (sky on); on metal `[145,147,150]` becomes `[145,101,33]`. The colour multiplies as it does on `LitMesh`.
+- **Step 2e, a mipmapped trilinear texture draws: passes.** `CreateTexture(..., sampler: new SamplerDescription(Linear, Linear, Linear, Repeat, Repeat, Repeat, 1, NoLodClamp, 0, 0), generateMipmaps: true)` gives `MipLevels` 7 at 64 and 5 at 16, `IsReady` true, and draws.
+- **Step 2 and 2d, the sky lights metal: passes.** Metallic 1, roughness 0.35, base `(0.8,0.8,0.8)`, front face of the cube from `front`, 8-bit sRGB after encode:
+
+  | sample | sky off | sky on |
+  |---|---|---|
+  | front face centre (256,256) | `[11,11,11]` | `[145,147,150]` |
+  | (200,300) | `[10,10,10]` | `[142,143,145]` |
+  | (320,300), the right face | `[9,9,9]` | `[138,139,141]` |
+  | (256,180), the top face | `[17,17,17]` | `[129,152,186]` |
+
+  **P3's T = 80**, halfway between the front-face centre's max channel without the sky (11) and with it (150), rounded down. A matte white Pbr face (metallic 0, roughness 1) goes from `[152,152,152]` to `[201,211,229]` with the sky, brighter and bluer, as the Plan says (the sky's SH ambient reaches Pbr, not `Lit`).
+- **Step 2c, history: passes.** With the sky, `front`, `back`, `front` of the metal cube gave `F96FDD846B09FFA8`, `7423595A78454391`, `F96FDD846B09FFA8`, and `back` first in a fresh process gave `7423595A78454391`. Without the sky the same held (`7D32E40BF67C01F0`, `CD620E0D2D81E6B3`, `7D32E40BF67C01F0`). **Found on the way:** a view applied and rendered in the *same* update renders with the previous view's light (the transform is published a loop iteration later); `RenderPump` already ends the step on a view change, so the product is not affected, but the equality-test host must do the same (apply, then render in a later update).
+- **`LitMesh` with and without the sky:** the same raw bytes in the probe (`C85BDF24D20C6168` at `front`), before the product guard below.
+
+**The sky** (`src/Carve.Server/RenderSky.cs`, `public static ProceduralSky Sky => ProceduralSky.Default;`, added on one entity in `RenderSystem.BuildScene` after the ambient light; nothing else changed). `ProceduralSky.Default` in 0.119.0, read in the probe:
+
+| field | value |
+|---|---|
+| `ZenithColor` | (0.18, 0.36, 0.72) |
+| `HorizonColor` | (0.7, 0.8, 0.92) |
+| `GroundColor` | (0.3, 0.28, 0.26) |
+| `HorizonSharpness` | 4 |
+| `SunDirection` | (0.30304578, 0.5050762, -0.80812204) |
+| `SunFromDirectionalLight` | false |
+| `SunAngularRadius`, `SunEdgeSoftness` | 0.0093, 0.3 |
+| `SunColor`, `SunIntensity` | (1, 0.95, 0.85), 20 |
+| `HaloStrength` / `HaloExponent` | 0.4 / 256 |
+| `GlowStrength` / `GlowExponent` | 0.15 / 8 |
+| `RenderLayerMask` | All |
+
+The sun is up and toward -Z, behind the model as `front` sees it, and fixed; Carve's directional light still turns with each view, and the sky reads none of it.
+
+**The guard (Agent 1's commit).** Every Verify suite run `--fresh` twice on this worktree (reason: T-78 baseline hashes, then the sky's guard): first at the milestone head after T-74 and T-76 merged (`5986ceb`, the sky change held outside the tree), then with the sky. All 12 passed both times. The SHA-256 of every PNG was taken: each scenario suite's frames from `cairn test artifacts <suite>`, and the PNGs `server-regression` writes under `artifacts/checker-tests`, `render-tests` and `uv-layout-tests` (cleared between the two runs so each set is that run's own). 310 PNGs (223 scenario frames, 87 test frames); **the two lists are identical**. The tables are `artifacts/review/T-78/hashes-before.tsv` and `hashes-after.tsv` in the task worktree (ignored), and copies stay in `%TEMP%\t78`. Not yet copied to the milestone worktree's `artifacts/review/T-78/`: a write there was refused to this agent, so the continuation or `finish` should carry them.
+
+### As built (2026-11-16, Claude Opus 5.5, agents 2 and 3)
+
+**The material function and render** (agent 2).
+- `src/Carve.Server/PbrMaterials.cs`: `Build(Carve.Core.Material, Func<MaterialTexture, bool, Texture>)` calls `Material.Pbr` with every field: base colour `FaceStyle.ToLinear` with alpha 1, emissive linear, occlusion strength `OcclusionTexture is null ? 1 : Occlusion` (ruling 4), `DoubleSided`. An instance caches textures by (SHA-256 of the PNG, sRGB), decoded by `ITextureLoader.DecodeCpu` and uploaded by `CreateTexture` as `Rgba8Srgb` (base, emissive) or `Rgba8Unorm` (the other maps), with `generateMipmaps: true` and `Sampler` = Linear/Linear/Linear, Repeat x3, anisotropy 1, `NoLodClamp` (ruling 1). Engine materials are cached by the Carve record (every field, texture bytes included) for the process.
+- `src/Carve.Server/RenderLights.cs`: ambient 0.25, `RenderSky.Sky`, directional 0.9, factored out of `RenderSystem.BuildScene` in the same order, and linked by the tests.
+- `MeshBridge.ToSubmeshedMeshData(mesh, space, out colours, out materials)`: export's primitive order (uncoloured, colours by first use, materials by first use). Corner UVs (`LookMeshes.CornerUvs(mesh, Vector2.Zero)`, the export's (0, 0) rule) only when a drawn face has a material, so a mesh of colours only gets exactly the buffer it always had.
+- `IRenderScene.ShowMaterials` (default no-op), called by `RenderPump.ShowMesh` with the model's materials before every mesh, posed too. `RenderSystem.Make`'s submesh branch runs on colours or materials: material submeshes from `PbrMaterials`, the others `LitMesh` as before. `RenderSystem` now takes `ITextureLoader`. The tool description gains one sentence after the `'mode'` line.
+- Tests: `MaterialSubmeshTests` (unit, 2), `MaterialRenderTests` (regression, 6: argument families with the marker's P2/P5 samples, `mesh`/`pose`/`clip`, locality beside colour and uncoloured faces, double-sided, metal >= T 80 and emissive P4, the five other looks byte-identical before and after `set_material`), `PbrEqualityTests` (regression, 1: in-process `EngineHost`; six materials covering every field and slot, exported by `GlbExport.Write` and loaded with `generateMipmaps: true`; fields and texture Width/Height/Format/MipLevels equal; raw readback **0 differing bytes** at `front` and `back`; the host's frames equal real `carve render` pixel for pixel). Frames go to `artifacts/material-tests/`.
+
+**Verify and the guard** (agent 3). `cairn task T-78 verify`: all 12 suites PASS (suites spread over Mantorok and Xellotath). The guard: every scenario suite's frames from `cairn test artifacts`, and, because the verify's `server-regression` ran on the other machine, `server-regression` rerun `--fresh` here with `artifacts/{checker,render,uv-layout,material}-tests` cleared first. 310 PNGs, **byte-identical to `hashes-before.tsv`** (`artifacts/review/T-78/hashes-after-agent3.tsv`). No existing frame changed. Scenario frames hash the same on both machines.
+
+**Break table** (agent 3; each change alone, solution rebuilt, the 9 new tests run, source restored; script `%TEMP%\t78\mut.py`):
+
+| break | fails |
+|---|---|
+| occlusion strength passed without a map | equality (fields differ) |
+| base and emissive uploaded `Rgba8Unorm` | equality (format) |
+| `generateMipmaps: false` | equality (MipLevels) |
+| UVs v-flipped in `MeshBridge` | argument families, mesh/pose/clip, beside, submesh UVs ("cell (0, 0) is (23, 25, 252), blue, not red") |
+| unmapped corners at `CheckerTexture.WhiteCentre` | submesh UVs (export rule) |
+| corner UVs on colour-only meshes too | colour-only buffers unchanged |
+| material submeshes first | submesh order |
+| `ShowMaterials` not called | all 7 render and equality tests ("the material 'leaf', which is not defined") |
+| `double_sided` dropped | double-sided, equality |
+| sky removed | metal ("metal cell (0, 7) is (51, 51, 51), near-black") |
+| emissive dropped | emissive, equality |
+| colour faces lose their colour when a material is present | beside (exact samples) |
+| the `FlatColour is null` guard dropped | other looks ("wireframe changed when the faces took a material") |
+
+Every break fails at least one test. Worth knowing: uploading base colour linear is caught only by the equality test; the marker's class samples still pass it.
+
+**Known, not fixed here:**
+- `render`'s `mesh` argument does not frame on the named mesh: every mesh is drawn, framed on them all (the `mesh` frame shows both cubes). Not T-78's.
+- The `back` render in the argument-family test only checks it succeeds: the marker face is not in sight from `back`. `labels`, `views` and `mesh` are checked by the marker samples only where the face is in sight.
+- An unmapped textured face samples (0, 0), where four texels meet under Repeat, so with the marker it is a blend of all four quadrants, not red. The game does the same; the equality test counts drawn pixels instead.
+- White under the sky is bluish, about `(221, 233, 252)`, so the tests' class rule takes "white" first, when every channel is at least T, before channel order.
+- With Repeat and linear filtering a textured face's edges pick up a thin line of the texture's opposite edge (visible on the marker frames).
+
+
+**Frame review** (agent 3, round 1): 8 sheets built from `artifacts/material-tests/` (equality, marker at front and zoom 3, metal before/sky removed/under the sky, emissive, beside colour, double-sided, argument families, other looks), copied to `G:\My Drive\artifacts\carve\M-7\T-78\round-1\` and kept in `artifacts/review/T-78/round-1/`. The person was told about the bluish white, the four-texel blend on unmapped faces and the edge lines. **Approved, no notes.** The sky-removed metal frame is `metal-sky-off.png`, kept from the break-table run.
