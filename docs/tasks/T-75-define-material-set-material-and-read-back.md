@@ -4,7 +4,7 @@ description: >-
 ---
 # T-75 — define_material, set_material and read-back
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
