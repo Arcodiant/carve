@@ -101,4 +101,4 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`), one agent, 2026-11-16, on `tas
 
 **Checks shown failing:** glyph moved one column (RuneRect shifted to u 0.375 to 0.5): the rectangle test, the glyph test and the rune pixel-equality case fail (3). Generator writing v-flipped: pixel equality fails for 6 of 8 textures (the symmetric staves-normal and staves-occlusion cannot differ).
 
-**Not done:** evidence under `artifacts/review/T-77/` was not made; review images are in `G:\My Drivertifacts\carve\M-7\T-77ound-1\` (outside the worktree).
+**Not done:** evidence under `artifacts/review/T-77/` was not made; review images are in `G:\My Drive\artifacts\carve\M-7\T-77\round-1\` (outside the worktree).
