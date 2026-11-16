@@ -55,7 +55,14 @@ public sealed class MeshHealth
     /// <summary>No problems and no warnings.</summary>
     public bool Ok => Problems.Count == 0 && Warnings.Count == 0;
 
-    public static MeshHealth Create(PolygonMesh mesh)
+    public static MeshHealth Create(PolygonMesh mesh) => Create(mesh, []);
+
+    /// <summary>
+    /// As <see cref="Create(PolygonMesh)"/>, with the model's <paramref name="materials"/> beside the mesh: a face whose material
+    /// has a texture and which has no UVs is warned of by the material's name (replacing the generic unmapped warning, in a mesh
+    /// with no UVs too), and a material the mesh uses with an occlusion strength but no occlusion map is warned of (T-75).
+    /// </summary>
+    public static MeshHealth Create(PolygonMesh mesh, IReadOnlyList<Material> materials)
     {
         var report = MeshReport.Create(mesh);
         var triangles = Triangulator.Triangulate(mesh);
@@ -78,7 +85,20 @@ public sealed class MeshHealth
             mesh.LiveFaces.Sum(mesh.FaceArea),
             shells.All(s => s.SignedVolume is not null) ? shells.Sum(s => s.SignedVolume!.Value) : null);
 
-        var (uvWarnings, uvStats) = MeshUvHealth.Create(mesh);
+        var texturedFaces = new Dictionary<int, string>();
+        var materialWarnings = new List<MeshWarning>();
+        foreach (var name in Model.MaterialsUsedBy(mesh))
+        {
+            if (materials.FirstOrDefault(m => m.Name == name) is not { } material) continue;
+            if (material.Textures.Any(t => t.Texture is not null))
+                foreach (var (face, used) in mesh.Style!.Materials.Where(p => p.Value == name))
+                    texturedFaces[face] = used;
+            if (material.Occlusion != 1f && material.OcclusionTexture is null)
+                materialWarnings.Add(new(MeshWarningKind.MaterialNoEffect, $"materials['{name}']",
+                    MeshEdits.Invariant($"occlusion is {material.Occlusion:R} but the material has no occlusion_texture, so it has no effect (glTF scales only the map)")));
+        }
+        var (uvWarnings, uvStats) = MeshUvHealth.Create(mesh, texturedFaces.Count == 0 ? null : texturedFaces);
+        uvWarnings.AddRange(materialWarnings);
         if (uvStats is not null) stats = stats with { Uvs = uvStats };
         IReadOnlyList<MeshWarning> warnings = uvWarnings.Count == 0 ? report.Warnings : [.. report.Warnings, .. uvWarnings];
 

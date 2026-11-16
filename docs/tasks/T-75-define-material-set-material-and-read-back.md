@@ -91,3 +91,42 @@ An agent gives faces materials through MCP: it defines a named material from PNG
 - In `check`, the material warning for a textured face with no UVs replaces the generic unmapped-face warning on that face: one warning per face.
 - `save mesh=` writes only the materials that mesh uses; `open mesh=` refuses a same-named material defined differently; a texture with no relative path from the save folder refuses the save (all three in T-74's Rulings).
 - Occlusion strength set without an occlusion map has no effect (glTF scales only the map); render and export ignore it, and `define_material` or `check` warns that it has no effect (the person, 2026-11-16, from T-78's research).
+
+### As built (2026-11-16, Claude Sonnet 5.5)
+
+The Scope with the Rulings. Differences are called out.
+
+**Tools as registered** (`src/Carve.Server/MaterialTools.cs`, in `Program.cs`'s list after `set_colour`; each one undo step, each argument set closed):
+
+- `define_material(name, base_colour?, metallic?, roughness?, emissive?, occlusion?, double_sided?, base_colour_texture?, metallic_roughness_texture?, normal_texture?, emissive_texture?, occlusion_texture?)`. Fields left out are the defaults, and a redefinition replaces the material whole (fields left out go back to their defaults). Texture paths go through `ToolPaths.Resolve(..., ".png", verb: "reads")`, relative to the working folder or absolute; the file is read with `MaterialTexture.Load` when called. Result: `{"replaced":bool,"material":{name, base_colour, metallic, roughness, emissive, occlusion, double_sided, base_colour_texture, metallic_roughness_texture, normal_texture, emissive_texture, occlusion_texture},"warnings":[]}`; a texture is `null` or `{"path":"<absolute>","width":w,"height":h}`. All problems are listed in one error (`define_material failed with N problem(s)`), each as `<argument>: <text>`: T-74's `Material.Problems`, a missing file (`no file at <abs>; the .png files in <folder> (n) are: a.png, b.png`, or no `.png` files, or the folder does not exist), a folder, a path not ending `.png` (`define_material reads .png files`), a file that is not a PNG or is outside 1 to 4096, a value of the wrong kind, an unknown argument.
+- `set_material(material, faces | group, mesh?)`. Result `{"mesh","material","faces":[ids sorted],"warnings":[...]}`, `warnings` only when the material has a texture and some of the faces have no UVs (`faces[0, 5]: no UVs, so the texture of 'wood' is not mapped onto them; give them UVs with project_uvs, unwrap or set_uvs`; it still assigns). Refusals: `material: no material named 'x'; the materials are 'a', 'b'` (or `the model defines none yet, define one with define_material`), and `set_colour`'s for faces and group. It clears the faces' colours (T-74's `WithMaterial`); `set_colour`'s description now says it clears a material.
+- `ModelStore.DefineMaterial(tool, material, out replaced, out problems)` and a `Restyle` overload whose change is given the model beside the mesh. `OpenTool.ListLimit` is internal for the shared `.png` listing.
+- `save` calls `CarveFile.TextureProblem(model, folder)` (its text, prefixed `save: `) then `Write(model, folder)`; `open` calls `Read(text, folder)`. Both descriptions say how materials and textures travel.
+
+**`get_mesh` shape.** Unchanged for a model with no materials. With materials: `materials:[{...every field as define_material reports it...}]` (the whole model's, definition order) before `uvs`, and `face_materials:[{"material":"wood","faces":[ids]}]` when a face of the mesh has one (grouped by name, ids ascending), after `groups`. A face with a material is absent from `colours`.
+
+**`check` text.** In `src/Carve.Core/MeshHealth.cs`/`MeshUvHealth.cs`: `MeshHealth.Create(mesh, materials)` (the one-argument form is as before).
+
+- `faces[3]: material 'wood' has a texture but the face has no UVs, so it samples the texture's corner`, one per such face (a material with any of the five textures), replacing the generic `no UVs, so the face samples the texture's corner` on that face (Ruling), and given in a mesh with no UVs at all too, where it is the only UV warning (no `uvs` stats, as before). A face of a plain material, or a coloured one, gets the generic warning only where it already did.
+- `materials['wood']: occlusion is 0.5 but the material has no occlusion_texture, so it has no effect (glTF scales only the map)`, for a material the mesh's faces use (kind `MeshWarningKind.MaterialNoEffect`). `define_material` returns the same fact as `occlusion: 0.5 has no effect without an occlusion_texture (glTF scales only the map); give one or leave occlusion at 1`.
+- `check` gives `ok:false` for either, as it does for any warning.
+
+**`merge_faces` wording** (`FaceMerge.ColourWarnings`): colours only is as before, byte for byte. When either face has a material: `faces[1]: merged with material 'wood', and the merged face keeps faces[0]'s look, no colour or material` (looks are `material 'x'`, `colour #RRGGBB` or `no colour or material`), and two faces with the same material and colour do not warn. The tool description says so.
+
+**Differences from the Scope.**
+
+- **`unit` refusal tests are store and Core level, the tool refusals are `regression`.** `Carve.Server.Tests` never links the server's tools ("started as real processes, never linked"), so `define_material`/`set_material` argument parsing runs through the real `carve` in `MaterialToolTests` (Tier regression, no GPU used). The unit tier has `MaterialStoreTests` (the two store steps, undo, a refused change) and `MaterialHealthTests` in `Carve.Core.Tests` (the check warnings and merge wording).
+- The `Core` files `MeshHealth.cs`, `MeshUvHealth.cs`, `MeshReport.cs` and `FaceMerge.cs` are touched (a model-aware `MeshHealth.Create`, a warning kind, the merge text); the Notes' ownership list named the tools, but the Rulings need these.
+- The fixture is `tests/Carve.Server.Tests/Fixtures/swatch.png` (4 x 4), listed in `tests.json`'s `server-unit` and `server-regression` inputs.
+- The occlusion-without-map warning, and `set_material`'s no-UV warning, are my additions on the Rulings' "define_material or check warns"; the second is not in the Scope.
+- Not changed: T-76's export code. The export description still says what it did; it does not know materials until T-76.
+
+**Tests.** `MaterialToolTests` (18 cases, regression): each description's example run as is on the cube, `get_mesh` read-back, `check` in a mesh with and without UVs, occlusion, replace, colour and material clearing each other and `undo` of each, group assignment, every refusal, a missing texture's `.png` listing, a non-PNG, an unknown material, save and open through a new process with a texture in `textures/wood/` and the file saved into `out/`, a deleted texture refusing the open, `save mesh=` writing only the used materials, `open mesh=` refusing a differently defined one.
+
+**Each new check failing on a broken product:**
+
+| Broken on purpose | Tests that failed |
+|---|---|
+| the textured warning no longer replaces the generic one | `In_a_partly_mapped_mesh_the_material_warning_replaces_the_generic_one_for_that_face_only`, `Check_names_the_material_of_a_textured_face_without_UVs_once_per_face_...` |
+| `open` ignores the file's folder | `Save_and_open_round_trip_materials_with_a_texture_in_a_subfolder_...`, `Open_refuses_a_file_whose_texture_is_gone_...` |
+| the occlusion warning never fires | `Occlusion_strength_without_a_map_warns_in_define_material_and_in_check_...` |

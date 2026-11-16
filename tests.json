@@ -35,6 +35,7 @@
         {
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
+        "tests/Carve.Server.Tests/Fixtures/*.png",
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
@@ -53,6 +54,7 @@
         {
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
+        "tests/Carve.Server.Tests/Fixtures/*.png",
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Crate/CheckerColours.cs",

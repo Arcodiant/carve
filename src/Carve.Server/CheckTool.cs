@@ -26,9 +26,11 @@ public sealed class CheckTool(ModelStore store)
         + "\"no face uses this vertex\": a stray that a game loads for nothing; call define_mesh again without it. "
         + "UV warnings, only for a mesh that has UVs on some face (a mesh with none gets none, and no uvs in stats; uvs counts the faces with and without UVs), each by face id. "
         + "\"no UVs, so the face samples the texture's corner\": the face is unmapped; project_uvs or unwrap it, or set_uvs it. "
+        + "\"material 'wood' has a texture but the face has no UVs, so it samples the texture's corner\": the face's material has a texture and the face is unmapped, so the texture is not laid out on it; this one warning replaces the one above for that face, and it is given even in a mesh with no UVs at all (which otherwise gets none). Give the faces UVs with project_uvs, unwrap or set_uvs. "
         + "\"UVs flipped, so the texture is mirrored on the face\": its UVs wind clockwise on screen (u right, v down), the shoelace sum over (u, v) is positive; set_uvs to turn it, or project_uvs it again. "
         + "\"UVs of zero area, so the face is one smeared texel\": its UV area is below 1e-9 times the square of its UV bounds' diagonal, as a zero-area face in space is; project_uvs or unwrap it, or set_uvs corners that span an area. A smeared face is not also called flipped. "
         + "\"UVs overlap faces[m], so the two faces show the same texels\": two faces' UV triangles share more than 1e-6 of UV area (about a fifteenth of a texel of the 256 checker), so painting one paints the other. Each pair is listed once, under the lower id; sharing an edge is not an overlap. Mirrored halves sharing a texture area are deliberate and still warned of, so read the pair before moving anything; otherwise unwrap, which separates islands, or put a seam where islands collide and unwrap again. "
+        + "Material warning, by material (materials['wood']): \"occlusion is 0.5 but the material has no occlusion_texture, so it has no effect\": a material the mesh uses has an occlusion strength other than 1 and no occlusion map, and glTF scales only the map, so render and export ignore it; give an occlusion_texture with define_material or leave occlusion at 1. "
         + "There is no delete yet, so removing a vertex or a face means define_mesh with the lists you want, and the ids after it close up. "
         + "Notes. 1 unit = 1 m, so size is the model's size in metres. A prop stands on y = 0, so the base note says where this one stands. The origin is where a game places the model, so it belongs inside the bounds (on them counts). More than one shell is noted because a model is usually one, though a detached part may be meant. "
         + "Stats. bounds and size are of the vertices faces use, closed is true when every edge has exactly two faces, triangles are what a game draws, area is the sum of the face areas in square metres, and volume is in cubic metres: the sum of the shells' signed volumes, null unless every shell is closed and consistently wound, and an inside-out shell's counts as negative. "
@@ -45,7 +47,7 @@ public sealed class CheckTool(ModelStore store)
         if (errors.Count > 0) return Failed("check", errors);
         if (Target(store, "check", name, out var error) is not { } target) return error!;
 
-        var health = MeshHealth.Create(target);
+        var health = MeshHealth.Create(target, store.Current.Model.Materials);
         var stats = health.Stats;
         // In this order; uvs is left out for a mesh with none, so its output is what it always was.
         var shown = new Dictionary<string, object?>
