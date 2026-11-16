@@ -4,7 +4,7 @@ description: >-
 ---
 # M-7 — Materials and textures
 
-**Status:** Planned
+**Status:** Active
 
 **One-liner:** *An agent assigns materials and textures per face and gets a textured model into a game*
 
