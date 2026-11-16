@@ -155,13 +155,14 @@ internal sealed class Pool
     {
         Need(Look.Clean);
         Need(Look.Rust);
-        int cleanRb = int.MinValue, rustRb = int.MaxValue;
+        int cleanRb = int.MinValue, rustRb = int.MaxValue, cleanMin = int.MaxValue;
         foreach (var s in _by[Look.Clean])
         {
             var p = Pixel(s);
             if (Max(p) < T) Fail($"clean iron at ({s.Hit.X}, {s.Hit.Y}) is {p}, near-black (below {T}): the sky should light it");
             if (Warm(p)) Fail($"clean iron at ({s.Hit.X}, {s.Hit.Y}) is {p}, ordered R > G > B like rust");
             cleanRb = Math.Max(cleanRb, p.R - p.B);
+            cleanMin = Math.Min(cleanMin, Max(p));
         }
 
         foreach (var s in _by[Look.Rust])
@@ -171,7 +172,7 @@ internal sealed class Pool
             rustRb = Math.Min(rustRb, p.R - p.B);
         }
 
-        Log.Add($"{_what}\tiron\tclean R-B up to {cleanRb}\trust R-B down to {rustRb}");
+        Log.Add($"{_what}\tiron\tclean brightest channel down to {cleanMin} (T = {T})\tclean R-B up to {cleanRb}\trust R-B down to {rustRb}");
         if (rustRb < cleanRb + M) Fail($"the least rust-red sample (R-B {rustRb}) is not {M} redder than the reddest clean iron (R-B {cleanRb})");
         Orientation(Look.Clean, Look.Rust);
     }
