@@ -4,7 +4,7 @@ description: >-
 ---
 # T-81 — Materials acceptance run
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
