@@ -113,6 +113,43 @@ public sealed class ModelStore
         Change(tool, name, change, (mesh, style) => mesh.WithStyle(style), out refused, out problem);
 
     /// <summary>
+    /// As <see cref="Restyle(string, string?, Func{PolygonMesh, ValueTuple{FaceStyle, List{string}}}, out List{string}, out string)"/>, with the model beside the mesh,
+    /// for a change that needs the model's materials (set_material).
+    /// </summary>
+    public ModelSnapshot? Restyle(string tool, string? name, Func<Model, PolygonMesh, (FaceStyle? Style, List<string> Problems)> change,
+        out List<string> refused, out string? problem)
+    {
+        lock (_write)
+        {
+            refused = [];
+            var model = _current.Model;
+            var target = model.Target(name, out problem);
+            if (target is null) return null;
+            var (style, problems) = change(model, target.Mesh);
+            refused = problems;
+            if (style is null || problems.Count > 0) return null;
+            return PushLocked(model.With(target.Name, target.Mesh.WithStyle(style)), tool);
+        }
+    }
+
+    /// <summary>
+    /// Defines <paramref name="material"/> in the model under the lock, replacing the one of that name in place or appending, as one step.
+    /// Null, pushing nothing, with <paramref name="problems"/>, when the material has a problem (<see cref="Material.Problems"/>).
+    /// <paramref name="replaced"/> says whether a material of that name was there before.
+    /// </summary>
+    public ModelSnapshot? DefineMaterial(string tool, Material material, out bool replaced, out List<string> problems)
+    {
+        lock (_write)
+        {
+            replaced = false;
+            problems = Material.Problems(material).Select(p => $"{p.Field}: {p.Problem}").ToList();
+            if (problems.Count > 0) return null;
+            var next = _current.Model.WithMaterial(material, out replaced);
+            return PushLocked(next, tool);
+        }
+    }
+
+    /// <summary>
     /// Changes the shading (mode and hard edges) of the mesh <paramref name="name"/> picks, under the write lock, as
     /// <see cref="Restyle"/> does for the style: <paramref name="change"/> returns the new shade, or the problems that refuse it.
     /// </summary>
