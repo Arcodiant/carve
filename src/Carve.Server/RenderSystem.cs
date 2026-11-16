@@ -100,6 +100,10 @@ internal sealed class RenderSystem(
         var ambient = scenes.CreateEntity(Scene);
         entities.AddComponent(ambient, new AmbientLight { Color = Vector3.One, Intensity = 0.25f });
 
+        // The fixed sky (T-78): it lights PBR material faces only, baked once, and is never drawn.
+        var sky = scenes.CreateEntity(Scene);
+        entities.AddComponent(sky, RenderSky.Sky);
+
         _light = scenes.CreateEntity(Scene);
         entities.AddComponent(_light, new DirectionalLight { Color = Vector3.One, Intensity = 0.9f });
         entities.AddComponent(_light, new Transform3D
