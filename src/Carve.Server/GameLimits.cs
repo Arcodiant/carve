@@ -45,7 +45,7 @@ public sealed record GameLimits(int? MaxTriangles, int? MaxSubmeshes, float? Min
 
     /// <summary>
     /// The warnings for a model past these limits, each past its limit and never at it: the triangles of the whole model;
-    /// its submeshes (the primitives written) or its distinct colours; and, only for a skeleton holding every bone of
+    /// its submeshes (the primitives written, a primitive for each colour and each material a piece uses) or its distinct colours; and, only for a skeleton holding every bone of
     /// <see cref="SkinnedExport.SyntyRequiredBones"/>, the rest height of all meshes. A static model has no skeleton, so
     /// it is warned on triangles and submeshes alone.
     /// </summary>
@@ -59,8 +59,11 @@ public sealed record GameLimits(int? MaxTriangles, int? MaxSubmeshes, float? Min
         if (MaxSubmeshes is { } most)
         {
             var colours = model.Meshes.SelectMany(m => m.Mesh.Style?.Colours.Values.Select(c => c.ToUpperInvariant()) ?? []).Distinct().Count();
+            var materials = model.Meshes.SelectMany(m => Model.MaterialsUsedBy(m.Mesh)).Distinct().Count();
             if (submeshes > most || colours > most)
-                warnings.Add($"{N(submeshes)} submeshes and {N(colours)} colours, above the game's max_submeshes {N(most)}; share colours between pieces where you can");
+                warnings.Add(materials == 0
+                    ? $"{N(submeshes)} submeshes and {N(colours)} colours, above the game's max_submeshes {N(most)}; share colours between pieces where you can"
+                    : $"{N(submeshes)} submeshes, {N(colours)} colours and {N(materials)} materials, above the game's max_submeshes {N(most)}; share colours and materials between pieces where you can");
         }
         if ((MinHeight is not null || MaxHeight is not null)
             && model.Skeleton is { } skeleton && SkinnedExport.SyntyRequiredBones.All(skeleton.Names.Contains))
