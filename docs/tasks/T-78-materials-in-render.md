@@ -4,7 +4,7 @@ description: >-
 ---
 # T-78 — Materials in render
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
