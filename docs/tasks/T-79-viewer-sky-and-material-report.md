@@ -69,9 +69,11 @@ The Scope holds, with these details:
 2. **One fixed sky.** The viewer's `--sky` is T-78's sky: `ProceduralSky.Default` with its own sun direction, unchanged, baked once, with no rebake. It does not follow the viewer's sun.
 3. **Engine need 8 (D-1), Low.** The `.glb`'s glTF sampler does not decide sampling: 0.119.0 ignores it. Whoever loads a Carve `.glb` must pass `generateMipmaps: true` to get the mipmapped, trilinear textures Carve's render shows. Without it, the engine draws them nearest-sampled with no mips. Carve's render, the viewer and the tests pass the flag, and a game must pass it too.
 
+4. **No link to `RenderSky.cs` (2026-11-16, the person).** The viewer uses `ProceduralSky.Default` directly, with a comment tying it to `RenderSky.Sky`; the guard `The_viewer_references_no_Carve_code` stays untouched, since it forbids a linked Carve source file.
+
 ### As built (2026-11-16, Claude Sonnet 5.5)
 
-**The switch.** `--sky` (no value) in `ViewerOptions` (`ViewerOptions.Sky`, default false). It adds one entity carrying `Carve.Server.RenderSky.Sky`, which is `ProceduralSky.Default` unchanged, with its own sun, baked once. The viewer links `src/Carve.Server/RenderSky.cs` as a file (`Compile Include ... Link`) and still references no Carve project. The viewer's own `DirectionalLight` and ambient stay as they are; the sky does not follow them, and no sky is drawn behind the model. The viewer now loads with `LoadModel(path, generateMipmaps: true)` (ruling 1, engine need 8).
+**The switch.** `--sky` (no value) in `ViewerOptions` (`ViewerOptions.Sky`, default false). It adds one entity carrying `ProceduralSky.Default` unchanged, with its own sun, baked once: the same value as `RenderSky.Sky`, written out in `ViewerSystem` because the viewer links no Carve code (ruling 4). The viewer's own `DirectionalLight` and ambient stay as they are; the sky does not follow them, and no sky is drawn behind the model. The viewer now loads with `LoadModel(path, generateMipmaps: true)` (ruling 1, engine need 8).
 
 **How T-80 calls it**, with the barrel's export as the content folder:
 
