@@ -4,13 +4,14 @@ using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
 using SharpGLTF.Schema2;
+using CarveMaterial = Carve.Core.Material;
 
 namespace Carve.Server;
 
 /// <summary>What a skinned export wrote, for the result line.</summary>
 public sealed record SkinnedGlb(
     byte[] Bytes, IReadOnlyList<string> Pieces, IReadOnlyList<string> Materials, int Triangles,
-    int BoundToRoot);
+    int BoundToRoot, int Primitives = 0);
 
 /// <summary>
 /// A model with a skeleton as one self-contained binary glTF (D-6, A skinned export is one glTF mesh; The rest pose is
@@ -56,7 +57,9 @@ public static class SkinnedExport
     public static SkinnedGlb Write(Model model, string name)
     {
         if (model.Skeleton is null) throw new ArgumentException("the model has no skeleton", nameof(model));
-        return model.Meshes.Any(m => GlbExport.HasUvs(m.Mesh))
+        var uvs = model.Meshes.Any(m => GlbExport.HasUvs(m.Mesh))
+            || GlbExport.Textured(GlbExport.UsedBy(model.Meshes.Select(m => m.Mesh), model.Materials));
+        return uvs
             ? Write<VertexTexture1>(model, name, (m, f, v) => new VertexTexture1(GlbExport.UvAt(m, f, v)))
             : Write<VertexEmpty>(model, name, (_, _, _) => default);
     }
@@ -68,6 +71,10 @@ public static class SkinnedExport
         var (root, scene, joints, skin) = GlbRig.Start(name, skeleton);
         var builder = new MeshBuilder<MaterialBuilder, VertexPositionNormal, TvM, VertexJoints4>(name);
         var materials = new List<string>();
+        var primitiveCount = 0;
+        var images = new GlbExport.Images();
+        var shared = new Dictionary<string, MaterialBuilder>();
+        var taken = model.Meshes.SelectMany(m => Model.MaterialsUsedBy(m.Mesh)).ToHashSet();
         var triangleCount = 0;
         var boundToRoot = 0;
         foreach (var piece in model.Meshes)
@@ -76,17 +83,31 @@ public static class SkinnedExport
             var triangles = Triangulator.Triangulate(mesh);
             var corners = Shading.CornersOf(mesh);
             var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, TvM, VertexJoints4>>();
-            foreach (var (materialName, colour) in Materials(piece))
+            foreach (var p in Primitives(piece, taken))
             {
-                primitives[colour ?? ""] = builder.UsePrimitive(GlbExport.Material(materialName, colour));
-                materials.Add(materialName);
+                if (p.Material is { } m)
+                {
+                    if (!shared.TryGetValue(m, out var builderOf))
+                    {
+                        shared[m] = builderOf = GlbExport.Material(model.FindMaterial(m)!, images);
+                        materials.Add(m);
+                        primitiveCount++; // the mesh builder keeps one primitive per material, so a second piece's faces join the first's
+                    }
+                    primitives["m" + m] = builder.UsePrimitive(builderOf);
+                }
+                else
+                {
+                    primitives["c" + (p.Colour ?? "")] = builder.UsePrimitive(GlbExport.Material(p.Name, p.Colour));
+                    materials.Add(p.Name);
+                    primitiveCount++;
+                }
             }
 
             foreach (var t in triangles)
             {
                 var face = mesh.Faces[t.Face];
                 var at = corners[t.Face];
-                var primitive = primitives[GlbExport.ColourOf(mesh, t.Face) ?? ""];
+                var primitive = primitives[GlbExport.KeyOf(mesh, t.Face)];
                 primitive.AddTriangle(
                     Vertex(mesh, t.A, at[face.CornerOf(t.A)], texture(mesh, t.Face, t.A)),
                     Vertex(mesh, t.B, at[face.CornerOf(t.B)], texture(mesh, t.Face, t.B)),
@@ -102,17 +123,35 @@ public static class SkinnedExport
         GlbRig.WriteClips(root, skeleton, joints, model.Clips);
 
         var pieces = model.Names.ToList();
-        return new SkinnedGlb(root.WriteGLB().ToArray(), pieces, materials, triangleCount, boundToRoot);
+        return new SkinnedGlb(root.WriteGLB().ToArray(), pieces, materials, triangleCount, boundToRoot, primitiveCount);
     }
 
-    /// <summary>The piece's primitives in order of first use by face: (material name, colour or null for uncoloured).</summary>
-    public static List<(string Name, string? Colour)> Materials(NamedMesh piece)
+    /// <summary>The piece's primitives in order of first use by face: (material name, colour or null for uncoloured). Material faces are not in it; see <see cref="Primitives"/>.</summary>
+    public static List<(string Name, string? Colour)> Materials(NamedMesh piece) =>
+        [.. Primitives(piece, new HashSet<string>()).Where(p => p.Material is null).Select(p => (p.Name, p.Colour))];
+
+    /// <summary>One primitive of a piece: its glTF material's name, its colour (null: uncoloured), and the Carve material's name when it has one.</summary>
+    internal sealed record Primitive(string Name, string? Colour, string? Material);
+
+    /// <summary>
+    /// The piece's primitives: the colours and the uncoloured faces in order of first use by face, then each Carve material
+    /// in order of first use, named for the material. The uncoloured primitive is named for the bare mesh, and when that is
+    /// also the name of a material used in the model (<paramref name="taken"/>) it is <c>&lt;mesh&gt;:uncoloured</c> instead
+    /// (with <c>_</c> added until no group of the piece has that name), since a material's name holds no ':'.
+    /// </summary>
+    internal static List<Primitive> Primitives(NamedMesh piece, IReadOnlySet<string> taken)
     {
         var mesh = piece.Mesh;
         var order = new List<string?>();
         var faces = new Dictionary<string, List<int>>();
+        var materials = new List<string>();
         foreach (var f in mesh.LiveFaces)
         {
+            if (mesh.Style?.MaterialOf(f) is { } material)
+            {
+                if (!materials.Contains(material)) materials.Add(material);
+                continue;
+            }
             var colour = GlbExport.ColourOf(mesh, f);
             if (!faces.TryGetValue(colour ?? "", out var list))
             {
@@ -125,7 +164,17 @@ public static class SkinnedExport
         // A group name that is another primitive's colour would give two primitives one name; that primitive keeps its
         // colour name instead. Colours are unique within the piece and mesh names hold no ':', so the names are unique in the file.
         var hexes = order.Where(c => c is not null).Select(c => Hex(c!)).ToList();
-        return [.. order.Select(c => (c is null ? piece.Name : $"{piece.Name}:{UnclashedGroup(mesh, faces[c], Hex(c), hexes) ?? Hex(c)}", c))];
+        var bare = piece.Name;
+        if (taken.Contains(bare))
+        {
+            var groups = mesh.Style?.Groups.Select(g => g.Name).ToHashSet() ?? [];
+            var suffix = "uncoloured";
+            while (groups.Contains(suffix) || hexes.Contains(suffix)) suffix += "_";
+            bare = $"{piece.Name}:{suffix}";
+        }
+        var result = order.Select(c => new Primitive(c is null ? bare : $"{piece.Name}:{UnclashedGroup(mesh, faces[c], Hex(c), hexes) ?? Hex(c)}", c, null)).ToList();
+        result.AddRange(materials.Select(m => new Primitive(m, null, m)));
+        return result;
     }
 
     private static string Hex(string colour) => colour.TrimStart('#').ToLowerInvariant();

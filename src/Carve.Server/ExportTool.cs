@@ -18,8 +18,12 @@ public sealed class ExportTool(ModelStore store)
         + "What is written: one mesh on one node, both named after the file name without its extension (crate.glb gives crate), the node's transform the identity; "
         + "the triangles render draws, with flat normals: each face keeps its own normal, so every edge is hard; "
         + "one matte grey material named 'carve' (base colour 0.72, 0.72, 0.70, metallic 0, roughness 1, single-sided), and for faces coloured with set_colour one more opaque matte material per colour, named 'carve #RRGGBB', its baseColorFactor the linear form of the colour (metallic 0, roughness 1), a primitive for each; "
-        + "positions and normals, and when any face has UVs a TEXCOORD_0 holding each corner's UV exactly as Carve holds it (no conversion: glTF's axes, (0, 0) at the image's top-left), a vertex split wherever its UV or normal differ; "
-        + "a model with no UVs has no TEXCOORD_0; the corners of a face without UVs are written as (0, 0), and the result warns '<mesh>: N faces have no UVs; their corners are written as (0, 0)' with the first face ids; no vertex colours or textures. "
+        + "faces given a material with set_material (define_material) are written as glTF pbrMetallicRoughness, one primitive per material under the material's own name, after the colours' primitives, in order of first use by face: "
+        + "baseColorFactor the linear form of base_colour (alpha 1), metallicFactor and roughnessFactor always written (glTF's default metallic is 1, so a material at its default roughness 1 and metallic 0 says so), emissiveFactor the linear form of emissive and left out when it is black, doubleSided, "
+        + "and each texture embedded in the .glb as the PNG bytes it was defined with, unchanged (a PNG used by several materials or channels is embedded once): base_colour_texture as baseColorTexture, metallic_roughness_texture as metallicRoughnessTexture (roughness in G, metallic in B), normal_texture as normalTexture, emissive_texture as emissiveTexture, occlusion_texture as occlusionTexture with the material's occlusion as its strength (occlusion without an occlusion_texture is not written: glTF only scales the map). "
+        + "An emissive_texture shows only with a non-black emissive, which multiplies it. No alpha fields and no sampler are written: materials are opaque, and the engine uses its own sampling. "
+        + "positions and normals, and when any face has UVs, or any material in use has a texture, a TEXCOORD_0 holding each corner's UV exactly as Carve holds it (no conversion: glTF's axes, (0, 0) at the image's top-left), a vertex split wherever its UV or normal differ; "
+        + "a model with no UVs has no TEXCOORD_0; the corners of a face without UVs are written as (0, 0), and the result warns '<mesh>: N faces have no UVs; their corners are written as (0, 0)' with the first face ids, and for faces of a textured material \"material 'wood' has a texture, but N faces using it have no UVs; their corners are written as (0, 0) (<mesh> faces ...)\" in place of that warning for those faces; no vertex colours. "
         + "Axes and units are the mesh's own: +Y up, +Z front, 1 unit = 1 m, the origin where you authored it. Nothing is scaled, turned, recentred or converted, "
         + "so build the model at the size and place the game wants it. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
@@ -29,7 +33,7 @@ public sealed class ExportTool(ModelStore store)
         + "which leaves any file already there as it was and no partial file. "
         + "A model of several meshes and no skeleton is written as one mesh, every mesh merged in order, as above. "
         + "With a skeleton (define_skeleton) the file is skinned, for a character: one glTF mesh named after the file holding every mesh of the model as primitives, "
-        + "one per mesh and colour (meshes in order, colours by first face), each with its own material: '<mesh>' for uncoloured faces, '<mesh>:<group>' when a face group holds exactly that colour's faces, else '<mesh>:<rrggbb>' (also when the group's name is another colour's rrggbb in that mesh, so no two materials share a name); "
+        + "one per mesh and colour (meshes in order, colours by first face), each with its own material: '<mesh>' for uncoloured faces, '<mesh>:<group>' when a face group holds exactly that colour's faces, else '<mesh>:<rrggbb>' (also when the group's name is another colour's rrggbb in that mesh, so no two materials share a name); then the materials the mesh's faces use, one primitive each named for the material (a material two meshes use is one glTF material and one primitive, with both meshes' faces; a material named like a mesh renames that mesh's uncoloured material to '<mesh>:uncoloured' only when the names clash); "
         + "positions in the rest pose with JOINTS_0 and WEIGHTS_0 from set_weights; a node 'Armature' (identity, not a bone) with the bones under it in your order; skins[0] over every bone, "
         + "its inverse bind matrices the inverse of each bone's rest world transform; and one animation per clip (define_clip), LINEAR or STEP, every animated channel keyed at 0 and at the clip's duration. "
         + "A vertex with no weight is refused, the vertices listed and nothing written; allow_unweighted: true exports anyway, binding them to the first root bone, and the result says so. "
@@ -38,7 +42,7 @@ public sealed class ExportTool(ModelStore store)
         + "write_limits: true fills in the keys the file is missing with Orcward's starting numbers (max_triangles 5000, max_submeshes 8, min_height 1.4, max_height 2.4), creating the file beside the .glb when none was named or found, and never changes a key already set, though it rewrites the file with the keys in a fixed order (plain JSON, no comments); it is written after the .glb, and the result says what it filled. Edit the numbers to the game's own. "
         + "A limits file that is not a plain JSON object of those keys (a count a whole number of at least 1, a height a number above 0, min_height not above max_height), a limits argument naming no file without write_limits, or one no file could be written at (a file that is not .json, a folder, a character a path may not hold), is a tool error that writes nothing. "
         + "A mesh with warnings still exports, and the result repeats them. export changes nothing: not the mesh, its ids, or what undo steps back to. "
-        + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve' (or each material, when there are several), size <x> x <y> x <z> m, "
+        + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve' (or each material, when there are several) (the colours' and each material's name), size <x> x <y> x <z> m, "
         + "bounds (<min x, y, z>) to (<max x, y, z>), then where the limits came from (limits from <file>, or no game limits), then any warnings; a skinned export's line names its pieces, materials, bones and clips instead of the one material. "
         + "mode: 'model' (the default) writes all of the above; 'clips' writes the armature, skins[0] and the animations with no mesh, no node holding a mesh and no material, "
         + "which is one file of clips for every character that shares the skeleton: a game loads it with IModelGeometryLoader.LoadAnimationSet (the same bones in the same order and the same clips as the model file) and retargets it, "
@@ -47,6 +51,7 @@ public sealed class ExportTool(ModelStore store)
         + "A role map (*.humanoid.json) and clip events (*.events.json) are sidecars the game writes beside the file; carve writes none. Clips mode has no mesh, so no limit warnings, though it reads and writes the limits file as model mode does. "
         + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
         + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
+        + "Worked example of a material: define_material {name: 'wood', base_colour: '#C8A06E', roughness: 0.6, base_colour_texture: 'wood.png'}, project_uvs, set_material {faces: [0, 1], material: 'wood'}, then export: the .glb holds primitives 'carve' and 'wood', 'wood' with baseColorTexture holding wood.png's bytes, the result line says 2 materials 'carve', 'wood', and the game's loader reads 'wood' back as that material. "
         + "Worked example, writing into a game's content folder (put the game's folder for <game>; the first export for a game can add limits: \"<game>/Content\" and write_limits: true to start <game>/Content/carve-limits.json); the game then loads it as "
         + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
         + ExampleMarker + SaveTool.WorkedExport;
@@ -133,11 +138,12 @@ public sealed class ExportTool(ModelStore store)
     private static CallToolResult Static(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source)
     {
         var triangles = Shading.Triangles(mesh);
-        var bytes = GlbExport.Write(mesh, triangles, target.Stem);
+        var bytes = GlbExport.Write(mesh, triangles, target.Stem, model.Materials);
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
-        var warnings = source.Limits.Warnings(model, triangles.Count, GlbExport.MaterialNames(mesh).Length);
-        return Line(Summary(mesh, target, replaced, triangles.Count, source.Describe(written: false), warnings, GlbExport.UvWarnings(model)));
+        var warnings = source.Limits.Warnings(model, triangles.Count, GlbExport.MaterialNames(mesh, model.Materials).Length);
+        return Line(Summary(mesh, GlbExport.MaterialNames(mesh, model.Materials), target, replaced, triangles.Count, source.Describe(written: false), warnings,
+            [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model)]));
     }
 
     /// <summary>Clips mode: the armature, skin and animations with no mesh, or a refusal that writes nothing.</summary>
@@ -186,8 +192,9 @@ public sealed class ExportTool(ModelStore store)
             line += $"; allow_unweighted: {N(glb.BoundToRoot)} vertices with no weight were bound to the first root bone '{skeleton.Bones[0].Name}'";
 
         line += source.Describe(written: false);
-        var warnings = source.Limits.Warnings(model, glb.Triangles, glb.Materials.Count).ToList();
+        var warnings = source.Limits.Warnings(model, glb.Triangles, glb.Primitives).ToList();
         warnings.AddRange(GlbExport.UvWarnings(model));
+        warnings.AddRange(GlbExport.MaterialUvWarnings(model));
         foreach (var piece in model.Meshes)
             warnings.AddRange(MeshReport.Create(piece.Mesh).Warnings.Select(w => $"mesh '{piece.Name}': " + w.ToString().ReplaceLineEndings(" ")));
         if (warnings.Count > 0)
@@ -196,15 +203,14 @@ public sealed class ExportTool(ModelStore store)
     }
 
     /// <summary>The result line; numbers are culture-invariant.</summary>
-    private static string Materials(PolygonMesh mesh)
+    private static string Materials(string[] names)
     {
-        var names = GlbExport.MaterialNames(mesh);
         return names.Length == 1
             ? $"1 material '{names[0]}'"
             : $"{names.Length.ToString(CultureInfo.InvariantCulture)} materials {NameList.Quoted(names)}";
     }
 
-    private static string Summary(PolygonMesh mesh, ToolPath target, bool replaced, int triangles, string limits, IReadOnlyList<string> limitWarnings, IReadOnlyList<string> uvWarnings)
+    private static string Summary(PolygonMesh mesh, string[] materialNames, ToolPath target, bool replaced, int triangles, string limits, IReadOnlyList<string> limitWarnings, IReadOnlyList<string> uvWarnings)
     {
         var report = MeshReport.Create(mesh);
         var (min, max) = (report.BoundsMin, report.BoundsMax);
@@ -213,7 +219,7 @@ public sealed class ExportTool(ModelStore store)
         static string Point(Vector3 v) => $"({N(v.X)}, {N(v.Y)}, {N(v.Z)})";
 
         var line = $"exported {target.Written(replaced)}: "
-            + $"{triangles.ToString(CultureInfo.InvariantCulture)} triangles, {Materials(mesh)}, "
+            + $"{triangles.ToString(CultureInfo.InvariantCulture)} triangles, {Materials(materialNames)}, "
             + $"size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}"
             + limits;
         var warnings = limitWarnings.Concat(report.Warnings.Select(w => w.ToString().ReplaceLineEndings(" "))).Concat(uvWarnings).ToList();
