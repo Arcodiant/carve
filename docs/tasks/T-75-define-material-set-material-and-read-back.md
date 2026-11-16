@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-74
 
-**Verify:** server-unit, server-regression, scenario-cube, scenario-crate, scenario-shed, scenario-export, scenario-character, scenario-soft
+**Verify:** server-unit, server-regression, scenario-cube, scenario-crate, scenario-shed, scenario-export, scenario-character, scenario-soft, scenario-uvs, scenario-cuts, scenario-gatehouse, scenario-rig
 
 **Perf:** skip: Carve declares no heavy suites
 
