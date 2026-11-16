@@ -72,3 +72,17 @@ A model's materials reach the game inside the one `.glb`: every PBR field and te
   - report a long `verify` wait;
   - evidence in the milestone worktree's `artifacts/review/T-76/`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### Checked against landed code (2026-11-16)
+
+- **Static export sees a mesh, not a model.** `ExportTool` passes `model.Combined` to `GlbExport.Write(PolygonMesh?, …)`, and the material definitions live on `Model` (T-74). Pass the model's `Materials` into `GlbExport` as well. `Combined` carries each face's material name (T-74).
+- **Skinned names the uncoloured primitive after the bare mesh name**, not `carve` (`SkinnedExport.Materials`, line 128). So a material named like a mesh clashes, and T-74's name rules do not prevent it. This is T-74's open question Q1, and its recommended answer puts the fix here.
+- **No `TEXCOORD_0` when no face has UVs.** `GlbExport.HasUvs` writes UVs only when some live face is mapped, so a textured material on an unmapped model would reference texcoords that are not there. Suggest writing `TEXCOORD_0` (unmapped corners at (0, 0), as today) whenever a used material has a texture. No existing export has a material, so no existing bytes change. Put this to the person.
+- **An export UV warning already exists.** `GlbExport.UvWarnings` warns per piece (`<mesh>: N faces have no UVs; …`) whenever any piece has UVs. Suggest the Scope say how the new per-material warning sits beside it: an addition, or the same faces named once.
+- **The submesh limit is `GameLimits.Warnings`**, not `SkinnedExport`. It counts distinct colours and its text says "colours". Counting materials means editing `GameLimits.cs` and possibly that text, which is outside the owned list and an existing warning's wording.
+- **`ExportTool`'s description** (line 20) says the export holds only `carve` and `carve #RRGGBB` materials. It is content and needs the material sentence. `ExportTool.Materials` (line 199) summarises colours only.
+
+### Rulings (2026-11-16, the person)
+
+- A material may share a mesh's name. Skinned export renames the uncoloured primitive's material only when the names clash.
+- Export writes `TEXCOORD_0` whenever a material in use has a texture (faces without UVs get (0, 0) and are warned of already).

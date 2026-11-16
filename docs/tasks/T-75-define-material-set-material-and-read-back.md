@@ -70,3 +70,23 @@ An agent gives faces materials through MCP: it defines a named material from PNG
   - report a long `verify` wait;
   - evidence in the milestone worktree's `artifacts/review/T-75/`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### Checked against landed code (2026-11-16)
+
+- **`check` already warns on unmapped faces.** `MeshUvHealth` gives `faces[n]: no UVs, so the face samples the texture's corner` for every unmapped live face, but only when the mesh has at least one mapped face.
+  - In a partly mapped mesh, a textured-material face with no UVs would get that warning and the new one.
+  - In a mesh with no UVs at all, it gets only the new one.
+  
+  Suggest the Scope say which applies: one warning per face that names the material, either replacing the existing one for that face or added only where it does not fire. Put this to the person; T-74's Plan collects the other open rules.
+- **Files outside the owned list.**
+  - `set_material` and `define_material` need the model's materials. `ModelStore.Restyle` hands the change a mesh only, so a model-level store method is needed in `ModelStore.cs`.
+  - `save` and `open` must pass the `.carve` file's folder to `CarveFile.Write`/`Read` (T-74's Plan: `Write(Model, folder)`, `Read(text, folder)`), in `SaveTool.cs` and `OpenTool.cs`.
+  
+  Suggest adding all three files to this task's ownership. T-76 does not touch them.
+- **`save mesh=` and `open mesh=`** carry materials by T-74's rules for Q2 and Q3. The regression test should cover the ruled behaviour.
+
+### Rulings (2026-11-16, the person)
+
+- `merge_faces`' warning names a face's material rather than saying "colour none".
+- In `check`, the material warning for a textured face with no UVs replaces the generic unmapped-face warning on that face: one warning per face.
+- `save mesh=` writes only the materials that mesh uses; `open mesh=` refuses a same-named material defined differently; a texture with no relative path from the save folder refuses the save (all three in T-74's Rulings).
