@@ -198,6 +198,7 @@ Researched 2026-11-16 against the milestone worktree (M-6 and M-5 landed; T-71 s
 - For T-76: a material named like a mesh is allowed; skinned export renames the uncoloured primitive's material only when it clashes.
 - For T-75: `merge_faces`' warning names a face's material; `check`'s textured-without-UVs warning replaces the generic unmapped-face warning on that face.
 - For T-76: export writes `TEXCOORD_0` whenever a used material has a texture.
+- `open mesh=` brings in and compares only the materials the opened mesh's faces use; the rest of the file's list is ignored (as built, kept by the person 2026-11-16).
 
 ### As built (2026-11-16, Claude Opus 5.5)
 
