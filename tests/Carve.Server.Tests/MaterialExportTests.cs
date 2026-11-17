@@ -141,6 +141,21 @@ public class MaterialExportTests
         Assert.Equal(0.0, material.GetProperty("pbrMetallicRoughness").GetProperty("metallicFactor").GetDouble()); // written: glTF's default is 1
     }
 
+    /// <summary>What export's description says of the factors (RV-47): each is left out when it equals glTF's default 1.</summary>
+    [Fact]
+    public void Metallic_and_roughness_factors_are_left_out_where_they_equal_glTFs_default_of_1()
+    {
+        var glb = Static(StaticModel(Steel with { Roughness = 1f }, new Material("wood")));
+        var wood = MaterialJson(glb, "wood").GetProperty("pbrMetallicRoughness");
+        Assert.Equal(0.0, wood.GetProperty("metallicFactor").GetDouble());
+        Assert.False(wood.TryGetProperty("roughnessFactor", out _));
+        var metal = MaterialJson(glb, "steel").GetProperty("pbrMetallicRoughness");
+        Assert.False(metal.TryGetProperty("metallicFactor", out _));
+        Assert.False(metal.TryGetProperty("roughnessFactor", out _));
+        var parsed = Parse(glb).SubmeshMaterials[3]!; // carve, carve #C8503C, wood, steel
+        Assert.Equal((1f, 1f), (parsed.Metallic, parsed.Roughness));
+    }
+
     [Fact]
     public void Each_corners_UV_is_written_as_Carve_holds_it_so_a_texture_lands_unflipped()
     {
