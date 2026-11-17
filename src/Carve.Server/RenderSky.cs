@@ -4,8 +4,8 @@ namespace Carve.Server;
 
 /// <summary>
 /// The fixed sky that lights a face with a material (T-78): the engine's <see cref="ProceduralSky.Default"/> unchanged, sun
-/// included, so a PBR metal has something to reflect. The one definition, in engine types only, so that the viewer links this
-/// file and lights a model as <c>render</c> does.
+/// included, so a PBR metal has something to reflect. The viewer links no Carve code (T-79's ruling 4), so it repeats this
+/// sky from <see cref="ProceduralSky.Default"/> in its own <c>ViewerSystem</c>: a change here does not reach the viewer.
 /// </summary>
 /// <remarks>
 /// Nothing here follows the camera or Carve's directional light (<see cref="ProceduralSky.SunFromDirectionalLight"/> stays off),

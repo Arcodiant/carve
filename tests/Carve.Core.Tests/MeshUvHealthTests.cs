@@ -111,7 +111,7 @@ public class MeshUvHealthTests
     private static PolygonMesh Overlapping(Func<FaceStyle, FaceStyle> style)
         => Mapped((0, Unflipped(0, 0, 1, 1)), (1, Unflipped(0, 0, 1, 1))).WithStyle(style(FaceStyle.None));
 
-    // T-80: faces with different materials sample different textures, so sharing a UV area is no fault.
+    // T-80's ruling 5: faces with different materials are not warned of, even were their materials to share a PNG.
     [Fact]
     public void An_overlap_between_two_different_materials_is_not_warned_of()
         => Assert.Empty(UvWarnings(Overlapping(s => s.WithMaterial([0], "wood").WithMaterial([1], "iron"))));
