@@ -53,7 +53,7 @@ internal static class MaterialsSpec
 }
 
 /// <summary>
-/// M-7 through the real tools: the barrel (M-6's sample) given UVs, four materials and their textures, seen in eight frames with every pixel worked
+/// M-7 through the real tools: the barrel (M-6's sample) given UVs, four materials and their textures, seen in nine frames with every pixel worked
 /// from the geometry, the UVs and the textures, then saved, reopened and exported for the viewer.
 /// </summary>
 public sealed class MaterialsScenario : IScenario

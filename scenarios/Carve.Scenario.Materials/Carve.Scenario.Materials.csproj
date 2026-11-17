@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The materials: the barrel given UVs, four materials and their textures, seen in eight frames, saved, reopened and exported for the viewer. -->
+  <!-- The materials: the barrel given UVs, four materials and their textures, seen in nine frames, saved, reopened and exported for the viewer. -->
   <PropertyGroup>
     <RootNamespace>Carve.Scenario.Materials</RootNamespace>
     <IsPackable>false</IsPackable>
@@ -13,7 +13,7 @@
     <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
   </ItemGroup>
 
-  <!-- Linked, never copied: the Uvs scenario's barrel and its mesh reading, the Crate's build and camera, and the generator that labels the textures' regions. -->
+  <!-- Linked, never copied: the Uvs scenario's mesh reading, the Crate's build and camera, and the generator that labels the textures' regions. -->
   <ItemGroup>
     <Compile Include="../Carve.Scenario.Uvs/UvsScene.cs" Link="UvsScene.cs" />
     <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
