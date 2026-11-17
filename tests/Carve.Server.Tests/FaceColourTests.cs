@@ -80,7 +80,7 @@ public class FaceColourTests
         // the engine's glTF parser reads from the exported file in the same submesh: every parameter the loader passes to
         // Material.Pbr is equal, and the material is the PBR path, not the classic lit one.
         var mesh = Coloured();
-        MeshBridge.ToSubmeshedMeshData(mesh, DrawnSpace.Of(Vector3.Zero, Vector3.One), out var colours);
+        MeshBridge.ToSubmeshedMeshData(mesh, DrawnSpace.Of(Vector3.Zero, Vector3.One), out var colours, out _);
         var parsed = GlbExportTests.Parser.Parse(GlbExport.Write(mesh, Shading.Triangles(mesh), "cube"), ModelFormat.Gltf)
             .SubmeshMaterials.Select(m => m!).ToArray();
 

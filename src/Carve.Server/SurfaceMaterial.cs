@@ -1,5 +1,6 @@
 using Carve.Core;
 using Empyrean;
+using Material = Empyrean.Material;
 
 namespace Carve.Server;
 
