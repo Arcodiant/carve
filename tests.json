@@ -36,6 +36,12 @@
         {
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Acceptance/Carve.Scenario.Acceptance.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj"
+        },
         "tests/Carve.Server.Tests/Fixtures/*.png",
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",

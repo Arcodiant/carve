@@ -143,6 +143,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - **T-86** (off-milestone): `server-regression` timing out on a loaded machine (below).
 - **T-51** (per-game export limits) is still open.
 - `CLAUDE.md` and the acceptance check's files are inputs of no suite; the latter by ruling.
+  - **The person's ruling (2026-11-17), "Add as inputs":** the two acceptance projects are inputs of `server-unit` (its build compiles them; nothing new runs), while `CLAUDE.md` and the `run-acceptance-*.ps1` scripts stay uncovered.
 
 **Test report** (`cairn test report --since 3d`):
 - `server-regression` is again about 90 % of the slot time. It caught 9 failures, 7 of them unique to it.
@@ -196,5 +197,6 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - **Behaviour-preserving only:** one `WarningsSuffix` for export's and save's result lines; `ColourRule`'s lit surface and hex parsing each in one place (`Lit` and `GreyRedLessBlue` share it); the gardener's rest colour check moved into `GardenerPixels.ExpectRestColours`, shared by character and soft; the cube's pre-sky comments brought up to date; `CLAUDE.md`'s layout names every scenario linking `ColourRule` and `GardenerPixels`, and gains the sky scenario's row.
 - **As built brought up to date:** T-45's loop closure on X, Y and Z (T-83); T-50's piece height rule in `GameLimits.Warnings(..., wholeBody: !asPiece)` and its argument list (T-51); T-49's frame rule as luma past 4 (the sky rebase's ruling), its rounds measured under the rule they ran with. Each says what changed in a sentence.
 - **The guard:** `cairn milestone M-19 verify` passed every check but `review` (17 suites, 17 ran), and all 490 frames, `.glb`, `.carve` and `.tsv` files of the 14 frame suites are hash-identical to dbd296e's run.
+- **Uncovered files, the person's ruling (2026-11-17), "Add as inputs":** `scenarios/Carve.Scenario.Acceptance` and `tests/Carve.AcceptanceLoad.Tests` were added to `server-unit`'s inputs as `dotnet-closure`s, so a change to them alone re-runs a suite whose solution build compiles them, and `cairn lint` no longer warns that no suite runs the test project.
 - **Left:** the crate's and shed's "not highlighted" checks repeat the same `GreyRedLessBlue` within-6 test with different reporting (`Fail` against `Note`); the Orcward frame check and the character's can and hand checks are alike but check different things (flips, frame names).
 
