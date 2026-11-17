@@ -37,7 +37,7 @@ internal static class ColourRule
     /// <summary>Colour / grey for each channel, the colour's channels in linear light.</summary>
     public static double[] Scale(string hex)
     {
-        var (r, g, b) = (Convert.ToInt32(hex[1..3], 16), Convert.ToInt32(hex[3..5], 16), Convert.ToInt32(hex[5..7], 16));
+        var (r, g, b) = Channels(hex);
         var albedo = new Vector3((float)Linear(r), (float)Linear(g), (float)Linear(b));
         return [albedo.X / Grey.X, albedo.Y / Grey.Y, albedo.Z / Grey.Z];
     }
@@ -60,12 +60,8 @@ internal static class ColourRule
     /// </summary>
     public static double[] Lit(string hex, Vector3 normal, Vector3 direction)
     {
-        var (r, g, b) = (Convert.ToInt32(hex[1..3], 16), Convert.ToInt32(hex[3..5], 16), Convert.ToInt32(hex[5..7], 16));
-        var nl = Math.Max(0, Vector3.Dot(Vector3.Normalize(normal), ToLight(direction)));
-        var diffuse = 0.25 + (Light * nl / Math.PI);
-        var sky = SkyLight(normal);
-        var s = Reflected(normal, direction);
-        return [(Linear(r) * (diffuse + sky[0])) + s[0], (Linear(g) * (diffuse + sky[1])) + s[1], (Linear(b) * (diffuse + sky[2])) + s[2]];
+        var (r, g, b) = Channels(hex);
+        return Lit(Linear(r), Linear(g), Linear(b), normal, direction);
     }
 
     /// <summary>
@@ -153,11 +149,8 @@ internal static class ColourRule
     /// </summary>
     public static int GreyRedLessBlue(Vector3 normal, Vector3 direction)
     {
-        var nl = Math.Max(0, Vector3.Dot(Vector3.Normalize(normal), ToLight(direction)));
-        var diffuse = 0.25 + (Light * nl / Math.PI);
-        var sky = SkyLight(normal);
-        var s = Reflected(normal, direction);
-        return Encode((Grey.X * (diffuse + sky[0])) + s[0]) - Encode((Grey.Z * (diffuse + sky[2])) + s[2]);
+        var lit = Lit(Grey.X, Grey.Y, Grey.Z, normal, direction);
+        return Encode(lit[0]) - Encode(lit[2]);
     }
 
     /// <summary>A linear channel in 8 bit sRGB, rounded and clipped.</summary>
@@ -172,6 +165,23 @@ internal static class ColourRule
     {
         var c = channel / 255.0;
         return c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+    }
+
+    /// <summary>A <c>#RRGGBB</c> colour's three 8 bit sRGB channels.</summary>
+    private static (int R, int G, int B) Channels(string hex) =>
+        (Convert.ToInt32(hex[1..3], 16), Convert.ToInt32(hex[3..5], 16), Convert.ToInt32(hex[5..7], 16));
+
+    /// <summary>
+    /// The pixel, in linear light, of a surface of linear albedo (<paramref name="r"/>, <paramref name="g"/>, <paramref name="b"/>)
+    /// under T-82's light model with the sky: albedo x (ambient 0.25 + the light x n.l / pi + the sky's light) plus <see cref="Reflected"/>.
+    /// </summary>
+    private static double[] Lit(double r, double g, double b, Vector3 normal, Vector3 direction)
+    {
+        var nl = Math.Max(0, Vector3.Dot(Vector3.Normalize(normal), ToLight(direction)));
+        var diffuse = 0.25 + (Light * nl / Math.PI);
+        var sky = SkyLight(normal);
+        var s = Reflected(normal, direction);
+        return [(r * (diffuse + sky[0])) + s[0], (g * (diffuse + sky[1])) + s[1], (b * (diffuse + sky[2])) + s[2]];
     }
 
     private static readonly Vector3 FrontDirection = new(1.6f, 1.2f, 2.2f);
