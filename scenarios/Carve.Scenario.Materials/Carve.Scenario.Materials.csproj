@@ -15,7 +15,6 @@
 
   <!-- Linked, never copied: the Uvs scenario's barrel and its mesh reading, the Crate's build and camera, and the generator that labels the textures' regions. -->
   <ItemGroup>
-    <Compile Include="../Carve.Scenario.Uvs/BarrelSpec.cs" Link="BarrelSpec.cs" />
     <Compile Include="../Carve.Scenario.Uvs/UvsScene.cs" Link="UvsScene.cs" />
     <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
     <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />

@@ -313,7 +313,6 @@
         {
           "dotnet-closure": "tests/Carve.MaterialsLoad.Tests/Carve.MaterialsLoad.Tests.csproj"
         },
-        "scenarios/Carve.Scenario.Uvs/BarrelSpec.cs",
         "scenarios/Carve.Scenario.Uvs/UvsScene.cs",
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
