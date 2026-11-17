@@ -36,7 +36,7 @@ A model is a tree of named parts. Each part has its own transform relative to it
 A part exports as a glTF node with its name and transform. Its geometry is the node's mesh, and instances are nodes that share one mesh. glTF's scene is already a named node tree, Y up with counter-clockwise front faces, the same as Carve, so this needs no conversion beyond triangulating.
 
 **Alternatives:** flatten the whole model into one mesh on export.
-**Would change if:** Empyrean's `IModelLoader` ignores or flattens the node hierarchy. Not checked yet.
+**Would change if:** Empyrean's `IModelLoader` ignores or flattens the node hierarchy. Checked at M-9's planning (2026-11-17): Empyrean 0.119.0's `SplitParts` load keeps every mesh node, every animated node and their ancestors, and shares one `Mesh` between nodes on one glTF mesh. It refuses a skinned file, morph targets and a mirrored node.
 
 ### A part's origin is its pivot
 
@@ -52,6 +52,8 @@ glTF has no separate pivot: a node turns about its own origin. A part's pivot is
 **Certainty:** Leaning · **Strictness:** Guideline
 
 The Carve file keeps the full tree. The `.glb` keeps a node only where something moves, has a socket, or is an instance, and merges static subtrees into their parent's mesh, so bolts and track links do not each cost a draw call and a transform.
+
+At M-9's planning (2026-11-17) the person ruled the details: a part keeps its node when it is marked `moves` (M-13 adds sockets); one root node named after the file holds every static part; and static instances are merged too, so only moving instances are nodes sharing one mesh. A model with nothing marked `moves` exports as before.
 
 **Alternatives:** mirror the tree one to one.
 **Would change if:** draw calls do not matter for Empyrean games at prop scale, or a merge loses something a game needs.
@@ -91,9 +93,14 @@ The modelling skill goes: brief, then a part tree (parts, envelopes, relationshi
 
 ## Open questions
 
-- **The file.** How the tree extends M-3's version 1 Carve file (`{"carve": 1, "vertices", "faces"}`): a version 2 with a `parts` key, or a file per part. Decided at M-9's planning.
-- **Ids.** How tools name a part, and what happens to vertex and face ids within a part when the tree changes.
-- **Kept levels.** Stored as a full mesh per level, or as a mesh plus the step it came from.
-- **Rigid or moving.** Whether merging uses a `rigid` flag on the part, the absence of a pivot or socket, or both.
-- **LOD and collision encoding.** `MSFT_lod`, naming conventions (`_LOD1`, `_col`) or other. This turns on what Empyrean loads. Decided at M-12's planning.
-- **Envelopes.** Whether a child outside its parent's envelope is a warning, an error, or only reported.
+Settled at M-9's planning (2026-11-17), by the person; the full list is in [M-9](../milestones/M-9-parts.md)'s *Decided at planning*:
+
+- **The file.** Version 7 adds `parts`, plus `levels` on a mesh. It is written only when the model needs it, and every mesh is a part.
+- **Ids.** Part names are unique in one flat namespace. Edit tools keep `mesh`, which names a part with geometry. Instances are `instance_of` a part that owns geometry. Ids stay in each part's own mesh, in part-local coordinates, so changes to the tree never change them.
+- **Kept levels.** A level is a full mesh snapshot with an explicit number. "Level N" means each part's newest kept level ≤ N.
+- **Rigid or moving.** A `moves` flag, with the merge rules above.
+- **Envelopes.** An envelope is in the part's own local space and covers its subtree. Leaving one is a warning in `check` and `get_parts`, never a refusal.
+
+Still open:
+
+- **LOD and collision encoding.** `MSFT_lod`, naming conventions (`_LOD1`, `_col`) or something else. This turns on what Empyrean loads: 0.119.0 has a `LodGroups` load of sibling `<stem>_LODn` nodes. Decided at M-12's planning.
