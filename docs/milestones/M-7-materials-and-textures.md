@@ -267,13 +267,14 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
 - **Fixes:**
   - Fixer A (Opus 5.5) answered 16 findings (15 defects, one found twice). Fixer B (Sonnet 5.5) answered 6 in the viewer and scenario. The orchestrator answered the other 3.
   - Every code fix has a break shown failing, except the `Keep` call site in `RenderSystem`, which has none of its own.
-  - Every existing frame and committed export stayed byte-identical. Fixer B's table of 229 frames was taken before fixer A's render change `68f810e`. RV-48 had it taken again at the head (`3f9ba34`), with all 229 scenario frames and all 120 of server-regression's test frames identical to `307d692`. Fixer A pinned the soft gardener's and the gatehouse's exports to what `main` writes.
+  - Every existing frame and committed export stayed byte-identical. Fixer B's table of 229 frames was taken before fixer A's render change `68f810e`. RV-48 had it taken again at `3f9ba34` on `fix/RV-48`, whose code is identical to the landed `3893cf6`, with all 229 scenario frames and all 120 of server-regression's test frames identical to `307d692`. Fixer A pinned the soft gardener's and the gatehouse's exports to what `main` writes.
   - Each fixer ran the suites its changes touched on its own branch. After its rebase, fixer A re-ran core-unit, server-unit, scenario-uvs and scenario-materials.
   - Fixer B rebuilt the hash guard's base frames from a `git archive` of `307d692` run locally, because the queue had no jobs on that commit.
 - **Review RV-48, round 2:** one Opus reviewer checked RV-47's answers against the fix diff. 24 of 25 held. The one that did not was the record of who looked at T-80's frames. It raised 7 findings: 0 Major, 3 Minor, 4 Nit, none a code defect.
   - The Minors: no test showed `render` calls `Keep`; the frame guard predated the render change; and this Retrospective said a member looked at T-80's frames.
   - Fixed by an Opus fixer (two agents, the first stopped at its call limit so it could not wake beside its continuation), plus the orchestrator for this file.
   - The new real-`carve` release test fails when the `Keep` call is deleted, given only the drawn set, or moved before the swap. Calling it with the model's materials alone cannot be told apart: in every reachable state the drawn set is a subset of them.
+  - Run on the fixes, at `3f9ba34` (code identical to the landed `3893cf6`): all 12 frame and materials suites ran through the queue, and server-unit and server-regression (584 tests, including the new release test) were carried from the first fixer's runs on that same commit. server-regression also ran at `307d692` (561 passing) for the frame base. The round-3 reviewer ran `RenderReleaseTests` and `PbrReleaseTests` again (3 of 3 passing).
   - The reviewer's harness refused its findings file, so it returned them in its report and the orchestrator copied them in.
 - **Orchestrator errors in this phase:**
   - This Retrospective first said T-78's and T-80's evidence was still on disk, and that the closing `verify` was all carried. Both were wrong, and both were corrected from RV-47.
