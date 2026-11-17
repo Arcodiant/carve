@@ -28,8 +28,10 @@ public sealed class CubeScenario : IScenario
     /// ruling of 2026-11-13: under the engine's PBR material the directional light reaches a face as albedo / pi (Lambert's diffuse term,
     /// the light's intensity unscaled) while the ambient floor is unchanged, so through the sRGB encoding each step the light makes is
     /// about 0.4 to 0.45 of what it was. Worked from the faces' n.l (cube front: top 0.78, +Z 0.52, +X 0.35; the grey 0.72, ambient 0.25,
-    /// light 0.9), the closest pair, +Z over +X, now steps by 8 (19 under LitMesh), so 10 would fail a correct frame; 6 keeps 2 of headroom
-    /// and still fails two faces drawn in one shade (a step of 0) or in the wrong order.
+    /// light 0.9), the closest pair, +Z over +X, stepped by 8 (19 under LitMesh), so 10 would fail a correct frame; 6 keeps 2 of headroom
+    /// and still fails two faces drawn in one shade (a step of 0) or in the wrong order. Under M-7's sky +Z over +X steps by 2 from the
+    /// front, so front views no longer check that pair (<see cref="CheckFrontOrder"/>) and a few pairs are held to their own least
+    /// step (the person's ruling of 2026-11-17, "Accept all", M-19 rows 1 to 3).
     /// </summary>
     private const int MinimumStep = 6;
 
@@ -262,9 +264,8 @@ public sealed class CubeScenario : IScenario
         var capPoint = CylAt(Facet(1, 0.5f, 1) * new Vector3(0.85f, 1, 0.85f));
         var capOther = CylAt(new Vector3(-0.3f, 1, -0.2f));
         var belowRim = CylAt(Facet(1, 0.5f, 0.85f));
-        // The side's two ends across the image, far enough apart in n.l that MinimumStep holds under the PBR material (T-82, the person's
-        // ruling of 2026-11-13: re-pick, else lower). The light turned with this camera gives facet 13 an n.l of 0.03 and facet 3 one of
-        // 0.23, so 119 against 131 (grey 0.72, ambient 0.25, light 0.9 / pi, sRGB); facets 14 and 3 were 127 against 131, 4 apart.
+        // The side's two ends across the image. Facet 13 (n.l 0.03 with the light turned with this camera) was picked under T-82 (the
+        // person's ruling of 2026-11-13: re-pick, else lower), when facets 14 and 3 were 4 apart.
         var sideMirror = CylAt(Facet(13, 0.5f, 0));              // facing (+x, -z), at the image's right edge: the one side of the image
         // Under M-7's sky the side's whole range is 7 (facets 4 to 13 measure 190 to 197), so the other end is facet 1, not 3, and the pair
         // is held to SideEnds, not MinimumStep: the person's ruling of 2026-11-17 ("Accept all", M-19 row 3a). Measured 191 against 197.
@@ -320,8 +321,7 @@ public sealed class CubeScenario : IScenario
         // With no hard rim the twice-subdivided cylinder rounds in, so facet 13's point at mid height is background there. Its far end is taken
         // lower on the side and inside the silhouette instead: the cage's vertex 14 (315 degrees, between facets 13 and 14) at y -0.3, pulled in
         // to 0.9 of the radius. The pillow's normal there has turned down and past the silhouette's, so it faces away from the light (n.l at or
-        // below 0) and is lit by the ambient alone: grey 0.72 x ambient 0.25 = 0.18, sRGB 118, against facet 3's 131, 13 apart under
-        // MinimumStep 6 (T-82, the person's ruling of 2026-11-13: re-pick, else lower).
+        // below 0) and is lit by the light's ambient alone (T-82, the person's ruling of 2026-11-13: re-pick, else lower).
         var softSideMirror = CylAt(Ring(14, -0.3f) * new Vector3(0.9f, 1, 0.9f));
         // Its other end is facet 1 at mid height (pulled in to 0.9 of the radius, inside the pillow's silhouette), not facet 3: under M-7's
         // sky facet 3 is 192 against 188, and facet 1 measures 197 to 198. The person's ruling of 2026-11-17 ("Accept all", M-19 row 3c);
