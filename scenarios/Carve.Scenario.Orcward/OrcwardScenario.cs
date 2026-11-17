@@ -171,7 +171,8 @@ public sealed class OrcwardScenario : IScenario
             driver.Fail($"{r.Name}: a twisted limb passes the rule, {r.Differing} px, largest patch {r.LargestPatch} px");
         }
 
-        // A wrong file must fail at one frame at least; a swapped bone order or inverse bind shows only where a clip moves the bone.
+        // A wrong file must fail at one frame at least. render_glb skins a file at its bind pose with no clip (RV-52), so a swapped bone
+        // order or inverse bind fails at rest as well as where a clip moves the bone; swapped colours fail on the colour checks.
         foreach (var group in _results.Where(r => r.Kind == "break").GroupBy(r => System.Text.RegularExpressions.Regex.Replace(r.Name, "-(rest|walk).*$", "")))
         {
             if (!group.Any(Fails))

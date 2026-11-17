@@ -94,12 +94,13 @@ public class OrcwardLoadTests
     public void Every_wrong_file_fails_the_same_rule()
     {
         var wrong = Rows().Where(r => r.Kind == "break").ToList();
-        foreach (var kind in new[] { "swapped-bone-order", "wrong-inverse-binds", "reversed-winding", "dropped-piece" })
+        foreach (var kind in new[] { "swapped-bone-order", "wrong-inverse-binds", "reversed-winding", "swapped-colours", "dropped-piece" })
         {
             Assert.Contains(wrong, r => r.Name.StartsWith(kind, StringComparison.Ordinal));
         }
 
-        // A rest frame is drawn with no palette, so a wrong bone order or inverse bind shows only in a clip frame: each kind fails at one frame at least.
+        // Each kind fails at one frame at least. With no clip render_glb skins at the bind pose (RV-52), so a wrong bone order or inverse
+        // bind fails at rest as well as in a clip; swapped colours fail on the colour checks, which luma cannot see.
         foreach (var kind in wrong.GroupBy(r => System.Text.RegularExpressions.Regex.Replace(r.Name, "-(rest|walk).*$", "")))
         {
             Assert.True(kind.Any(r => r.Fails), $"{kind.Key}: passes at every frame ({string.Join(", ", kind.Select(r => $"{r.Name} {r.Differing} px"))})");
