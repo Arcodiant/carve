@@ -4,19 +4,30 @@
 .DESCRIPTION
     -Round is a round folder that passes scripts/run-acceptance-check.ps1. Each copy is broken in one way (a vertex with no weight, the
     hat piece missing, the clips file missing, a model file that is another character's, a different character's model file) and
-    the checks of tests/Carve.AcceptanceLoad.Tests, and for the last two the frame scenario, run on it. Prints a table of what failed.
-    Needs -NoBuild only if everything is already built. The table is also written to <Round>/acceptance/negatives.tsv.
+    the checks of tests/Carve.AcceptanceLoad.Tests, and for the last two the frame scenario, run on it. Prints a table of what failed,
+    also written to <Round>/acceptance/negatives.tsv, and exits 1 when a broken copy is not caught (no check failed and, where the
+    frame scenario runs, it passed) or a run was stopped, 0 when every one is caught. Builds the scenario, the server and the checks
+    first unless -NoBuild; each run of the checks is stopped after -ChecksTimeoutSeconds (exit 124, counted as not caught).
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Round,
     [Parameter(Mandatory)][string]$OtherRound,
-    [string]$Configuration = 'Debug'
+    [string]$Configuration = 'Debug',
+    [switch]$NoBuild,
+    [int]$ChecksTimeoutSeconds = 180
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'bounded-run.ps1')
 $tests = Join-Path $root 'tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj'
+if (-not $NoBuild) {
+    foreach ($project in @((Join-Path $root 'src/Carve.Server/Carve.Server.csproj'), (Join-Path $root 'scenarios/Carve.Scenario.Acceptance/Carve.Scenario.Acceptance.csproj'), $tests)) {
+        dotnet build $project -c $Configuration --nologo -v q 2>&1 | ForEach-Object { Write-Err $_ }
+        if ($LASTEXITCODE -ne 0) { Write-Err "run-acceptance-negatives: the build of $project failed"; exit $LASTEXITCODE }
+    }
+}
 $work = Join-Path ([IO.Path]::GetTempPath()) 'carve-acceptance-negatives'
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }
 New-Item -ItemType Directory $work | Out-Null
@@ -35,9 +46,17 @@ function Run-Checks([string]$name, [string]$dir, [bool]$frames) {
         & (Join-Path $PSScriptRoot 'run-scenario.ps1') acceptance -Configuration $Configuration -NoBuild *> $null
         $sceneFailed = $LASTEXITCODE -ne 0
     }
-    $out = dotnet test $tests -c $Configuration --no-build --nologo 2>&1 | Out-String
-    $failed = [regex]::Matches($out, '(?m)^\s+Failed (\S+)') | ForEach-Object { $_.Groups[1].Value -replace '^.*\.', '' }
-    $script:rows += [pscustomobject]@{ Broken = $name; Scenario = $(if ($frames) { if ($sceneFailed) { 'fails' } else { 'passes' } } else { '-' }); FailedChecks = ($failed -join ', ') }
+    $checks = Invoke-BoundedDotnet @('test', $tests, '-c', $Configuration, '--no-build', '--nologo') $root $ChecksTimeoutSeconds `
+        "run-acceptance-negatives: the checks on '$name' are still running after $ChecksTimeoutSeconds s; stopped"
+    $out = ($checks.Stdout + $checks.Stderr) -join "`n"
+    $failed = @([regex]::Matches($out, '(?m)^\s+Failed (\S+)') | ForEach-Object { $_.Groups[1].Value -replace '^.*\.', '' })
+    $caught = $checks.Code -ne 124 -and ($sceneFailed -or ($checks.Code -ne 0 -and $failed.Count -gt 0))
+    $script:rows += [pscustomobject]@{
+        Broken = $name
+        Scenario = $(if ($frames) { if ($sceneFailed) { 'fails' } else { 'passes' } } else { '-' })
+        FailedChecks = $(if ($checks.Code -eq 124) { 'stopped (time limit)' } else { $failed -join ', ' })
+        Caught = $(if ($caught) { 'yes' } else { 'NO' })
+    }
 }
 
 # 1. a vertex with no weight
@@ -66,3 +85,9 @@ Run-Checks 'saved file of another character' $d $true
 
 $rows | Format-Table -AutoSize | Out-String | Write-Host
 $rows | ConvertTo-Csv -Delimiter "`t" -NoTypeInformation | Set-Content (Join-Path (Resolve-Path $Round).Path 'acceptance/negatives.tsv')
+$missed = @($rows | Where-Object { $_.Caught -ne 'yes' })
+if ($missed.Count -gt 0) {
+    Write-Err "run-acceptance-negatives: not caught: $(($missed | ForEach-Object Broken) -join '; ')"
+    exit 1
+}
+exit 0

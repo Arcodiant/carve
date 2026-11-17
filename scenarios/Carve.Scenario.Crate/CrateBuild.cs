@@ -191,8 +191,11 @@ internal static class CrateBuild
 
     /// <summary>
     /// What every native front frame of the crate must show: the corners are background, the centre is the mesh, the
-    /// top, +Z and +X frame faces are in order (brightest first) at their points, and the +X bar's top differs from the
-    /// panel behind it. A mirrored camera puts +X where +Z is, and an up-flipped one the lid at the bottom, so either fails.
+    /// top is brighter than +Z and the three frame faces stand above the background at their points, and the +X bar's top
+    /// differs from the panel behind it. +Z over +X is no longer checked (the sky ruling, M-19 row 1), so the face order alone
+    /// does not catch a mirror. Shown on round 3's crate-front and export front frames, mirrored and flipped (RV-52): a mirrored
+    /// camera puts the background at the +Z point (G 53) and one face under both bar points (201 and 201); an up-flipped one
+    /// gives the top and +Z points the same face (202 and 202) and the bar points again one face (199 and 199). Either fails.
     /// </summary>
     public static void CheckFront(ScenarioDriver driver, ScenarioFrame frame)
     {

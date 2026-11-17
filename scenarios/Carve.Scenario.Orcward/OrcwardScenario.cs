@@ -36,6 +36,7 @@ public sealed class OrcwardScenario : IScenario
     private static readonly string[] BodyGroups = ["skin", "shirt", "trousers", "boots", "can"];
     private static readonly string[] HatGroups = ["straw", "band"];
     private readonly List<Comparison.Result> _results = [];
+    private readonly Dictionary<string, string> _colour = [];
 
     public async Task RunAsync(ScenarioDriver driver)
     {
@@ -82,8 +83,12 @@ public sealed class OrcwardScenario : IScenario
         {
             var (viaRender, viaGlb) = await PairAsync(driver, name, view, clip, time, glb);
             Locals locals = spec is null ? (_ => (null, null)) : (b => spec.Sample(b, time));
-            CheckFrame(driver, viaRender, view == "+z" ? front : side, view == "+z", body, locals);
-            CheckFrame(driver, viaGlb, view == "+z" ? front : side, view == "+z", body, locals);
+            foreach (var problem in CheckFrame(viaRender, view == "+z" ? front : side, view == "+z", body, hat, locals)
+                .Concat(CheckFrame(viaGlb, view == "+z" ? front : side, view == "+z", body, hat, locals)))
+            {
+                driver.Fail(problem);
+            }
+
             Record(driver, name, "good", viaRender, viaGlb);
         }
 
@@ -101,7 +106,11 @@ public sealed class OrcwardScenario : IScenario
             ("swapped-bone-order", e => e.SwapJoints("UpperLeg_L", "UpperLeg_R")),
             ("wrong-inverse-binds", e => e.SwapInverseBinds("UpperLeg_L", "UpperLeg_R")),
             ("reversed-winding", e => Assert(driver, e.ReverseWinding() > 0, "reversed-winding: no triangles")),
+            // Luma cannot tell the trousers from the band (RV-52): this one is caught by the good frames' colour checks.
+            ("swapped-colours", e => e.SwapBaseColours("Body:trousers", "Hat:band")),
         };
+        Locals atRestLocals = _ => (null, null);
+        Locals walkHalfLocals = b => walk.Sample(b, 0.5f);
         Record(driver, "untouched-rewrite-walk-0.500-side", "control", walkHalf, controlFrame);
         foreach (var (name, edit) in tampered)
         {
@@ -110,12 +119,12 @@ public sealed class OrcwardScenario : IScenario
             var file = Path.Combine(work, $"gardener-{name}.glb");
             await File.WriteAllBytesAsync(file, e.Write());
             var atRest = await driver.CaptureToolAsync("render_glb", $"break-{name}-rest-front", new { path = file, view = "+z" });
-            Record(driver, $"{name}-rest-front", "break", rest, atRest);
+            Record(driver, $"{name}-rest-front", "break", rest, atRest, ColourVerdict(name, atRest, front, true, body, hat, atRestLocals));
             var walking = await driver.CaptureToolAsync("render_glb", $"break-{name}-walk-0.500-side", new { path = file, clip = "Walk", time = 0.5, view = "+x" });
-            Record(driver, $"{name}-walk-0.500-side", "break", walkHalf, walking);
+            Record(driver, $"{name}-walk-0.500-side", "break", walkHalf, walking, ColourVerdict(name, walking, side, false, body, hat, walkHalfLocals));
             // Seen from the side a shift in X is along the view, so a bone put wrong sideways shows only from the front.
             var walkingFront = await driver.CaptureToolAsync("render_glb", $"break-{name}-walk-0.500-front", new { path = file, clip = "Walk", time = 0.5, view = "+z" });
-            Record(driver, $"{name}-walk-0.500-front", "break", walkHalfFront, walkingFront);
+            Record(driver, $"{name}-walk-0.500-front", "break", walkHalfFront, walkingFront, ColourVerdict(name, walkingFront, front, true, body, hat, walkHalfLocals));
         }
 
         // A dropped piece: the body alone, as a piece, in place of the whole.
@@ -136,10 +145,12 @@ public sealed class OrcwardScenario : IScenario
             Record(driver, $"{name}-rest-front", "twist", twisted, good);
         }
 
-        var tsv = new StringBuilder("name\tkind\tdiffering\ttotal\tpercent\tpatch\tfails\tforeground\n");
+        // The colour column: "-" where no colour check is asked of the row, "ok", or "wrong: " and what read wrong; a wrong colour fails the row.
+        var tsv = new StringBuilder("name\tkind\tdiffering\ttotal\tpercent\tpatch\tfails\tforeground\tcolour\n");
         foreach (var r in _results)
         {
-            tsv.Append($"{r.Name}\t{r.Kind}\t{r.Differing}\t{r.Total}\t{r.Percent:0.000}\t{r.LargestPatch}\t{(r.Fails ? "fails" : "passes")}\t{r.Foreground}\n");
+            var colour = _colour.GetValueOrDefault(r.Name, "-");
+            tsv.Append($"{r.Name}\t{r.Kind}\t{r.Differing}\t{r.Total}\t{r.Percent:0.000}\t{r.LargestPatch}\t{(Fails(r) ? "fails" : "passes")}\t{r.Foreground}\t{colour}\n");
         }
 
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "differences.tsv"), tsv.ToString());
@@ -157,7 +168,7 @@ public sealed class OrcwardScenario : IScenario
         // A wrong file must fail at one frame at least; a swapped bone order or inverse bind shows only where a clip moves the bone.
         foreach (var group in _results.Where(r => r.Kind == "break").GroupBy(r => System.Text.RegularExpressions.Regex.Replace(r.Name, "-(rest|walk).*$", "")))
         {
-            if (!group.Any(r => r.Fails))
+            if (!group.Any(Fails))
             {
                 driver.Fail($"{group.Key}: a wrong file passes Orcward's rule at every frame, {string.Join(", ", group.Select(r => $"{r.Name} {r.Differing} px"))}");
             }
@@ -174,8 +185,31 @@ public sealed class OrcwardScenario : IScenario
         }
     }
 
-    private void Record(ScenarioDriver driver, string name, string kind, ScenarioFrame viaRender, ScenarioFrame viaGlb)
+    /// <summary>A row fails by D-6's rule, or, where its colours are checked, by a colour read wrong.</summary>
+    private bool Fails(Comparison.Result r) => r.Fails || _colour.GetValueOrDefault(r.Name, "-").StartsWith("wrong", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The colour column of a break's row: the good frames' colour checks (<see cref="CheckFrame"/>) run on the wrong file's frame,
+    /// for the break whose fault is a colour only; "-" for the others, whose rows keep D-6's verdict alone.
+    /// </summary>
+    private static string ColourVerdict(string name, ScenarioFrame frame, Func<Vector3, Vector2> project, bool fromFront, GardenerSpec.MeshSpec body, GardenerSpec.MeshSpec hat, Locals locals)
     {
+        if (name != "swapped-colours")
+        {
+            return "-";
+        }
+
+        var problems = CheckFrame(frame, project, fromFront, body, hat, locals);
+        return problems.Count == 0 ? "ok" : "wrong: " + string.Join(" | ", problems).Replace('\t', ' ').Replace('\n', ' ');
+    }
+
+    private void Record(ScenarioDriver driver, string name, string kind, ScenarioFrame viaRender, ScenarioFrame viaGlb, string? colour = null)
+    {
+        if (colour is not null)
+        {
+            _colour[name] = colour;
+        }
+
         var r = Comparison.Measure(name, kind, viaRender, viaGlb);
         _results.Add(r);
         Comparison.WriteTriptych(Path.Combine(driver.RunFolder, "compare", $"{kind}-{name}.png"), viaRender, viaGlb);
@@ -191,34 +225,78 @@ public sealed class OrcwardScenario : IScenario
     }
 
     /// <summary>
-    /// A positive pixel check on a new frame, worked from the framing's bounds: from the front the can's face, posed to this clip
-    /// time, reads as the can, and neither its mirror in X nor the same pixel flipped upside down does; from the side the near
-    /// hand reads as skin, and its flipped place does not (its mirror too, where it is off the image's centre).
+    /// The positive pixel checks on a new frame, worked from the framing's bounds; what fails, empty when nothing does. From the
+    /// front the can's face, posed to this clip time, reads as the can, and neither its mirror in X nor the same pixel flipped upside
+    /// down does; from the side the near hand reads as skin, and its flipped place does not (its mirror too, where it is off the
+    /// image's centre). From either, a face of the near thigh reads as the trousers and one of the hat's band as the band: luma
+    /// cannot tell those two apart (RV-52, the person's ruling of 2026-11-17, "Add colour checks"). Each positive check reads
+    /// against the palette lit at the face's posed normal (<see cref="ClassifyLit"/>), as the rest checks do (M-19 row 6).
     /// </summary>
-    private static void CheckFrame(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, bool fromFront, GardenerSpec.MeshSpec body, Locals locals)
+    private static List<string> CheckFrame(ScenarioFrame frame, Func<Vector3, Vector2> project, bool fromFront, GardenerSpec.MeshSpec body, GardenerSpec.MeshSpec hat, Locals locals)
     {
         Func<string, (Quaternion? Rotation, Vector3? Translation)> f = b => locals(b);
+        var problems = new List<string>();
+        var direction = fromFront ? Vector3.UnitZ : Vector3.UnitX;
+        Vector3 Expect(GardenerSpec.MeshSpec mesh, string group, Vector3 near, string bone, string what)
+        {
+            var face = mesh.NearestFace(group, near);
+            var (at, normal) = PosedFace(mesh.Centroid(face), mesh.Normal(face), bone, f);
+            var (x, y) = Holding(project(at));
+            if (LitProblem(frame, x, y, group, $"{what}, posed to {at}", normal, direction) is { } problem)
+            {
+                problems.Add(problem);
+            }
+
+            return at;
+        }
+
+        void Not(int x, int y, string group, string what)
+        {
+            if (Classify(frame, x, y).Group == group)
+            {
+                problems.Add($"{frame.Name}: {what} at ({x}, {y}) reads as {group}, which it must not");
+            }
+        }
+
         if (fromFront)
         {
-            var rest = body.Centroid(body.NearestFace("can", new Vector3(-0.435f, 0.39f, 0.30f)));
-            var at = GardenerSpec.Posed(rest, "WateringCan", f);
+            var at = Expect(body, "can", new Vector3(-0.435f, 0.39f, 0.30f), "WateringCan", "the can face");
             var (x, y) = Holding(project(at));
-            ExpectGroup(driver, frame, x, y, "can", $"{frame.Name}: the can face, posed to {at}");
             var (mx, my) = Holding(project(new Vector3(-at.X, at.Y, at.Z)));
-            ExpectNot(driver, frame, mx, my, "can", $"{frame.Name}: the can's mirror in X");
-            ExpectNot(driver, frame, x, Size - 1 - y, "can", $"{frame.Name}: the can's place flipped upside down");
+            Not(mx, my, "can", "the can's mirror in X");
+            Not(x, Size - 1 - y, "can", "the can's place flipped upside down");
+            Expect(body, "trousers", new Vector3(0.09f, 0.40f, 0.3f), "UpperLeg_L", "the left thigh's front face");
+            Expect(hat, "band", new Vector3(0, 1.43f, 0.3f), "Head", "the band's front face");
         }
         else
         {
             var hand = GardenerSpec.Posed(new Vector3(0.415f, 0.60f, 0), "Hand_L", f);
             var (x, y) = Holding(project(hand));
-            ExpectGroup(driver, frame, x, y, "skin", $"{frame.Name}: the near hand at {hand}");
-            ExpectNot(driver, frame, x, Size - 1 - y, "skin", $"{frame.Name}: the hand's place flipped upside down");
+            var handFace = body.NearestFace("skin", new Vector3(0.465f, 0.60f, 0));
+            var (_, handNormal) = PosedFace(body.Centroid(handFace), body.Normal(handFace), "Hand_L", f);
+            if (LitProblem(frame, x, y, "skin", $"the near hand at {hand}", handNormal, direction) is { } problem)
+            {
+                problems.Add(problem);
+            }
+
+            Not(x, Size - 1 - y, "skin", "the hand's place flipped upside down");
             if (Math.Abs(x - Size / 2) > 20)
             {
-                ExpectNot(driver, frame, Size - 1 - x, y, "skin", $"{frame.Name}: the hand's mirror");
+                Not(Size - 1 - x, y, "skin", "the hand's mirror");
             }
+
+            Expect(body, "trousers", new Vector3(0.3f, 0.40f, 0), "UpperLeg_L", "the near thigh's outer face");
+            Expect(hat, "band", new Vector3(0.3f, 1.43f, 0), "Head", "the band's near face");
         }
+
+        return problems;
+    }
+
+    /// <summary>A rest point and its face's rest normal, moved with <paramref name="bone"/>: the normal turns as the bone turns it.</summary>
+    private static (Vector3 At, Vector3 Normal) PosedFace(Vector3 rest, Vector3 normal, string bone, Func<string, (Quaternion? Rotation, Vector3? Translation)> locals)
+    {
+        var at = GardenerSpec.Posed(rest, bone, locals);
+        return (at, Vector3.Normalize(GardenerSpec.Posed(rest + (0.01f * normal), bone, locals) - at));
     }
 
     // ---- build and export, through the tools ----

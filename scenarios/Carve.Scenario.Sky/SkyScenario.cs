@@ -68,9 +68,9 @@ public sealed class SkyScenario : IScenario
                 var l = ColourRule.ToLight(direction);
                 var nl = Vector3.Dot(nn, l);
                 var s = ColourRule.Specular(nn, direction);
-                Expect(driver, $"n{Key(n)}-grey-{view}", pixels[("grey", view)], ColourRule.Grey, nn, direction, nl, 2);
-                Expect(driver, $"n{Key(n)}-white-{view}", pixels[("white", view)], Vector3.One, nn, direction, nl, 2);
-                Expect(driver, $"n{Key(n)}-black-{view}", pixels[("black", view)], Vector3.Zero, nn, direction, nl, 3);
+                Expect(driver, $"n{Key(n)}-grey-{view}", pixels[("grey", view)], ColourRule.Grey, nn, direction, 2);
+                Expect(driver, $"n{Key(n)}-white-{view}", pixels[("white", view)], Vector3.One, nn, direction, 2);
+                Expect(driver, $"n{Key(n)}-black-{view}", pixels[("black", view)], Vector3.Zero, nn, direction, 3);
                 table.Append(CultureInfo.InvariantCulture, $"{n.X},{n.Y},{n.Z}\t{view}\t{nv:0.0000}\t{nl:0.0000}\t{l.X:0.0000},{l.Y:0.0000},{l.Z:0.0000}\t{s:0.000000}\t{Rgb(pixels[("grey", view)])}\t{Rgb(pixels[("black", view)])}\t{Rgb(pixels[("white", view)])}\n");
             }
 
@@ -81,26 +81,19 @@ public sealed class SkyScenario : IScenario
 
     /// <summary>
     /// Fails unless the pixel is within <paramref name="tolerance"/> levels in each channel of <see cref="ColourRule"/>'s
-    /// model: albedo x (ambient 0.25 + 0.9 n.l / pi + the sky's light) + the light's and the sky's specular. A grey or
+    /// model, worked by <see cref="ColourRule.Lit(double, double, double, Vector3, Vector3)"/> itself: albedo x (ambient 0.25 + 0.9 n.l / pi +
+    /// the sky's light) + the light's and the sky's specular. A grey or
     /// white face is held to 2, ColourRule's tolerance; a black one, all specular, to 3, as the sky's specular is fitted.
     /// </summary>
-    private static void Expect(ScenarioDriver driver, string what, (byte R, byte G, byte B, byte A) got, Vector3 albedo, Vector3 n, Vector3 direction, float nl, int tolerance)
+    private static void Expect(ScenarioDriver driver, string what, (byte R, byte G, byte B, byte A) got, Vector3 albedo, Vector3 n, Vector3 direction, int tolerance)
     {
-        var diffuse = 0.25 + (ColourRule.Light * Math.Max(0, nl) / Math.PI);
-        var sky = ColourRule.SkyLight(n);
-        var s = ColourRule.Reflected(n, direction);
-        int[] want = [Srgb((albedo.X * (diffuse + sky[0])) + s[0]), Srgb((albedo.Y * (diffuse + sky[1])) + s[1]), Srgb((albedo.Z * (diffuse + sky[2])) + s[2])];
+        var lit = ColourRule.Lit(albedo.X, albedo.Y, albedo.Z, n, direction);
+        int[] want = [ColourRule.Encode(lit[0]), ColourRule.Encode(lit[1]), ColourRule.Encode(lit[2])];
         int[] seen = [got.R, got.G, got.B];
         if (Enumerable.Range(0, 3).Any(c => Math.Abs(seen[c] - want[c]) > tolerance))
         {
             driver.Fail($"{what}: ({got.R}, {got.G}, {got.B}) against the model's ({want[0]}, {want[1]}, {want[2]}), tolerance {tolerance}");
         }
-    }
-
-    private static int Srgb(double linear)
-    {
-        var x = Math.Clamp(linear, 0, 1);
-        return (int)Math.Round(255 * (x <= 0.0031308 ? 12.92 * x : (1.055 * Math.Pow(x, 1 / 2.4)) - 0.055));
     }
 
     private static string Key(Vector3 n) =>

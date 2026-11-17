@@ -173,9 +173,10 @@ internal static class ColourRule
 
     /// <summary>
     /// The pixel, in linear light, of a surface of linear albedo (<paramref name="r"/>, <paramref name="g"/>, <paramref name="b"/>)
-    /// under T-82's light model with the sky: albedo x (ambient 0.25 + the light x n.l / pi + the sky's light) plus <see cref="Reflected"/>.
+    /// under T-82's light model with the sky: albedo x (ambient 0.25 + the light x n.l / pi + the sky's light) plus <see cref="Reflected"/>,
+    /// n.l taken toward <see cref="ToLight"/> of <paramref name="direction"/>. The one place the lit surface is worked; the sky scenario holds it to the measured sky.
     /// </summary>
-    private static double[] Lit(double r, double g, double b, Vector3 normal, Vector3 direction)
+    public static double[] Lit(double r, double g, double b, Vector3 normal, Vector3 direction)
     {
         var nl = Math.Max(0, Vector3.Dot(Vector3.Normalize(normal), ToLight(direction)));
         var diffuse = 0.25 + (Light * nl / Math.PI);

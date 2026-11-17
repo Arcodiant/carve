@@ -177,17 +177,23 @@ public sealed class SoftScenario : IScenario
 
         // Every warning is a face that is not planar (what subdivide makes of a quad); a limit (triangles, primitives, height) must not
         // be one. By T-72's rule (the person, 2026-11-13) each mesh names its first 10 and folds the rest into one line, and the named
-        // lines and the folded count add up to select's non_planar faces of that mesh, so a regression that adds a warning or loses a
+        // lines and the folded count add up to select's non_planar faces of that mesh, the named faces are select's lowest ids and the
+        // fold line comes after them, so a regression that adds a warning or loses a
         // face is caught. select's results are kept in the run folder for SoftLoad.Tests.
-        var counts = new Dictionary<string, int>();
+        var nonPlanar = new Dictionary<string, IReadOnlyList<int>>();
         foreach (var name in new[] { "Body", "Hat" })
         {
             var selected = await CallTextAsync(driver, "select", new { kind = "faces", where = "non_planar", mesh = name });
             await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, $"select-non-planar-{name}.txt"), selected);
-            counts[name] = JsonDocument.Parse(selected).RootElement.GetProperty("count").GetInt32();
+            var found = JsonDocument.Parse(selected).RootElement;
+            nonPlanar[name] = [.. found.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32())];
+            if (nonPlanar[name].Count != found.GetProperty("count").GetInt32())
+            {
+                driver.Fail($"select non_planar on {name}: count {found.GetProperty("count")} against {nonPlanar[name].Count} faces listed");
+            }
         }
         var warned = exported.IndexOf("warning(s): ", StringComparison.Ordinal);
-        var problem = warned < 0 ? "no warnings" : NotPlanarFold.Check(exported[(warned + "warning(s): ".Length)..], counts);
+        var problem = warned < 0 ? "no warnings" : NotPlanarFold.Check(exported[(warned + "warning(s): ".Length)..], nonPlanar);
         if (problem is not null)
         {
             driver.Fail($"export: {problem}");

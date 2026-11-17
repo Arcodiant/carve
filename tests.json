@@ -88,6 +88,7 @@
         {
           "dotnet-closure": "scenarios/Carve.Scenario.Cube/Carve.Scenario.Cube.csproj"
         },
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
@@ -112,6 +113,7 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],
@@ -178,6 +180,7 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "samples/barrel.carve",
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
@@ -208,6 +211,7 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "samples/leaky-shed.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
@@ -282,6 +286,7 @@
         {
           "dotnet-closure": "tests/Carve.CharacterLoad.Tests/Carve.CharacterLoad.Tests.csproj"
         },
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "samples/gardener.carve",
@@ -310,6 +315,7 @@
         {
           "dotnet-closure": "tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj"
         },
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "scenarios/Carve.Scenario.Character/GardenerSpec.cs",
         "scenarios/Carve.Scenario.Character/GardenerPixels.cs",
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
@@ -436,6 +442,7 @@
         {
           "dotnet-closure": "tests/Carve.OrcwardLoad.Tests/Carve.OrcwardLoad.Tests.csproj"
         },
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "scenarios/Carve.Scenario.Character/GardenerSpec.cs",
         "scenarios/Carve.Scenario.Character/GardenerPixels.cs",
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",

@@ -61,23 +61,40 @@ internal static class GardenerPixels
     /// </summary>
     public static void ExpectGroup(ScenarioDriver driver, ScenarioFrame frame, int x, int y, string group, string what, Vector3 normal, Vector3 direction)
     {
-        var (found, dot) = ("outside the image", 0f);
-        if (x >= 0 && y >= 0 && x < frame.Width && y < frame.Height)
+        if (LitProblem(frame, x, y, group, what, normal, direction) is { } problem)
         {
-            var p = frame.Pixel(x, y);
-            var n = Vector3.Normalize(new Vector3(Srgb(p.R), Srgb(p.G), Srgb(p.B)));
-            (found, dot) = GardenerSpec.Palette
-                .Select(c => (c.Group, Lit: ColourRule.Lit(c.Colour, normal, direction)))
-                .Select(c => (c.Group, Linear: Vector3.Normalize(new Vector3((float)c.Lit[0], (float)c.Lit[1], (float)c.Lit[2]))))
-                .Append(Palette[^1])
-                .Select(c => (c.Group, Dot: Vector3.Dot(c.Linear, n)))
-                .MaxBy(c => c.Dot);
+            driver.Fail(problem);
+        }
+    }
+
+    /// <summary>
+    /// The group whose colour, lit as a face of world <paramref name="normal"/> is lit along <paramref name="direction"/>
+    /// (<see cref="ColourRule.Lit(string, Vector3, Vector3)"/>), is nearest the pixel in direction, and how near (the cosine).
+    /// </summary>
+    public static (string Group, float Dot) ClassifyLit(ScenarioFrame frame, int x, int y, Vector3 normal, Vector3 direction)
+    {
+        if (x < 0 || y < 0 || x >= frame.Width || y >= frame.Height)
+        {
+            return ("outside the image", 0);
         }
 
-        if (found != group || dot < 0.98f)
-        {
-            driver.Fail($"{frame.Name}: {what} at ({x}, {y}) reads as {found} (match {dot:0.000}, against the palette lit at {normal}) with pixel {(x >= 0 && y >= 0 && x < frame.Width && y < frame.Height ? frame.Pixel(x, y).ToString() : "-")}, expected {group}");
-        }
+        var p = frame.Pixel(x, y);
+        var n = Vector3.Normalize(new Vector3(Srgb(p.R), Srgb(p.G), Srgb(p.B)));
+        return GardenerSpec.Palette
+            .Select(c => (c.Group, Lit: ColourRule.Lit(c.Colour, normal, direction)))
+            .Select(c => (c.Group, Linear: Vector3.Normalize(new Vector3((float)c.Lit[0], (float)c.Lit[1], (float)c.Lit[2]))))
+            .Append(Palette[^1])
+            .Select(c => (c.Group, Dot: Vector3.Dot(c.Linear, n)))
+            .MaxBy(c => c.Dot);
+    }
+
+    /// <summary>What <see cref="ExpectGroup(ScenarioDriver, ScenarioFrame, int, int, string, string, Vector3, Vector3)"/> fails with, or null when the pixel reads as <paramref name="group"/>.</summary>
+    public static string? LitProblem(ScenarioFrame frame, int x, int y, string group, string what, Vector3 normal, Vector3 direction)
+    {
+        var (found, dot) = ClassifyLit(frame, x, y, normal, direction);
+        return found != group || dot < 0.98f
+            ? $"{frame.Name}: {what} at ({x}, {y}) reads as {found} (match {dot:0.000}, against the palette lit at {normal}) with pixel {(x >= 0 && y >= 0 && x < frame.Width && y < frame.Height ? frame.Pixel(x, y).ToString() : "-")}, expected {group}"
+            : null;
     }
 
     /// <summary>

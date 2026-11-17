@@ -30,7 +30,7 @@ public sealed class CubeScenario : IScenario
     /// about 0.4 to 0.45 of what it was. Worked from the faces' n.l (cube front: top 0.78, +Z 0.52, +X 0.35; the grey 0.72, ambient 0.25,
     /// light 0.9), the closest pair, +Z over +X, stepped by 8 (19 under LitMesh), so 10 would fail a correct frame; 6 keeps 2 of headroom
     /// and still fails two faces drawn in one shade (a step of 0) or in the wrong order. Under M-7's sky +Z over +X steps by 2 from the
-    /// front, so front views no longer check that pair (<see cref="CheckFrontOrder"/>) and a few pairs are held to their own least
+    /// front, so front views no longer check that pair (<see cref="Carve.Scenario.Crate.CrateBuild.CheckFrontOrder"/>, linked from the Crate) and a few pairs are held to their own least
     /// step (the person's ruling of 2026-11-17, "Accept all", M-19 rows 1 to 3).
     /// </summary>
     private const int MinimumStep = 6;
@@ -91,7 +91,7 @@ public sealed class CubeScenario : IScenario
         var cubeBack = await driver.CaptureAsync("cube-back", new { view = "back" });
         CheckCorners(driver, cubeFront);
         CheckCorners(driver, cubeBack);
-        CheckFrontOrder(driver, cubeFront, CubeFront);
+        Carve.Scenario.Crate.CrateBuild.CheckFrontOrder(driver, cubeFront, CubeFront);
         CheckOrder(driver, cubeBack, CubeBack, "-Z", "-X", "underside");
 
         // 2. A repeat of the same view is the same pixels.
@@ -505,7 +505,7 @@ public sealed class CubeScenario : IScenario
         CheckCaption(driver, frame, $"{size}x{size}, view front, 8 vertices, 6 faces");
         CheckCorners(driver, frame);
         CheckNotBackground(driver, frame, (size / 2, size / 2), "the centre");
-        CheckFrontOrder(driver, frame, CubeFront.Select(p => (p.X * size / 512, p.Y * size / 512)).ToArray());
+        Carve.Scenario.Crate.CrateBuild.CheckFrontOrder(driver, frame, CubeFront.Select(p => (p.X * size / 512, p.Y * size / 512)).ToArray());
     }
 
     /// <summary>One pixel at least <see cref="MinimumStep"/> brighter than another, in the green channel.</summary>
@@ -751,30 +751,6 @@ public sealed class CubeScenario : IScenario
         {
             CheckBackground(driver, frame, (0, i), "the left edge");
             CheckBackground(driver, frame, (frame.Width - 1, i), "the right edge");
-        }
-    }
-
-    /// <summary>
-    /// The front view's three faces (top, +Z, +X): the top at least <see cref="MinimumStep"/> above +Z, and each face at least
-    /// that above the background. +Z over +X is not checked: under M-7's sky the two step by 2 (the light model predicts 3), and
-    /// the person ruled on 2026-11-17 ("Accept all", M-19 row 1) to drop that pair from front views; the back view keeps the
-    /// three-face order (<see cref="CheckOrder"/>).
-    /// </summary>
-    private static void CheckFrontOrder(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y)[] at)
-    {
-        string[] faces = ["top", "+Z", "+X"];
-        var g = at.Select(a => (int)frame.Pixel(a.X, a.Y).G).ToArray();
-        if (g[0] < g[1] + MinimumStep)
-        {
-            driver.Fail($"{frame.Name}: top ({g[0]}) should be at least {MinimumStep} brighter than +Z ({g[1]})");
-        }
-
-        for (var i = 0; i < 3; i++)
-        {
-            if (g[i] < 53 + MinimumStep)
-            {
-                driver.Fail($"{frame.Name}: {faces[i]} ({g[i]}) should be at least {MinimumStep} above the background");
-            }
         }
     }
 

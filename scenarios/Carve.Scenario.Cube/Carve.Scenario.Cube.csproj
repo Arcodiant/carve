@@ -12,4 +12,8 @@
     <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
+  </ItemGroup>
+
 </Project>

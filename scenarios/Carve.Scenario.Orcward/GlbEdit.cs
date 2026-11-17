@@ -98,6 +98,20 @@ internal sealed class GlbEdit
         tmp.CopyTo(_bin, offset + ib * 64);
     }
 
+    /// <summary>
+    /// Swaps the base colours of the two named materials, as an export with a material index off between primitives would draw
+    /// them: each group in the other's colour, the geometry untouched.
+    /// </summary>
+    public void SwapBaseColours(string a, string b)
+    {
+        JsonNode Pbr(string name) =>
+            _json["materials"]!.AsArray().Single(m => (string?)m!["name"] == name)!["pbrMetallicRoughness"]!;
+        var (pa, pb) = (Pbr(a), Pbr(b));
+        var colourA = pa["baseColorFactor"]!.DeepClone();
+        pa["baseColorFactor"] = pb["baseColorFactor"]!.DeepClone();
+        pb["baseColorFactor"] = colourA;
+    }
+
     /// <summary>Reverses every triangle's winding (indices 1 and 2 swapped), once per index accessor.</summary>
     public int ReverseWinding()
     {
