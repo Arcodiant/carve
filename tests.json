@@ -21,6 +21,7 @@
         "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs",
         "samples/gatehouse.carve",
         "samples/barrel.carve",
+        "samples/barrel-textured.carve",
         "samples/textures/*.png"
       ],
       "resources": "cpu",
@@ -40,7 +41,9 @@
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
         "scenarios/**/*.csproj",
-        "spikes/**/*.csproj"
+        "spikes/**/*.csproj",
+        "samples/gardener-soft.carve",
+        "samples/gatehouse.carve"
       ],
       "resources": "cpu",
       "est-seconds": 12
