@@ -220,7 +220,7 @@ public static class LookMeshes
 
     /// <summary>
     /// One colour per vertex of <see cref="MeshBridge"/>'s triangles, each from its corner normal from <see cref="Shading"/>:
-    /// a flat mesh's corner normal is its face's, so a flat mesh is coloured as it always was, and a smooth one blends.
+    /// a smooth mesh's faces blend, and a flat mesh's are coloured by their faces' normals, posed too (<see cref="Shading.FaceHasCornerNormals"/>).
     /// The order is <see cref="MeshBridge.ToMeshData"/>'s, which reverses each triangle for the engine: A, then C, then B.
     /// </summary>
     private static Rgba8[] CornerColours(PolygonMesh mesh)
@@ -229,9 +229,11 @@ public static class LookMeshes
         var colours = new Rgba8[triangles.Count * 3];
         for (var t = 0; t < triangles.Count; t++)
         {
-            colours[t * 3] = NormalColour(triangles[t].NormalA);
-            colours[t * 3 + 1] = NormalColour(triangles[t].NormalC);
-            colours[t * 3 + 2] = NormalColour(triangles[t].NormalB);
+            var triangle = triangles[t];
+            var corners = Shading.FaceHasCornerNormals(mesh, triangle.Face);
+            colours[t * 3] = NormalColour(corners ? triangle.NormalA : triangle.Normal);
+            colours[t * 3 + 1] = NormalColour(corners ? triangle.NormalC : triangle.Normal);
+            colours[t * 3 + 2] = NormalColour(corners ? triangle.NormalB : triangle.Normal);
         }
 
         return colours;

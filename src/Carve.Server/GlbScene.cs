@@ -6,7 +6,9 @@ namespace Carve.Server;
 
 /// <summary>
 /// A <c>.glb</c> as <c>render_glb</c> draws it: the file's bytes, which the frame thread loads through the engine's model
-/// loader, the bone palette the file's own clip gives at the time asked (null draws the file as it lies, unskinned), and the
+/// loader, the bone palette the file's own clip gives at the time asked (with no clip, a skinned file's bind pose: every bone
+/// at its node's rest transform composed with the file's inverse binds, as a game skins it with no clip playing; null only for
+/// a file with no skin, drawn as it lies), and the
 /// framing of its rest pose (D-6: the rest bounds, as <c>render</c> frames a posed model, T-32). Nothing here shares
 /// Carve's preview skinning (D-6, two samplers): the pose is the engine's <see cref="ClipPoseProvider"/> and
 /// <see cref="SkinningPalette"/>, drawn by the engine's GPU skinning through a <see cref="SkinnedPose"/>.
@@ -93,6 +95,10 @@ internal sealed class GlbScene
 
             palette = Pose(skin.Skeleton, found, time);
         }
+        else if (parsed.Skin is { } rest)
+        {
+            palette = Bind(rest.Skeleton);
+        }
 
         var positions = parsed.Skin is { } skinned
             ? skinned.SkinnedMeshData.Vertices.Select(v => v.Position)
@@ -120,6 +126,17 @@ internal sealed class GlbScene
             BoundsMin = min,
             BoundsMax = max,
         };
+    }
+
+    /// <summary>The skeleton in its bind pose (every bone at its node's rest transform), composed with the file's inverse binds: what a game that poses the model with no clip skins with.</summary>
+    private static Matrix4x4[] Bind(Skeleton skeleton)
+    {
+        var local = new BonePose[skeleton.BoneCount];
+        for (var i = 0; i < local.Length; i++)
+            local[i] = BonePose.Bind(skeleton.Bones[i]);
+        var palette = new Matrix4x4[skeleton.BoneCount];
+        SkinningPalette.Compute(skeleton, local, palette);
+        return palette;
     }
 
     /// <summary>The engine's own sampling of <paramref name="clip"/> at <paramref name="time"/>, composed into the palette the GPU skins with.</summary>

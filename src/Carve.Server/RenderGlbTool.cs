@@ -40,7 +40,8 @@ internal static class RenderGlbTool
 
     private const string Text =
         "Draws a .glb file as a game on the Empyrean engine gets it: read by the engine's own model loader with the file's own materials, "
-        + "and, given a clip, posed by the engine's own sampling of that clip and drawn with its GPU skinning. Use it on what export wrote, to see the export and not "
+        + "and, given a clip, posed by the engine's own sampling of that clip and drawn with its GPU skinning; with no clip, a skinned file is drawn skinned at its bind pose "
+        + "(every bone at its node's rest transform, through the file's inverse binds), as a game draws it with no clip playing. Use it on what export wrote, to see the export and not "
         + "Carve's preview of it. The scene, light, background and cameras are render's, and the frame is fitted to the file's rest pose as render fits a posed model, "
         + "so a render_glb frame and a render frame of the same model, view, size, clip and time line up. A clip can carry a limb past the rest pose's frame, as in render. "
         + "The model being edited is not changed. "
@@ -143,7 +144,7 @@ internal static class RenderGlbTool
             direction is null ? $"view {view ?? "front"}" : $"direction ({RenderTool.Join(direction)})",
         };
         if (projection == Projection.Orthographic) parts.Add("orthographic");
-        parts.Add(clip is null ? "no clip: the file as loaded" : string.Create(CultureInfo.InvariantCulture, $"clip '{clip}' at {time} s"));
+        parts.Add(clip is null ? (glb.Palette is null ? "no clip: the file as loaded, unskinned" : "no clip: skinned at its bind pose") : string.Create(CultureInfo.InvariantCulture, $"clip '{clip}' at {time} s"));
         RenderTool.AddZoomAndTarget(parts, zoom, target);
         var text = $"{string.Join(", ", parts)}; {glb.Vertices} vertices, {glb.Triangles} triangles, as the engine loaded them";
         return text + glb.WarningsText;

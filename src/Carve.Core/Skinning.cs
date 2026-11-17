@@ -149,7 +149,10 @@ public static class Skinning
 
     /// <summary>
     /// The model with every weighted mesh at its posed vertex positions, colours, materials and groups kept, weights dropped (the
-    /// result is a plain mesh to draw). A model with no skeleton comes back unchanged.
+    /// result is a plain mesh to draw), and its rest corner normals skinned (<see cref="CornerNormals"/>), a flat mesh's as a
+    /// smooth one's: the export writes a flat mesh's face normal at each corner and a game skins those with the blended bone
+    /// matrices, so a posed flat face is lit by its skinned corners and not by its posed polygon's own normal (D-6).
+    /// A model with no skeleton comes back unchanged.
     /// </summary>
     public static Model Posed(Model model, Pose pose)
     {
@@ -158,7 +161,7 @@ public static class Skinning
         foreach (var (name, mesh) in model.Meshes)
         {
             result = result.With(name, mesh.Weights is null ? mesh
-                : mesh.WithVertices(Positions(mesh, skeleton, pose), mesh.ShadingMode == ShadingMode.Smooth ? CornerNormals(mesh, skeleton, pose) : null));
+                : mesh.WithVertices(Positions(mesh, skeleton, pose), CornerNormals(mesh, skeleton, pose)));
         }
         return result;
     }

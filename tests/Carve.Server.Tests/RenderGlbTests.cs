@@ -180,7 +180,7 @@ public class RenderGlbTests
                 $"Walk at {t} s: render_glb's silhouette {a} is not render's {b}");
         }
 
-        // With no clip, the file as it lies: the rest pose, framed on the same bounds.
+        // With no clip, the file skinned at its bind pose, framed on the same bounds.
         var front = Image(await carve.CallToolAsync("render_glb", """{"path":"gardener.glb","view":"+z"}"""), "gardener-rest-front-glb");
         var head = gardener.PixelOf(gardener.Posed("Head", "Idle", 0), "+z");
         Assert.True(Classify(front, head) == "skin", $"rest: the head at {head} is {Classify(front, head)}, expected skin");
