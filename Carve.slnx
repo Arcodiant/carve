@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="extensions/Carve.Debug/Carve.Debug.csproj" />
   <Project Path="scenarios/Carve.Scenario.Cube/Carve.Scenario.Cube.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Sky/Carve.Scenario.Sky.csproj" />
   <Project Path="scenarios/Carve.Scenario.Crate/Carve.Scenario.Crate.csproj" />
   <Project Path="scenarios/Carve.Scenario.Uvs/Carve.Scenario.Uvs.csproj" />
   <Project Path="scenarios/Carve.Scenario.Materials/Carve.Scenario.Materials.csproj" />

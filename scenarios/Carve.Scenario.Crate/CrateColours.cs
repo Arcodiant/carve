@@ -97,7 +97,7 @@ internal static class CrateColours
         Vector3 direction, Vector3 normal, IEnumerable<Vector3> points, string hex, string what)
     {
         var scale = ColourRule.Scale(hex);
-        var specular = ColourRule.Specular(normal, direction);
+        var specular = ColourRule.Reflected(normal, direction);
         var checkedPoints = 0;
         foreach (var point in points)
         {
@@ -114,7 +114,7 @@ internal static class CrateColours
                 if (Math.Abs(got[ch] - expected) > Relative * expected + Floor)
                 {
                     driver.Fail($"{coloured.Name}: {what} at ({x}, {y}) channel {"RGB"[ch]} is {got[ch]:F4} in linear light, expected {expected:F4} "
-                        + $"((the grey frame's {lit[ch]:F4} - specular {specular:F4}) x {scale[ch]:F3} + specular); pixel {c}, grey pixel {k}");
+                        + $"((the grey frame's {lit[ch]:F4} - specular {specular[ch]:F4}) x {scale[ch]:F3} + specular); pixel {c}, grey pixel {k}");
                 }
             }
 
