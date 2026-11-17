@@ -111,6 +111,12 @@ public sealed class OrcwardScenario : IScenario
         };
         Locals atRestLocals = _ => (null, null);
         Locals walkHalfLocals = b => walk.Sample(b, 0.5f);
+        // The model's own walk from the front is a good frame too: the checks the swapped colours are read by must pass on it.
+        foreach (var problem in CheckFrame(walkHalfFront, front, true, body, hat, walkHalfLocals))
+        {
+            driver.Fail(problem);
+        }
+
         Record(driver, "untouched-rewrite-walk-0.500-side", "control", walkHalf, controlFrame);
         foreach (var (name, edit) in tampered)
         {
@@ -265,7 +271,8 @@ public sealed class OrcwardScenario : IScenario
             var (mx, my) = Holding(project(new Vector3(-at.X, at.Y, at.Z)));
             Not(mx, my, "can", "the can's mirror in X");
             Not(x, Size - 1 - y, "can", "the can's place flipped upside down");
-            Expect(body, "trousers", new Vector3(0.09f, 0.40f, 0.3f), "UpperLeg_L", "the left thigh's front face");
+            // The thigh's top segment, wholly UpperLeg_L's: a point further forward finds the torso's trousers band, which is Hips'.
+            Expect(body, "trousers", new Vector3(0.09f, 0.485f, 0.1f), "UpperLeg_L", "the left thigh's front face");
             Expect(hat, "band", new Vector3(0, 1.43f, 0.3f), "Head", "the band's front face");
         }
         else
