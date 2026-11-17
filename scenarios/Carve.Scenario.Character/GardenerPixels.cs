@@ -80,6 +80,28 @@ internal static class GardenerPixels
         }
     }
 
+    /// <summary>
+    /// The rest frame from +Z: the centre of one front face of each colour's group, projected from the mesh, reads as that
+    /// colour, against the palette lit by the sky at the face's own normal (the person's ruling of 2026-11-17, M-19 row 6).
+    /// Shared by the character and soft scenarios, whose rest checks are the same.
+    /// </summary>
+    public static void ExpectRestColours(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, GardenerSpec.MeshSpec body, GardenerSpec.MeshSpec hat)
+    {
+        var targets = new (GardenerSpec.MeshSpec Mesh, string Group, Vector3 Near)[]
+        {
+            (body, "shirt", new Vector3(0, 0.85f, 0.3f)), (body, "trousers", new Vector3(0, 0.57f, 0.3f)), (body, "skin", new Vector3(0.07f, 1.27f, 0.3f)),
+            (body, "boots", new Vector3(0.09f, 0.05f, 0.4f)), (body, "can", new Vector3(-0.435f, 0.39f, 0.30f)),
+            (hat, "straw", new Vector3(0, 1.485f, 0.3f)), (hat, "band", new Vector3(0, 1.43f, 0.3f)),
+        };
+        foreach (var (mesh, group, near) in targets)
+        {
+            var face = mesh.NearestFace(group, near);
+            var c = mesh.Centroid(face);
+            var (x, y) = CameraPixels.Holding(project(c));
+            ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}", mesh.Normal(face), Vector3.UnitZ);
+        }
+    }
+
     public static void ExpectNot(ScenarioDriver driver, ScenarioFrame frame, int x, int y, string group, string what)
     {
         if (Classify(frame, x, y).Group == group)

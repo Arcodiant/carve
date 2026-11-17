@@ -215,20 +215,7 @@ public sealed class CharacterScenario : IScenario
     /// </summary>
     private static void CheckRest(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, GardenerSpec.MeshSpec body, GardenerSpec.MeshSpec hat)
     {
-        var targets = new (GardenerSpec.MeshSpec Mesh, string Group, Vector3 Near)[]
-        {
-            (body, "shirt", new Vector3(0, 0.85f, 0.3f)), (body, "trousers", new Vector3(0, 0.57f, 0.3f)), (body, "skin", new Vector3(0.07f, 1.27f, 0.3f)),
-            (body, "boots", new Vector3(0.09f, 0.05f, 0.4f)), (body, "can", new Vector3(-0.435f, 0.39f, 0.30f)),
-            (hat, "straw", new Vector3(0, 1.485f, 0.3f)), (hat, "band", new Vector3(0, 1.43f, 0.3f)),
-        };
-        foreach (var (mesh, group, near) in targets)
-        {
-            // Against the palette lit by the sky at the face's own normal (the person's ruling of 2026-11-17, M-19 row 6).
-            var face = mesh.NearestFace(group, near);
-            var c = mesh.Centroid(face);
-            var (x, y) = Holding(project(c));
-            ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}", mesh.Normal(face), Vector3.UnitZ);
-        }
+        ExpectRestColours(driver, frame, project, body, hat);
 
         // T-84: the torso's top segment, the slope of each shoulder below the neck, is the shirt's and not skin. Each side's front face of
         // it, projected from the mesh under the framing's bounds, reads as the shirt; the same point with the image flipped upside down
