@@ -38,7 +38,7 @@ A looping clip whose translation does not close on any axis is warned about, as 
 Run on Sonnet 5.5 (claude-sonnet-5-5), one agent.
 
 - **Loop closure** (`ClipChecks.Check`): a looping translation channel closes when its first and last key are within 1 mm (T-45's constant) by 3D distance, so X, Y and Z all count; the warning says "on X/Y/Z". Root travel is unchanged: X/Z only, looping or not. The spec left open per-axis versus 3D distance; I used the 3D distance (within 1 mm on each axis follows from it, and it is T-45's measure extended).
-- **Wording**: D-6 *Clips* closing-tolerance paragraph and the constants' comments in `ClipChecks.cs` updated.
+- **Wording**: D-6 *Clips* closing-tolerance paragraph and the constants' comments in `ClipChecks.cs` updated. *Brought up to date (2026-11-17, RV-52, e889af0):* `define_clip`'s tool description still said "on X/Z" for loop closure; it now says the distance on X/Y/Z, matching the code and the warning, and `get_clips` and `export` defer to it.
 - **Tests** (`ClipChecksTests`, unit): Y-only gap warns; within 1 mm on every axis is clean; a looping root that moves on Y but closes on X/Z gets the loop-free result with no travel warning. T-45's `A_clean_looping_clip_has_no_warning` had a Y gap of 0.2 m that it relied on not being compared; its end key now closes.
 - **Check shown failing**, tests run against T-45's `ClipChecks`:
 

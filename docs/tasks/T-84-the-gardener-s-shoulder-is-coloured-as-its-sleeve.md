@@ -42,7 +42,7 @@ Built on Sonnet 5.5.
 
 - **Cause:** not the arm lathe. The torso lathe's last segment, from the chest ring (y 1.02, r 0.15) to the neck ring (y 1.12, r 0.07), was grouped `skin`. It is the slope of the shoulders, the sleeves start on it, so a cone of flesh showed at the top of each arm. Fix: `GardenerSpec.ShoulderSegment = "shirt"` for that segment (colour only: the face count, vertices, bones and weights are unchanged; 8 faces move from the skin group to shirt). The cap above stays skin (the neck).
 - **Rebuilt from it:** `samples/gardener.carve` and `samples/gardener-soft.carve` (copied from the scenarios' `work/` files, byte-equal to them as before). `tests.json`: `server-regression` now lists `samples/gardener.carve` as an input (RenderGlbTests reads it; the first verify carried a stale pass for it).
-- **New check** (`CharacterScenario.CheckRest`, rest front): for each side, the shoulder-slope face (found by nearest shirt face to (+-0.04, 1.07, 0.1), failing if its centroid is not between y 1.02 and 1.12) projected under the rest-bounds framing reads shirt; the same point flipped upside down is not shirt.
+- **New check** (`CharacterScenario.CheckRest`, rest front): for each side, the shoulder-slope face (found by nearest shirt face to (+-0.04, 1.07, 0.1), failing if its centroid is not between y 1.02 and 1.12) projected under the rest-bounds framing reads shirt; the same point flipped upside down is not shirt. *Brought up to date (2026-11-17, RV-52, 45ac156):* the shoulder slope's face now reads against the palette lit at its normal (`ExpectGroup` with the face's normal, `GardenerPixels.ClassifyLit`), as the rest checks do since the sky rebase; the flipped point's `ExpectNot` keeps the bare palette.
 - **Break table:**
 
 | Mutation | Result |

@@ -115,7 +115,7 @@ A looping clip whose channels do not end as they start is a warning, as is a cli
 
 **Certainty:** Leaning · **Strictness:** Rule
 
-Carve's preview poses on the CPU in `Carve.Core` and draws the result as a plain mesh. `render_glb` loads the exported file through the engine's own loader and draws it with GPU skinning. The two share no skinning code, so a frame that matches proves the export and not only a path agreeing with itself.
+Carve's preview poses on the CPU in `Carve.Core` and draws the result as a plain mesh, its corner normals skinned with the same weights; a flat mesh's too, since the export writes a flat face's normal at each corner and a game skins those, so a posed flat face is lit by its skinned corners and not by its posed polygon's own normal (RV-52, the person's ruling of 2026-11-17, "Fix render in M-19"). `render_glb` loads the exported file through the engine's own loader and draws it with GPU skinning; with no clip, a skinned file is skinned at its bind pose (every bone at its node's rest transform, through the file's inverse binds), as a game draws it with no clip playing (RV-52, the person's ruling of 2026-11-17, "Skin at bind pose"). The two share no skinning code, so a frame that matches proves the export and not only a path agreeing with itself.
 
 They do share the material, by the person's ruling (2026-11-12, T-82: "render goes PBR"): the preview draws each colour with the engine's PBR material and the very parameters the loader makes from the exported file (metallic 0, roughness 1), in the same scene light, so the two agree in shading and differ only where the posing does. A highlighted face in the shaded look follows the surface's PBR shading (ruled 2026-11-13). At T-82 a `render` and a `render_glb` of the gardener at rest and in Walk at 0.5 s differed in no pixel past 8/255 (under `Material.LitMesh`: 15.0 % and 12.1 %).
 
@@ -162,7 +162,7 @@ The limits are the game's, not Carve's (T-51, ruled 2026-11-13). They live in `c
 
 **Certainty:** Leaning · **Strictness:** Rule
 
-T-48 starts from Orcward's rule: a pixel differs when R, G or B differs by more than 8 of 255, and a frame fails past 0.5 % of its pixels. It is loosened only on differences measured at T-48, and only by the person.
+T-48 starts from Orcward's rule: a pixel differs when R, G or B differs by more than 8 of 255, and a frame fails past 0.5 % of its pixels. It is loosened only by the person, on measured differences.
 
 **Ruling, 2026-11-13 (the person), after T-48 found a twisted hand passing the whole-frame count:** the rule keeps 8/255 and 0.5 % for shading noise, and also fails any frame with a connected patch of differing pixels larger than 50 px (8-connected, so a limb's diagonal outline stays one patch). A twisted limb is a patch; noise is scattered. 50 was kept because it separates with a wide margin: the largest patch in any good frame is 2 px, in any twist 130 px or more.
 
@@ -175,15 +175,27 @@ T-48 starts from Orcward's rule: a pixel differs when R, G or B differs by more 
 | reversed winding (rest / Walk 0.5 side / front) | 39,415 / 31,622 / 38,184 | 39,401 / 31,604 / 38,184 |
 | dropped piece (rest) | 26,979 | 26,589 |
 
-**Ruling, 2026-11-13 (the person), on wrong files:** the suite must fail on every wrong file, but which frame catches it may vary. A rest frame is the bind pose with no palette, so a swapped bone order or swapped inverse binds are invisible at rest (0 px) and caught only in a clip frame; seen from the side a shift in X lies along the view, so the swapped inverse binds are caught from the front (the cluster rule also catches them from the side). Each wrong file therefore fails at one frame at least.
+**Ruling, 2026-11-13 (the person), on wrong files:** the suite must fail on every wrong file, but which frame catches it may vary. At T-48 a rest frame was the bind pose with no palette, so a swapped bone order or swapped inverse binds were invisible at rest (0 px) and caught only in a clip frame (since 2026-11-17 `render_glb` skins a rest frame at the bind pose, and both fail at rest too: see below); seen from the side a shift in X lies along the view, so the swapped inverse binds are caught from the front (the cluster rule also catches them from the side). Each wrong file therefore fails at one frame at least.
 
-**Ruling, 2026-11-17 (the person, M-19's third rebase, "Accept all"):** a pixel differs when its luma (Rec. 709 of the sRGB values, 0.2126 R + 0.7152 G + 0.0722 B) differs past 4 of 255, in place of "R, G or B past 8"; the 0.5 % and the connected-patch-past-50 limits are kept. Under M-7's sky the two draws' slightly different normals on one trouser facet between keys (posed face against skinned corners) make a step that is mostly blue, since the sky's light is: under the old measure it gave a good frame (Walk 0.25 s, side) a 23 px patch, the same as the hand twisted Y 45. By luma the measures separate again. It applies wherever the rule is used: `ComparisonPng`, the Orcward scenario and its checks, and T-49's acceptance step.
+**Ruling, 2026-11-17 (the person, M-19's third rebase, "Accept all"):** a pixel differs when its luma (Rec. 709 of the sRGB values, 0.2126 R + 0.7152 G + 0.0722 B) differs past 4 of 255, in place of "R, G or B past 8"; the 0.5 % and the connected-patch-past-50 limits are kept. Under M-7's sky a good frame (Walk 0.25 s, side) had a 23 px patch under the old measure, the same as the hand twisted Y 45, and 2 px by luma. Walk 0.25 s is a key, so by T-48's own note that was a bug and not noise; RV-52 found it (`render` lit a posed flat face by its polygon's normal, the game by its skinned corners) and it was fixed in M-19 (below), so every good frame now differs by 0 px. It applies wherever the rule is used: `ComparisonPng`, the Orcward scenario and its checks, and T-49's acceptance step.
 
 | Frames, luma past 4 (measured on M-19's third-rebase sweep) | Largest patch |
 |---|---|
 | ten good frames | 2 px or less |
 | Hand_L twisted (five) | 101 to 597 px |
 | wrong files (each at its catching frame) | 268 to 26,231 px |
+
+**Rulings, 2026-11-17 (the person, on M-19's review RV-52).** (1) "Add colour checks": luma cannot tell the gardener's trousers (`#3C54A0`) from its hat band (`#C0392B`), lit within 1.3 to 2.6 of each other, so Orcward's good frames also check a thigh face as trousers and a hat-band face as band, front and side, against the palette lit at each face's posed normal, and a file with the two swapped (`swapped-colours`) must fail on colour; `differences.tsv` gains a `colour` column. The frame rule itself is unchanged. (2) "Skin at bind pose": `render_glb` with no clip skins a skinned file at its bind pose, so a rest frame now checks the skin (above). (3) "Fix render in M-19": `render` lights a posed flat mesh by its skinned corner normals, as the game does (*Two samplers*).
+
+| Orcward, after the RV-52 fixes (differing px / % / largest patch) | rest front | Walk 0.5 s side | Walk 0.5 s front |
+|---|---|---|---|
+| good frames and the control | 0 | 0 | 0 |
+| swapped bone order | 2,669 / 1.018 / 982 (fails) | 3,823 / 1.458 / 3,823 | 2,662 / 1.015 / 1,127 |
+| swapped inverse binds | 10,361 / 3.952 / 5,185 (fails) | 543 / 0.207 / 268 | 9,581 / 3.655 / 5,313 |
+| reversed winding | 27,809 / 10.608 / 18,995 | 22,446 / 8.562 / 18,592 | 29,242 / 11.155 / 19,029 |
+| swapped colours (fails on colour at each) | 45 px | 77 px | 45 px |
+| dropped piece | 26,642 / 10.163 / 26,231 | | |
+| Hand_L twisted Y 45 / Y 90 / X 45 / Z 45 / Z 90 (rest front) | 127 / 0.048 / 100; 311 / 0.119 / 281; 502 / 0.191 / 502; 332 / 0.127 / 328; 574 / 0.219 / 570 | | |
 
 **Alternatives:** counting only pixels on the character (a twist is 0.38 % to 1.42 % of the character's pixels, still under 0.5 % for the smallest); a smaller region or a lower limit. The cluster rule was chosen over both.
 **Would change if:** a good frame shows a patch near 50 px, or a twist falls below it.

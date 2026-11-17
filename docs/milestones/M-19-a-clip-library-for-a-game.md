@@ -20,7 +20,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 
 **Order.** T-45, T-47 and T-50 side by side; T-48; T-49. Stronger model on T-47, Sonnet on the rest.
 
-**The frame rule** is Orcward's, in D-6. Only the person may loosen it, on differences measured at T-48.
+**The frame rule** is Orcward's, in D-6. Only the person may loosen it, on measured differences.
 
 ## Required tasks
 
@@ -42,7 +42,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
   - builds the gardener with both looping clips through the tools;
   - exports the model, the clips and the Hat piece with no warnings;
   - loads them through `IModelGeometryLoader.Load` and `LoadAnimationSet`, with the same 22 bones, inverse binds and clips;
-  - compares `render_glb` with `render` at rest and at nine clip times, four of them between keys. Every good frame differs by 0 px, apart from one frame at 2 px.
+  - compares `render_glb` with `render` at rest and at nine clip times, four of them between keys. Every good frame differed by 0 px, apart from one frame at 2 px (Walk 0.25 s side, a key; RV-52 found it a bug in `render`, fixed, and every good frame now differs by 0 px).
 - **Each planted fault fails:** reversed winding, a dropped piece, a swapped bone order, swapped inverse binds, and all five twisted hands.
 - **The pieces of it:**
   - `get_clips` and the loop and travel warnings (T-45, T-83);
@@ -54,7 +54,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
   - `render_glb` matches `render` within 1 px over 14 pairs;
   - no vertex is left unweighted.
 - **The person approved every frame set put to review:** T-47's (after T-84's fix), T-84's shoulder crops, T-82's two baseline sets, T-48's round 2 and T-49's character.
-- **`cairn milestone M-19 verify` (2026-11-13, at 91bb472, before this retrospective)** passed every check but `review`, which comes after the person's go:
+- **`cairn milestone M-19 verify` (2026-11-13, at 91bb472, before this retrospective; a pre-rebase commit, not an ancestor of the branch now)** passed every check but `review`, which comes after the person's go:
   - 9/9 members done and merged;
   - all 12 suites pass, 11 ran and 1 carried.
 - **Models:**
@@ -117,7 +117,8 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - **A real game.** Every file is proved through the engine's loaders and `render_glb`, not loaded and played in Orcward. The shared-palette swap of a piece at runtime was not run in a scene. T-48 checks the file side only.
 - **Hash guards that were partial or argued, not run:**
   - T-45 and T-83 changed no render code and hashed nothing.
-  - T-50 hashed the Character suite only.
+  - T-47 changed `RenderSystem` and `RenderPump`, which every frame suite draws through, but its `**Verify:**` was `server-regression`, `scenario-cube` and `scenario-crate`, and it hashed only those 87 cube and crate frames; character, soft, rig, shed and export were neither verified nor hashed (added after RV-52).
+  - T-50 hashed the Character suite only, and changed `ExportTool`'s mode handling with `scenario-export`, `scenario-soft` and `scenario-rig` out of its verify scope.
   - T-49 compared no hashes, after showing `src/` unchanged since T-48. The orchestrator confirmed that.
   - T-72 compared no hashes, since only warning text changed.
   - T-48's guard was the full one: seven suites, every frame and `.glb`.
@@ -128,6 +129,9 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
   - The soft torso's smooth run sits at its limit of 5 with no headroom in the model.
   - T-47's loader-warning path is tested only with a fake loader.
   - T-49's round 1 session-1 `.carve` file was not kept.
+  - **Mirror and flip gaps in front views** (brought up to date after RV-52):
+    - *Closed:* T-49's acceptance step (a silhouette check, d5f3ec6); the crate front and the export's front, front-reopened and front-<error> frames, shown in Python on round-3 frames to fail mirrored and flipped (45ac156).
+    - *Not shown:* the cube front (row 1) and the label sheet's front tile (`CrateLabels.cs`); row 3a (cylinder sides) and row 3c (soft rim), as above.
 - **Readings members landed that the spec did not settle** (in their As built):
   - T-50: a piece gets no height warning, chosen meshes keep the model's order, and duplicates are ignored.
   - T-72:
@@ -139,11 +143,11 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 
 **Known and left.**
 
-- **T-85** (off-milestone): an environment map in the render scene, from the person's question on T-82's review.
+- **T-85** (off-milestone), an environment map in the render scene, from the person's question on T-82's review: **closed** by the person's ruling of 2026-11-17 (RV-52), "Close it". M-7's sky, which came in with the third rebase, gives the render scene a diffuse ambient and a specular probe that reach every PBR face, the colour faces among them.
+- **B-5** (off-milestone): some of the gardener's leg faces are wound inside out, in `GardenerSpec` and `samples/gardener.carve` (thigh faces 126 and 132, found in RV-52's fix round). `render` and the lit-palette checks use the same inverted normal, so they agree; a game would light those faces from inside or cull them. The person's ruling of 2026-11-17: "File a bug, off-milestone". A fix moves frames.
 - **T-86** (off-milestone): `server-regression` timing out on a loaded machine (below).
 - **T-51** (per-game export limits) is still open.
-- `CLAUDE.md` and the acceptance check's files are inputs of no suite; the latter by ruling.
-  - **The person's ruling (2026-11-17), "Add as inputs":** the two acceptance projects are inputs of `server-unit` (its build compiles them; nothing new runs), while `CLAUDE.md` and the `run-acceptance-*.ps1` scripts stay uncovered.
+- `CLAUDE.md` and the `run-acceptance-*.ps1` scripts are inputs of no suite. At first the acceptance check's projects were too, by T-49's ruling; **the person's ruling (2026-11-17), "Add as inputs"**, made the two acceptance projects inputs of `server-unit` (its build compiles them; nothing new runs).
 
 **Test report** (`cairn test report --since 3d`):
 - `server-regression` is again about 90 % of the slot time. It caught 9 failures, 7 of them unique to it.
@@ -186,11 +190,11 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - **Frames:**
   - Against `main` at 5bc4559, 10 of 16 `scenario-cuts` frames and 23 of 26 `scenario-gatehouse` frames changed under PBR. `scenario-uvs` changed 0 of 22.
   - **The person approved 16 pairs** (`C:\Users\andre\artifacts\carve\M-19\rebase\round-1`) on 2026-11-16.
-- **`cairn milestone M-19 verify` at df70148:** every check but `review` passes, across 14 suites (7 ran, 8 carried).
+- **`cairn milestone M-19 verify` at df70148:** every check but `review` passes, across 15 suites (7 ran, 8 carried). df70148, like 91bb472 and T-82's and T-84's baselines eded55f and 91438b0, is a commit from before a later rebase and not an ancestor of the branch now.
 - **Not checked:**
   - The colour and wall breaks were worked in the light model, not by breaking the product.
   - In perspective frames, the specular uses the camera's direction, not each pixel's.
-- **The third rebase, onto `720a6fa` (M-7's sky, 0.10.0), 2026-11-17, by two Opus 5.5 agents.** The conflicts kept both sides as before. Under M-7's sky eleven of M-19's checks moved; the sky's light was measured (`scenario-sky`, 26 normals) and `ColourRule` extended with it, and **the person ruled "Accept all" (2026-11-17)** on the table of every moved check, re-derived under the sky (6335267): front views judged top over +Z and each face over the background, `cube-zoom3-corner` at 2 shades, the cylinder's sides by facet 1, the soft torso's steps and shade counts, "not highlighted" by `ColourRule.GreyRedLessBlue`, the gardener's rest points against the lit palette, and `ExportHashTests` pinned to M-19's `F67B9897...` hash. **D-6's frame rule is now luma past 4** (`Comparison.Differs`, `PixelThreshold` 4.0). In the verify run's Orcward table the good frames differ by at most 2 pixels (walk 0.250 side) and every twist fails: Hand_L Y45 190 pixels, patch 101; Y90 249, 185; X45 399, 396; Z45 291, 285; Z90 598, 597 (limit 50). Each ruled check was shown failing on a broken frame made from a run's own (probe reverted, in `round-3\breaks`). The gaps: the breaks were made on frames, not by breaking the product, and a mirrored camera is not caught by row 1 (cube front), row 3a (cylinder sides) or row 3c (soft rim), whose points still differ. Against `main` by hash: cube 27 of 32 frames changed, crate 50/69, shed 8/10, character 21/21, soft 11/11, cuts 10/16, gatehouse 23/26, export 5/7, rig 2/9, materials 2/23; uvs 0/22 and viewer-cube 0/6 are unchanged; main has no sky or Orcward suite. **The person approved 15 pairs and two Orcward triptychs** (`round-3\review`, 2026-11-17). `cairn milestone M-19 verify` at 1e2c497: every check but `review` passes, across 17 suites (17 ran). Not checked: the luma rule on T-49's acceptance rounds (no round folder run), and the lit palette only at the `CheckRest` points.
+- **The third rebase, onto `720a6fa` (M-7's sky, 0.10.0), 2026-11-17, by two Opus 5.5 agents.** The conflicts kept both sides as before. Under M-7's sky eleven of M-19's checks moved; the sky's light was measured (`scenario-sky`, 26 normals) and `ColourRule` extended with it, and **the person ruled "Accept all" (2026-11-17)** on the table of every moved check, re-derived under the sky (6335267): front views judged top over +Z and each face over the background, `cube-zoom3-corner` at 2 shades, the cylinder's sides by facet 1, the soft torso's steps and shade counts, "not highlighted" by `ColourRule.GreyRedLessBlue`, the gardener's rest points against the lit palette, and `ExportHashTests` pinned to M-19's `F67B9897...` hash. **D-6's frame rule is now luma past 4** (`Comparison.Differs`, `PixelThreshold` 4.0). In the verify run's Orcward table the good frames differ by at most 2 pixels (walk 0.250 side) and every twist fails: Hand_L Y45 190 pixels, patch 101; Y90 249, 185; X45 399, 396; Z45 291, 285; Z90 598, 597 (limit 50). Each ruled check was shown failing on a broken frame made from a run's own (probe reverted, in `round-3\breaks`). The gaps: the breaks were made on frames, not by breaking the product, and a mirrored camera is not caught by row 1 (cube front), row 3a (cylinder sides) or row 3c (soft rim), whose points still differ. (RV-52 found the same front-view gap in the crate front, the label sheet's front tile, the export's front frames and T-49's acceptance step; its fix round closed some of them: see *The review (RV-52)*.) Against `main` by hash: cube 27 of 32 frames changed, crate 50/69, shed 8/10, character 21/21, soft 11/11, cuts 10/16, gatehouse 23/26, export 5/7, rig 2/9, materials 2/23; uvs 0/22 and viewer-cube 0/6 are unchanged; main has no sky or Orcward suite. **The person approved 15 pairs and two Orcward triptychs** (`round-3\review`, 2026-11-17). `cairn milestone M-19 verify` at 1e2c497: every check but `review` passes, across 17 suites (17 ran). Not checked: the luma rule on T-49's acceptance rounds (no round folder run), and the lit palette only at the `CheckRest` points.
 
 ### The refactor pass (2026-11-17, Opus 5.5)
 
@@ -200,3 +204,32 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - **Uncovered files, the person's ruling (2026-11-17), "Add as inputs":** `scenarios/Carve.Scenario.Acceptance` and `tests/Carve.AcceptanceLoad.Tests` were added to `server-unit`'s inputs as `dotnet-closure`s, so a change to them alone re-runs a suite whose solution build compiles them, and `cairn lint` no longer warns that no suite runs the test project.
 - **Left:** the crate's and shed's "not highlighted" checks repeat the same `GreyRedLessBlue` within-6 test with different reporting (`Fail` against `Note`); the Orcward frame check and the character's can and hand checks are alike but check different things (flips, frame names).
 
+### The review (RV-52)
+
+- **Three reviewers, round 1** (2026-11-17, `docs/reviews/RV-52-review-of-m-19.md`, ae76320), each an Opus 5.5 subagent in a fresh context, one per part:
+  - product code: 3 findings (define_clip's description, a missing skinned-export test, `get_clips` writing `null`);
+  - scenarios and frame checks: 10 (luma blind to trousers against band, `ColourRule.cs` missing from six suites' inputs, `render_glb`'s rest frames drawing no skin, no mirror check in the acceptance step, a stale `CheckFront` comment, a negatives script that asserted nothing, `NotPlanarFold.Check`, the bare palette in three checks, Walk 0.25 s being a key, and two duplications);
+  - tracker and design: 10, answered in the docs pass.
+- **The fix round**, Opus 5.5 agents:
+  - e889af0: `define_clip`'s description says loop closure is X/Y/Z; `get_clips` leaves out a part the clip does not key; tests for both and for clip warnings in a skinned model export.
+  - 45ac156: Orcward's colour checks on trousers and band against the lit palette, the `swapped-colours` break and the `colour` column; `ColourRule.cs` an input of six suites (and `CrateBuild.cs`, `ComparisonPng.cs` of `server-unit`); `NotPlanarFold.Check` holds the named faces to `select`'s lowest ids and the fold line last; the can, near-hand and shoulder checks against the lit palette; one `CheckFrontOrder` and the sky check through `ColourRule.Lit`; the negatives script exits 1 when a break is not caught, with `-NoBuild` and a time limit; `CheckFront`'s comment corrected.
+  - d5f3ec6: the acceptance step fails a mirrored or flipped camera (silhouettes from `get_mesh`, `silhouettes.tsv`).
+  - b3a4d23: the front thigh check reads the thigh, and the model's own Walk 0.5 s from the front is checked.
+  - 05237fb: `render_glb` skins a skinned file at its bind pose with no clip, and `render` lights a posed flat mesh by its skinned corner normals. Every good Orcward frame now differs by 0 px, and the rest frames of a swapped bone order (2,669 px, patch 982) and swapped inverse binds (10,361 px, patch 5,185) fail.
+  - The docs pass (this commit): D-1, D-6, `CLAUDE.md`, the As builts of T-45, T-47, T-48, T-49, T-82, T-83 and T-84, T-85 closed, B-5 filed, and every finding's outcome.
+- **The person's rulings (2026-11-17):**
+  - "Add colour checks" (scenarios 1): the frame rule stays; Orcward's good frames check trousers and band by colour.
+  - "Investigate, then decide", then "Skin at bind pose" (scenarios 3).
+  - "Fix render in M-19" (scenarios 9): Walk 0.25 s's 2 px were a bug.
+  - "Fix all as found" for the other code findings.
+  - "Close it" (T-85, answered by M-7's sky).
+  - "File a bug, off-milestone" (the inside-out leg faces, B-5).
+  - "Add as inputs" (the acceptance projects in `server-unit`), recorded above.
+- **The moved frames of 05237fb were shown to the person three times** and approved on the third. The questions were on the crossed legs of the swapped-bone-order break, the bulge in the weighed pose, and why broken files are among the frames; each was answered, and no code changed.
+- **Not checked:**
+  - the cube front and the label sheet's front tile under a mirror;
+  - the acceptance guard that a view differs from its own mirror or flip, not shown failing;
+  - a plain negatives run on a known-good round;
+  - `ExportTool`'s clip-warning line deleted to watch the new skinned-export test fail;
+  - T-49's acceptance frames after 05237fb (`run-acceptance-check.ps1` not run again, and they will move); the acceptance side frames differ from round 2's recorded table by 1 to 2 px, and the front-against-back control reads 21,550 px against 21,431 (the good frames still pass; not looked into);
+  - scenario-rig, materials, export, cube, shed, uvs, cuts, gatehouse and sky not run by the fixers after 05237fb (none poses a model or calls `render_glb`); the milestone's verify after the docs pass runs them.

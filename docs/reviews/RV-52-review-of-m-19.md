@@ -37,7 +37,9 @@ The tool description says a looping clip warns when its "translation ends more t
 
 Failure case: an agent writes a looping Idle whose Hips end 5 cm lower than they start. From the description it expects no warning, because the gap is in Y. `define_clip` then warns "... 50 mm from where it starts on X/Y/Z", which the description says cannot happen. `get_clips`'s description (line 268) and `export`'s description defer to define_clip's wording, so they inherit the error.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** e889af0. It says a looping translation warns more than 1 mm away from where it starts (the distance on X/Y/Z); root travel stays X/Z as the code does.
 
 ### Clip warnings in a model-mode (skinned) export have no test
 
@@ -47,7 +49,9 @@ Failure case: an agent writes a looping Idle whose Hips end 5 cm lower than they
 
 Failure case: delete line 230 and, as far as the tests can tell, every test still passes, while a skinned export of a model with a drifting loop goes out silently. A smaller gap in the same test: the unknown-name error of `get_clips` (line 100) asserts only `IsError`, not the clip list that the As built says it gives.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** e889af0. `SkinnedExportToolTests.A_skinned_model_export_carries_the_clip_warnings` (50 mm on Y in a skinned model export); the unknown-name get_clips test asserts the exact error with the known clips listed.
 
 ### get_clips writes `"rotation": null` where the description says the part is left out
 
@@ -57,7 +61,9 @@ The description says "a part the clip does not key is left out". `Part` returns 
 
 Failure case: a client that reads the result as the description gives it, `"rotation" in channel`, finds a rotation part that is null. No test looks at the missing part, because the test's `drift` clip keys only translation and only `translation` is read. Either the description or the serialisation (ignore nulls for this result) needs to change.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** e889af0. Serialised with `JsonIgnoreCondition.WhenWritingNull`; a test asserts the translation-only channel has no `rotation`. Carve clips have no scale channel.
 
 ## Findings: scenarios and frame checks
 
@@ -68,85 +74,117 @@ Reviewer: Opus 5.5 (claude-opus-5-5). The worktree is `C:\repos\carve\branches\m
 The code implements D-6's rule as ruled: luma past 4, more than 0.5 % of pixels, or an 8-connected patch over 50 px. But luma is blind to hue, and two of the gardener's colours have almost the same luma. Trousers `#3C54A0` give 84.4 and band `#C0392B` give 84.7 unlit. I worked them through `ColourRule`'s model (ambient, sun and sky, front view; specular left out), and lit faces give trousers 80.6 / band 79.3 at normal +Z, 83.5 / 80.9 at the shoulder-slope normal, and 79.5 / 77.9 at (0.5, 0, 0.87). Each gap is 1.3 to 2.6, under the threshold of 4.
 So a `.glb` whose trousers came out red, or whose hat band came out blue, gives 0 differing pixels in every good frame. That is the kind of fault an export would make with a material index off between primitives or meshes. The only colour checks on the good frames, `CheckFrame`, test the can's face and the near hand (skin). They never test trousers or band.
 The scenario therefore does not show that "a game's load matches the preview" in colour for those two groups. A hue check needs to cover them, either through the positive checks or as a chroma term. This does not reopen the ruling: the patch and count limits can stay as they are.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 45ac156, b3a4d23; ruling "Add colour checks", 2026-11-17. Good frames check a thigh face as trousers and a hat-band face as band, front and side, against the lit palette; new break `swapped-colours` fails on colour at all 3 rows; `differences.tsv` gains a `colour` column. Frame rule unchanged.
 
 ### `ColourRule.cs` is missing from the inputs of six suites that compile it, `scenario-sky` among them
 `tests.json:104-123` (`scenario-sky`), `:425-452` (`scenario-orcward`), and the `scenario-character`, `scenario-soft`, `scenario-shed` and `scenario-uvs` entries. Rubric point 6.
 cairn's `dotnet-closure` follows `ProjectReference`s and project folders only (`C:\repos\cairn\scripts\cairn\generators.py`). It does not follow linked `<Compile Include="../...">` items, which is why these entries list `CrateBuild.cs`, `GardenerSpec.cs` and so on by hand.
 `ColourRule.cs` is linked by the Sky, Orcward, Character, Soft, Shed and Uvs projects. The Character, Shed and Uvs links are new in this diff. Only `scenario-cuts` and `scenario-gatehouse` list it.
 Failure case: change `SkyLight`'s coefficients or `Light`. `scenario-sky` exists to hold `ColourRule` to the measured sky, yet it carries its pass, and so do Orcward, Character, Soft, Shed and Uvs, whose lit-palette and "not highlighted" checks depend on the file.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 45ac156. Input of scenario-sky, -orcward, -character, -soft, -shed, -uvs; server-unit also gains CrateBuild.cs and ComparisonPng.cs, which the acceptance project links.
 
 ### `render_glb`'s rest frames draw no skin, so the two good rest pairs prove nothing about the skin a game applies
 `OrcwardScenario.cs:67-68, 112-113` and the measured table (`round-3\jobs\m19-orcward\orcward\differences.tsv`). Rubric point 1. I raise it under my part because of what the scenario claims to prove.
 `swapped-bone-order-rest-front` and `wrong-inverse-binds-rest-front` both differ by 0 px. With UpperLeg_L/R's joints swapped and their inverse binds kept, the joint matrix at rest is world(R) x IBM(L), which is not the identity. A game that skins the loaded file at its rest nodes would draw that leg moved onto the other leg. `render_glb` draws it correct, so at rest it is not drawing what a game would draw from this file.
 The "at least one frame" ruling covers the scenario's verdict, and it stands. Even so, the rest pairs `rest-front` and `rest-side`, and every break's rest frame, check only the static mesh and materials, and the summary's "matches at rest" should say so. The `src/` reviewer may want to check whether rest without a clip skips skinning.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 05237fb; ruling "Skin at bind pose", 2026-11-17. With no clip a skinned file is skinned at its bind pose; good frames byte-identical; swapped-bone-order-rest-front 0 → 2669 px (1.018 %, patch 982) and wrong-inverse-binds-rest-front 0 → 10361 px (3.952 %, patch 5185), both now fail.
 
 ### The acceptance frame step has no check that a mirrored or flipped camera fails
 `scenarios/Carve.Scenario.Acceptance/AcceptanceScenario.cs:73-93`. Rubric points 2 and 4.
 T-49's Notes carry the rule "a positive pixel check on every new frame, and one a mirrored or flipped camera would fail". The scenario's only checks are that the character covers at least 2 % of the frame, which survives any mirror or flip, and a front-render against back-glb control, which shows that the measure tells views apart and not that either draw is the right way round.
 If a camera fault is shared by `render` and `render_glb`, both mirror, every pair measures 0, and the round passes. T-49's As built does not list this gap, and the milestone's list of weak checks does not include it.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** d5f3ec6. Each rest front/side frame from render and render_glb must overlap (IoU ≥ 0.9) a silhouette predicted from get_mesh through `CameraPixels.Perspective`, and at least one view must differ from its own mirror and one from its own flip; results in `acceptance/silhouettes.tsv`. Shown failing on a copy of T-49 round 2 (mirrored 0.721, flipped 0.525). The guard that a view differs from its own mirror/flip was not shown failing.
 
 ### `CrateBuild.CheckFront` still claims a mirrored camera fails, but the check that caught it was dropped, and the same gap reaches more frames than "cube front"
 `scenarios/Carve.Scenario.Crate/CrateBuild.cs:192-202`, with `CrateLabels.cs` (front tile) and `scenarios/Carve.Scenario.Export/ExportScenario.cs:52, 76, 132` as callers. Rubric point 4.
 The comment reads: "A mirrored camera puts +X where +Z is ... so either fails". Under the sky ruling (row 1) `CheckFrontOrder` no longer orders +Z over +X, and that order was what failed a mirror. The comment in `CrateLabels` was updated to "a flipped camera reorders"; the one in `CrateBuild` was not.
 The milestone records the mirror gap for "row 1 (cube front)" only. The same rule now judges the crate front, the label sheet's front tile and three frames of the export scenario. None of these has been shown failing under a mirror. The remaining `FrontBarTop`/`FrontPanelBehindBar` difference or the background floor might still catch one, but that is not shown.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 45ac156. Comment corrected; shown in Python on round-3 frames that the crate front and the export's front, front-reopened and front-<error> fail mirrored and flipped. The label sheet's front tile (`CrateLabels.cs:170`) and the cube front are not shown and stay recorded as gaps.
 
 ### `run-acceptance-negatives.ps1` asserts nothing and documents a switch it lacks
 `scripts/run-acceptance-negatives.ps1:8, 31-41, 67-68`. Rubric point 2.
 The script prints a table of what failed and exits 0 whatever the table says, so a negative that wrongly passes is visible only to someone who reads the table. The help text says "Needs -NoBuild only if everything is already built", but there is no `-NoBuild` parameter. It always runs `run-scenario.ps1 -NoBuild` and `dotnet test --no-build`, so on a stale build it silently tests old binaries. The `dotnet test` call is also unbounded, unlike `run-acceptance-check.ps1`'s `Invoke-BoundedDotnet`.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 45ac156. Exits 1 on an uncaught break or a stopped run, `Caught` column, real `-NoBuild`, `dotnet test` bounded (`-ChecksTimeoutSeconds`, 180). Shown: an uncaught break exits 1.
 
 ### `NotPlanarFold.Check` does not check which faces are named, or that the fold line comes last
 `scenarios/Carve.Scenario.Soft/NotPlanarFold.cs:44-55`. Rubric point 2.
 T-72's reading, as landed, is that the "first 10" are the lowest face ids and the fold line goes last. The check compares counts and requires the named ids to be in ascending order, but it never compares them with `select`'s ids, which the scenario already writes to `select-non-planar-<mesh>.txt`. It also accepts a fold line anywhere.
 Failure case: an export naming faces 3, 7, 12, ... (any 10 ascending non-planar ids, not the lowest), or putting the fold line first, passes both `scenario-soft` and `SoftLoad.Tests`.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 45ac156. Named faces must be select's lowest 10 ids; a face named after the fold line fails. Shown failing both ways.
 
 ### Orcward's good-frame colour checks and T-84's shoulder check use the bare palette, while the rest checks moved to the lit one
 `OrcwardScenario.cs:206, 215` and `CharacterScenario.cs` (T-84 shoulder `ExpectGroup`), against `GardenerPixels.cs:62-81`. Rubric point 1.
 Under the sky the bare palette was shown to misread boots as skin, and ruling row 6 moved `ExpectRestColours` to `ColourRule.Lit`. The can, near-hand and shoulder-slope checks still classify against the bare palette at a 0.98 match. They pass today, but they are not applying the prediction the ruling made the rule for these frames, and the shoulder slope is the most upward-facing (bluest-lit) point checked. This is the same class of check as the one the ruling changed, applied unevenly.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 45ac156. Orcward's can and near-hand and T-84's shoulder checks read against the lit palette (`GardenerPixels.ClassifyLit`); the `ExpectNot` negatives keep the bare palette.
 
 ### Walk 0.25 s is a key, yet D-6 explains its 2 px difference as "between keys"
 `OrcwardScenario.cs:75-79` against T-48's Note ("If the frames differ at a key, that is a bug and not a tolerance: find it"). Rubric point 4.
 Walk's keys are at 0, 0.25, 0.5, 0.75 and 1 s, so `walk-0.250-side`, the one good frame that differs, is at a key. The cause D-6 and `ComparisonPng.cs:11-13` give, posed faces against skinned corners, would apply at a key too, so the fault is in the wording rather than the code. Still, T-48's note was not answered on its own terms. The docs reviewer may want D-6's "between keys" corrected.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 05237fb; ruling "Fix render in M-19", 2026-11-17. A bug — render lit a posed flat face by its posed polygon normal while the glb's skinned corner normals light it in a game; `Skinning.Posed` now gives flat meshes skinned corner normals and every good Orcward frame differs by 0 px.
 
 ### Small duplications the refactor pass left
 Rubric point 1 (risk of drift). `CheckFrontOrder` exists twice, in `CubeScenario.cs:757-779` (private) and `CrateBuild.cs:232-250`, with the same text and the same background constant 53. `SkyScenario.Expect` (`SkyScenario.cs:88-93`) restates `ColourRule`'s private `Lit` with its own ambient 0.25, which works against the refactor's "lit surface in one place". A change to the ambient in `ColourRule` would leave the sky check on the old one.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 45ac156. One `CheckFrontOrder` (CrateBuild; Cube links it and scenario-cube has it as an input); the sky check uses `ColourRule.Lit`.
 
 ## Findings: tracker and design
 
 ### CLAUDE.md still says the acceptance projects have no tests.json entry
 `CLAUDE.md` layout rows `scenarios/Carve.Scenario.Acceptance` ("No suite (no `tests.json` entry)") and `tests/Carve.AcceptanceLoad.Tests` ("has no suite (no `tests.json` entry)"). Rubric point 7, and a ruling not carried into the docs. Since e07fc76 ("Add as inputs", 2026-11-17) both projects are `dotnet-closure` inputs of `server-unit` (`tests.json` lines 40 and 43). The rows should say that they have no suite of their own but are built by `server-unit`. T-49's As built ruling (3) ("No `tests.json` suite for the two acceptance projects; their `CLAUDE.md` rows say...") needs a one-line note saying the later ruling now covers them. The layout also has no rows for `scripts/run-acceptance-check.ps1` or `run-acceptance-negatives.ps1`, although every other run script has one.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** both `CLAUDE.md` rows now say no suite of their own but a `dotnet-closure` input of `server-unit`, whose build compiles them; T-49's ruling (3) carries a note that "Add as inputs" now covers them; the layout gains rows for `run-acceptance-check.ps1` and `run-acceptance-negatives.ps1`.
 
 ### Milestone "Known and left" contradicts itself on uncovered files
 `docs/milestones/M-19-a-clip-library-for-a-game.md:145-146`. Rubric point 7. Line 145 says "`CLAUDE.md` and the acceptance check's files are inputs of no suite; the latter by ruling". The sub-bullet below it, and line 200, say the acceptance projects are now inputs of `server-unit`. Only `CLAUDE.md` and the `run-acceptance-*.ps1` scripts remain uncovered, so line 145 is stale.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** the line now says only `CLAUDE.md` and the `run-acceptance-*.ps1` scripts are inputs of no suite, with the acceptance projects' history and the "Add as inputs" ruling folded into it.
 
 ### T-85's premise was overtaken by M-7's sky
 `docs/tasks/T-85-an-environment-map-in-the-render-scene-so-reflections-show.md` (Goal), together with T-82's As built (`**Review:**` paragraph, line 70: "the scene has no environment map") and the milestone's Known and left (line 142). Rubric point 7. After the third rebase the render scene has M-7's fixed sky. `src/Carve.Server/RenderSky.cs` says its diffuse ambient and specular probe reach PBR faces, and since T-82 that includes every colour face. T-85's "Today the render scene ... has no environment map" is no longer true. Its scope (find an environment map in the engine docs, and accept that every frame changes again) is largely done by M-7 plus this milestone. T-85 should be re-scoped (for example, to "metallic/roughness so a reflection can show") or closed, and the two other mentions updated.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** the person ruled "Close it" (2026-11-17); T-85 is Done with a note that M-7's sky (`RenderSky`) gives the render scene a diffuse ambient and a specular probe reaching every PBR face; T-82's `**Review:**` paragraph and the milestone's Known and left say so.
 
 ### D-1 contradicts T-82's ruling after the rebase
 `docs/design/D-1-carve-concept.md:197` (from M-7): "`render` draws material faces through `Material.Pbr`, under a fixed sky, and leaves other faces as they were". Rubric point 5 (a ruling not consistent across the decision doc). T-82's ruling, recorded in the same doc at lines 85-94, draws colour faces through PBR too, so "leaves other faces as they were" no longer holds on this branch. Lines 85-94 also describe the scene light as "unchanged (ambient 0.25, a directional light of 0.9)" and do not mention the sky that now lights those faces. The rebase kept both texts and did not reconcile them.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** D-1's T-82 ruling now names M-7's sky lighting the PBR faces beside the ambient and directional light, and the M-7 materials line says colour faces are PBR too since T-82.
 
 ### T-48's and T-82's As built were not brought up to date after the sky rebase
 Rubric point 7. The refactor pass updated T-45, T-50 and T-49 only.
 - `docs/tasks/T-48-orcward-done-when-scenario.md`, *The rule*: "Orcward's 8/255 and 0.5 % stay for shading noise". The code is `Comparison.PixelThreshold = 4` on luma (D-6, 2026-11-17). T-48 owns the rule and its As built now describes a measure the scenario no longer uses. Its table (smallest twist patch 130) is also pre-luma (now 101), with no note saying so, unlike T-49's.
 - `docs/tasks/T-82-...md`, table: the cylinder ends are "facet 14 / 3 to 13 / 3", and the soft rim compares "against facet 3". The cylinder grade is "facet 2 to facet 14, `least: 3`". `CubeScenario.cs:270-327` now uses facet 1, not 3, under the sky ("Accept all", rows 3a and 3c). The smooth side's grade "is no longer checked in the shaded frame" (line 274). The light model "ambient 0.25 + 0.9 n.l / pi" is no longer the whole model (`ColourRule` adds the sky and the specular). The As built needs a dated "brought up to date" note, as T-49's has.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** T-48's As built marks its rule and tables as T-48's and adds a dated *Brought up to date* section (luma past 4, the colour checks, the rest frames skinned, the key note answered, the measured table after 05237fb, smallest twist patch 100); T-82's adds a dated note on the cylinder ends (facet 13 against 1, `SideEnds` 4), the soft rim (facet 1), the dropped smooth grade and `ColourRule`'s fuller light model.
 
 ### Retrospective: verify suite count does not add up
 `docs/milestones/M-19-a-clip-library-for-a-game.md:189`: "across 14 suites (7 ran, 8 carried)". Rubric point 7 (retrospective accuracy). 7 + 8 = 15, and `tests.json` at df70148 has 15 suites. Separately, the verify points df70148 and 91bb472 (lines 57 and 189), and T-82's and T-84's baselines eded55f and 91438b0, are pre-rebase commits that are not ancestors of HEAD. That is expected after a rebase, but the retrospective could say so.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** 15 suites (7 ran, 8 carried), and the retrospective now says df70148, 91bb472, eded55f and 91438b0 are pre-rebase commits, not ancestors of the branch.
 
 ### T-47's and T-50's narrow Verify scopes, and the retrospective's list of partial guards
 Rubric point 4.
@@ -155,19 +193,27 @@ Rubric point 4.
 - The milestone's "Hash guards that were partial or argued" (lines 118-123) lists T-45, T-83, T-50, T-49, T-72 and T-48 but leaves out T-47.
 
 The impact is small, since the milestone verify ran every suite and T-82 re-baselined every frame afterwards. Still, the retrospective's list should be complete.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** the retrospective's partial-guard list now has T-47 (its verify scope and 87 hashed frames) and T-50's mode handling with export, soft and rig out of scope; T-47's As built records its guard scope.
 
 ### T-49's As built contradicts itself on the session model
 `docs/tasks/T-49-character-acceptance-run.md`, *Models*: "The acceptance agents of both rounds ran on Sonnet 5.5". The first paragraph and the milestone retrospective (line 51) say every `claude -p` session ran on Opus 5.5, which matches the ruling "sessions on Opus". The *Models* line probably means the member's own agents. As written, it is wrong.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** T-49's *Models* line says the member's own agents ran on Sonnet 5.5 and the acceptance sessions on Opus 5.5, with a dated correction note.
 
 ### D-6's frame-rule text still ties loosening to T-48
 `docs/design/D-6-characters-rigging-animation-and-character-export.md:165`: "It is loosened only on differences measured at T-48, and only by the person." Rubric point 5 (wording). The person changed the rule on 2026-11-17 on differences measured in the third rebase's sweep (line 180). The ruling is properly recorded with its table. The opening sentence should drop "at T-48" (for example, "only by the person, on measured differences") so that the Rule does not appear to be broken by its own later ruling.
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** D-6 now reads "It is loosened only by the person, on measured differences"; the milestone's frame-rule line matches.
 
 ### T-45's As built states loop closure per axis, but the code uses a 3D distance
 `docs/tasks/T-45-clip-checks-and-read-back.md`, closing-tolerance bullet: "translation closes when within 1 mm on X, Y and Z". Rubric point 7. `ClipChecks.cs:40-41` compares `(b - a).Length()` with 1 mm, a 3D distance, as T-83's As built says. A gap of 0.8 mm on each axis passes the per-axis reading and fails the code. D-6 line 109 ("within 1 mm of its first, compared on X, Y and Z") is acceptable as written. T-45's text should say "by 3D distance".
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** T-45's As built says loop closure is within 1 mm by 3D distance (T-83).
 
 ## Summary
 
