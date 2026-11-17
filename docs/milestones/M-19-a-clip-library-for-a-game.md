@@ -189,3 +189,39 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - **Not checked:**
   - The colour and wall breaks were worked in the light model, not by breaking the product.
   - In perspective frames, the specular uses the camera's direction, not each pixel's.
+
+### Hand-off
+
+Third rebase, onto `origin/main` 720a6fa (M-7, 0.10.0), by an Opus 5.5 agent, 2026-11-16. **Rebased locally, not pushed.**
+
+- **Ruling (the person, 2026-11-16):** "Colour faces PBR under the sky": every colour face is PBR and lit by M-7's sky. Every shaded colour frame changes and goes to review. `ColourRule` and T-82's thresholds are re-derived with the sky, with one question to the person.
+- **Done:**
+  - Rebased, with every conflict resolved keeping both sides:
+    - export's description and warnings keep the clip, not-planar and material-UV parts;
+    - the tool list holds the material tools beside `get_clips` and `render_glb`;
+    - `save` gives the clip warnings and M-7's missing-texture lines;
+    - export passes `glb.Primitives` with `wholeBody: !asPiece`;
+    - `RenderSystem` keeps M-7's materials and the glb fields side by side; a material face is `Pbr.Of`, and a colour face is `SurfaceMaterial.Of` (T-82);
+    - CLAUDE.md keeps both the materials and the Orcward and acceptance rows.
+  - The build fix is its own commit: `SurfaceMaterial` names `Empyrean.Material`, and `FaceColourTests` takes the new `out materials`. The build passes with warnings as errors.
+- **Verify, run 1** (no threshold changed; logs in `C:\Users\andre\artifacts\carve\M-19\rebase\round-2\`):
+  - Passing: core-unit, rig, uvs, materials, viewer-cube.
+  - Failing: server-unit, server-regression, cube, crate, export, shed (18 checks), cuts (15), gatehouse (43), character, soft and orcward.
+  - cube, crate, export, character, soft and orcward stop at their first failure. The full list of moved checks needs those scenarios' later checks too.
+- **The sky's size, as measured:**
+  - cube-front +Z 201 and +X 199, where the model without the sky (T-82) predicts 147 and 139: the sky adds about 55 to 60 to a grey face and nearly levels the face order.
+  - A light-grey shed wall reads (189, 199, 213): it turns blue, with R-B about 24.
+  - The brown door reads (96, 67, 46) against (95, 64, 38): +1, +3, +8.
+  - The blue pocket wall reads (70, 119, 168) against (51, 84, 108).
+  - The engine docs (0.119.0, `ProceduralSky`) give the diffuse as a per-frame SH projection of the sky, plus a specular probe baked from it. `ProceduralSky.Default`'s numbers are not documented, so the sky's part must be measured, not predicted.
+- **Other failures:**
+  - `ExportHashTests.The_soft_gardeners_skinned_export_is_the_bytes_written_before_materials`: M-7 pins main's gardener bytes, and T-84 changed them. It is the same case as the M-6 pin the person accepted.
+  - Orcward: `twist-Hand_L-Y45` now passes the cluster rule: 41 px, largest patch 23 px. The sky flattens the contrast, so the wrong file is no longer caught.
+  - character and soft: a boots sample reads as skin, at (71, 49, 39).
+- **Left:**
+  1. Measure the sky's added light per world normal: grey and black faces, front and back.
+  2. Extend the light model.
+  3. Get every failing check, past the first-failure stops.
+  4. Build the one table for the person.
+  5. Compare frames by hash against main at 720a6fa, and review them under `rebase\round-2`.
+  6. Write the paragraph in *The rebase onto main*, push, and run `cairn lint`.
