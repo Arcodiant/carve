@@ -4,7 +4,7 @@ description: >-
 ---
 # T-87 — In-process tool harness
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
