@@ -380,7 +380,15 @@ public static class CarveFile
     /// against the folder and its PNG read. A texture that is missing or unreadable is an error naming the path the file
     /// gave and the absolute path tried.
     /// </summary>
-    public static CarveFileResult Read(string text, string? folder)
+    public static CarveFileResult Read(string text, string? folder) => Read(text, folder, null);
+
+    /// <summary>
+    /// As <see cref="Read(string, string)"/>, for <c>open mesh=</c>: when <paramref name="mesh"/> names a mesh of a version 6
+    /// file, only the materials that mesh's faces use are read and checked (an unused material's missing texture refuses
+    /// nothing, T-74's ruling, RV-47), and the model holds that mesh alone, with the file's skeleton and clips. A name the
+    /// file has no mesh of reads the whole file, so the caller can list the meshes there are.
+    /// </summary>
+    public static CarveFileResult Read(string text, string? folder, string? mesh)
     {
         ArgumentNullException.ThrowIfNull(text);
         JsonDocument document;
@@ -402,7 +410,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) is (2 or 3 or 4 or 5 or 6) and { } version ? ReadVersion2(root, version, folder) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3 or 4 or 5 or 6) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
         }
     }
 
@@ -489,20 +497,30 @@ public static class CarveFile
     }
 
     /// <summary>Version 2: the whole model.</summary>
-    private static CarveFileResult ReadVersion2(JsonElement root, int version, string? folder)
+    private static CarveFileResult ReadVersion2(JsonElement root, int version, string? folder, string? only)
     {
         var errors = new List<MeshError>();
         var fields = Fields(root, "", Invariant($"a version {version} Carve file"), version >= 6 ? FileKeysV6 : FileKeys, errors)!;
+        var used = only is null || version < 6 ? null : MaterialsUsedBy(fields, only);
 
         // The materials first, since faces name them (T-74); a name is known even when the rest of its material is not.
         var materials = new List<Material>();
         var materialNames = new List<string>();
         if (fields.TryGetValue(MaterialsKey, out var ms) && List(ms, MaterialsKey, errors) is { } materialList)
         {
-            var loaded = new Dictionary<string, (MaterialTexture? Texture, string? Problem)>(StringComparer.OrdinalIgnoreCase);
+            // Keyed by the path exactly as resolved: two spellings of one path differ in case only on a case-insensitive
+            // system, where each is read and keeps its own path; on a case-sensitive one they are two files (RV-47).
+            var loaded = new Dictionary<string, (MaterialTexture? Texture, string? Problem)>(StringComparer.Ordinal);
             var i = 0;
             foreach (var item in materialList.EnumerateArray())
-                if (ReadMaterial(item, Invariant($"materials[{i++}]"), folder, loaded, materialNames, errors) is { } material) materials.Add(material);
+                if (used is not null && NameOf(item) is { } other && !used.Contains(other))
+                {
+                    // A material the opened mesh does not use is not brought in, so it is not read: only its name is kept,
+                    // so the file's other meshes that name it are not refused.
+                    if (!materialNames.Contains(other)) materialNames.Add(other);
+                    i++;
+                }
+                else if (ReadMaterial(item, Invariant($"materials[{i++}]"), folder, loaded, materialNames, errors) is { } material) materials.Add(material);
         }
 
         // The skeleton is read first, since weights and clips name its bones; its problems are listed after the meshes'.
@@ -552,9 +570,34 @@ public static class CarveFile
         }
 
         if (errors.Count > 0) return Refused(errors);
+        if (used is not null && meshes.Count(x => x.Name == only) == 1) meshes = [meshes.Single(x => x.Name == only)];
         var (model, problems) = Model.Create(meshes, skeleton, clips, materials);
         if (model is null) return Refused(problems);
         return new CarveFileResult(model, [], model.Meshes.SelectMany(x => MeshReport.Create(x.Mesh).Warnings).ToArray(), version);
+    }
+
+    /// <summary>A JSON object's <c>name</c> string, or null.</summary>
+    private static string? NameOf(JsonElement item) =>
+        item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
+
+    /// <summary>
+    /// The names of the materials the faces of the mesh named <paramref name="mesh"/> use, as the file lists them; null when
+    /// the file has no mesh of that name (then the whole file is read).
+    /// </summary>
+    private static HashSet<string>? MaterialsUsedBy(Dictionary<string, JsonElement> fields, string mesh)
+    {
+        if (!fields.TryGetValue("meshes", out var meshes) || meshes.ValueKind != JsonValueKind.Array) return null;
+        foreach (var item in meshes.EnumerateArray())
+        {
+            if (NameOf(item) != mesh) continue;
+            var used = new HashSet<string>(StringComparer.Ordinal);
+            if (item.TryGetProperty(MaterialsKey, out var uses) && uses.ValueKind == JsonValueKind.Array)
+                foreach (var use in uses.EnumerateArray())
+                    if (use.ValueKind == JsonValueKind.Object && use.TryGetProperty("material", out var m) && m.ValueKind == JsonValueKind.String)
+                        used.Add(m.GetString()!);
+            return used;
+        }
+        return null;
     }
 
     /// <summary>

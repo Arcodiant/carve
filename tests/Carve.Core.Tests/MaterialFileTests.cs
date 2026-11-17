@@ -242,6 +242,74 @@ public sealed class MaterialFileTests : IDisposable
         Assert.Equal(written, Encoding.UTF8.GetBytes(CarveFile.Write(read.Model, RepoRoot())));
     }
 
+    /// <summary>The byte-identical guard for the one committed version 6 file, whose texture paths are relative to its own folder (RV-47).</summary>
+    [Fact]
+    public void The_committed_textured_barrel_reads_and_writes_unchanged()
+    {
+        var path = Path.Combine(RepoRoot(), "samples", "barrel-textured.carve");
+        var committed = File.ReadAllText(path).ReplaceLineEndings("\n");
+        var folder = Path.GetDirectoryName(path)!;
+        var read = CarveFile.Read(committed, folder);
+        Assert.True(read.Succeeded, string.Join("; ", read.Errors));
+        Assert.Equal(6, read.Version);
+        Assert.NotEmpty(read.Model!.Materials);
+        Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(committed))),
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(CarveFile.Write(read.Model, folder)))));
+    }
+
+    /// <summary>Meshes 'a' and 'b', each using its own material; 'other' (b's) has a texture.</summary>
+    private string TwoMeshes(string folder)
+    {
+        var model = Model.Empty.WithMaterial(new Material("used", BaseColour: "#C8503C"))
+            .WithMaterial(new Material("other", BaseColourTexture: Png($"{folder}/other.png", 4, 4)))
+            .With("a", TestMeshes.Cube().WithStyle(FaceStyle.None.WithMaterial([0], "used")))
+            .With("b", TestMeshes.Cube().WithStyle(FaceStyle.None.WithMaterial([1], "other")));
+        return CarveFile.Write(model, Path.Combine(_root, folder));
+    }
+
+    [Fact]
+    public void Read_for_one_mesh_reads_only_the_materials_it_uses()
+    {
+        var folder = Path.Combine(_root, "m");
+        var text = TwoMeshes("m");
+        File.Delete(Path.Combine(folder, "other.png"));
+
+        var a = CarveFile.Read(text, folder, "a");
+        Assert.True(a.Succeeded, string.Join("; ", a.Errors));
+        Assert.Equal(["a"], a.Model!.Meshes.Select(m => m.Name));
+        Assert.Equal([new Material("used", BaseColour: "#C8503C")], a.Model.Materials);
+
+        // The mesh that uses the missing texture, and the whole file, are still refused at the material's field.
+        Assert.Equal("materials[1].base_colour_texture", Assert.Single(CarveFile.Read(text, folder, "b").Errors).Element);
+        Assert.Equal("materials[1].base_colour_texture", Assert.Single(CarveFile.Read(text, folder).Errors).Element);
+        // A name the file has no mesh of reads the whole file, as before.
+        Assert.Equal("materials[1].base_colour_texture", Assert.Single(CarveFile.Read(text, folder, "c").Errors).Element);
+    }
+
+    [Fact]
+    public void Read_for_one_mesh_with_every_texture_there_is_that_mesh_and_its_materials()
+    {
+        var folder = Path.Combine(_root, "m");
+        var b = CarveFile.Read(TwoMeshes("m"), folder, "b");
+        Assert.True(b.Succeeded, string.Join("; ", b.Errors));
+        Assert.Equal(["b"], b.Model!.Meshes.Select(m => m.Name));
+        Assert.Equal(["other"], b.Model.Materials.Select(m => m.Name));
+    }
+
+    /// <summary>Two spellings of one texture path, differing in case, each keep their own path (RV-47); on a case-sensitive system they are two files.</summary>
+    [Fact]
+    public void Texture_paths_differing_in_case_are_read_each_as_given()
+    {
+        if (!OperatingSystem.IsWindows()) return; // the one file must answer to both spellings
+        var folder = Path.Combine(_root, "c");
+        Png("c/tex/a.png", 4, 4);
+        var text = WithMaterials("""[{"name": "one", "base_colour_texture": "tex/a.png"}, {"name": "two", "base_colour_texture": "TEX/A.png"}]""", "[]");
+        var read = CarveFile.Read(text, folder);
+        Assert.True(read.Succeeded, string.Join("; ", read.Errors));
+        Assert.Equal(Path.Combine(folder, "tex", "a.png"), read.Model!.Materials[0].BaseColourTexture!.Path);
+        Assert.Equal(Path.Combine(folder, "TEX", "A.png"), read.Model.Materials[1].BaseColourTexture!.Path);
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
