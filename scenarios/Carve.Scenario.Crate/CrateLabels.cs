@@ -162,12 +162,12 @@ internal static class CrateLabels
         CheckTile(driver, sheet, 0, Tile + Gutter, close, Tile, "(2, 1, 1)");
         CheckTile(driver, sheet, Tile + Gutter, Tile + Gutter, minusZ, "-z".Length, "-z");
 
-        // The front tile: top over +Z over +X at the projected points, which a mirrored or flipped camera reorders.
+        // The front tile: top over +Z at the projected points, which a flipped camera reorders (+Z over +X dropped under the sky, ruling of 2026-11-17).
         var pixel = Perspective(CrateMin, CrateMax, Front, Tile);
         var lidBand = crate.FindAll(p => p.Y > 0.8f - Near).First(f => crate.Faces[f].Any(v => crate.Vertices[v].Z > 1 - Near));
         var plusZBand = crate.Find(p => p.Z > 1 - Near && p.Y > 0.68f - Near);
         var plusXBand = crate.Find(p => Math.Abs(p.X - 1) < Near && p.Y > 0.68f - Near);
-        CheckOrder(driver, sheet, [Holding(pixel(crate.Centre(lidBand))), Holding(pixel(crate.Centre(plusZBand))), Holding(pixel(crate.Centre(plusXBand)))], "top", "+Z", "+X");
+        CheckFrontOrder(driver, sheet, [Holding(pixel(crate.Centre(lidBand))), Holding(pixel(crate.Centre(plusZBand))), Holding(pixel(crate.Centre(plusXBand)))]);
 
         // The direction's tile: its caption's first nine letters read (2, 1, 1): each letter is 8 pixels wide, so
         // the two 1s match, as do the two commas and the two spaces, and the brackets differ. A name would not.

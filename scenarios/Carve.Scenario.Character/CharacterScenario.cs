@@ -223,9 +223,11 @@ public sealed class CharacterScenario : IScenario
         };
         foreach (var (mesh, group, near) in targets)
         {
-            var c = mesh.Centroid(mesh.NearestFace(group, near));
+            // Against the palette lit by the sky at the face's own normal (the person's ruling of 2026-11-17, M-19 row 6).
+            var face = mesh.NearestFace(group, near);
+            var c = mesh.Centroid(face);
             var (x, y) = Holding(project(c));
-            ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}");
+            ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}", mesh.Normal(face), Vector3.UnitZ);
         }
 
         // T-84: the torso's top segment, the slope of each shoulder below the neck, is the shirt's and not skin. Each side's front face of

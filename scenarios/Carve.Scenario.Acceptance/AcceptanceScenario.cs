@@ -21,8 +21,8 @@ public sealed class AcceptanceExtension : ICarveExtension
 /// The frame step of T-49's acceptance run. A fresh agent's session left a round folder (<c>CARVE_ACCEPTANCE_RUN</c>) with
 /// <c>character.carve</c> and <c>game/Content/models/character.glb</c>. This opens the saved model and draws it with <c>render</c>
 /// and the exported file with <c>render_glb</c>, at rest and at three times of every clip it has, from the front and the side,
-/// and measures each pair under D-6's rule as the Orcward scenario does (<see cref="Comparison"/>, linked): a pixel differs past 8
-/// of 255, a frame fails past 0.5 % of its pixels or with a connected patch of differing pixels past 50. Each frame also has a
+/// and measures each pair under D-6's rule as the Orcward scenario does (<see cref="Comparison"/>, linked): a pixel differs when its luma
+/// differs past 4 of 255 (the person's ruling of 2026-11-17; past 8 in R, G or B before), a frame fails past 0.5 % of its pixels or with a connected patch of differing pixels past 50. Each frame also has a
 /// positive check: the character covers at least 2 % of the frame (a camera that looked away would show background), and the
 /// render of the front does not pass against the exported file's view from the back (so the comparison tells views apart).
 /// Results go to <c>acceptance/differences.tsv</c> and a triptych of each pair to <c>acceptance/compare/</c> in the round folder,

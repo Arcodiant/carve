@@ -70,7 +70,7 @@ public sealed class CrateScenario : IScenario
             CheckNotBackground(driver, frame, Centre, "the centre");
         }
 
-        CheckOrder(driver, front, [FrontTop, FrontPlusZ, FrontPlusX], "top", "+Z", "+X");
+        CheckFrontOrder(driver, front, [FrontTop, FrontPlusZ, FrontPlusX]);
         CheckDiffers(driver, front, FrontBarTop, FrontPanelBehindBar, "the +X bar's top", "the +X panel behind it");
         CheckDiffers(driver, back, BackBarUnderside, BackPanelBehindBar, "the -X bar's underside", "the -X panel behind it");
         CheckDiffers(driver, left, LeftBarTop, LeftPanelBehindBar, "the -X bar's top", "the -X panel behind it");

@@ -6,8 +6,13 @@ namespace Carve.Scenario.Orcward;
 /// <summary>Orcward's frame rule, and the review image: render | render_glb | difference, side by side.</summary>
 internal static class Comparison
 {
-    /// <summary>Orcward's rule (D-6): a pixel differs past this many of 255 in R, G or B.</summary>
-    public const int PixelThreshold = 8;
+    /// <summary>
+    /// Orcward's rule (D-6): a pixel differs when its luma (Rec. 709, 0.2126 R + 0.7152 G + 0.0722 B of the sRGB values) differs
+    /// past this many of 255. Until 2026-11-17 it was 8 in R, G or B; under M-7's sky a shading step between the two draws' slightly
+    /// different normals is mostly blue, and gave a good frame a 23 px patch, the twisted hand's own. By luma every good frame's patch
+    /// is 2 px or less and the twists' 101 to 597. The person's ruling of 2026-11-17 ("Accept all", M-19 row 7).
+    /// </summary>
+    public const double PixelThreshold = 4;
 
     /// <summary>The cluster rule (the person's ruling, 2026-11-13): a frame also fails past this many pixels in one connected patch.</summary>
     public const int PatchLimit = 50;
@@ -21,8 +26,8 @@ internal static class Comparison
     }
 
     public static bool Differs(ScenarioFrame a, ScenarioFrame b, int i) =>
-        Math.Abs(a.Pixels[i] - b.Pixels[i]) > PixelThreshold || Math.Abs(a.Pixels[i + 1] - b.Pixels[i + 1]) > PixelThreshold
-        || Math.Abs(a.Pixels[i + 2] - b.Pixels[i + 2]) > PixelThreshold;
+        Math.Abs((0.2126 * (a.Pixels[i] - b.Pixels[i])) + (0.7152 * (a.Pixels[i + 1] - b.Pixels[i + 1])) + (0.0722 * (a.Pixels[i + 2] - b.Pixels[i + 2])))
+        > PixelThreshold;
 
     public static Result Measure(string name, string kind, ScenarioFrame a, ScenarioFrame b)
     {

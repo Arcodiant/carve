@@ -1,5 +1,6 @@
 using System.Numerics;
 using Carve.Debug;
+using Carve.Scenario.Crate;
 using static Carve.Scenario.Shed.Checks;
 
 namespace Carve.Scenario.Shed;
@@ -7,6 +8,8 @@ namespace Carve.Scenario.Shed;
 /// <summary>The shed in each look, size and sheet, before it is moved.</summary>
 internal static class ShedLooks
 {
+    private static readonly Vector3 ShedFront = new(1.6f, 1.2f, 2.2f);
+
     private static readonly Vector3 Min = Vector3.Zero;
     private static readonly Vector3 Max = new(4, 3.9f, 3);
     private static readonly float Radius = (Max - Min).Length() / 2;
@@ -104,10 +107,13 @@ internal static class ShedLooks
             var (x, y) = camera.Pixel(point);
             if (camera.Seen(shed, x, y) == face)
             {
+                // Not highlighted: R - B within 6 of the grey face's own under the sky, from the light model at the face's normal (the
+                // person's ruling of 2026-11-17, "Accept all", M-19 row 5; the sky makes it about -24 here).
                 var p = picked.Pixel(x, y);
-                if (Math.Abs(p.R - p.B) > 6)
+                var grey = ColourRule.GreyRedLessBlue(shed.Normal(face), ShedFront);
+                if (Math.Abs(p.R - p.B - grey) > 6)
                 {
-                    Note($"{picked.Name}: the closed wall's face {face} at {point} is {p}: it is not highlighted, so |R - B| should be at most 6");
+                    Note($"{picked.Name}: the closed wall's face {face} at {point} is {p}: it is not highlighted, so R - B should be within 6 of the grey face's {grey}");
                 }
             }
         }

@@ -82,6 +82,8 @@ public class OrcwardLoadTests
     public void Every_twisted_limb_fails_as_a_patch()
     {
         // The cluster rule (ruling of 2026-11-13): a patch of differing pixels past 50 px fails the frame, whatever the whole-frame count.
+        // A pixel differs by luma past 4 since the person's ruling of 2026-11-17 (M-19 row 7, D-6): under M-7's sky the old "past 8 in
+        // R, G or B" left the hand twisted by 45 degrees at a 23 px patch, the size of a good frame's blue shading step.
         var twists = Rows().Where(r => r.Kind == "twist").ToList();
         Assert.Equal(5, twists.Count);
         Assert.All(twists, r => Assert.True(r.Fails && r.Patch > 50, $"{r.Name}: {r.Differing} px, largest patch {r.Patch} px"));

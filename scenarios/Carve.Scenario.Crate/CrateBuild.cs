@@ -198,7 +198,7 @@ internal static class CrateBuild
     {
         CheckCorners(driver, frame);
         CheckNotBackground(driver, frame, (256, 256), "the centre");
-        CheckOrder(driver, frame, [FrontTop, FrontPlusZ, FrontPlusX], "top", "+Z", "+X");
+        CheckFrontOrder(driver, frame, [FrontTop, FrontPlusZ, FrontPlusX]);
         CheckDiffers(driver, frame, FrontBarTop, FrontPanelBehindBar, "the +X bar's top", "the +X panel behind it");
     }
 
@@ -220,6 +220,30 @@ internal static class CrateBuild
         if (Math.Abs(ga - gb) < MinimumStep)
         {
             driver.Fail($"{frame.Name}: {whatA} at ({a.X}, {a.Y}) is {ga} and {whatB} at ({b.X}, {b.Y}) is {gb}; they should differ by at least {MinimumStep}");
+        }
+    }
+
+    /// <summary>
+    /// The front view's three faces (top, +Z, +X): the top at least <see cref="MinimumStep"/> above +Z, and each face at least
+    /// that above the background. +Z over +X is not checked: under M-7's sky the two step by 2 (the light model predicts 3), and
+    /// the person ruled on 2026-11-17 ("Accept all", M-19 row 1) to drop that pair from front views; the back view keeps the
+    /// three-face order (<see cref="CheckOrder"/>).
+    /// </summary>
+    public static void CheckFrontOrder(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y)[] at)
+    {
+        string[] faces = ["top", "+Z", "+X"];
+        var g = at.Select(a => (int)frame.Pixel(a.X, a.Y).G).ToArray();
+        if (g[0] < g[1] + MinimumStep)
+        {
+            driver.Fail($"{frame.Name}: top ({g[0]}) should be at least {MinimumStep} brighter than +Z ({g[1]})");
+        }
+
+        for (var i = 0; i < 3; i++)
+        {
+            if (g[i] < 53 + MinimumStep)
+            {
+                driver.Fail($"{frame.Name}: {faces[i]} ({g[i]}) should be at least {MinimumStep} above the background");
+            }
         }
     }
 

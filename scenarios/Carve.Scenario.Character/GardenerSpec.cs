@@ -249,6 +249,20 @@ internal static class GardenerSpec
         public Vector3 Centroid(int face) =>
             Faces[face].Select(v => new Vector3(Vertices[v][0], Vertices[v][1], Vertices[v][2])).Aggregate(Vector3.Zero, (a, b) => a + b) / Faces[face].Length;
 
+        /// <summary>The face's unit normal (Newell's), its corners wound counter-clockwise seen from outside.</summary>
+        public Vector3 Normal(int face)
+        {
+            var n = Vector3.Zero;
+            var corners = Faces[face];
+            for (var i = 0; i < corners.Length; i++)
+            {
+                var (a, b) = (Vertices[corners[i]], Vertices[corners[(i + 1) % corners.Length]]);
+                n += new Vector3((a[1] - b[1]) * (a[2] + b[2]), (a[2] - b[2]) * (a[0] + b[0]), (a[0] - b[0]) * (a[1] + b[1]));
+            }
+
+            return Vector3.Normalize(n);
+        }
+
         /// <summary>The face of <paramref name="group"/> whose centre is nearest <paramref name="near"/>.</summary>
         public int NearestFace(string group, Vector3 near) => FacesOf(group).MinBy(f => Vector3.DistanceSquared(Centroid(f), near));
 

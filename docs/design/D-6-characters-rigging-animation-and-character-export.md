@@ -177,6 +177,14 @@ T-48 starts from Orcward's rule: a pixel differs when R, G or B differs by more 
 
 **Ruling, 2026-11-13 (the person), on wrong files:** the suite must fail on every wrong file, but which frame catches it may vary. A rest frame is the bind pose with no palette, so a swapped bone order or swapped inverse binds are invisible at rest (0 px) and caught only in a clip frame; seen from the side a shift in X lies along the view, so the swapped inverse binds are caught from the front (the cluster rule also catches them from the side). Each wrong file therefore fails at one frame at least.
 
+**Ruling, 2026-11-17 (the person, M-19's third rebase, "Accept all"):** a pixel differs when its luma (Rec. 709 of the sRGB values, 0.2126 R + 0.7152 G + 0.0722 B) differs past 4 of 255, in place of "R, G or B past 8"; the 0.5 % and the connected-patch-past-50 limits are kept. Under M-7's sky the two draws' slightly different normals on one trouser facet between keys (posed face against skinned corners) make a step that is mostly blue, since the sky's light is: under the old measure it gave a good frame (Walk 0.25 s, side) a 23 px patch, the same as the hand twisted Y 45. By luma the measures separate again. It applies wherever the rule is used: `ComparisonPng`, the Orcward scenario and its checks, and T-49's acceptance step.
+
+| Frames, luma past 4 (measured on M-19's third-rebase sweep) | Largest patch |
+|---|---|
+| ten good frames | 2 px or less |
+| Hand_L twisted (five) | 101 to 597 px |
+| wrong files (each at its catching frame) | 268 to 26,231 px |
+
 **Alternatives:** counting only pixels on the character (a twist is 0.38 % to 1.42 % of the character's pixels, still under 0.5 % for the smallest); a smaller region or a lower limit. The cluster rule was chosen over both.
 **Would change if:** a good frame shows a patch near 50 px, or a twist falls below it.
 

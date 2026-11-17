@@ -89,7 +89,7 @@ public sealed class CubeScenario : IScenario
         var cubeBack = await driver.CaptureAsync("cube-back", new { view = "back" });
         CheckCorners(driver, cubeFront);
         CheckCorners(driver, cubeBack);
-        CheckOrder(driver, cubeFront, CubeFront, "top", "+Z", "+X");
+        CheckFrontOrder(driver, cubeFront, CubeFront);
         CheckOrder(driver, cubeBack, CubeBack, "-Z", "-X", "underside");
 
         // 2. A repeat of the same view is the same pixels.
@@ -116,7 +116,9 @@ public sealed class CubeScenario : IScenario
         CheckNotBackground(driver, fromBelow, Centre, "the centre");
 
         var zoomed = await driver.CaptureAsync("cube-zoom3-corner", new { view = "front", zoom = 3, target = new[] { 1, 1, 1 } });
-        CheckShades(driver, zoomed, 3);
+        // Two shades, not three: the person's ruling of 2026-11-17 ("Accept all", M-19 row 2). Under M-7's sky +Z and +X step
+        // by 2 from the front (199 against 201) and merge into one shade; the top (216) is the other.
+        CheckShades(driver, zoomed, 2);
         CheckNotBackground(driver, zoomed, Centre, "the corner (1, 1, 1) at the centre");
         // Zoomed in, the cube fills the lower corners; only the two at the top are background.
         CheckBackground(driver, zoomed, (0, 0), "the top left corner");
@@ -264,9 +266,13 @@ public sealed class CubeScenario : IScenario
         // ruling of 2026-11-13: re-pick, else lower). The light turned with this camera gives facet 13 an n.l of 0.03 and facet 3 one of
         // 0.23, so 119 against 131 (grey 0.72, ambient 0.25, light 0.9 / pi, sRGB); facets 14 and 3 were 127 against 131, 4 apart.
         var sideMirror = CylAt(Facet(13, 0.5f, 0));              // facing (+x, -z), at the image's right edge: the one side of the image
-        var sideOther = CylAt(Facet(3, 0.5f, 0));                // facing (+z): the other side
-        // One smooth facet's grade, taken on facet 14, where n.l climbs fastest among the lit facets (0.09 at its 315 degree end to 0.21 at its
-        // 337.5 degree one): t 0.2 against 0.8 is about 5 apart under PBR. Facet 2, near the light's peak, grades by 2 (T-82).
+        // Under M-7's sky the side's whole range is 7 (facets 4 to 13 measure 190 to 197), so the other end is facet 1, not 3, and the pair
+        // is held to SideEnds, not MinimumStep: the person's ruling of 2026-11-17 ("Accept all", M-19 row 3a). Measured 191 against 197.
+        var sideOther = CylAt(Facet(1, 0.5f, 0));                // facing (+x, +z) at 22.5 to 45 degrees: the other side
+        const int SideEnds = 4;
+        // Facet 14's two ends, a plateau when flat. The smooth side's grade across it is no longer checked in the shaded frame: under M-7's
+        // sky it is 1 to 2 (193 against 194), and the person ruled on 2026-11-17 ("Accept all", M-19 row 3b) to drop it; the normals look's
+        // red across facet 2 shows the smooth side grading within a facet.
         var gradeLow = CylAt(Facet(14, 0.2f, 0));
         var gradeHigh = CylAt(Facet(14, 0.8f, 0));
 
@@ -278,7 +284,7 @@ public sealed class CubeScenario : IScenario
         CheckCapOneShade(driver, cylFlat, capPoint, capOther, "the flat cap is one shade");
         CheckSame(driver, cylFlat, CylAt(Facet(2, 0.2f, 0)), CylAt(Facet(2, 0.8f, 0)), "the flat side facet is one shade, a plateau");
         CheckDiffers(driver, cylFlat, capPoint, belowRim, "the flat cap against the side below the rim");
-        CheckDiffers(driver, cylFlat, sideMirror, sideOther, "the flat side, at its two ends across the image (a mirrored camera draws other facets)");
+        CheckDiffers(driver, cylFlat, sideMirror, sideOther, "the flat side, at its two ends across the image (a mirrored camera draws other facets)", SideEnds);
         CheckBrightestOf(driver, cylFlat, capPoint, "the cap is the brightest part, so a flipped camera (cap below) fails", sideMirror, sideOther, belowRim);
 
         var cylFlatNormals = await driver.CaptureAsync("cylinder-flat-normals-dir-2-2-1-ortho", cylNormalsView);
@@ -294,9 +300,8 @@ public sealed class CubeScenario : IScenario
         if (cylSmooth.Pixel(capPoint.X, capPoint.Y) != cylFlat.Pixel(capPoint.X, capPoint.Y)) driver.Fail($"{cylSmooth.Name}: the hard-rimmed cap should keep its flat shade");
         CheckClose(driver, cylSmooth, edgeLeft, edgeRight, "the smooth side runs on across a facet edge", 2);
         CheckSame(driver, cylFlat, gradeLow, gradeHigh, "the flat side facet 14 is one shade, a plateau");
-        CheckDiffers(driver, cylSmooth, gradeLow, gradeHigh, "the smooth side grades across one facet, where flat is a plateau", 3);
         CheckDiffers(driver, cylSmooth, capPoint, belowRim, "the crease where the cap meets the side");
-        CheckDiffers(driver, cylSmooth, sideMirror, sideOther, "the smooth side, at its two ends across the image (a mirrored camera draws other facets)");
+        CheckDiffers(driver, cylSmooth, sideMirror, sideOther, "the smooth side, at its two ends across the image (a mirrored camera draws other facets)", SideEnds);
         CheckBrightestOf(driver, cylSmooth, capPoint, "the cap is the brightest part, so a flipped camera (cap below) fails", sideMirror, sideOther, belowRim);
 
         var cylSmoothNormals = await driver.CaptureAsync("cylinder-smooth-normals-dir-2-2-1-ortho", cylNormalsView);
@@ -318,6 +323,10 @@ public sealed class CubeScenario : IScenario
         // below 0) and is lit by the ambient alone: grey 0.72 x ambient 0.25 = 0.18, sRGB 118, against facet 3's 131, 13 apart under
         // MinimumStep 6 (T-82, the person's ruling of 2026-11-13: re-pick, else lower).
         var softSideMirror = CylAt(Ring(14, -0.3f) * new Vector3(0.9f, 1, 0.9f));
+        // Its other end is facet 1 at mid height (pulled in to 0.9 of the radius, inside the pillow's silhouette), not facet 3: under M-7's
+        // sky facet 3 is 192 against 188, and facet 1 measures 197 to 198. The person's ruling of 2026-11-17 ("Accept all", M-19 row 3c);
+        // MinimumStep 6 kept.
+        var softSideOther = CylAt(Facet(1, 0.5f, 0) * new Vector3(0.9f, 1, 0.9f));
         Ok(driver, await driver.CallAsync("subdivide", new { levels = 2 }));
         var subSmooth = await driver.CaptureAsync("cylinder-subdivided-smooth-dir-2-2-1-ortho", cylView);
         CheckNotBackground(driver, subSmooth, farRim, "the subdivided cylinder just inside its far top rim, the rim being hard");
@@ -325,7 +334,7 @@ public sealed class CubeScenario : IScenario
         if (subSmooth.Pixel(capPoint.X, capPoint.Y) != cylSmooth.Pixel(capPoint.X, capPoint.Y)) driver.Fail($"{subSmooth.Name}: the hard-rimmed cap should keep the shade it had before subdividing");
         CheckDiffers(driver, subSmooth, capPoint, belowRim, "the crease where the subdivided cap meets the side");
         CheckClose(driver, subSmooth, edgeLeft, edgeRight, "the subdivided side runs on across the old facet edge", 2);
-        CheckDiffers(driver, subSmooth, sideMirror, sideOther, "the subdivided side, at its two ends across the image (a mirrored camera draws other facets)");
+        CheckDiffers(driver, subSmooth, sideMirror, sideOther, "the subdivided side, at its two ends across the image (a mirrored camera draws other facets)", SideEnds);
         CheckBrightestOf(driver, subSmooth, capPoint, "the subdivided cap is the brightest part, so a flipped camera (cap below) fails", sideMirror, sideOther, belowRim);
 
         Ok(driver, await driver.CallAsync("set_shading", new { shading = "flat" }));
@@ -342,8 +351,9 @@ public sealed class CubeScenario : IScenario
         CheckBackground(driver, subSoft, farRim, "just inside the far top rim, rounded away with no hard rim");
         CheckNotBackground(driver, subSoft, capCentre, "the soft cylinder's top");
         CheckNotBackground(driver, subSoft, softSideMirror, "the soft cylinder's side, on one side of the image");
-        CheckDiffers(driver, subSoft, softSideMirror, sideOther, "the soft side, at its two ends across the image (a mirrored camera draws other parts)");
-        CheckBrightestOf(driver, subSoft, capCentre, "the soft top is the brightest part, so a flipped camera (top below) fails", softSideMirror, sideOther);
+        CheckNotBackground(driver, subSoft, softSideOther, "the soft cylinder's side, on the other side of the image");
+        CheckDiffers(driver, subSoft, softSideMirror, softSideOther, "the soft side, at its two ends across the image (a mirrored camera draws other parts)");
+        CheckBrightestOf(driver, subSoft, capCentre, "the soft top is the brightest part, so a flipped camera (top below) fails", softSideMirror, softSideOther);
 
         // 3. The L-block: two concave hexagon caps and six quad sides.
         var (lVertices, lFaces) = LBlock();
@@ -495,7 +505,7 @@ public sealed class CubeScenario : IScenario
         CheckCaption(driver, frame, $"{size}x{size}, view front, 8 vertices, 6 faces");
         CheckCorners(driver, frame);
         CheckNotBackground(driver, frame, (size / 2, size / 2), "the centre");
-        CheckOrder(driver, frame, CubeFront.Select(p => (p.X * size / 512, p.Y * size / 512)).ToArray(), "top", "+Z", "+X");
+        CheckFrontOrder(driver, frame, CubeFront.Select(p => (p.X * size / 512, p.Y * size / 512)).ToArray());
     }
 
     /// <summary>One pixel at least <see cref="MinimumStep"/> brighter than another, in the green channel.</summary>
@@ -741,6 +751,30 @@ public sealed class CubeScenario : IScenario
         {
             CheckBackground(driver, frame, (0, i), "the left edge");
             CheckBackground(driver, frame, (frame.Width - 1, i), "the right edge");
+        }
+    }
+
+    /// <summary>
+    /// The front view's three faces (top, +Z, +X): the top at least <see cref="MinimumStep"/> above +Z, and each face at least
+    /// that above the background. +Z over +X is not checked: under M-7's sky the two step by 2 (the light model predicts 3), and
+    /// the person ruled on 2026-11-17 ("Accept all", M-19 row 1) to drop that pair from front views; the back view keeps the
+    /// three-face order (<see cref="CheckOrder"/>).
+    /// </summary>
+    private static void CheckFrontOrder(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y)[] at)
+    {
+        string[] faces = ["top", "+Z", "+X"];
+        var g = at.Select(a => (int)frame.Pixel(a.X, a.Y).G).ToArray();
+        if (g[0] < g[1] + MinimumStep)
+        {
+            driver.Fail($"{frame.Name}: top ({g[0]}) should be at least {MinimumStep} brighter than +Z ({g[1]})");
+        }
+
+        for (var i = 0; i < 3; i++)
+        {
+            if (g[i] < 53 + MinimumStep)
+            {
+                driver.Fail($"{frame.Name}: {faces[i]} ({g[i]}) should be at least {MinimumStep} above the background");
+            }
         }
     }
 

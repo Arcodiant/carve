@@ -1,5 +1,6 @@
 using System.Numerics;
 using Carve.Debug;
+using Carve.Scenario.Crate;
 
 namespace Carve.Scenario.Character;
 
@@ -49,6 +50,33 @@ internal static class GardenerPixels
         if (found != group || dot < 0.98f)
         {
             driver.Fail($"{frame.Name}: {what} at ({x}, {y}) reads as {found} (match {dot:0.000}) with pixel {(x >= 0 && y >= 0 && x < frame.Width && y < frame.Height ? frame.Pixel(x, y).ToString() : "-")}, expected {group}");
+        }
+    }
+
+    /// <summary>
+    /// As <see cref="ExpectGroup"/>, but against the palette lit as a face of world <paramref name="normal"/> is lit along
+    /// <paramref name="direction"/> (<see cref="ColourRule.Lit"/>, M-7's sky included), not the bare colours. The sky's light is
+    /// mostly blue, so it turns a dark colour toward another's direction: bare, the boots at rest read as skin (0.996 against
+    /// 0.985); lit, as boots (1.000 against 0.986). The person's ruling of 2026-11-17 ("Accept all", M-19 row 6).
+    /// </summary>
+    public static void ExpectGroup(ScenarioDriver driver, ScenarioFrame frame, int x, int y, string group, string what, Vector3 normal, Vector3 direction)
+    {
+        var (found, dot) = ("outside the image", 0f);
+        if (x >= 0 && y >= 0 && x < frame.Width && y < frame.Height)
+        {
+            var p = frame.Pixel(x, y);
+            var n = Vector3.Normalize(new Vector3(Srgb(p.R), Srgb(p.G), Srgb(p.B)));
+            (found, dot) = GardenerSpec.Palette
+                .Select(c => (c.Group, Lit: ColourRule.Lit(c.Colour, normal, direction)))
+                .Select(c => (c.Group, Linear: Vector3.Normalize(new Vector3((float)c.Lit[0], (float)c.Lit[1], (float)c.Lit[2]))))
+                .Append(Palette[^1])
+                .Select(c => (c.Group, Dot: Vector3.Dot(c.Linear, n)))
+                .MaxBy(c => c.Dot);
+        }
+
+        if (found != group || dot < 0.98f)
+        {
+            driver.Fail($"{frame.Name}: {what} at ({x}, {y}) reads as {found} (match {dot:0.000}, against the palette lit at {normal}) with pixel {(x >= 0 && y >= 0 && x < frame.Width && y < frame.Height ? frame.Pixel(x, y).ToString() : "-")}, expected {group}");
         }
     }
 

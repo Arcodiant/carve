@@ -25,7 +25,8 @@ public sealed class OrcwardExtension : ICarveExtension
 /// Orcward's done-when, in one run (M-19): the gardener with both looping clips exported in the three modes with no warnings
 /// into <c>game/Content/models/</c> of the run folder (which <c>tests/Carve.OrcwardLoad.Tests</c> then loads as a game would), and
 /// every <c>render_glb</c> frame of an exported file compared with <c>render</c>'s frame of the model under Orcward's rule (a pixel
-/// differs past 8 of 255 in R, G or B; a frame fails past 0.5 % of its pixels), at rest and at times of each clip, between keys
+/// differs when its luma differs past 4 of 255, the person's ruling of 2026-11-17; a frame fails past 0.5 % of its pixels or with a
+/// connected patch of differing pixels past 50), at rest and at times of each clip, between keys
 /// included. Then the same comparison on files and poses that are wrong, each of which must fail. The measured differences are
 /// written to <c>differences.tsv</c> and a triptych of each pair to <c>compare/</c>.
 /// </summary>

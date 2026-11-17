@@ -145,6 +145,28 @@ internal static class ColourRule
         return Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitZ, turn));
     }
 
+    /// <summary>
+    /// A grey face's red less its blue, in 8 bit sRGB levels, from the light model (<see cref="Grey"/> lit as <see cref="Lit"/>
+    /// lights a colour): what "not highlighted" is judged against. Under M-7's sky a grey face is blue-cast, its R - B about
+    /// -47 facing up and -24 facing a side from the front, so the old "|R - B| at most 6" no longer reads "grey" (the person's
+    /// ruling of 2026-11-17, "Accept all", M-19 row 5).
+    /// </summary>
+    public static int GreyRedLessBlue(Vector3 normal, Vector3 direction)
+    {
+        var nl = Math.Max(0, Vector3.Dot(Vector3.Normalize(normal), ToLight(direction)));
+        var diffuse = 0.25 + (Light * nl / Math.PI);
+        var sky = SkyLight(normal);
+        var s = Reflected(normal, direction);
+        return Encode((Grey.X * (diffuse + sky[0])) + s[0]) - Encode((Grey.Z * (diffuse + sky[2])) + s[2]);
+    }
+
+    /// <summary>A linear channel in 8 bit sRGB, rounded and clipped.</summary>
+    public static int Encode(double linear)
+    {
+        var c = Math.Clamp(linear, 0, 1);
+        return (int)Math.Round(255 * (c <= 0.0031308 ? 12.92 * c : (1.055 * Math.Pow(c, 1 / 2.4)) - 0.055));
+    }
+
     /// <summary>An 8 bit sRGB channel in linear light.</summary>
     public static double Linear(int channel)
     {

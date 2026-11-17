@@ -226,9 +226,11 @@ public sealed class SoftScenario : IScenario
         };
         foreach (var (mesh, group, near) in targets)
         {
-            var c = mesh.Centroid(mesh.NearestFace(group, near));
+            // Against the palette lit by the sky at the face's own normal (the person's ruling of 2026-11-17, M-19 row 6).
+            var face = mesh.NearestFace(group, near);
+            var c = mesh.Centroid(face);
             var (x, y) = Holding(project(c));
-            ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}");
+            ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}", mesh.Normal(face), Vector3.UnitZ);
         }
 
         var can = body.Centroid(body.NearestFace("can", new Vector3(-0.435f, 0.39f, 0.30f)));
@@ -243,8 +245,11 @@ public sealed class SoftScenario : IScenario
         ExpectNot(driver, frame, mx, my, "can", "the can's mirror in the world (+X)");
     }
 
-    private const int FacetStep = 9;
-    private const int SmoothStep = 5;
+    // Under M-7's sky the flat torso's facet edges step by 7 and the smooth one's by 2 (the sky's light, about 1.3 to 2.3 times the old
+    // ambient, flattens a step the sun makes): the person's ruling of 2026-11-17 ("Accept all", M-19 row 4a), 9 to 5 and 5 to 4, each
+    // side clearing by 2.
+    private const int FacetStep = 5;
+    private const int SmoothStep = 4;
 
     /// <summary>
     /// The torso, from the front, at the height 0.80 m: its octagon's two side facet edges (world x of plus and minus 0.1687). Flat, the
@@ -278,16 +283,13 @@ public sealed class SoftScenario : IScenario
         // out leave the soft torso (it is background past about -0.21) or cut the flat plateau to 10.
         var (from, row) = Holding(project(new Vector3(-0.195f, 0.80f, 0.17f)));
         var (to, _) = Holding(project(new Vector3(-0.115f, 0.80f, 0.17f)));
-        int run = 1, longest = 1;
-        for (var x = from + 1; x <= to; x++)
+        // Under M-7's sky the smooth ramp is flatter (130 to 136 over the span) and holds a shade for 7 pixels, so the span is judged by its
+        // count of distinct shades, not its longest run: smooth 5 or more (measured 7), flat 3 or fewer (measured 2, a plateau per facet).
+        // The person's ruling of 2026-11-17 ("Accept all", M-19 row 4b).
+        var shades = Enumerable.Range(from, to - from + 1).Select(x => Luma(frame, x, row)).Distinct().Count();
+        if (flat ? shades > 3 : shades < 5)
         {
-            run = Luma(frame, x, row) == Luma(frame, x - 1, row) ? run + 1 : 1;
-            longest = Math.Max(longest, run);
-        }
-
-        if (flat ? longest < 10 : longest > 5)
-        {
-            driver.Fail($"{frame.Name}: the torso's shade over x {from} to {to} at row {row} has a run of {longest} equal pixels; {(flat ? "a flat mesh holds one shade per facet (10 or more)" : "a smooth one is a ramp (5 or fewer)")}");
+            driver.Fail($"{frame.Name}: the torso's shade over x {from} to {to} at row {row} takes {shades} distinct shades; {(flat ? "a flat mesh holds one shade per facet (3 or fewer)" : "a smooth one is a ramp (5 or more)")}");
         }
     }
 

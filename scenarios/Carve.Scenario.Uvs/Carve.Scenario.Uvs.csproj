@@ -19,6 +19,7 @@
     <Compile Include="../Carve.Scenario.Crate/CheckerColours.cs" Link="CheckerColours.cs" />
     <Compile Include="../Carve.Scenario.Crate/UvLayoutPixels.cs" Link="UvLayoutPixels.cs" />
     <Compile Include="../Carve.Scenario.Crate/CrateLooks.cs" Link="CrateLooks.cs" />
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
     <Compile Include="../Carve.Scenario.Crate/CrateChecker.cs" Link="CrateChecker.cs" />
     <Compile Include="../Carve.Scenario.Crate/CrateLabels.cs" Link="CrateLabels.cs" />
     <Compile Include="../Carve.Scenario.Crate/CrateUvLayout.cs" Link="CrateUvLayout.cs" />

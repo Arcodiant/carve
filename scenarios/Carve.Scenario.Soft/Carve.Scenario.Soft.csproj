@@ -16,6 +16,7 @@
     <!-- The crate scenario's call helpers and camera maths, and the gardener's data and pixel classifier, linked and not copied. -->
     <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
     <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
     <Compile Include="../Carve.Scenario.Character/GardenerSpec.cs" Link="GardenerSpec.cs" />
     <Compile Include="../Carve.Scenario.Character/GardenerPixels.cs" Link="GardenerPixels.cs" />
   </ItemGroup>
