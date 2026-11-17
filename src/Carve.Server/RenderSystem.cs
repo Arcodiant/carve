@@ -19,6 +19,7 @@ internal sealed class RenderSystem(
     IRenderTargetReadback readback,
     IImmediateSurfaceRegistry surfaces,
     ITextureLoader textures,
+    IAssetResidency residency,
     RenderComposition composition,
     RenderQueue queue,
     ModelStore store,
@@ -53,9 +54,15 @@ internal sealed class RenderSystem(
     private Material? _checkerMaterial;
     private PbrMaterials? _pbr;
     private IReadOnlyList<Carve.Core.Material> _materials = [];
+    // The Carve materials of the submesh materials Make chose, and of those the mesh entity draws now (RV-47).
+    private Carve.Core.Material[] _nextDrawn = [];
+    private Carve.Core.Material[] _drawn = [];
 
-    /// <summary>The engine materials of the model's materials, made on the frame thread and held for the process (T-78).</summary>
-    private PbrMaterials Pbr => _pbr ??= new PbrMaterials(resources, textures);
+    /// <summary>
+    /// The engine materials of the model's materials, made on the frame thread (T-78); each is released, with any texture
+    /// no kept material samples, once the model no longer has it and the mesh entity no longer draws it (RV-47).
+    /// </summary>
+    private PbrMaterials Pbr => _pbr ??= new PbrMaterials(resources, textures, residency);
 
     /// <summary>The model's materials, for the faces of the next mesh shown that use one (T-78).</summary>
     public void ShowMaterials(IReadOnlyList<Carve.Core.Material> materials) => _materials = materials;
@@ -144,6 +151,7 @@ internal sealed class RenderSystem(
             _uvWindow = layout.Window;
             _nextMaterial = LayoutMaterial;
             _nextSubmeshMaterials = null;
+            _nextDrawn = [];
             _nextEdgeColour = UvLayout.Edge;
             return
             [
@@ -161,6 +169,7 @@ internal sealed class RenderSystem(
         // in the shaded look is a submesh and a material per colour (D-6); anything else is the one mesh it always was.
         _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
         _nextSubmeshMaterials = null;
+        _nextDrawn = [];
         MeshData<PositionUvNormalVertex> data;
         if (scene.Uvs is { } uvs)
         {
@@ -172,10 +181,13 @@ internal sealed class RenderSystem(
         {
             // A material face is the engine's PBR material the game's loader makes of it (T-78), a colour face LitMesh as ever.
             data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours, out var materials);
-            _nextSubmeshMaterials = colours.Zip(materials, (c, m) => m is not null
-                    ? Pbr.Of(_materials.FirstOrDefault(d => d.Name == m) ?? throw new InvalidOperationException($"a face uses the material '{m}', which is not defined"))
+            var drawn = materials.Select(m => m is null ? null
+                : _materials.FirstOrDefault(d => d.Name == m) ?? throw new InvalidOperationException($"a face uses the material '{m}', which is not defined")).ToArray();
+            _nextSubmeshMaterials = colours.Zip(drawn, (c, m) => m is not null
+                    ? Pbr.Of(m)
                     : Material.LitMesh(c is null ? Surface : FaceStyle.ToLinear(c)))
                 .ToArray();
+            _nextDrawn = drawn.OfType<Carve.Core.Material>().ToArray();
         }
         else
         {
@@ -205,6 +217,10 @@ internal sealed class RenderSystem(
             _meshEntity = AddInstance(fill, _nextMaterial!);
             entities.GetComponent<MeshInstance>(_meshEntity.Value).SubmeshMaterials = _nextSubmeshMaterials!;
         }
+
+        // The entity now draws only the next materials, so any other the model no longer has can go.
+        _drawn = _nextDrawn;
+        _pbr?.Keep(_materials.Concat(_drawn));
 
         _edgeLines = Swap(_edgeLines, edges, _nextEdgeColour);
         _orangeLines = Swap(_orangeLines, orange, LookMeshes.Orange);

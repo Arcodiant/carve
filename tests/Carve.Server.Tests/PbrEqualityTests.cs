@@ -21,9 +21,10 @@ namespace Carve.Server.Tests;
 /// </summary>
 internal static class EngineHost
 {
-    public sealed record Kit(IGraphicsResourceManager Resources, IModelLoader Models, ITextureLoader Textures);
+    public sealed record Kit(IGraphicsResourceManager Resources, IModelLoader Models, ITextureLoader Textures, IAssetResidency Residency);
 
-    public sealed record Shot(Mesh Mesh, Material[] Submeshes, Vector3 Half, RenderView View);
+    /// <summary>One frame; <paramref name="Before"/>, when given, runs on the frame thread just before the shot is applied.</summary>
+    public sealed record Shot(Mesh Mesh, Material[] Submeshes, Vector3 Half, RenderView View, Action? Before = null);
 
     public sealed record Frame(byte[] Raw, DecodedImage Image);
 
@@ -60,7 +61,7 @@ internal static class EngineHost
 
     private sealed class HostSystem(
         ISceneManager scenes, IEntityManager entities, IGraphicsResourceManager resources, IOffscreenRenderer renderer,
-        IRenderTargetReadback readback, IModelLoader models, ITextureLoader textures, RenderComposition composition,
+        IRenderTargetReadback readback, IModelLoader models, ITextureLoader textures, IAssetResidency residency, RenderComposition composition,
         IGameLifecycle life, Plan plan) : ISystem
     {
         private const string Scene = "carve";
@@ -94,7 +95,7 @@ internal static class EngineHost
                         entities.AddComponent(camera, new RenderTag(RenderComposition.CameraTag(size)));
                         _cameras.Add(camera);
                     }
-                    _shots = plan.Shots(new Kit(resources, models, textures));
+                    _shots = plan.Shots(new Kit(resources, models, textures, residency));
                     return;
                 }
 
@@ -129,6 +130,7 @@ internal static class EngineHost
 
         private void Apply(Shot shot)
         {
+            shot.Before?.Invoke();
             if (_mesh is { } entity)
             {
                 ref var instance = ref entities.GetComponent<MeshInstance>(entity);
