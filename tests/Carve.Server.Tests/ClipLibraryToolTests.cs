@@ -96,8 +96,11 @@ public sealed class ClipLibraryToolTests() : TempFolderTests("carve-clip-library
         var keys = one.GetProperty("channels").GetProperty("Hips").GetProperty("translation").GetProperty("keys");
         Assert.Equal(2, keys.GetArrayLength());
         Assert.Equal(0.5, keys[1].GetProperty("value")[2].GetDouble());
+        Assert.False(one.GetProperty("channels").GetProperty("Hips").TryGetProperty("rotation", out _), "a part the clip does not key is left out, not null");
         Assert.Equal(2, one.GetProperty("warnings").GetArrayLength());
-        Assert.True(IsError(await carve.CallToolAsync("get_clips", """{"name":"nope"}""")));
+        var unknown = await carve.CallToolAsync("get_clips", """{"name":"nope"}""");
+        Assert.True(IsError(unknown));
+        Assert.Equal("get_clips: no clip named 'nope'; the clips are 'idle', 'drift'", TextOf(unknown));
 
         var saved = TextOf(await carve.CallToolAsync("save", """{"path":"d.carve"}"""));
         Assert.Contains("2 warning(s): clip 'drift' loops", saved);

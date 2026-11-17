@@ -129,6 +129,24 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
         Assert.False(File.Exists(Path.Combine(Root, "clips.glb")));
     }
 
+    /// <summary>
+    /// RV-52: a clip warning reaches a model-mode (skinned) export too, not only a clips-mode one. The clip's gap is on Y
+    /// alone, so it also shows that loop closure is measured on X/Y/Z (T-83).
+    /// </summary>
+    [Fact]
+    public async Task A_skinned_model_export_carries_the_clip_warnings()
+    {
+        using var carve = await StartChainAsync(Root);
+        Ok(await carve.CallToolAsync("define_clip",
+            """{"name":"sag","duration":1,"loop":true,"channels":{"joint":{"translation":{"keys":[{"time":0,"value":[0,1,0]},{"time":1,"value":[0,0.95,0]}]}}}}"""));
+        var exported = await carve.CallToolAsync("export", """{"path":"chain.glb"}""");
+        Ok(exported);
+        var text = TextOf(exported);
+        Assert.Contains(" skinned: ", text);
+        Assert.Contains("; 1 warning(s): clip 'sag' loops but bone 'joint' translation ends 50 mm from where it starts on X/Y/Z", text);
+        Assert.True(File.Exists(Path.Combine(Root, "chain.glb")));
+    }
+
     [Fact]
     public async Task The_result_names_the_path_pieces_materials_bones_and_clips()
     {

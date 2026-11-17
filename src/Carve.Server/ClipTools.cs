@@ -30,7 +30,7 @@ public sealed class DefineClipTool(ModelStore store)
         + "Between two keys LINEAR moves translation in a straight line and turns rotation by the shortest arc (spherical interpolation; q and -q are the same turn, so a key's sign never sends the bone the long way round); "
         + "STEP holds the earlier key until the time reaches the next. Before the first key and after the last a channel holds that key; it does not wrap. "
         + "render(clip, time) draws the clip at a moment. "
-        + "Returns JSON {name, duration, loop, bones: [animated bone names], replaced: true if a clip of that name was there before, clips: [every clip name], warnings: [strings]}. warnings never refuse the clip: a looping clip whose rotation ends more than 1 degree from where it starts (q and -q count as equal), or whose translation ends more than 1 mm away on X/Z; a clip whose root bone's translation ends more than 1 mm from where it starts on X/Z (clips are in place). Each names the clip, bone and difference. "
+        + "Returns JSON {name, duration, loop, bones: [animated bone names], replaced: true if a clip of that name was there before, clips: [every clip name], warnings: [strings]}. warnings never refuse the clip: a looping clip whose rotation ends more than 1 degree from where it starts (q and -q count as equal), or whose translation ends more than 1 mm away from where it starts (the distance on X/Y/Z); a clip whose root bone's translation ends more than 1 mm from where it starts on X/Z (clips are in place). Each names the clip, bone and difference. "
         + "Errors, each a tool error that changes nothing and lists every problem by place (e.g. channels.joint.rotation.keys[1]): no skeleton yet; an empty name; a duration not greater than 0; "
         + "a bone the skeleton lacks; a bone with neither part; an interpolation other than LINEAR or STEP; a part with no keys; a key time outside [0, duration], the same as or earlier than the key before it; "
         + "a rotation that is not a unit quaternion (within 0.001); a value that is not 3 or 4 finite numbers. "
@@ -296,7 +296,7 @@ public sealed class GetClipsTool(ModelStore store)
             if (clips.Count == 0)
                 return Error($"get_clips: no clip named '{wanted}'; the clips are " + (model.Clips.Count == 0 ? "none yet" : NameList.Quoted(model.Clips.Select(c => c.Name))));
         }
-        return Ok(new
+        return Line(JsonSerializer.Serialize(new
         {
             clips = clips.Select(c => new
             {
@@ -310,8 +310,12 @@ public sealed class GetClipsTool(ModelStore store)
                 }),
                 warnings = ClipChecks.Check(c, model.Skeleton!),
             }).ToArray(),
-        });
+        }, OmitMissingParts));
     }
+
+    /// <summary>get_clips leaves out a part the clip does not key, as its description says, rather than writing it as null.</summary>
+    private static readonly JsonSerializerOptions OmitMissingParts =
+        new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
 
     private static object? Part<T>(ClipChannel<T>? channel, Func<T, float[]> value) => channel is null ? null : new
     {
