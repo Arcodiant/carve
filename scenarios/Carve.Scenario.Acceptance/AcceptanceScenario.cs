@@ -1,4 +1,6 @@
+using System.Numerics;
 using System.Text;
+using System.Text.Json;
 using Carve.Debug;
 using Carve.Extensibility;
 using Carve.Scenario.Orcward;
@@ -25,11 +27,16 @@ public sealed class AcceptanceExtension : ICarveExtension
 /// differs past 4 of 255 (the person's ruling of 2026-11-17; past 8 in R, G or B before), a frame fails past 0.5 % of its pixels or with a connected patch of differing pixels past 50. Each frame also has a
 /// positive check: the character covers at least 2 % of the frame (a camera that looked away would show background), and the
 /// render of the front does not pass against the exported file's view from the back (so the comparison tells views apart).
-/// Results go to <c>acceptance/differences.tsv</c> and a triptych of each pair to <c>acceptance/compare/</c> in the round folder,
+/// At rest, both draws of the front and the side must also overlap the silhouette worked out from the saved meshes
+/// (<see cref="Silhouette"/>) by 0.9 or more, which a camera fault <c>render</c> and <c>render_glb</c> share would fail, and at least one
+/// view's silhouette must overlap its own mirror, and one its own flip, by less (else this check could not see the fault).
+/// Results go to <c>acceptance/differences.tsv</c> (the silhouette overlaps to <c>acceptance/silhouettes.tsv</c>) and a triptych of each pair to <c>acceptance/compare/</c> in the round folder,
 /// which <c>tests/Carve.AcceptanceLoad.Tests</c> then reads along with the loads.
 /// </summary>
 public sealed class AcceptanceScenario : IScenario
 {
+    private const int Size = 512;
+
     public async Task RunAsync(ScenarioDriver driver)
     {
         var round = Environment.GetEnvironmentVariable("CARVE_ACCEPTANCE_RUN") ?? throw new InvalidOperationException("CARVE_ACCEPTANCE_RUN is unset");
@@ -46,6 +53,42 @@ public sealed class AcceptanceScenario : IScenario
         await CallTextAsync(driver, "open", new { path = carveFile });
         var clips = (await CallJsonAsync(driver, "get_clips", new { })).GetProperty("clips").EnumerateArray()
             .Select(c => (Name: c.GetProperty("name").GetString()!, Duration: c.GetProperty("duration").GetSingle())).ToList();
+
+        // The meshes, named by the saved file, read through get_mesh: what the silhouette at rest is worked from.
+        var meshes = new List<(Vector3[] Vertices, int[][] Faces)>();
+        foreach (var m in JsonDocument.Parse(await File.ReadAllTextAsync(carveFile)).RootElement.GetProperty("meshes").EnumerateArray())
+        {
+            var mesh = await CallJsonAsync(driver, "get_mesh", new { mesh = m.GetProperty("name").GetString()! });
+            meshes.Add((
+                mesh.GetProperty("vertices").EnumerateArray().Select(v =>
+                {
+                    var at = v.GetProperty("at");
+                    return new Vector3(at[0].GetSingle(), at[1].GetSingle(), at[2].GetSingle());
+                }).ToArray(),
+                mesh.GetProperty("faces").EnumerateArray().Select(f => f.GetProperty("vertices").EnumerateArray().Select(x => x.GetInt32()).ToArray()).ToArray()));
+        }
+
+        var silhouettes = new StringBuilder("name\toverlap\tfails\n");
+        var predicted = new Dictionary<string, bool[]>();
+        foreach (var (viewName, direction) in new[] { ("front", Vector3.UnitZ), ("side", Vector3.UnitX) })
+        {
+            var p = Silhouette.Predict(meshes, direction, Size);
+            predicted[viewName] = p;
+            foreach (var (kind, turned) in new[] { ("mirror", Silhouette.Mirror(p, Size)), ("flip", Silhouette.Flip(p, Size)) })
+            {
+                var o = Silhouette.Overlap(p, turned);
+                silhouettes.Append($"predicted-{viewName}-vs-{kind}\t{o:0.000}\t{(o < Silhouette.Least ? "differs" : "same")}\n");
+            }
+        }
+
+        foreach (var kind in new[] { "mirror", "flip" })
+        {
+            Func<bool[], bool[]> turn = kind == "mirror" ? p => Silhouette.Mirror(p, Size) : p => Silhouette.Flip(p, Size);
+            if (predicted.Values.All(p => Silhouette.Overlap(p, turn(p)) >= Silhouette.Least))
+            {
+                driver.Fail($"the character's silhouette is the same under a {kind} from the front and the side, so the silhouette check cannot see a {kind}ed camera");
+            }
+        }
 
         var results = new List<Comparison.Result>();
         var views = new[] { ("front", "+z"), ("side", "+x") };
@@ -67,6 +110,19 @@ public sealed class AcceptanceScenario : IScenario
                 object b = clip is null ? new { path = glb, view } : new { path = glb, view, clip, time };
                 var viaRender = await driver.CaptureAsync($"render-{poseName}-{viewName}", a);
                 var viaGlb = await driver.CaptureToolAsync("render_glb", $"glb-{poseName}-{viewName}", b);
+                if (clip is null)
+                {
+                    foreach (var frame in new[] { viaRender, viaGlb })
+                    {
+                        var o = Silhouette.Overlap(Silhouette.Foreground(frame), predicted[viewName]);
+                        silhouettes.Append($"{frame.Name}\t{o:0.000}\t{(o < Silhouette.Least ? "fails" : "passes")}\n");
+                        if (o < Silhouette.Least)
+                        {
+                            driver.Fail($"{frame.Name}: the character overlaps its silhouette worked from the meshes by {o:0.000}, under {Silhouette.Least} (a mirrored, flipped or misplaced camera)");
+                        }
+                    }
+                }
+
                 var r = Comparison.Measure($"{poseName}-{viewName}", "good", viaRender, viaGlb);
                 results.Add(r);
                 Comparison.WriteTriptych(Path.Combine(outDir, "compare", $"{poseName}-{viewName}.png"), viaRender, viaGlb);
@@ -99,5 +155,6 @@ public sealed class AcceptanceScenario : IScenario
         }
 
         await File.WriteAllTextAsync(Path.Combine(outDir, "differences.tsv"), tsv.ToString());
+        await File.WriteAllTextAsync(Path.Combine(outDir, "silhouettes.tsv"), silhouettes.ToString());
     }
 }

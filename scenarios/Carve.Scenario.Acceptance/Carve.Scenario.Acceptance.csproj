@@ -13,9 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The crate scenario's call helpers and the Orcward frame rule, linked and not copied. -->
+    <!-- The crate scenario's call helpers and camera, and the Orcward frame rule, linked and not copied. -->
     <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
     <Compile Include="../Carve.Scenario.Orcward/ComparisonPng.cs" Link="ComparisonPng.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
   </ItemGroup>
 
 </Project>

@@ -46,6 +46,8 @@
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Orcward/ComparisonPng.cs",
         "scenarios/**/*.csproj",
         "spikes/**/*.csproj",
         "samples/gardener-soft.carve",
