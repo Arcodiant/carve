@@ -63,7 +63,7 @@ public static class GlbExport
     }
 
     /// <summary>True when any material in <paramref name="used"/> has a texture, so <c>TEXCOORD_0</c> is written.</summary>
-    internal static bool Textured(IEnumerable<CarveMaterial> used) => used.Any(m => m.Textures.Any(t => t.Texture is not null));
+    internal static bool Textured(IEnumerable<CarveMaterial> used) => used.Any(m => m.HasTexture);
 
     /// <summary>Each distinct set of PNG bytes once, however many materials and channels use it.</summary>
     internal sealed class Images
@@ -150,7 +150,7 @@ public static class GlbExport
     }
 
     private static HashSet<string> TexturedNames(Model model) =>
-        [.. model.Materials.Where(m => m.Textures.Any(t => t.Texture is not null)).Select(m => m.Name)];
+        [.. model.Materials.Where(m => m.HasTexture).Select(m => m.Name)];
 
     /// <summary>
     /// One warning per textured material that faces use without UVs, in model order:
@@ -160,7 +160,7 @@ public static class GlbExport
     public static IReadOnlyList<string> MaterialUvWarnings(Model model)
     {
         var warnings = new List<string>();
-        foreach (var material in model.Materials.Where(m => m.Textures.Any(t => t.Texture is not null)))
+        foreach (var material in model.Materials.Where(m => m.HasTexture))
         {
             var perMesh = model.Meshes
                 .Select(m => (m.Name, Faces: m.Mesh.LiveFaces.Where(f => m.Mesh.Style?.MaterialOf(f) == material.Name && m.Mesh.Uvs?.IsMapped(f) != true).ToList()))

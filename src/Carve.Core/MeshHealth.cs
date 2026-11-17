@@ -90,10 +90,10 @@ public sealed class MeshHealth
         foreach (var name in Model.MaterialsUsedBy(mesh))
         {
             if (materials.FirstOrDefault(m => m.Name == name) is not { } material) continue;
-            if (material.Textures.Any(t => t.Texture is not null))
+            if (material.HasTexture)
                 foreach (var (face, used) in mesh.Style!.Materials.Where(p => p.Value == name))
                     texturedFaces[face] = used;
-            if (material.Occlusion != 1f && material.OcclusionTexture is null)
+            if (material.OcclusionHasNoEffect)
                 materialWarnings.Add(new(MeshWarningKind.MaterialNoEffect, $"materials['{name}']",
                     MeshEdits.Invariant($"occlusion is {material.Occlusion:R} but the material has no occlusion_texture, so it has no effect (glTF scales only the map)")));
         }
