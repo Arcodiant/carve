@@ -1,6 +1,6 @@
 ---
 description: >-
-  The barrel is given wood, iron, end-grain and rune materials, seen in eight frames, saved, reopened, exported and shown in the viewer, in suite scenario-materials
+  The barrel is given wood, iron, end-grain and rune materials, seen in nine frames, saved, reopened, exported and shown in the viewer, in suite scenario-materials
 ---
 # T-80 — Textured barrel scenario
 
@@ -149,6 +149,6 @@ Checked against the barrel spec, `UvProjection.Cylindrical` and T-78's plan. The
 - **Sample counts:** `barrel-front-256` and the sheet's front tile have 18 RuneOn samples (at least 3 that a flip or mirror would change: all 18), over P6's floor; `barrel-top` checks only "pale ring: lit and warm" (4446 samples). No count is below the floor of 8. Samples log: `pixel-samples.txt` in each run folder.
 - **The saved file is `samples/barrel-textured.carve`,** committed beside `samples/textures/` with its paths as `textures/<file>`; nothing is copied.
 - **Hash guard (agent 3, Claude Sonnet 5.5, `claude-sonnet-5-5`):** the frames of every suite but scenario-materials (12 suites, 229 PNGs) from the queue on 71fa146 (the milestone tip without T-80) and on this branch's verify jobs are byte-identical by SHA-256; tables regenerated in RV-47 (`base.sha256`, `new.sha256`, 229 PNGs, diff empty, from 307d692 and from the RV-47 fixes) under `G:/My Drive/artifacts/carve/M-7/RV-47/evidence/`; the originals were lost with the worktree.
-- **Frame review (round 1, the person):** the eight scenario frames and `viewer-front`, `viewer-angle` sent to Waystone from `G:/My Drive/artifacts/carve/M-7/T-80/round-1/`; outcome Commented, no per-frame notes, overall note "Looks good", taken as approval (the question tool was unavailable to ask again). No frame change. Frames were not opened by this agent. No sample count under P6's floor.
+- **Frame review (round 1, the person):** the eight scenario frames of the time (`barrel-bottom` came with RV-47) and `viewer-front`, `viewer-angle` sent to Waystone from `G:/My Drive/artifacts/carve/M-7/T-80/round-1/`; outcome Commented, no per-frame notes, overall note "Looks good", taken as approval (the question tool was unavailable to ask again). No frame change. Frames were not opened by this agent. No sample count under P6's floor.
 - **RV-47 fixes (fixer B):** `viewer-angle` gets the rune check and both viewer frames the P5 orientation check (`viewer-samples.tsv` carries `FlipV` and `MirrorU`; 92 rune sites at `viewer-angle`, 143 at `viewer-front`, all of them flip- and mirror-sensitive). The bottom cap (face 32) cannot be resolved in `barrel-back` or the sheet's back tile (a pixel spans 1.5 to 2.4 texels there, the rings' light band is 5 of a 9-texel period, so no footprint is one class: 0 of 5384 sites), so a ninth frame, `barrel-bottom` (`-y`, 512), carries the check as `barrel-top` does for face 33 (4581 sites; it shows the octagon with concentric rings). Existing frames unchanged. `BarrelSpec` is back in `UvsScenario.cs` and no longer linked. The caption exclusion in `Pool` is per tile.
 - Verify: `VERIFY PASS` (15 suites, `scenario-materials` 58 s).
