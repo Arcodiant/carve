@@ -49,7 +49,7 @@ The release logic itself has no defect:
 
 **Outcome:** fixed
 
-**Fix:** RenderReleaseTests (Tier regression) runs the real carve with the debug extension and a Tiny scenario mode `Tiny:Mode=release`, which reads `IGraphicsResourceManager.Residency` from DI with no product hook. It walks a face from plain to PNG A to PNG B to the UV look and back, measuring textures and the material table at each stage. Breaks: the `Keep` call deleted, given `_drawn` alone, or moved before the swap each fail. Given `_materials` alone it passes, because at every Install `_drawn` is a subset of `_materials`, so no reachable state tells them apart. Carve.Scenario.Tiny now references Arcodiant.Empyrean.Graphics (fixer, Opus 5.5, bbd20d9)
+**Fix:** RenderReleaseTests (Tier regression) runs the real carve with the debug extension and a Tiny scenario mode `Tiny:Mode=release`, which reads `IGraphicsResourceManager.Residency` from DI with no product hook. It walks a face from plain to PNG A to PNG B to the UV look and back, measuring textures and the material table at each stage. Breaks: the `Keep` call deleted, given `_drawn` alone, or moved before the swap each fail. Given `_materials` alone it passes, because at every Install `_drawn` is a subset of `_materials`, so no reachable state tells them apart. Carve.Scenario.Tiny now references Arcodiant.Empyrean.Graphics (fixer, Opus 5.5, 343eb56)
 
 ### "Every existing frame stayed byte-identical" rests on a table taken before render's release change
 
@@ -63,7 +63,7 @@ After its rebase, fixer A re-ran core-unit, server-unit, scenario-uvs and scenar
 
 **Outcome:** fixed
 
-**Fix:** The guard was re-taken at 3f9ba34, after 68f810e. All 229 scenario frames hash the same as base.sha256 (307d692), in head.sha256. server-regression's 120 test frames (not 87) hash the same at 307d692 and at the head, in server-base.sha256 and server-head.sha256, and no frame is new. README.txt in `G:\My Drive\artifacts\carve\M-7\RV-47\evidence\` says which commit each table covers. The Retrospective now cites the head table (fixer continuation, Opus 5.5; orchestrator)
+**Fix:** The guard was re-taken at 3f9ba34 on fix/RV-48 (its code is identical to the landed 3893cf6), after 68f810e. All 229 scenario frames hash the same as base.sha256 (307d692), in head.sha256. server-regression's 120 test frames (not 87) hash the same at 307d692 and at the head, in server-base.sha256 and server-head.sha256, and no frame is new. README.txt in `G:\My Drive\artifacts\carve\M-7\RV-47\evidence\` says which commit each table covers. The Retrospective now cites the head table (fixer continuation, Opus 5.5; orchestrator)
 
 ### The Retrospective still says a member looked at T-80's frames, so the no-change reason for finding 18 is false
 
@@ -103,7 +103,7 @@ The Retrospective says "Fixer A fixed the 14 product findings. Fixer B fixed 6 .
 
 **Outcome:** fixed
 
-**Fix:** T-78's Plan notes that 68f810e changed this, and its As built describes the holders, `Keep` in Install, and the two release tests (fixer, 3f9ba34)
+**Fix:** T-78's Plan notes that 68f810e changed this, and its As built describes the holders, `Keep` in Install, and the two release tests (fixer, 3893cf6)
 
 ### "Eight frames" and the barrel link are still named after barrel-bottom was added and BarrelSpec unlinked
 
@@ -115,7 +115,7 @@ The Retrospective says "Fixer A fixed the 14 product findings. Fixer B fixed 6 .
 
 **Outcome:** fixed
 
-**Fix:** The words are now nine frames in MaterialsScenario.cs's summary, the csproj header, T-80's description and UNRELEASED.md, and the milestone's member line (dbb7bb7); the csproj link comment no longer names the barrel (fixer, 3f9ba34)
+**Fix:** The words are now nine frames in MaterialsScenario.cs's summary, the csproj header, T-80's description and UNRELEASED.md, and the milestone's member line (dbb7bb7); the csproj link comment no longer names the barrel (fixer, 3893cf6)
 
 ### save's new sentence says the texture was read by define_material, but open reads it too
 
@@ -127,7 +127,7 @@ The description says the warning comes for "each texture whose PNG has been move
 
 **Outcome:** fixed
 
-**Fix:** save's description now reads "since define_material or open read it" (fixer, aeaecd3)
+**Fix:** save's description now reads "since define_material or open read it" (fixer, 2bf6e40)
 
 ## Answers checked
 
