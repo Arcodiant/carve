@@ -192,36 +192,39 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 
 ### Hand-off
 
-Third rebase, onto `origin/main` 720a6fa (M-7, 0.10.0), by an Opus 5.5 agent, 2026-11-16. **Rebased locally, not pushed.**
+Third rebase, onto `origin/main` 720a6fa (M-7, 0.10.0), by two Opus 5.5 agents, 2026-11-16 and 2026-11-17. **Rebased locally, not pushed** (`origin/milestone/M-19` is still 7ac5790; `origin/main` was still 720a6fa on 2026-11-17).
 
-- **Ruling (the person, 2026-11-16):** "Colour faces PBR under the sky": every colour face is PBR and lit by M-7's sky. Every shaded colour frame changes and goes to review. `ColourRule` and T-82's thresholds are re-derived with the sky, with one question to the person.
-- **Done:**
-  - Rebased, with every conflict resolved keeping both sides:
-    - export's description and warnings keep the clip, not-planar and material-UV parts;
-    - the tool list holds the material tools beside `get_clips` and `render_glb`;
-    - `save` gives the clip warnings and M-7's missing-texture lines;
-    - export passes `glb.Primitives` with `wholeBody: !asPiece`;
-    - `RenderSystem` keeps M-7's materials and the glb fields side by side; a material face is `Pbr.Of`, and a colour face is `SurfaceMaterial.Of` (T-82);
-    - CLAUDE.md keeps both the materials and the Orcward and acceptance rows.
-  - The build fix is its own commit: `SurfaceMaterial` names `Empyrean.Material`, and `FaceColourTests` takes the new `out materials`. The build passes with warnings as errors.
-- **Verify, run 1** (no threshold changed; logs in `C:\Users\andre\artifacts\carve\M-19\rebase\round-2\`):
-  - Passing: core-unit, rig, uvs, materials, viewer-cube.
-  - Failing: server-unit, server-regression, cube, crate, export, shed (18 checks), cuts (15), gatehouse (43), character, soft and orcward.
-  - cube, crate, export, character, soft and orcward stop at their first failure. The full list of moved checks needs those scenarios' later checks too.
-- **The sky's size, as measured:**
-  - cube-front +Z 201 and +X 199, where the model without the sky (T-82) predicts 147 and 139: the sky adds about 55 to 60 to a grey face and nearly levels the face order.
-  - A light-grey shed wall reads (189, 199, 213): it turns blue, with R-B about 24.
-  - The brown door reads (96, 67, 46) against (95, 64, 38): +1, +3, +8.
-  - The blue pocket wall reads (70, 119, 168) against (51, 84, 108).
-  - The engine docs (0.119.0, `ProceduralSky`) give the diffuse as a per-frame SH projection of the sky, plus a specular probe baked from it. `ProceduralSky.Default`'s numbers are not documented, so the sky's part must be measured, not predicted.
-- **Other failures:**
-  - `ExportHashTests.The_soft_gardeners_skinned_export_is_the_bytes_written_before_materials`: M-7 pins main's gardener bytes, and T-84 changed them. It is the same case as the M-6 pin the person accepted.
-  - Orcward: `twist-Hand_L-Y45` now passes the cluster rule: 41 px, largest patch 23 px. The sky flattens the contrast, so the wrong file is no longer caught.
-  - character and soft: a boots sample reads as skin, at (71, 49, 39).
+- **Rulings (the person):**
+  - 2026-11-16, "Colour faces PBR under the sky": every colour face is PBR and lit by M-7's sky. Every shaded colour frame changes and goes to review. `ColourRule` and T-82's thresholds are re-derived with the sky, with one question to the person.
+  - 2026-11-17, "Carry on as ruled": keep the default sky on every colour face; measure it, re-derive every moved check (cube margins near 2), and put a new twisted-limb rule to the person.
+- **Done by the first agent:** the rebase, every conflict kept both sides (export's description and warnings, the tool list, `save`'s warnings, `glb.Primitives` with `wholeBody: !asPiece`, `RenderSystem`'s materials beside the glb fields, CLAUDE.md), and the build fix (`SurfaceMaterial` names `Empyrean.Material`; `FaceColourTests` takes `out materials`).
+- **Done by the second agent (30ad636):**
+  - **The sky measured.** New scenario `scenario-sky` (`scenarios/Carve.Scenario.Sky`, suite in `tests.json`): a unit quad facing each of 26 world normals, drawn grey, black and white, from `front`, `back` and straight on, the centre pixel read. `sky.tsv` in the run folder; a copy and the fitting scripts (`fit.py`, `fitspec.py`, `model.py`) in `C:\Users\andre\artifacts\carve\M-19\rebase\round-2\sky\`.
+    - A black face is specular alone, so (grey - black) / albedo - (0.25 + 0.9 n.l / pi) is the sky's light. The grey and white faces give the same value within 0.006 in linear light, and the same normal from two views agrees within 0.013.
+    - The sky's light fits a first-order SH, constant plus linear in the world normal, within 0.009 linear: R 0.332 - 0.050 n.y, G 0.416 + 0.043 n.y, B 0.575 + 0.220 n.y (x and z terms 0.013 or less). It is about 1.3 to 2.3 times the 0.25 ambient: this is the +55 to +60 on a grey face and the blue cast.
+    - The sky's specular is 0.003 to 0.02 linear. It fits the sky's light from the reflected direction times 0.0128 + 0.0267 (1 - n.v)^2.
+  - **The model extended.** `ColourRule.SkyLight`, `SkySpecular` and `Reflected` (light + sky specular, per channel). `Predict` and `Lit` use them, and `CrateColours` reports the per-channel specular.
+    - Against the 47 measured views: grey within 1 level in every channel, white within 2 (blue clips at 255), black within 3. T-82's model without the sky misses grey by up to 64 (G) and 87 (B).
+    - `scenario-sky` checks every pixel against the model (2 levels; black 3) and passes.
+    - It predicts the failing pixels: cube-front +Z (192, 201, 216) and +X (189, 199, 213) are the quads' measured values exactly.
+- **Every moved check, past the first-failure stops.** `ScenarioDriver.Fail` was made non-fatal for one local run and reverted (not committed). Logs: `round-2\sweep\`, one per suite.
+  - With the extended `ColourRule`, **scenario-cuts and scenario-gatehouse pass whole** (were 15 and 43), the gatehouse's load checks included. So does every ColourRule check in the crate.
+  - The load checks after the scenarios, run by hand on the sweep's run folders: `ExportViewer` 5/5, `CharacterLoad` 7/7 and `SoftLoad` 12/12 pass; `OrcwardLoad` fails `Every_twisted_limb_fails_as_a_patch` only.
+  - What still fails, grouped (value now / needed):
+    1. **Cube +Z over +X by MinimumStep 6:** 201 against 199 (crate 202/199) in cube-front, -256, -1024, crate-front, crate-sheet-four, export's five `front*` frames, and `RenderTests.A_cube_shows_three_faces...(Front)` in server-regression. The model predicts a step of 2. Top over +Z (216/201) and the back view's -Z, -X, underside (213, 204, 181) still step by 6 or more.
+    2. **cube-zoom3-corner, three shades:** 2 shades (199, 216); +Z and +X merge, the same 2-level step.
+    3. **Cube's cylinder sides (dir 2,2,1 ortho):** flat 191/193 needs a step of 6; smooth 191/193 needs 6 and 193/194 needs 3; subdivided 191/193 needs 6; soft rims 188/192 needs 6.
+    4. **Soft gardener's torso:** flat facet edges step by 7 at (224, 242) and (316, 242), needing 9; smooth torso has a run of 7 equal pixels, needing 5 or fewer.
+    5. **"Not highlighted, |R - B| at most 6":** a grey face now has R - B of 24 to 48. Crate-highlight-front, 8 points at (197, 216, 245); shed-open-edges, 18 points on faces 3 and 4 at (189, 199, 213) and (192, 201, 216). This is shed's whole 18.
+    6. **Boots read as skin:** gardener-rest-front, soft-flat-rest-front and soft-smooth-rest-front, the boots point (295, 448) at (71, 49, 39), match 0.996 to skin.
+    7. **Orcward twist:** `twist-Hand_L-Y45` differs at 41 px, largest patch 23. **Under the sky one good frame also has a 23 px largest patch** (the other good frames have 0). The twists are 23, 91, 264, 451 and 623. So no patch-size limit at 8/255 separates Y45 from the good frames. A rule needs another measure: the pixel threshold, or a patch on the hand's own region. `round-2\sweep\orcward-differences.tsv` holds the table.
+    8. **`ExportHashTests.The_soft_gardeners_skinned_export_is_the_bytes_written_before_materials`:** pins main's 259F5B54..., and M-19's bytes are F67B9897... (T-84's shoulder fix). This is the M-6 pin case again. Not yet checked: that 7ac5790 (before M-7) writes the same F67B9897 bytes.
 - **Left:**
-  1. Measure the sky's added light per world normal: grey and black faces, front and back.
-  2. Extend the light model.
-  3. Get every failing check, past the first-failure stops.
-  4. Build the one table for the person.
-  5. Compare frames by hash against main at 720a6fa, and review them under `rebase\round-2`.
-  6. Write the paragraph in *The rebase onto main*, push, and run `cairn lint`.
+  1. For each group above, work what the extended model predicts and a proposal: re-derived (tolerance kept), re-picked points, or a loosening, with the number.
+     - Group 1 cannot keep an order check with headroom: 2 predicted against a model error of 1.
+     - Groups 3 and 4 need the cylinder's and torso's facet normals put through `ColourRule.SkyLight`.
+     - Group 5 needs the grey's own R - B from the model, with `SkyLight` per normal, or the highlight's colour instead.
+     - Group 6 needs `Lit` for boots and skin at that normal.
+  2. The twist rule: measure patch sizes at pixel thresholds below 8 for every good and twisted pair. The pairs are `render-<name>` against `glb-<name>`, and `break-twist-...-rest-front` against `break-twist-...-glb-rest-front`, in `artifacts\scenarios\orcward\1\frames`. Find which good frame has the 23 px patch and why.
+  3. The one table, in the person's question; then the hash comparison of frames against main, the review under `rebase\round-2`, the paragraph in *The rebase onto main*, the push and `cairn lint`.
+- **Not checked:** the sky's light was measured at quad centres only. Perspective frames use per-pixel view directions, and the model uses the camera's.
