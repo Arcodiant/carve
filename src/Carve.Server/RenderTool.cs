@@ -199,6 +199,8 @@ internal static class RenderTool
         + "'size' is the image's width and height: 256 for a quick look or a sheet tile, 512 (the default), 1024 for a dense mesh with labels. "
         + "The caption opens with it: '256x256, view front, 8 vertices, 6 faces'. "
         + "'mode' is the look: 'shaded' (the default), 'wireframe', 'normals', 'checker' or 'uvs'. Neither wireframe nor normals depends on the light. "
+        + "In 'shaded', a face with a material (define_material, set_material) is drawn as the game's PBR shading draws it, its textures sampled at the face's UVs (a face with no UVs samples the texture's corner at (0, 0), as the game does), "
+        + "lit by Carve's light and a fixed sky so that metal reads; a game's own lighting will differ. Only material faces take the sky's light, so a matte white material face is brighter and bluer on top than an uncoloured or coloured face. Every other look ignores materials, as it ignores colours. "
         + "'wireframe' draws every edge in light grey over faces filled near black: use it to count and place edges and see the face loops. It is hidden-line, not see-through: "
         + "an edge behind a face is hidden, so look from another side to see it. "
         + "'normals' colours each face by the way it faces and stands a light grey spike on it along its normal, at its centre, or for a face with holes at a point on the face clear of the holes: use it to find a face pointing the wrong way, or a non-planar face, whose spike is off. On a smooth mesh (set_shading) it shows the corner normals instead: the colour blends across a soft edge and breaks at a hard one, and a spike stands on each corner along its normal. "

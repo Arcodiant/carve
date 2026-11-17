@@ -2,6 +2,8 @@ using System.Numerics;
 using Carve.Core;
 using Empyrean;
 using Microsoft.Extensions.Logging;
+// Carve.Core has its own Material (T-74); the render one is the engine's.
+using Material = Empyrean.Material;
 
 namespace Carve.Server;
 
@@ -16,6 +18,8 @@ internal sealed class RenderSystem(
     IOffscreenRenderer renderer,
     IRenderTargetReadback readback,
     IImmediateSurfaceRegistry surfaces,
+    ITextureLoader textures,
+    IAssetResidency residency,
     RenderComposition composition,
     RenderQueue queue,
     ModelStore store,
@@ -48,6 +52,20 @@ internal sealed class RenderSystem(
     private float[]? _weights;
     private Texture? _checker;
     private Material? _checkerMaterial;
+    private PbrMaterials? _pbr;
+    private IReadOnlyList<Carve.Core.Material> _materials = [];
+    // The Carve materials of the submesh materials Make chose, and of those the mesh entity draws now (RV-47).
+    private Carve.Core.Material[] _nextDrawn = [];
+    private Carve.Core.Material[] _drawn = [];
+
+    /// <summary>
+    /// The engine materials of the model's materials, made on the frame thread (T-78); each is released, with any texture
+    /// no kept material samples, once the model no longer has it and the mesh entity no longer draws it (RV-47).
+    /// </summary>
+    private PbrMaterials Pbr => _pbr ??= new PbrMaterials(resources, textures, residency);
+
+    /// <summary>The model's materials, for the faces of the next mesh shown that use one (T-78).</summary>
+    public void ShowMaterials(IReadOnlyList<Carve.Core.Material> materials) => _materials = materials;
 
     private LookHolder<Mesh> Looks => _looks ??= new LookHolder<Mesh>(this);
 
@@ -95,17 +113,7 @@ internal sealed class RenderSystem(
     {
         scenes.CreateScene(Scene);
 
-        var ambient = scenes.CreateEntity(Scene);
-        entities.AddComponent(ambient, new AmbientLight { Color = Vector3.One, Intensity = 0.25f });
-
-        _light = scenes.CreateEntity(Scene);
-        entities.AddComponent(_light, new DirectionalLight { Color = Vector3.One, Intensity = 0.9f });
-        entities.AddComponent(_light, new Transform3D
-        {
-            Position = Vector3.Zero,
-            Scale = Vector3.One,
-            Orientation = ViewFraming.LightOrientation(RenderView.Front),
-        });
+        _light = RenderLights.Add(scenes, entities, Scene);
 
         // The near and far here are placeholders: each view sets the whole projection by hand,
         // because the headless host does not apply a camera's projection.
@@ -143,6 +151,7 @@ internal sealed class RenderSystem(
             _uvWindow = layout.Window;
             _nextMaterial = LayoutMaterial;
             _nextSubmeshMaterials = null;
+            _nextDrawn = [];
             _nextEdgeColour = UvLayout.Edge;
             return
             [
@@ -160,6 +169,7 @@ internal sealed class RenderSystem(
         // in the shaded look is a submesh and a material per colour (D-6); anything else is the one mesh it always was.
         _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
         _nextSubmeshMaterials = null;
+        _nextDrawn = [];
         MeshData<PositionUvNormalVertex> data;
         if (scene.Uvs is { } uvs)
         {
@@ -167,11 +177,17 @@ internal sealed class RenderSystem(
             _nextMaterial = CheckerMaterial;
             data = MeshBridge.ToMeshData(mesh, space, uvs);
         }
-        else if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 })
+        else if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 } or { Materials.Count: > 0 })
         {
-            data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours);
-            _nextSubmeshMaterials = colours
-                .Select(c => Material.LitMesh(c is null ? Surface : FaceStyle.ToLinear(c))).ToArray();
+            // A material face is the engine's PBR material the game's loader makes of it (T-78), a colour face LitMesh as ever.
+            data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours, out var materials);
+            var drawn = materials.Select(m => m is null ? null
+                : _materials.FirstOrDefault(d => d.Name == m) ?? throw new InvalidOperationException($"a face uses the material '{m}', which is not defined")).ToArray();
+            _nextSubmeshMaterials = colours.Zip(drawn, (c, m) => m is not null
+                    ? Pbr.Of(m)
+                    : Material.LitMesh(c is null ? Surface : FaceStyle.ToLinear(c)))
+                .ToArray();
+            _nextDrawn = drawn.OfType<Carve.Core.Material>().ToArray();
         }
         else
         {
@@ -201,6 +217,10 @@ internal sealed class RenderSystem(
             _meshEntity = AddInstance(fill, _nextMaterial!);
             entities.GetComponent<MeshInstance>(_meshEntity.Value).SubmeshMaterials = _nextSubmeshMaterials!;
         }
+
+        // The entity now draws only the next materials, so any other the model no longer has can go.
+        _drawn = _nextDrawn;
+        _pbr?.Keep(_materials.Concat(_drawn));
 
         _edgeLines = Swap(_edgeLines, edges, _nextEdgeColour);
         _orangeLines = Swap(_orangeLines, orange, LookMeshes.Orange);

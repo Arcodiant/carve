@@ -20,7 +20,9 @@
         "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
         "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs",
         "samples/gatehouse.carve",
-        "samples/barrel.carve"
+        "samples/barrel.carve",
+        "samples/barrel-textured.carve",
+        "samples/textures/*.png"
       ],
       "resources": "cpu",
       "est-seconds": 30
@@ -34,11 +36,14 @@
         {
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
+        "tests/Carve.Server.Tests/Fixtures/*.png",
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
         "scenarios/**/*.csproj",
-        "spikes/**/*.csproj"
+        "spikes/**/*.csproj",
+        "samples/gardener-soft.carve",
+        "samples/gatehouse.carve"
       ],
       "resources": "cpu",
       "est-seconds": 12
@@ -52,6 +57,7 @@
         {
           "dotnet-closure": "tests/Carve.Server.Tests/Carve.Server.Tests.csproj"
         },
+        "tests/Carve.Server.Tests/Fixtures/*.png",
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
@@ -291,6 +297,45 @@
         "vulkan"
       ],
       "est-seconds": 90
+    },
+    {
+      "id": "scenario-materials",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-materials-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Materials/Carve.Scenario.Materials.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "spikes/Carve.ModelViewer/Carve.ModelViewer.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.MaterialsLoad.Tests/Carve.MaterialsLoad.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Uvs/UvsScene.cs",
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "tools/Carve.SampleTextures/TextureSet.cs",
+        "tools/Carve.SampleTextures/Png.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
+        "tests/Carve.ModelViewer.Tests/FramePixels.cs",
+        "samples/barrel.carve",
+        "samples/barrel-textured.carve",
+        "samples/textures/*.png",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-viewer.ps1",
+        "scripts/run-materials-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 120
     },
     {
       "id": "scenario-cuts",

@@ -6,7 +6,9 @@ public sealed record NamedMesh(string Name, PolygonMesh Mesh);
 /// <summary>
 /// What a model is (D-6): named meshes in the order they were first defined. Immutable: every change returns a new
 /// model. Names are non-empty, hold no ':' and are unique; a mesh keeps its own vertex and face ids. It may have a Skeleton, kept by every
-/// change to the meshes, and named clips (D-6, clips), kept likewise; no two clips share a name.
+/// change to the meshes, and named clips (D-6, clips), kept likewise; no two clips share a name. It holds named PBR
+/// materials (M-7, T-74) in definition order, kept likewise; any mesh's faces may use any of them by name
+/// (<see cref="FaceStyle.MaterialOf"/>), and every material a face uses is defined.
 /// </summary>
 public sealed class Model
 {
@@ -14,21 +16,56 @@ public sealed class Model
     public const string DefaultName = "mesh";
 
     /// <summary>The model with no meshes.</summary>
-    public static readonly Model Empty = new([], null, []);
+    public static readonly Model Empty = new([], null, [], []);
 
     private readonly NamedMesh[] _meshes;
     private PolygonMesh? _combined;
 
     private readonly Clip[] _clips;
+    private readonly Material[] _materials;
 
-    private Model(NamedMesh[] meshes, Skeleton? skeleton, Clip[] clips)
+    private Model(NamedMesh[] meshes, Skeleton? skeleton, Clip[] clips, Material[] materials)
     {
         _meshes = meshes;
         Skeleton = skeleton;
         _clips = clips;
+        _materials = materials;
         Meshes = Array.AsReadOnly(meshes);
         Clips = Array.AsReadOnly(clips);
+        Materials = Array.AsReadOnly(materials);
     }
+
+    /// <summary>The materials in the order they were first defined (T-74).</summary>
+    public IReadOnlyList<Material> Materials { get; }
+
+    /// <summary>The material called <paramref name="name"/>, or null.</summary>
+    public Material? FindMaterial(string name) => System.Array.Find(_materials, m => m.Name == name);
+
+    /// <summary>The model with <paramref name="material"/>: it replaces the material of that name in its place, or is added after the others.</summary>
+    /// <exception cref="ArgumentException">The material has a problem (<see cref="Material.Problems"/>).</exception>
+    public Model WithMaterial(Material material) => WithMaterial(material, out _);
+
+    /// <summary>The model with <paramref name="material"/>, and whether it <paramref name="replaced"/> one of that name (in its place) rather than being added last.</summary>
+    /// <exception cref="ArgumentException">The material has a problem (<see cref="Material.Problems"/>).</exception>
+    public Model WithMaterial(Material material, out bool replaced)
+    {
+        ArgumentNullException.ThrowIfNull(material);
+        if (Material.Problems(material) is [var (field, problem), ..]) throw new ArgumentException($"{field}: {problem}", nameof(material));
+        var at = System.Array.FindIndex(_materials, m => m.Name == material.Name);
+        replaced = at >= 0;
+        var next = replaced ? (Material[])_materials.Clone() : [.. _materials, null!];
+        next[replaced ? at : next.Length - 1] = material;
+        return new Model(_meshes, Skeleton, _clips, next);
+    }
+
+    /// <summary>The empty model's meshes with these materials, for a model rebuilt mesh by mesh (<see cref="Skinning.Posed"/>).</summary>
+    internal Model WithMaterials(IReadOnlyList<Material> materials) => new(_meshes, Skeleton, _clips, [.. materials]);
+
+    /// <summary>The material names, quoted and comma-separated, in definition order.</summary>
+    public string ListMaterialNames() => NameList.Quoted(_materials.Select(m => m.Name));
+
+    /// <summary>The material names <paramref name="mesh"/>'s faces use, each once, in the order of the faces that first use them.</summary>
+    public static IEnumerable<string> MaterialsUsedBy(PolygonMesh mesh) => mesh.Style?.Materials.Values.Distinct() ?? [];
 
     /// <summary>The clips in the order they were first defined.</summary>
     public IReadOnlyList<Clip> Clips { get; }
@@ -43,7 +80,7 @@ public sealed class Model
         var at = System.Array.FindIndex(_clips, c => c.Name == clip.Name);
         var next = at >= 0 ? (Clip[])_clips.Clone() : [.. _clips, null!];
         next[at >= 0 ? at : next.Length - 1] = clip;
-        return new Model(_meshes, Skeleton, next);
+        return new Model(_meshes, Skeleton, next, _materials);
     }
 
     /// <summary>The model with <paramref name="clips"/> in place of its clips.</summary>
@@ -53,11 +90,11 @@ public sealed class Model
         ArgumentNullException.ThrowIfNull(clips);
         if (clips.GroupBy(c => c.Name).FirstOrDefault(g => g.Count() > 1) is { } twice)
             throw new ArgumentException($"two clips are named '{twice.Key}'; clip names must be unique", nameof(clips));
-        return new Model(_meshes, Skeleton, [.. clips]);
+        return new Model(_meshes, Skeleton, [.. clips], _materials);
     }
 
     /// <summary>The model without the clip called <paramref name="name"/> (unchanged when there is none).</summary>
-    public Model WithoutClip(string name) => new(_meshes, Skeleton, System.Array.FindAll(_clips, c => c.Name != name));
+    public Model WithoutClip(string name) => new(_meshes, Skeleton, System.Array.FindAll(_clips, c => c.Name != name), _materials);
 
     /// <summary>The meshes in definition order.</summary>
     public IReadOnlyList<NamedMesh> Meshes { get; }
@@ -69,7 +106,7 @@ public sealed class Model
     public Model WithSkeleton(Skeleton skeleton)
     {
         ArgumentNullException.ThrowIfNull(skeleton);
-        return new Model(_meshes, skeleton, _clips);
+        return new Model(_meshes, skeleton, _clips, _materials);
     }
 
     /// <summary>The names in definition order.</summary>
@@ -88,15 +125,17 @@ public sealed class Model
     /// The model with <paramref name="mesh"/> under <paramref name="name"/>: it replaces the mesh of that name in its
     /// place, or is added after the others when the name is new.
     /// </summary>
-    /// <exception cref="ArgumentException">The name is null or empty.</exception>
+    /// <exception cref="ArgumentException">The name is null or empty, or a face uses a material the model does not define.</exception>
     public Model With(string name, PolygonMesh mesh)
     {
         if (NameProblem(name) is { } problem) throw new ArgumentException(problem, nameof(name));
         ArgumentNullException.ThrowIfNull(mesh);
+        if (MaterialsUsedBy(mesh).FirstOrDefault(n => FindMaterial(n) is null) is { } undefined)
+            throw new ArgumentException($"a face uses the material '{undefined}', which the model does not define", nameof(mesh));
         var at = System.Array.FindIndex(_meshes, m => m.Name == name);
         var next = at >= 0 ? (NamedMesh[])_meshes.Clone() : [.. _meshes, null!];
         next[at >= 0 ? at : next.Length - 1] = new NamedMesh(name, mesh);
-        return new Model(next, Skeleton, _clips);
+        return new Model(next, Skeleton, _clips, _materials);
     }
 
     /// <summary>
@@ -106,11 +145,28 @@ public sealed class Model
     /// clips must each already be valid on their own (made by <see cref="PolygonMesh.Create"/>, <see cref="Skeleton.Create"/>
     /// and <see cref="Clip.Create"/>).
     /// </summary>
-    public static (Model? Model, IReadOnlyList<MeshError> Errors) Create(IReadOnlyList<NamedMesh> meshes, Skeleton? skeleton, IReadOnlyList<Clip> clips)
+    public static (Model? Model, IReadOnlyList<MeshError> Errors) Create(IReadOnlyList<NamedMesh> meshes, Skeleton? skeleton, IReadOnlyList<Clip> clips) =>
+        Create(meshes, skeleton, clips, []);
+
+    /// <summary>
+    /// <see cref="Create(IReadOnlyList{NamedMesh}, Skeleton?, IReadOnlyList{Clip})"/> with materials (T-74), which adds the
+    /// problems of each material (<c>materials[0].roughness</c>), two of one name (<c>materials[1].name</c>), and a face whose
+    /// material is not among them (<c>meshes[0].materials</c>).
+    /// </summary>
+    public static (Model? Model, IReadOnlyList<MeshError> Errors) Create(IReadOnlyList<NamedMesh> meshes, Skeleton? skeleton, IReadOnlyList<Clip> clips,
+        IReadOnlyList<Material> materials)
     {
         ArgumentNullException.ThrowIfNull(meshes);
         ArgumentNullException.ThrowIfNull(clips);
+        ArgumentNullException.ThrowIfNull(materials);
         var errors = new List<MeshError>();
+        var materialNames = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < materials.Count; i++)
+        {
+            errors.AddRange(Material.Problems(materials[i]).Select(p => new MeshError($"materials[{i}].{p.Field}", p.Problem)));
+            if (materials[i].Name is { } n && !materialNames.Add(n))
+                errors.Add(new MeshError($"materials[{i}].name", $"a material named '{n}' comes earlier; material names must be unique"));
+        }
         var names = new HashSet<string>();
         for (var i = 0; i < meshes.Count; i++)
         {
@@ -124,31 +180,39 @@ public sealed class Model
                 else if (weights.Vertices.SelectMany(weights.Of).Any(x => x.Bone < 0 || x.Bone >= bones))
                     errors.Add(new MeshError($"meshes[{i}].weights", "a weight is on a bone the skeleton does not have"));
             }
+            foreach (var (face, used) in mesh.Style?.Materials ?? new Dictionary<int, string>())
+                if (!materialNames.Contains(used))
+                    errors.Add(new MeshError($"meshes[{i}].materials", $"face {face} uses the material '{used}', which is not defined"));
         }
         var clipNames = new HashSet<string>();
         for (var i = 0; i < clips.Count; i++)
             if (!clipNames.Add(clips[i].Name))
                 errors.Add(new MeshError($"clips[{i}].name", $"two clips are named '{clips[i].Name}'; clip names must be unique"));
-        return errors.Count > 0 ? (null, errors) : (new Model([.. meshes], skeleton, [.. clips]), errors);
+        return errors.Count > 0 ? (null, errors) : (new Model([.. meshes], skeleton, [.. clips], [.. materials]), errors);
     }
 
     /// <summary>
     /// The model a Carve file of the one mesh <paramref name="name"/> holds, so that it opens on its own: that mesh, and
-    /// when it has weights the skeleton they name and the clips that move it; with no weights, the mesh alone. Null when
-    /// there is no mesh of that name.
+    /// when it has weights the skeleton they name and the clips that move it; with no weights, the mesh alone. It keeps only
+    /// the materials that mesh's faces use, in the model's order (the person's ruling, 2026-11-16). Null when there is no
+    /// mesh of that name.
     /// </summary>
     public Model? Piece(string name)
     {
         var found = System.Array.Find(_meshes, m => m.Name == name);
         if (found is null) return null;
-        return found.Mesh.Weights is null ? new Model([found], null, []) : new Model([found], Skeleton, _clips);
+        var used = MaterialsUsedBy(found.Mesh).ToHashSet(StringComparer.Ordinal);
+        var materials = System.Array.FindAll(_materials, m => used.Contains(m.Name));
+        return found.Mesh.Weights is null ? new Model([found], null, [], materials) : new Model([found], Skeleton, _clips, materials);
     }
 
     /// <summary>
     /// This model with the mesh <paramref name="name"/> taken from <paramref name="source"/> (a model a file holds): it
     /// replaces the mesh of that name, or is added after the others. Its weights are moved onto this model's skeleton by
-    /// bone name, every weight kept to the bit. Null, with <paramref name="problem"/> saying why, when the source has no mesh
-    /// of that name, or the mesh has weights on bones this model's skeleton does not have; this model is unchanged.
+    /// bone name, every weight kept to the bit. The materials its faces use come with it: one this model lacks is added after
+    /// the others, and one this model defines the same is kept. Null, with <paramref name="problem"/> saying why, when the
+    /// source has no mesh of that name, the mesh has weights on bones this model's skeleton does not have, or it uses a
+    /// material this model defines differently under the same name (the person's ruling, 2026-11-16); this model is unchanged.
     /// </summary>
     public Model? WithMeshFrom(Model source, string name, out string? problem)
     {
@@ -180,7 +244,19 @@ public sealed class Model
             mesh = mesh.WithWeights(VertexWeights.Of(weights.Vertices.Select(v => KeyValuePair.Create(v,
                 weights.Of(v).Select(x => new Influence(to[from[x.Bone].Name], x.Weight)).OrderBy(x => x.Bone).ToArray()))));
         }
-        return With(name, mesh);
+        var target = this;
+        foreach (var used in MaterialsUsedBy(mesh))
+        {
+            var theirs = source.FindMaterial(used)!;
+            if (FindMaterial(used) is not { } ours) target = target.WithMaterial(theirs);
+            else if (ours != theirs)
+            {
+                problem = $"mesh: the file's mesh '{name}' uses the material '{used}', which the model defines differently; "
+                    + "define one of them again under another name, or open the whole file";
+                return null;
+            }
+        }
+        return target.With(name, mesh);
     }
 
     /// <summary>
@@ -245,7 +321,7 @@ public sealed class Model
 
     /// <summary>
     /// Every mesh as one, for drawing them together and taking bounds over all of them: the meshes' vertices and faces
-    /// in definition order, each mesh's ids offset past the ones before, its UVs and seams with them. A model of one mesh gives that mesh itself, so
+    /// in definition order, each mesh's ids offset past the ones before, its colours, materials, UVs and seams with them. A model of one mesh gives that mesh itself, so
     /// it draws exactly as before; an empty model gives null.
     /// </summary>
     public PolygonMesh? Combined => _meshes.Length switch
@@ -260,6 +336,7 @@ public sealed class Model
         var vertices = new List<System.Numerics.Vector3>();
         var faces = new List<Face>();
         var colours = new List<KeyValuePair<int, string>>();
+        var materials = new List<KeyValuePair<int, string>>();
         var hard = new List<(int, int)>();
         var corners = new List<System.Numerics.Vector3[]>();
         var flat = new List<bool>();
@@ -271,7 +348,12 @@ public sealed class Model
         foreach (var (_, mesh) in _meshes)
         {
             var offset = vertices.Count;
-            if (mesh.Style is { } style) colours.AddRange(style.ColoursOffset(faces.Count));
+            if (mesh.Style is { } style)
+            {
+                var looks = style.LooksOffset(faces.Count);
+                colours.AddRange(looks.Colours);
+                materials.AddRange(looks.Materials);
+            }
             if (mesh.Uvs is { } uvs)
             {
                 // Each mesh's UVs and seams offset as its faces and vertices are, so a mapped face stays mapped.
@@ -294,7 +376,7 @@ public sealed class Model
         // A flat piece keeps its face-centre spikes beside a smooth one, so the combined mesh says which faces are flat.
         var combined = PolygonMesh.Assemble([.. vertices], [.. faces], shade, posed ? [.. corners] : null,
             (smooth || posed) && flat.Contains(true) ? [.. flat] : null, deleted.Contains(true) ? [.. deleted] : null);
-        var styled = colours.Count == 0 ? combined : combined.WithStyle(FaceStyle.OfColours(colours));
+        var styled = colours.Count == 0 && materials.Count == 0 ? combined : combined.WithStyle(FaceStyle.OfLooks(colours, materials));
         // No mesh with UVs or seams gives a combined mesh without them, as before.
         return uvFaces.Count == 0 && seams.Count == 0
             ? styled

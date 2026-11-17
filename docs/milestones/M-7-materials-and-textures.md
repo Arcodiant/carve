@@ -4,7 +4,7 @@ description: >-
 ---
 # M-7 — Materials and textures
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *An agent assigns materials and textures per face and gets a textured model into a game*
 
@@ -136,7 +136,164 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
 - [ ] [T-77](../tasks/T-77-sample-textures.md) — Committed code generates the textured barrel's eight 256 x 256 PNG textures, and a test keeps the committed files equal to it pixel for pixel
 - [ ] [T-78](../tasks/T-78-materials-in-render.md) — render draws a face with a material through Material.Pbr, the same material the engine's loader makes of the export, lit with a fixed sky so metal reads
 - [ ] [T-79](../tasks/T-79-viewer-sky-and-material-report.md) — The model viewer takes --sky to light a model with Carve's fixed sky, and view.json reports every PBR field and texture of each material
-- [ ] [T-80](../tasks/T-80-textured-barrel-scenario.md) — The barrel is given wood, iron, end-grain and rune materials, seen in eight frames, saved, reopened, exported and shown in the viewer, in suite scenario-materials
+- [ ] [T-80](../tasks/T-80-textured-barrel-scenario.md) — The barrel is given wood, iron, end-grain and rune materials, seen in nine frames, saved, reopened, exported and shown in the viewer, in suite scenario-materials
 - [ ] [T-81](../tasks/T-81-materials-acceptance-run.md) — Fresh agents texture a model from the tool descriptions alone and recover from a planted missing texture path
 
 ## Retrospective
+
+**As planned.**
+
+- The order held: T-74 beside T-77, then T-75 beside T-76, then T-78, T-79, T-80 and T-81. No sibling rebase had a conflict.
+- File ownership was set at dispatch and held:
+  - T-75 owned the tools, `check`, save and open.
+  - T-76 owned export and `GameLimits.cs`.
+  - T-77 owned the generator and `samples/textures/`.
+- The research agents for T-74 and T-78 checked every member's Scope against the code that had landed, as M-6's retrospective asked. T-78's research ran ahead of T-74 and T-76. Every open rule they found reached the person before implementation started.
+- Everything is reachable through the product's own MCP tools:
+  - named, model-wide PBR materials with PNG textures;
+  - `define_material` and `set_material`;
+  - read-back in `get_mesh` and `check`;
+  - Carve file version 6, with texture paths relative to the file;
+  - export as glTF metallic-roughness with the PNGs embedded, static and skinned;
+  - `render` drawing a material through `Material.Pbr` under the engine's default `ProceduralSky`;
+  - the viewer's `--sky` and its full material report.
+- **One function draws as the game would.** Render's material frames are byte-identical to what `IModelLoader` makes of the exported `.glb`, at front and back. The test's in-process host matches the real `render` pixel for pixel (T-78).
+- **The guard held.** Every existing frame stayed byte-identical by hash through every member that renders: 310 PNGs at T-78 (223 scenario, 87 server-regression), and 229 scenario frames at T-80. A model with no material writes the same file and the same `.glb` as before (T-74, T-76).
+- **The person approved every new image set:**
+  - T-77's eight textures;
+  - T-78's 8 sheets;
+  - T-79's two viewer frames;
+  - T-80's new iron and end-grain textures, and its ten frames;
+  - T-81's render and viewer frame.
+
+  None needed a change.
+- **The acceptance run (T-81) passed in round 1, with no description edit.** A fresh `claude -p` (Sonnet 5.5) hit the planted path (`iron-mr.png` against `iron_mr.png` on disk). It read the folder's PNG list in `define_material`'s error and corrected the path. It ended with iron on faces 0 to 7 and 24 to 31, a silent `check`, and the `.glb` loading in the viewer with `--sky` with no warnings. Because the run agent had no file tools, only the error could reveal the plant. That met M-5's ask.
+- The milestone's `verify` passes every check but `review`: 8/8 members merged, and 15 suites passing including the new `scenario-materials`. At the members' end all 15 were carried from the last code commits, since T-81 changed no code. After the refactor pass, `verify` re-ran 14 of them fresh (see *Before `finish`*).
+- **Models and agents per member:**
+
+  | Member | Model | Agents |
+  |---|---|---|
+  | T-74 | Opus 5.5 | 2 (research, implementation) |
+  | T-75 | Sonnet 5.5 | 1 |
+  | T-76 | Sonnet 5.5 | 2 (waited on T-75's tools for its end-to-end test) |
+  | T-77 | Sonnet 5.5 | 1 |
+  | T-78 | Opus 5.5 | 4 (research, three implementation; the last did the frame review) |
+  | T-79 | Sonnet 5.5 | 1 (resumed once for a ruling) |
+  | T-80 | Sonnet 5.5 | 3 (implementation, continuation resumed twice for rulings, guard and frame review) |
+  | T-81 | Sonnet 5.5 | 1 |
+
+  Sonnet held up on every member given to it, and no rework was traced to the cheaper tier. Every stop on a Sonnet member was a rule the spec did not settle, not a fault.
+
+**Not as planned.**
+
+- **The person ruled about 30 times.** Most rulings took the recommended option. Five did not:
+  - mipmaps on (not the loader's `PixelArt` default);
+  - a fixed sky sun (not one following Carve's per-view light);
+  - `check` skipping UV overlap between faces whose materials differ;
+  - the iron lightened (not a threshold of its own);
+  - separate UV regions for the two caps.
+
+  The last three changed T-77's textures and a Core rule during T-80. Each was made, tested and shown to the person as images before it landed. Every ruling is in its member's `### Rulings`.
+- **Mipmaps on led to engine need 8 (Low):** the engine ignores a glTF sampler. Render, the viewer and the tests all load with `generateMipmaps: true`, and a game must pass that flag too.
+- **The planner's lit threshold did not fit the sample.** T = 80 came from T-78's probe on a bright metal. T-77's dark iron (58, 61, 66) read about 60 under the sky, so T-80 stopped. Once the iron was lightened to about (210, 214, 222), the dimmest clean iron reads 118 at `front`, and with the sky removed it reads (9, 9, 10) and fails.
+- **The sample's own UVs met `check` only in T-80:**
+  - The caps' planar UVs fill [0, 0, 1, 1], so they overlapped every side face and each other: 65 warnings.
+  - The stave gaps are one texel wide on a polygon edge, so no sample can meet P2.
+  - The end-grain rings, and the rune at 256 px, are near the footprint limit.
+- **Readings landed without asking, each told to the person after the fact:**
+  - T-74 compares only the materials the opened mesh uses in `open mesh=`. The person kept it.
+  - T-75 added a `set_material` warning for a textured material on faces with no UVs. It also gives the occlusion-strength warning in both `define_material` and `check`, where the ruling said "or".
+  - T-76 applied `check`'s ruling to export's UV warnings.
+  - T-81 read "two Pbr materials" as the two the agent made: the caps keep the default material. The person kept it.
+  - T-81 ran the session under test with `claude -p --model sonnet`, where earlier rounds used the default model with no `--model` flag. That is a run-condition change, which should have been asked first. RV-47 found it, and the person ruled that the pass counts.
+- **The orchestrator's own errors:**
+  - T-80's brief said the barrel's `check` "should then give no warning". That was the orchestrator's inference, not a ruling, and it cost a stop. Same-material caps still warned, and the person ruled the separate cap regions.
+  - At dispatch, the orchestrator added `scenario-uvs`, `scenario-cuts`, `scenario-gatehouse` and `scenario-rig` to five members' `**Verify:**` lines. The plan named only `scenario-uvs`; the other three landed after planning. The person was told in the opening table.
+- **Waystone closed mid-run.** It ended T-74 and T-77 while their `verify` jobs were queued. Both resumed with their context and lost no work.
+- **Waystone's "Commented" outcome came back three times without a clear approval:** T-79, T-80 ("Looks good") and T-81's context. Each was confirmed with the person by AskUserQuestion.
+- **The permission check refused a write.** T-78's agent 1 could not copy its hash tables to the milestone worktree's `artifacts/review/T-78/`, and the orchestrator did not override it. One temporary relaxation of a check in T-80 was also refused; nothing was loosened.
+- **T-79's spec asked for something an existing guard forbids:** linking `RenderSky.cs` into the viewer. The person ruled to use `ProceduralSky.Default` directly, and the guard stays as it is.
+- **The pre-dispatch queue check returned a carried pass** (`scenario-cube` on Xellotath), not a fresh run. It proved the queue and the feed, not a new run on the GPU.
+
+**Never verified.**
+
+- **A real game.** The textured `.glb` has been loaded by the model viewer (`StandardHdr`, `IModelLoader`) and by the in-process test host, not in Orcward or another game. A game must also pass `generateMipmaps: true` (engine need 8).
+- **Weak or partial checks:**
+  - T-78: uploading the base colour as linear is caught only by the equality test, not by the marker samples.
+  - T-78: the `back` view in the argument-family test only checks that the render succeeds.
+  - T-80: the stave gaps have no pixel check (dropped by ruling). The end-grain checks only "pale ring: lit and warm".
+  - T-81: wood against iron was judged by eye, not by pixel sampling. Whether T-77's staves line up with `unwrap`'s UVs was not measured; it is not a pass item.
+  - T-76: two of its breaks (image dedup, black emissive) are equivalent mutants, because SharpGLTF does both itself.
+- **Carried passes:** at the members' end, the milestone's `verify` ran no suite fresh: all 15 were carried from `ed16e5d` and `b35b0e9`. The refactor pass's `verify` re-ran 14 fresh. The fixers' suites are listed under *Before `finish`*.
+- **The orchestrator opened no frame.** Every look above is a member's or the person's. T-80's ten frames, and RV-47's ninth, were looked at by the person alone: no T-80 agent opened them (T-80's As built).
+
+**Known and left.**
+
+- `render`'s `mesh` argument frames on every mesh, not only the named one (found by T-78).
+- Looks the person saw and kept:
+  - white under the sky is bluish, around (221, 233, 252);
+  - an unmapped textured face samples a blend of four texels at (0, 0), as the game does;
+  - a thin line from the texture's opposite edge shows along textured faces' edges.
+- Engine need 7 (alpha) and engine need 8 (the glTF sampler) are in D-1, both Low. No requests were filed.
+- **M-19 is finished on its own branch but not on `main`.** It also edits `check`, `get_mesh` and export (T-72's fold of not-planar warnings). The rebase of M-7 onto `origin/main` will meet it if M-19 lands first.
+- **Folders that `finish` could not remove remain on disk, unregistered from git:** `branches/task/T-74`, `T-75`, `T-76`, `T-78`, `T-79`, `T-80` and `T-81`. Each was an agent's working folder. `finish` emptied each one and could not remove the empty folder, so the evidence kept in their ignored `artifacts/review/` is gone: T-78's hash and break tables, and T-80's hash tables and break-run folders. (An earlier draft of this Retrospective said they held it; RV-47 found they do not.) T-80's evidence was regenerated in RV-47 at `G:\My Drive\artifacts\carve\M-7\RV-47\evidence\`. T-78's was not; its pass rests on its As built and the frames the person approved.
+- **Scratch not cleared:**
+  - `%TEMP%\t74`, `%TEMP%\t78` (the probe, hash tables and runs), `%TEMP%\carve-m7-acceptance` (a Release publish and round 1);
+  - `D:\tmp-hash-before.txt` and `D:\tmp-hash-after.txt`, from T-76, which its agent could not delete.
+- **Evidence:** review rounds and the acceptance round are under `G:\My Drive\artifacts\carve\M-7\` (T-77, T-78, T-79, T-80, T-81). The 11 copies of T-81's tool results left at this worktree's root were byte-identical to the Drive copies and were removed.
+- `CLAUDE.md` is an input of no suite (a `verify` warning, as in M-5 and M-6).
+- `C:\tools\carve` is not re-published.
+
+**Before `finish`** (after the person said go):
+
+- **Rebase onto `main`:** none needed. `main` had not moved since M-7 started (still `5bc4559`), and M-19 is not on it.
+- **Refactor pass (Opus 5.5, 3 commits):**
+  - `Material.HasTexture` and `Material.OcclusionHasNoEffect` replace rules written in several places, and the field defaults are named constants;
+  - export and render share one PNG hash;
+  - the tests share one PNG writer.
+
+  No behaviour, description or check changed. The milestone's `verify` then re-ran 14 suites fresh and carried `viewer-cube`, all passing.
+- **Review RV-47, round 1:** four Opus reviewers, split by area (Core and tools; export and render; the viewer, textures and scenario), plus one pass over the whole diff. 25 findings: 3 Major (two of them the same `set_material` example, found independently), 16 Minor, 6 Nit. The Majors:
+  - `set_material`'s worked example promised a silent `check`, while its own test asserted four warnings;
+  - T-81's unasked change of the run's model.
+
+  The person ruled four, each as recommended:
+  - T-81's pass counts;
+  - `check`'s false reason for the cross-material skip goes, and the rule stays;
+  - `save` warns of a held texture whose file is gone;
+  - render releases textures and materials no model uses, now.
+
+  The person also approved a ninth frame, `barrel-bottom`, which fixer B added because no existing frame can sample the bottom cap under P2.
+- **Fixes:**
+  - Fixer A (Opus 5.5) answered 16 findings (15 defects, one found twice). Fixer B (Sonnet 5.5) answered 6 in the viewer and scenario. The orchestrator answered the other 3.
+  - Every code fix has a break shown failing, except the `Keep` call site in `RenderSystem`, which has none of its own.
+  - Every existing frame and committed export stayed byte-identical. Fixer B's table of 229 frames was taken before fixer A's render change `68f810e`. RV-48 had it taken again at `3f9ba34` on `fix/RV-48`, whose code is identical to the landed `3893cf6`, with all 229 scenario frames and all 120 of server-regression's test frames identical to `307d692`. Fixer A pinned the soft gardener's and the gatehouse's exports to what `main` writes.
+  - Each fixer ran the suites its changes touched on its own branch. After its rebase, fixer A re-ran core-unit, server-unit, scenario-uvs and scenario-materials.
+  - Fixer B rebuilt the hash guard's base frames from a `git archive` of `307d692` run locally, because the queue had no jobs on that commit.
+- **Review RV-48, round 2:** one Opus reviewer checked RV-47's answers against the fix diff. 24 of 25 held. The one that did not was the record of who looked at T-80's frames. It raised 7 findings: 0 Major, 3 Minor, 4 Nit, none a code defect.
+  - The Minors: no test showed `render` calls `Keep`; the frame guard predated the render change; and this Retrospective said a member looked at T-80's frames.
+  - Fixed by an Opus fixer (two agents, the first stopped at its call limit so it could not wake beside its continuation), plus the orchestrator for this file.
+  - The new real-`carve` release test fails when the `Keep` call is deleted, given only the drawn set, or moved before the swap. Calling it with the model's materials alone cannot be told apart: in every reachable state the drawn set is a subset of them.
+  - Run on the fixes, at `3f9ba34` (code identical to the landed `3893cf6`): all 12 frame and materials suites ran through the queue (the 11 frame suites, whose frames make `head.sha256`, and scenario-materials), and server-unit and server-regression were carried from the first fixer's runs on that same commit; server-regression's run passed 584 tests, including the new release test. server-regression also ran at `307d692` (561 passing) for the frame base. The round-3 reviewer ran `RenderReleaseTests` and `PbrReleaseTests` again (3 of 3 passing).
+  - The reviewer's harness refused its findings file, so it returned them in its report and the orchestrator copied them in.
+- **Rounds 3 to 5 (RV-49 to RV-51), one Opus reviewer each:**
+  - RV-49 found all 7 of RV-48's answers holding, and no code defect. It confirmed the `_materials`-alone break is unreachable, and that the Tiny test scenario's engine package reference is within CLAUDE.md's rule, which binds `scenarios/`. It raised 2 records-only Nits: commits cited that the rebase had replaced, and round 2's runs not recorded.
+  - RV-50 read documents only. It found both answers holding, and one Nit: the 584 tests were given to two suites.
+  - RV-51 checked that one line and had no findings. The person chose to fix that last Nit and run round 5 rather than skip it.
+  - Only `scenario-materials`' queued run at `3f9ba34` rests on a fixer's report alone, which was not kept.
+- **The closing `verify`** on `a340a87` passes every check, the review included (RV-51, current at patch-id `54c3facfe595`). It ran 4 suites and carried 11 from `3f9ba34` and `9e79cd1`, whose code is the head's.
+- **Orchestrator errors in this phase:**
+  - This Retrospective first said T-78's and T-80's evidence was still on disk, and that the closing `verify` was all carried. Both were wrong, and both were corrected from RV-47.
+  - A backslash in a path was eaten in transit to Python, and was repaired before commit.
+
+**Test report** (`cairn test report --since 1d`, which includes other projects' jobs on the same runners): `server-regression` is about 71% of Carve's slot time. There were no flakes. One `server-unit` failure was its only unique catch: the guard that stopped T-79 from linking Carve code into the viewer. `scenario-materials` is about 9 s of wall time a run. 153 passes' logs ran elsewhere and can't be read here. Nothing was filed.
+
+**For the next plan.**
+
+- **Work the sample's numbers through every check at planning, not only the prompt's.** The cap overlap, the one-texel gaps, the dark iron against a threshold probed on a bright metal, and the thin hoop bands were all predictable from T-77's layout and T-55's projection. They cost T-80 two stops and three rulings that changed a member already Done.
+- **Probe thresholds on the sample's own materials.** A threshold measured on a stand-in does not carry to the real texture.
+- **An orchestrator's brief must not state an outcome the person has not ruled.** Write the ruling as given, and let the member work out what follows.
+- **Name where evidence lives at dispatch, outside `artifacts/`:** the Drive folder, as T-81 did. Writes to the milestone worktree from a member were refused here.
+- **Treat Waystone's "Commented" as unanswered** until the person says approved, and say so in every brief, as T-81's did.
+- **Have members `cd` out of their worktree before `finish`,** so the folder can be removed, and keep their evidence elsewhere first.
+- **Look members still take three or four agents** (T-78, T-80). Planning the frame review as its own agent worked again: both reviews were sent by a fresh agent with room to spare. T-78's review agent opened one image. T-80's opened none, so the person's look was the only one on T-80's frames. The next brief should ask the review agent to look itself, cropped or scaled, before it asks.

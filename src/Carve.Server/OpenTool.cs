@@ -10,7 +10,7 @@ namespace Carve.Server;
 public sealed class OpenTool(ModelStore store)
 {
     /// <summary>How many .carve files a missing-file error lists before it counts the rest.</summary>
-    private const int ListLimit = 20;
+    internal const int ListLimit = 20;
 
     private const string OpenMeshText =
         "The one mesh to take from the file, by its name there (a version 1 file's single mesh is taken whatever the name, and placed under it, so long as it is a name define_mesh takes: not empty and with no ':'): it replaces the model's mesh of that name, or is added when the name is new, and the rest of the model stays. "
@@ -22,6 +22,7 @@ public sealed class OpenTool(ModelStore store)
         + "and the mesh's weights are matched to the model's skeleton by bone name, so it is refused when they name a bone the model's skeleton does not have. "
         + "A version 1 file (one mesh, from before skeletons) opens as one mesh named mesh, or, with mesh given, as that one mesh under the name given, any name define_mesh takes (not empty, no ':'). "
         + "Either way open is one step like any other, so undo takes it back to the model before it. The first change a process has cannot be undone, whichever tool made it, so undo straight after an open that gave the process its first model is a tool error (the model stays), while a process that had a mesh before the open can undo it; and only the last 100 changes are kept, so once 100 changes have followed an open, the open itself can no longer be undone. Takes path, the file to read. "
+        + "A file's materials come with it: each texture is read again from its path relative to the .carve file's folder, so a texture that is missing or is not a PNG refuses the open, naming materials[i].<field>. With mesh, only the materials that mesh's faces use come with it and are read, so a missing texture on another material does not refuse it: one the model lacks is added, one the model already defines identically is kept, and one the model defines differently refuses the open, naming the material (define one of them again under another name, or open the whole file). "
         + "The file holds the polygons exactly, with the ids they were saved with: vertex 0 is the file's first vertex and face 0 its first face, "
         + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so the file brings no older states with it, "
         + "and carve keeps no current file: give the path to open and to save every time. "
@@ -57,7 +58,7 @@ public sealed class OpenTool(ModelStore store)
             return Error($"open: could not read {target.FullPath}: {e.Message}");
         }
 
-        var read = CarveFile.Read(content);
+        var read = CarveFile.Read(content, Path.GetDirectoryName(target.FullPath), name);
         if (!read.Succeeded)
         {
             var problems = read.Errors.Select(x => x.ToString()).ToList();

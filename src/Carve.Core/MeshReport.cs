@@ -13,6 +13,7 @@ public enum MeshWarningKind
     UvFlipped,
     UvZeroArea,
     UvOverlap,
+    MaterialNoEffect,
 }
 
 /// <summary>A legal-but-suspicious feature of a mesh. <see cref="Element"/> names it, e.g. <c>faces[2]</c>, <c>vertices[7]</c> or <c>edges[0-1]</c>.</summary>

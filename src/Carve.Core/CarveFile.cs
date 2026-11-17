@@ -23,7 +23,7 @@ public sealed class CarveFileResult
     /// <summary>The model the file holds, every mesh, vertex, face, bone and clip in its place, or null when the file was refused.</summary>
     public Model? Model { get; }
 
-    /// <summary>The version the file was read as, 1 to 4, or 0 when the file was refused.</summary>
+    /// <summary>The version the file was read as, 1 to 6, or 0 when the file was refused.</summary>
     public int Version { get; }
 
     /// <summary>The model's only mesh, or null when the file was refused or holds several.</summary>
@@ -43,7 +43,7 @@ public sealed class CarveFileResult
 /// skeleton and the clips), read back bit-exact with every vertex, face and bone at its id. Undo history is not saved.
 /// </summary>
 /// <remarks>
-/// <para><see cref="Write"/> gives version 5 (T-53) for a model with UVs or seams on some mesh, else version 4 (T-63) for a model with a holed face or a tombstone, and otherwise what earlier builds gave
+/// <para><see cref="Write(Model, string)"/> gives version 6 (T-74) for a model with a material, else version 5 (T-53) for a model with UVs or seams on some mesh, else version 4 (T-63) for a model with a holed face or a tombstone, and otherwise what earlier builds gave
 /// (version 3 with a smooth mesh or a hard edge, else version 2, byte for byte): the lowest version that holds the model,
 /// as the person ruled (2026-11-11). Version 4 is version 3 with faces that may have holes: a face is
 /// either a plain array of vertex ids, its outer loop, or the object <c>{"loop": [...], "holes": [[...], ...]}</c>, as
@@ -54,6 +54,12 @@ public sealed class CarveFileResult
 /// (<c>[{"face": f, "uv": [[u, v], ...]}, ...]</c>, one per mapped face in face-id order, one UV per <see cref="Face.Corners"/>
 /// entry: the outer loop, then each hole) and <c>seams</c> (vertex-id pairs as <c>hard_edges</c>), each left out when empty;
 /// UVs are written and read bit-exact, as vertices are, and follow glTF ((0, 0) top-left, v down).
+/// Version 6 (T-74) is version 5 with, after <c>carve</c>, <c>materials</c>: one object per line in definition order, its
+/// <c>name</c> and then only the fields that differ from their defaults, in record order (<c>base_colour</c>, <c>metallic</c>,
+/// <c>roughness</c>, <c>emissive</c>, <c>occlusion</c>, <c>double_sided</c>, then the five <c>*_texture</c> keys, each a path
+/// relative to the file's folder with <c>/</c> separators); and, after <c>colours</c> in a mesh, <c>materials</c>
+/// (<c>[{"material": name, "faces": [...]}, ...]</c>, grouped by name and ordered by first face), left out when no face has one.
+/// It is written only when the model has a material, so every other model is written as before, byte for byte.
 /// Version 3 (T-42) added, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or <c>"smooth"</c>) and
 /// <c>hard_edges</c> (vertex-id pairs, lower id first, in order).
 /// Version 2: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
@@ -61,20 +67,22 @@ public sealed class CarveFileResult
 /// <c>weights</c>; two-space indent, one vertex, face, colour, group, weighted vertex, bone or clip key per line, <c>\n</c>
 /// line ends and a newline at the end. Each float is the shortest text that reads back to the same <see cref="float"/>,
 /// each weight the shortest that reads back to the same <see cref="double"/>.</para>
-/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2, 3 and 4, keys in any order and
+/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2 to 6, keys in any order and
 /// any whitespace, and holds the file to exactly what the tools accept: geometry to <see cref="PolygonMesh.Create"/>, bones
 /// to <see cref="Skeleton.Create"/>, weights to <see cref="VertexWeights.Raw"/>, clips to <see cref="Clip.Create"/>, the
 /// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.
 /// <c>"meshes": []</c> is read only beside a skeleton: a clip library, a skeleton and clips with no mesh (the person,
-/// 2026-11-09); with no skeleton it is refused.</para>
+/// 2026-11-09); with no skeleton it is refused. A version 6 texture path is resolved against the folder given to
+/// <see cref="Read(string, string)"/> and the PNG read then, every material rule checked, and every face's material must be
+/// defined.</para>
 /// </remarks>
 public static class CarveFile
 {
     /// <summary>The version <see cref="Write"/> writes.</summary>
-    public const int Version = 5;
+    public const int Version = 6;
 
-    /// <summary>The versions <see cref="Read"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5];
+    /// <summary>The versions <see cref="Read(string)"/> reads.</summary>
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6];
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
@@ -84,6 +92,12 @@ public static class CarveFile
     private static readonly string[] MeshKeys = ["name", VerticesKey, FacesKey, "colours", "groups", "weights"];
     private static readonly string[] MeshKeysV3 = [.. MeshKeys, "shading", "hard_edges"];
     private static readonly string[] MeshKeysV5 = [.. MeshKeysV3, "uvs", "seams"];
+    private const string MaterialsKey = "materials";
+    private static readonly string[] FileKeysV6 = [VersionKey, MaterialsKey, "meshes", "skeleton", "clips"];
+    private static readonly string[] MeshKeysV6 = ["name", VerticesKey, FacesKey, "colours", MaterialsKey, "groups", "weights", "shading", "hard_edges", "uvs", "seams"];
+    private static readonly string[] MaterialUseKeys = ["material", "faces"];
+    private static readonly string[] MaterialFactorKeys = ["base_colour", "metallic", "roughness", "emissive", "occlusion", "double_sided"];
+    private static readonly string[] MaterialKeys = ["name", .. MaterialFactorKeys, .. new Material("m").Textures.Select(t => t.Field)];
     private static readonly string[] UvKeys = ["face", "uv"];
     private static readonly string[] ColourKeys = ["colour", "faces"];
     private static readonly string[] GroupKeys = ["name", "faces"];
@@ -105,19 +119,66 @@ public static class CarveFile
         return Write(Model.Of(Model.DefaultName, mesh));
     }
 
-    /// <summary>The file's text for a model, version 2, 3 or 4 as the remarks say. The same model always gives the same text.</summary>
+    /// <summary>The file's text for a model, version 2 to 6 as the remarks say. The same model always gives the same text.</summary>
+    /// <exception cref="ArgumentException">A material has a texture, whose path needs the file's folder: use <see cref="Write(Model, string)"/>.</exception>
     public static string Write(Model model)
     {
         ArgumentNullException.ThrowIfNull(model);
+        if (model.Materials.Any(m => m.HasTexture))
+            throw new ArgumentException("a material has a texture, and a texture's path is written relative to the file's folder; pass the folder", nameof(model));
+        return WriteText(model, null);
+    }
+
+    /// <summary>
+    /// The file's text for a model saved in <paramref name="folder"/>: each texture's path is written relative to it, with
+    /// <c>/</c> separators. Otherwise as <see cref="Write(Model)"/>.
+    /// </summary>
+    /// <exception cref="ArgumentException">A texture has no path relative to the folder (<see cref="TextureProblem"/>).</exception>
+    public static string Write(Model model, string folder)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentException.ThrowIfNullOrEmpty(folder);
+        if (TextureProblem(model, folder) is { } problem) throw new ArgumentException(problem, nameof(model));
+        return WriteText(model, folder);
+    }
+
+    /// <summary>
+    /// Why <paramref name="model"/> cannot be saved in <paramref name="folder"/>, or null when it can: a texture with no path
+    /// relative to the folder (on another drive) refuses the save, naming the texture (the person's ruling, 2026-11-16).
+    /// </summary>
+    public static string? TextureProblem(Model model, string folder)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentException.ThrowIfNullOrEmpty(folder);
+        for (var i = 0; i < model.Materials.Count; i++)
+            foreach (var (field, texture) in model.Materials[i].Textures)
+                if (texture is not null && RelativePath(folder, texture.Path) is null)
+                    return Invariant($"materials[{i}].{field}: the texture '{texture.Path}' of the material '{model.Materials[i].Name}' has no path relative to '{Path.GetFullPath(folder)}' (it is on another drive); save the file on the texture's drive, or copy the texture there and define the material again");
+        return null;
+    }
+
+    /// <summary>The path of <paramref name="file"/> relative to <paramref name="folder"/> with <c>/</c> separators, or null when it has none.</summary>
+    private static string? RelativePath(string folder, string file)
+    {
+        var relative = Path.GetRelativePath(Path.GetFullPath(folder), file);
+        return Path.IsPathRooted(relative) ? null : relative.Replace('\\', '/');
+    }
+
+    private static string WriteText(Model model, string? folder)
+    {
         var w = new Writer();
         w.Line(0, "{");
         // The lowest version that holds the model (the person's ruling, 2026-11-11): version 4 only when a face has holes or a slot is a
         // tombstone (T-64), so a model a version 2 or 3 file can hold is still written as before, byte for byte (T-42's rule and its tests).
         // Version 5 only when a mesh has UVs or seams (T-53, the person's ruling 2026-11-13).
-        var version = model.Meshes.Any(m => m.Mesh.Uvs is not null) ? Version
+        // Version 6 only when the model has a material (T-74), so every model without one is written as before, byte for byte.
+        var version = model.Materials.Count > 0 ? Version
+            : model.Meshes.Any(m => m.Mesh.Uvs is not null) ? 5
             : model.Meshes.Any(m => m.Mesh.HasTombstones || m.Mesh.Faces.Any(f => f.HasHoles)) ? 4
             : model.Meshes.Any(m => m.Mesh.Shade is not null) ? 3 : 2;
         w.Line(1, $"\"{VersionKey}\": {version.ToString(CultureInfo.InvariantCulture)},");
+        if (model.Materials.Count > 0)
+            w.List(1, MaterialsKey, model.Materials.Count, i => MaterialText(model.Materials[i], folder), ",");
         w.Open(1, "\"meshes\": [", model.Meshes.Count == 0, ",");
         for (var i = 0; i < model.Meshes.Count; i++)
         {
@@ -167,6 +228,12 @@ public static class CarveFile
             .Select(g => (Colour: g.Key, Faces: g.Select(c => c.Key).Order().ToArray()))
             .OrderBy(c => c.Faces[0]).ToArray();
         w.List(3, "colours", colours.Length, i => $"{{\"colour\": {Text(colours[i].Colour)}, \"faces\": {Ids(colours[i].Faces)}}}", ",");
+        // Version 6 (T-74): "materials", left out when no face has one.
+        var used = style.Materials.GroupBy(c => c.Value, StringComparer.Ordinal)
+            .Select(g => (Material: g.Key, Faces: g.Select(c => c.Key).Order().ToArray()))
+            .OrderBy(c => c.Faces[0]).ToArray();
+        if (used.Length > 0)
+            w.List(3, MaterialsKey, used.Length, i => $"{{\"material\": {Text(used[i].Material)}, \"faces\": {Ids(used[i].Faces)}}}", ",");
         var groups = style.Groups;
         w.List(3, "groups", groups.Count, i => $"{{\"name\": {Text(groups[i].Name)}, \"faces\": {Ids(groups[i].Faces)}}}", ",");
 
@@ -193,6 +260,23 @@ public static class CarveFile
     }
 
     private static string Uv(Vector2 uv) => $"[{Number(uv.X)}, {Number(uv.Y)}]";
+
+    /// <summary>A material on one line: its name, then each field that is not its default (hex by its text, floats by their bits), in record order.</summary>
+    private static string MaterialText(Material m, string? folder)
+    {
+        var parts = new List<string> { $"\"name\": {Text(m.Name)}" };
+        if (!string.Equals(m.BaseColour, Material.DefaultBaseColour, StringComparison.Ordinal)) parts.Add($"\"base_colour\": {Text(m.BaseColour)}");
+        if (!SameBits(m.Metallic, Material.DefaultMetallic)) parts.Add($"\"metallic\": {Number(m.Metallic)}");
+        if (!SameBits(m.Roughness, Material.DefaultRoughness)) parts.Add($"\"roughness\": {Number(m.Roughness)}");
+        if (!string.Equals(m.Emissive, Material.DefaultEmissive, StringComparison.Ordinal)) parts.Add($"\"emissive\": {Text(m.Emissive)}");
+        if (!SameBits(m.Occlusion, Material.DefaultOcclusion)) parts.Add($"\"occlusion\": {Number(m.Occlusion)}");
+        if (m.DoubleSided) parts.Add("\"double_sided\": true");
+        foreach (var (field, texture) in m.Textures)
+            if (texture is not null) parts.Add($"\"{field}\": {Text(RelativePath(folder!, texture.Path)!)}");
+        return "{" + string.Join(", ", parts) + "}";
+    }
+
+    private static bool SameBits(float a, float b) => BitConverter.SingleToInt32Bits(a) == BitConverter.SingleToInt32Bits(b);
 
     private static void WriteClip(Writer w, Clip clip)
     {
@@ -285,8 +369,26 @@ public static class CarveFile
 
     // ---- Reading ---------------------------------------------------------------------------------------------------
 
-    /// <summary>Reads a file's text into a model, or every error that stops one, each named by where it is in the file.</summary>
-    public static CarveFileResult Read(string text)
+    /// <summary>
+    /// Reads a file's text into a model, or every error that stops one, each named by where it is in the file. A material
+    /// with a texture is refused, since its path is relative to the file's folder: use <see cref="Read(string, string)"/>.
+    /// </summary>
+    public static CarveFileResult Read(string text) => Read(text, null);
+
+    /// <summary>
+    /// Reads the text of a file in <paramref name="folder"/>: as <see cref="Read(string)"/>, with each texture path resolved
+    /// against the folder and its PNG read. A texture that is missing or unreadable is an error naming the path the file
+    /// gave and the absolute path tried.
+    /// </summary>
+    public static CarveFileResult Read(string text, string? folder) => Read(text, folder, null);
+
+    /// <summary>
+    /// As <see cref="Read(string, string)"/>, for <c>open mesh=</c>: when <paramref name="mesh"/> names a mesh of a version 6
+    /// file, only the materials that mesh's faces use are read and checked (an unused material's missing texture refuses
+    /// nothing, T-74's ruling, RV-47), and the model holds that mesh alone, with the file's skeleton and clips. A name the
+    /// file has no mesh of reads the whole file, so the caller can list the meshes there are.
+    /// </summary>
+    public static CarveFileResult Read(string text, string? folder, string? mesh)
     {
         ArgumentNullException.ThrowIfNull(text);
         JsonDocument document;
@@ -308,7 +410,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) is (2 or 3 or 4 or 5) and { } version ? ReadVersion2(root, version) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3 or 4 or 5 or 6) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
         }
     }
 
@@ -395,10 +497,31 @@ public static class CarveFile
     }
 
     /// <summary>Version 2: the whole model.</summary>
-    private static CarveFileResult ReadVersion2(JsonElement root, int version)
+    private static CarveFileResult ReadVersion2(JsonElement root, int version, string? folder, string? only)
     {
         var errors = new List<MeshError>();
-        var fields = Fields(root, "", Invariant($"a version {version} Carve file"), FileKeys, errors)!;
+        var fields = Fields(root, "", Invariant($"a version {version} Carve file"), version >= 6 ? FileKeysV6 : FileKeys, errors)!;
+        var used = only is null || version < 6 ? null : MaterialsUsedBy(fields, only);
+
+        // The materials first, since faces name them (T-74); a name is known even when the rest of its material is not.
+        var materials = new List<Material>();
+        var materialNames = new List<string>();
+        if (fields.TryGetValue(MaterialsKey, out var ms) && List(ms, MaterialsKey, errors) is { } materialList)
+        {
+            // Keyed by the path exactly as resolved: two spellings of one path differ in case only on a case-insensitive
+            // system, where each is read and keeps its own path; on a case-sensitive one they are two files (RV-47).
+            var loaded = new Dictionary<string, (MaterialTexture? Texture, string? Problem)>(StringComparer.Ordinal);
+            var i = 0;
+            foreach (var item in materialList.EnumerateArray())
+                if (used is not null && NameOf(item) is { } other && !used.Contains(other))
+                {
+                    // A material the opened mesh does not use is not brought in, so it is not read: only its name is kept,
+                    // so the file's other meshes that name it are not refused.
+                    if (!materialNames.Contains(other)) materialNames.Add(other);
+                    i++;
+                }
+                else if (ReadMaterial(item, Invariant($"materials[{i++}]"), folder, loaded, materialNames, errors) is { } material) materials.Add(material);
+        }
 
         // The skeleton is read first, since weights and clips name its bones; its problems are listed after the meshes'.
         var skeletonErrors = new List<MeshError>();
@@ -424,7 +547,7 @@ public static class CarveFile
             var i = 0;
             foreach (var item in m.EnumerateArray())
             {
-                if (ReadMesh(item, Invariant($"meshes[{i}]"), skeleton, skeletonGood, version, errors) is { } mesh) meshes.Add(mesh);
+                if (ReadMesh(item, Invariant($"meshes[{i}]"), skeleton, skeletonGood, version, materialNames, errors) is { } mesh) meshes.Add(mesh);
                 i++;
             }
         }
@@ -447,15 +570,107 @@ public static class CarveFile
         }
 
         if (errors.Count > 0) return Refused(errors);
-        var (model, problems) = Model.Create(meshes, skeleton, clips);
+        if (used is not null && meshes.Count(x => x.Name == only) == 1) meshes = [meshes.Single(x => x.Name == only)];
+        var (model, problems) = Model.Create(meshes, skeleton, clips, materials);
         if (model is null) return Refused(problems);
         return new CarveFileResult(model, [], model.Meshes.SelectMany(x => MeshReport.Create(x.Mesh).Warnings).ToArray(), version);
     }
 
-    private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, int version, List<MeshError> errors)
+    /// <summary>A JSON object's <c>name</c> string, or null.</summary>
+    private static string? NameOf(JsonElement item) =>
+        item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
+
+    /// <summary>
+    /// The names of the materials the faces of the mesh named <paramref name="mesh"/> use, as the file lists them; null when
+    /// the file has no mesh of that name (then the whole file is read).
+    /// </summary>
+    private static HashSet<string>? MaterialsUsedBy(Dictionary<string, JsonElement> fields, string mesh)
+    {
+        if (!fields.TryGetValue("meshes", out var meshes) || meshes.ValueKind != JsonValueKind.Array) return null;
+        foreach (var item in meshes.EnumerateArray())
+        {
+            if (NameOf(item) != mesh) continue;
+            var used = new HashSet<string>(StringComparer.Ordinal);
+            if (item.TryGetProperty(MaterialsKey, out var uses) && uses.ValueKind == JsonValueKind.Array)
+                foreach (var use in uses.EnumerateArray())
+                    if (use.ValueKind == JsonValueKind.Object && use.TryGetProperty("material", out var m) && m.ValueKind == JsonValueKind.String)
+                        used.Add(m.GetString()!);
+            return used;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// One of version 6's materials (T-74): every field checked as <see cref="Material.Problems"/> checks it, at its key, and
+    /// each texture read from the folder, each absolute path once per read. Its name, when it is a usable one, joins
+    /// <paramref name="names"/> even when the rest is refused, so faces naming it are not refused as well.
+    /// </summary>
+    private static Material? ReadMaterial(JsonElement item, string at, string? folder,
+        Dictionary<string, (MaterialTexture? Texture, string? Problem)> loaded, List<string> names, List<MeshError> errors)
     {
         var before = errors.Count;
-        if (Fields(item, at, "a mesh", version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
+        if (Fields(item, at, "a material", MaterialKeys, errors) is not { } f) return null;
+        var name = Required(f, at, "name", "a material", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
+        if (name is not null)
+        {
+            if (Material.NameProblem(name) is { } bad) errors.Add(new MeshError($"{at}.name", bad));
+            else if (names.Contains(name)) errors.Add(new MeshError($"{at}.name", $"a material named '{name}' comes earlier; material names must be unique"));
+            else names.Add(name);
+        }
+        string? Hex(string key, string fallback) =>
+            f.TryGetValue(key, out var h) ? Str(h, $"{at}.{key}", errors) : fallback;
+        float? Factor(string key, float fallback) =>
+            f.TryGetValue(key, out var x) ? Float(x, $"{at}.{key}", errors) : fallback;
+        var baseColour = Hex("base_colour", Material.DefaultBaseColour);
+        var metallic = Factor("metallic", Material.DefaultMetallic);
+        var roughness = Factor("roughness", Material.DefaultRoughness);
+        var emissive = Hex("emissive", Material.DefaultEmissive);
+        var occlusion = Factor("occlusion", Material.DefaultOcclusion);
+        var doubleSided = false;
+        if (f.TryGetValue("double_sided", out var ds))
+        {
+            if (ds.ValueKind is JsonValueKind.True or JsonValueKind.False) doubleSided = ds.GetBoolean();
+            else errors.Add(new MeshError($"{at}.double_sided", $"double_sided is {Describe(ds)}, not true or false"));
+        }
+        var textures = new Dictionary<string, MaterialTexture>();
+        foreach (var field in MaterialKeys.Skip(1 + MaterialFactorKeys.Length))
+        {
+            if (!f.TryGetValue(field, out var t) || Str(t, $"{at}.{field}", errors) is not { } given) continue;
+            if (folder is null)
+            {
+                errors.Add(new MeshError($"{at}.{field}", "a texture needs the file's folder, since its path is relative to it"));
+                continue;
+            }
+            string full;
+            try
+            {
+                full = given.Length == 0 ? throw new ArgumentException("the path is empty") : Path.GetFullPath(Path.Combine(folder, given));
+            }
+            catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                errors.Add(new MeshError($"{at}.{field}", $"cannot read '{given}': {e.Message}"));
+                continue;
+            }
+            if (!loaded.TryGetValue(full, out var read))
+                loaded[full] = read = (MaterialTexture.Load(full, out var why), why);
+            if (read.Texture is { } texture) textures[field] = texture;
+            else errors.Add(new MeshError($"{at}.{field}", $"cannot read '{given}' ({full}): {read.Problem}"));
+        }
+        if (errors.Count > before || name is null) return null;
+
+        var material = new Material(name, baseColour!, metallic!.Value, roughness!.Value, emissive!, occlusion!.Value, doubleSided,
+            textures.GetValueOrDefault("base_colour_texture"), textures.GetValueOrDefault("metallic_roughness_texture"),
+            textures.GetValueOrDefault("normal_texture"), textures.GetValueOrDefault("emissive_texture"),
+            textures.GetValueOrDefault("occlusion_texture"));
+        var problems = Material.Problems(material).Where(p => p.Field != "name").ToArray();
+        errors.AddRange(problems.Select(p => new MeshError($"{at}.{p.Field}", p.Problem)));
+        return problems.Length > 0 ? null : material;
+    }
+
+    private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, int version, List<string> materialNames, List<MeshError> errors)
+    {
+        var before = errors.Count;
+        if (Fields(item, at, "a mesh", version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
         var name = Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         f.TryGetValue(VerticesKey, out var vs);
         f.TryGetValue(FacesKey, out var fs);
@@ -474,9 +689,9 @@ public static class CarveFile
         var mesh = created.Mesh!;
 
         var style = FaceStyle.None;
+        var coloured = new Dictionary<int, string>();
         if (f.TryGetValue("colours", out var colours) && List(colours, $"{at}.colours", errors) is { } cl)
         {
-            var coloured = new Dictionary<int, string>();
             var i = 0;
             foreach (var entry in cl.EnumerateArray())
             {
@@ -490,6 +705,35 @@ public static class CarveFile
                     if (!coloured.TryAdd(face, hex))
                         errors.Add(new MeshError(Invariant($"{e}.faces[{k}]"), Invariant($"face {face} is given a colour earlier; give each face one colour")));
                 style = style.WithColour(ids, hex);
+            }
+        }
+        if (f.TryGetValue(MaterialsKey, out var uses) && List(uses, $"{at}.{MaterialsKey}", errors) is { } ul)
+        {
+            // Version 6 (T-74): each face's material, which the file must define; a face has a colour or a material, not both.
+            var given = new HashSet<int>();
+            var i = 0;
+            foreach (var entry in ul.EnumerateArray())
+            {
+                var e = Invariant($"{at}.{MaterialsKey}[{i++}]");
+                if (Fields(entry, e, "a face material", MaterialUseKeys, errors) is not { } uf) continue;
+                var used = Required(uf, e, "material", "a face material", errors) is { } u ? Str(u, $"{e}.material", errors) : null;
+                if (used is not null && !materialNames.Contains(used))
+                {
+                    errors.Add(new MeshError($"{e}.material", materialNames.Count == 0
+                        ? $"no material named '{used}'; the file defines no materials"
+                        : $"no material named '{used}'; the materials are {NameList.Quoted(materialNames)}"));
+                    used = null;
+                }
+                var ids = FaceList(uf, e, "a face material", mesh, "nothing to give the material: list at least one face", errors);
+                if (used is null || ids is null) continue;
+                foreach (var (face, k) in ids.Select((x, k) => (x, k)))
+                {
+                    if (!given.Add(face))
+                        errors.Add(new MeshError(Invariant($"{e}.faces[{k}]"), Invariant($"face {face} is given a material earlier; give each face one material")));
+                    else if (coloured.ContainsKey(face))
+                        errors.Add(new MeshError(Invariant($"{e}.faces[{k}]"), Invariant($"face {face} is given a colour too; a face has a colour or a material, not both")));
+                }
+                style = style.WithMaterial(ids, used);
             }
         }
         if (f.TryGetValue("groups", out var groups) && List(groups, $"{at}.groups", errors) is { } gl)

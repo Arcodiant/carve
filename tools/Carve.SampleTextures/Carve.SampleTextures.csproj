@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Engine-free: writes the textured barrel's eight PNGs into samples/textures (T-77). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Carve.SampleTextures</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StbImageWriteSharp" Version="$(StbImageWriteSharpVersion)" />
+  </ItemGroup>
+
+</Project>

@@ -64,7 +64,7 @@ public class FaceColourTests
         var mesh = Coloured();
         var space = DrawnSpace.Of(Vector3.Zero, Vector3.One);
         var plain = MeshBridge.ToMeshData(mesh, space);
-        var cut = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours);
+        var cut = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours, out _);
 
         Assert.Equal(new string?[] { null, Red.ToUpperInvariant(), Blue }, colours);
         Assert.Equal(plain.Vertices, cut.Vertices);

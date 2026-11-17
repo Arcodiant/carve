@@ -61,6 +61,8 @@ public sealed class SaveTool(ModelStore store)
         + "The .carve file is the one to keep working in: it holds the polygons exactly, every vertex and face in its id order and every number to the bit, so after open the ids you used before still name the same vertices and faces. "
         + "It does not hold the undo history (open starts from the file as one step), a current file name (carve remembers none: give the path every time) or any render setting. "
         + "The .glb that export writes is only for the game, and has no faces to edit. "
+        + "Materials (define_material) are saved too, as a version 6 file's materials list and each mesh's face materials; a model with none is written as it always was. A texture is saved as a path relative to the .carve file's folder, so keep the PNG files with the file or below it; save does not copy them, and open reads them again from those paths. "
+        + "With mesh, only the materials that mesh's faces use are written. A texture that has no relative path from the file's folder (on another drive) refuses the save, naming the material and the field. "
         + "The file is versioned JSON (version 2), keys always in one order, one vertex, face, colour, group, weighted vertex, bone or clip key per line, so the same model always gives the same bytes and a diff shows what changed: "
         + "meshes [{name, vertices, faces, colours [{colour, faces}], groups [{name, faces}], weights [{vertex, bones {bone: weight}}]}], skeleton [{name, parent, position, rotation}] or null, "
         + "and clips [{name, duration, loop, channels {bone: {rotation, translation: {interpolation, keys [{time, value}]}}}}], as define_skeleton and define_clip take them. "
@@ -72,7 +74,8 @@ public sealed class SaveTool(ModelStore store)
         + "a path naming a folder; any extension but .carve; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
         + "save changes nothing: not the model, its ids, or what undo steps back to. "
-        + "Returns one line: saved <file> to <absolute path> (replaced, when it was): <n> vertices, <n> faces, then the meshes when there are several, and the bones and clips when there is a skeleton.\n"
+        + "Returns one line: saved <file> to <absolute path> (replaced, when it was): <n> vertices, <n> faces, then the meshes when there are several, and the bones and clips when there is a skeleton; "
+        + "then a line \"warning: the texture '<path>' (<where it is used>) is no longer at its path; ...\" for each texture whose PNG has been moved or deleted since define_material or open read it, since open reads the PNG again and refuses the file until it is back (save still writes the file).\n"
         + "Worked example, from an empty file to a game's content folder (put the game's folder for <game>); each numbered line is a call, and the game then loads the model as "
         + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
         + "1. define_mesh with the cube from its description.\n"
@@ -100,10 +103,32 @@ public sealed class SaveTool(ModelStore store)
         var target = ToolPaths.Resolve("save", text, Extension, out var pathError);
         if (target is null) return Error(pathError!);
 
-        var bytes = new UTF8Encoding(false).GetBytes(CarveFile.Write(model));
+        var folder = Path.GetDirectoryName(target.FullPath)!;
+        if (CarveFile.TextureProblem(model, folder) is { } textureProblem) return Error("save: " + textureProblem);
+        var bytes = new UTF8Encoding(false).GetBytes(CarveFile.Write(model, folder));
         if (!ToolPaths.Write("save", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
 
-        return Line($"saved {target.Written(replaced)}: {Summary(model)}");
+        return Line($"saved {target.Written(replaced)}: {Summary(model)}" + string.Concat(MissingTextures(model).Select(w => "\nwarning: " + w)));
+    }
+
+    /// <summary>
+    /// One warning per texture path of <paramref name="model"/> with no file there now (moved or deleted since define_material
+    /// read it), naming where it is used: the save still writes the path, but open reads the PNG again and would refuse the
+    /// file (the person's ruling, RV-47).
+    /// </summary>
+    public static IEnumerable<string> MissingTextures(Model model)
+    {
+        var uses = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        for (var i = 0; i < model.Materials.Count; i++)
+            foreach (var (field, texture) in model.Materials[i].Textures)
+                if (texture is not null)
+                {
+                    if (!uses.TryGetValue(texture.Path, out var at)) uses[texture.Path] = at = [];
+                    at.Add(string.Create(CultureInfo.InvariantCulture, $"materials[{i}].{field} of '{model.Materials[i].Name}'"));
+                }
+        foreach (var (path, at) in uses)
+            if (!File.Exists(path))
+                yield return $"the texture '{path}' ({string.Join(", ", at)}) is no longer at its path; the file is saved with the path, but open refuses it until the PNG is there again";
     }
 
     /// <summary>What a file of <paramref name="model"/> holds: vertices and faces, and the meshes, bones and clips when there are any to name.</summary>

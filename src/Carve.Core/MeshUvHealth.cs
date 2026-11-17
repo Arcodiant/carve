@@ -8,13 +8,17 @@ internal static class MeshUvHealth
     /// <summary>Two faces overlap in UV space when their triangles' common area is more than this (about a fifteenth of a texel of the 256 checker). The planner's, T-60.</summary>
     internal const double OverlapTolerance = 1e-6;
 
+    private static MeshWarning TexturedUnmapped(int face, string material) =>
+        new(MeshWarningKind.UvUnmapped, $"faces[{face}]", $"material '{material}' has a texture but the face has no UVs, so it samples the texture's corner");
+
     private readonly record struct Tri(double Ax, double Ay, double Bx, double By, double Cx, double Cy);
 
-    /// <summary>Unmapped, flipped and zero-area faces by face id, then each overlapping pair once, the lower id first.</summary>
-    internal static (List<MeshWarning> Warnings, UvStats? Stats) Create(PolygonMesh mesh)
+    /// <summary>Unmapped, flipped and zero-area faces by face id, then each overlapping pair once, the lower id first, except a pair whose faces both have a material and the materials differ.</summary>
+    internal static (List<MeshWarning> Warnings, UvStats? Stats) Create(PolygonMesh mesh, IReadOnlyDictionary<int, string>? textured = null)
     {
         var uvs = mesh.Uvs;
-        if (uvs is null || uvs.MappedFaces.Count == 0) return ([], null);
+        if (uvs is null || uvs.MappedFaces.Count == 0)
+            return (textured is null ? [] : mesh.LiveFaces.Where(textured.ContainsKey).Select(f => TexturedUnmapped(f, textured[f])).ToList(), null);
 
         var warnings = new List<MeshWarning>();
         var live = mesh.LiveFaces.ToArray();
@@ -25,7 +29,10 @@ internal static class MeshUvHealth
         {
             if (uvs.Of(f) is not { } uv)
             {
-                warnings.Add(new(MeshWarningKind.UvUnmapped, $"faces[{f}]", "no UVs, so the face samples the texture's corner"));
+                // A face whose material has a texture says so, and that one warning replaces the generic one (T-75).
+                warnings.Add(textured is not null && textured.TryGetValue(f, out var material)
+                    ? TexturedUnmapped(f, material)
+                    : new(MeshWarningKind.UvUnmapped, $"faces[{f}]", "no UVs, so the face samples the texture's corner"));
                 continue;
             }
             mapped++;
@@ -51,6 +58,9 @@ internal static class MeshUvHealth
             for (var j = i + 1; j < ids.Length; j++)
             {
                 var b = boxes[ids[j]];
+                // Two faces with different materials are not warned of (T-80's ruling 5), even when the materials share a PNG
+                // and so show the same texels; the same material, or a face with no material, still warns.
+                if (mesh.Style?.MaterialOf(ids[i]) is { } ma && mesh.Style.MaterialOf(ids[j]) is { } mb && ma != mb) continue;
                 if (a.MaxU <= b.MinU || b.MaxU <= a.MinU || a.MaxV <= b.MinV || b.MaxV <= a.MinV) continue;
                 var common = 0.0;
                 foreach (var s in triangles[ids[i]])

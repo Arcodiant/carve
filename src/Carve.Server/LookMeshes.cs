@@ -158,7 +158,11 @@ public static class LookMeshes
     /// Each triangle vertex's UV in <see cref="MeshBridge.ToMeshData"/>'s order (A, C, B): its corner's UV on its face,
     /// a hole's corners included; every corner of an unmapped face at <see cref="CheckerTexture.WhiteCentre"/>.
     /// </summary>
-    public static Vector2[] CornerUvs(PolygonMesh mesh)
+    public static Vector2[] CornerUvs(PolygonMesh mesh) => CornerUvs(mesh, CheckerTexture.WhiteCentre);
+
+    /// <summary>As <see cref="CornerUvs(PolygonMesh)"/>, with every corner of an unmapped face at <paramref name="unmapped"/>:
+    /// (0, 0) for a material face, the export's rule (T-78), so a face draws what the game samples there.</summary>
+    public static Vector2[] CornerUvs(PolygonMesh mesh, Vector2 unmapped)
     {
         var triangles = Triangulator.Triangulate(mesh);
         var uvs = new Vector2[triangles.Count * 3];
@@ -167,7 +171,7 @@ public static class LookMeshes
             var (a, b, c, face) = triangles[t];
             if (mesh.Uvs?.Of(face) is not { } corners)
             {
-                uvs[t * 3] = uvs[t * 3 + 1] = uvs[t * 3 + 2] = CheckerTexture.WhiteCentre;
+                uvs[t * 3] = uvs[t * 3 + 1] = uvs[t * 3 + 2] = unmapped;
                 continue;
             }
 
