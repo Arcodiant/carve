@@ -31,7 +31,9 @@ description: >-
 
 `scenarios/Carve.Scenario.Acceptance/AcceptanceScenario.cs:65` and `:68` (d5f3ec6). Rubric 1, correctness. The new step reads every mesh through `get_mesh` and takes `v.GetProperty("at")` for each vertex and `f.GetProperty("vertices")` for each face. `get_mesh`'s own description (`src/Carve.Server/GetMeshTool.cs:13`, `:17`) says a deleted vertex or face is `null` in its slot, and a face with holes is written as `{loop, holes}` with no `vertices`. So `GetProperty` throws (`InvalidOperationException` on a null element, `KeyNotFoundException` on a holed face). Failure case: a fresh agent's round in which the character was made with `delete`, `knife`, `plane_cut` or a holed `define_mesh` face. The frame step then stops with an exception before any frame is captured, instead of measuring a round that may be good. Before d5f3ec6 the step never read `get_mesh`. A smaller effect of the same parsing: if holed faces were read by their outer loop, the fan fill would cover the holes, and the prediction would come out larger than the frame.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** Silhouette.Read (`scenarios/Carve.Scenario.Acceptance/Silhouette.cs`) skips a null vertex or face and reads a holed face as its loop and its holes; `Predict` frames on the live vertices only and draws a holed face from its loop and holes together (even-odd), a plain face by its fan as before, so the gardener's prediction is unchanged. `SilhouetteTests` (server-unit) reads a get_mesh body with a deleted vertex, a deleted face and a holed plate, and checks the hole is open; shown failing with the holed face filled from its loop alone ("the hole's middle is drawn"). Commit e881a57.
 
 ### Nothing fails if the two RV-52 render fixes are undone (findings 3 and 9)
 
@@ -41,31 +43,41 @@ description: >-
 
 I checked the code paths themselves and found them right. Flat, smooth, mixed (combined) and unweighted meshes and pieces all agree with `SkinnedExport` (`Shading.CornersOf`, a flat face's normal at each corner). `Model.Combined`'s flat flags are unchanged for every case. Deleted faces are safe because a tombstone has no corners. What is missing is a test that holds them.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** `RenderGlbTests.With_no_clip_a_file_with_a_wrong_skin_draws_wrong_at_rest` (server-regression) swaps the thighs' inverse binds with Orcward's `GlbEdit` and requires the rest frame to differ from the good one past 0.5 % and the caption to say bind pose; with GlbScene's bind pose removed it failed on the caption, and with the caption check also off on the pixels ("differs ... by 0 px"). `ShadingFileTests.A_posed_flat_mesh_is_lit_by_its_skinned_corners_and_shows_its_faces` (core-unit) poses a flat cube with blended weights and requires its corners to be `Skinning.CornerNormals` and its faces flat in the normals look; with `Skinning.Posed` giving only a smooth mesh corners it failed ("a posed flat mesh carries no skinned corners"). Both fixes restored, never committed reverted. Commit 3c16e98.
 
 ### `NotPlanarFold`'s new checks have no unit test, beside a unit-test class for the old ones
 
 `scenarios/Carve.Scenario.Soft/NotPlanarFold.cs:25` and the fold-last check in the private `Check` (45ac156). Rubric 2. RV-52 finding "`NotPlanarFold.Check` does not check which faces are named, or that the fold line comes last" was answered "Shown failing both ways". That showing is not committed. `tests/Carve.SoftLoad.Tests/NotPlanarFoldCheckTests.cs` (unit tier, no run folder needed) still calls only the count overload. No test passes the id overload a wrong set of named faces, or puts a named face after the fold line. Failure case: a change that drops the `SequenceEqual(lowest)` comparison or the `foldSeen` check passes every unit test. Only a soft scenario run whose export happened to misorder its warnings would catch it.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** `NotPlanarFoldCheckTests` gains the id overload passing the right text, failing named faces that are not select's lowest (the count overload passes them), and failing a face named after its mesh's fold line (both overloads). Shown failing with the `SequenceEqual(lowest)` and `foldSeen` checks disabled: 2 of 9 fail. Commit 1092901.
 
 ### OrcwardLoad.Tests does not require the new break, and its comment is now false
 
 `tests/Carve.OrcwardLoad.Tests/OrcwardLoadTests.cs:97` and `:102` (45ac156, 05237fb). Rubric 1/2, low. The table is still read correctly. The new `colour` column is the ninth field, and `p[6]` "fails" already folds a wrong colour in through `Fails(r)`; I confirmed this on run `orcward/3` (7 of 7 pass). But the list of break kinds that must be present has no `swapped-colours`. The RV-52 answer says that break "fails on colour at all 3 rows", and the load checks would not notice if the break vanished from the table. Separately, the comment at `:102` says "A rest frame is drawn with no palette, so a wrong bone order or inverse bind shows only in a clip frame". So does `OrcwardScenario.cs:174`. Since 05237fb both kinds fail at rest (2669 and 10361 px in run 3).
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** `swapped-colours` added to the break kinds `Every_wrong_file_fails_the_same_rule` requires; the comments at `OrcwardLoadTests.cs:102` and `OrcwardScenario.cs:174` now say a wrong bone order or inverse bind fails at rest too, since render_glb skins at the bind pose. OrcwardLoad.Tests on `orcward/3`: 7 of 7 pass. Commit ca47b0a.
 
 ## Findings: tracker and design
 
 ### D-6's and T-48's after-fix tables give a measured 0 for good frames at Walk 0.5 s front, but no good frame is drawn there
 `docs/design/D-6-characters-rigging-animation-and-character-export.md:192` and `docs/tasks/T-48-orcward-done-when-scenario.md:81`: the row "good frames ... and the control | 0 | 0 | 0" puts a 0 under the column "Walk 0.5 s front". Rubric point 7 (the As built matches the code) and point 5 (D-6's measured table). `OrcwardScenario.cs:66-80` draws its good pairs at rest front and side, Idle front and Walk side only. The control is Walk 0.5 s side only (`:120`). At Walk 0.5 s front the scenario takes only `render`'s frame (`break-model-walk-0.500-front`, `:102`), as the reference for the breaks, and colour-checks it (`:115`). No `render_glb` of the good file is drawn there. The `differences.tsv` of job J-20261117-231941-730f6e (at 455c21d) has no good or control row for `walk-0.500-front`. The other cells of both tables match that file exactly. The third cell should read "—" or "not drawn"; it should not read 0.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** The "Walk 0.5 s front" cell of the good frames and the control reads "not drawn" in D-6's and T-48's after-fix tables. In the RV-53 docs commit.
 
 ### T-49's As built still says the rounds were not measured under the luma rule
 `docs/tasks/T-49-character-acceptance-run.md:47`: "the rounds were not measured again under it". Rubric point 7. In the fix round (d5f3ec6), the acceptance step was run on a copy of round 2 (`C:\Users\andre\artifacts\carve\M-19\review\acceptance-copy\acceptance\differences.tsv`). Under luma past 4, all 14 good pairs pass, the largest is 1 px (walk 0.000 side), and the control is 21,550 px, patch 16,855. The milestone's *The review (RV-52)* "Not checked" bullet mentions these numbers in passing. T-49's own *Brought up to date* section records only the silhouettes and the mirrored and flipped copies. It does not record the luma measurement, and line 47 is left saying the opposite. The fix is one dated line, noting that the run came before 05237fb and that its frames will move.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**How:** T-49's *Brought up to date (RV-52)* gains a dated line: the fix round's acceptance run on a copy of round 2, all 14 good pairs pass, the largest 1 px (Walk 0.000 side), control 21,550 px, patch 16,855, checked against that copy's `differences.tsv`; the run came before 05237fb, so its frames will move. Line 47 now says the rounds were not run again, and points to it. In the RV-53 docs commit.
 
 ## Summary
 

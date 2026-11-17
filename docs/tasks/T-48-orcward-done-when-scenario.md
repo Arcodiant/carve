@@ -78,7 +78,7 @@ Measured after 05237fb (`differences.tsv`; differing px / % / largest patch):
 
 | Frame | rest front | Walk 0.5 s side | Walk 0.5 s front |
 |---|---|---|---|
-| good frames (rest front and side, Idle 0.5/1.0/1.5 s, Walk 0, 0.125, 0.25, 0.5, 0.875 s) and the control | 0 | 0 | 0 |
+| good frames (rest front and side, Idle 0.5/1.0/1.5 s, Walk 0, 0.125, 0.25, 0.5, 0.875 s) and the control | 0 | 0 | not drawn |
 | swapped bone order | 2,669 / 1.018 / 982 (fails) | 3,823 / 1.458 / 3,823 | 2,662 / 1.015 / 1,127 |
 | swapped inverse binds | 10,361 / 3.952 / 5,185 (fails) | 543 / 0.207 / 268 | 9,581 / 3.655 / 5,313 |
 | reversed winding | 27,809 / 10.608 / 18,995 | 22,446 / 8.562 / 18,592 | 29,242 / 11.155 / 19,029 |

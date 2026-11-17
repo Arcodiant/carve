@@ -204,7 +204,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - **Uncovered files, the person's ruling (2026-11-17), "Add as inputs":** `scenarios/Carve.Scenario.Acceptance` and `tests/Carve.AcceptanceLoad.Tests` were added to `server-unit`'s inputs as `dotnet-closure`s, so a change to them alone re-runs a suite whose solution build compiles them, and `cairn lint` no longer warns that no suite runs the test project.
 - **Left:** the crate's and shed's "not highlighted" checks repeat the same `GreyRedLessBlue` within-6 test with different reporting (`Fail` against `Note`); the Orcward frame check and the character's can and hand checks are alike but check different things (flips, frame names).
 
-### The review (RV-52)
+### The review (RV-52) and the re-review (RV-53)
 
 - **Three reviewers, round 1** (2026-11-17, `docs/reviews/RV-52-review-of-m-19.md`, ae76320), each an Opus 5.5 subagent in a fresh context, one per part:
   - product code: 3 findings (define_clip's description, a missing skinned-export test, `get_clips` writing `null`);
@@ -233,3 +233,4 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
   - `ExportTool`'s clip-warning line deleted to watch the new skinned-export test fail;
   - T-49's acceptance frames after 05237fb (`run-acceptance-check.ps1` not run again, and they will move); the acceptance side frames differ from round 2's recorded table by 1 to 2 px, and the front-against-back control reads 21,550 px against 21,431 (the good frames still pass; not looked into);
   - scenario-rig, materials, export, cube, shed, uvs, cuts, gatehouse and sky not run by the fixers after 05237fb (none poses a model or calls `render_glb`); the milestone's verify after the docs pass runs them.
+- **RV-53, round 2 (2026-11-17, Opus 5.5, "Fix all as found"):** 6 findings, all fixed. The acceptance silhouette reads get_mesh's deleted slots and holed faces (e881a57); tests that fail if 05237fb's bind pose or a posed flat mesh's skinned corners are undone (3c16e98); unit tests for `NotPlanarFold`'s id overload and fold-line-last rule (1092901); OrcwardLoad.Tests requires `swapped-colours`, and the rest-frame comments are corrected (ca47b0a); D-6's and T-48's never-drawn good cell at Walk 0.5 s front reads "not drawn", and T-49 records the fix round's luma run on a copy of round 2. Each new test was shown failing with its fix reverted. No frame or verdict moved.

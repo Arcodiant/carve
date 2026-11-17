@@ -189,7 +189,7 @@ T-48 starts from Orcward's rule: a pixel differs when R, G or B differs by more 
 
 | Orcward, after the RV-52 fixes (differing px / % / largest patch) | rest front | Walk 0.5 s side | Walk 0.5 s front |
 |---|---|---|---|
-| good frames and the control | 0 | 0 | 0 |
+| good frames and the control | 0 | 0 | not drawn |
 | swapped bone order | 2,669 / 1.018 / 982 (fails) | 3,823 / 1.458 / 3,823 | 2,662 / 1.015 / 1,127 |
 | swapped inverse binds | 10,361 / 3.952 / 5,185 (fails) | 543 / 0.207 / 268 | 9,581 / 3.655 / 5,313 |
 | reversed winding | 27,809 / 10.608 / 18,995 | 22,446 / 8.562 / 18,592 | 29,242 / 11.155 / 19,029 |
