@@ -55,17 +55,11 @@ public sealed class AcceptanceScenario : IScenario
             .Select(c => (Name: c.GetProperty("name").GetString()!, Duration: c.GetProperty("duration").GetSingle())).ToList();
 
         // The meshes, named by the saved file, read through get_mesh: what the silhouette at rest is worked from.
-        var meshes = new List<(Vector3[] Vertices, int[][] Faces)>();
+        // A deleted vertex or face is null in its slot, and a holed face is {loop, holes} (RV-53): Silhouette.Read keeps both.
+        var meshes = new List<Silhouette.Mesh>();
         foreach (var m in JsonDocument.Parse(await File.ReadAllTextAsync(carveFile)).RootElement.GetProperty("meshes").EnumerateArray())
         {
-            var mesh = await CallJsonAsync(driver, "get_mesh", new { mesh = m.GetProperty("name").GetString()! });
-            meshes.Add((
-                mesh.GetProperty("vertices").EnumerateArray().Select(v =>
-                {
-                    var at = v.GetProperty("at");
-                    return new Vector3(at[0].GetSingle(), at[1].GetSingle(), at[2].GetSingle());
-                }).ToArray(),
-                mesh.GetProperty("faces").EnumerateArray().Select(f => f.GetProperty("vertices").EnumerateArray().Select(x => x.GetInt32()).ToArray()).ToArray()));
+            meshes.Add(Silhouette.Read(await CallJsonAsync(driver, "get_mesh", new { mesh = m.GetProperty("name").GetString()! })));
         }
 
         var silhouettes = new StringBuilder("name\toverlap\tfails\n");
@@ -114,7 +108,7 @@ public sealed class AcceptanceScenario : IScenario
                 {
                     foreach (var frame in new[] { viaRender, viaGlb })
                     {
-                        var o = Silhouette.Overlap(Silhouette.Foreground(frame), predicted[viewName]);
+                        var o = Silhouette.Overlap(Foreground(frame), predicted[viewName]);
                         silhouettes.Append($"{frame.Name}\t{o:0.000}\t{(o < Silhouette.Least ? "fails" : "passes")}\n");
                         if (o < Silhouette.Least)
                         {
@@ -156,5 +150,18 @@ public sealed class AcceptanceScenario : IScenario
 
         await File.WriteAllTextAsync(Path.Combine(outDir, "differences.tsv"), tsv.ToString());
         await File.WriteAllTextAsync(Path.Combine(outDir, "silhouettes.tsv"), silhouettes.ToString());
+    }
+
+    /// <summary>The frame's pixels that are not the background (kept here, so <see cref="Silhouette"/> needs no scenario types and a unit test can link it).</summary>
+    private static bool[] Foreground(ScenarioFrame frame)
+    {
+        var mask = new bool[frame.Width * frame.Height];
+        for (var i = 0; i < mask.Length; i++)
+        {
+            var p = frame.Pixels.AsSpan(i * 4, 4);
+            mask[i] = !IsBackground((p[0], p[1], p[2], p[3]));
+        }
+
+        return mask;
     }
 }

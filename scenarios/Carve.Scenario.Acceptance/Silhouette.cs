@@ -1,5 +1,5 @@
 using System.Numerics;
-using Carve.Debug;
+using System.Text.Json;
 using Carve.Scenario.Crate;
 
 namespace Carve.Scenario.Acceptance;
@@ -15,46 +15,73 @@ internal static class Silhouette
     /// <summary>A frame must overlap the prediction this much (intersection over union); a view only tells a mirror or flip apart when the prediction overlaps its own mirror or flip less.</summary>
     public const double Least = 0.9;
 
+    /// <summary>
+    /// One mesh as <c>get_mesh</c> gives it: a deleted vertex is null in its slot, and each live face is its loops, the outer
+    /// loop first and then each hole (a deleted face is left out; no other face refers to it).
+    /// </summary>
+    public sealed record Mesh(Vector3?[] Vertices, int[][][] Faces);
+
+    /// <summary>Reads <c>get_mesh</c>'s JSON, keeping its null slots and its holed faces ({loop, holes}) (RV-53).</summary>
+    public static Mesh Read(JsonElement mesh)
+    {
+        static int[] Ids(JsonElement ids) => ids.EnumerateArray().Select(x => x.GetInt32()).ToArray();
+        var vertices = mesh.GetProperty("vertices").EnumerateArray().Select(v =>
+        {
+            if (v.ValueKind == JsonValueKind.Null)
+            {
+                return (Vector3?)null;
+            }
+
+            var at = v.GetProperty("at");
+            return new Vector3(at[0].GetSingle(), at[1].GetSingle(), at[2].GetSingle());
+        }).ToArray();
+        var faces = mesh.GetProperty("faces").EnumerateArray().Where(f => f.ValueKind != JsonValueKind.Null).Select(f =>
+            f.TryGetProperty("loop", out var loop)
+                ? new[] { Ids(loop) }.Concat(f.GetProperty("holes").EnumerateArray().Select(Ids)).ToArray()
+                : new[] { Ids(f.GetProperty("vertices")) }).ToArray();
+        return new Mesh(vertices, faces);
+    }
+
     /// <summary>The pixels whose centre lies inside a projected face of any mesh, row by row from the top left.</summary>
-    public static bool[] Predict(IReadOnlyList<(Vector3[] Vertices, int[][] Faces)> meshes, Vector3 direction, int size)
+    public static bool[] Predict(IReadOnlyList<Mesh> meshes, Vector3 direction, int size)
     {
         var min = new Vector3(float.MaxValue);
         var max = new Vector3(float.MinValue);
         foreach (var v in meshes.SelectMany(m => m.Vertices))
         {
-            min = Vector3.Min(min, v);
-            max = Vector3.Max(max, v);
+            if (v is { } live)
+            {
+                min = Vector3.Min(min, live);
+                max = Vector3.Max(max, live);
+            }
         }
 
         var project = CameraPixels.Perspective(min, max, direction, size);
         var inside = new bool[size * size];
         foreach (var (vertices, faces) in meshes)
         {
-            var at = vertices.Select(project).ToArray();
+            var at = vertices.Select(v => v is { } live ? project(live) : default).ToArray();
             foreach (var face in faces)
             {
-                // A fan from the first corner: the faces are planar and convex enough for their silhouette.
-                for (var k = 1; k + 1 < face.Length; k++)
+                if (face.Length == 1)
                 {
-                    Fill(inside, size, at[face[0]], at[face[k]], at[face[k + 1]]);
+                    // A fan from the first corner: the faces are planar and convex enough for their silhouette.
+                    var loop = face[0];
+                    for (var k = 1; k + 1 < loop.Length; k++)
+                    {
+                        Fill(inside, size, at[loop[0]], at[loop[k]], at[loop[k + 1]]);
+                    }
+                }
+                else
+                {
+                    // A holed face is drawn from its loop and its holes, not its loop alone: a pixel is inside when its centre
+                    // crosses the face's edges, outer loop and holes together, an odd number of times.
+                    FillHoled(inside, size, face.Select(l => l.Select(i => at[i]).ToArray()).ToArray());
                 }
             }
         }
 
         return inside;
-    }
-
-    /// <summary>The frame's pixels that are not the background.</summary>
-    public static bool[] Foreground(ScenarioFrame frame)
-    {
-        var mask = new bool[frame.Width * frame.Height];
-        for (var i = 0; i < mask.Length; i++)
-        {
-            var p = frame.Pixels.AsSpan(i * 4, 4);
-            mask[i] = !CrateBuild.IsBackground((p[0], p[1], p[2], p[3]));
-        }
-
-        return mask;
     }
 
     public static double Overlap(bool[] a, bool[] b)
@@ -88,6 +115,39 @@ internal static class Silhouette
         }
 
         return r;
+    }
+
+    private static void FillHoled(bool[] inside, int size, Vector2[][] loops)
+    {
+        var outer = loops[0];
+        var x0 = Math.Max(0, (int)MathF.Floor(outer.Min(p => p.X)));
+        var x1 = Math.Min(size - 1, (int)MathF.Ceiling(outer.Max(p => p.X)));
+        var y0 = Math.Max(0, (int)MathF.Floor(outer.Min(p => p.Y)));
+        var y1 = Math.Min(size - 1, (int)MathF.Ceiling(outer.Max(p => p.Y)));
+        for (var y = y0; y <= y1; y++)
+        {
+            for (var x = x0; x <= x1; x++)
+            {
+                var p = new Vector2(x + 0.5f, y + 0.5f);
+                var odd = false;
+                foreach (var loop in loops)
+                {
+                    for (int i = 0, j = loop.Length - 1; i < loop.Length; j = i++)
+                    {
+                        var (a, b) = (loop[i], loop[j]);
+                        if ((a.Y > p.Y) != (b.Y > p.Y) && p.X < a.X + (p.Y - a.Y) * (b.X - a.X) / (b.Y - a.Y))
+                        {
+                            odd = !odd;
+                        }
+                    }
+                }
+
+                if (odd)
+                {
+                    inside[y * size + x] = true;
+                }
+            }
+        }
     }
 
     private static void Fill(bool[] inside, int size, Vector2 a, Vector2 b, Vector2 c)
