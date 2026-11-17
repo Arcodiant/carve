@@ -30,7 +30,7 @@ internal static class MaterialJson
 
     /// <summary>The warning for a material with an occlusion strength and no occlusion map, or null: glTF scales only the map.</summary>
     public static string? OcclusionWarning(Material m) =>
-        m.Occlusion != 1f && m.OcclusionTexture is null
+        m.OcclusionHasNoEffect
             ? string.Create(CultureInfo.InvariantCulture, $"occlusion: {m.Occlusion:R} has no effect without an occlusion_texture (glTF scales only the map); give one or leave occlusion at 1")
             : null;
 }
@@ -116,21 +116,18 @@ public sealed class DefineMaterialTool(ModelStore store)
             if (LoadTexture(field, path, out var texture, out var problem)) loaded[field] = texture!;
             else errors.Add(problem!);
         }
-        // Everything that is wrong with the values is reported with the argument problems, not one at a time.
-        if (errors.Count == 0 || materialName is not null)
-        {
-            var defaults = new Material("");
-            var draft = new Material(materialName ?? "", baseColour ?? defaults.BaseColour, metal ?? defaults.Metallic, rough ?? defaults.Roughness,
-                emissiveColour ?? defaults.Emissive, occ ?? defaults.Occlusion, twoSided);
-            foreach (var (field, problem) in Material.Problems(draft))
-                if (field is not "name" || materialName is not null) errors.Add($"{field}: {problem}");
-        }
-        if (errors.Count > 0) return Failed("define_material", errors);
-
-        var material = new Material(materialName!, baseColour ?? Material.DefaultBaseColour, metal ?? 0f, rough ?? 1f,
-            emissiveColour ?? (loaded.ContainsKey("emissive_texture") ? "#FFFFFF" : Material.DefaultEmissive), occ ?? 1f, twoSided,
+        // An emissive_texture with no emissive glows as it is (a default black emissive would hide it).
+        var material = new Material(materialName ?? "", baseColour ?? Material.DefaultBaseColour, metal ?? Material.DefaultMetallic,
+            rough ?? Material.DefaultRoughness,
+            emissiveColour ?? (loaded.ContainsKey("emissive_texture") ? "#FFFFFF" : Material.DefaultEmissive), occ ?? Material.DefaultOcclusion, twoSided,
             loaded.GetValueOrDefault("base_colour_texture"), loaded.GetValueOrDefault("metallic_roughness_texture"),
             loaded.GetValueOrDefault("normal_texture"), loaded.GetValueOrDefault("emissive_texture"), loaded.GetValueOrDefault("occlusion_texture"));
+        // Everything that is wrong with the values is reported with the argument problems, not one at a time. The loaded
+        // textures were checked as they were read, so they add no problem here.
+        if (errors.Count == 0 || materialName is not null)
+            foreach (var (field, problem) in Material.Problems(material))
+                if (field is not "name" || materialName is not null) errors.Add($"{field}: {problem}");
+        if (errors.Count > 0) return Failed("define_material", errors);
 
         var snapshot = store.DefineMaterial("define_material", material, out var replaced, out var problems);
         if (snapshot is null) return Failed("define_material", problems);
@@ -252,7 +249,7 @@ public sealed class SetMaterialTool(ModelStore store)
             else FaceArguments.CheckIds(m, ids!, problems);
             if (problems.Count > 0) return (null, problems);
             given = ids!.Distinct().Order().ToArray();
-            if (defined!.Textures.Any(t => t.Texture is not null))
+            if (defined!.HasTexture)
             {
                 var bare = given.Where(i => m.Uvs?.Of(i) is null).ToArray();
                 if (bare.Length > 0)

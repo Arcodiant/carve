@@ -124,7 +124,7 @@ public static class CarveFile
     public static string Write(Model model)
     {
         ArgumentNullException.ThrowIfNull(model);
-        if (model.Materials.Any(m => m.Textures.Any(t => t.Texture is not null)))
+        if (model.Materials.Any(m => m.HasTexture))
             throw new ArgumentException("a material has a texture, and a texture's path is written relative to the file's folder; pass the folder", nameof(model));
         return WriteText(model, null);
     }
@@ -266,10 +266,10 @@ public static class CarveFile
     {
         var parts = new List<string> { $"\"name\": {Text(m.Name)}" };
         if (!string.Equals(m.BaseColour, Material.DefaultBaseColour, StringComparison.Ordinal)) parts.Add($"\"base_colour\": {Text(m.BaseColour)}");
-        if (!SameBits(m.Metallic, 0f)) parts.Add($"\"metallic\": {Number(m.Metallic)}");
-        if (!SameBits(m.Roughness, 1f)) parts.Add($"\"roughness\": {Number(m.Roughness)}");
+        if (!SameBits(m.Metallic, Material.DefaultMetallic)) parts.Add($"\"metallic\": {Number(m.Metallic)}");
+        if (!SameBits(m.Roughness, Material.DefaultRoughness)) parts.Add($"\"roughness\": {Number(m.Roughness)}");
         if (!string.Equals(m.Emissive, Material.DefaultEmissive, StringComparison.Ordinal)) parts.Add($"\"emissive\": {Text(m.Emissive)}");
-        if (!SameBits(m.Occlusion, 1f)) parts.Add($"\"occlusion\": {Number(m.Occlusion)}");
+        if (!SameBits(m.Occlusion, Material.DefaultOcclusion)) parts.Add($"\"occlusion\": {Number(m.Occlusion)}");
         if (m.DoubleSided) parts.Add("\"double_sided\": true");
         foreach (var (field, texture) in m.Textures)
             if (texture is not null) parts.Add($"\"{field}\": {Text(RelativePath(folder!, texture.Path)!)}");
@@ -579,10 +579,10 @@ public static class CarveFile
         float? Factor(string key, float fallback) =>
             f.TryGetValue(key, out var x) ? Float(x, $"{at}.{key}", errors) : fallback;
         var baseColour = Hex("base_colour", Material.DefaultBaseColour);
-        var metallic = Factor("metallic", 0f);
-        var roughness = Factor("roughness", 1f);
+        var metallic = Factor("metallic", Material.DefaultMetallic);
+        var roughness = Factor("roughness", Material.DefaultRoughness);
         var emissive = Hex("emissive", Material.DefaultEmissive);
-        var occlusion = Factor("occlusion", 1f);
+        var occlusion = Factor("occlusion", Material.DefaultOcclusion);
         var doubleSided = false;
         if (f.TryGetValue("double_sided", out var ds))
         {

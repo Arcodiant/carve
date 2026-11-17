@@ -89,10 +89,10 @@ public sealed record MaterialTexture(string Path, ImmutableArray<byte> Png, int 
 public sealed record Material(
     string Name,
     string BaseColour = Material.DefaultBaseColour,
-    float Metallic = 0f,
-    float Roughness = 1f,
+    float Metallic = Material.DefaultMetallic,
+    float Roughness = Material.DefaultRoughness,
     string Emissive = Material.DefaultEmissive,
-    float Occlusion = 1f,
+    float Occlusion = Material.DefaultOcclusion,
     bool DoubleSided = false,
     MaterialTexture? BaseColourTexture = null,
     MaterialTexture? MetallicRoughnessTexture = null,
@@ -102,6 +102,9 @@ public sealed record Material(
 {
     public const string DefaultBaseColour = "#FFFFFF";
     public const string DefaultEmissive = "#000000";
+    public const float DefaultMetallic = 0f;
+    public const float DefaultRoughness = 1f;
+    public const float DefaultOcclusion = 1f;
 
     /// <summary>The name an export gives its colour materials' prefix, which no material may take.</summary>
     public const string ReservedName = "carve";
@@ -115,6 +118,12 @@ public sealed record Material(
         ("emissive_texture", EmissiveTexture),
         ("occlusion_texture", OcclusionTexture),
     ];
+
+    /// <summary>True when any of the five textures is set.</summary>
+    public bool HasTexture => Textures.Any(t => t.Texture is not null);
+
+    /// <summary>True when the occlusion strength is not 1 and there is no occlusion map, so it has no effect (glTF scales only the map).</summary>
+    public bool OcclusionHasNoEffect => Occlusion != 1f && OcclusionTexture is null;
 
     /// <summary>
     /// Why <paramref name="name"/> cannot name a material, or null when it can: not empty, no ':' or '#', and not
