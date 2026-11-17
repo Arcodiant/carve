@@ -136,7 +136,7 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
 - [ ] [T-77](../tasks/T-77-sample-textures.md) — Committed code generates the textured barrel's eight 256 x 256 PNG textures, and a test keeps the committed files equal to it pixel for pixel
 - [ ] [T-78](../tasks/T-78-materials-in-render.md) — render draws a face with a material through Material.Pbr, the same material the engine's loader makes of the export, lit with a fixed sky so metal reads
 - [ ] [T-79](../tasks/T-79-viewer-sky-and-material-report.md) — The model viewer takes --sky to light a model with Carve's fixed sky, and view.json reports every PBR field and texture of each material
-- [ ] [T-80](../tasks/T-80-textured-barrel-scenario.md) — The barrel is given wood, iron, end-grain and rune materials, seen in eight frames, saved, reopened, exported and shown in the viewer, in suite scenario-materials
+- [ ] [T-80](../tasks/T-80-textured-barrel-scenario.md) — The barrel is given wood, iron, end-grain and rune materials, seen in nine frames, saved, reopened, exported and shown in the viewer, in suite scenario-materials
 - [ ] [T-81](../tasks/T-81-materials-acceptance-run.md) — Fresh agents texture a model from the tool descriptions alone and recover from a planted missing texture path
 
 ## Retrospective
@@ -225,7 +225,7 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
   - T-81: wood against iron was judged by eye, not by pixel sampling. Whether T-77's staves line up with `unwrap`'s UVs was not measured; it is not a pass item.
   - T-76: two of its breaks (image dedup, black emissive) are equivalent mutants, because SharpGLTF does both itself.
 - **Carried passes:** at the members' end, the milestone's `verify` ran no suite fresh: all 15 were carried from `ed16e5d` and `b35b0e9`. The refactor pass's `verify` re-ran 14 fresh. The fixers' suites are listed under *Before `finish`*.
-- **The orchestrator opened no frame.** Every look above is a member's or the person's.
+- **The orchestrator opened no frame.** Every look above is a member's or the person's. T-80's ten frames, and RV-47's ninth, were looked at by the person alone: no T-80 agent opened them (T-80's As built).
 
 **Known and left.**
 
@@ -265,7 +265,7 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
 
   The person also approved a ninth frame, `barrel-bottom`, which fixer B added because no existing frame can sample the bottom cap under P2.
 - **Fixes:**
-  - Fixer A (Opus 5.5) fixed the 14 product findings. Fixer B (Sonnet 5.5) fixed 6 in the viewer and scenario. The orchestrator answered the other three.
+  - Fixer A (Opus 5.5) answered 16 findings (15 defects, one found twice). Fixer B (Sonnet 5.5) answered 6 in the viewer and scenario. The orchestrator answered the other 3.
   - Every code fix has a break shown failing, except the `Keep` call site in `RenderSystem`, which has none of its own.
   - Every existing frame and committed export stayed byte-identical. Fixer B's table covers 229 frames. Fixer A pinned the soft gardener's and the gatehouse's exports to what `main` writes.
   - Each fixer ran the suites its changes touched on its own branch. After its rebase, fixer A re-ran core-unit, server-unit, scenario-uvs and scenario-materials.
@@ -284,4 +284,4 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
 - **Name where evidence lives at dispatch, outside `artifacts/`:** the Drive folder, as T-81 did. Writes to the milestone worktree from a member were refused here.
 - **Treat Waystone's "Commented" as unanswered** until the person says approved, and say so in every brief, as T-81's did.
 - **Have members `cd` out of their worktree before `finish`,** so the folder can be removed, and keep their evidence elsewhere first.
-- **Look members still take three or four agents** (T-78, T-80). Planning the frame review as its own agent worked again: both reviews were done by a fresh agent with room to spare.
+- **Look members still take three or four agents** (T-78, T-80). Planning the frame review as its own agent worked again: both reviews were sent by a fresh agent with room to spare. T-78's review agent opened one image. T-80's opened none, so the person's look was the only one on T-80's frames. The next brief should ask the review agent to look itself, cropped or scaled, before it asks.
