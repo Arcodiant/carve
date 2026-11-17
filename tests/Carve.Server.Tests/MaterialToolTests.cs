@@ -60,6 +60,9 @@ public class MaterialToolTests : FileToolTests
         var warnings = Strings(Body(Ok(await carve.CallToolAsync("check", "{}"))).GetProperty("warnings"));
         Assert.DoesNotContain(warnings, w => w.StartsWith("faces[2]:") || w.StartsWith("faces[3]:"));
         Assert.Equal(4, warnings.Count(w => w.EndsWith("no UVs, so the face samples the texture's corner")));
+        // ... and nothing else, as the example says (RV-47).
+        Assert.Equal(new[] { 0, 1, 4, 5 }.Select(f => $"faces[{f}]: no UVs, so the face samples the texture's corner"), warnings);
+        Assert.Contains("check warns only of the other four faces, 0, 1, 4 and 5", Description(tools, "set_material"));
     }
 
     [Fact]
@@ -161,6 +164,98 @@ public class MaterialToolTests : FileToolTests
         using var scope = carve;
         Assert.Contains(expected, Refused(await carve.CallToolAsync(tool, arguments)));
         Assert.False(Body(Ok(await carve.CallToolAsync("get_mesh", "{}"))).TryGetProperty("materials", out _));
+    }
+
+    /// <summary>The refusals T-75's Scope lists that the theory above leaves out (RV-47), each through the real tool.</summary>
+    [Theory]
+    [InlineData("define_material", """{"name":""}""", "name: a material name must not be empty")]
+    [InlineData("define_material", """{"name":"a:b"}""", "name: a material name must not contain ':'")]
+    [InlineData("define_material", """{"name":"a#b"}""", "name: a material name must not contain '#'")]
+    [InlineData("define_material", """{"name":"carve"}""", "name: a material must not be named 'carve'")]
+    [InlineData("define_material", """{"name":"m","base_colour":"red"}""", "base_colour: 'red' is not a colour")]
+    [InlineData("define_material", """{"name":"m","emissive":"#00000"}""", "emissive: '#00000' is not a colour")]
+    [InlineData("define_material", """{"name":"m","metallic":-1}""", "metallic: metallic is -1; it is a number from 0 to 1")]
+    [InlineData("define_material", """{"name":"m","occlusion":1.5}""", "occlusion: occlusion is 1.5; it is a number from 0 to 1")]
+    [InlineData("define_material", """{"name":"m","double_sided":"yes"}""", "double_sided: expected true or false, got")]
+    [InlineData("define_material", """{"name":"m","metallic":"1"}""", "metallic: expected a number, got")]
+    [InlineData("set_material", """{"material":"m","faces":[0],"group":"g"}""", "faces, group: give faces or group, not both")]
+    [InlineData("set_material", """{"material":"m"}""", "faces, group: give one of faces or group")]
+    [InlineData("set_material", """{"material":"m","faces":[0],"mesh":"nope"}""", "mesh: no mesh named 'nope'")]
+    public async Task Every_other_refusal_names_the_argument_and_changes_nothing(string tool, string arguments, string expected)
+    {
+        var (carve, _) = await StartAsync();
+        using var scope = carve;
+        if (tool == "set_material") Ok(await carve.CallToolAsync("define_material", """{"name":"m"}"""));
+        var before = Ok(await carve.CallToolAsync("get_mesh", "{}"));
+        Assert.Contains(expected, Refused(await carve.CallToolAsync(tool, arguments)));
+        Assert.Equal(before, Ok(await carve.CallToolAsync("get_mesh", "{}")));
+    }
+
+    [Fact]
+    public async Task A_texture_path_naming_a_folder_is_refused_at_its_argument()
+    {
+        Directory.CreateDirectory(Path.Combine(Root, "dir.png"));
+        var (carve, _) = await StartAsync();
+        using var scope = carve;
+        Assert.Contains($"occlusion_texture: {Path.Combine(Root, "dir.png")} is a folder, not a file",
+            Refused(await carve.CallToolAsync("define_material", """{"name":"m","occlusion_texture":"dir.png"}""")));
+    }
+
+    /// <summary>define_material reports argument problems and the material's own problems together, each once (RV-47).</summary>
+    [Theory]
+    [InlineData("""{"name":"a:b","metallic":"1","roughness":2}""", "metallic: expected a number", "name: a material name must not contain ':'", "roughness: roughness is 2")]
+    [InlineData("""{"metallic":"1","roughness":2}""", "name: required but missing", "metallic: expected a number")]
+    [InlineData("""{"name":"m","roughness":2,"metallic":3}""", "metallic: metallic is 3", "roughness: roughness is 2")]
+    [InlineData("""{"name":"","base_colour":7}""", "base_colour: expected a string", "name: a material name must not be empty")]
+    public async Task Argument_errors_and_material_problems_are_reported_together_each_once(string arguments, params string[] expected)
+    {
+        var (carve, _) = await StartAsync();
+        using var scope = carve;
+        var lines = Refused(await carve.CallToolAsync("define_material", arguments)).ReplaceLineEndings("\n").Split('\n');
+        Assert.StartsWith($"define_material failed with {expected.Length} problem(s)", lines[0]);
+        Assert.Equal(expected.Order(StringComparer.Ordinal), lines.Skip(1).Select(l => expected.Single(e => l.StartsWith(e, StringComparison.Ordinal))).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task Save_warns_of_each_texture_gone_from_its_path_and_still_writes_the_file()
+    {
+        var oak = Path.GetFullPath(Texture("tex/oak.png"));
+        var ash = Texture("tex/ash.png");
+        var (carve, _) = await StartAsync();
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_material", """{"name":"oak","base_colour_texture":"tex/oak.png","occlusion_texture":"tex/oak.png"}"""));
+        Ok(await carve.CallToolAsync("define_material", """{"name":"ash","base_colour_texture":"tex/ash.png"}"""));
+        Assert.DoesNotContain("warning", Ok(await carve.CallToolAsync("save", """{"path":"before.carve"}""")));
+
+        File.Delete(oak);
+        var lines = Ok(await carve.CallToolAsync("save", """{"path":"model.carve"}""")).ReplaceLineEndings("\n").Split('\n');
+        Assert.StartsWith("saved model.carve", lines[0]);
+        Assert.Equal([$"warning: the texture '{oak}' (materials[0].base_colour_texture of 'oak', materials[0].occlusion_texture of 'oak') is no longer at its path; "
+            + "the file is saved with the path, but open refuses it until the PNG is there again"], lines.Skip(1));
+        Assert.Contains("\"base_colour_texture\": \"tex/oak.png\"", File.ReadAllText(Path.Combine(Root, "model.carve")));
+        Assert.True(File.Exists(ash));
+    }
+
+    [Fact]
+    public async Task Open_with_mesh_reads_only_the_materials_that_mesh_uses()
+    {
+        var png = Texture("tex/oak.png");
+        var (carve, _) = await StartAsync();
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_material", """{"name":"used","base_colour":"#C8503C"}"""));
+        Ok(await carve.CallToolAsync("define_material", """{"name":"oak","base_colour_texture":"tex/oak.png"}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"used","faces":[0]}"""));
+        Ok(await carve.CallToolAsync("save", """{"path":"model.carve"}"""));
+        File.Delete(png);
+
+        // The whole file still needs every texture; the mesh alone needs only its own materials' (T-74's ruling).
+        Assert.Contains("materials[1].base_colour_texture: cannot read 'tex/oak.png'", Refused(await carve.CallToolAsync("open", """{"path":"model.carve"}""")));
+        var (fresh, _) = await StartAsync(mesh: null);
+        using var second = fresh;
+        Ok(await fresh.CallToolAsync("open", """{"path":"model.carve","mesh":"mesh"}"""));
+        var mesh = Body(Ok(await fresh.CallToolAsync("get_mesh", "{}")));
+        Assert.Equal(["used"], mesh.GetProperty("materials").EnumerateArray().Select(m => m.GetProperty("name").GetString()!));
+        Assert.Equal([0], mesh.GetProperty("face_materials").EnumerateArray().Single().GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()));
     }
 
     [Fact]

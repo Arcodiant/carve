@@ -201,7 +201,7 @@ public sealed class SetMaterialTool(ModelStore store)
         + "Worked example on define_mesh's unit cube: texture its top and front, faces 3 and 2, with the crate material. "
         + "1. project_uvs maps them: {\"method\":\"box\",\"faces\":[2,3]}. "
         + "2. define_material makes the material: {\"name\":\"crate\",\"roughness\":0.8,\"base_colour_texture\":\"textures/crate.png\"}. "
-        + "3. set_material is this call, after which get_mesh lists faces 2 and 3 under crate and check has no warning:\n"
+        + "3. set_material is this call, after which get_mesh lists faces 2 and 3 under crate, and check warns only of the other four faces, 0, 1, 4 and 5, which have no UVs (\"faces[0]: no UVs, so the face samples the texture's corner\"); they have no material and no texture, so nothing is drawn wrong:\n"
         + ExampleMarker + """{"material":"crate","faces":[2,3]}""";
 
     public static McpServerTool Create() => MeshToolSupport.Create<SetMaterialTool>("set_material", Text, WithMesh(new JsonObject
