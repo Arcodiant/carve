@@ -75,7 +75,7 @@ public sealed class SaveTool(ModelStore store)
         + "which leaves any file already there as it was and no partial file. "
         + "save changes nothing: not the model, its ids, or what undo steps back to. "
         + "Returns one line: saved <file> to <absolute path> (replaced, when it was): <n> vertices, <n> faces, then the meshes when there are several, and the bones and clips when there is a skeleton; "
-        + "then a line \"warning: the texture '<path>' (<where it is used>) is no longer at its path; ...\" for each texture whose PNG has been moved or deleted since define_material read it, since open reads the PNG again and refuses the file until it is back (save still writes the file).\n"
+        + "then a line \"warning: the texture '<path>' (<where it is used>) is no longer at its path; ...\" for each texture whose PNG has been moved or deleted since define_material or open read it, since open reads the PNG again and refuses the file until it is back (save still writes the file).\n"
         + "Worked example, from an empty file to a game's content folder (put the game's folder for <game>); each numbered line is a call, and the game then loads the model as "
         + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
         + "1. define_mesh with the cube from its description.\n"
