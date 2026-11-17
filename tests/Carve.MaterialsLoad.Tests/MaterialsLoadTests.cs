@@ -127,7 +127,7 @@ public class MaterialsLoadTests
             && Floats("emissive").SequenceEqual([emissive.X, emissive.Y, emissive.Z])
             && m.GetProperty("occlusion").GetSingle() == want.Occlusion
             && m.GetProperty("doubleSided").GetBoolean() == want.DoubleSided
-            && Slot("baseColour", want.BaseColourTexture) && Slot("metallicRoughness", want.MetallicRoughnessTexture)
+            && Slot("baseColor", want.BaseColourTexture) && Slot("metallicRoughness", want.MetallicRoughnessTexture)
             && Slot("normal", want.NormalTexture) && Slot("emissive", want.EmissiveTexture) && Slot("occlusion", want.OcclusionTexture);
     }
 
@@ -152,11 +152,16 @@ public class MaterialsLoadTests
             Assert.True(clean.Length >= 8 && rust.Length >= 8, $"{view}: {clean.Length} clean and {rust.Length} rust samples, at least 8 each");
             Assert.All(clean, p => Assert.False(Warm(p) || Max(p) < T, $"{view}: clean iron {p} is warm or near-black"));
             Assert.All(rust, p => Assert.True(Warm(p), $"{view}: rust {p} is not ordered R > G > B"));
-            if (view == "viewer-front")
+            Assert.True(on.Length >= 8 && off.Length >= 8, $"{view}: {on.Length} rune and {off.Length} plain samples, at least 8 each");
+            Assert.All(on, p => Assert.True(Warm(p), $"{view}: rune {p} is not warm"));
+            Assert.True(on.Min(Max) >= off.Max(Max) + M, $"{view}: the rune's least bright texel {on.Min(Max)} is not {M} above plain wood's brightest {off.Max(Max)}");
+
+            // P5: the sites tell a v-flipped texture and a u-mirrored one apart (the scenario worked the flags from the geometry), at least 3 of each.
+            foreach (var (what, looks) in new[] { ("iron", new[] { "Clean", "Rust" }), ("rune", new[] { "RuneOn" }) })
             {
-                Assert.True(on.Length >= 8 && off.Length >= 8, $"{view}: {on.Length} rune and {off.Length} plain samples, at least 8 each");
-                Assert.All(on, p => Assert.True(Warm(p), $"{view}: rune {p} is not warm"));
-                Assert.True(on.Min(Max) >= off.Max(Max) + M, $"{view}: the rune's least bright texel {on.Min(Max)} is not {M} above plain wood's brightest {off.Max(Max)}");
+                var of = sites.Where(s => s[0] == view && looks.Contains(s[3])).ToArray();
+                int v = of.Count(s => s[5] == "True"), u = of.Count(s => s[6] == "True");
+                Assert.True(v >= 3 && u >= 3, $"{view}: {what} sites that change class under a v-flip {v}, under a u-mirror {u}, at least 3 each");
             }
         }
     }
