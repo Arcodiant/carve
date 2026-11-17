@@ -25,7 +25,7 @@ internal static class TexturedCubeFixture
     /// <summary>Each slot's size, in the order the report lists them.</summary>
     public static readonly (string Slot, int Width, int Height)[] Sizes =
     [
-        ("baseColour", 4, 4), ("metallicRoughness", 2, 2), ("normal", 8, 8), ("emissive", 4, 2), ("occlusion", 2, 4),
+        ("baseColor", 4, 4), ("metallicRoughness", 2, 2), ("normal", 8, 8), ("emissive", 4, 2), ("occlusion", 2, 4),
     ];
 
     private static readonly (Vector3 Normal, Vector3[] Corners)[] Faces =

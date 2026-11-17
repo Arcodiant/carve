@@ -217,7 +217,7 @@ internal sealed class ViewerSystem(
                     flags = m.Flags.ToString(),
                     textures = new
                     {
-                        baseColour = Slot(m.Texture),
+                        baseColor = Slot(m.Texture),
                         metallicRoughness = Slot(m.MetallicRoughnessTexture),
                         normal = Slot(m.NormalTexture),
                         emissive = Slot(m.EmissiveTexture),
