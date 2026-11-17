@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-48 — Review of M-7, round 2
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-7
 
@@ -47,7 +47,9 @@ The release logic itself has no defect:
 - A material redefined between renders is released only once the entity draws the new one.
 - The equality test's host builds `PbrMaterials` with no residency and never calls `Keep`.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** RenderReleaseTests (Tier regression) runs the real carve with the debug extension and a Tiny scenario mode `Tiny:Mode=release`, which reads `IGraphicsResourceManager.Residency` from DI with no product hook. It walks a face from plain to PNG A to PNG B to the UV look and back, measuring textures and the material table at each stage. Breaks: the `Keep` call deleted, given `_drawn` alone, or moved before the swap each fail. Given `_materials` alone it passes, because at every Install `_drawn` is a subset of `_materials`, so no reachable state tells them apart. Carve.Scenario.Tiny now references Arcodiant.Empyrean.Graphics (fixer, Opus 5.5, bbd20d9)
 
 ### "Every existing frame stayed byte-identical" rests on a table taken before render's release change
 
@@ -59,7 +61,9 @@ The evidence README says `new.sha256` came from the `fix/RV-47-scenario` tree, w
 
 After its rebase, fixer A re-ran core-unit, server-unit, scenario-uvs and scenario-materials. Those check pixels against the geometry, not against base hashes, and they leave out `server-regression`, which holds the new `PbrReleaseTests` and the 87 server frames. The Retrospective's sentence presents the frame guard as covering the head, and it does not. A gate `verify` on `7f86436` was running at review time. Either compare that run's frames with `base.sha256`, or reword the sentence to say which commit the table covers.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** The guard was re-taken at 3f9ba34, after 68f810e. All 229 scenario frames hash the same as base.sha256 (307d692), in head.sha256. server-regression's 120 test frames (not 87) hash the same at 307d692 and at the head, in server-base.sha256 and server-head.sha256, and no frame is new. README.txt in `G:\My Drive\artifacts\carve\M-7\RV-47\evidence\` says which commit each table covers. The Retrospective now cites the head table (fixer continuation, Opus 5.5; orchestrator)
 
 ### The Retrospective still says a member looked at T-80's frames, so the no-change reason for finding 18 is false
 
@@ -73,7 +77,9 @@ RV-47's outcome says no change is needed because "T-80's earlier agents opened n
 
 T-80's As built (line 152) says agent 3 ("guard and frame review") sent the frames to Waystone and "Frames were not opened by this agent". So no member agent looked at T-80's ten frames, and the Retrospective still implies one did. The person's own review stands. The record is what is wrong, not the frames.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** The Retrospective now says no T-80 agent opened its frames, and that the person's look was the only one on them (orchestrator, dbb7bb7)
 
 ### The Retrospective's count of who answered what does not add up to 25
 
@@ -83,7 +89,9 @@ T-80's As built (line 152) says agent 3 ("guard and frame review") sent the fram
 
 The Retrospective says "Fixer A fixed the 14 product findings. Fixer B fixed 6 ... The orchestrator answered the other three." That is 23. By RV-47's own Fix lines, fixer A answered 16 findings, 15 distinct defects with the duplicate `set_material` one. Fixer B answered 6 and the orchestrator 3, so the total is 25.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** The count now reads 16, 6 and 3 (orchestrator, dbb7bb7)
 
 ### T-78's Plan and As built still say render's materials and textures are held for the process
 
@@ -93,7 +101,9 @@ The Retrospective says "Fixer A fixed the 14 product findings. Fixer B fixed 6 .
 
 `68f810e` makes `PbrMaterials` release what no model uses. T-78 is the member that owns `PbrMaterials`, and its As built still ends "Engine materials are cached by the Carve record ... for the process". Its Plan, line 124, still says "Both are held for the process, like `Checker`". RV-47 updated T-76's and T-80's As built, but not T-78's. The code's own summary was updated (`PbrMaterials.cs:12-13`).
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** T-78's Plan notes that 68f810e changed this, and its As built describes the holders, `Keep` in Install, and the two release tests (fixer, 3f9ba34)
 
 ### "Eight frames" and the barrel link are still named after barrel-bottom was added and BarrelSpec unlinked
 
@@ -103,7 +113,9 @@ The Retrospective says "Fixer A fixed the 14 product findings. Fixer B fixed 6 .
 
 `CLAUDE.md` now says nine frames, but the scenario's class summary still says "seen in eight frames". So do T-80's description, the milestone's member line, and the changelog entry that `finish` will carry to `main`. The csproj comment still opens "Linked, never copied: the Uvs scenario's barrel and its mesh reading", but `3a9c79c` removed the `BarrelSpec.cs` link and only `UvsScene.cs` is left.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** The words are now nine frames in MaterialsScenario.cs's summary, the csproj header, T-80's description and UNRELEASED.md, and the milestone's member line (dbb7bb7); the csproj link comment no longer names the barrel (fixer, 3f9ba34)
 
 ### save's new sentence says the texture was read by define_material, but open reads it too
 
@@ -113,7 +125,9 @@ The Retrospective says "Fixer A fixed the 14 product findings. Fixer B fixed 6 .
 
 The description says the warning comes for "each texture whose PNG has been moved or deleted since define_material read it". `MissingTextures` checks every held texture, and `open` reads each PNG again as well. After `open` and a deleted PNG, `save` warns of a texture that `define_material` never read. "since define_material or open read it" would match the code.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** save's description now reads "since define_material or open read it" (fixer, aeaecd3)
 
 ## Answers checked
 
