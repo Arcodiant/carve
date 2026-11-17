@@ -91,7 +91,7 @@ pwsh scripts/run-viewer.ps1 <content folder> <model path in it, e.g. models/barr
 | `occlusion` | `Material.Occlusion` (1 when the file has no occlusion map) |
 | `doubleSided` | bool |
 | `flags` | `MaterialFlags` as the engine prints it, e.g. `Textured, SolidColor, NormalMapped, Lit, LitWithVertexNormals, Pbr` |
-| `textures` | object with the slots `baseColour`, `metallicRoughness`, `normal`, `emissive`, `occlusion`, each `{ set, width, height, format }` (`set` false gives 0, 0 and `format` null; `format` is the engine's `TextureFormat`, `Rgba8Srgb` for base and emissive, `Rgba8Unorm` for the rest) |
+| `textures` | object with the slots `baseColor`, `metallicRoughness`, `normal`, `emissive`, `occlusion`, each `{ set, width, height, format }` (`set` false gives 0, 0 and `format` null; `format` is the engine's `TextureFormat`, `Rgba8Srgb` for base and emissive, `Rgba8Unorm` for the rest) |
 
 Per T-76, base colour is the linear `baseColorFactor`, `occlusion` is the strength written only with an occlusion map, and `emissive` is zero when the factor was black. `materials` lists one entry per submesh material, or the base one.
 
@@ -112,6 +112,6 @@ No existing frame changed by loading with mipmaps.
 | Broken on purpose | Tests that failed |
 |---|---|
 | the sky entity never added | A_metallic_face_is_lighter_with_the_sky_than_without |
-| baseColour slot read from the normal texture | View_json_reports_every_field_and_texture_of_the_material (both cases) |
+| baseColor slot read from the normal texture | View_json_reports_every_field_and_texture_of_the_material (both cases) |
 
 A review of the plain and `--sky` frames of the fixture cube went to the person (round-1); it came back with no notes. Not checked: a real textured (non-flat) model under `--sky`, which is T-80.
