@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The scenario the debug extension's tests stack on it. The engine package is only for reading the clock back from outside the debug extension; a real scenario does not take it. -->
+  <!-- The scenario the debug extension's tests stack on it. The engine packages are only for reading the clock and the graphics residency counts back from outside the debug extension; a real scenario does not take them. -->
   <PropertyGroup>
     <RootNamespace>Carve.Scenario.Tiny</RootNamespace>
     <IsPackable>false</IsPackable>
@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Arcodiant.Empyrean" Version="$(EmpyreanVersion)" />
+    <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
   </ItemGroup>
 
   <ItemGroup>
