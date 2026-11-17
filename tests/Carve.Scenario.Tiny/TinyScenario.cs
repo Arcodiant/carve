@@ -99,6 +99,10 @@ public sealed class TinyScenario(IConfiguration configuration, SeededRandom rand
             case "clock":
                 await ClockAsync(driver);
                 break;
+
+            case "release":
+                await ReleaseAsync(driver);
+                break;
         }
     }
 
@@ -109,6 +113,42 @@ public sealed class TinyScenario(IConfiguration configuration, SeededRandom rand
         var second = await driver.CaptureAsync("second", new { view = "front" });
         driver.AssertBytesEqual("repeat render", first.Pixels, second.Pixels);
         Console.Error.WriteLine($"tiny: frame {first.Width}x{first.Height} corner {first.Pixel(2, 2)} caption {first.Caption}");
+    }
+
+    // One face drawn in material m, redefined between renders: plain, textured from Tiny:TextureA, from Tiny:TextureB, the
+    // same drawn in the UV layout (which draws no material), plain again. After each, the engine's own counts, read once a few
+    // more renders have waited out the frames in flight.
+    private async Task ReleaseAsync(ScenarioDriver driver)
+    {
+        await driver.CallAsync("define_mesh", Quad);
+        await driver.CallAsync("set_uvs", new { faces = new[] { new { face = 0, uv = new[] { new[] { 0, 1 }, new[] { 1, 1 }, new[] { 1, 0 }, new[] { 0, 0 } } } } });
+        (object? Material, string Mode)[] stages =
+        [
+            (new { name = "m", base_colour = "#80A0C0" }, "shaded"),
+            (new { name = "m", base_colour_texture = configuration["Tiny:TextureA"] }, "shaded"),
+            (new { name = "m", base_colour_texture = configuration["Tiny:TextureB"] }, "shaded"),
+            (null, "uvs"),
+            (new { name = "m", base_colour = "#80A0C0" }, "shaded"),
+        ];
+        var resources = services.GetRequiredService<IGraphicsResourceManager>();
+        for (var i = 0; i < stages.Length; i++)
+        {
+            if (stages[i].Material is { } material) await Ok(driver, "define_material", material);
+            if (i == 0) await Ok(driver, "set_material", new { faces = new[] { 0 }, material = "m" });
+            foreach (var view in new[] { "front", "back", "front", "back", "front", "back" })
+                await Ok(driver, "render", stages[i].Mode == "uvs" ? new { mode = "uvs" } : new { view, mode = "shaded" });
+            var counts = resources.Residency;
+            Console.Error.WriteLine($"tiny: residency {i} textures {counts.TextureCount} table {counts.MaterialTableUsed}");
+        }
+    }
+
+    private static async Task Ok(ScenarioDriver driver, string tool, object arguments)
+    {
+        var result = await driver.CallAsync(tool, arguments);
+        if (result.IsError is true)
+        {
+            driver.Fail($"{tool}: {result.Content.OfType<TextContentBlock>().First().Text}");
+        }
     }
 
     // A render first, so that the frame loop has run and the delta is the engine's own reading.
