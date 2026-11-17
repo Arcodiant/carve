@@ -58,8 +58,8 @@ internal static class MeshUvHealth
             for (var j = i + 1; j < ids.Length; j++)
             {
                 var b = boxes[ids[j]];
-                // Two faces with different materials sample different textures, so sharing a UV area is no fault (T-80);
-                // the same material, or a face with no material, still warns.
+                // Two faces with different materials are not warned of (T-80's ruling 5), even when the materials share a PNG
+                // and so show the same texels; the same material, or a face with no material, still warns.
                 if (mesh.Style?.MaterialOf(ids[i]) is { } ma && mesh.Style.MaterialOf(ids[j]) is { } mb && ma != mb) continue;
                 if (a.MaxU <= b.MinU || b.MaxU <= a.MinU || a.MaxV <= b.MinV || b.MaxV <= a.MinV) continue;
                 var common = 0.0;
