@@ -122,7 +122,13 @@ public sealed class MaterialsScenario : IScenario
 
         var top = await CaptureAsync(driver, frames, "barrel-top", new { view = "+y", size = Size, mode = "shaded" });
         var topPool = new Pool(driver, top, new Shot(faces, min, max, Vector3.UnitY, Size), "top", materials, none);
-        topPool.Rings();
+        topPool.Rings(33);
+
+        // The bottom cap (face 32) is in sight in back and the sheet's back tile, but there a pixel spans 1.5 to 2.4 texels and the rings' light band
+        // is 5 wide (period 9): no footprint is all one class (P2). Straight under, as top is straight over, a pixel spans under 1, so it resolves.
+        var bottom = await CaptureAsync(driver, frames, "barrel-bottom", new { view = "-y", size = Size, mode = "shaded" });
+        var bottomPool = new Pool(driver, bottom, new Shot(faces, min, max, -Vector3.UnitY, Size), "bottom", materials, none);
+        bottomPool.Rings(32);
 
         // 3. Frame 4: close on the top hoop (face 30, the one most head-on to front).
         var target = faces[30].Centre;
@@ -142,7 +148,7 @@ public sealed class MaterialsScenario : IScenario
             {
                 case "front": tile.RuneGlows(3); tile.IronAndRust(); break;
                 case "back": tile.NoRune(); tile.IronAndRust(); break;
-                case "+y": tile.Rings(); break;
+                case "+y": tile.Rings(33); break;
                 default: tile.Wood(); tile.IronAndRust(); break;
             }
         }
@@ -269,7 +275,8 @@ public sealed class MaterialsScenario : IScenario
             foreach (var hit in shot.Sites(0, 0))
             {
                 if (!materials.TryGetValue(hit.Face.Face, out var name) || Texels.For(name) is not { } classify || Shot.Class(hit.Texel, hit.Half, classify) is not { } look) continue;
-                lines.Add($"{view}\t{hit.X}\t{hit.Y}\t{look}\t{hit.Face.Face}");
+                var (flipped, mirrored) = Pool.Flips(hit, look, classify);
+                lines.Add($"{view}\t{hit.X}\t{hit.Y}\t{look}\t{hit.Face.Face}\t{flipped}\t{mirrored}");
             }
         }
 

@@ -153,15 +153,14 @@ internal sealed class Shot
 
     /// <summary>
     /// Every pixel of the tile that is a P2 sample site: a face sees it, it is 3 px (scaled) clear of every drawn edge and 4 px of the tile's border,
-    /// and it is not under the caption.
+    /// and it is not under the tile's caption (a sheet captions every tile in its own top left corner, so the test is on the tile's own pixel, not the frame's).
     /// </summary>
     public IEnumerable<Hit> Sites(int captionWidth, int captionHeight)
     {
         for (var y = 4; y < Size - 4; y++)
         for (var x = 4; x < Size - 4; x++)
         {
-            var (fx, fy) = InFrame(x, y);
-            if (fx < captionWidth && fy < captionHeight) continue;
+            if (x < captionWidth && y < captionHeight) continue;
             if (At(x, y) is not { } hit || !Clear(new Vector2(x + 0.5f, y + 0.5f))) continue;
             yield return hit;
         }

@@ -70,12 +70,19 @@ internal sealed class Pool
 
             if (!materials.TryGetValue(hit.Face.Face, out var name) || Texels.For(name) is not { } classify) continue;
             if (Shot.Class(hit.Texel, hit.Half, classify) is not { } look) continue;
-            var flipped = Shot.Class(new Vector2(hit.Texel.X, Shot.TextureSize - hit.Texel.Y), hit.Half, classify);
-            var mirrored = Shot.Class(new Vector2(Shot.TextureSize - hit.Texel.X, hit.Texel.Y), hit.Half, classify);
-            _by[look].Add(new Sample(hit, look, flipped != look, mirrored != look));
+            var (flipped, mirrored) = Flips(hit, look, classify);
+            _by[look].Add(new Sample(hit, look, flipped, mirrored));
         }
 
         Log.Add($"{_what}\tsamples\t{string.Join(", ", _by.Select(e => $"{e.Key} {e.Value.Count}"))}");
+    }
+
+    /// <summary>Whether the hit's class would be another under a v-flipped texture, and under a u-mirrored one (P5).</summary>
+    public static (bool FlipV, bool MirrorU) Flips(Hit hit, Look look, Func<int, int, Look?> classify)
+    {
+        var flipped = Shot.Class(new Vector2(hit.Texel.X, Shot.TextureSize - hit.Texel.Y), hit.Half, classify);
+        var mirrored = Shot.Class(new Vector2(Shot.TextureSize - hit.Texel.X, hit.Texel.Y), hit.Half, classify);
+        return (flipped != look, mirrored != look);
     }
 
     public IReadOnlyList<Sample> Of(Look look) => _by[look];
@@ -188,12 +195,13 @@ internal sealed class Pool
         }
     }
 
-    /// <summary>The cap's pale rings: lit and warm. The rings are not resolved at +y (P2), so nothing finer is checked there (ruling 4).</summary>
-    public void Rings()
+    /// <summary>The cap's pale rings: lit and warm, and on the cap <paramref name="face"/> (33 the top, 32 the bottom). The rings are not resolved at +y (P2), so nothing finer is checked there (ruling 4).</summary>
+    public void Rings(int face)
     {
         Need(Look.RingLight);
         foreach (var s in _by[Look.RingLight])
         {
+            if (s.Hit.Face.Face != face) Fail($"end grain sample at ({s.Hit.X}, {s.Hit.Y}) is on face {s.Hit.Face.Face}, not the cap {face} in sight");
             var p = Pixel(s);
             if (Max(p) < T || !Warm(p)) Fail($"end grain at ({s.Hit.X}, {s.Hit.Y}) is {p}, not lit and warm (R > G > B by {M})");
         }
