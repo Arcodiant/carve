@@ -64,6 +64,7 @@
     <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Acceptance/Silhouette.cs" Link="Silhouette.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Orcward/GlbEdit.cs" Link="GlbEdit.cs" />
     <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
     <PackageReference Include="Arcodiant.Empyrean.Animation" Version="$(EmpyreanVersion)" />
     <PackageReference Include="SharpGLTF.Toolkit" Version="$(SharpGLTFVersion)" />

@@ -187,6 +187,38 @@ public class RenderGlbTests
     }
 
     /// <summary>
+    /// RV-52 finding 3, held by RV-53: with no clip, render_glb skins a skinned file at its bind pose, as a game does with no clip
+    /// playing, so a file whose skin is wrong (the thighs' inverse binds swapped, Orcward's <c>wrong-inverse-binds</c>) draws
+    /// wrong at rest too. Drawn as loaded, unskinned, the two rest frames would be the same.
+    /// </summary>
+    [Fact]
+    public async Task With_no_clip_a_file_with_a_wrong_skin_draws_wrong_at_rest()
+    {
+        using var carve = await StartAsync();
+        Assert.False(IsError(await carve.CallToolAsync("open", JsonSerializer.Serialize(new { path = Sample }))));
+        Assert.False(IsError(await carve.CallToolAsync("export", """{"path":"bind-gardener.glb"}""")));
+        var broken = Carve.Scenario.Orcward.GlbEdit.Read(File.ReadAllBytes(Path.Combine(Root, "bind-gardener.glb")));
+        broken.SwapInverseBinds("UpperLeg_L", "UpperLeg_R");
+        File.WriteAllBytes(Path.Combine(Root, "bind-gardener-wrong-binds.glb"), broken.Write());
+
+        var goodResult = await carve.CallToolAsync("render_glb", """{"path":"bind-gardener.glb","view":"+z"}""");
+        Assert.Contains("no clip: skinned at its bind pose", TextOf(goodResult, 1));
+        var good = Image(goodResult, "gardener-bind-rest-front-glb");
+        var wrong = Image(await carve.CallToolAsync("render_glb", """{"path":"bind-gardener-wrong-binds.glb","view":"+z"}"""), "gardener-wrong-binds-rest-front-glb");
+
+        var differing = 0;
+        for (var i = 0; i < Size * Size; i++)
+        {
+            var d = 0;
+            for (var c = 0; c < 3; c++) d = Math.Max(d, Math.Abs(good.Data[i * 4 + c] - wrong.Data[i * 4 + c]));
+            differing += d > 8 ? 1 : 0;
+        }
+
+        // D-6's frame rule fails a frame past 0.5 % of its pixels; Orcward measured this break at rest at 3.952 %.
+        Assert.True(differing * 200 > Size * Size, $"the wrong skin's rest frame differs from the good one by {differing} px, no more than 0.5 %: it was drawn unskinned");
+    }
+
+    /// <summary>
     /// T-82: render draws with the PBR material the loader makes from the exported file, so a render and a render_glb of the
     /// gardener at the same pose agree in shading under D-6's rule (a pixel differs past 8 of 255 in R, G or B; a frame fails
     /// past 0.5 % of its pixels). T-48 owns the full comparison; this keeps the shading gap T-47 measured (0.73 of the
