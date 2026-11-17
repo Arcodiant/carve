@@ -157,60 +157,35 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - Keep naming the long `verify` limit and the `test-artifacts/` trap in every brief.
 - Clean up the worktree folders `finish` leaves behind.
 
-### Hand-off
+### The rebase onto main (after the person's go, 2026-11-14 to 2026-11-16)
 
-The rebase onto `origin/main` at fb96f44 (0.8.2: M-5, B-2 and T-51) is done locally and not pushed; it stopped for the person.
-
-- **Done.** Conflicts resolved in T-45, T-50, T-47, T-48, T-49 (twice) and T-72, keeping both sides:
-  - export reads the game's limits in every mode, piece mode included;
-  - a piece warns on the game's `max_triangles` and `max_submeshes` but not on height (`GameLimits.Warnings(..., wholeBody: false)`);
-  - clip warnings and the not-planar fold come after the limit warnings.
-- **One fix on top**, 356b578: T-72's leaky-shed test sends each face's `Loop` (main's T-63 made faces objects). Checked by running `NotPlanarFoldToolTests` (4/4).
-- **Verify at 147bb3c** failed `review` (expected), `scenario-cuts` (12 checks), `scenario-gatehouse` (43 checks) and `server-regression` (the test fixed above).
-- **For the person.** The cuts and gatehouse failures are main's M-5 shade predictions: `ColourRule` from a grey face at `Checks.Exact`, under M-5's rulings of 2026-11-12. With T-82's PBR render they read 1 to 5 levels brighter than predicted, for example the door at (72, 46, 25) against (71, 43, 20). Making them pass would mean loosening the tolerance or re-modelling the prediction for PBR. Which rule wins is the person's call.
-- **The person's ruling (2026-11-14):** "Re-work the prediction": "ColourRule predicts the PBR result from T-82's light model (which reproduces frames within 1 level), and the tolerance stays at 2. Each changed check shown failing on its break. The crate's colour check, which passes today, follows the same rule."
-- **Second agent (Opus 5.5): T-82's model, as written, cannot hold the checks; stopped for the person again.** T-82's model (linear = albedo x (0.25 + 0.9 n.l / pi), light turned with the camera) is pure multiplication by albedo, so it predicts what straight multiplication does, up to its own error on grey; it was only ever checked on grey faces. The coloured faces carry an extra term that does not scale with albedo: PBR's specular lobe. Worked in the model (light and n.l from `tolight`, as T-82 did; script `%TEMP%\m19\model.py`), against the failing pixels from the last queued run:
-
-  | Face, view | Measured | T-82's model | Model + specular | Specular (linear) |
-  |---|---|---|---|---|
-  | door `#6b4423`, +Z, front (0.6, 0.35, 1) | (72, 46, 25) | (71, 44, 20), B off by 5 | (72, 46, 25) | 0.0024 |
-  | door, +Z ortho | (77, 49, 27) | (77, 48, 23), B off by 4 | (78, 50, 27) | 0.0027 |
-  | bottom wall `#4a7a9b`, +Y, front | (52, 85, 108) | (49, 84, 107), R off by 3 | (52, 85, 108) | 0.0037 |
-  | grey (0.72, 0.72, 0.70), +Z, front / ortho | | 151 / 162 | 151 / 163 | |
-
-  The specular term is the standard Cook-Torrance one with the shipped constants, added on top of T-82's diffuse with no fitted number: F0 0.04 (dielectric, `GlbExport.Metallic` 0), GGX at `GlbExport.Roughness` 1 (D = 1/pi), Smith G with k = (r+1)^2/8 = 0.5, Schlick Fresnel on v.h, the same light strength 0.9 as the diffuse, v the camera direction. One choice was made by the match: the diffuse is not scaled by (1 - F). With (1 - F) the door is (71, 45, 24) and the wall (51, 84, 106), still within 2. On grey the term is under 1 level, which is why T-82's model matched grey frames.
-- **Question for the person.** Implement `ColourRule` as T-82's diffuse plus this specular term (every check above within 2 at `Checks.Exact`, tolerance unchanged), or some other rule? Nothing is changed in code yet; the branch is still unpushed at the commit holding this Hand-off.
-- **The person's ruling (2026-11-14) on that question**, word for word: "Yes, diffuse + specular": "ColourRule predicts T-82's diffuse plus the standard PBR specular from the material's own settings; tolerance stays 2. Every check (cuts, gatehouse, crate) must land within it, each changed check shown failing on its break; any that doesn't comes back to you." The diffuse is not reduced by (1 - F): set by matching the frames, not by the settings (recorded at `ColourRule` too).
-- **Done by the second agent:** `ColourRule.Predict` and `ColourRule.Specular` (the light turned with the camera as `ViewFraming.LightOrientation` does, ported as `ToLight`); a coloured pixel is (the grey pixel of the same normal in the same frame - specular) x colour / grey + specular, in linear light. `CutsChecks.Predict` (knife, gatehouse) and the crate's `CheckSurface` use it; `Camera.Direction` added. Built with warnings as errors.
-- **Verify at b4f28b7:** every colour check now passes (`scenario-crate`, `scenario-gatehouse` and the cuts' 12), and so does `server-regression`. `review` fails (expected), and `scenario-cuts` fails 3 checks of another kind, so the run has stopped for the person again. `knife-slab-recess`'s wall check needs the pocket's lower left wall to differ from the pocket floor's predicted shade by more than 2 (`Checks.Exact`) in at least one channel. The wall reads (51, 84, 107) at <1.17, 1.1, 0.175>, <1.2, 1.05, 0.175> and <1.23, 1, 0.175>, against the floor's predicted (49, 82, 105): 2 apart in every channel. In the model the wall (n.l 0.655) is (51, 84, 107) and the floor (n.l 0.621) is (50, 83, 105), so under PBR the two really are within 2. The old prediction put the floor lower, at about (48, 81, 104), and that is the only reason the check passed before. The upper left wall (n.l 0, (35, 62, 81)) and the bottom wall ((52, 85, 108)) are not affected. **Question for the person:** drop the lower left wall from that check, check it some other way, or something else? The margin is not loosened without a ruling.
-- **Shown failing, worked in the model** (script `%TEMP%/m19/breaks.py`). Each figure is the largest channel's distance from the prediction in levels; the check fails past 2. The crate judges in linear light at its own 8 % + 0.004, unchanged:
-
-  | Changed check | Predicted (new rule) | Drawn as the model says | Break 1: drawn without the specular | Break 2: the face left grey |
-  |---|---|---|---|---|
-  | cuts knife: door, +Z, front | (72, 46, 25) | 0, passes | (71, 44, 20), 5, fails | (151, 151, 149), 124, fails |
-  | cuts knife: pocket floor, +Z, front | (50, 83, 105) | 0 | (48, 81, 105), 2, passes | 101, fails |
-  | cuts knife: bottom wall, +Y, front | (52, 85, 108) | 0 | (49, 84, 107), 3, fails | 103, fails |
-  | gatehouse: door, +Z, front | (72, 46, 25) | 0 | 5, fails | 124, fails |
-  | gatehouse: door, +Z ortho | (78, 50, 27) | 0 | (77, 48, 23), 4, fails | 134, fails |
-  | crate: lid panel, +Y, front | (44, 86, 144) | 0 | (40, 84, 143), 4 | 115, fails |
-  | crate: +Z band, front | (132, 52, 39) | 0 | (132, 50, 36), 3 | 105, fails |
-  | crate: +X band, front | (125, 48, 36) | 0 | (124, 47, 34), 2 | 100, fails |
-  | crate: lid panel, +Y, tilted | (46, 91, 152) | 0 | (43, 89, 151), 3 | 121, fails |
-  | crate: lid rim top, +Y, tilted | (152, 61, 46) | 0 | (151, 58, 43), 3 | 119, fails |
-
-  Every check fails on break 2 (the face not coloured). Break 1, a frame where the old multiplication would be right, is caught wherever the specular adds more than 2 levels, but not on the pocket floor or the crate's +X band. The breaks were worked in the model, not by breaking the product.
-- **Third agent (Opus 5.5), stopped at the checkpoint (about 60 calls; the capture review still to come).**
-  - **The person's ruling on the open check (2026-11-16)**, word for word: "Drop that wall from it": "The lower-left wall's three probes leave the 'differs from the floor' check. The bottom and upper-left walls still show the pocket has walls, and the lower-left wall keeps its own colour check (within 2 of its predicted shade)."
-  - **The wall change** (876ad64 after the rebase): the lower left wall had only the differs-from-floor check, so it now has its own colour check at `Checks.Exact`. It has no grey face of its normal, so its shade comes straight from T-82's light model plus the specular, `ColourRule.Lit` (`CutsChecks.Lit`): with the face's true normal (0.832, 0.555, 0), n.l 0.68, predicted (51, 84, 108), drawn (51, 84, 107). The comment cites the ruling. Shown failing in the model (`%TEMP%/m19/wall2.py`): the face left grey is (154, 154, 152), 103 off, fails; drawn without the specular, (49, 83, 107), 2 off, passes (as the pocket floor's break 1 does). Not shown by breaking the product.
-  - **The second rebase**, onto `origin/main` at 5bc4559 (M-6, UVs, 0.9.0), 61 commits, conflicts in five commits, both sides kept:
-    - T-45: `Program.cs`, the tool list keeps M-6's `set_uvs`, `unwrap` and `project_uvs` and adds `get_clips`; `ExportTool.cs`, the skinned export's UV warnings, then the clip warnings.
-    - T-50: `ExportTool.cs`, the limits with `wholeBody: !asPiece`, then the UV warnings (a piece gets them too), then the clip warnings.
-    - T-47: `Program.cs`, `render_glb` registered beside the UV tools; `RenderSystem.cs`, M-6's checker fields and seam lines kept with T-47's glb fields, and `ShowModel` hides the seam lines too under a loaded glb.
-    - T-84: `tests.json`, `server-regression` reads both `samples/barrel.carve` and `samples/gardener.carve`.
-    - T-72: `ExportTool.cs`, the static export's warnings are the limits, then the folded not-planar lines, then M-6's UV warnings.
-    - T-82 applied cleanly. M-6's checker look keeps its own `LitTextured` material, as CLAUDE.md says the other looks do, and `uvs` stays unlit.
-    - Built with warnings as errors; the unit tiers passed (Core 909, Server 337, SoftLoad 6).
-  - **What the rebase broke, fixed in df70148:** M-6's `The_exported_files_are_byte_identical_to_those_written_before_UVs` hashed main's pre-UV `gardener.glb`. T-84 changed the gardener's bytes before any UV work: `scenario-character` at a5d15ad (M-19 on fb96f44, no UVs) writes 181BE468..., and the rebased branch writes the same bytes, as it does `gardener.clips.glb` (still main's hash) and the hat piece. The guard now holds M-19's pre-UV hash and stays exact. **For the person to confirm:** a baseline moved to an equally strict value, not a loosening.
-  - **Verify at df70148:** every check but `review` passes (14 suites, 7 ran and 8 carried; `scenario-character` ran).
-  - **Frames compared by hash**, main at 5bc4559 (jobs J-20261117-011449-761e7f, J-20261117-011450-4daf77, J-20261117-011451-1a3cb9) against M-19's last runs: `scenario-cuts` 10 of 16 differ, `scenario-gatehouse` 23 of 26, `scenario-uvs` 0 of 22 (M-6's frames are unchanged by the PBR render). No frame was opened.
-  - **Left:** put the 16 pairs already copied to `C:\Users\andre\artifacts\carve\M-19\rebase\round-1` (32 files, `<frame>-main.png` beside `<frame>-m19.png`: six cuts frames, `knife-slab-recess` among them, and ten gatehouse ones, the sheet and the labelled reveal among them) to the person with `mcp__waystone__review`. Then remove this Hand-off, folding the conflicts of both rebases, the rulings (2026-11-14 twice, 2026-11-16), the guard hash and the shown-failing table into a short note under the Retrospective; commit, `git push --force-with-lease origin milestone/M-19`, `cairn lint`.
+- **Two rebases, by three Opus 5.5 agents.**
+  - The first was onto `fb96f44` (0.8.2: M-5's cuts and gatehouse, B-2, T-51).
+  - The second was onto `5bc4559` (M-6's UVs, 0.9.0).
+- **Every conflict kept both sides:**
+  - Export reads the game's limits (T-51) in every mode.
+  - A piece warns on triangles and submeshes but not on height (`GameLimits.Warnings(..., wholeBody: !asPiece)`), which keeps T-50's rule.
+  - After the limit warnings come the UV warnings, the clip warnings (T-45) and the folded not-planar lines (T-72).
+  - The tool list keeps M-6's `set_uvs`, `unwrap` and `project_uvs`, and adds `get_clips` and `render_glb`.
+  - `RenderSystem` keeps M-6's checker and seam lines beside T-47's glb fields, and a loaded glb hides the seams too.
+  - M-6's checker look keeps its own `LitTextured` material, and `uvs` stays unlit. Only the model's own colours are drawn with PBR (T-82).
+- **What the rebases broke, and the fixes:**
+  - T-72's leaky-shed test now sends each face's `Loop`, because main's T-63 made faces objects.
+  - M-5's colour checks (`ColourRule`, within 2) failed under PBR by 1 to 5 levels: PBR adds a specular term that does not scale with the colour.
+    - **The person's rulings (2026-11-14):** first "Re-work the prediction", then "Yes, diffuse + specular".
+    - `ColourRule` now predicts T-82's diffuse plus the standard PBR specular from the material's own settings (F0 0.04, roughness 1, light 0.9). The tolerance is still 2. The diffuse is not reduced by Fresnel; that was set by matching the frames.
+    - The cuts, gatehouse and crate colour checks pass under it.
+    - Shown failing in the model, not by breaking the product. A face left grey fails every check. Drawn without the specular, it fails every check but the pocket floor and the crate's +X band.
+  - `knife-slab-recess`'s lower-left pocket wall is within 2 of the floor under PBR (n.l 0.655 against 0.621).
+    - **The person's ruling (2026-11-16):** "Drop that wall from it".
+    - The wall leaves the differs-from-the-floor check and keeps a colour check of its own (`ColourRule.Lit`): predicted (51, 84, 108), drawn (51, 84, 107).
+  - M-6's byte-identity guard on `gardener.glb` held main's pre-UV hash, and T-84's shoulder fix changed the gardener's bytes.
+    - The guard now holds M-19's pre-UV hash (181BE468...), still an exact check.
+    - **The person accepted the new pin (2026-11-16).**
+- **Frames:**
+  - Against `main` at 5bc4559, 10 of 16 `scenario-cuts` frames and 23 of 26 `scenario-gatehouse` frames changed under PBR. `scenario-uvs` changed 0 of 22.
+  - **The person approved 16 pairs** (`C:\Users\andre\artifacts\carve\M-19\rebase\round-1`) on 2026-11-16.
+- **`cairn milestone M-19 verify` at df70148:** every check but `review` passes, across 14 suites (7 ran, 8 carried).
+- **Not checked:**
+  - The colour and wall breaks were worked in the light model, not by breaking the product.
+  - In perspective frames, the specular uses the camera's direction, not each pixel's.
