@@ -47,6 +47,13 @@ internal static class CutsChecks
         return Srgb(lit[0], lit[1], lit[2]);
     }
 
+    /// <summary>The pixel of a face coloured <paramref name="hex"/> straight from T-82's light model (<see cref="ColourRule.Lit"/>).</summary>
+    public static Rgb Lit(string hex, Vector3 normal, Vector3 direction)
+    {
+        var lit = ColourRule.Lit(hex, normal, direction);
+        return Srgb(lit[0], lit[1], lit[2]);
+    }
+
     /// <summary>
     /// The ray test must give <paramref name="face"/> at every probe named <paramref name="name"/> it is sure of, and be
     /// sure of at least <paramref name="least"/> of them.

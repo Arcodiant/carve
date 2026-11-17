@@ -53,6 +53,19 @@ internal static class ColourRule
     }
 
     /// <summary>
+    /// The pixel, in linear light, of a face coloured <paramref name="hex"/> straight from T-82's light model, for a face
+    /// with no grey face of the same normal in the frame: albedo x (ambient 0.25 + the light x n.l / pi) plus the specular.
+    /// </summary>
+    public static double[] Lit(string hex, Vector3 normal, Vector3 direction)
+    {
+        var (r, g, b) = (Convert.ToInt32(hex[1..3], 16), Convert.ToInt32(hex[3..5], 16), Convert.ToInt32(hex[5..7], 16));
+        var nl = Math.Max(0, Vector3.Dot(Vector3.Normalize(normal), ToLight(direction)));
+        var diffuse = 0.25 + (Light * nl / Math.PI);
+        var s = Specular(normal, direction);
+        return [(Linear(r) * diffuse) + s, (Linear(g) * diffuse) + s, (Linear(b) * diffuse) + s];
+    }
+
+    /// <summary>
     /// The specular a face of <paramref name="normal"/> adds, in linear light, seen along <paramref name="direction"/>
     /// (towards the eye, as <c>render</c> takes it): D G F / (4 n.l n.v) x n.l x the light, with the light turned with
     /// the camera as <c>render</c> turns it.
