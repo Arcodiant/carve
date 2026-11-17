@@ -182,7 +182,7 @@ public sealed class ExportTool(ModelStore store)
         return Line($"exported {target.Written(replaced)} as clips, with no mesh: "
             + $"{N(skeleton.Bones.Count)} bone(s) {NameList.Quoted(skeleton.Names)}, {N(model.Clips.Count)} clip(s) {NameList.Quoted(model.Clips.Select(c => c.Name))}"
             + source.Describe(written: false)
-            + (warnings.Count > 0 ? $"; {N(warnings.Count)} warning(s): " + string.Join("; ", warnings) : ""));
+            + WarningsSuffix(warnings));
     }
 
     /// <summary>Piece mode: the named meshes with the whole skeleton and no clips, or a refusal that writes nothing.</summary>
@@ -230,9 +230,7 @@ public sealed class ExportTool(ModelStore store)
         warnings.AddRange(ClipChecks.Check(model));
         foreach (var piece in model.Meshes)
             warnings.AddRange(MeshWarningFold.Lines(MeshReport.Create(piece.Mesh).Warnings).Select(w => $"mesh '{piece.Name}': " + w.ReplaceLineEndings(" ")));
-        if (warnings.Count > 0)
-            line += $"; {N(warnings.Count)} warning(s): " + string.Join("; ", warnings);
-        return Line(line);
+        return Line(line + WarningsSuffix(warnings));
     }
 
     /// <summary>The result line; numbers are culture-invariant.</summary>
@@ -256,8 +254,6 @@ public sealed class ExportTool(ModelStore store)
             + $"size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}"
             + limits;
         var warnings = limitWarnings.Concat(MeshWarningFold.Lines(report.Warnings)).Select(w => w.ReplaceLineEndings(" ")).Concat(uvWarnings).ToList();
-        if (warnings.Count > 0)
-            line += $"; {warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): " + string.Join("; ", warnings);
-        return line;
+        return line + WarningsSuffix(warnings);
     }
 }

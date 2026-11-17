@@ -111,7 +111,7 @@ public sealed class SaveTool(ModelStore store)
 
         var warnings = ClipChecks.Check(model);
         return Line($"saved {target.Written(replaced)}: {Summary(model)}"
-            + (warnings.Count > 0 ? $"; {warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): " + string.Join("; ", warnings) : "")
+            + WarningsSuffix(warnings)
             + string.Concat(MissingTextures(model).Select(w => "\nwarning: " + w)));
     }
 

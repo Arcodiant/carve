@@ -21,6 +21,11 @@ internal static class MeshToolSupport
     public static CallToolResult Line(string text) =>
         new() { Content = [new TextContentBlock { Text = text }] };
 
+    /// <summary>A result line's warnings: "; N warning(s): a; b", or nothing when there are none.</summary>
+    public static string WarningsSuffix(IReadOnlyCollection<string> warnings) => warnings.Count > 0
+        ? $"; {warnings.Count.ToString(CultureInfo.InvariantCulture)} warning(s): " + string.Join("; ", warnings)
+        : "";
+
     public static CallToolResult Ok(object body) => Line(JsonSerializer.Serialize(body));
 
     public static CallToolResult Error(string text) =>
