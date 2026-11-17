@@ -35,7 +35,7 @@ internal static class MaterialJson
             : null;
 }
 
-public sealed class DefineMaterialTool(ModelStore store)
+public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
 {
     public const string Text =
         "Defines a named material, the PBR look of a surface: define_material(name, and any of base_colour, metallic, roughness, emissive, occlusion, double_sided and five texture paths). "
@@ -113,7 +113,7 @@ public sealed class DefineMaterialTool(ModelStore store)
         {
             var path = OptionalString(field, value, errors);
             if (path is null) continue;
-            if (LoadTexture(field, path, out var texture, out var problem)) loaded[field] = texture!;
+            if (LoadTexture(field, path, toolFolder.Directory, out var texture, out var problem)) loaded[field] = texture!;
             else errors.Add(problem!);
         }
         // An emissive_texture with no emissive glows as it is (a default black emissive would hide it).
@@ -137,11 +137,11 @@ public sealed class DefineMaterialTool(ModelStore store)
         return Ok(new { replaced, material = MaterialJson.Of(material), warnings });
     }
 
-    /// <summary>Resolves, finds and reads one texture path; false with <paramref name="problem"/> (named by the argument) when it cannot.</summary>
-    private static bool LoadTexture(string field, string path, out MaterialTexture? texture, out string? problem)
+    /// <summary>Resolves (against <paramref name="baseDirectory"/>, the working directory when null), finds and reads one texture path; false with <paramref name="problem"/> (named by the argument) when it cannot.</summary>
+    private static bool LoadTexture(string field, string path, string? baseDirectory, out MaterialTexture? texture, out string? problem)
     {
         texture = null;
-        var target = ToolPaths.Resolve("define_material", path, ".png", out var pathError, verb: "reads");
+        var target = ToolPaths.Resolve("define_material", path, ".png", out var pathError, baseDirectory, verb: "reads");
         if (target is null)
         {
             problem = field + ": " + pathError!["define_material: ".Length..];

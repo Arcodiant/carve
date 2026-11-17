@@ -71,13 +71,8 @@ if (!services.Any(d => d.ServiceType == typeof(ITransport)))
     mcp.WithStdioServerTransport();
 }
 
-services.AddSingleton(RenderTool.Create);
-services.AddSingleton(RenderGlbTool.Create);
-mcp.WithTools([DefineMeshTool.Create(), MoveTool.Create(), ExtrudeTool.Create(), SubdivideTool.Create(), DeleteTool.Create(), MergeFacesTool.Create(), BridgeTool.Create(), PlaneCutTool.Create(), LoopCutTool.Create(), KnifeTool.Create(), GetMeshTool.Create(), UndoTool.Create(), ExportTool.Create(), SaveTool.Create(), OpenTool.Create(), CheckTool.Create(), SelectTool.Create(), DefineGroupTool.Create(), SetColourTool.Create(), DefineMaterialTool.Create(), SetMaterialTool.Create(), SetShadingTool.Create(), MarkEdgesTool.Create(), SetUvsTool.Create(), UnwrapTool.Create(), ProjectUvsTool.Create(), DefineSkeletonTool.Create(), GetSkeletonTool.Create(), SetWeightsTool.Create(), GetWeightsTool.Create(), WeighTool.Create(), DefineClipTool.Create(), DeleteClipTool.Create(), GetClipsTool.Create()]);
+CarveServer.AddTools(services, mcp);
 
-services.AddSingleton<EngineStatus>();
-services.AddSingleton<ModelStore>();
-services.AddSingleton<RenderQueue>();
 services.AddSingleton<RenderComposition>();
 services.UseRenderPipeline<RenderComposition>();
 services.AddSystem<RenderSystem>();

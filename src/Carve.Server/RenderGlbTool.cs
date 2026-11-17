@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Empyrean;
+using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using static Carve.Server.MeshToolSupport;
@@ -53,7 +54,8 @@ internal static class RenderGlbTool
         RequestContext<CallToolRequestParams> context,
         EngineStatus status,
         RenderQueue queue,
-        IModelGeometryLoader loader,
+        ToolFolder toolFolder,
+        IServiceProvider services,
         [Description("The .glb file to draw, absolute or relative to carve's working directory.")] string? path = null,
         JsonElement? clip = null,
         JsonElement? time = null,
@@ -80,7 +82,10 @@ internal static class RenderGlbTool
         var (clipName, clipTime) = ReadClip(clip, time, problems);
         if (problems.Count > 0) return Failed(Name, problems);
 
-        var file = ToolPaths.Resolve(Name, path, ".glb", out var pathError, verb: "reads");
+        await status.WhenSettled.WaitAsync(cancellationToken);
+        if (status.FaultMessage is { } fault) return Error(fault);
+
+        var file = ToolPaths.Resolve(Name, path, ".glb", out var pathError, toolFolder.Directory, verb: "reads");
         if (file is null) return Error(pathError!);
         if (Directory.Exists(file.FullPath)) return Error($"{Name}: {file.FullPath} is a folder, not a file");
         if (!File.Exists(file.FullPath)) return Error($"{Name}: no file at {file.FullPath}");
@@ -92,7 +97,7 @@ internal static class RenderGlbTool
             return Error($"{Name}: could not read {file.FullPath}: {e.Message}");
         }
 
-        var glb = GlbScene.Prepare(loader, bytes, clipName, clipTime, problems);
+        var glb = GlbScene.Prepare(services.GetRequiredService<IModelGeometryLoader>(), bytes, clipName, clipTime, problems);
         if (glb is null) return Failed(Name, problems);
 
         var targetVector = target is null ? (System.Numerics.Vector3?)null : RenderTool.Vector(target);

@@ -7,7 +7,7 @@ using static Carve.Server.MeshToolSupport;
 
 namespace Carve.Server;
 
-public sealed class OpenTool(ModelStore store)
+public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
 {
     /// <summary>How many .carve files a missing-file error lists before it counts the rest.</summary>
     internal const int ListLimit = 20;
@@ -45,7 +45,7 @@ public sealed class OpenTool(ModelStore store)
     {
         if (PathAndMeshArguments("open", context, path, mesh, out var text, out var name) is { } refused) return refused;
 
-        var target = ToolPaths.Resolve("open", text, SaveTool.Extension, out var pathError, verb: "reads");
+        var target = ToolPaths.Resolve("open", text, SaveTool.Extension, out var pathError, toolFolder.Directory, verb: "reads");
         if (target is null) return Error(pathError!);
 
         if (Directory.Exists(target.FullPath)) return Error($"open: {target.FullPath} is a folder, not a file");

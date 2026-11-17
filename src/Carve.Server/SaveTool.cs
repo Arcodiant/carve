@@ -8,7 +8,7 @@ using static Carve.Server.MeshToolSupport;
 
 namespace Carve.Server;
 
-public sealed class SaveTool(ModelStore store)
+public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
 {
     public const string Extension = ".carve";
 
@@ -101,7 +101,7 @@ public sealed class SaveTool(ModelStore store)
             model = model.Piece(name)!;
         }
 
-        var target = ToolPaths.Resolve("save", text, Extension, out var pathError);
+        var target = ToolPaths.Resolve("save", text, Extension, out var pathError, toolFolder.Directory);
         if (target is null) return Error(pathError!);
 
         var folder = Path.GetDirectoryName(target.FullPath)!;

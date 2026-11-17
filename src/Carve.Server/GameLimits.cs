@@ -165,9 +165,11 @@ public sealed record LimitsSource(GameLimits Limits, string? Path, bool Found, I
     /// Finds and reads the limits for an export to <paramref name="target"/>. Null, with <paramref name="error"/> a whole
     /// tool error, when the named file is missing (and not to be written), is unreadable or is not a valid limits file.
     /// </summary>
-    public static LimitsSource? Find(string tool, string? argument, bool write, string target, out string? error)
+    public static LimitsSource? Find(string tool, string? argument, bool write, string target, out string? error, string? baseDirectory = null)
     {
         error = null;
+        // A relative argument is looked at from baseDirectory, as ToolPaths.Resolve reads it; null is the working directory.
+        string Rooted(string relative) => baseDirectory is null ? relative : System.IO.Path.Combine(baseDirectory, relative);
         var from = System.IO.Path.GetDirectoryName(target)!;
         string? path = null;
         if (argument is not null)
@@ -180,15 +182,15 @@ public sealed record LimitsSource(GameLimits Limits, string? Path, bool Found, I
                 return null;
             }
             var trimmed = argument.TrimEnd('/', '\\');
-            if (File.Exists(argument) && !argument.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            if (File.Exists(Rooted(argument)) && !argument.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             {
                 error = $"{tool}: limits: \"{argument}\" is a file but not a .json one; give a folder holding {GameLimits.FileName} or a .json file. Nothing was written.";
                 return null;
             }
-            var candidate = trimmed.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && !Directory.Exists(trimmed)
+            var candidate = trimmed.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && !Directory.Exists(Rooted(trimmed))
                 ? argument
                 : System.IO.Path.Combine(argument, GameLimits.FileName);
-            if (ToolPaths.Resolve($"{tool}: limits", candidate, ".json", out var pathError, verb: "reads") is not { } resolved)
+            if (ToolPaths.Resolve($"{tool}: limits", candidate, ".json", out var pathError, baseDirectory, verb: "reads") is not { } resolved)
             {
                 error = $"{pathError}. Nothing was written.";
                 return null;

@@ -14,6 +14,18 @@ public sealed class EngineStatus
     public string? FaultMessage => _faultMessage;
 
     /// <summary>
+    /// A status already faulted with <paramref name="message"/>, for a host built with no engine (the unit harness in
+    /// <c>tests/Carve.Server.Tests</c>, T-87): whatever needs the engine refuses at once with the message instead of
+    /// waiting for an engine that never comes.
+    /// </summary>
+    public static EngineStatus Faulted(string message)
+    {
+        var status = new EngineStatus();
+        status.SetFaulted(message);
+        return status;
+    }
+
+    /// <summary>
     /// Completes once the engine is ready, has faulted or has stopped, and never throws: after
     /// awaiting it, check <see cref="FaultMessage"/>. A fault can also arrive after this has
     /// completed, so check it each time.
