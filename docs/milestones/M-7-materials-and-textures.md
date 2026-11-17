@@ -276,6 +276,12 @@ The looks add no sound, motion or feel, so the person's look at the frames of T-
   - The new real-`carve` release test fails when the `Keep` call is deleted, given only the drawn set, or moved before the swap. Calling it with the model's materials alone cannot be told apart: in every reachable state the drawn set is a subset of them.
   - Run on the fixes, at `3f9ba34` (code identical to the landed `3893cf6`): all 12 frame and materials suites ran through the queue (the 11 frame suites, whose frames make `head.sha256`, and scenario-materials), and server-unit and server-regression were carried from the first fixer's runs on that same commit; server-regression's run passed 584 tests, including the new release test. server-regression also ran at `307d692` (561 passing) for the frame base. The round-3 reviewer ran `RenderReleaseTests` and `PbrReleaseTests` again (3 of 3 passing).
   - The reviewer's harness refused its findings file, so it returned them in its report and the orchestrator copied them in.
+- **Rounds 3 to 5 (RV-49 to RV-51), one Opus reviewer each:**
+  - RV-49 found all 7 of RV-48's answers holding, and no code defect. It confirmed the `_materials`-alone break is unreachable, and that the Tiny test scenario's engine package reference is within CLAUDE.md's rule, which binds `scenarios/`. It raised 2 records-only Nits: commits cited that the rebase had replaced, and round 2's runs not recorded.
+  - RV-50 read documents only. It found both answers holding, and one Nit: the 584 tests were given to two suites.
+  - RV-51 checked that one line and had no findings. The person chose to fix that last Nit and run round 5 rather than skip it.
+  - Only `scenario-materials`' queued run at `3f9ba34` rests on a fixer's report alone, which was not kept.
+- **The closing `verify`** on `a340a87` passes every check, the review included (RV-51, current at patch-id `54c3facfe595`). It ran 4 suites and carried 11 from `3f9ba34` and `9e79cd1`, whose code is the head's.
 - **Orchestrator errors in this phase:**
   - This Retrospective first said T-78's and T-80's evidence was still on disk, and that the closing `verify` was all carried. Both were wrong, and both were corrected from RV-47.
   - A backslash in a path was eaten in transit to Python, and was repaired before commit.
