@@ -72,13 +72,15 @@ public static class GlbExport
 
         public ImageBuilder Of(MaterialTexture texture)
         {
-            var bytes = texture.Png.ToArray();
-            var key = Convert.ToHexString(SHA256.HashData(bytes));
+            var key = HashOf(texture);
             if (!_byHash.TryGetValue(key, out var image))
-                _byHash[key] = image = ImageBuilder.From(new MemoryImage(bytes));
+                _byHash[key] = image = ImageBuilder.From(new MemoryImage(texture.Png.ToArray()));
             return image;
         }
     }
+
+    /// <summary>The SHA-256 of a texture's PNG bytes, in hex: the key export and render share a PNG by.</summary>
+    internal static string HashOf(MaterialTexture texture) => Convert.ToHexString(SHA256.HashData(texture.Png.AsSpan()));
 
     /// <summary>
     /// The glTF metallic-roughness material of a Carve material: base colour factor (linear, alpha 1), metallic and roughness

@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Security.Cryptography;
 using Carve.Core;
 using Empyrean;
 using CarveMaterial = Carve.Core.Material;
@@ -42,10 +41,9 @@ internal sealed class PbrMaterials(IGraphicsResourceManager resources, ITextureL
     /// <summary>The texture of <paramref name="texture"/>'s PNG in the colour space asked, uploaded once.</summary>
     public Texture Texture(MaterialTexture texture, bool srgb)
     {
-        var bytes = texture.Png.ToArray();
-        var key = (Convert.ToHexString(SHA256.HashData(bytes)), srgb);
+        var key = (GlbExport.HashOf(texture), srgb);
         if (_textures.TryGetValue(key, out var made)) return made;
-        var image = loader.DecodeCpu(bytes);
+        var image = loader.DecodeCpu(texture.Png.ToArray());
         made = resources.CreateTexture(image.Pixels, image.Width, image.Height,
             srgb ? TextureFormat.Rgba8Srgb : TextureFormat.Rgba8Unorm, Sampler, generateMipmaps: true);
         _textures[key] = made;
