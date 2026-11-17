@@ -157,7 +157,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - Keep naming the long `verify` limit and the `test-artifacts/` trap in every brief.
 - Clean up the worktree folders `finish` leaves behind.
 
-### The rebase onto main (after the person's go, 2026-11-14 to 2026-11-16)
+### The rebase onto main (after the person's go, 2026-11-14 to 2026-11-17)
 
 - **Two rebases, by three Opus 5.5 agents.**
   - The first was onto `fb96f44` (0.8.2: M-5's cuts and gatehouse, B-2, T-51).
@@ -189,34 +189,4 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 - **Not checked:**
   - The colour and wall breaks were worked in the light model, not by breaking the product.
   - In perspective frames, the specular uses the camera's direction, not each pixel's.
-
-### Hand-off
-
-Third rebase, onto `origin/main` 720a6fa (M-7, 0.10.0). **Rebased locally, not pushed** (`origin/milestone/M-19` is still 7ac5790). The earlier hand-off (the sky model, the eleven-row table) is in git at 6d575ac.
-
-- **Ruling (the person), 2026-11-17, "Accept all":** every row of that table as proposed, D-6's rule to luma past 4, the gardener pin to M-19's hash.
-- **Done by the fourth agent (Opus 5.5), commit 6335267** (build warnings-as-errors clean). Every changed check cites the ruling and date:
-  1. Front views: `CheckFrontOrder` (cube, crate, crate-sheet-four; export via `CrateBuild.CheckFront`), top over +Z and each face over the background; the back view keeps `CheckOrder`. `RenderTests`' three-face test skips +Z over +X in the Front case only.
-  2. `cube-zoom3-corner` expects 2 shades.
-  3. Cylinder: `sideOther` is facet 1, the pair held to `SideEnds` 4 (flat, smooth, subdivided); the smooth facet-14 grade check removed (the flat plateau `CheckSame` kept); the soft-rimmed side's other end is facet 1 at mid height pulled to 0.9 radius (`softSideOther`), `MinimumStep` 6.
-  4. Soft torso: `FacetStep` 5, `SmoothStep` 4; the span counts distinct luma shades, smooth 5 or more, flat 3 or fewer.
-  5. `ColourRule.GreyRedLessBlue(normal, direction)` (and `ColourRule.Encode`); crate and shed "not highlighted" is R - B within 6 of it. `ColourRule.cs` is now linked by Shed, Character, Soft, Orcward and Uvs.
-  6. `GardenerPixels.ExpectGroup(..., normal, direction)` classifies against the palette lit by `ColourRule.Lit`; used by both `CheckRest`s (each face's own normal, `MeshSpec.Normal`, Newell). The other `ExpectGroup` points keep the bare palette (they passed in the sweep).
-  7. `Comparison.Differs`: luma (0.2126, 0.7152, 0.0722) of the sRGB difference past 4 (`PixelThreshold` 4.0); comments in the Orcward and Acceptance scenarios, `OrcwardLoadTests`, CLAUDE.md; D-6 records the rule, the date and the measured table.
-  8. `ExportHashTests` pinned to `F67B98974F443A7BA59A8694E547FCD2416C3303232025E2A4319C468237BD63`. Probed in full, all 64 digits: M-19 now and 7ac5790 (a probe test in a temporary detached worktree, removed) both write it.
-- **Shown failing** (local runs of cube, crate, shed, soft, character with a temporary `BreakProbe`, reverted, not committed; patch and log in `C:\Users\andre\artifacts\carve\M-19\rebase\round-3\breaks\`). Each broken frame is made from the run's own frame:
-  - Row 1: cube-front flipped upside down fails (top 201 against +Z 201). Mirrored in X it is not caught (the check never told a mirror apart; +Z/+X did).
-  - Row 2: the corner frame in one shade fails (1 shade, expected 2).
-  - Row 3a: flat, smooth and subdivided sides in one shade fail (197/197). Measured 191 against 197 (6 apart, limit 4). Mirrored or flipped frames are not caught: those points still differ.
-  - Row 3c: the soft side in one shade fails (199/199). Measured 188 against 199 (11, limit 6). Mirrored or flipped frames not caught.
-  - Rows 4a/4b: the flat frame judged as smooth fails (step 7 > 4); the smooth one judged as flat fails (step 2 < 5).
-  - Row 5: the crate's frame band with every face highlighted fails (R - B 104 against the grey's -47); the shed's 18 of 18 points fail the same way.
-  - Row 6: the skin face's pixel read as boots fails in the character and both soft frames (reads skin, match 1.000).
-  - Row 7: the twists themselves are the breaks; not yet read off this round's `differences.tsv`.
-  - Row 8: the old pin failed against M-19's bytes (run above).
-  - A caught probe still sets the run's `failure` in `run.json`, so these local runs exit 1 on the probe's message. That says nothing about the real checks.
-- **Left:**
-  1. `cairn milestone M-19 verify` at 6335267 (or this hand-off's commit) was started and still queued behind other projects' runner jobs when this agent stopped. Rerun it, background, and paste its output. Every check but `review` must pass, including `scenario-sky` and `OrcwardLoad` under the luma rule; read the twists' patches and the good frames' from its `differences.tsv` for D-6's table.
-  2. Compare every suite's frames by hash against `main` at 720a6fa; the review (`mcp__waystone__review`, under `round-3\review`, at most 32 files, main beside M-19: cube, crate, shed, gardener at rest and in a clip, soft gardener, cuts and gatehouse, an Orcward triptych; context: the sky's blue cast and flatter contrast are expected under the ruling).
-  3. Replace this hand-off with a short paragraph in *The rebase onto main*, commit, check `origin/main` is still 720a6fa, `git push --force-with-lease origin milestone/M-19`, `cairn lint`.
-- **Not checked:** the luma rule on T-49's acceptance rounds (no round folder run); the lit-palette rule only on the `CheckRest` points; the row 7 twists under the luma rule only in the round-3 model (`twist-measures.tsv`), not yet in a run.
+- **The third rebase, onto `720a6fa` (M-7's sky, 0.10.0), 2026-11-17, by two Opus 5.5 agents.** The conflicts kept both sides as before. Under M-7's sky eleven of M-19's checks moved; the sky's light was measured (`scenario-sky`, 26 normals) and `ColourRule` extended with it, and **the person ruled "Accept all" (2026-11-17)** on the table of every moved check, re-derived under the sky (6335267): front views judged top over +Z and each face over the background, `cube-zoom3-corner` at 2 shades, the cylinder's sides by facet 1, the soft torso's steps and shade counts, "not highlighted" by `ColourRule.GreyRedLessBlue`, the gardener's rest points against the lit palette, and `ExportHashTests` pinned to M-19's `F67B9897...` hash. **D-6's frame rule is now luma past 4** (`Comparison.Differs`, `PixelThreshold` 4.0). In the verify run's Orcward table the good frames differ by at most 2 pixels (walk 0.250 side) and every twist fails: Hand_L Y45 190 pixels, patch 101; Y90 249, 185; X45 399, 396; Z45 291, 285; Z90 598, 597 (limit 50). Each ruled check was shown failing on a broken frame made from a run's own (probe reverted, in `round-3\breaks`). The gaps: the breaks were made on frames, not by breaking the product, and a mirrored camera is not caught by row 1 (cube front), row 3a (cylinder sides) or row 3c (soft rim), whose points still differ. Against `main` by hash: cube 27 of 32 frames changed, crate 50/69, shed 8/10, character 21/21, soft 11/11, cuts 10/16, gatehouse 23/26, export 5/7, rig 2/9, materials 2/23; uvs 0/22 and viewer-cube 0/6 are unchanged; main has no sky or Orcward suite. **The person approved 15 pairs and two Orcward triptychs** (`round-3\review`, 2026-11-17). `cairn milestone M-19 verify` at 1e2c497: every check but `review` passes, across 17 suites (17 ran). Not checked: the luma rule on T-49's acceptance rounds (no round folder run), and the lit palette only at the `CheckRest` points.
