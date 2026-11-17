@@ -26,13 +26,19 @@ internal static class TestPng
             (raw[i], raw[i + 1], raw[i + 2]) = (r, g, b);
         }
 
-        using var packed = new MemoryStream();
-        using (var z = new ZLibStream(packed, CompressionLevel.Optimal, leaveOpen: true)) z.Write(raw);
         var header = new byte[13];
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(header, (uint)width);
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(4), (uint)height);
         header[8] = 8;
         header[9] = 2;
+        return Write(header, raw);
+    }
+
+    /// <summary>A PNG of <paramref name="header"/> (the IHDR data) and the filtered scanlines <paramref name="raw"/>, deflated.</summary>
+    public static byte[] Write(byte[] header, byte[] raw)
+    {
+        using var packed = new MemoryStream();
+        using (var z = new ZLibStream(packed, CompressionLevel.Optimal, leaveOpen: true)) z.Write(raw);
         using var png = new MemoryStream();
         png.Write([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         Chunk(png, "IHDR", header);

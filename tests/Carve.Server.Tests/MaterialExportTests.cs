@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using System.Numerics;
 using System.Text;
 using System.Text.Json;
@@ -29,27 +28,7 @@ public class MaterialExportTests
             raw.Add(0);
             for (var x = 0; x < 2; x++) raw.AddRange([(byte)(seed + x), (byte)((seed * 3) + y), seed, 255]);
         }
-        using var deflated = new MemoryStream();
-        using (var z = new ZLibStream(deflated, CompressionLevel.Optimal, leaveOpen: true)) z.Write(raw.ToArray());
-        var png = new List<byte> { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
-        Chunk(png, "IHDR", [0, 0, 0, 2, 0, 0, 0, 2, 8, 6, 0, 0, 0]);
-        Chunk(png, "IDAT", deflated.ToArray());
-        Chunk(png, "IEND", []);
-        return [.. png];
-    }
-
-    private static void Chunk(List<byte> png, string type, byte[] data)
-    {
-        png.AddRange(BitConverter.GetBytes((uint)data.Length).Reverse());
-        var body = Encoding.ASCII.GetBytes(type).Concat(data).ToArray();
-        png.AddRange(body);
-        var crc = uint.MaxValue;
-        foreach (var b in body)
-        {
-            crc ^= b;
-            for (var k = 0; k < 8; k++) crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320u : crc >> 1;
-        }
-        png.AddRange(BitConverter.GetBytes(~crc).Reverse());
+        return TestPng.Write([0, 0, 0, 2, 0, 0, 0, 2, 8, 6, 0, 0, 0], [.. raw]);
     }
 
     internal static MaterialTexture Texture(string name, byte seed) =>
