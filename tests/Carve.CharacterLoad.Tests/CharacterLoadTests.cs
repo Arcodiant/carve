@@ -30,7 +30,9 @@ public class CharacterLoadTests
     public void The_exported_files_are_byte_identical_to_those_written_before_UVs()
     {
         static string Hash(string file) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(Path.Combine(RunFolder, "game", "Content", "models", file))));
-        Assert.Equal("7C09FEA328FB611232B036517897F3FFC12816E268F25A0AF8D5C4442E71A8AD", Hash("gardener.glb"));
+        // M-19 (T-84) regrouped the shoulder slope as the shirt, which changed the gardener's bytes before any UV work:
+        // this is what M-19 wrote on 0.8.2, before UVs (scenario-character at a5d15ad), unchanged by the UV work.
+        Assert.Equal("181BE468096479FC2A8FC8977C7645207A581A437821BD3BEDC4E945117DF0DC", Hash("gardener.glb"));
         Assert.Equal("6D25ED0B3CE3E0576B23131EFD01D7BACCE987C278480E32160C4D1CBCEAF596", Hash("gardener.clips.glb"));
     }
 
