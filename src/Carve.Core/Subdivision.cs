@@ -167,6 +167,6 @@ internal static class Subdivision
 
         int[][] all = [.. outFaces, .. appended];
         var edited = PolygonMesh.Assemble(positions, all.Select(f => f.Length == 0 ? Face.Deleted : (Face)f).ToArray());
-        return new Level(positions, all, LayerRegistry.Edits.Carry(input.Mesh, edited, provenance));
+        return new Level(positions, all, LayerRegistry.Standard.Carry(input.Mesh, edited, provenance));
     }
 }

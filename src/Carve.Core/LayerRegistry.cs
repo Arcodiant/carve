@@ -5,7 +5,7 @@ namespace Carve.Core;
 /// <summary>
 /// The attribute layers an edit carries, in order (T-71). Every edit in the kernel describes where its elements came from
 /// (<see cref="EditProvenance"/>) and calls <see cref="Carry"/> on <see cref="Standard"/>, so a mesh's colours, materials,
-/// groups, weights, hard edges, UVs and seams carry through every edit by one mechanism. Immutable.
+/// groups, weights, hard edges, UVs, seams and morph targets carry through every edit by one mechanism. Immutable.
 /// </summary>
 public sealed class LayerRegistry
 {
@@ -19,13 +19,7 @@ public sealed class LayerRegistry
     /// <summary>The layers every mesh has, in the order they are carried (<see cref="StandardLayers"/>).</summary>
     public static LayerRegistry Standard { get; } = Empty
         .With(StandardLayers.Colour).With(StandardLayers.Material).With(StandardLayers.Groups)
-        .With(StandardLayers.Weights).With(StandardLayers.Hard).With(StandardLayers.Uvs).With(StandardLayers.Seams);
-
-    /// <summary>
-    /// What the kernel's edits carry: <see cref="Standard"/> and then the morph targets (<see cref="StandardLayers.Targets"/>,
-    /// T-100), kept out of <see cref="Standard"/> until the person rules on it (M-21's rebase onto T-71).
-    /// </summary>
-    internal static LayerRegistry Edits { get; } = Standard.With(StandardLayers.Targets);
+        .With(StandardLayers.Weights).With(StandardLayers.Hard).With(StandardLayers.Uvs).With(StandardLayers.Seams).With(StandardLayers.Targets);
 
     public IReadOnlyList<AttributeLayer> Layers => _layers;
 

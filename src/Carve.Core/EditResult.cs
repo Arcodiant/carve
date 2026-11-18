@@ -93,7 +93,7 @@ public sealed class EditResult
         IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded,
         DeletedElements? deleted = null, EditProvenance? provenance = null)
         => result.Succeeded
-            ? new EditResult(LayerRegistry.Edits.Carry(source, result.Mesh!, provenance ?? new EditProvenance()),
+            ? new EditResult(LayerRegistry.Standard.Carry(source, result.Mesh!, provenance ?? new EditProvenance()),
                 result.Errors, movedVertices, newVertices, newFaces, extruded, deleted)
             : Refused(result.Errors);
 }
