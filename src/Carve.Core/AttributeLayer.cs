@@ -4,7 +4,9 @@ namespace Carve.Core;
 /// One per-element data layer of a mesh (T-71): a name, the element kind it keys by, a value type, a default (what an
 /// element with no value has), and its rules for what an edit does to it, as <see cref="EditProvenance"/> describes the
 /// edit. A layer reads its values from a mesh and writes them back, so it adds no storage of its own; the standard layers
-/// are in <see cref="LayerRegistry.Standard"/>. Every rule is deterministic: elements are visited in id order, edges by
+/// are in <see cref="LayerRegistry.Standard"/>. Values are sparse: an element with no value stands for the default (an
+/// uncoloured face, an unweighted vertex, a soft edge, an unmapped face), so a rule's "false leaves it at the default"
+/// means the element is left with no value, and <c>Default</c> names that value for a reader. Every rule is deterministic: elements are visited in id order, edges by
 /// pair, and no rule draws on anything but its inputs.
 /// </summary>
 public abstract class AttributeLayer
@@ -55,9 +57,9 @@ public sealed class VertexLayer<T> : AttributeLayer
         : base(name, LayerElement.Vertex)
     {
         Default = defaultValue;
-        _read = read;
-        _write = write;
-        Create = create;
+        _read = read ?? throw new ArgumentNullException(nameof(read));
+        _write = write ?? throw new ArgumentNullException(nameof(write));
+        Create = create ?? throw new ArgumentNullException(nameof(create));
         Move = move ?? LayerRules.Keep;
     }
 
@@ -111,9 +113,9 @@ public sealed class EdgeLayer<T> : AttributeLayer
         : base(name, LayerElement.Edge)
     {
         Default = defaultValue;
-        _read = read;
-        _write = write;
-        Split = split;
+        _read = read ?? throw new ArgumentNullException(nameof(read));
+        _write = write ?? throw new ArgumentNullException(nameof(write));
+        Split = split ?? throw new ArgumentNullException(nameof(split));
         Reshape = reshape ?? LayerRules.Keep;
     }
 
@@ -166,9 +168,9 @@ public sealed class FaceLayer<T> : AttributeLayer
         : base(name, LayerElement.Face)
     {
         Default = defaultValue;
-        _read = read;
-        _write = write;
-        Create = create;
+        _read = read ?? throw new ArgumentNullException(nameof(read));
+        _write = write ?? throw new ArgumentNullException(nameof(write));
+        Create = create ?? throw new ArgumentNullException(nameof(create));
         Reshape = reshape ?? LayerRules.Keep;
     }
 
@@ -208,10 +210,11 @@ public sealed class FaceLayer<T> : AttributeLayer
 public sealed class CornerLayer<T> : AttributeLayer
 {
     /// <summary>
-    /// The value a stencil makes of <paramref name="terms"/> (each source value and its weight, in the stencil's order) over
-    /// <paramref name="divisor"/>: the lerp of UVs; false leaves the face without values.
+    /// The value <paramref name="stencil"/> makes of <paramref name="terms"/> (each source value and its weight, in the
+    /// stencil's order; the stencil gives the divisor and how the sum starts): the lerp of UVs; false leaves the face
+    /// without values.
     /// </summary>
-    public delegate bool CombineRule(IReadOnlyList<(T Value, double Weight)> terms, double divisor, out T value);
+    public delegate bool CombineRule(IReadOnlyList<(T Value, double Weight)> terms, Stencil stencil, out T value);
 
     /// <summary>What a corner's value becomes when its vertex moves; false leaves the face without values.</summary>
     public delegate bool MoveRule(int face, int corner, int vertex, T current, out T value);
@@ -224,10 +227,10 @@ public sealed class CornerLayer<T> : AttributeLayer
         : base(name, LayerElement.Corner)
     {
         Default = defaultValue;
-        _read = read;
-        _write = write;
-        Combine = combine;
-        Agree = agree;
+        _read = read ?? throw new ArgumentNullException(nameof(read));
+        _write = write ?? throw new ArgumentNullException(nameof(write));
+        Combine = combine ?? throw new ArgumentNullException(nameof(combine));
+        Agree = agree ?? throw new ArgumentNullException(nameof(agree));
         Move = move ?? LayerRules.Keep;
     }
 
@@ -348,7 +351,7 @@ public sealed class CornerLayer<T> : AttributeLayer
             if (!has) { value = default!; return false; }
             terms.Add((v, weight));
         }
-        return Combine(terms, stencil.Divisor, out value);
+        return Combine(terms, stencil, out value);
     }
 
     public override PolygonMesh Carry(PolygonMesh source, PolygonMesh edited, EditProvenance provenance) =>

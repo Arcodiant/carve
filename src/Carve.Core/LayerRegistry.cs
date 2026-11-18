@@ -73,7 +73,7 @@ public static class LayerRules
         return true;
     }
 
-    /// <summary>A corner keeps its value when its vertex moves (so a UV stays put; the bevel finding of T-71 is for a later rule).</summary>
+    /// <summary>A corner keeps its value when its vertex moves, so a UV stays put (the person, 2026-11-18; the stretched-UV half of T-71's bevel finding is for a later rule).</summary>
     public static bool Keep<T>(int face, int corner, int vertex, T current, out T value)
     {
         value = current;
@@ -99,19 +99,29 @@ public static class LayerRules
     }
 
     /// <summary>
-    /// The lerp of 2D values (UVs): the weighted sum in double over the divisor, rounded to float once; one term gives its
-    /// value exactly.
+    /// The lerp of 2D values (UVs): the weighted sum in double, from 0 or from the first term as the stencil says, over its
+    /// divisor, rounded to float once; one term gives its value exactly.
     /// </summary>
-    public static bool Lerp(IReadOnlyList<(Vector2 Value, double Weight)> terms, double divisor, out Vector2 value)
+    public static bool Lerp(IReadOnlyList<(Vector2 Value, double Weight)> terms, Stencil stencil, out Vector2 value)
     {
+        ArgumentNullException.ThrowIfNull(terms);
+        ArgumentNullException.ThrowIfNull(stencil);
         if (terms.Count == 1) { value = terms[0].Value; return true; }
         double x = 0, y = 0;
-        foreach (var (v, c) in terms)
+        var from = 0;
+        if (stencil.SumsFromFirst && terms.Count > 0)
         {
-            x += c * v.X;
-            y += c * v.Y;
+            x = terms[0].Weight * terms[0].Value.X;
+            y = terms[0].Weight * terms[0].Value.Y;
+            from = 1;
         }
-        value = divisor == 1 ? new Vector2((float)x, (float)y) : new Vector2((float)(x / divisor), (float)(y / divisor));
+        for (var i = from; i < terms.Count; i++)
+        {
+            x += terms[i].Weight * terms[i].Value.X;
+            y += terms[i].Weight * terms[i].Value.Y;
+        }
+        var d = stencil.Divisor;
+        value = d == 1 ? new Vector2((float)x, (float)y) : new Vector2((float)(x / d), (float)(y / d));
         return true;
     }
 
@@ -119,7 +129,8 @@ public static class LayerRules
     /// The weights rule: a blend's sources' bone weights summed by their stencil weights, a bone not above 0 dropped, the
     /// largest four kept (ties to the lower bone) and normalised to sum to 1 (<see cref="VertexWeights.Normalise"/>); an
     /// unweighted source adds nothing, and nothing left is no value. An offset vertex (an extrude's ring) starts unweighted
-    /// (the person, 2026-11-18).
+    /// (the person, 2026-11-18). Only the weights before the edit are read, so a source that is itself a new vertex adds
+    /// nothing: an edit that blends weights gives its stencils over the vertices it started from.
     /// </summary>
     public static bool BlendWeights(VertexOrigin origin, IReadOnlyDictionary<int, Influence[]> source, out Influence[] value)
     {

@@ -23,8 +23,9 @@ public class AttributeLayerTests
 
     private static Vector2 Lerped(int a, int b, double t, Vector2 at, Vector2 bt)
     {
-        var terms = Stencil.Lerp(a, b, t).Terms.Select(p => (p.Element == a ? at : bt, p.Weight)).ToList();
-        Assert.True(LayerRules.Lerp(terms, 1, out var value));
+        var stencil = Stencil.Lerp(a, b, t);
+        var terms = stencil.Terms.Select(p => (p.Element == a ? at : bt, p.Weight)).ToList();
+        Assert.True(LayerRules.Lerp(terms, stencil, out var value));
         return value;
     }
 
@@ -43,10 +44,35 @@ public class AttributeLayerTests
     public void Lerp_over_a_divisor_sums_first_then_divides_as_a_mean_does()
     {
         Vector2[] corners = [new(0.1f, 0.2f), new(0.4f, 0.3f), new(0.7f, 0.9f)];
-        Assert.True(LayerRules.Lerp(corners.Select(c => (c, 1.0)).ToList(), 3, out var mean));
+        var stencil = Stencil.Of([(0, 1.0), (1, 1.0), (2, 1.0)], divisor: 3);
+        Assert.True(LayerRules.Lerp(corners.Select(c => (c, 1.0)).ToList(), stencil, out var mean));
         double x = 0, y = 0;
         foreach (var c in corners) { x += c.X; y += c.Y; }
         Assert.Equal(new Vector2((float)(x / 3), (float)(y / 3)), mean);
+    }
+
+    [Fact]
+    public void A_sum_from_the_first_term_keeps_a_negative_zero_and_a_sum_from_zero_does_not()
+    {
+        List<(Vector2, double)> zeros = [(new Vector2(-0f, -0f), 1.0), (new Vector2(-0f, -0f), 1.0)];
+        Assert.True(LayerRules.Lerp(zeros, Stencil.Of([(0, 1.0), (1, 1.0)], divisor: 2, sumsFromFirst: true), out var first));
+        Assert.True(LayerRules.Lerp(zeros, Stencil.Of([(0, 1.0), (1, 1.0)], divisor: 2), out var zero));
+        Assert.True(float.IsNegative(first.X) && float.IsNegative(first.Y));
+        Assert.False(float.IsNegative(zero.X) || float.IsNegative(zero.Y));
+    }
+
+    [Fact]
+    public void Subdivide_keeps_a_negative_zero_uv_at_an_edge_midpoint_and_takes_the_mean_from_zero()
+    {
+        // RV-62: subdivide's midpoints sum from their first corner, as they did before T-71, and the mean from 0.
+        var cube = Cube();
+        var uvs = MeshUvs.None.WithFace(0, [new(-0f, -0f), new(-0f, -0f), new(-0f, 1), new(-0f, 1)]);
+        var child = Ok(MeshEdits.Subdivide(cube.WithUvs(uvs), 1)).Uvs!.Of(0)!; // [corner 0, mid 0-1, mean, mid 3-0]
+
+        Assert.True(float.IsNegative(child[0].X) && float.IsNegative(child[0].Y));
+        Assert.True(float.IsNegative(child[1].X) && float.IsNegative(child[1].Y));
+        Assert.False(float.IsNegative(child[2].X));
+        Assert.True(float.IsNegative(child[3].X));
     }
 
     [Fact]
@@ -183,7 +209,7 @@ public class AttributeLayerTests
             (int v, VertexOrigin? origin, int current, IReadOnlyDictionary<int, int> source, out int value) => { vertexCalls.Add(v); value = -current; return true; });
         var cornerCalls = new List<(int Face, int Corner, int Vertex)>();
         var corners = new CornerLayer<int>("c", 0, m => new Dictionary<int, int[]> { [0] = [1, 2, 3, 4] }, (_, m, _) => m,
-            (IReadOnlyList<(int Value, double Weight)> terms, double divisor, out int value) => { value = 0; return false; },
+            (IReadOnlyList<(int Value, double Weight)> terms, Stencil stencil, out int value) => { value = 0; return false; },
             EqualityComparer<int>.Default,
             (int f, int c, int v, int current, out int value) => { cornerCalls.Add((f, c, v)); value = current * 100; return true; });
 
@@ -296,13 +322,17 @@ public class AttributeLayerTests
             .WithStyle(FaceStyle.None.WithColour([0, 1], "#112233").WithGroup("top", [0]))
             .WithWeights(VertexWeights.Of(Enumerable.Range(0, 8).Select(v => KeyValuePair.Create(v, new[] { new Influence(0, 1) }))))
             .WithUvs(MeshUvs.None.WithFace(0, SquareUvs));
-        var result = MeshDelete.Delete(cube, null, [0]);
+        // Deleting vertex 0 takes the three faces on it and leaves no face on it, so it goes too.
+        var result = MeshDelete.Delete(cube, [0], null);
         var mesh = Ok(result);
 
+        Assert.Equal([0], result.Deleted.Vertices);
+        Assert.Contains(0, result.Deleted.Faces);
         Assert.Null(mesh.Style!.ColourOf(0));
         Assert.Null(mesh.Style.FacesOf("top"));
         Assert.False(mesh.Uvs?.IsMapped(0) ?? false);
-        Assert.All(result.Deleted.Vertices, v => Assert.False(mesh.Weights!.Has(v)));
+        Assert.False(mesh.Weights!.Has(0));
+        Assert.Equal(7, mesh.Weights.Count);
     }
 
     // ---- registry and determinism

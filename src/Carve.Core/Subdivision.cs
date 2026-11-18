@@ -142,7 +142,8 @@ internal static class Subdivision
 
         // Where everything came from (T-71): each point is its stencil, each edge is split at its edge point, and child k of
         // a face takes the face's colour and groups and its corners [k, (k + k+1) / 2, the mean, (k-1 + k) / 2] over the
-        // face's own corners, so UVs are linear in their face and never depend on the positions' stencils.
+        // face's own corners, so UVs are linear in their face and never depend on the positions' stencils. A midpoint sums
+        // from its first corner and the mean from 0, as before, so a negative zero lands where it did (RV-62).
         var provenance = new EditProvenance();
         for (var i = 0; i < stencils.Length; i++) provenance.Vertex(i, VertexOrigin.Blend(stencils[i]));
         for (var e = 0; e < e0; e++) provenance.Split(edges[e].Lo, edges[e].Hi, [v0 + f0 + e]);
@@ -153,10 +154,10 @@ internal static class Subdivision
             for (var c = 0; c < n; c++) mean.Add(c, 1);
             for (var k = 0; k < n; k++)
             {
-                var next = new Stencil(2);
+                var next = new Stencil(2, sumsFromFirst: true);
                 next.Add(k, 1);
                 next.Add((k + 1) % n, 1);
-                var previous = new Stencil(2);
+                var previous = new Stencil(2, sumsFromFirst: true);
                 previous.Add((k + n - 1) % n, 1);
                 previous.Add(k, 1);
                 provenance.Face(k == 0 ? f : added[k - 1],

@@ -28,10 +28,14 @@ public enum VertexOriginKind
 
 /// <summary>
 /// Where a vertex of an edited mesh came from (T-71): its <see cref="Kind"/> and its sources, a stencil over the vertex ids
-/// of the mesh before the edit (or, for a cut, earlier new vertices). A layer's rules decide what each kind gives.
+/// of the mesh before the edit. A layer's rules decide what each kind gives. A corner layer also follows a source that is
+/// an earlier new vertex, through that vertex's own origin; the weights rule reads only the weights before the edit, so
+/// such a source adds no weight.
 /// </summary>
 public sealed record VertexOrigin(VertexOriginKind Kind, Stencil Sources)
 {
+    public Stencil Sources { get; } = Sources ?? throw new ArgumentNullException(nameof(Sources));
+
     public static VertexOrigin Blend(Stencil sources) => new(VertexOriginKind.Blend, sources);
 
     public static VertexOrigin Offset(int vertex) => new(VertexOriginKind.Offset, Stencil.Of(vertex));
@@ -62,44 +66,63 @@ public enum CornerOriginKind
 /// Where a new or reshaped face came from (T-71): the face whose face values it takes (<see cref="Face"/>, an id of the
 /// mesh before the edit) and how its corner values are found (<see cref="Corners"/>).
 /// </summary>
+/// <remarks>
+/// A face that keeps an id it had before the edit keeps that id's face values (colour, material, groups) by the face
+/// layers' reshape rule, whatever <see cref="Face"/> says; for it, <see cref="Face"/> is the source of its corners only. A
+/// face with a new id takes both from <see cref="Face"/>. The lists are copied when set, and compared by reference.
+/// </remarks>
 public sealed record FaceOrigin(int Face, CornerOriginKind Corners)
 {
+    private readonly IReadOnlyList<Stencil>? _cornerStencils;
+    private readonly IReadOnlyList<int>? _joined;
+
     /// <summary>For <see cref="CornerOriginKind.Stencils"/>: one stencil per corner of the new face, over <see cref="Face"/>'s corner indices.</summary>
-    public IReadOnlyList<Stencil>? CornerStencils { get; init; }
+    public IReadOnlyList<Stencil>? CornerStencils
+    {
+        get => _cornerStencils;
+        init => _cornerStencils = value is null ? null : Array.AsReadOnly(value.ToArray());
+    }
 
     /// <summary>For <see cref="CornerOriginKind.Agree"/>: the faces merged into this one, ascending.</summary>
-    public IReadOnlyList<int>? Joined { get; init; }
+    public IReadOnlyList<int>? Joined
+    {
+        get => _joined;
+        init => _joined = value is null ? null : Array.AsReadOnly(value.ToArray());
+    }
 }
 
 /// <summary>
 /// What an edit says about where the elements of its result came from (T-71): each new or re-made vertex's
 /// <see cref="VertexOrigin"/>, each new or reshaped face's <see cref="FaceOrigin"/>, and each edge that was split, with the
 /// new vertices along it. <see cref="LayerRegistry.Carry"/> fills every layer from it. An element it does not name is
-/// kept (an existing one, whose id holds) or starts at its layers' defaults (a new one). Built by the edit, then read only.
+/// kept (an existing one, whose id holds) or starts at its layers' defaults (a new one). Built by the edit, then read only:
+/// nothing it hands out can be changed, so no layer's rule can change what a later layer sees.
 /// </summary>
 public sealed class EditProvenance
 {
     private readonly SortedDictionary<int, VertexOrigin> _vertices = [];
     private readonly SortedDictionary<int, FaceOrigin> _faces = [];
-    private readonly SortedDictionary<(int Lo, int Hi), int[]> _splits = [];
+    private readonly SortedDictionary<(int Lo, int Hi), IReadOnlyList<int>> _splits = [];
 
     /// <summary>Vertex id in the edited mesh to its origin: new vertices, and existing ones re-made (subdivide's vertex points).</summary>
-    public IReadOnlyDictionary<int, VertexOrigin> Vertices => _vertices;
+    public IReadOnlyDictionary<int, VertexOrigin> Vertices => _vertices.AsReadOnly();
 
     /// <summary>Face id in the edited mesh to its origin: new faces, and reshaped ones that say how their corners carry.</summary>
-    public IReadOnlyDictionary<int, FaceOrigin> Faces => _faces;
+    public IReadOnlyDictionary<int, FaceOrigin> Faces => _faces.AsReadOnly();
 
     /// <summary>Each split edge of the mesh before the edit, lower id first, to the new vertices along it from its lower end.</summary>
-    public IReadOnlyDictionary<(int Lo, int Hi), int[]> SplitEdges => _splits;
+    public IReadOnlyDictionary<(int Lo, int Hi), IReadOnlyList<int>> SplitEdges => _splits.AsReadOnly();
 
     public EditProvenance Vertex(int id, VertexOrigin origin)
     {
+        ArgumentNullException.ThrowIfNull(origin);
         _vertices[id] = origin;
         return this;
     }
 
     public EditProvenance Face(int id, FaceOrigin origin)
     {
+        ArgumentNullException.ThrowIfNull(origin);
         _faces[id] = origin;
         return this;
     }
@@ -107,9 +130,10 @@ public sealed class EditProvenance
     /// <summary>Edge <paramref name="a"/>-<paramref name="b"/> split by <paramref name="along"/>, given from <paramref name="a"/> toward <paramref name="b"/>.</summary>
     public EditProvenance Split(int a, int b, IEnumerable<int> along)
     {
+        ArgumentNullException.ThrowIfNull(along);
         var chain = along.ToArray();
         if (a > b) Array.Reverse(chain);
-        _splits[(Math.Min(a, b), Math.Max(a, b))] = chain;
+        _splits[(Math.Min(a, b), Math.Max(a, b))] = Array.AsReadOnly(chain);
         return this;
     }
 
