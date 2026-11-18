@@ -85,8 +85,10 @@ internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
 
     public async Task<JsonElement> ListToolsAsync() => (await SendAsync("tools/list", null)).GetProperty("tools");
 
-    public Task<JsonElement> CallToolAsync(string name, string arguments) =>
-        SendAsync("tools/call", new JsonObject { ["name"] = name, ["arguments"] = JsonNode.Parse(arguments) });
+    public Task<JsonElement> CallToolAsync(string name, string arguments) => CallToolAsync(name, arguments, CancellationToken.None);
+
+    public Task<JsonElement> CallToolAsync(string name, string arguments, CancellationToken cancellationToken) =>
+        SendAsync("tools/call", new JsonObject { ["name"] = name, ["arguments"] = JsonNode.Parse(arguments) }, cancellationToken);
 
     public async ValueTask DisposeAsync()
     {
@@ -95,9 +97,11 @@ internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
         _host.Dispose();
     }
 
-    private async Task<JsonElement> SendAsync(string method, JsonNode? parameters)
+    private async Task<JsonElement> SendAsync(string method, JsonNode? parameters, CancellationToken cancellationToken = default)
     {
-        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        // Cancelling the token sends notifications/cancelled for the request, as a client does.
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cancel.CancelAfter(TimeSpan.FromSeconds(30));
         var response = await _client!.SendRequestAsync(new JsonRpcRequest { Method = method, Params = parameters }, cancel.Token);
         return JsonSerializer.SerializeToElement(response.Result);
     }

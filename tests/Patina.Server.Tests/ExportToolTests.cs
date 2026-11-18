@@ -148,4 +148,20 @@ public class ExportToolTests
         var head = ExportTool.WorkedHead.Replace("<folder>", Path.Combine(folder.Path, "textures", "planks"));
         Assert.Matches(new Regex("^" + Regex.Escape(head) + @"\n- base_colour\.png: 1024x1024, \d+ bytes, slot base_colour_texture\n- normal\.png: 1024x1024, \d+ bytes, slot normal_texture$"), result);
     }
+
+    [Fact]
+    public async Task Other_tools_answer_while_an_export_runs()
+    {
+        using var folder = new TempFolder();
+        await using var patina = await OpenPlanks(folder.Path);
+
+        // Some 6 s to run in a debug build, so it is still evaluating when the other calls come.
+        var export = patina.CallToolAsync("export", """{"folder":"big","size":2048,"outputs":["base_colour"]}""", TestContext.Current.CancellationToken);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        await patina.Ok("get_graph", "{}");
+        Assert.False(Results.IsError(await patina.CallToolAsync("swatch", """{"view":"flat","size":32}""", TestContext.Current.CancellationToken)));
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"get_graph and swatch waited {watch.Elapsed} behind the export");
+        Assert.False(Results.IsError(await export));
+    }
 }

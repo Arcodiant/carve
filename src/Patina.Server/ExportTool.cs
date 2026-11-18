@@ -61,9 +61,16 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         if (Unknown("export", context, "folder", "size", "outputs") is { } unknown) return unknown;
         if (!TryText("export", "folder", folder, out var folderText, out var bad)) return bad!;
         if (string.IsNullOrWhiteSpace(folderText)) return Error("export: folder is missing; give the folder to write the PNGs into, such as textures/planks");
+        TextureGraph graph;
         lock (store.Gate)
         {
-            if (store.Graph is not { } graph) return Error("export: " + NoGraph);
+            if (store.Graph is not { } open) return Error("export: " + NoGraph);
+            graph = open;
+        }
+        // The graph is a value, so it is evaluated outside the store's lock and the other tools answer while an export
+        // runs (minutes at 8192). Exports take turns, as two could write the same files.
+        lock (Exports)
+        {
             var faults = GraphValidator.Validate(graph, registry);
             if (faults.Count > 0)
                 return Error($"export: refused: the graph has {Faults(faults)}\nAn export needs a graph that evaluates; fix them with edit_graph, then export again. Nothing was written.");
@@ -138,4 +145,6 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
             return Line($"export: wrote {Count(lines.Count, "file")} to {target} at size {pixels}\n" + string.Join("\n", lines));
         }
     }
+
+    private static readonly object Exports = new();
 }
