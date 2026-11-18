@@ -65,5 +65,5 @@ Opus 5.5, 2026-11-18, first agent, at the tool-call checkpoint.
   1. *May `define_part` on an existing part change `instance_of`?* (Notes: stop and ask.) Built for now as: no, a different value is refused. Allowing it would mean deciding what happens to an owner's geometry and levels, or an instance becoming an empty.
   2. *T-91's empty-part refusal says `define_mesh mesh=Axle_F gives it some`, but define_mesh's argument is `name`*, and Scope keeps define_mesh's schema unchanged. Either the Core text should say `name=` (a Core change, T-91's text) or define_mesh should take `mesh`. Left as T-91 wrote it.
 - **Left:** the break table (each new check shown failing on a broken product) is not made yet; evidence goes to `G:\My Drive\artifacts\carve\M-9\T-93\`. `cairn lint` and `finish` not run.
-- **Checked:** `PartTools*` tests; the full `verify` was started and was still running after 10 minutes (see report).
+- **Checked:** `cairn task T-93 verify`: core-unit passed; server-unit gave 862 of 863, the one failure `ToolHarnessTests` counting 38 tools, now 41 (three new tools; fixed in its own commit). A second verify was started at hand-off; its result is in the report. That verify waited over 10 minutes.
 - **Surprising:** none in the code; `verify` is slow.
