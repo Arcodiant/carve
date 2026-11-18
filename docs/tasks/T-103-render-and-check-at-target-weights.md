@@ -123,9 +123,9 @@ Model: Claude Sonnet 5.5, the implementer. Checkpoint reached: code committed an
 - **Done**: everything in Scope except the frame review. `render` and `check` take `targets`; `check`'s three rules; the
   `scenario-morph` suite with 12 frames; tests; As built above. The weight range is the person's ruling of 2026-11-18 (in As built).
 - **Left**: the review agent opens each of the 12 frames itself (cropped or scaled), then sends them to the person with
-  `mcp__waystone__review` (files copied to `G:\My Drivertifacts\carve\M-21\T-103ound-1`). "Commented" is not approval.
+  `mcp__waystone__review` (files copied to `G:\My Drive\artifacts\carve\M-21\T-103\round-1`). "Commented" is not approval.
   Then `cairn task T-103 finish` from this worktree. The frames are at
-  `D:\Repos\carveranches	ask\T-103rtifacts\scenarios\morphrames\` and copied to `~rtifacts\carve\M-21\T-103rames\`.
+  `D:\Repos\carve\branches\task\T-103\artifacts\scenarios\morph\1\frames\` and copied to `~\artifacts\carve\M-21\T-103\frames\`.
 - **What to look at**: `morph-rest-z` and `morph-bulge-0-z` are the same file by hash. `morph-bulge-half-z` and `morph-bulge-1-z`: the middle ring
   grows to a half-width of 0.6 and 0.7 m, the rims stay 0.5, the silhouette straight between the rings. `morph-bulge-1-normals-z` against
   `morph-rest-normals-z`: the colours grade with the new slope. `morph-bulge-1-wire-sheet`: two tiles, +z and +x, 256 each.
