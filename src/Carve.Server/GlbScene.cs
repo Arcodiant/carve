@@ -56,10 +56,10 @@ internal sealed class GlbScene
 
     /// <summary>
     /// Parses <paramref name="bytes"/> with the engine's geometry loader (on the CPU, so off the frame thread) and poses it
-    /// at <paramref name="clip"/> and <paramref name="time"/>; the problems, in the words of the arguments, are added to
+    /// at <paramref name="clip"/> and <paramref name="time"/>; <paramref name="weightRefusals"/> (target name to the refusal of its weight) are reported for the names the file has; the problems, in the words of the arguments, are added to
     /// <paramref name="errors"/> and null returned.
     /// </summary>
-    public static GlbScene? Prepare(IModelGeometryLoader loader, byte[] bytes, string? clip, float time, List<string> errors, IReadOnlyList<KeyValuePair<string, float>>? targets = null)
+    public static GlbScene? Prepare(IModelGeometryLoader loader, byte[] bytes, string? clip, float time, List<string> errors, IReadOnlyList<KeyValuePair<string, float>>? targets = null, IReadOnlyDictionary<string, string>? weightRefusals = null)
     {
         ParsedModel parsed;
         try
@@ -75,8 +75,15 @@ internal sealed class GlbScene
         if (targets is { Count: > 0 })
         {
             var names = parsed.MorphTargets?.TargetNames ?? [];
-            foreach (var t in targets.Where(t => Array.IndexOf(names, t.Key) < 0))
+            // A name is checked before its weight, as render checks them: an unknown target is named even when its weight is out of range too.
+            foreach (var t in targets)
             {
+                if (Array.IndexOf(names, t.Key) >= 0)
+                {
+                    if (weightRefusals is not null && weightRefusals.TryGetValue(t.Key, out var refusal)) errors.Add(refusal);
+                    continue;
+                }
+
                 errors.Add(names.Length == 0
                     ? $"targets.{t.Key}: the file has no morph targets, so there is no weight to give; give no targets to draw it as it is"
                     : $"targets.{t.Key}: the file has no target named '{t.Key}'; the targets are {Carve.Core.NameList.Quoted(names)}");

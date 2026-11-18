@@ -88,11 +88,13 @@ internal static class RenderGlbTool
 
         var problems = new List<string>();
         var (clipName, clipTime) = ReadClip(clip, time, problems);
-        var weights = ReadTargets(targets, problems);
+        var weights = ReadTargets(targets, problems, out var weightRefusals);
         if (problems.Count > 0) return Failed(Name, problems);
 
         await status.WhenSettled.WaitAsync(cancellationToken);
-        if (status.FaultMessage is { } fault) return Error(fault);
+
+        // The file's target names are known only to the engine's loader, so a refused weight is told at once when there is no engine, and otherwise after the names are checked.
+        if (status.FaultMessage is { } fault) return weightRefusals.Count > 0 ? Failed(Name, weightRefusals.Values.ToList()) : Error(fault);
 
         var file = ToolPaths.Resolve(Name, path, ".glb", out var pathError, toolFolder.Directory, verb: "reads");
         if (file is null) return Error(pathError!);
@@ -109,7 +111,7 @@ internal static class RenderGlbTool
         // The engine-fault check above must come first: an engine-less host (the test harness) has no loader registered.
         if (services.GetService<IModelGeometryLoader>() is not { } loader)
             return Error($"{Name}: no IModelGeometryLoader is registered, so the .glb cannot be read.");
-        var glb = GlbScene.Prepare(loader, bytes, clipName, clipTime, problems, weights);
+        var glb = GlbScene.Prepare(loader, bytes, clipName, clipTime, problems, weights, weightRefusals);
         if (glb is null) return Failed(Name, problems);
 
         var targetVector = target is null ? (System.Numerics.Vector3?)null : RenderTool.Vector(target);
@@ -153,8 +155,9 @@ internal static class RenderGlbTool
     }
 
     /// <summary>The targets argument: an object of name to a finite weight from 0 to 1, as render's targets are ruled (2026-11-18).</summary>
-    private static List<KeyValuePair<string, float>>? ReadTargets(JsonElement? targets, List<string> errors)
+    private static List<KeyValuePair<string, float>>? ReadTargets(JsonElement? targets, List<string> errors, out Dictionary<string, string> refusals)
     {
+        refusals = new Dictionary<string, string>(StringComparer.Ordinal);
         if (Absent(targets)) return null;
         if (targets!.Value.ValueKind != JsonValueKind.Object)
         {
@@ -165,20 +168,15 @@ internal static class RenderGlbTool
         var weights = new List<KeyValuePair<string, float>>();
         foreach (var property in targets.Value.EnumerateObject())
         {
-            if (property.Value.ValueKind != JsonValueKind.Number || !IsFinite(property.Value))
+            if (property.Value.ValueKind != JsonValueKind.Number)
             {
                 errors.Add($"targets.{property.Name}: expected a number, got {Describe(property.Value)}");
                 continue;
             }
 
-            var weight = property.Value.GetDouble();
-            if (weight is < 0 or > 1)
-            {
-                errors.Add(string.Create(CultureInfo.InvariantCulture, $"targets.{property.Name}: weight {weight:R} is outside 0 to 1"));
-                continue;
-            }
-
-            weights.Add(new(property.Name, (float)weight));
+            // The name still goes to the file's check, with a weight that is never drawn: the name is told before its weight.
+            if (TargetWeightsArgument.WeightRefusal($"targets.{property.Name}", property.Value, out var weight) is { } refusal) refusals[property.Name] = refusal;
+            weights.Add(new(property.Name, weight));
         }
 
         return weights;

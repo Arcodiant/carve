@@ -51,15 +51,21 @@ internal static class TargetWeightsArgument
                 continue;
             }
 
-            var weight = t.Value.TryGetDouble(out var d) ? d : double.NaN;
-            if (!double.IsFinite(weight) || !float.IsFinite((float)weight))
-                errors.Add($"{at}: the weight is not a finite number");
-            else if (weight < 0 || weight > 1)
-                errors.Add(string.Create(CultureInfo.InvariantCulture, $"{at}: weight {weight:R} is outside 0 to 1"));
-            else
-                found[t.Name] = (float)weight;
+            if (WeightRefusal(at, t.Value, out var w) is { } refusal) errors.Add(refusal);
+            else found[t.Name] = w;
         }
 
         return errors.Count > before || found.Count == 0 ? null : new TargetWeights(found);
+    }
+
+    /// <summary>The refusal of a weight that is not a finite number or lies outside 0 to 1 (render, check and render_glb word it alike), or null with the weight in <paramref name="weight"/>.</summary>
+    public static string? WeightRefusal(string at, JsonElement number, out float weight)
+    {
+        weight = 0;
+        var d = number.TryGetDouble(out var got) ? got : double.NaN;
+        if (!double.IsFinite(d) || !float.IsFinite((float)d)) return $"{at}: the weight is not a finite number";
+        if (d < 0 || d > 1) return string.Create(CultureInfo.InvariantCulture, $"{at}: weight {d:R} is outside 0 to 1");
+        weight = (float)d;
+        return null;
     }
 }
