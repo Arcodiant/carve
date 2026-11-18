@@ -91,6 +91,8 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
             if (angleArg.ValueKind != JsonValueKind.Number || !double.IsFinite(angleArg.GetDouble()))
                 return Error($"swatch: angle is a number of degrees, not {Kind(angleArg)}");
             angle = (float)angleArg.GetDouble();
+            // A double past float's range becomes infinity, which would turn the sphere by a NaN rotation.
+            if (!float.IsFinite(angle)) return Error($"swatch: angle {angleArg.GetRawText()} is out of range; angle is a number of degrees");
         }
 
         var evaluator = new GraphEvaluator(graph, registry);

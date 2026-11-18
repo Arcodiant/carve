@@ -91,6 +91,7 @@ public class SwatchTests
     [InlineData("""{"view":"side"}""", "swatch: view is 'side'; give sheet, flat, tiled or sphere")]
     [InlineData("""{"output":"normal"}""", "swatch: output is for flat and tiled; the sheet shows every output")]
     [InlineData("""{"view":"flat","angle":90}""", "swatch: angle turns the sphere, for sheet and sphere; flat has none")]
+    [InlineData("""{"view":"sphere","angle":1e300}""", "swatch: angle 1e300 is out of range; angle is a number of degrees")]
     [InlineData("""{"view":"flat","output":"emissive"}""", "swatch: output is 'emissive'; give base_colour, normal, roughness or occlusion")]
     [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle")]
     [InlineData("""{"view":"sphere"}""", "swatch: " + PatinaHarness.NoEngine)]
