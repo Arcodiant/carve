@@ -39,7 +39,7 @@ I read `git diff origin/main...HEAD` for `src/Carve.Hosting`, `src/Carve.Server`
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: `FrameLog.Keep` now runs under the `Writing` lock (and is `internal`); `FrameLogTests.OneFrameKeptFromManyThreadsAtOnceIsWrittenWithoutACollision` keeps one 4 MB frame from eight threads at once, eight rounds, and threw the sharing-violation `IOException` without the lock (c0d9079)
 
 ### Three product commits after T-128 finished, outside any member, and T-128's As built now describes code that no longer exists
 
@@ -63,7 +63,7 @@ I read `git diff origin/main...HEAD` for `src/Carve.Hosting`, `src/Carve.Server`
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed: `RenderLights.AmbientIntensity`/`DirectionalIntensity` are `internal const`, `VerticalCosine` `private`; `OffscreenTarget.Size`/`Multisampled`/`Depth` `internal`; the unused `LogFilePrefix` is removed (the log name stays `<temp>/<name>-<pid>.log`); `EngineDefaults` is a `ReadOnlyDictionary`, held by `EngineHostOptionsTests.TheEngineDefaultsCannotBeWrittenThroughACast`, which failed against the mutable `Dictionary`. No value changes (f44e507)
 
 ### Test-local `EngineHost` hides `Carve.Hosting.EngineHost`
 
@@ -75,7 +75,7 @@ I read `git diff origin/main...HEAD` for `src/Carve.Hosting`, `src/Carve.Server`
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed: the test-local host in `PbrEqualityTests.cs` (and its uses in `PbrReleaseTests.cs`) is renamed `InProcessEngine`, so `EngineHost` in the test project means `Carve.Hosting.EngineHost`; a rename, so no test of its own, the build is the check (5e6867d)
 
 ## Findings: Patina.Graphs and the planks (claude-opus-5-5)
 
@@ -91,7 +91,7 @@ I read all of `src/Patina.Graphs`, the tests, `tools/Patina.SampleGraphs` and `p
 
 **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed: an input whose source is a node of unknown type now marks its node's inputs at fault (no fault of its own: the unknown type's says why), so `Kinds` never calls `OutputKind` without that port; `GraphFaultTests.AnInputFromANodeOfUnknownTypeIsOnlyThatNodesFault` (levels on `in`, blend on `a`, blend on `b`) gets the one fault "unknown type 'nosie'", and threw `KeyNotFoundException` for levels and blend-`a` without the fix (58957fc)
 
 ### An unknown output role adds a false "two outputs with one role" fault
 
@@ -103,7 +103,7 @@ I read all of `src/Patina.Graphs`, the tests, `tools/Patina.SampleGraphs` and `p
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: `Outputs` leaves out an output whose `role` is already at fault; `GraphFaultTests.AnUnknownRoleIsNotAlsoCountedAsTheDefaultRole` gets the single `b/role` fault, and got the false second one without the fix (db475d4)
 
 ### No built-in node is tested banded against whole
 
@@ -115,7 +115,7 @@ I read all of `src/Patina.Graphs`, the tests, `tools/Patina.SampleGraphs` and `p
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: `PlanksGraphTests.ThePlanksGiveTheSameBytesBandedAsWhole` evaluates each of the planks' four outputs at 64 px in bands of 1, 3, 7 and 32 rows and holds them byte-equal to one band; it passes on the real nodes and failed (normal) on a `height_to_normal` that leaves the top row of each band after the first unfilled (c7252fd)
 
 ### Write's order follows whatever comparer the caller's dictionary has
 
@@ -127,7 +127,7 @@ I read all of `src/Patina.Graphs`, the tests, `tools/Patina.SampleGraphs` and `p
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed: `TexGraphFile.Write` sorts nodes, inputs and params ordinally itself; `TexGraphFileTests.WriteListsNodesInOrdinalOrderWhateverTheDictionarysComparer` builds a graph with the default (culture) comparer and holds `a0` before `a_`, `b0` before `b_`, and `Write(Read(Write(g))) == Write(g)`; it failed without the fix (2c29053)
 
 ### Load-error columns count UTF-8 bytes, not characters
 
@@ -139,7 +139,7 @@ I read all of `src/Patina.Graphs`, the tests, `tools/Patina.SampleGraphs` and `p
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed: both the not-JSON and the shape path now count characters, skipping UTF-8 continuation bytes; `TexGraphFileTests.ALoadErrorColumnCountsCharactersNotBytes` (a shape fault after `"éé"`, and a not-JSON fault on line 2) failed without the fix (07a09a2)
 
 ## Findings: Patina.Server (claude-opus-5-5)
 
