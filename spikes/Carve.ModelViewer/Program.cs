@@ -44,6 +44,9 @@ try
             services.AddSingleton(options);
             services.AddSingleton(run);
             services.UseRenderPipeline(RenderPipelinePresets.StandardHdr);
+            // For the window's weight panel and its clip; with no window neither is used.
+            services.AddEmpyreanUi();
+            services.AddEmpyreanAnimation();
             services.AddSystem<ViewerSystem>();
         })
         .Build()

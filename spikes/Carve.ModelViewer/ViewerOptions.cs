@@ -8,10 +8,10 @@ namespace Carve.ModelViewer;
 internal sealed record ViewSpec(string Name, Vector3 Direction);
 
 /// <summary>The viewer's own command line. Anything under <c>--Empyrean:</c> belongs to the engine.</summary>
-internal sealed partial record ViewerOptions(string Content, string Model, string Out, IReadOnlyList<ViewSpec> Views, bool Sky = false)
+internal sealed partial record ViewerOptions(string Content, string Model, string Out, IReadOnlyList<ViewSpec> Views, bool Sky = false, IReadOnlyList<KeyValuePair<string, float>>? Targets = null)
 {
     public const string Usage =
-        "usage: Carve.ModelViewer --content <folder> --model <content path> --out <folder> [--view <name>=<x,y,z>]... [--sky]";
+        "usage: Carve.ModelViewer --content <folder> --model <content path> --out <folder> [--view <name>=<x,y,z>]... [--sky] [--targets <name>=<0..1>,...]";
 
     private static readonly ViewSpec DefaultView = new("front", new Vector3(1.6f, 1.2f, 2.2f));
 
@@ -29,6 +29,7 @@ internal sealed partial record ViewerOptions(string Content, string Model, strin
         var views = new List<ViewSpec>();
         var engine = new List<string>();
         var sky = false;
+        IReadOnlyList<KeyValuePair<string, float>>? targets = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -51,7 +52,7 @@ internal sealed partial record ViewerOptions(string Content, string Model, strin
                 continue;
             }
 
-            if (arg is not ("--content" or "--model" or "--out" or "--view"))
+            if (arg is not ("--content" or "--model" or "--out" or "--view" or "--targets"))
             {
                 throw new ArgumentException($"unknown argument \"{arg}\"");
             }
@@ -67,6 +68,7 @@ internal sealed partial record ViewerOptions(string Content, string Model, strin
                 case "--content": content = value; break;
                 case "--model": model = value; break;
                 case "--out": output = value; break;
+                case "--targets": targets = ParseTargets(value); break;
                 default: views.Add(ParseView(value, views)); break;
             }
         }
@@ -78,7 +80,36 @@ internal sealed partial record ViewerOptions(string Content, string Model, strin
 
         engineArgs = engine.ToArray();
         return new ViewerOptions(
-            Path.GetFullPath(content), model, Path.GetFullPath(output), views.Count > 0 ? views : [DefaultView], sky);
+            Path.GetFullPath(content), model, Path.GetFullPath(output), views.Count > 0 ? views : [DefaultView], sky, targets);
+    }
+
+    /// <summary>The starting morph weights: <c>Bulk=0.5,Lean=0</c>, each from 0 to 1, a name once.</summary>
+    private static List<KeyValuePair<string, float>> ParseTargets(string text)
+    {
+        var weights = new List<KeyValuePair<string, float>>();
+        foreach (var part in text.Split(','))
+        {
+            var pair = part.Split('=');
+            if (pair.Length != 2 || pair[0].Length == 0
+                || !float.TryParse(pair[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var weight))
+            {
+                throw new ArgumentException($"--targets \"{text}\" is not <name>=<weight>,...");
+            }
+
+            if (!(weight is >= 0 and <= 1))
+            {
+                throw new ArgumentException($"--targets: the weight of \"{pair[0]}\" is {pair[1]}, outside 0 to 1");
+            }
+
+            if (weights.Any(w => w.Key == pair[0]))
+            {
+                throw new ArgumentException($"--targets \"{pair[0]}\" is given twice");
+            }
+
+            weights.Add(new(pair[0], weight));
+        }
+
+        return weights;
     }
 
     private static ViewSpec ParseView(string text, List<ViewSpec> seen)

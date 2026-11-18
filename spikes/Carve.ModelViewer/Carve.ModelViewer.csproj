@@ -9,6 +9,9 @@
 
   <ItemGroup>
     <PackageReference Include="Arcodiant.Empyrean.Hosting.Glfw" Version="$(EmpyreanVersion)" />
+    <!-- The window's weight panel (T-108): the engine's own UI labels, and the clip the Space key plays. Neither draws or runs in a headless capture. -->
+    <PackageReference Include="Arcodiant.Empyrean.Ui" Version="$(EmpyreanVersion)" />
+    <PackageReference Include="Arcodiant.Empyrean.Animation" Version="$(EmpyreanVersion)" />
   </ItemGroup>
 
 </Project>

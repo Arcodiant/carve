@@ -1,5 +1,8 @@
 using System.Numerics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Empyrean;
 
 namespace Carve.ModelViewer;
@@ -16,7 +19,9 @@ internal sealed class ViewerSystem(
     ISceneManager scenes,
     IEntityManager entities,
     IScreenshotService screenshots,
-    IGameLifecycle lifecycle) : ISystem
+    IGameLifecycle lifecycle,
+    IConfiguration configuration,
+    IServiceProvider services) : ISystem
 {
     private const string Scene = "viewer";
 
@@ -30,6 +35,12 @@ internal sealed class ViewerSystem(
     private int _settle;
     private Task? _capture;
     private bool _finished;
+    private Entity _instance;
+    private float[]? _weights;
+    private WeightPanel? _panel;
+    private Label? _panelText;
+    private IInputService? _input;
+    private bool _animated;
 
     public void Initialise()
     {
@@ -85,12 +96,25 @@ internal sealed class ViewerSystem(
             if (++_next == _frames.Count)
             {
                 File.WriteAllText(Path.Combine(options.Out, "view.json"), Describe());
+                if (Windowed)
+                {
+                    // The captures are made, with no panel in them; now the window stays for a person to drive.
+                    BeginInteractive();
+                    return;
+                }
+
                 _finished = true;
                 lifecycle.RequestStop();
                 return;
             }
 
             Pose();
+            return;
+        }
+
+        if (_panel is not null)
+        {
+            Interact();
             return;
         }
 
@@ -130,6 +154,11 @@ internal sealed class ViewerSystem(
         _frames = options.Views
             .Select(view => ViewFrame.Fit(view, model.Mesh.Bounds.Min, model.Mesh.Bounds.Max))
             .ToList();
+        if (!StartWeights(model))
+        {
+            return false;
+        }
+
         BuildScene(model);
         _model = model;
         return true;
@@ -154,6 +183,7 @@ internal sealed class ViewerSystem(
         entities.GetOrAddComponent<WorldTransform>(sun) = new WorldTransform { Matrix = ViewerLook.SunWorld() };
 
         var instance = scenes.CreateEntity(Scene);
+        _instance = instance;
         entities.AddComponent(instance, new MeshInstance
         {
             Mesh = model.Mesh,
@@ -168,12 +198,128 @@ internal sealed class ViewerSystem(
             Scale = Vector3.One,
         });
 
+        if (_weights is not null)
+        {
+            entities.AddComponent(instance, new MorphWeights { Weights = _weights });
+        }
+
         // One near and far that hold for every view: each eye is outside the bounding sphere.
         var radius = (model.Mesh.Bounds.Max - model.Mesh.Bounds.Min).Length() * 0.5f;
         var centre = (model.Mesh.Bounds.Min + model.Mesh.Bounds.Max) * 0.5f;
         var furthest = _frames.Max(f => (f.Eye - centre).Length());
         _camera = scenes.CreateEntity(Scene);
         entities.AddCamera3D(_camera, ViewFrame.FieldOfViewY, radius * 0.1f, (furthest + radius) * 1.1f);
+    }
+
+    /// <summary>With no window the viewer is the headless capture of old; the key is the engine's own switch.</summary>
+    private bool Windowed => !(configuration.GetValue<bool?>("Empyrean:Graphics:VirtualSurface") ?? true);
+
+    /// <summary>
+    /// The starting weights, as a game sets them: each name resolved once with <c>IndexOfTarget</c> into a dense array.
+    /// A name the file lacks, or weights for a file with none, stop the run with the file's own names.
+    /// </summary>
+    private bool StartWeights(Model model)
+    {
+        var requested = options.Targets ?? [];
+        if (model.MorphTargets is not { } set)
+        {
+            if (requested.Count > 0)
+            {
+                Stop($"--targets given, but {options.Model} has no morph targets");
+                return false;
+            }
+
+            return true;
+        }
+
+        var names = set.TargetNames;
+        foreach (var (name, _) in requested)
+        {
+            if (!names.Contains(name))
+            {
+                Stop($"--targets: {options.Model} has no target named '{name}'; its targets are {string.Join(", ", names.Select(n => $"'{n}'"))}");
+                return false;
+            }
+        }
+
+        _weights = new float[set.TargetCount];
+        foreach (var (name, weight) in requested)
+        {
+            _weights[set.IndexOfTarget(name)] = weight;
+        }
+
+        return true;
+    }
+
+    /// <summary>The panel, keys and clip of the window: built once the captures are done, so no capture has the panel in it.</summary>
+    private void BeginInteractive()
+    {
+        var model = _model!;
+        var clip = model.Skeleton is not null && model.Animations is { Length: > 0 } ? model.Animations[0] : null;
+        var names = model.MorphTargets?.TargetNames ?? [];
+        if (names.Count == 0 && clip is null)
+        {
+            _finished = true;
+            lifecycle.RequestStop();
+            return;
+        }
+
+        _input = services.GetRequiredService<IInputService>();
+        _panel = new WeightPanel(names, _weights ?? [], clip?.Name);
+        var ui = services.GetRequiredService<IUiService>();
+        var panel = ui.Root(Scene, null!).Add(new Panel
+        {
+            Anchor = Anchor.TopLeft,
+            Padding = 10f,
+            Background = new Vector4(0f, 0f, 0f, 0.55f),
+        });
+        _panelText = panel.Add(new Label { Text = _panel.Text(), Scale = 1.5f });
+        _next = 0;
+        Pose();
+    }
+
+    private void Interact()
+    {
+        var input = _input!;
+        var panel = _panel!;
+        var changed = false;
+        if (input.WasKeyPressedThisFrame(Key.Tab))
+        {
+            panel.Next();
+            changed = true;
+        }
+
+        var steps = (input.WasKeyPressedThisFrame(Key.Right) ? 1 : 0) - (input.WasKeyPressedThisFrame(Key.Left) ? 1 : 0);
+        if (steps != 0)
+        {
+            panel.Nudge(steps);
+            changed = true;
+        }
+
+        if (input.WasKeyPressedThisFrame(Key.Digit0) || input.WasKeyPressedThisFrame(Key.Keypad0))
+        {
+            panel.Reset();
+            changed = true;
+        }
+
+        if (input.WasKeyPressedThisFrame(Key.Space) && panel.TogglePlay())
+        {
+            var model = _model!;
+            if (!_animated)
+            {
+                entities.AddComponent(_instance, new Animator { Skeleton = model.Skeleton, Clip = model.Animations![0], Loop = true });
+                _animated = true;
+            }
+
+            entities.GetComponent<Animator>(_instance).Playing = panel.Playing;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            // The weights array is the component's own, written in place; the panel redraws from the same numbers.
+            _panelText!.Text = panel.Text();
+        }
     }
 
     private void Pose()
@@ -199,7 +345,7 @@ internal sealed class ViewerSystem(
             ? submeshes.Select(m => m ?? _model.Material!).ToArray()
             : [_model.Material!];
 
-        return JsonSerializer.Serialize(
+        var json = JsonSerializer.Serialize(
             new
             {
                 model = options.Model,
@@ -239,6 +385,15 @@ internal sealed class ViewerSystem(
                 },
             },
             new JsonSerializerOptions { WriteIndented = true });
+        if (options.Targets is not { Count: > 0 } requested)
+        {
+            return json;
+        }
+
+        // Only when asked for, so a run without --targets writes the file it always did.
+        var node = JsonNode.Parse(json)!.AsObject();
+        node["targets"] = new JsonObject(requested.Select(t => KeyValuePair.Create<string, JsonNode?>(t.Key, JsonValue.Create(t.Value))));
+        return node.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
 
     /// <summary>Whether a texture slot is set, and if so its size and format.</summary>
