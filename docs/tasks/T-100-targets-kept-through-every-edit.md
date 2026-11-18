@@ -4,7 +4,7 @@ description: >-
 ---
 # T-100 — Targets kept through every edit
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
