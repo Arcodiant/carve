@@ -7,3 +7,4 @@
 - T-115: patina's export writes each output as a PNG at any power of two to 8192, in bounded memory
 - T-116: samples/barrel-planks.carve: M-7's barrel with its staves from the planks graph, in a scenario of its own
 - T-114: patina's swatch: the sheet, flat, tiled 3 x 3 and a sphere through Material.Pbr under Carve's fixed sky
+- T-117: Fresh agents build a wood material in patina from the tool descriptions alone, recover from a broken starter graph and put it on the barrel
