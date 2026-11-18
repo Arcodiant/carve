@@ -117,19 +117,23 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review c
   1 level off the slate, which is why that rule is a fraction). The thresholds 52 and 58..110 leave about 12 levels each
   side. **To put to the person before landing** (the Scope's stop): those thresholds, the label band, and the
   fraction rule for the silhouette.
-- **Breaks** (`PATINA_SWATCH_BREAK`, read once in `SwatchBreak`; unset changes nothing), each run of `scenario-patina`
-  with it set, all caught (`artifacts/T-114/breaks.txt` in this worktree):
+- **Breaks**, made on the scenario side since the person's ruling (below): patina carries no break switch, and nothing in
+  `src/` names one. `SwatchStage.BreaksAsync` makes each break after the positive checks, runs the same checks on a
+  `PatinaChecks` of its own and fails the run unless every check named for the break fails; it writes what each failed to
+  `swatch-breaks.txt` in the run folder and captures no frame, so the frame set is the approved one. All caught in job
+  `J-20261118-145644-0`:
 
-  | Break | Caught by |
-  |---|---|
-  | `role-order` (sheet columns reversed) | sheet flat and tiled *exact*, all 16 cells at 256 and 64 |
-  | `u-flip` (textures mirrored before upload) | *stave order* 0 vs 200 (2 of 4 pairs) and 90 vs 200 (1 of 2); the gaps are symmetric, so only the tones see it |
-  | `tiled-shift` (half a tile) | tiled 128 *exact*, sheet tiled cells, and the seam graph's *seamless* (the seam moved inside the tile) |
-  | `roughness-as-base` | *dark* and *in band* on all three spheres, and *stave order* |
-  | the seam graph (noise mixed 0.7 with a once-across ramp) | *seamless* fails, as it must: the scenario asserts it does |
+  | Break | How it is made now | Caught by |
+  |---|---|---|
+  | `role-order` (sheet columns reversed) | the four cells of each sheet read back swapped end for end, labels and all | sheet flat and tiled *exact*, all 16 cells at 256 and 64 |
+  | `u-flip` (textures mirrored) | the texels the checks predict from mirrored left to right (`Readback(mirrorU: true)`), against the spheres as drawn: the same mismatch the other way round | *stave order* 0 vs 200 (1 of 3 pairs) and 90 vs 200 (2 of 3) |
+  | `tiled-shift` (half a tile) | the 1:1 tiled frames rolled 64 px in x and y (exactly the break); the sheets' tiled cells rolled 43 px, the whole pixel nearest half a tile of three to 256 px | tiled 128 *exact*, all 8 sheet tiled cells, and the seam graph's *seamless* (the seam moved inside the tile) |
+  | `roughness-as-base` | through the tools: the planks with `base_out` fed from `roughness`, three spheres drawn by `swatch` and judged against the planks | *dark* and *in band* on all three spheres, and *stave order* 0 vs 200 |
+  | the seam graph (noise mixed 0.7 with a once-across ramp) | the graph itself, always run | *seamless* fails, as it must: the scenario asserts it does |
 
-  The seam is always run, not behind a switch: the scenario-only "break" is the graph itself, since a `noise` cannot be
-  made not to wrap without editing the node.
+  `SwatchImages.Tiled` and `SwatchSheet.Compose` lost their shift parameter and `SwatchImages.Mirrored` went, with
+  `SwatchBreak`. The 8 frames of `J-20261118-145644-0` are byte-identical by SHA-256 to the approved
+  `J-20261118-100559-862909`'s; none was opened again.
 - **Tests**: `SwatchTests` (11 + 11 refusal cases, harness with `EngineStatus.Faulted`, so flat and tiled are tested
   with no GPU and the sphere and sheet are refused with the fault), the worked example, the tool lists in
   `GraphToolTests`, `PatinaProcessTests` and `GraphStage`. `scenario-patina` is now `gpu` (and reads
@@ -164,19 +168,9 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review c
   patina product to the scenario or test side (CLAUDE.md's no-debug-in-product rule); no engine need for the sphere's UV
   mapping, `SwatchSphere.cs` stands.
 
-### Hand-off
-
-Frame-review agent (Claude Opus 5.5, `claude-opus-5-5`). **Left, first:** the person's ruling that `PATINA_SWATCH_BREAK` /
-`SwatchBreak` moves out of the patina product (`src/Patina.Server/SwatchRendering.cs` and the places it is read) to the
-scenario or test side, keeping every break of the table above caught; not done here. After it, `cairn task T-114 verify`
-and `finish` (not run by this agent, as the orchestrator asked).
-
-Done: all 8 frames of `J-20261118-100559-862909` opened and described above; round 1 sent and **approved** by the person,
-with the thresholds, the label band and the silhouette fraction; `swatch` added to the `CLAUDE.md` Layout row (approved
-in the same review). Rebased onto `origin/milestone/M-27` (T-115's `export`): conflicts in `Program.cs`'s tool list,
-`PatinaStages.cs`, `GraphStage`, `GraphToolTests`, `PatinaProcessTests` and the README, each resolved keeping both, the
-tool lists now exact: the seven, then `export`, then `swatch`. `verify` after the rebase: VERIFY PASS (patina-unit, server-unit, core-unit, scenario-patina, patina-regression on Mantorok). Ready to finish once the break switch has moved.
-
-Not checked: the frames after the rebase were not opened again (the rebase touched no swatch code). The
-`CLAUDE.md` row does not list T-115's `export` either; left to T-115's owner. The person noted the roughness is not
-very apparent on the sphere (the planks' roughness is high and narrow); approved as is.
+- **Finishing agent** (Claude Opus 5.5, `claude-opus-5-5`, third agent, after the first two, also Opus 5.5): moved the
+  breaks to the scenario side as above, added T-115's `export` to the `CLAUDE.md` `Patina.Server` row, rebased onto
+  `origin/milestone/M-27`, verify: VERIFY PASS (patina-unit, server-unit, core-unit, scenario-patina, patina-regression on
+  Mantorok). Earlier: after the first rebase onto T-115 the tool lists were made exact (the seven, then `export`, then
+  `swatch`). Not checked: no frame was opened by this agent (all hashes equal the approved set); the person noted the
+  roughness is not very apparent on the sphere (the planks' roughness is high and narrow), approved as is.
