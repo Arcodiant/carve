@@ -53,7 +53,9 @@ I read `git diff origin/main...HEAD` for `src/Carve.Hosting`, `src/Carve.Server`
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** T-128's As built has a bullet for the refactor pass (run by the cairn process before review, verified by `cairn milestone M-27 verify`): `cabbfad` dropped `ViewFraming.VerticalCosine`, `ee8608e` `PbrMaterials.Sampler`, `01cb4b2` made `ViewFraming.FrontDirection` read `RenderLights.FrontDirection`, and f44e507's narrowing; T-111's lines on `PbrMaterials.Sampler` say it went and `TextureUpload.Sampler` is the one sampler (6da63dc). A tracker change, so no test; the merged tree's frames are hashed by `cairn milestone M-27 verify`'s scenarios
 
 ### More of Carve.Hosting is public than any second server reads
 
@@ -185,7 +187,9 @@ I read every file in `src/Patina.Server` and the test names and key bodies in `t
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** per the person's ruling (2026-11-18), `GraphValidator.Kinds` kind-checks every input whose source is a node of a known type, even when another input of that node is at fault; an input whose source is missing, of unknown type or on a cycle is tried as greyscale and as colour, and a node's output kind (and a type's own input check) counts only when every try agrees, so what it would decide stays unchecked (79c37af). The probe is `GraphToolTests.A_kind_mismatch_behind_another_input_s_fault_is_refused_at_the_edit_that_makes_it` (the first edit is now refused with that fault; the fix of `b` then evaluates), failing before the change; `GraphFaultTests.AnInputIsKindCheckedEvenWhenAnotherInputOfItsNodeIsAtFault` (failing before) and `WhatAnInputAtFaultWouldDecideIsNotKindChecked` hold the validator; `PlanksGraphTests.T117sPlantInThePlanksGivesItsOneFault` holds T-117's `grain_2` plant to its one fault. No test or worked example of T-110's or T-113's changed its count, and no tool description stated the old rule or quotes a changed count, so none changed; the rule is in T-110's and T-113's As built
 
 ### patina-regression's inputs omit the sample graph its 8192 test reads
 
