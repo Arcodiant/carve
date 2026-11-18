@@ -128,7 +128,9 @@ internal sealed class CarveProcess : IToolCaller, IDisposable
     {
         var id = Interlocked.Increment(ref _lastId);
         await SendAsync($$"""{"jsonrpc":"2.0","id":{{id}},"method":"tools/list"}""");
-        return (await ReadResponseAsync(id)).GetProperty("result").GetProperty("tools");
+        var tools = (await ReadResponseAsync(id)).GetProperty("result").GetProperty("tools");
+        FrameLog.Tools(tools);
+        return tools;
     }
 
     /// <summary>The <c>result</c> of <c>tools/call</c>.</summary>
@@ -138,7 +140,9 @@ internal sealed class CarveProcess : IToolCaller, IDisposable
     {
         var id = Interlocked.Increment(ref _lastId);
         await SendAsync($$$"""{"jsonrpc":"2.0","id":{{{id}}},"method":"tools/call","params":{"name":"{{{name}}}","arguments":{{{arguments}}}}}""");
-        return (await ReadResponseAsync(id)).GetProperty("result");
+        var result = (await ReadResponseAsync(id)).GetProperty("result");
+        FrameLog.Call(name, arguments, result);
+        return result;
     }
 
     public void CloseStdin() => _process.StandardInput.Close();
