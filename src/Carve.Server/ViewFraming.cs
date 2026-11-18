@@ -49,9 +49,6 @@ public static class ViewFraming
     /// <summary>The part of the frame left clear on each side, at the tightest edge.</summary>
     public const float Margin = 0.08f;
 
-    /// <summary>Within this cone of vertical, up is -Z: CreateLookAt returns NaN looking along up.</summary>
-    public static readonly float VerticalCosine = RenderLights.VerticalCosine;
-
     internal static readonly Vector3 FrontDirection = new(1.6f, 1.2f, 2.2f);
 
     /// <summary>The names <c>view</c> takes, each with its direction: the two corners, then head-on along each axis.</summary>
