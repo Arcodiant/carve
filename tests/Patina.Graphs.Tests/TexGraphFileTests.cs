@@ -93,4 +93,18 @@ public class TexGraphFileTests
         var read = TexGraphFile.Read("{\n  \"version\": 1,\n  \"size\": 300,\n  \"seed\": 7, \"nodes\": {} }");
         Assert.Equal((3, 11), (read.Error!.Line, read.Error.Column)); // the 300
     }
+
+    [Fact]
+    public void WriteListsNodesInOrdinalOrderWhateverTheDictionarysComparer()
+    {
+        // The default comparer is the culture's, which puts "a_" before "a0"; ordinal puts "a0" first.
+        var colour = GraphNode.Of("colour");
+        var inputs = System.Collections.Immutable.ImmutableSortedDictionary.Create<string, string>().Add("b_", "x").Add("b0", "x");
+        var nodes = System.Collections.Immutable.ImmutableSortedDictionary.Create<string, GraphNode>()
+            .Add("a_", colour).Add("a0", colour with { Inputs = inputs });
+        var text = TexGraphFile.Write(new TextureGraph(256, 0, nodes));
+        Assert.True(text.IndexOf("\"a0\"", StringComparison.Ordinal) < text.IndexOf("\"a_\"", StringComparison.Ordinal), text);
+        Assert.True(text.IndexOf("\"b0\"", StringComparison.Ordinal) < text.IndexOf("\"b_\"", StringComparison.Ordinal), text);
+        Assert.Equal(TexGraphFile.Write(TexGraphFile.Read(text).Graph!), text);
+    }
 }

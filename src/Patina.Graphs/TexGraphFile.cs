@@ -35,13 +35,13 @@ public static class TexGraphFile
         }
         s.Append("  \"nodes\": {\n");
         var i = 0;
-        foreach (var (id, node) in graph.Nodes)
+        foreach (var (id, node) in graph.Nodes.OrderBy(p => p.Key, StringComparer.Ordinal)) // ordinal whatever the dictionary's own comparer
         {
             s.Append("    ").Append(Quote(id)).Append(": { \"type\": ").Append(Quote(node.Type));
             if (node.Inputs.Count > 0)
-                s.Append(", \"inputs\": { ").Append(string.Join(", ", node.Inputs.Select(p => Quote(p.Key) + ": " + Quote(p.Value)))).Append(" }");
+                s.Append(", \"inputs\": { ").Append(string.Join(", ", node.Inputs.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => Quote(p.Key) + ": " + Quote(p.Value)))).Append(" }");
             if (node.Params.Count > 0)
-                s.Append(", \"params\": { ").Append(string.Join(", ", node.Params.Select(p => Quote(p.Key) + ": " + Value(p.Value)))).Append(" }");
+                s.Append(", \"params\": { ").Append(string.Join(", ", node.Params.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => Quote(p.Key) + ": " + Value(p.Value)))).Append(" }");
             s.Append(" }").Append(++i < graph.Nodes.Count ? ",\n" : "\n");
         }
         s.Append("  }\n}\n");
