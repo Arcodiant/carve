@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
     <Content Include="../../samples/leaky-shed.carve" Link="leaky-shed.carve" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

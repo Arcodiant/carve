@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- T-49's frame step: a fresh agent's saved character and exported glb, render against render_glb. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Acceptance</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The crate scenario's call helpers and camera, and the Orcward frame rule, linked and not copied. -->
+    <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
+    <Compile Include="../Carve.Scenario.Orcward/ComparisonPng.cs" Link="ComparisonPng.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+  </ItemGroup>
+
+</Project>

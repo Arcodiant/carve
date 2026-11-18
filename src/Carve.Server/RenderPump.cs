@@ -20,6 +20,9 @@ internal interface IRenderScene
     {
     }
 
+    /// <summary>Draws this loaded <c>.glb</c> in place of the model, framed on its own rest bounds, or (null) the model again.</summary>
+    void ShowGlb(GlbScene? glb) { }
+
     /// <summary>Points the cameras and the light for this spec of the mesh shown, and draws its look if that changed.</summary>
     void ApplyView(RenderSpec spec);
 
@@ -48,6 +51,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     private Model? _shownModel;
     private Pose? _shownPose;
     private string? _shownWeights;
+    private GlbScene? _shownGlb;
 
     public void Step()
     {
@@ -67,6 +71,29 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             if (!waiting)
             {
                 return;
+            }
+
+            // A loaded glb (render_glb) is drawn in place of the model. Putting it in, or taking it out, is a change of
+            // the scene: it ends the step, and the view is applied again, on the new framing, before anything is drawn.
+            if (!ReferenceEquals(next!.Spec.Glb, _shownGlb))
+            {
+                ShowGlb(next);
+                return;
+            }
+
+            // The model's own checks are not this request's: it draws the file, not the store.
+            if (next.Spec.Glb is not null)
+            {
+                if (next.Spec != _spec || !_viewApplied)
+                {
+                    ChangeView(next);
+                    return;
+                }
+
+                queue.TryTake(out _);
+                next.ServedVersion = _version;
+                scene.Render(next);
+                continue;
             }
 
             if (_meshFault is { } fault)
@@ -177,6 +204,38 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             // The mesh is in, the camera is not to be trusted: the next request sets it again.
             _viewApplied = false;
             scene.Report(e, ViewFault(e));
+        }
+    }
+
+    private void ShowGlb(RenderRequest next)
+    {
+        _viewApplied = false;
+        try
+        {
+            scene.ShowGlb(next.Spec.Glb);
+            _shownGlb = next.Spec.Glb;
+        }
+        catch (Exception e)
+        {
+            // Back to the model, so a failed file leaves nothing of itself in the scene.
+            var fault = $"The file could not be put in the scene: {e.GetBaseException().Message}";
+            scene.Report(e, fault);
+            if (next.Spec.Glb is not null)
+            {
+                queue.TryTake(out _);
+                next.Fail(new InvalidOperationException(fault));
+            }
+
+            try
+            {
+                scene.ShowGlb(null);
+            }
+            catch (Exception again)
+            {
+                scene.Report(again, "The model could not be put back after a file failed.");
+            }
+
+            _shownGlb = null;
         }
     }
 

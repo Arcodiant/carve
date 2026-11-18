@@ -19,7 +19,7 @@ public sealed class SubdivideTool(ModelStore store)
         + "Hard edges (mark_edges) stay creased: a hard edge's two halves are hard, and the surface keeps a sharp line along it. "
         + "An open edge, one with a face on one side only, follows the boundary rule, so an open rim stays a rim. A vertex where three or more hard or open edges meet is a corner and stays where it is. "
         + "New faces take their face's colour and groups; new vertices take bone weights blended from the vertices they are made from, at most four bones each. The shading mode is kept: set_shading smooth to see a soft surface. "
-        + "The new quads are generally not flat, which is expected here, so this result folds the not-planar warnings into one line, \"N faces are not planar (expected after subdivide)\", after the other warnings; get_mesh, check and export still list each face, and select faces where non_planar names them. "
+        + "The new quads are generally not flat, which is expected here, so this result folds the not-planar warnings into one line, \"N faces are not planar (expected after subdivide)\", after the other warnings; get_mesh, check, export, open and move name the first 10 faces and fold the rest, and select faces where non_planar names them. "
         + "Returns JSON {vertices, faces, edges, triangles, closed, bounds:{min,max}, warnings:[], levels, created:{vertices:{first, count}, faces:{first, count}}, deleted:{vertices:[], faces:[]}, split:[]}, triangles counting the whole model; created.vertices is the block of slots appended after the existing vertices, and when the mesh has a deleted face each level makes a face point for it, so the block holds one deleted slot (null in get_mesh) per deleted face per level; "
         + "triangles is for weighing against a game's budget, which export warns on from the game's carve-limits.json; subdivide gives no game-limit warning of its own. "
         + "Bad input (levels missing, not a whole number or outside 1 to 3, an argument subdivide does not take) is a tool error; the mesh is left unchanged and nothing is added to undo. "
@@ -86,7 +86,7 @@ public sealed class SubdivideTool(ModelStore store)
     /// <summary>
     /// The report's warnings with the not-planar ones folded into one line at the end: Catmull-Clark quads are
     /// almost never flat, and one line per face would bury the rest (the person's ruling, 2026-11-10). Only this
-    /// result folds them; get_mesh, check and export list each face as before.
+    /// result folds them; the other reports fold at 10 faces (MeshWarningFold).
     /// </summary>
     internal static List<string> Warnings(MeshReport report)
     {

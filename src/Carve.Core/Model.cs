@@ -365,7 +365,7 @@ public sealed class Model
             deleted.AddRange(Enumerable.Range(0, mesh.Vertices.Count).Select(mesh.IsVertexDeleted));
             faces.AddRange(mesh.Faces.Select(f => f.Map(v => v + offset)));
             if (posed) corners.AddRange(Shading.CornersOf(mesh));
-            flat.AddRange(Enumerable.Repeat(!Shading.HasCornerNormals(mesh), mesh.Faces.Count));
+            flat.AddRange(Enumerable.Repeat(mesh.ShadingMode != ShadingMode.Smooth, mesh.Faces.Count));
             if (!smooth) continue;
             // Shading is per mesh: a flat piece of a mixed model has every edge hard, a smooth piece its own.
             var edges = mesh.ShadingMode == ShadingMode.Smooth ? mesh.HardEdges : mesh.Topology.Edges.Select(e => (e.Lo, e.Hi));

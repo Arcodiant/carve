@@ -113,19 +113,16 @@ public class SoftLoadTests
     }
 
     [SkippableOrRun]
-    public void The_flat_export_is_clean_and_the_soft_ones_warnings_are_the_non_planar_faces_select_finds()
+    public void The_flat_export_is_clean_and_the_soft_ones_warnings_name_ten_faces_per_mesh_and_fold_the_rest_to_what_select_finds()
     {
         Assert.DoesNotContain("warning(s)", File.ReadAllText(Path.Combine(RunFolder, "export-flat-result.txt")));
         var soft = File.ReadAllText(Path.Combine(RunFolder, "export-result.txt"));
         var at = soft.IndexOf("warning(s): ", StringComparison.Ordinal);
-        Assert.True(at >= 0, "subdivide leaves faces that are not planar; the export lists them");
-        var warnings = soft[(at + "warning(s): ".Length)..].Split("; ");
-        Assert.All(warnings, w => Assert.Contains("face is not planar", w));
-        // As many as select finds non_planar on the same model, mesh by mesh (the person, 2026-11-10, until T-72 lands).
-        var nonPlanar = new[] { "Body", "Hat" }.Sum(name => System.Text.Json.JsonDocument.Parse(
+        Assert.True(at >= 0, "subdivide leaves faces that are not planar; the export names 10 per mesh and folds the rest");
+        // Per mesh: the 10 named lines and the folded count add up to what select finds non_planar, and nothing else warns (T-72).
+        var counts = new[] { "Body", "Hat" }.ToDictionary(name => name, name => System.Text.Json.JsonDocument.Parse(
             File.ReadAllText(Path.Combine(RunFolder, $"select-non-planar-{name}.txt"))).RootElement.GetProperty("count").GetInt32());
-        Assert.True(nonPlanar > 0, "select finds no non_planar face on the soft gardener");
-        Assert.Equal(nonPlanar, warnings.Length);
+        Assert.Null(Carve.Scenario.Soft.NotPlanarFold.Check(soft[(at + "warning(s): ".Length)..], counts));
     }
 }
 

@@ -172,8 +172,12 @@ internal static class CrateBuild
         }
     }
 
-    /// <summary>Faces must differ in the green channel by at least this much (10/255, as in M-1).</summary>
-    public const int MinimumStep = 10;
+    /// <summary>
+    /// Faces must differ in the green channel by at least this much: 6/255 since T-82 (10 in M-1), by the person's ruling of 2026-11-13,
+    /// worked as the cube scenario's <c>MinimumStep</c> is: under the engine's PBR material a step the light makes is about 0.4 to 0.45 of
+    /// LitMesh's, and the cube's closest face pair (+Z over +X from the front) steps by 8.
+    /// </summary>
+    public const int MinimumStep = 6;
 
     // front: the top, +Z and +X frame faces in M-1's order (brightest first), each in the middle of its
     // 0.12 frame band: the top frame's left band, the +Z frame's left band, the +X frame's near band.
@@ -187,14 +191,17 @@ internal static class CrateBuild
 
     /// <summary>
     /// What every native front frame of the crate must show: the corners are background, the centre is the mesh, the
-    /// top, +Z and +X frame faces are in order (brightest first) at their points, and the +X bar's top differs from the
-    /// panel behind it. A mirrored camera puts +X where +Z is, and an up-flipped one the lid at the bottom, so either fails.
+    /// top is brighter than +Z and the three frame faces stand above the background at their points, and the +X bar's top
+    /// differs from the panel behind it. +Z over +X is no longer checked (the sky ruling, M-19 row 1), so the face order alone
+    /// does not catch a mirror. Shown on round 3's crate-front and export front frames, mirrored and flipped (RV-52): a mirrored
+    /// camera puts the background at the +Z point (G 53) and one face under both bar points (201 and 201); an up-flipped one
+    /// gives the top and +Z points the same face (202 and 202) and the bar points again one face (199 and 199). Either fails.
     /// </summary>
     public static void CheckFront(ScenarioDriver driver, ScenarioFrame frame)
     {
         CheckCorners(driver, frame);
         CheckNotBackground(driver, frame, (256, 256), "the centre");
-        CheckOrder(driver, frame, [FrontTop, FrontPlusZ, FrontPlusX], "top", "+Z", "+X");
+        CheckFrontOrder(driver, frame, [FrontTop, FrontPlusZ, FrontPlusX]);
         CheckDiffers(driver, frame, FrontBarTop, FrontPanelBehindBar, "the +X bar's top", "the +X panel behind it");
     }
 
@@ -216,6 +223,30 @@ internal static class CrateBuild
         if (Math.Abs(ga - gb) < MinimumStep)
         {
             driver.Fail($"{frame.Name}: {whatA} at ({a.X}, {a.Y}) is {ga} and {whatB} at ({b.X}, {b.Y}) is {gb}; they should differ by at least {MinimumStep}");
+        }
+    }
+
+    /// <summary>
+    /// The front view's three faces (top, +Z, +X): the top at least <see cref="MinimumStep"/> above +Z, and each face at least
+    /// that above the background. +Z over +X is not checked: under M-7's sky the two step by 2 (the light model predicts 3), and
+    /// the person ruled on 2026-11-17 ("Accept all", M-19 row 1) to drop that pair from front views; the back view keeps the
+    /// three-face order (<see cref="CheckOrder"/>).
+    /// </summary>
+    public static void CheckFrontOrder(ScenarioDriver driver, ScenarioFrame frame, (int X, int Y)[] at)
+    {
+        string[] faces = ["top", "+Z", "+X"];
+        var g = at.Select(a => (int)frame.Pixel(a.X, a.Y).G).ToArray();
+        if (g[0] < g[1] + MinimumStep)
+        {
+            driver.Fail($"{frame.Name}: top ({g[0]}) should be at least {MinimumStep} brighter than +Z ({g[1]})");
+        }
+
+        for (var i = 0; i < 3; i++)
+        {
+            if (g[i] < 53 + MinimumStep)
+            {
+                driver.Fail($"{frame.Name}: {faces[i]} ({g[i]}) should be at least {MinimumStep} above the background");
+            }
         }
     }
 

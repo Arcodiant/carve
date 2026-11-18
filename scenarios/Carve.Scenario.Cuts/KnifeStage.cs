@@ -149,8 +149,10 @@ internal sealed class KnifeStage : ICutsStage
     /// The person's rulings on shade prediction (2026-11-12). A coloured face's pixel is predicted by the Crate scenario's
     /// rule (<see cref="ColourRule"/>) from a grey face of the same normal in the same frame, at <see cref="Checks.Exact"/>:
     /// the door piece and the pocket floor from the front (face 1), the pocket's bottom wall (+Y, blue as the extrude
-    /// leaves it) from the slab's top (face 3). The two slanted walls have no face of the same normal, so each of their
-    /// probes must differ from the pocket floor's shade by more than <see cref="Checks.Exact"/> in at least one channel.
+    /// leaves it) from the slab's top (face 3). The two slanted walls have no face of the same normal: the upper left wall's
+    /// probes must differ from the pocket floor's shade by more than <see cref="Checks.Exact"/> in at least one channel, and
+    /// the lower left wall's, which faces the light and is within 2 of the floor under PBR, are predicted straight from the
+    /// light model (the person's ruling, 2026-11-16).
     /// </summary>
     private static void Predicted(ScenarioFrame frame, Camera camera, Solid solid, int doorPiece)
     {
@@ -177,30 +179,38 @@ internal sealed class KnifeStage : ICutsStage
             return;
         }
 
-        var floor = Predict(f, HexagonBlue);
-        Coloured(frame, camera, solid, Probes.Where(p => p.Name == "the door"), doorPiece, Predict(f, DoorBrown), "the door piece, brown, from the front", false);
+        var floor = Predict(f, HexagonBlue, solid.Normal(1), camera.Direction);
+        Coloured(frame, camera, solid, Probes.Where(p => p.Name == "the door"), doorPiece, Predict(f, DoorBrown, solid.Normal(1), camera.Direction), "the door piece, brown, from the front", false);
         Coloured(frame, camera, solid, Probes.Where(p => p.Name == "the recess"), 6, floor, "the pocket floor, blue, from the front", false);
-        Coloured(frame, camera, solid, Walls.Where(p => p.Name == "the bottom wall"), bottom, Predict(t, HexagonBlue), "the bottom wall, blue, from the top", true);
-        foreach (var (wall, name) in new[] { (lowerLeft, "the lower left wall"), (upperLeft, "the upper left wall") })
+        Coloured(frame, camera, solid, Walls.Where(p => p.Name == "the bottom wall"), bottom, Predict(t, HexagonBlue, solid.Normal(3), camera.Direction), "the bottom wall, blue, from the top", true);
+        // The person's ruling (2026-11-16), word for word: "Drop that wall from it": "The lower-left wall's three probes
+        // leave the 'differs from the floor' check. The bottom and upper-left walls still show the pocket has walls, and
+        // the lower-left wall keeps its own colour check (within 2 of its predicted shade)." Under PBR that wall faces the
+        // light (n.l 0.68 against the floor's 0.62) and really is within 2 of the floor. It has no grey face of its normal,
+        // so its shade comes straight from T-82's light model plus the specular: (51, 84, 108), drawn (51, 84, 107).
+        if (lowerLeft >= 0)
         {
-            var sure = 0;
-            foreach (var (_, at) in Walls.Where(p => p.Name == name))
-            {
-                var (x, y) = camera.Pixel(at);
-                if (Shows(frame, camera, solid, x, y, wall, true, $"{name} {at}") is not { } p)
-                {
-                    continue;
-                }
+            Coloured(frame, camera, solid, Walls.Where(p => p.Name == "the lower left wall"), lowerLeft, Lit(HexagonBlue, solid.Normal(lowerLeft), camera.Direction), "the lower left wall, blue, from the light model", true);
+        }
 
-                sure++;
-                if (Math.Abs(p.R - floor.R) <= Exact && Math.Abs(p.G - floor.G) <= Exact && Math.Abs(p.B - floor.B) <= Exact)
-                {
-                    Note($"{frame.Name}: {name} {at} at ({x}, {y}) is {p}, within {Exact} of the pocket floor's {floor} in every channel: not shaded as a wall");
-                }
+        const string name = "the upper left wall";
+        var sure = 0;
+        foreach (var (_, at) in Walls.Where(p => p.Name == name))
+        {
+            var (x, y) = camera.Pixel(at);
+            if (Shows(frame, camera, solid, x, y, upperLeft, true, $"{name} {at}") is not { } p)
+            {
+                continue;
             }
 
-            Least(frame, name, sure, 1);
+            sure++;
+            if (Math.Abs(p.R - floor.R) <= Exact && Math.Abs(p.G - floor.G) <= Exact && Math.Abs(p.B - floor.B) <= Exact)
+            {
+                Note($"{frame.Name}: {name} {at} at ({x}, {y}) is {p}, within {Exact} of the pocket floor's {floor} in every channel: not shaded as a wall");
+            }
         }
+
+        Least(frame, name, sure, 1);
     }
 
     /// <summary>The grey pixel of <paramref name="face"/> at the first probe that surely shows it.</summary>

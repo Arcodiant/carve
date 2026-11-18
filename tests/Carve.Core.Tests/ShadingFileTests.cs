@@ -90,4 +90,33 @@ public class ShadingFileTests
         for (var f = 0; f < posed.Length; f++)
             for (var k = 0; k < posed[f].Length; k++) Assert.Equal(posed[f][k], drawn[f][k]);
     }
+
+    [Fact]
+    public void A_posed_flat_mesh_is_lit_by_its_skinned_corners_and_shows_its_faces()
+    {
+        // RV-52 finding 9, held by RV-53: the export writes a flat face's normal at each corner and a game skins it, so a posed
+        // flat mesh is lit by those skinned corners, not by its posed polygons' own normals. Vertex 0 follows "base" alone and the
+        // rest are blended half and half with a quarter-turned "tip", so the faces at vertex 0 bend and the two differ there.
+        var skeleton = Skeleton.Create([new("base", null, Vector3.Zero, Quaternion.Identity), new("tip", "base", Vector3.Zero, Quaternion.Identity)]).Skeleton!;
+        var cube = Cube().WithWeights(VertexWeights.Of(Enumerable.Range(0, 8).ToDictionary(v => v,
+            v => v == 0 ? new[] { new Influence(0, 1.0) } : [new Influence(0, 0.5), new Influence(1, 0.5)])));
+        Assert.Equal(ShadingMode.Flat, cube.ShadingMode);
+        var quarter = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 2);
+        var pose = new Pose(new Dictionary<string, (Quaternion?, Vector3?)> { ["tip"] = (quarter, null) });
+
+        var skinned = Skinning.CornerNormals(cube, skeleton, pose);
+        var combined = Skinning.Posed(Model.Of("body", cube).WithSkeleton(skeleton), pose).Combined!;
+        Assert.True(Shading.HasCornerNormals(combined), "a posed flat mesh carries no skinned corners: it is lit by its posed polygons");
+        var drawn = Shading.CornersOf(combined);
+        for (var f = 0; f < skinned.Length; f++)
+        {
+            Assert.False(Shading.FaceHasCornerNormals(combined, f), $"face {f} of a posed flat mesh shows corner normals in the normals look");
+            for (var k = 0; k < skinned[f].Length; k++)
+                Assert.True((skinned[f][k] - drawn[f][k]).Length() < 1e-5f, $"face {f} corner {k}: lit by {drawn[f][k]}, skinned {skinned[f][k]}");
+        }
+
+        // The case is one the fix changes: some corner's skinned normal is not its posed polygon's own.
+        var own = Shading.Corners(cube.WithVertices(combined.Vertices));
+        Assert.Contains(Enumerable.Range(0, skinned.Length), f => Enumerable.Range(0, skinned[f].Length).Any(k => (skinned[f][k] - own[f][k]).Length() > 1e-3f));
+    }
 }

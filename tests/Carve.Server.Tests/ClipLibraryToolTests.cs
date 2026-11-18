@@ -71,4 +71,43 @@ public sealed class ClipLibraryToolTests() : TempFolderTests("carve-clip-library
         Assert.StartsWith("export: mode clips: ", TextOf(exported));
         Assert.Empty(Directory.GetFiles(Root));
     }
+
+    private const string Drift = """{"name":"drift","duration":1,"loop":true,"channels":{"Hips":{"translation":{"keys":[{"time":0,"value":[0,1,0]},{"time":1,"value":[0,1,0.5]}]}}}}""";
+
+    [Fact]
+    public async Task Clip_warnings_reach_define_clip_get_clips_save_and_export()
+    {
+        using var carve = await StartAsync();
+        Ok(await carve.CallToolAsync("define_skeleton", Hips));
+
+        var clean = await carve.CallToolAsync("define_clip", Idle);
+        Ok(clean);
+        Assert.Equal(0, JsonDocument.Parse(TextOf(clean)).RootElement.GetProperty("warnings").GetArrayLength());
+
+        var defined = await carve.CallToolAsync("define_clip", Drift);
+        Ok(defined);
+        Assert.Equal(2, JsonDocument.Parse(TextOf(defined)).RootElement.GetProperty("warnings").GetArrayLength());
+
+        var all = JsonDocument.Parse(TextOf(await carve.CallToolAsync("get_clips", "{}"))).RootElement.GetProperty("clips");
+        Assert.Equal(["idle", "drift"], all.EnumerateArray().Select(c => c.GetProperty("name").GetString()));
+        var one = JsonDocument.Parse(TextOf(await carve.CallToolAsync("get_clips", """{"name":"drift"}"""))).RootElement.GetProperty("clips")[0];
+        Assert.True(one.GetProperty("loop").GetBoolean());
+        Assert.Equal(1, one.GetProperty("duration").GetDouble());
+        var keys = one.GetProperty("channels").GetProperty("Hips").GetProperty("translation").GetProperty("keys");
+        Assert.Equal(2, keys.GetArrayLength());
+        Assert.Equal(0.5, keys[1].GetProperty("value")[2].GetDouble());
+        Assert.False(one.GetProperty("channels").GetProperty("Hips").TryGetProperty("rotation", out _), "a part the clip does not key is left out, not null");
+        Assert.Equal(2, one.GetProperty("warnings").GetArrayLength());
+        var unknown = await carve.CallToolAsync("get_clips", """{"name":"nope"}""");
+        Assert.True(IsError(unknown));
+        Assert.Equal("get_clips: no clip named 'nope'; the clips are 'idle', 'drift'", TextOf(unknown));
+
+        var saved = TextOf(await carve.CallToolAsync("save", """{"path":"d.carve"}"""));
+        Assert.Contains("2 warning(s): clip 'drift' loops", saved);
+        var exported = TextOf(await carve.CallToolAsync("export", """{"path":"d.clips.glb","mode":"clips"}"""));
+        Assert.Contains("2 warning(s): clip 'drift' loops", exported);
+
+        Ok(await carve.CallToolAsync("delete_clip", """{"name":"drift"}"""));
+        Assert.DoesNotContain("warning", TextOf(await carve.CallToolAsync("save", """{"path":"e.carve"}""")));
+    }
 }

@@ -74,6 +74,35 @@ public class FaceColourTests
     }
 
     [Fact]
+    public void Render_draws_each_colour_with_the_PBR_material_the_loader_makes_from_the_export()
+    {
+        // T-82: the preview shades as the game will. Each of render's submesh colours, in render's order, against the material
+        // the engine's glTF parser reads from the exported file in the same submesh: every parameter the loader passes to
+        // Material.Pbr is equal, and the material is the PBR path, not the classic lit one.
+        var mesh = Coloured();
+        MeshBridge.ToSubmeshedMeshData(mesh, DrawnSpace.Of(Vector3.Zero, Vector3.One), out var colours, out _);
+        var parsed = GlbExportTests.Parser.Parse(GlbExport.Write(mesh, Shading.Triangles(mesh), "cube"), ModelFormat.Gltf)
+            .SubmeshMaterials.Select(m => m!).ToArray();
+
+        Assert.Equal(parsed.Length, colours.Length);
+        foreach (var (colour, file) in colours.Zip(parsed))
+        {
+            var drawn = SurfaceMaterial.Of(colour);
+            Assert.True(file.Pbr);
+            Assert.True(drawn.Flags.HasFlag(MaterialFlags.Lit | MaterialFlags.Pbr), $"{colour ?? "grey"}: {drawn.Flags} is not lit PBR");
+            Assert.Equal(file.BaseColor, drawn.Color);
+            Assert.Equal(file.Metallic, drawn.Metallic);
+            Assert.Equal(file.Roughness, drawn.Roughness);
+            Assert.Equal(file.EmissiveColor, drawn.EmissiveColor);
+            Assert.Equal(file.Occlusion, drawn.Occlusion);
+            Assert.Equal(file.DoubleSided, drawn.DoubleSided);
+            Assert.Null(file.TextureBytes);
+            Assert.Null(drawn.Texture);
+            Assert.Null(drawn.MetallicRoughnessTexture);
+        }
+    }
+
+    [Fact]
     public void Colours_and_groups_step_back_with_undo_and_an_extrude_hands_them_to_its_walls()
     {
         var store = new ModelStore();

@@ -285,10 +285,23 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         Assert.True(IsBackground(image, PixelOf(new Vector3(1.9f, 0.5f, 1))), "something is drawn between the boxes");
     }
 
+    /// <summary>
+    /// Whether the pixel reads as the highlight's orange. Since T-82 a highlighted face is a PBR-shaded tint (the person's ruling
+    /// of 2026-11-13): the orange vertex colour (1, 0.55, 0.1) multiplies the lit base colour (0.72, 0.72, 0.70). In the light
+    /// model the front face (n.l 0.513) is (145, 110, 47), and (145, 145, 143) untinted; at the cube's darkest n.l (0.351) the
+    /// tint is (137, 103, 44). So red at least 120, red over green by at least 20 (35 and 34 tinted, 0 untinted) and blue
+    /// under 90 (47 tinted, 143 untinted); before T-82, under LitMesh, it was red over 150 and over green by 40.
+    /// </summary>
     private static bool IsOrange(ImageResult image, (int X, int Y) p)
     {
         var at = (p.Y * image.Width + p.X) * 4;
-        return image.Data[at] > 150 && image.Data[at] > image.Data[at + 1] + 40 && image.Data[at + 2] < 90;
+        return image.Data[at] >= 120 && image.Data[at] >= image.Data[at + 1] + 20 && image.Data[at + 2] < 90;
+    }
+
+    private static string PixelAt(ImageResult image, (int X, int Y) p)
+    {
+        var at = (p.Y * image.Width + p.X) * 4;
+        return $"({image.Data[at]}, {image.Data[at + 1]}, {image.Data[at + 2]})";
     }
 
     /// <summary>Whether two frames differ anywhere within 12 pixels of <paramref name="p"/>.</summary>
@@ -333,8 +346,8 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         // The tall box's face 1 is face 7 of the same boxes as one mesh.
         Assert.Equal(whole, highlighted);
         var lit = ImageResult.FromMemory(highlighted, ColorComponents.RedGreenBlueAlpha);
-        Assert.True(IsOrange(lit, PixelOf(new Vector3(2.5f, 1.5f, 1))), "the tall box's front face is not orange");
-        Assert.False(IsOrange(lit, PixelOf(new Vector3(0.5f, 0.5f, 1))), "the cube's front face is orange");
+        Assert.True(IsOrange(lit, PixelOf(new Vector3(2.5f, 1.5f, 1))), $"the tall box's front face is not orange: {PixelAt(lit, PixelOf(new Vector3(2.5f, 1.5f, 1)))}");
+        Assert.False(IsOrange(lit, PixelOf(new Vector3(0.5f, 0.5f, 1))), $"the cube's front face is orange: {PixelAt(lit, PixelOf(new Vector3(0.5f, 0.5f, 1)))}");
 
         // The tall box's front face carries its label; the cube's, whose id 1 is the same number, carries none.
         var bare = ImageResult.FromMemory(plain, ColorComponents.RedGreenBlueAlpha);

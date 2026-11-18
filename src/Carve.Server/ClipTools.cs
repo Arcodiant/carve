@@ -30,7 +30,7 @@ public sealed class DefineClipTool(ModelStore store)
         + "Between two keys LINEAR moves translation in a straight line and turns rotation by the shortest arc (spherical interpolation; q and -q are the same turn, so a key's sign never sends the bone the long way round); "
         + "STEP holds the earlier key until the time reaches the next. Before the first key and after the last a channel holds that key; it does not wrap. "
         + "render(clip, time) draws the clip at a moment. "
-        + "Returns JSON {name, duration, loop, bones: [animated bone names], replaced: true if a clip of that name was there before, clips: [every clip name]}. "
+        + "Returns JSON {name, duration, loop, bones: [animated bone names], replaced: true if a clip of that name was there before, clips: [every clip name], warnings: [strings]}. warnings never refuse the clip: a looping clip whose rotation ends more than 1 degree from where it starts (q and -q count as equal), or whose translation ends more than 1 mm away from where it starts (the distance on X/Y/Z); a clip whose root bone's translation ends more than 1 mm from where it starts on X/Z (clips are in place). Each names the clip, bone and difference. "
         + "Errors, each a tool error that changes nothing and lists every problem by place (e.g. channels.joint.rotation.keys[1]): no skeleton yet; an empty name; a duration not greater than 0; "
         + "a bone the skeleton lacks; a bone with neither part; an interpolation other than LINEAR or STEP; a part with no keys; a key time outside [0, duration], the same as or earlier than the key before it; "
         + "a rotation that is not a unit quaternion (within 0.001); a value that is not 3 or 4 finite numbers. "
@@ -124,6 +124,7 @@ public sealed class DefineClipTool(ModelStore store)
             bones = clip.Channels.Select(c => c.Bone).ToArray(),
             replaced,
             clips = done.Model.Clips.Select(c => c.Name).ToArray(),
+            warnings = ClipChecks.Check(clip, done.Model.Skeleton!),
         });
     }
 
@@ -256,4 +257,69 @@ public sealed class DeleteClipTool(ModelStore store)
         if (store.DeleteClip("delete_clip", clip, out var refusal) is not { } done) return Failed("delete_clip", [refusal!]);
         return Ok(new { deleted = clip, clips = done.Model.Clips.Select(c => c.Name).ToArray() });
     }
+}
+
+/// <summary>The <c>get_clips</c> tool: reads the clips back as given, with their warnings.</summary>
+public sealed class GetClipsTool(ModelStore store)
+{
+    private const string Text =
+        "Reads back the clips: get_clips(name?). With no name every clip, in the order defined; with one, that clip. "
+        + "Returns JSON {clips: [{name, duration, loop, channels: {bone: {rotation: {interpolation, keys: [{time, value}]}, translation: {...}}}, warnings: [strings]}]}, "
+        + "the keys exactly as given to define_clip (a part the clip does not key is left out). warnings are define_clip's: a looping clip that does not close, or a root bone that ends elsewhere on the ground plane. "
+        + "With no skeleton or no clips the list is empty. Errors: a name no clip has (the error lists the clips), a name that is not a string. "
+        + DefineClipTool.ExampleMarker + """ {"name":"wave"}""";
+
+    public static McpServerTool Create() => MeshToolSupport.Create<GetClipsTool>("get_clips", Text, new JsonObject
+    {
+        ["type"] = "object",
+        ["properties"] = new JsonObject
+        {
+            ["name"] = new JsonObject { ["description"] = "One clip to read, as named to define_clip. Left out, every clip.", ["type"] = "string" },
+        },
+    });
+
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? name = null)
+    {
+        var errors = UnknownArguments("get_clips", context, "name");
+        string? wanted = null;
+        if (!Absent(name))
+        {
+            if (name!.Value.ValueKind != JsonValueKind.String) errors.Add($"name: expected a string, got {Describe(name.Value)}");
+            else wanted = name.Value.GetString();
+        }
+        if (errors.Count > 0) return Failed("get_clips", errors);
+        var model = store.Current.Model;
+        var clips = model.Clips.ToList();
+        if (wanted is not null)
+        {
+            clips = clips.Where(c => c.Name == wanted).ToList();
+            if (clips.Count == 0)
+                return Error($"get_clips: no clip named '{wanted}'; the clips are " + (model.Clips.Count == 0 ? "none yet" : NameList.Quoted(model.Clips.Select(c => c.Name))));
+        }
+        return Line(JsonSerializer.Serialize(new
+        {
+            clips = clips.Select(c => new
+            {
+                name = c.Name,
+                duration = c.Duration,
+                loop = c.Loop,
+                channels = c.Channels.ToDictionary(b => b.Bone, b => new
+                {
+                    rotation = Part(b.Rotation, q => new[] { q.X, q.Y, q.Z, q.W }),
+                    translation = Part(b.Translation, v => new[] { v.X, v.Y, v.Z }),
+                }),
+                warnings = ClipChecks.Check(c, model.Skeleton!),
+            }).ToArray(),
+        }, OmitMissingParts));
+    }
+
+    /// <summary>get_clips leaves out a part the clip does not key, as its description says, rather than writing it as null.</summary>
+    private static readonly JsonSerializerOptions OmitMissingParts =
+        new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
+
+    private static object? Part<T>(ClipChannel<T>? channel, Func<T, float[]> value) => channel is null ? null : new
+    {
+        interpolation = channel.Interpolation == ClipInterpolation.Step ? "STEP" : "LINEAR",
+        keys = channel.Keys.Select(k => new { time = k.Time, value = value(k.Value) }).ToArray(),
+    };
 }

@@ -142,6 +142,9 @@ internal sealed class Camera
 
     private Vector3 Drawn(Vector3 p) => (p - _centre) / _radius;
 
+    /// <summary>The unit direction from the framed box towards the eye, as <c>render</c> takes <c>direction</c>.</summary>
+    public Vector3 Direction => _unit;
+
     public Vector3 Eye => _centre + _unit * _distance * _radius;
 
     public Vector2 Project(Vector3 p)

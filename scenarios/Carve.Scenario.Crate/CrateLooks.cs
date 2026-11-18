@@ -148,12 +148,15 @@ internal static class CrateLooks
             }
         }
 
+        // Not highlighted: R - B within 6 of the grey face's own under the sky, from the light model at the face's normal (the
+        // person's ruling of 2026-11-17, "Accept all", M-19 row 5; the sky makes it about -47 here, so |R - B| at most 6 no longer held).
+        var lidGrey = ColourRule.GreyRedLessBlue(Vector3.Normalize(CrateUvs.Normal(crate, lidBand)), Front);
         foreach (var at in crate.Samples(lidBand))
         {
             var p = picked.Pixel(Holding(frontPixel(at)).X, Holding(frontPixel(at)).Y);
-            if (Math.Abs(p.R - p.B) > 6)
+            if (Math.Abs(p.R - p.B - lidGrey) > 6)
             {
-                driver.Fail($"{picked.Name}: the frame at {at} is {p}: it is not highlighted, so |R - B| should be at most 6");
+                driver.Fail($"{picked.Name}: the frame at {at} is {p}: it is not highlighted, so R - B should be within 6 of the grey face's {lidGrey}");
             }
         }
 

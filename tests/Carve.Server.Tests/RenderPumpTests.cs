@@ -1,3 +1,4 @@
+using System.Numerics;
 using Carve.Core;
 using Carve.Core.Tests;
 
@@ -56,6 +57,8 @@ public class RenderPumpTests
             : spec == new RenderSpec(CameraSpec.ForView(RenderView.Back)) ? "Back"
             : spec == new RenderSpec(spec.Camera) ? spec.Camera.ToString()
             : spec.ToString();
+
+        public void ShowGlb(GlbScene? glb) => Log.Add(glb is null ? "model" : "glb");
 
         public void Render(RenderRequest request)
         {
@@ -486,5 +489,75 @@ public class RenderPumpTests
         Assert.StartsWith("weights: no bone named 'Root'", FailureOf(renamed));
         Assert.Equal(4, _scene.Rendered.Count);
         Assert.Empty(_scene.Reported);
+    }
+    /// <summary>A glb of one triangle, prepared as render_glb prepares a file, through a loader that hands back a parsed model.</summary>
+    internal static GlbScene Glb(params string[] warnings)
+    {
+        var errors = new List<string>();
+        return GlbScene.Prepare(new OneModelLoader(warnings), [1, 2, 3], null, 0, errors) ?? throw new InvalidOperationException(string.Join("; ", errors));
+    }
+
+    internal sealed class OneModelLoader(string[] warnings) : Empyrean.IModelGeometryLoader
+    {
+        public Empyrean.ParsedModel Parse(byte[] modelBytes, Empyrean.ModelFormat format) =>
+            new(new Empyrean.MeshData<Empyrean.PositionUvNormalVertex>(
+                [new() { Position = new Vector3(0, 0, 0) }, new() { Position = new Vector3(2, 0, 0) }, new() { Position = new Vector3(0, 4, 0) }],
+                [0, 1, 2], []), [], null!, null!, null!) { Warnings = warnings };
+
+        public Empyrean.ParsedModel Parse(byte[] modelBytes, Empyrean.ModelFormat format, Empyrean.ModelParseOptions options) => Parse(modelBytes, format);
+
+        public Empyrean.ParsedModel Load(Empyrean.ContentPath path) => throw new NotSupportedException();
+
+        public Empyrean.ParsedModel Load(Empyrean.ContentPath path, Empyrean.ModelParseOptions options) => throw new NotSupportedException();
+
+        public Empyrean.ParsedAnimationSet LoadAnimationSet(Empyrean.ContentPath path) => throw new NotSupportedException();
+
+        public Empyrean.ParsedAnimationSet ParseAnimationSet(byte[] modelBytes) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public void A_glb_is_put_in_and_taken_out_as_changes_of_the_scene_each_drawn_on_a_later_step()
+    {
+        var pump = Started();
+        _scene.Log.Clear();
+        var glb = Glb();
+        _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)) { Glb = glb });
+        _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)));
+
+        // "|" marks the end of each step: putting the glb in, or taking it out, is all its step does.
+        for (var i = 0; i < 6; i++)
+        {
+            pump.Step();
+            _scene.Log.Add("|");
+        }
+
+        Assert.Equal(2, _scene.Rendered.Count);
+        Assert.Same(glb, _scene.Rendered[0].Request.Spec.Glb);
+        Assert.Null(_scene.Rendered[1].Request.Spec.Glb);
+        Assert.Equal(["glb", "|", "view", "|", "render", "model", "|", "view", "|", "render", "|", "|"], _scene.Log.Select(l => l.Split(' ')[0]));
+    }
+
+    [Fact]
+    public void A_glb_render_is_served_while_the_model_cannot_be_shown()
+    {
+        var pump = new RenderPump(_queue, _store, _scene);
+        _scene.OnShow = _ => new InvalidOperationException("no device");
+        pump.Step();
+        _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)) { Glb = Glb() });
+        for (var i = 0; i < 3; i++) pump.Step();
+        Assert.Single(_scene.Rendered);
+    }
+
+    [Fact]
+    public void A_glb_is_framed_on_its_bounds_and_carries_the_loaders_warnings()
+    {
+        var glb = Glb("a skinned glTF's other meshes were dropped");
+        Assert.Equal(new Vector3(0, 0, 0), glb.BoundsMin);
+        Assert.Equal(new Vector3(2, 4, 0), glb.BoundsMax);
+        Assert.Equal(DrawnSpace.Of(glb.BoundsMin, glb.BoundsMax), glb.Space);
+        Assert.Equal((3, 1), (glb.Vertices, glb.Triangles));
+        Assert.Null(glb.Palette);
+        Assert.Equal("\nThe loader's warnings:\n- a skinned glTF's other meshes were dropped", glb.WarningsText);
+        Assert.Equal("", Glb().WarningsText);
     }
 }

@@ -9,7 +9,12 @@ namespace Carve.Server.Tests;
 public class RenderTests
 {
     private const int Size = 512;
-    private const int MinimumStep = 10;
+    /// <summary>
+    /// Faces must differ in the green channel by at least this much: 6/255 since T-82 (10 before), by the person's ruling of
+    /// 2026-11-13, worked as the scenarios' is: under the engine's PBR material the front view's +Z face (n.l 0.513) is 147 and
+    /// the +X face (n.l 0.351) 139 in the light model, a step of 8 (measured 145 and 137); the back view steps by 11 and 30.
+    /// </summary>
+    private const int MinimumStep = 6;
 
     private const string Cube =
         """{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
@@ -120,7 +125,14 @@ public class RenderTests
 
         var (high, mid, low) = (At(image, pixels[0]), At(image, pixels[1]), At(image, pixels[2]));
         Assert.True(high.G >= mid.G + MinimumStep, $"{high} then {mid}");
-        Assert.True(mid.G >= low.G + MinimumStep, $"{mid} then {low}");
+        // The person's ruling of 2026-11-17 ("Accept all", M-19 row 1): under M-7's sky +Z and +X step by 2 from the
+        // front (the light model predicts 3), so that pair is not checked in the front view; the back view keeps the order.
+        if (view != RenderView.Front)
+        {
+            Assert.True(mid.G >= low.G + MinimumStep, $"{mid} then {low}");
+        }
+
+        Assert.True(mid.G >= 53 + MinimumStep, $"{mid} against the background");
         Assert.True(low.G >= 53 + MinimumStep, $"{low} against the background");
     }
 

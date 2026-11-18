@@ -11,7 +11,7 @@ namespace Carve.Server.Tests;
 [Trait("Tier", "regression")]
 public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
 {
-    private static string Cube(string name, float y) =>
+    internal static string Cube(string name, float y) =>
         JsonSerializer.Serialize(new
         {
             name,
@@ -19,14 +19,14 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
             faces = TestMeshes.CubeFaces,
         });
 
-    private const string Chain =
+    internal const string Chain =
         """{"bones":[{"name":"base","parent":null,"position":[0,0,0],"rotation":[0,0,0,1]},{"name":"joint","parent":"base","position":[0,1,0],"rotation":[0,0,0,1]}]}""";
 
     /// <summary>define_clip's worked example.</summary>
     private const string Wave =
         """{"name":"wave","duration":1,"loop":true,"channels":{"joint":{"rotation":{"interpolation":"LINEAR","keys":[{"time":0,"value":[0,0,0,1]},{"time":0.5,"value":[0,0,0.70710677,0.70710677]},{"time":1,"value":[0,0,0,1]}]}}}}""";
 
-    private static void Ok(JsonElement result) => Assert.False(IsError(result), TextOf(result));
+    internal static void Ok(JsonElement result) => Assert.False(IsError(result), TextOf(result));
 
     /// <summary>Two boxes on a two-bone chain; the upper box weighted only when <paramref name="weighUpper"/>; two clips.</summary>
     internal static async Task<CarveProcess> StartChainAsync(string folder, bool weighUpper = true)
@@ -106,7 +106,7 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
         Assert.Equal(bytes, File.ReadAllBytes(clipsPath));
         Assert.Contains("(replaced)", TextOf(await carve.CallToolAsync("export", """{"path":"chain.glb","overwrite":true}""")));
         Assert.Equal(modelBytes, File.ReadAllBytes(modelPath));
-        Assert.Contains("mode: expected", TextOf(await carve.CallToolAsync("export", """{"path":"x.glb","mode":"piece"}""")));
+        Assert.Contains("mode: expected", TextOf(await carve.CallToolAsync("export", """{"path":"x.glb","mode":"bogus"}""")));
 
         // No clips: refused, nothing written.
         Ok(await carve.CallToolAsync("delete_clip", """{"name":"wave"}"""));
@@ -127,6 +127,24 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
         Assert.True(IsError(refused), TextOf(refused));
         Assert.Contains("no skeleton", TextOf(refused));
         Assert.False(File.Exists(Path.Combine(Root, "clips.glb")));
+    }
+
+    /// <summary>
+    /// RV-52: a clip warning reaches a model-mode (skinned) export too, not only a clips-mode one. The clip's gap is on Y
+    /// alone, so it also shows that loop closure is measured on X/Y/Z (T-83).
+    /// </summary>
+    [Fact]
+    public async Task A_skinned_model_export_carries_the_clip_warnings()
+    {
+        using var carve = await StartChainAsync(Root);
+        Ok(await carve.CallToolAsync("define_clip",
+            """{"name":"sag","duration":1,"loop":true,"channels":{"joint":{"translation":{"keys":[{"time":0,"value":[0,1,0]},{"time":1,"value":[0,0.95,0]}]}}}}"""));
+        var exported = await carve.CallToolAsync("export", """{"path":"chain.glb"}""");
+        Ok(exported);
+        var text = TextOf(exported);
+        Assert.Contains(" skinned: ", text);
+        Assert.Contains("; 1 warning(s): clip 'sag' loops but bone 'joint' translation ends 50 mm from where it starts on X/Y/Z", text);
+        Assert.True(File.Exists(Path.Combine(Root, "chain.glb")));
     }
 
     [Fact]

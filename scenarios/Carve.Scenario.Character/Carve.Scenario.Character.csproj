@@ -16,6 +16,7 @@
     <!-- The crate scenario's call helpers and its camera maths, linked and not copied. -->
     <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
     <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
   </ItemGroup>
 
 </Project>

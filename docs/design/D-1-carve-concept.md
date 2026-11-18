@@ -85,6 +85,19 @@ C#/.NET 10, with renders drawn by Empyrean itself, so a screenshot shows the mod
 as the game would. The kernel, `Carve.Core`, stays engine-free. Rendering needs a
 machine with a Vulkan device, even with no window.
 
+*Ruled by the person (2026-11-12, T-82):* every look that draws the model's own
+colour draws it with the engine's PBR material, with the parameters the engine's
+loader makes from Carve's exported `.glb` (base colour, metallic 0, roughness 1,
+single-sided), so the preview is shaded as the game shades the file. The scene's
+light is unchanged (ambient 0.25, a directional light of 0.9); under PBR its share
+of a lit face is about a third of what `Material.LitMesh` gave, and the scenarios'
+shade margins were lowered to match (2026-11-13). Wireframe, normals, UVs, weights,
+bones and labels keep their own materials; a highlighted face in the shaded look
+is a tint on the surface and is shaded through PBR with it. Since M-19's rebase
+onto M-7 (2026-11-17), the scene also has M-7's fixed sky (`RenderSky`): its
+diffuse ambient and specular probe light every PBR face, the colour faces among
+them, beside the ambient and the directional light above.
+
 **Alternatives:** a small software rasteriser of our own, which runs anywhere and
 is byte-repeatable, but won't match the game.
 **Would change if:** Empyrean cannot run windowless inside a long-lived server
@@ -184,7 +197,7 @@ process and a protocol between the two.
   - Named, model-wide materials hold every field Empyrean's glTF loader reads. They are set with `define_material` and `set_material`.
   - A face has a colour or a material, never both.
   - Textures are supplied PNGs. The Carve file refers to each by a path relative to itself, and export embeds them in the `.glb`.
-  - `render` draws material faces through `Material.Pbr`, under a fixed sky, and leaves other faces as they were.
+  - `render` draws material faces through `Material.Pbr`, under a fixed sky. (M-7 left colour faces as they were; since T-82 (M-19), colour faces are PBR too and the sky lights them as well.)
 - **Render modes.** Which come first, and do any need something Empyrean does not
   have? The first look at its docs did not find a normals or UV debug view; a
   material or shader of Carve's own may do it. *Decided at M-4:* wireframe, normals and highlight came first. None needed anything of the engine: it had line lists on the headless path, per-vertex colours on the unlit `SolidColor` material and an immediate text surface for the labels (T-25, T-26), so there is no engine need. *UVs, decided at M-6 planning:* two looks, `checker` (the model lit with a generated checker) and `uvs` (one mesh's layout drawn flat). A planning probe showed the engine loads `TEXCOORD_0` and draws a texture headless, so no engine need is expected.

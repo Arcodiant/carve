@@ -17,9 +17,6 @@ internal static class CrateLabels
     private const int Tile = 256;
     private const int Gutter = 2;
 
-    /// <summary>The backing darkens a face by at least this.</summary>
-    private const int Backing = 60;
-
     /// <summary>An engine text or dot pixel reads this or more on every channel; nothing under a backing does.</summary>
     private const int White = 250;
 
@@ -165,12 +162,12 @@ internal static class CrateLabels
         CheckTile(driver, sheet, 0, Tile + Gutter, close, Tile, "(2, 1, 1)");
         CheckTile(driver, sheet, Tile + Gutter, Tile + Gutter, minusZ, "-z".Length, "-z");
 
-        // The front tile: top over +Z over +X at the projected points, which a mirrored or flipped camera reorders.
+        // The front tile: top over +Z at the projected points, which a flipped camera reorders (+Z over +X dropped under the sky, ruling of 2026-11-17).
         var pixel = Perspective(CrateMin, CrateMax, Front, Tile);
         var lidBand = crate.FindAll(p => p.Y > 0.8f - Near).First(f => crate.Faces[f].Any(v => crate.Vertices[v].Z > 1 - Near));
         var plusZBand = crate.Find(p => p.Z > 1 - Near && p.Y > 0.68f - Near);
         var plusXBand = crate.Find(p => Math.Abs(p.X - 1) < Near && p.Y > 0.68f - Near);
-        CheckOrder(driver, sheet, [Holding(pixel(crate.Centre(lidBand))), Holding(pixel(crate.Centre(plusZBand))), Holding(pixel(crate.Centre(plusXBand)))], "top", "+Z", "+X");
+        CheckFrontOrder(driver, sheet, [Holding(pixel(crate.Centre(lidBand))), Holding(pixel(crate.Centre(plusZBand))), Holding(pixel(crate.Centre(plusXBand)))]);
 
         // The direction's tile: its caption's first nine letters read (2, 1, 1): each letter is 8 pixels wide, so
         // the two 1s match, as do the two commas and the two spaces, and the brackets differ. A name would not.
@@ -226,7 +223,7 @@ internal static class CrateLabels
         return ((int)MathF.Round(from.X), (int)MathF.Round(from.Y), width, 16);
     }
 
-    private static void CheckFaceLabel(ScenarioDriver driver, ScenarioFrame labelled, ScenarioFrame plain, Func<Vector3, Vector2> pixel, Shape shape, int face, string what, int darkenBy = Backing)
+    private static void CheckFaceLabel(ScenarioDriver driver, ScenarioFrame labelled, ScenarioFrame plain, Func<Vector3, Vector2> pixel, Shape shape, int face, string what, int? darkenBy = null)
     {
         var at = pixel(shape.Centre(face));
         var box = IdBox(at, face, centred: true);
@@ -241,10 +238,15 @@ internal static class CrateLabels
             driver.Fail($"{labelled.Name}: {what}'s centre at ({x}, {y}) is a letter's pixel, so it says nothing of the backing");
         }
 
+        // The least darkening, unless a caller sets it, is worked from the face's own shade (T-82, the person's ruling of 2026-11-13): the
+        // 0.6 black backing leaves 0.4 of the face's linear light (Backed), less the 10 the backed value is allowed below. It was a fixed 60,
+        // which held while LitMesh lit the lid brighter. Under the PBR material a face lit as the cube's top (n.l 0.783, grey 0.72) is 158,
+        // which the backing takes to 103, darker by 55, so the least is 45. A label drawn with no backing darkens by 0 and fails.
         var expected = Backed(shade.G);
-        if (shade.G - seen.G < darkenBy || Math.Abs(seen.G - expected) > 10)
+        var least = darkenBy ?? shade.G - expected - 10;
+        if (shade.G - seen.G < least || Math.Abs(seen.G - expected) > 10)
         {
-            driver.Fail($"{labelled.Name}: {what}'s centre at ({x}, {y}) is {seen} over {shade}: the backing should give {expected}, darker by {darkenBy} or more");
+            driver.Fail($"{labelled.Name}: {what}'s centre at ({x}, {y}) is {seen} over {shade}: the backing should give {expected}, darker by {least} or more");
         }
     }
 

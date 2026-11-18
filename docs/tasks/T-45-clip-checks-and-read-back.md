@@ -4,7 +4,7 @@ description: >-
 ---
 # T-45 — Clip checks and read-back
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -34,3 +34,21 @@ An agent finds a popping loop or a drifting walk from a result, not from the gam
 - **Carried from the M-1 to M-4 plans:** the byte-identical guard on every existing frame, by hash before and after; a positive pixel check on every new frame, and one a mirrored or flipped camera would fail; each new check shown failing, as a table.
 - **Open rules: stop and ask.** Anything D-6 does not settle, any loosened check, and any change to a D-6 decision.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Run on Sonnet 5.5 (claude-sonnet-5-5), one agent.
+
+- **Closing tolerance** (the person's ruling, 2026-11-11, "1° / 1 mm"): rotation closes when first and last key differ by at most 1° (q and -q equal); translation closes when its last key is within 1 mm of its first by 3D distance (so X, Y and Z all count; T-83), and a root counts as in place when within 1 mm on X/Z. Constants `RotationToleranceDegrees` (1) and `TranslationToleranceMetres` (0.001) in `src/Carve.Core/ClipChecks.cs`, commented; recorded in D-6's *Clips*. *Brought up to date in M-19's refactor pass:* T-45 read the ruling literally and compared loop closure on X/Z only, so a looping bob in Y that did not close was not warned; T-83 (the person's ruling of 2026-11-12) made loop closure compare all three axes, and the warning now says "on X/Y/Z".
+- **Warnings** (`ClipChecks.Check`, compared on each channel's first and last key): a looping clip's rotation or translation that does not close, naming clip, bone, channel and difference; a root bone whose translation ends more than 1 mm away on X/Z (the ground plane), looping or not. A looping root that drifts gets both. Carried in `define_clip`'s result (`warnings`), `get_clips`, `save`'s line and `export`'s line (skinned and clips modes; piece mode is T-50's and has no clips).
+- **`get_clips(name?)`**: `{clips:[{name, duration, loop, channels:{bone:{rotation, translation}}, warnings}]}`, keys as given; a part the clip does not key is left out (serialised with `JsonIgnoreCondition.WhenWritingNull`), not written as null; an unknown name is an error listing the clips (`get_clips: no clip named 'nope'; the clips are 'idle', 'drift'`).
+- **Tests**: `ClipChecksTests` (unit: each warning, clean, sign-flip closed, 1° boundary, non-loop, child bone not travel) and `Clip_warnings_reach_define_clip_get_clips_save_and_export` (regression: a clips-mode export; it also asserts that a translation-only channel has no `rotation`, and the unknown-name error word for word). `SkinnedExportToolTests.A_skinned_model_export_carries_the_clip_warnings` (regression) holds the warnings in a skinned model-mode export, with a 50 mm gap on Y alone.
+- **Guard checks**: no render, mesh or frame code changed, so existing frames are unchanged by construction; the scenario suites in verify (`scenario-cube`, `scenario-crate`) are the hash guard. No new frame, so no pixel check. Each new check shown failing by mutation of `ClipChecks`:
+
+| Mutation | Tests failing |
+|---|---|
+| both tolerances set to 100 | 5 (rotation, 1° boundary, root travel x2, loop+travel) |
+| loop condition dropped from the rotation check | `A_non_looping_rotation_may_end_elsewhere` |
+
+- *Brought up to date (2026-11-17, RV-52, e889af0):* `define_clip`'s description now says a looping translation warns more than 1 mm away from where it starts (the distance on X/Y/Z), root travel staying X/Z; `get_clips` leaves out a missing part instead of writing `null`; and the skinned model-mode export's clip warnings have a test. Not shown: `ExportTool`'s `ClipChecks.Check` line removed to watch the new test fail.
+- **Not checked**: no frame or sound review (none made). Engine needs: none.

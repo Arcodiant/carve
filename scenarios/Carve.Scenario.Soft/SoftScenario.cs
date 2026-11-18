@@ -175,26 +175,28 @@ public sealed class SoftScenario : IScenario
             driver.Fail($"export: expected 22 bones, 2 clips and {triangles} triangles, got {exported}");
         }
 
-        // Every warning is a face that is not planar (what subdivide makes of a quad, which the export still lists face by face); a limit
-        // (triangles, primitives, height) must not be one. Their count is select's non_planar faces over both meshes, so a
-        // regression that adds some is caught (the person, 2026-11-10, until T-72 lands). select's results are kept in the run
-        // folder for SoftLoad.Tests.
-        var nonPlanar = 0;
+        // Every warning is a face that is not planar (what subdivide makes of a quad); a limit (triangles, primitives, height) must not
+        // be one. By T-72's rule (the person, 2026-11-13) each mesh names its first 10 and folds the rest into one line, and the named
+        // lines and the folded count add up to select's non_planar faces of that mesh, the named faces are select's lowest ids and the
+        // fold line comes after them, so a regression that adds a warning or loses a
+        // face is caught. select's results are kept in the run folder for SoftLoad.Tests.
+        var nonPlanar = new Dictionary<string, IReadOnlyList<int>>();
         foreach (var name in new[] { "Body", "Hat" })
         {
             var selected = await CallTextAsync(driver, "select", new { kind = "faces", where = "non_planar", mesh = name });
             await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, $"select-non-planar-{name}.txt"), selected);
-            nonPlanar += JsonDocument.Parse(selected).RootElement.GetProperty("count").GetInt32();
+            var found = JsonDocument.Parse(selected).RootElement;
+            nonPlanar[name] = [.. found.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32())];
+            if (nonPlanar[name].Count != found.GetProperty("count").GetInt32())
+            {
+                driver.Fail($"select non_planar on {name}: count {found.GetProperty("count")} against {nonPlanar[name].Count} faces listed");
+            }
         }
         var warned = exported.IndexOf("warning(s): ", StringComparison.Ordinal);
-        var warnings = warned < 0 ? [] : exported[(warned + "warning(s): ".Length)..].Split("; ");
-        if (warnings.Any(w => !w.Contains("face is not planar")))
+        var problem = warned < 0 ? "no warnings" : NotPlanarFold.Check(exported[(warned + "warning(s): ".Length)..], nonPlanar);
+        if (problem is not null)
         {
-            driver.Fail($"export: a warning that is not about a face being non-planar: {warnings.First(w => !w.Contains("face is not planar"))}");
-        }
-        if (nonPlanar == 0 || warnings.Length != nonPlanar)
-        {
-            driver.Fail($"export: expected one warning per face select finds non_planar ({nonPlanar}), got {warnings.Length}");
+            driver.Fail($"export: {problem}");
         }
 
         if (flatExport.Contains("warning(s)"))
@@ -222,18 +224,7 @@ public sealed class SoftScenario : IScenario
     /// <summary>The centre of a front face of each colour reads as that colour; the can (at -X) is on the image's left, and a frame mirrored in X would put it on the right.</summary>
     private static void CheckRest(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, GardenerSpec.MeshSpec body, GardenerSpec.MeshSpec hat)
     {
-        var targets = new (GardenerSpec.MeshSpec Mesh, string Group, Vector3 Near)[]
-        {
-            (body, "shirt", new Vector3(0, 0.85f, 0.3f)), (body, "trousers", new Vector3(0, 0.57f, 0.3f)), (body, "skin", new Vector3(0.07f, 1.27f, 0.3f)),
-            (body, "boots", new Vector3(0.09f, 0.05f, 0.4f)), (body, "can", new Vector3(-0.435f, 0.39f, 0.30f)),
-            (hat, "straw", new Vector3(0, 1.485f, 0.3f)), (hat, "band", new Vector3(0, 1.43f, 0.3f)),
-        };
-        foreach (var (mesh, group, near) in targets)
-        {
-            var c = mesh.Centroid(mesh.NearestFace(group, near));
-            var (x, y) = Holding(project(c));
-            ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}");
-        }
+        ExpectRestColours(driver, frame, project, body, hat);
 
         var can = body.Centroid(body.NearestFace("can", new Vector3(-0.435f, 0.39f, 0.30f)));
         var (cx, cy) = Holding(project(can));
@@ -247,9 +238,19 @@ public sealed class SoftScenario : IScenario
         ExpectNot(driver, frame, mx, my, "can", "the can's mirror in the world (+X)");
     }
 
+    // Under M-7's sky the flat torso's facet edges step by 7 and the smooth one's by 2 (the sky's light, about 1.3 to 2.3 times the old
+    // ambient, flattens a step the sun makes): the person's ruling of 2026-11-17 ("Accept all", M-19 row 4a), 9 to 5 and 5 to 4, each
+    // side clearing by 2.
+    private const int FacetStep = 5;
+    private const int SmoothStep = 4;
+
     /// <summary>
     /// The torso, from the front, at the height 0.80 m: its octagon's two side facet edges (world x of plus and minus 0.1687). Flat, the
-    /// shade steps across each (30 and 31 on a 6 pixel span); soft, it runs on across them (5 to 9 on the same span).
+    /// shade steps across each; soft, it runs on across them. Under LitMesh the steps were 30 and 31 flat and 5 to 9 soft on a 6 pixel
+    /// span, against 20 and 12. Since T-82 the material is the engine's PBR one, whose directional light reaches a face as albedo / pi with
+    /// the ambient floor unchanged, so a step the light makes is about 0.43 of LitMesh's (the cube's faces, worked from their n.l): flat
+    /// about 13, soft 2 to 4. The bounds scale with it, by the person's ruling of 2026-11-13: 9 or more flat, 5 or less soft. The light
+    /// model worked over the samples' geometry (see the span below) gives flat steps of 13 and 14 and soft ones of 5 and 5.
     /// </summary>
     private static void CheckTorso(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, bool flat)
     {
@@ -259,26 +260,29 @@ public sealed class SoftScenario : IScenario
             ExpectGroup(driver, frame, x - 3, y, "shirt", "the torso, left of a facet edge");
             ExpectGroup(driver, frame, x + 3, y, "shirt", "the torso, right of a facet edge");
             var step = Math.Abs(Luma(frame, x + 3, y) - Luma(frame, x - 3, y));
-            if (flat ? step < 20 : step > 12)
+            if (flat ? step < FacetStep : step > SmoothStep)
             {
-                driver.Fail($"{frame.Name}: across the torso's facet edge at ({x}, {y}) the shade steps by {step}; {(flat ? "a flat mesh steps by 20 or more" : "a smooth one runs on, by 12 or less")}");
+                driver.Fail($"{frame.Name}: across the torso's facet edge at ({x}, {y}) the shade steps by {step}; {(flat ? $"a flat mesh steps by {FacetStep} or more" : $"a smooth one runs on, by {SmoothStep} or less")}");
             }
         }
 
-        // Between the facet edge and the lit centre the shade is a ramp when smooth, however many facets the mesh has (a run of equal
-        // shades of at most 5 pixels), and a plateau per facet when not (flat: 17 or more; flat and subdivided: about 11).
-        var (from, row) = Holding(project(new Vector3(-0.16f, 0.80f, 0.17f)));
-        var (to, _) = Holding(project(new Vector3(-0.08f, 0.80f, 0.17f)));
-        int run = 1, longest = 1;
-        for (var x = from + 1; x <= to; x++)
+        // Across the side facet edge, toward the lit centre, the shade is a ramp when smooth, however many facets the mesh has (a run of
+        // equal shades of at most 5 pixels), and a plateau per facet when not (10 or more). The span starts near the torso's -X silhouette
+        // (T-82, the person's ruling of 2026-11-13: re-pick, else lower), where the surface turns from the camera fastest per pixel. Worked
+        // from the samples' geometry and the light model (the +z camera's light toward (-0.02, 0.47, 0.89); the shirt's linear colour times
+        // ambient 0.25 plus 0.9 n.l / pi; sRGB; a ray cast per pixel, the soft mesh's corner normals interpolated): flat, the row crosses the
+        // facet edge onto the front facet, one shade for the 16 pixels to the span's end; smooth, it ramps 89 to 101 and holds a shade for 5
+        // pixels at most, where it nears the lit centre. The old span, -0.16 to -0.08, lies wholly in that gentler part. Spans tried further
+        // out leave the soft torso (it is background past about -0.21) or cut the flat plateau to 10.
+        var (from, row) = Holding(project(new Vector3(-0.195f, 0.80f, 0.17f)));
+        var (to, _) = Holding(project(new Vector3(-0.115f, 0.80f, 0.17f)));
+        // Under M-7's sky the smooth ramp is flatter (130 to 136 over the span) and holds a shade for 7 pixels, so the span is judged by its
+        // count of distinct shades, not its longest run: smooth 5 or more (measured 7), flat 3 or fewer (measured 2, a plateau per facet).
+        // The person's ruling of 2026-11-17 ("Accept all", M-19 row 4b).
+        var shades = Enumerable.Range(from, to - from + 1).Select(x => Luma(frame, x, row)).Distinct().Count();
+        if (flat ? shades > 3 : shades < 5)
         {
-            run = Luma(frame, x, row) == Luma(frame, x - 1, row) ? run + 1 : 1;
-            longest = Math.Max(longest, run);
-        }
-
-        if (flat ? longest < 10 : longest > 5)
-        {
-            driver.Fail($"{frame.Name}: the torso's shade over x {from} to {to} at row {row} has a run of {longest} equal pixels; {(flat ? "a flat mesh holds one shade per facet (10 or more)" : "a smooth one is a ramp (5 or fewer)")}");
+            driver.Fail($"{frame.Name}: the torso's shade over x {from} to {to} at row {row} takes {shades} distinct shades; {(flat ? "a flat mesh holds one shade per facet (3 or fewer)" : "a smooth one is a ramp (5 or more)")}");
         }
     }
 
@@ -298,6 +302,12 @@ public sealed class SoftScenario : IScenario
         ExpectGroup(driver, frame, x, y, "can", "the top of the watering can (at -X)");
         ExpectNot(driver, frame, Size - 1 - x, y, "can", "where a frame mirrored in X would show the can");
     }
+
+    // The rim's steps, scaled as the torso's are (T-82, the person's ruling of 2026-11-13): under LitMesh a creased rim broke by 28 in one
+    // pixel and an uncreased one rolled off in stages of 12, against a stage of 10 and a break of 20. At about 0.43 of that under PBR the
+    // break is about 12 and a stage about 5, so a stage counts from 4 and a break from 9.
+    private const int RimStage = 4;
+    private const int RimBreak = 9;
 
     /// <summary>
     /// The brim's top face, in front of the crown. Creased, its shade holds as far as the rim (the same at 0.18 and 0.226 m from the axis, a
@@ -332,11 +342,11 @@ public sealed class SoftScenario : IScenario
             driver.Fail($"{frame.Name}: only {y - oy} straw pixels below the brim's top at ({ox}, {oy}), expected the wall under the rim");
         }
 
-        // The first step of 10 or more: one pixel's jump when creased (28 flat; the wall's own shade), a stage of the roll-off when not (12).
-        var first = Enumerable.Range(1, profile.Count - 1).Select(k => Math.Abs(profile[k] - profile[k - 1])).FirstOrDefault(d => d >= 10);
-        if (creased ? first < 20 : first >= 20)
+        // The first step of RimStage or more: one pixel's jump when creased (the wall's own shade), a stage of the roll-off when not.
+        var first = Enumerable.Range(1, profile.Count - 1).Select(k => Math.Abs(profile[k] - profile[k - 1])).FirstOrDefault(d => d >= RimStage);
+        if (creased ? first < RimBreak : first >= RimBreak)
         {
-            driver.Fail($"{frame.Name}: down the rim from ({ox}, {oy}) the shades are {string.Join(" ", profile)} (the first step of 10 or more is {first}); {(creased ? "a creased rim breaks at once, by 20 or more" : "an uncreased rim rolls off, by less than 20 at a step")}");
+            driver.Fail($"{frame.Name}: down the rim from ({ox}, {oy}) the shades are {string.Join(" ", profile)} (the first step of {RimStage} or more is {first}); {(creased ? $"a creased rim breaks at once, by {RimBreak} or more" : $"an uncreased rim rolls off, by less than {RimBreak} at a step")}");
         }
     }
     // ---- build, through the tools (as T-36's scenario built it) ----

@@ -659,7 +659,7 @@ internal static class RenderTool
     }
 
     /// <summary>What is wrong with one camera's arguments, in the words of the argument; null when nothing is.</summary>
-    private static string? CameraRefusal(string? view, double[]? direction, double zoom, double[]? target)
+    internal static string? CameraRefusal(string? view, double[]? direction, double zoom, double[]? target)
     {
         if (view is not null && direction is not null)
         {
@@ -868,7 +868,7 @@ internal static class RenderTool
         }
     }
 
-    private static void AddZoomAndTarget(List<string> parts, double zoom, double[]? target)
+    internal static void AddZoomAndTarget(List<string> parts, double zoom, double[]? target)
     {
         if (zoom != 1)
         {
@@ -903,14 +903,14 @@ internal static class RenderTool
     private static bool Finite3(double[] v) => v.Length == 3 && v.All(double.IsFinite);
 
     /// <summary>Three numbers as given, narrowed to the mesh's own precision.</summary>
-    private static Vector3 Vector(double[] v) => new((float)v[0], (float)v[1], (float)v[2]);
+    internal static Vector3 Vector(double[] v) => new((float)v[0], (float)v[1], (float)v[2]);
 
-    private static string Join(IEnumerable<double> v) =>
+    internal static string Join(IEnumerable<double> v) =>
         string.Join(", ", v.Select(x => x.ToString("G", CultureInfo.InvariantCulture)));
 
     // Interim until engine need 2: the engine encodes a PNG only into a file (WritePngAsync), so this
     // calls an encoder library directly, on the bytes that method would write.
-    private static byte[] EncodePng(byte[] pixels, int width, int height)
+    internal static byte[] EncodePng(byte[] pixels, int width, int height)
     {
         using var png = new MemoryStream();
         new ImageWriter().WritePng(pixels, width, height, ColorComponents.RedGreenBlueAlpha, png);

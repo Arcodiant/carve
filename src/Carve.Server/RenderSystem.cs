@@ -21,14 +21,12 @@ internal sealed class RenderSystem(
     ITextureLoader textures,
     IAssetResidency residency,
     RenderComposition composition,
+    IModelLoader models,
     RenderQueue queue,
     ModelStore store,
     ILogger<RenderSystem> log) : ISystem, IRenderScene, LookHolder<Mesh>.IParts
 {
     private const string Scene = "carve";
-
-    /// <summary>The colour of the model's surface: the one value, <see cref="GlbExport.BaseColor"/>, so the game sees what render shows.</summary>
-    private static readonly Vector4 Surface = GlbExport.BaseColor;
 
     private Entity _light;
     private readonly List<Entity> _cameras = [];
@@ -66,6 +64,10 @@ internal sealed class RenderSystem(
 
     /// <summary>The model's materials, for the faces of the next mesh shown that use one (T-78).</summary>
     public void ShowMaterials(IReadOnlyList<Carve.Core.Material> materials) => _materials = materials;
+
+    private GlbScene? _glb;
+    private Entity? _glbEntity;
+    private (byte[] Bytes, Empyrean.Model Model)? _loaded;
 
     private LookHolder<Mesh> Looks => _looks ??= new LookHolder<Mesh>(this);
 
@@ -167,7 +169,8 @@ internal sealed class RenderSystem(
         var scene = LookMeshes.Compose(mesh, space, look == Look.Weights && _weights is null ? Look.Shaded : look, highlight, _weights);
         // The fill's material, put on its entity by Install with the meshes made here. A mesh with coloured faces drawn
         // in the shaded look is a submesh and a material per colour (D-6); anything else is the one mesh it always was.
-        _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : Material.LitMesh(Surface);
+        // The model's own colours draw with the PBR material the engine's loader makes from the exported .glb (T-82).
+        _nextMaterial = scene.FlatColour is { } flat ? Material.SolidColor(flat) : SurfaceMaterial.Of(null);
         _nextSubmeshMaterials = null;
         _nextDrawn = [];
         MeshData<PositionUvNormalVertex> data;
@@ -179,13 +182,13 @@ internal sealed class RenderSystem(
         }
         else if (scene.FlatColour is null && mesh.Style is { Colours.Count: > 0 } or { Materials.Count: > 0 })
         {
-            // A material face is the engine's PBR material the game's loader makes of it (T-78), a colour face LitMesh as ever.
+            // A material face is the engine's PBR material the game's loader makes of it (T-78), a colour face the PBR material the loader makes of its exported colour (T-82).
             data = MeshBridge.ToSubmeshedMeshData(mesh, space, out var colours, out var materials);
             var drawn = materials.Select(m => m is null ? null
                 : _materials.FirstOrDefault(d => d.Name == m) ?? throw new InvalidOperationException($"a face uses the material '{m}', which is not defined")).ToArray();
             _nextSubmeshMaterials = colours.Zip(drawn, (c, m) => m is not null
                     ? Pbr.Of(m)
-                    : Material.LitMesh(c is null ? Surface : FaceStyle.ToLinear(c)))
+                    : SurfaceMaterial.Of(c))
                 .ToArray();
             _nextDrawn = drawn.OfType<Carve.Core.Material>().ToArray();
         }
@@ -225,6 +228,76 @@ internal sealed class RenderSystem(
         _edgeLines = Swap(_edgeLines, edges, _nextEdgeColour);
         _orangeLines = Swap(_orangeLines, orange, LookMeshes.Orange);
         _seamLines = Swap(_seamLines, seams, UvLayout.Seam);
+        if (_glb is not null)
+        {
+            ShowModel(false);
+        }
+    }
+
+    public void ShowGlb(GlbScene? glb)
+    {
+        if (_glbEntity is { } gone)
+        {
+            entities.DestroyEntity(gone);
+            _glbEntity = null;
+        }
+
+        _glb = null;
+        if (glb is null)
+        {
+            ShowModel(true);
+            return;
+        }
+
+        // The engine's own loader, with the file's own materials. A load from bytes is not cached by the engine, so the
+        // last file is kept here: the frames of one file at several times and views load it once.
+        if (_loaded is not { } last || !last.Bytes.AsSpan().SequenceEqual(glb.Bytes))
+        {
+            _loaded = (glb.Bytes, models.LoadModel(glb.Bytes, ModelFormat.Gltf, new ModelLoadOptions()));
+        }
+
+        var model = _loaded.Value.Model;
+        var entity = scenes.CreateEntity(Scene);
+        entities.AddComponent(entity, new MeshInstance
+        {
+            Mesh = model.Mesh,
+            Material = model.Material ?? SurfaceMaterial.Of(null),
+            SubmeshMaterials = model.SubmeshMaterials!,
+            Mode = RenderMode.Mode3D,
+            RenderLayerMask = RenderLayerMask.All,
+            CastsShadow = true,
+        });
+        // Into the drawn space render puts the model in: centred on the rest bounds and scaled by their half-diagonal.
+        var space = glb.Space;
+        var scale = (float)(1 / space.Radius);
+        entities.AddComponent(entity, new Transform3D
+        {
+            Position = new Vector3((float)(-space.X / space.Radius), (float)(-space.Y / space.Radius), (float)(-space.Z / space.Radius)),
+            Orientation = Quaternion.Identity,
+            Scale = new Vector3(scale),
+        });
+        if (glb.Palette is { } palette)
+        {
+            // The engine's GPU skinning: a non-empty SkinnedPose over the loaded bone-attribute mesh.
+            entities.AddComponent(entity, new SkinnedPose { Palette = palette });
+        }
+
+        _glbEntity = entity;
+        _glb = glb;
+        ShowModel(false);
+    }
+
+    /// <summary>Shows or hides the model's own entities, which stay as they are under a loaded glb.</summary>
+    private void ShowModel(bool shown)
+    {
+        var mask = shown ? RenderLayerMask.All : RenderLayerMask.None;
+        foreach (var slot in new[] { _meshEntity, _edgeLines, _orangeLines, _seamLines })
+        {
+            if (slot is { } entity)
+            {
+                entities.GetComponent<MeshInstance>(entity).RenderLayerMask = mask;
+            }
+        }
     }
 
     public void Destroy(Mesh mesh) => resources.Destroy(mesh);
@@ -292,8 +365,9 @@ internal sealed class RenderSystem(
 
         // The target is in the mesh's own coordinates; the camera works in drawn space.
         var camera = spec.Camera;
-        var drawn = camera.Target is { } target ? camera with { Target = _space.Apply(target) } : camera;
-        var frame = ViewFraming.Frame(_drawnHalf, drawn, spec.Projection);
+        var space = _glb?.Space ?? _space;
+        var drawn = camera.Target is { } target ? camera with { Target = space.Apply(target) } : camera;
+        var frame = ViewFraming.Frame(_glb?.DrawnHalf ?? _drawnHalf, drawn, spec.Projection);
         _frame = frame;
         foreach (var entity in _cameras)
         {
@@ -394,8 +468,8 @@ internal sealed class RenderSystem(
     {
         try
         {
-            var vertices = _report!.VertexCount;
-            var faces = _report.FaceCount;
+            var vertices = _glb?.Vertices ?? _report!.VertexCount;
+            var faces = _glb?.Triangles ?? _report!.FaceCount;
             var version = request.ServedVersion;
 
             DrawOverlay(request.Spec);

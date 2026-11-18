@@ -23,7 +23,7 @@ public sealed class CharacterExtension : ICarveExtension
 /// <summary>
 /// The thin slice of M-16 proved through the real tools, on the gardener (<see cref="GardenerSpec"/>): built, looked at at
 /// rest, in a pose and in each clip at three times, saved, reopened and compared, and exported into <c>game/Content/models/</c>
-/// of the run folder (a stand-in content folder) as a model and as clips, with the refusals of an existing file and of an
+/// of the run folder (a stand-in content folder) as a model, as clips and the hat as a piece, with the refusals of an existing file and of an
 /// unweighted vertex. <c>tests/Carve.CharacterLoad.Tests</c> then reads that folder as a game would.
 /// </summary>
 public sealed class CharacterScenario : IScenario
@@ -215,17 +215,25 @@ public sealed class CharacterScenario : IScenario
     /// </summary>
     private static void CheckRest(ScenarioDriver driver, ScenarioFrame frame, Func<Vector3, Vector2> project, GardenerSpec.MeshSpec body, GardenerSpec.MeshSpec hat)
     {
-        var targets = new (GardenerSpec.MeshSpec Mesh, string Group, Vector3 Near)[]
+        ExpectRestColours(driver, frame, project, body, hat);
+
+        // T-84: the torso's top segment, the slope of each shoulder below the neck, is the shirt's and not skin. Each side's front face of
+        // it, projected from the mesh under the framing's bounds, reads as the shirt; the same point with the image flipped upside down
+        // lands on the legs or the gap between them, so a camera flipped in Y fails the first and a mesh whose slope is skin the same.
+        // It reads against the palette lit at the slope's own normal, as the rest colours do (M-19 row 6; RV-52): the slope is the most
+        // upward-facing point checked, the one the sky's blue reaches most.
+        foreach (var sign in new[] { 1f, -1f })
         {
-            (body, "shirt", new Vector3(0, 0.85f, 0.3f)), (body, "trousers", new Vector3(0, 0.57f, 0.3f)), (body, "skin", new Vector3(0.07f, 1.27f, 0.3f)),
-            (body, "boots", new Vector3(0.09f, 0.05f, 0.4f)), (body, "can", new Vector3(-0.435f, 0.39f, 0.30f)),
-            (hat, "straw", new Vector3(0, 1.485f, 0.3f)), (hat, "band", new Vector3(0, 1.43f, 0.3f)),
-        };
-        foreach (var (mesh, group, near) in targets)
-        {
-            var c = mesh.Centroid(mesh.NearestFace(group, near));
-            var (x, y) = Holding(project(c));
-            ExpectGroup(driver, frame, x, y, group, $"the {group} face at {c}");
+            var slope = body.NearestFace("shirt", new Vector3(0.04f * sign, 1.07f, 0.1f));
+            var s = body.Centroid(slope);
+            if (s.Y is < 1.02f or > 1.12f)
+            {
+                driver.Fail($"{frame.Name}: the nearest shirt face to the shoulder slope is at {s}, not between the chest and neck rings");
+            }
+
+            var (sx, sy) = Holding(project(s));
+            ExpectGroup(driver, frame, sx, sy, "shirt", $"the shoulder slope's face at {s}, not skin", body.Normal(slope), Vector3.UnitZ);
+            ExpectNot(driver, frame, sx, Size - 1 - sy, "shirt", $"the shoulder slope's point flipped upside down, at the image's ({sx}, {Size - 1 - sy})");
         }
 
         var can = body.Centroid(body.NearestFace("can", new Vector3(-0.435f, 0.39f, 0.30f)));
@@ -390,6 +398,19 @@ public sealed class CharacterScenario : IScenario
         await ExpectToolErrorAsync(driver, "export", new { path = clips, mode = "clips" }, "already exists", "overwrite");
         await CallTextAsync(driver, "export", new { path = clips, mode = "clips", overwrite = true });
         driver.AssertBytesEqual("gardener.clips.glb, exported again with overwrite", clipsBytes, await File.ReadAllBytesAsync(clips));
+
+        // The hat as a piece: its own file with every bone in the body's order and no clips, for a game to wear on the body's palette.
+        var hat = Path.Combine(models, "gardener.hat.glb");
+        var hatResult = await CallTextAsync(driver, "export", new { path = hat, mode = "piece", meshes = new[] { "Hat" } });
+        if (!hatResult.Contains("as a piece") || !hatResult.Contains("22 bone(s)") || hatResult.Contains("warning(s)"))
+        {
+            driver.Fail($"export mode piece: got {hatResult}");
+        }
+
+        var hatBytes = await File.ReadAllBytesAsync(hat);
+        await ExpectToolErrorAsync(driver, "export", new { path = hat, mode = "piece", meshes = new[] { "Hat" } }, "already exists", "overwrite");
+        await CallTextAsync(driver, "export", new { path = hat, mode = "piece", meshes = new[] { "Hat" }, overwrite = true });
+        driver.AssertBytesEqual("gardener.hat.glb, exported again with overwrite", hatBytes, await File.ReadAllBytesAsync(hat));
 
         // A vertex with no weight: extruding the hat's top face makes new ones. Refused and nothing written, then bound to the first root bone.
         var hatBefore = await CallTextAsync(driver, "get_mesh", new { mesh = "Hat" });

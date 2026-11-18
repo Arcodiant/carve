@@ -72,11 +72,12 @@ public static class Shading
     public static bool HasCornerNormals(PolygonMesh mesh) => mesh.ShadingMode == ShadingMode.Smooth || mesh.PosedCorners is not null;
 
     /// <summary>
-    /// Whether face <paramref name="face"/> is drawn with corner normals: <see cref="HasCornerNormals"/>, except for the faces of
-    /// a flat mesh drawn in one combined mesh beside a smooth one (<see cref="Model.Combined"/>), which stay flat.
+    /// Whether face <paramref name="face"/> shows corner normals in the normals look: a face of a smooth mesh. A flat mesh's faces
+    /// stay flat there, posed too (a posed flat mesh is lit by its skinned corners, <see cref="Skinning.Posed"/>, but the look
+    /// shows its faces), and so do a flat mesh's faces in one combined mesh beside a smooth one (<see cref="Model.Combined"/>).
     /// </summary>
     public static bool FaceHasCornerNormals(PolygonMesh mesh, int face) =>
-        HasCornerNormals(mesh) && mesh.FlatFaces?[face] != true;
+        mesh.FlatFaces is { } flat ? !flat[face] : mesh.ShadingMode == ShadingMode.Smooth;
 
     /// <summary>
     /// The shade of <paramref name="mesh"/> with <paramref name="edges"/> made hard or soft (mark_edges), or null when a pair is

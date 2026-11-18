@@ -25,7 +25,9 @@ public class ExportHashTests
     public void The_soft_gardeners_skinned_export_is_the_bytes_written_before_materials()
     {
         var model = Sample("gardener-soft.carve");
-        Assert.Equal("259F5B541BA81994C926175AD001172BA3A48DC83FC351E83B54AC2AC9912D1B", Hash(SkinnedExport.Write(model, "gardener-soft").Bytes));
+        // M-19's bytes, not main's 259F5B54...: T-84's shoulder fix changed the soft gardener. 7ac5790 (M-19 before M-7) writes these
+        // same 64 hex digits. The person's ruling of 2026-11-17 ("Accept all", M-19 row 8), as the M-6 pin was re-pinned on 2026-11-16.
+        Assert.Equal("F67B98974F443A7BA59A8694E547FCD2416C3303232025E2A4319C468237BD63", Hash(SkinnedExport.Write(model, "gardener-soft").Bytes));
     }
 
     [Fact]

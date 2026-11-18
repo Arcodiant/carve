@@ -37,11 +37,21 @@ internal static class CutsChecks
     /// <summary>The directions of a square's four sides, in the order of <see cref="Signs"/>.</summary>
     public static (float X, float Y)[] Sides() => [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
-    /// <summary>The grey pixel times colour / grey in each channel, in linear light (<see cref="ColourRule"/>).</summary>
-    public static Rgb Predict(Rgb grey, string hex)
+    /// <summary>
+    /// The pixel of a face coloured <paramref name="hex"/> from the grey pixel of a face of the same <paramref name="normal"/>
+    /// in the same frame along <paramref name="direction"/>: T-82's diffuse plus the PBR specular (<see cref="ColourRule"/>).
+    /// </summary>
+    public static Rgb Predict(Rgb grey, string hex, Vector3 normal, Vector3 direction)
     {
-        var scale = ColourRule.Scale(hex);
-        return Srgb(ColourRule.Linear(grey.R) * scale[0], ColourRule.Linear(grey.G) * scale[1], ColourRule.Linear(grey.B) * scale[2]);
+        var lit = ColourRule.Predict([ColourRule.Linear(grey.R), ColourRule.Linear(grey.G), ColourRule.Linear(grey.B)], hex, normal, direction);
+        return Srgb(lit[0], lit[1], lit[2]);
+    }
+
+    /// <summary>The pixel of a face coloured <paramref name="hex"/> straight from T-82's light model (<see cref="ColourRule.Lit"/>).</summary>
+    public static Rgb Lit(string hex, Vector3 normal, Vector3 direction)
+    {
+        var lit = ColourRule.Lit(hex, normal, direction);
+        return Srgb(lit[0], lit[1], lit[2]);
     }
 
     /// <summary>
