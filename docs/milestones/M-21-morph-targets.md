@@ -138,3 +138,95 @@ viewer window (real-time pass only, not in captures):
 - [ ] [T-107](../tasks/T-107-morph-targets-acceptance-run.md) — Fresh agents give a mesh dials from the tool descriptions alone, across two sessions, and export it for a game
 
 ## Retrospective
+
+**As planned.**
+
+- **The slice works end to end.**
+  - A mesh carries named targets as sparse deltas (T-99).
+  - It keeps them through `subdivide`, exactly, and through every edit (T-100).
+  - It saves them as Carve file version 8 (T-101) and defines and deletes them through the tools (T-102).
+  - It is seen and checked at weights (T-103) and exported as glTF morph targets the engine reads back (T-104).
+  - It is drawn by the engine at weights with `render_glb` and driven live in the viewer (T-108).
+  - The arm sample is built through the tools (T-105), loaded in the engine and driven by the person (T-106), and fresh agents did the whole job from the descriptions (T-107).
+- **Exactness held without a loosened check.**
+  - Subdivide of base plus delta equals subdivided base plus subdivided delta within 1e-6 of the diagonal, on the arm cage and the creased cylinder at levels 1 and 2 (T-99).
+  - Every edit matches the edit of the morphed mesh within 1e-6 (T-100).
+  - `render_glb` of the export equals `render` with 0 of 262,144 px differing, at Bulge 0, 0.5 and 1 (T-108) and at the arm's Bulk 0, 0.5 and 1 (T-106). A control pair fails D-6's rule in both.
+- **Every existing frame stayed byte-identical.** T-103 hashed 419 frames over 13 scenarios against a baseline build. T-105 hashed the cylinder's 12. Files without targets export byte-identically (T-104, four pinned hashes), and save byte-identically (T-101, every committed `.carve` rewritten).
+- **Every check was shown failing on a broken product.** Each member records its own, for example:
+  - the wrong face stencil (T-99);
+  - zero deltas on new vertices (T-100);
+  - a double-summed write (T-101);
+  - swapped targets and dropped `NORMAL` (T-104);
+  - a mirrored camera, ignored weights, and the morph applied after skinning (T-105, catching what T-103's symmetric cylinder could not);
+  - `render_glb` given no weights (T-106).
+- **The person approved every set put to review:**
+  - T-103's 12 frames, with its two departures: a 2 m cylinder, and Pinch reshaped so it can flip faces;
+  - T-105's 7 distinct arm frames;
+  - T-106's live viewer pass and frames 8–10;
+  - T-107's 8 frames.
+- **Acceptance (T-107).** One round of two `claude -p` sessions on Opus 5.5, on plain `carve` with `--allowedTools "mcp__carve__*" --tools ""`.
+  - The plant fired: `faces[7][0]: vertex 7 here, 13 in the other mesh`.
+  - Session 2 opened, subdivided, checked at weights, rendered and exported a `.glb` with both targets, and its `render_glb` frames were byte-identical to `render`'s.
+- **`cairn milestone M-21 verify` (2026-11-18, at c5832ab, before this retrospective)** passed every check but `review`, which comes after the person's go:
+  - 10/10 members done and merged;
+  - all 18 suites pass, 16 ran and 2 carried, `server-regression` 294 s on Xellotath.
+- **Models:**
+
+  | Member | Model | Agents |
+  |---|---|---|
+  | T-99 | Opus 5.5 | 1 |
+  | T-100 | Sonnet 5.5 | 1 |
+  | T-101 | Opus 5.5 | 1 |
+  | T-102 | Sonnet 5.5 | 1 |
+  | T-103 | Sonnet 5.5 | 2 (the checkpoint, then the review agent) |
+  | T-104 | Opus 5.5 | 1 |
+  | T-108 | Sonnet 5.5 | 2 (the checkpoint; the continuation held until T-103 landed, for the `render` comparison) |
+  | T-105 | Sonnet 5.5 | 2 (the checkpoint, then the review agent) |
+  | T-106 | Sonnet 5.5 | 2 (the checkpoint, then the person's pass and review) |
+  | T-107 | Sonnet 5.5 (inner sessions Opus 5.5) | 2 (a question) |
+
+  No rework was traced to the cheaper tier. Every second agent was a planned review agent or a stop for the person.
+
+**Rulings the person gave during the milestone** (each recorded in the member's As built):
+
+- **Weight range** (asked before T-103's dispatch): `render`, `check` and `render_glb` refuse a weight outside [0, 1], naming the target. Carve stores no range; a game drives the exported morphs however it likes.
+- **Vertex split in the `.glb`** (T-104 landed it, asked afterwards): corners merge in the export only when their deltas agree too, so a model with targets can write more vertices than without. Kept.
+- **Not-planar warnings on the arm** (T-106): pinned, so only not-planar warnings are accepted and their folded count equals `select faces where non_planar`, as `scenario-soft` does. The rule for smooth meshes is filed as **T-127**, off-milestone.
+- **T-107's recovery**: round 1 counts. The error was understood and the dials were made correctly from positions without guessing, though the second file was not fixed. No second round.
+- **`export` names the targets it wrote** (T-107 found it missing): added in T-107, only when the model has targets, so other exports' text is unchanged.
+
+**Not as planned.**
+
+- **Rounding in the delta of the sum shows** (T-99). A target given as absolute positions comes back at weight 1 bit for bit within a factor of 2 of its base (Lean, Bulk), and up to one ulp off further out (x3.7, x0.001). Kept, as storage stays deltas (the person's decision, and glTF's); tests pin both cases.
+- **T-103 changed its test content** to make the checks able to fail: the cylinder 2 m, and Pinch reshaped, since a radial push through the axis cannot flip a Newell normal. Approved in review.
+- **T-105 departed from the sketch's wording, not its arm:**
+  - the arm stage runs before the cylinder in one scenario, as a model cannot be emptied;
+  - the Wrist's rest is local 0.3, world 0.6;
+  - frame 7's checks near the spike are limited to those the ray test is sure of.
+
+  The person's approval carried no separate ruling on them.
+- **T-108 waited on T-103.** Its `render` comparison needed T-103's `targets`, so its continuation was held for one landing.
+- **Small product changes outside a member's listed files:** two `ModelStore.cs` overloads (T-101, for open's check under the write lock); `Skinning.Morphed` made public (T-103); `export`'s target names (T-107, by ruling).
+- **`finish` again could not remove any member's worktree folder.** `branches/task/T-99` to `T-108` are unregistered from git and left on disk for the person to delete.
+- **The orchestrator misreported once.** It called T-104 done before it had landed, and corrected it in the next message. Report a member only from `plan`.
+
+**Never verified.**
+
+- **Viewer keys** are covered by `WeightPanelTests` and the person's one live pass only; nothing scripts the window.
+- **`scripts/run-viewer.ps1` cannot pass `--Empyrean:Graphics:VirtualSurface=false`** (PowerShell takes it as a parameter). Members ran the viewer's dll with `dotnet exec`. Not fixed.
+- **T-107's `limb.glb`** was loaded only through the inner agent's `render_glb`, not by an independent check.
+- `server-regression` ran for T-103, T-104 and T-108, and in the milestone's verify; not for T-105, T-106 or T-107's export change on their own.
+
+**Known and left.**
+
+- **T-127**: not-planar warnings on smooth meshes (the arm's 49, the soft gardener's too).
+- **M-9's T-92** will need to read version 8, and a file with both parts and targets needs a version above both (T-101's As built).
+- Corrective targets and morph weights in clips stay out, as decided at planning.
+
+**Next time.**
+
+- **Ask open rules before dispatch.** The weight range was asked first and T-103 ran without a stop on it. The vertex split and the not-planar count were each a ruling after the fact.
+- **Plan a member's frame review as its second agent from the start.** It was here for T-103, T-105 and T-106, and the checkpoint fell where planned.
+- **Plant faults the tools cannot route around**, or say what recovery means when they can. T-107's agent sidestepped the mismatched file with `positions`, which the Scope had not foreseen.
+- **Put a member's dependence on a sibling's feature in the order table.** T-108's comparison needed T-103's `render` targets, which the waves did not show.
