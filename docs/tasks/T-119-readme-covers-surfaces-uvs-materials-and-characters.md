@@ -4,7 +4,7 @@ description: >-
 ---
 # T-119 — README covers surfaces, UVs, materials and characters
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
@@ -32,3 +32,19 @@ to 0.11.0.
 - No code changes.
 
 ## Notes
+
+The sections' JSON examples come from each tool's own description, except
+where that description is wrong or does not fit one running example:
+
+- `define_group` and `set_material` name the wrong unit-cube faces in their
+  own examples (B-6); the README uses the correct ids, `[0,1,4,5]` for the
+  sides and `[1,3]` for the front and top.
+- The Characters section uses one small figure (meshes `body` and `hat`, the
+  skeleton from `define_skeleton`'s example) so its examples run in order.
+
+### As built
+
+Four README sections after *Cutting*: several meshes, colours and smooth
+surfaces; UVs; materials and textures; characters (skeleton, weights, clips,
+the three export modes, `render_glb`, game limits). The walkthrough's export
+step now says a second export needs `overwrite: true`.
