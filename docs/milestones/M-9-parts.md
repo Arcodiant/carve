@@ -117,6 +117,7 @@ In wave 2, `ModelStore.cs` is shared by T-92 and T-93, for adds only. `Program.c
 
 - [ ] [T-91](../tasks/T-91-part-tree-in-the-core.md) — A model is a named tree of parts with transforms, envelopes, instances and kept levels, placed in world space for drawing, with the sample rover worked in Core
 - [ ] [T-92](../tasks/T-92-carve-file-version-7.md) — The Carve file holds the part tree as version 7, written only when a model needs it, and save and open carry one part's geometry and levels as a piece
+- [ ] [T-132](../tasks/T-132-carve-file-version-9-parts-beside-morph-targets.md) — The Carve file holds a part tree beside morph targets as version 9, so save no longer refuses a model with both (added 2026-11-18 by the person's ruling on RV-64's open question)
 - [ ] [T-93](../tasks/T-93-part-tools.md) — define_part, get_parts and keep_level build and read a part tree, the edit tools act on a named part, and check warns when a part leaves its envelope
 - [ ] [T-95](../tasks/T-95-export-a-part-tree.md) — export writes the part tree as glTF nodes, merging static parts into their nearest kept ancestor and sharing one mesh between instances, and a skinned model bakes its parts
 - [ ] [T-94](../tasks/T-94-render-a-part-tree.md) — render draws every part where it is placed, isolates a subtree with part and draws a kept level with level, and get_mesh gives a part's placement
