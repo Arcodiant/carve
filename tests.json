@@ -36,7 +36,8 @@
       "inputs": [
         {
           "dotnet-closure": "tests/Patina.Graphs.Tests/Patina.Graphs.Tests.csproj"
-        }
+        },
+        "samples/graphs/**"
       ],
       "resources": "cpu",
       "est-seconds": 15

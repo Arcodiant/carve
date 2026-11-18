@@ -12,6 +12,11 @@ public sealed class NodeRegistry
     [
         new ColourNode(),
         new OutputNode(),
+        new NoiseNode(),
+        new GradientNode(),
+        new LevelsNode(),
+        new BlendNode(),
+        new HeightToNormalNode(),
     ]);
 
     private readonly IReadOnlyDictionary<string, NodeType> _types;

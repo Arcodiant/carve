@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "size": 256,
+  "seed": 77,
+  "nodes": {
+    "base": { "type": "blend", "inputs": { "a": "grained", "b": "gap" }, "params": { "mode": "multiply" } },
+    "base_out": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "base_colour" } },
+    "bevel": { "type": "gradient", "params": { "axis": "u", "repeat": 8, "shape": "triangle" } },
+    "gap": { "type": "levels", "inputs": { "in": "bevel" }, "params": { "in_high": 0.25, "in_low": 0.15, "out_low": 0.16 } },
+    "grain": { "type": "levels", "inputs": { "in": "grain_raw" }, "params": { "out_high": 1.05, "out_low": 0.95 } },
+    "grain_raw": { "type": "noise", "params": { "cells": [64, 2], "interpolation": "smooth", "octaves": 2, "seed": 1 } },
+    "grained": { "type": "blend", "inputs": { "a": "toned", "b": "grain" }, "params": { "mode": "multiply" } },
+    "normal": { "type": "height_to_normal", "inputs": { "height": "slope" }, "params": { "strength": 0.01 } },
+    "normal_out": { "type": "output", "inputs": { "in": "normal" }, "params": { "role": "normal" } },
+    "occlusion": { "type": "levels", "inputs": { "in": "bevel" }, "params": { "in_high": 0.25, "out_low": 0.55 } },
+    "occlusion_out": { "type": "output", "inputs": { "in": "occlusion" }, "params": { "role": "occlusion" } },
+    "roughness": { "type": "levels", "inputs": { "in": "grain_raw" }, "params": { "out_high": 0.8, "out_low": 0.55 } },
+    "roughness_out": { "type": "output", "inputs": { "in": "roughness" }, "params": { "role": "roughness" } },
+    "slope": { "type": "levels", "inputs": { "in": "bevel" }, "params": { "in_high": 0.25 } },
+    "tone": { "type": "levels", "inputs": { "in": "tone_raw" }, "params": { "out_high": 1.12, "out_low": 0.86 } },
+    "tone_raw": { "type": "noise", "params": { "cells": [8, 1], "interpolation": "step", "seed": 11 } },
+    "toned": { "type": "blend", "inputs": { "a": "wood", "b": "tone" }, "params": { "mode": "multiply" } },
+    "wood": { "type": "colour", "params": { "colour": "#aa7040" } }
+  }
+}
