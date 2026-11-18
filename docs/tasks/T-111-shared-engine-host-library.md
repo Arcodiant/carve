@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** — (none)
 
-**Verify:** core-unit, server-unit, scenario-cube, scenario-sky, scenario-rig, scenario-crate, scenario-uvs, scenario-shed, scenario-export, viewer-cube, scenario-character, scenario-soft, scenario-materials, scenario-cuts, scenario-gatehouse, scenario-orcward
+**Verify:** core-unit, server-unit, server-regression, scenario-cube, scenario-sky, scenario-rig, scenario-crate, scenario-uvs, scenario-shed, scenario-export, viewer-cube, scenario-character, scenario-soft, scenario-materials, scenario-cuts, scenario-gatehouse, scenario-orcward
 
 ## Goal
 
