@@ -127,47 +127,16 @@ public sealed class FaceStyle
         return new FaceStyle(_colours, groups, _materials);
     }
 
-    /// <summary>
-    /// The style after an extrude: each wall takes its source face's colour and joins its groups. Faces keep their ids, so
-    /// nothing else changes.
-    /// </summary>
-    internal FaceStyle Carry(IReadOnlyList<ExtrudedFace> extruded) =>
-        Carry(extruded.Select(x => (x.Face, x.Walls)).ToList());
+    /// <summary>This style with exactly these colours (the colour layer's write, T-71).</summary>
+    internal FaceStyle WithColours(IReadOnlyDictionary<int, string> colours) =>
+        new(new SortedDictionary<int, string>(colours.ToDictionary()), _groups, _materials);
 
-    /// <summary>
-    /// The style after an edit that appends faces made from existing ones (an extrude's walls, a subdivided face's other
-    /// children): each added face takes its source face's colour or material and joins its groups. Faces keep their ids, so nothing else changes.
-    /// </summary>
-    internal FaceStyle Carry(IReadOnlyList<(int Face, IReadOnlyList<int> Added)> made)
-    {
-        if (made.Count == 0) return this;
-        var colours = new SortedDictionary<int, string>(_colours);
-        var materials = _materials.Count == 0 ? _materials : new SortedDictionary<int, string>(_materials);
-        var groups = _groups.Select(g => (g.Name, Members: new HashSet<int>(g.Faces), Faces: g.Faces.ToList())).ToList();
-        foreach (var (face, added) in made)
-        {
-            if (_colours.TryGetValue(face, out var hex))
-                foreach (var w in added) colours[w] = hex;
-            if (_materials.TryGetValue(face, out var material))
-                foreach (var w in added) materials[w] = material;
-            foreach (var g in groups)
-                if (g.Members.Contains(face)) g.Faces.AddRange(added);
-        }
-        return new FaceStyle(colours, groups.Select(g => (g.Name, g.Faces.Order().ToArray())).ToList(), materials);
-    }
+    /// <summary>This style with exactly these materials (the material layer's write, T-71).</summary>
+    internal FaceStyle WithMaterials(IReadOnlyDictionary<int, string> materials) =>
+        new(_colours, _groups, new SortedDictionary<int, string>(materials.ToDictionary()));
 
-    /// <summary>This style with <paramref name="faces"/> in no colour, material or group (a deleted face leaves all, T-64); a group left empty goes.</summary>
-    internal FaceStyle Without(IEnumerable<int> faces)
-    {
-        var gone = faces.ToHashSet();
-        if (gone.Count == 0) return this;
-        var colours = new SortedDictionary<int, string>(_colours.Where(c => !gone.Contains(c.Key)).ToDictionary());
-        var groups = _groups.Select(g => (g.Name, Faces: g.Faces.Where(f => !gone.Contains(f)).ToArray()))
-            .Where(g => g.Faces.Length > 0).ToList();
-        var materials = _materials.Count == 0 ? _materials
-            : new SortedDictionary<int, string>(_materials.Where(m => !gone.Contains(m.Key)).ToDictionary());
-        return new FaceStyle(colours, groups, materials);
-    }
+    /// <summary>This style with exactly these groups, in this order, each's faces ascending (the groups layer's write, T-71).</summary>
+    internal FaceStyle WithGroups(List<(string Name, int[] Faces)> groups) => new(_colours, groups, _materials);
 
     /// <summary>The colours and the materials alone, with every face id moved up by <paramref name="faceOffset"/> (groups are not carried).</summary>
     internal (IEnumerable<KeyValuePair<int, string>> Colours, IEnumerable<KeyValuePair<int, string>> Materials) LooksOffset(int faceOffset) =>

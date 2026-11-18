@@ -75,8 +75,12 @@ public sealed class MeshUvs
         return new MeshUvs(_faces, [.. set]);
     }
 
-    /// <summary>These UVs with <paramref name="faces"/> unmapped: a tombstoned face leaves its UVs, as it leaves its colour.</summary>
-    internal MeshUvs Without(IEnumerable<int> faces) => WithFaces(faces.Select(f => KeyValuePair.Create(f, (IReadOnlyList<Vector2>?)null)));
+    /// <summary>These UVs with exactly these faces mapped (the UV layer's write, T-71).</summary>
+    internal MeshUvs WithOnlyFaces(IReadOnlyDictionary<int, Vector2[]> faces) =>
+        new(new SortedDictionary<int, Vector2[]>(faces.ToDictionary(p => p.Key, p => (Vector2[])p.Value.Clone())), _seams);
+
+    /// <summary>These UVs with exactly these seams (the seam layer's write, T-71).</summary>
+    internal MeshUvs WithOnlySeams(IEnumerable<(int Lo, int Hi)> seams) => new(_faces, [.. new SortedSet<(int Lo, int Hi)>(seams)]);
 
     /// <summary>The message for a face given the wrong number of UVs.</summary>
     public static string CornerCountMessage(Face face, int given)

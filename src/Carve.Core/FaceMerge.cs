@@ -162,8 +162,9 @@ public static class FaceMerge
 
         var result = mesh.Edit(reshapedFaces: [KeyValuePair.Create(survivor, merged)], deletedVertices: gone, deletedFaces: others);
         var mergedUvs = MergedUvs(mesh, listed, merged);
-        var uvFaces = mesh.Uvs is null ? null : new Dictionary<int, IReadOnlyList<Vector2>?> { [survivor] = mergedUvs };
-        var edit = EditResult.From(mesh, result, [], [], [], [], new DeletedElements(gone, others), uvFaces);
+        // The merged face keeps its own colour and groups, and its corners where the listed faces agree (T-71).
+        var provenance = new EditProvenance().Face(survivor, new FaceOrigin(survivor, CornerOriginKind.Agree) { Joined = [.. listed.Order()] });
+        var edit = EditResult.From(mesh, result, [], [], [], [], new DeletedElements(gone, others), provenance);
         if (edit.Succeeded) warnings = [.. FoldWarnings(mesh, listed, survivor, PolygonMesh.NewellVector(mesh.Vertices, merged.Loop)), .. ColourWarnings(mesh, survivor, others), .. UvWarnings(mesh, listed, survivor, mergedUvs)];
         return edit;
 

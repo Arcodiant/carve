@@ -112,15 +112,6 @@ public sealed class VertexWeights
         return all.Count == 0 ? None : new VertexWeights(all);
     }
 
-    /// <summary>These weights with none on <paramref name="vertices"/> (a deleted vertex leaves its weights, T-64).</summary>
-    public VertexWeights Without(IEnumerable<int> vertices)
-    {
-        var next = new SortedDictionary<int, Influence[]>(_byVertex);
-        var changed = false;
-        foreach (var v in vertices) changed |= next.Remove(v);
-        return !changed ? this : next.Count == 0 ? None : new VertexWeights(next);
-    }
-
     /// <summary>These weights with <paramref name="influences"/> (already normalised) on every vertex of <paramref name="vertices"/>.</summary>
     public VertexWeights With(IEnumerable<int> vertices, Influence[] influences)
     {

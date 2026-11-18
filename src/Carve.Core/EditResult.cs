@@ -1,5 +1,3 @@
-using System.Numerics;
-
 namespace Carve.Core;
 
 /// <summary>
@@ -75,6 +73,10 @@ public sealed class EditResult
     /// </summary>
     public IReadOnlyList<SplitFace> Split { get; }
 
+    /// <summary>This result with <paramref name="split"/> as the faces it split (T-65).</summary>
+    internal EditResult WithSplit(IReadOnlyList<SplitFace> split) =>
+        Succeeded ? new(Mesh, Errors, MovedVertices, NewVertices, NewFaces, Extruded, Deleted, split) : this;
+
     internal static EditResult Refused(IReadOnlyList<MeshError> errors) => new(null, errors, [], [], [], []);
 
     /// <summary>The result of an edit that has already carried colours, groups, weights and shading onto <paramref name="mesh"/>.</summary>
@@ -82,64 +84,16 @@ public sealed class EditResult
         IReadOnlyList<int> newFaces, DeletedElements? deleted = null, IReadOnlyList<SplitFace>? split = null)
         => new(mesh, [], movedVertices, newVertices, newFaces, [], deleted, split);
 
-    private static PolygonMesh Carried(PolygonMesh source, PolygonMesh edited, IReadOnlyList<(int Face, IReadOnlyList<int> Added)> made,
-        IReadOnlyDictionary<int, IReadOnlyList<Vector2>?>? uvFaces = null)
-        => CarriedUvs(source, CarriedRest(source, edited, made), uvFaces);
-
     /// <summary>
-    /// UVs and seams carried onto <paramref name="mesh"/> (T-53): a face of the source that is mapped and still live with the
-    /// same corner count keeps its UVs by position (a moved face, an extruded cap, every face the edit left alone); a face
-    /// whose corner count changed, a tombstoned face and every appended face end up unmapped, unless the edit worked a
-    /// face's UVs out itself (<paramref name="uvFaces"/>, null to unmap). A seam the edit no longer has as an edge is dropped,
-    /// as a hard edge is (T-42).
+    /// The result of an edit of <paramref name="source"/> (T-71): every layer of <see cref="LayerRegistry.Standard"/> carried
+    /// onto the edited geometry by its rules, from what <paramref name="provenance"/> says each new or reshaped element came
+    /// from (none said: an existing element keeps its values, a new one starts at the defaults).
     /// </summary>
-    internal static PolygonMesh CarriedUvs(PolygonMesh source, PolygonMesh mesh, IReadOnlyDictionary<int, IReadOnlyList<Vector2>?>? uvFaces = null)
-    {
-        if (source.Uvs is not { } uvs) return mesh;
-        var kept = new List<KeyValuePair<int, IReadOnlyList<Vector2>?>>();
-        foreach (var f in uvs.MappedFaces)
-        {
-            var keep = f < mesh.Faces.Count && !mesh.Faces[f].IsDeleted && mesh.Faces[f].Corners.Count == source.Faces[f].Corners.Count;
-            if (!keep) kept.Add(KeyValuePair.Create(f, (IReadOnlyList<Vector2>?)null));
-        }
-        if (uvFaces is not null) kept.AddRange(uvFaces);
-        var carried = uvs.WithFaces(kept);
-        var gone = carried.Seams.Where(e => !mesh.Topology.TryGetEdge(e.Lo, e.Hi, out _)).Select(e => (e.Lo, e.Hi)).ToArray();
-        return mesh.WithUvs(gone.Length == 0 ? carried : carried.WithSeams(gone, false));
-    }
-
-    private static PolygonMesh CarriedRest(PolygonMesh source, PolygonMesh edited, IReadOnlyList<(int Face, IReadOnlyList<int> Added)> made)
-    {
-        var mesh = source.Style is { } style ? edited.WithStyle(style.Carry(made)) : edited;
-        mesh = source.Weights is { } weights ? mesh.WithWeights(weights) : mesh;
-        // A tombstoned face leaves its colour and its groups, and a tombstoned vertex its weights (T-64).
-        if (mesh.HasTombstones)
-        {
-            if (mesh.Style is { } kept) mesh = mesh.WithStyle(kept.Without(Enumerable.Range(0, mesh.Faces.Count).Where(mesh.IsFaceDeleted)));
-            if (mesh.Weights is { } held) mesh = mesh.WithWeights(held.Without(Enumerable.Range(0, mesh.Vertices.Count).Where(mesh.IsVertexDeleted)));
-        }
-        // The mode and the hard edges carry; a hard edge the edit no longer has is dropped (T-42).
-        if (source.Shade is not { } shade) return mesh;
-        var gone = shade.Hard.Where(e => !mesh.Topology.TryGetEdge(e.Lo, e.Hi, out _)).ToArray();
-        return mesh.WithShade(gone.Length == 0 ? shade : shade.WithEdges(gone.Select(e => (e.Lo, e.Hi)), false));
-    }
-
-    /// <summary>The result of an edit of <paramref name="source"/>: the new mesh keeps the source's face colours and groups, and walls take their source face's.</summary>
     internal static EditResult From(PolygonMesh source, MeshResult result, IReadOnlyList<int> movedVertices,
         IReadOnlyList<int> newVertices, IReadOnlyList<int> newFaces, IReadOnlyList<ExtrudedFace> extruded,
-        DeletedElements? deleted = null, IReadOnlyDictionary<int, IReadOnlyList<Vector2>?>? uvFaces = null)
+        DeletedElements? deleted = null, EditProvenance? provenance = null)
         => result.Succeeded
-            ? new EditResult(Carried(source, result.Mesh!, extruded.Select(x => (x.Face, x.Walls)).ToList(), uvFaces),
+            ? new EditResult(LayerRegistry.Standard.Carry(source, result.Mesh!, provenance ?? new EditProvenance()),
                 result.Errors, movedVertices, newVertices, newFaces, extruded, deleted)
-            : Refused(result.Errors);
-
-    /// <summary>
-    /// The result of an edit of <paramref name="source"/> that appends faces taking another face's colour and groups
-    /// (<c>bridge</c>, T-68): each <c>Added</c> face takes its <c>Face</c>'s, as extrude's walls take theirs.
-    /// </summary>
-    internal static EditResult From(PolygonMesh source, MeshResult result, IReadOnlyList<int> newFaces,
-        IReadOnlyList<(int Face, IReadOnlyList<int> Added)> styledFrom)
-        => result.Succeeded
-            ? new EditResult(Carried(source, result.Mesh!, styledFrom), result.Errors, [], [], newFaces, [])
             : Refused(result.Errors);
 }
