@@ -1,3 +1,6 @@
+extern alias carve;
+
+using GameLimits = carve::Carve.Server.GameLimits;
 using System.Numerics;
 using System.Text;
 using System.Text.Json;

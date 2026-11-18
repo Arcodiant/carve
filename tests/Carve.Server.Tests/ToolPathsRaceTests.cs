@@ -1,3 +1,7 @@
+extern alias carve;
+
+using ToolPaths = carve::Carve.Server.ToolPaths;
+
 namespace Carve.Server.Tests;
 
 /// <summary>RV-24 B1: without overwrite, writes racing to one new path leave exactly one winner, whose bytes are the file's.</summary>

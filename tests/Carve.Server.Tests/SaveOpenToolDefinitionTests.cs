@@ -8,29 +8,8 @@ namespace Carve.Server.Tests;
 
 /// <summary>The tool-definition checks moved out of the regression class of the same family (T-88): description, schema and worked-example checks on the in-process harness.</summary>
 [Trait("Tier", "unit")]
-public sealed class SaveOpenToolDefinitionTests() : TempFolderTests("carve-saveopen")
+public sealed class SaveOpenToolDefinitionTests() : FileToolTests("carve-saveopen")
 {
-    private static string Refused(JsonElement result)
-    {
-        Assert.True(IsError(result), TextOf(result));
-        return TextOf(result);
-    }
-
-    private static string Ok(JsonElement result)
-    {
-        Assert.False(IsError(result), TextOf(result));
-        return TextOf(result);
-    }
-
-    private async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(string? mesh = "cube")
-    {
-        var carve = new ToolHarness(workingDirectory: Root);
-        await carve.InitializeAsync();
-        var tools = await carve.ListToolsAsync();
-        if (mesh is not null) Assert.False(IsError(await carve.CallToolAsync("define_mesh", mesh == "cube" ? Cube(tools) : mesh)));
-        return (carve, tools);
-    }
-
     private static async Task ExtrudeAndRaise(ToolHarness carve)
     {
         Ok(await carve.CallToolAsync("extrude", """{"faces":[1],"distance":-0.2}"""));
