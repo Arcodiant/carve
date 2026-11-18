@@ -4,7 +4,7 @@ description: >-
 ---
 # T-99 — Morph targets in the Core
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
