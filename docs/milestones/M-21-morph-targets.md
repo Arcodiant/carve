@@ -114,7 +114,7 @@ viewer window (real-time pass only, not in captures):
 | 1 | T-99 | alone |
 | 2 | T-100, T-101, T-102 | side by side |
 | 3 | T-103, T-104 | side by side |
-| 4 | T-108, T-105 | side by side; T-108 needs T-104, T-105 needs T-100, T-101 and T-103 |
+| 4 | T-108, T-105 | side by side; T-108 needs T-104 and T-103 (its `render` comparison takes `render`'s `targets`; T-103 was added in the building, RV-64), T-105 needs T-100, T-101 and T-103 |
 | 5 | T-106 | after T-105, T-104 and T-108 |
 | 6 | T-107 | last |
 

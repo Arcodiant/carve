@@ -12,7 +12,7 @@ description: >-
 
 **Batch:** — (standalone)
 
-**Depends on:** T-104
+**Depends on:** T-103, T-104
 
 **Verify:** server-regression, viewer-cube
 
