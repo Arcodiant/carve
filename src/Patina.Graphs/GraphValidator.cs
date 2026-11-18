@@ -202,6 +202,8 @@ public static class GraphValidator
         var byRole = new Dictionary<OutputRole, string>();
         foreach (var node in a.Nodes.Values.Where(n => n.Type is OutputNode).OrderBy(n => n.Id, StringComparer.Ordinal))
         {
+            // A role already at fault reads as the default, so it is not counted against another output's: no cascade.
+            if (a.Faults.Any(f => f.Node == node.Id && f.Parameter == "role")) continue;
             var role = OutputNode.Role(node.Parameters);
             if (byRole.TryGetValue(role, out var first))
                 a.Fault(node.Id, null, "role", $"node '{node.Id}' parameter 'role': {OutputRoles.Name(role)} is already the role of output '{first}'; a graph has one output per role");

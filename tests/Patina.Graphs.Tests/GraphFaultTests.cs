@@ -147,4 +147,13 @@ public class GraphFaultTests
         Assert.Equal("x", fault.Node);
         Assert.Contains("unknown type 'nosie'", fault.Message);
     }
+
+    [Fact]
+    public void AnUnknownRoleIsNotAlsoCountedAsTheDefaultRole()
+    {
+        var read = TexGraphFile.Read("""{ "version": 1, "size": 32, "seed": 7, "nodes": { "c": { "type": "colour" }, "a": { "type": "output", "inputs": { "in": "c" } }, "b": { "type": "output", "inputs": { "in": "c" }, "params": { "role": "albedo" } } } }""");
+        var fault = Assert.Single(read.Faults);
+        Assert.Equal(("b", "role"), (fault.Node, fault.Parameter));
+        Assert.Contains("\"albedo\"", fault.Message);
+    }
 }
