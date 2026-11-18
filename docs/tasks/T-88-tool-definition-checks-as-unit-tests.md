@@ -4,7 +4,7 @@ description: >-
 ---
 # T-88 — Tool definition checks as unit tests
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
