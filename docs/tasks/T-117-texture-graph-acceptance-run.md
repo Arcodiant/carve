@@ -4,7 +4,7 @@ description: >-
 ---
 # T-117 — Texture graph acceptance run
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
