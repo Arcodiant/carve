@@ -166,14 +166,17 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review c
 
 ### Hand-off
 
-Done: code, tests and scenario committed; `verify` run (output at the hand-off report). Left: the frame review by a
-fresh agent (8 frames, below), putting the thresholds above to the person, then `finish`. Not opened by this agent: any
-frame. Frames of the clean local run: `artifacts/scenarios/patina/5/frames/` in this worktree (`swatch-sheet-256`,
-`swatch-sheet-64`, `swatch-flat-normal-256`, `swatch-tiled-base-128`, `swatch-sphere-0`, `-90`, `-200`,
-`swatch-tiled-seam`). **The verify run to review:** job `J-20261118-100559-862909` (`scenario-patina` at 726ef57,
-Mantorok, pass); its frames copied to `artifacts/T-114/verify-job/patina/frames/` in this worktree (fetch again with
-`cairn test artifacts J-20261118-100559-862909`; not `cairn test artifacts scenario-patina`, which gives T-115's newest
-job). T-115 also edits `scenario-patina`'s stages and is running beside this: the rebase onto it will touch
-`PatinaStages.cs`, `Program.cs`'s tool list, the tool-list checks (`GraphStage`, `GraphToolTests`,
-`PatinaProcessTests`) and the README; keep both sides (swatch and export both in the lists).
+Frame-review agent (Claude Opus 5.5, `claude-opus-5-5`). **Left, first:** the person's ruling that `PATINA_SWATCH_BREAK` /
+`SwatchBreak` moves out of the patina product (`src/Patina.Server/SwatchRendering.cs` and the places it is read) to the
+scenario or test side, keeping every break of the table above caught; not done here. After it, `cairn task T-114 verify`
+and `finish` (not run by this agent, as the orchestrator asked).
 
+Done: all 8 frames of `J-20261118-100559-862909` opened and described above; round 1 sent and **approved** by the person,
+with the thresholds, the label band and the silhouette fraction; `swatch` added to the `CLAUDE.md` Layout row (approved
+in the same review). Rebased onto `origin/milestone/M-27` (T-115's `export`): conflicts in `Program.cs`'s tool list,
+`PatinaStages.cs`, `GraphStage`, `GraphToolTests`, `PatinaProcessTests` and the README, each resolved keeping both, the
+tool lists now exact: the seven, then `export`, then `swatch`. `verify` after the rebase: VERIFY PASS (patina-unit, server-unit, core-unit, scenario-patina, patina-regression on Mantorok). Ready to finish once the break switch has moved.
+
+Not checked: the frames after the rebase were not opened again (the rebase touched no swatch code). The
+`CLAUDE.md` row does not list T-115's `export` either; left to T-115's owner. The person noted the roughness is not
+very apparent on the sphere (the planks' roughness is high and narrow); approved as is.
