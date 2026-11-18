@@ -93,7 +93,7 @@ under `samples/graphs/` changed.
   than every stave sample (darkest 128); staves differ in tone, each pair of faces predicted 12 (M-7's `M`) or more apart by `ColourRule.Lit` from the
   planks' own texels must read apart the same way, with at least one such pair per frame; and the PNGs' gaps are checked 3 texels each side at start.
 - **Breaks (`CARVE_PLANKS_BREAK`), each fails:** `t77-base` (tone order, front), `roughness-base` (a rune-like orange pixel in back, the stave being
-  red-orange; the gap rule would also catch it, it is reached later), `mirror` (rune not where predicted, front). Run with `-NoBuild` by hand, not part of the suite.
+  red-orange; the gap rule would also catch it, it is reached later), `mirror` (u mirrored on the side: the checks predict from 1 - u on the 32 cylindrical faces, the frames drawn as the tools made them; RV-68: it first moved the prediction's camera instead; caught by the rune check, front, "only 0 P2 samples of RuneOn": the mirrored u puts the rune's emissive texels off the rune faces' part of the texture). Run with `-NoBuild` by hand, not part of the suite.
 - **Tests:** the saved file equals the sample by content; the sample binds the planks' maps to `staves` and `rune-stave` and M-7's textures to the rest;
   the exported `.glb` loads four materials, two of them with the planks' four maps.
 - **Not checked:** the frames themselves (a later agent looks at them); the viewer (M-7's step 2 is not repeated); the roughness map's specular is not predicted

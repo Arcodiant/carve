@@ -96,15 +96,17 @@ public sealed class PlanksScenario : IScenario
         var barrel = await Scene.ReadOneAsync(driver, "mesh");
         var materials = FaceMaterials(driver, barrel);
         if (barrel.Faces.Length != 34 || materials.Count != 34) driver.Fail($"expected 34 faces, all with a material; got {barrel.Faces.Length} faces and {materials.Count} with a material");
-        var faces = Enumerable.Range(0, barrel.Faces.Length).Select(f => new FaceGeo(f, barrel.Faces[f].Select(v => barrel.Vertices[v]).ToArray(), barrel.Uvs.TryGetValue(f, out var uv) ? uv : null)).ToArray();
+        // The mirror break: the checks predict from u mirrored on the side (1 - u on the 32 cylindrical faces), as if project_uvs had
+        // written it the other way round; the frames are drawn as the tools made them.
+        Vector2[]? Predicted(int f, Vector2[] uv) => PlanksSpec.Break == "mirror" && f < 32 ? [.. uv.Select(t => new Vector2(1 - t.X, t.Y))] : uv;
+        var faces = Enumerable.Range(0, barrel.Faces.Length).Select(f => new FaceGeo(f, barrel.Faces[f].Select(v => barrel.Vertices[v]).ToArray(), barrel.Uvs.TryGetValue(f, out var uv) ? Predicted(f, uv) : null)).ToArray();
         var (min, max) = (barrel.BoundsMin, barrel.BoundsMax);
         var none = new HashSet<int>();
         var frames = new Dictionary<string, ScenarioFrame>();
 
         // 2. Front, back and top.
         var front = frames["planks-front"] = await driver.CaptureAsync("planks-front", new { view = "front", size = Size, mode = "shaded" });
-        var frontDirection = PlanksSpec.Break == "mirror" ? new Vector3(-Front.X, Front.Y, Front.Z) : Front;
-        var frontPool = new Pool(driver, front, new Shot(faces, min, max, frontDirection, Size), "front", materials, none);
+        var frontPool = new Pool(driver, front, new Shot(faces, min, max, Front, Size), "front", materials, none);
         frontPool.RuneGlows();
         frontPool.IronAndRust();
         frontPool.Wood();
