@@ -171,7 +171,9 @@ I read every file in `src/Patina.Server` and the test names and key bodies in `t
 
 **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `export` copies the graph under `store.Gate` and evaluates outside it, exports taking turns (aeb3d9a, `ExportToolTests.Other_tools_answer_while_an_export_runs`). `Run` now takes the call's `CancellationToken` (the SDK binds it to the request, and `notifications/cancelled` cancels it), checks it in each band and before the encode, and waits its turn on a `SemaphoreSlim` with it, so a cancelled export writes nothing more and frees the next (07e30d8). The SDK's own client (2.3.0) sends no `notifications/cancelled` when its token is cancelled (a tap on its writes showed none), so `ExportToolTests.An_export_named_in_notifications_cancelled_stops_and_writes_nothing` sends one by hand, as the probe did; without the fix a 32 px export waited 21.4 s behind the cancelled one
 
 ### edit_graph lets a hidden fault through, then blames the fix for it
 
@@ -195,7 +197,9 @@ I read every file in `src/Patina.Server` and the test names and key bodies in `t
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** patina-regression's inputs list `samples/graphs/**` (e9a9eef); a suite's inputs have no test of their own. scenario-patina's duplicate entry is answered under the scenarios findings
 
 ### An export folder with a character a path may not hold gives a bare SDK error
 
@@ -207,7 +211,9 @@ I read every file in `src/Patina.Server` and the test names and key bodies in `t
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `Path.GetFullPath` runs inside a `try`, and the refusal names the folder as given with the reason (dae74fa); `ExportToolTests.A_folder_with_a_character_a_path_may_not_hold_is_named_with_the_reason` got `An error occurred invoking 'export'.` without the fix
 
 ### swatch takes an angle that overflows to infinity
 
@@ -219,7 +225,9 @@ I read every file in `src/Patina.Server` and the test names and key bodies in `t
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the angle is refused when its `float` is not finite: `swatch: angle 1e300 is out of range; angle is a number of degrees` (598f569); a case in `SwatchTests.Refusals_say_what_to_do`, which without the fix went on past the angle
 
 ### Stale test name and a stale As built line about the tool lists
 
@@ -231,7 +239,9 @@ I read every file in `src/Patina.Server` and the test names and key bodies in `t
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the test is `Tools_list_gives_the_nine_tools_in_order_each_closed_to_other_arguments`, and T-115's As built *Tests* paragraph says the tools-list asserts compare all nine names, in order (abae867); a rename and a doc line, with no test of their own
 
 ## Findings: the scenarios and checks (claude-opus-5-5)
 
