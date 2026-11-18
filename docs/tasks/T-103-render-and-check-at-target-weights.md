@@ -63,7 +63,7 @@ mesh before it ever reaches a game.
 
 ### As built
 
-Built by Claude Sonnet 5.5 (the implementer). The frames are judged by a separate review agent (see Hand-off).
+Built by Claude Sonnet 5.5 (the implementer). The frames are judged by a separate review agent (see Frame review below).
 
 - **`render` and `check` take `targets`**: an object of target name to weight (`src/Carve.Server/TargetWeightsArgument.cs`
   reads it; `TargetWeights.cs` is the value the frame thread compares). Each mesh with a target of that name is morphed,
@@ -115,26 +115,5 @@ Built by Claude Sonnet 5.5 (the implementer). The frames are judged by a separat
 - **Existing frames**: scenario frame hashes of the untouched code (HEAD, a throwaway worktree under `artifacts/baseline`) against
   this change: 13 scenarios (cube, crate, rig, soft, materials, uvs, cuts, shed, character, gatehouse, orcward, sky, export), 419 frames, each scenario's frame set hashed by file: **every one identical**. With no `targets` the pump takes the old path (the morph argument is null). The scenarios not run: acceptance, and the ones that need another process.
 - Engine needs: none. Files outside the worktree: none.
-
-### Hand-off
-
-Model: Claude Sonnet 5.5, the implementer. Checkpoint reached: code committed and verified, frames still to be judged.
-
-- **Done**: everything in Scope except the frame review. `render` and `check` take `targets`; `check`'s three rules; the
-  `scenario-morph` suite with 12 frames; tests; As built above. The weight range is the person's ruling of 2026-11-18 (in As built).
-- **Left**: the review agent opens each of the 12 frames itself (cropped or scaled), then sends them to the person with
-  `mcp__waystone__review` (files copied to `G:\My Drive\artifacts\carve\M-21\T-103\round-1`). "Commented" is not approval.
-  Then `cairn task T-103 finish` from this worktree. The frames are at
-  `D:\Repos\carve\branches\task\T-103\artifacts\scenarios\morph\1\frames\` and copied to `~\artifacts\carve\M-21\T-103\frames\`.
-- **What to look at**: `morph-rest-z` and `morph-bulge-0-z` are the same file by hash. `morph-bulge-half-z` and `morph-bulge-1-z`: the middle ring
-  grows to a half-width of 0.6 and 0.7 m, the rims stay 0.5, the silhouette straight between the rings. `morph-bulge-1-normals-z` against
-  `morph-rest-normals-z`: the colours grade with the new slope. `morph-bulge-1-wire-sheet`: two tiles, +z and +x, 256 each.
-  `morph-posed-z` (Top bent 45 degrees about z at the middle ring) and `morph-posed-bulge-1-z`: the bulge rides the bend (the one
-  check not worked from geometry; look at it). `morph-posed-bulge-0-z` is the same file as `morph-posed-z`. `morph-pinch-1-z`
-  and `-normals-z`: the middle ring in and above the top rim, the upper side turned inside out (so culled or dark; `check` names the 8 faces).
-- **Checked**: the 10 pixel checks per shaded frame (the silhouette, worked from `get_mesh`), the weight-0 byte equalities, that
-  every existing frame is byte-identical (13 scenarios), the weights-ignored product fails the scenario, a rule removed from
-  `check` fails its tests. **Not checked**: no frame has been looked at by me; morph-after-skin and a mirrored camera are not
-  caught by this cylinder (As built); `server-regression` is run by `verify`.
-- **Surprising**: a radial push through the axis does not flip a face (As built), so Pinch lifts the ring instead; and the scenario
-  driver camel-cases an anonymous object's property names, so `targets` and `pose` are built from dictionaries to keep a target's case.
+- **Frame review**: a separate review agent (Claude Sonnet 5.5) opened the 10 distinct frames (the 12 hold two pairs of byte-equal files) and found each as the spec and As built say; then sent all 12 to the person with `mcp__waystone__review` (copied to `G:/My Drive/artifacts/carve/M-21/T-103/round-1`). **Verdict: approved**, including the two deviations (a 2 m cylinder rather than 1 m; Pinch reshaped so it can flip faces). The Pinch frames run off the top of the frame because framing stays on the rest bounds, as designed.
+- Not checked: morph-after-skin and a mirrored camera (the cylinder cannot show either; T-105's arm does).
