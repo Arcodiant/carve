@@ -78,6 +78,10 @@ and keep targets exactly through `subdivide`. Every other M-21 task builds on th
 
 ### As built
 
+> 2026-11-18: the rebase onto T-71 moved the carriage. `Subdivision.Level` no longer has a `Targets` field: the
+> `StandardLayers.Targets` layer in `LayerRegistry.Standard` carries the deltas (`LayerRules.BlendDeltas` and
+> `ReblendDeltas`), through `Subdivision.Once`'s provenance. The text below was written before.
+
 Built by Claude Opus 5.5 (the stronger model the Notes ask for).
 
 - **Type.** `src/Carve.Core/MorphTargets.cs`: `MorphTarget` (a name and sparse deltas, `SortedDictionary<int, Vector3>`;
@@ -103,8 +107,8 @@ Built by Claude Opus 5.5 (the stronger model the Notes ask for).
     even with no skeleton, then skins (`null` targets is the old `Posed(model, pose)`). T-103 calls this.
 - **Sum.** Each vertex is summed in double from its base, targets in definition order, and rounded once; a vertex no
   given target moves keeps its base bits, and all weights 0 gives the base exactly.
-- **Subdivide.** `Subdivision.Level` carries `Targets`; each new vertex's delta is its position's own `Stencil` over the
-  level's dense deltas (same terms, same order). `MeshEdits.Subdivide` drops deltas on tombstones. Exact within 1e-6 of
+- **Subdivide.** Each new vertex's delta is its position's own `Stencil` over the
+  level's dense deltas (same terms, same order; now `LayerRules.BlendDeltas` on the `Targets` layer). `MeshEdits.Subdivide` drops deltas on tombstones. Exact within 1e-6 of
   the bounding-box diagonal on the arm cage (Bulk) and the hard-rimmed cylinder (both rims hard, one side edge hard, so
   creases and corners), at levels 1 and 2. The 1e-6 tolerance was met; nothing was loosened.
 - **`Model.Combined`** offsets each mesh's target ids by its vertex offset and joins a name used on two meshes into one

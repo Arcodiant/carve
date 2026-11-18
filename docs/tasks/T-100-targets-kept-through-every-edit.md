@@ -31,7 +31,7 @@ All in `src/Carve.Core`. The rules the person agreed (2026-11-16):
 | `extrude` (and its inset) | each new vertex copies the delta of the vertex it was made from |
 | `delete` | a deleted vertex's delta goes with it; the rest are kept |
 | `merge_faces`, `bridge` | kept; a vertex these remove loses its delta |
-| `plane_cut`, `loop_cut`, `knife` | each new vertex blends deltas by the same `Subdivision.Stencil` that blends its weights (`FaceSplit.CarryRest`) |
+| `plane_cut`, `loop_cut`, `knife` | each new vertex blends deltas by the same `Subdivision.Stencil` that blends its weights (the `Targets` layer's `LayerRules.BlendDeltas`) |
 | style-only tools (colour, groups, material, shading, hard edges, UVs, weights) | untouched |
 
 - `EditResult` carries the targets through like `Weights`. Find every edit through `MeshEdits`, `FaceSplit`,
@@ -52,17 +52,22 @@ All in `src/Carve.Core`. The rules the person agreed (2026-11-16):
 
 ### As built
 
+> 2026-11-18: the rebase onto T-71 moved the carriage into the attribute-layer registry. `EditResult.CarriedRest`,
+> `FaceSplit.CarryRest` and `Stencil.Apply(Func<int, Vector3>)` are gone: `StandardLayers.Targets` (in
+> `LayerRegistry.Standard`) does the carrying, and `Stencil.Apply(IReadOnlyList<Vector3>)` works the stencil. Names
+> below are as first written; the tests are unchanged.
+
 Built by Claude Sonnet 5.5, as the Notes ask.
 
 - **Every edit keeps its targets; none had to be refused.** The edits, all found through `EditResult` (`MeshEdits`) or
   `FaceSplit`:
-  - `EditResult.CarriedRest` carries `source.Targets` onto the edited mesh (as `Weights`), then drops the deltas of
+  - `EditResult.CarriedRest` (now `LayerRegistry.Standard.Carry`, in `EditResult.From`) carries `source.Targets` onto the edited mesh (as `Weights`), then drops the deltas of
     tombstoned vertices: this covers `move`, `delete`, `merge_faces` (`FaceMerge`), `bridge` (`Bridge`, no vertex made
     or removed) and the deletion half of `plane_cut` (`PlaneCut`).
   - `EditResult.From(..., extruded, ...)` gives each extrude ring vertex the delta of the corner it stands over, in every
     target (`WithExtrudedDeltas`; hole corners too). Inset needs nothing more.
-  - `FaceSplit.CarryRest` blends each new vertex's delta by the `Subdivision.Stencil` that blends its weights
-    (new `Stencil.Apply(Func<int, Vector3>)`, summed in double, rounded once; a stencil on an earlier new vertex is
+  - `FaceSplit.CarryRest` (now the layer's `LayerRules.BlendDeltas`) blends each new vertex's delta by the `Subdivision.Stencil` that blends its weights
+    (`Stencil.Apply` over the deltas as a list, not the removed `Apply(Func<int, Vector3>)`; summed in double, rounded once; a stencil on an earlier new vertex is
     resolved down to source vertices). `FaceSplit.Split` is the one path for `plane_cut`, `loop_cut` and `knife`.
   - `MeshEdits.Subdivide` was T-99's. Style-only tools do not touch geometry.
 - **Tests**, `tests/Carve.Core.Tests/TargetsKeptThroughEditsTests.cs` (11, unit): the morphed edited mesh against the
@@ -77,5 +82,5 @@ Built by Claude Sonnet 5.5, as the Notes ask.
   |---|---|
   | a split's new vertices given a zero delta | 5: both plane_cut tests, loop_cut, both knife tests |
   | an extrude ring given a zero delta | 2: both extrude tests |
-  | targets not carried by `CarriedRest` | 7: move, delete, merge, bridge, both extrude, plane_cut with a side kept |
+  | targets not carried (`CarriedRest`, now the `Targets` layer) | 7: move, delete, merge, bridge, both extrude, plane_cut with a side kept |
   | a tombstoned vertex keeping its delta | 3: delete, merge, plane_cut with a side kept |
