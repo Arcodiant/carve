@@ -111,6 +111,5 @@ Built by Claude Sonnet 5.5 (the implementer). The frames were judged by a separa
 
 - **Existing frames**: the cylinder's 12 morph frames are byte-identical to the untouched code's (`sha256` of each file); the other scenarios were not run (no tool or product code changed).
 - Engine needs: none. Files outside the worktree: none (evidence: `~\artifacts\carve\M-21\T-105\`).
-- **Frame review** (Claude Sonnet 5.5, separate agent): the seven distinct frames opened and judged against the sketch (Bulk thickens upper arm and forearm, not elbow or wrist; Lean thinner; mixed between; Curl stands the forearm up with Bulk's thickness; Bad spike under the arm at x 0.12); the six `-reopened` copies are byte-equal to frames 1 to 6 by sha256. Sent to the person as `G:\My Drivertifacts\carve\M-21\T-105
-ound-1`: **approved**, no notes, the departures above accepted.
+- **Frame review** (Claude Sonnet 5.5, separate agent): the seven distinct frames opened and judged against the sketch (Bulk thickens upper arm and forearm, not elbow or wrist; Lean thinner; mixed between; Curl stands the forearm up with Bulk's thickness; Bad spike under the arm at x 0.12); the six `-reopened` copies are byte-equal to frames 1 to 6 by sha256. Sent to the person as `G:\My Drive\artifacts\carve\M-21\T-105\round-1`: **approved**, no notes, the departures above accepted.
 - Not checked: `render_glb` of the arm (T-106); the scenario with the whole `server-regression` suite.
