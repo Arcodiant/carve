@@ -45,11 +45,14 @@ internal interface IToolCaller
 /// <summary>
 /// patina's real tools in this process, as carve's <c>ToolHarness</c> (T-87) serves carve's: the host is built with
 /// <c>Program.AddTools</c>, the registration patina's <c>Program.cs</c> makes, and spoken to by an MCP client over
-/// in-memory pipes. There is no engine, no stdio and no extension; patina's tools need none.
+/// in-memory pipes. There is no engine (swatch's sphere is refused), no stdio and no extension.
 /// </summary>
 internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
 {
     private const string ProtocolVersion = "2025-06-18";
+
+    /// <summary>The engine fault the harness reports, having no engine.</summary>
+    public const string NoEngine = "the test harness has no engine";
 
     private readonly IHost _host;
     private readonly Pipe _toServer = new();
@@ -62,6 +65,8 @@ internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
         var mcp = builder.Services.AddMcpServer(o => o.ServerInfo = new Implementation { Name = "patina", Version = "0" });
         mcp.WithStreamServerTransport(_toServer.Reader.AsStream(), _fromServer.Writer.AsStream());
         Program.AddTools(builder.Services, mcp, workingDirectory is null ? null : Path.GetFullPath(workingDirectory));
+        // No engine here: swatch's flat and tiled views need none, and its sphere and sheet are refused with this.
+        builder.Services.AddSingleton(Carve.Hosting.EngineStatus.Faulted(NoEngine));
         _host = builder.Build();
     }
 

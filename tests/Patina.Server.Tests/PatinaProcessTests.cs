@@ -51,8 +51,7 @@ public class PatinaProcessTests
             await Send(null, "notifications/initialized", "{}");
 
             var tools = (await Send(2, "tools/list", "{}")).GetProperty("tools").EnumerateArray().Select(t => t.GetProperty("name").GetString()).ToList();
-            Assert.Equal(["define_graph", "edit_graph", "get_graph", "save", "open", "push_snapshot", "pop_snapshot"], tools.Take(7));
-            Assert.Contains("export", tools);
+            Assert.Equal(["define_graph", "edit_graph", "get_graph", "save", "open", "push_snapshot", "pop_snapshot", "export", "swatch"], tools);
 
             async Task<string> Call(int id, string tool, string arguments)
             {

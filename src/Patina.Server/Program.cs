@@ -1,16 +1,23 @@
 using Carve.Hosting;
+using Empyrean;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 using Patina.Graphs.Nodes;
 using Patina.Server;
 
 // patina hosts through Carve.Hosting (T-111) as carve does: its own name and tools, the same extension loading, the
-// stdio transport unless an extension brings its own. It has no render pipeline yet (T-114 adds the first look).
+// stdio transport unless an extension brings its own. Its one look is swatch's sphere (T-114).
 return await EngineHost.RunAsync(args, new EngineHostOptions
 {
     Name = "patina",
     Product = typeof(Program).Assembly,
-    AddServer = server => Program.AddTools(server.Services, server.Mcp),
+    AddServer = server =>
+    {
+        Program.AddTools(server.Services, server.Mcp);
+        server.Services.AddSingleton<SwatchComposition>();
+        server.Services.UseRenderPipeline<SwatchComposition>();
+        server.Services.AddSystem<SwatchSystem>();
+    },
 });
 
 /// <summary>patina's tools, and the services they share, in one place for this file and the unit harness.</summary>
@@ -27,6 +34,7 @@ public partial class Program
         PushSnapshotTool.Create(),
         PopSnapshotTool.Create(),
         ExportTool.Create(),
+        SwatchTool.Create(),
     ];
 
     /// <summary>
@@ -40,5 +48,6 @@ public partial class Program
         services.AddSingleton(registry);
         services.AddSingleton<GraphStore>();
         services.AddSingleton(new ToolFolder(baseDirectory));
+        services.AddSingleton<OffscreenQueue<SwatchRequest>>();
     }
 }

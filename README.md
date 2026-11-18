@@ -195,6 +195,13 @@ carve material's texture slots: `base_colour.png` for `base_colour_texture`,
 image) for `metallic_roughness_texture`, `occlusion.png` for `occlusion_texture`.
 At 8192 it works in bounded memory but takes minutes for four outputs.
 
+`swatch` shows the open graph: by default a sheet with a column per output (flat
+over tiled 3 x 3, to show seams) beside a sphere wearing all of them through the
+engine's PBR material under Carve's fixed sky; or `view` `flat`, `tiled` or
+`sphere` alone, at a `size` from 32 to 2048, the sphere turned by `angle`.
+patina needs a Vulkan device to draw the sphere and the sheet; flat and tiled
+need none.
+
 ## License
 
 Carve is released under the [MIT license](LICENSE).

@@ -10,6 +10,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
     <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+    <!-- swatch's checks evaluate the graph themselves (T-114); engine-free, as patina loads it too. -->
+    <ProjectReference Include="../../src/Patina.Graphs/Patina.Graphs.csproj" />
   </ItemGroup>
 
 </Project>

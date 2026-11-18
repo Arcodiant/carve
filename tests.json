@@ -581,11 +581,12 @@
         {
           "dotnet-closure": "src/Patina.Server/Patina.Server.csproj"
         },
+        "samples/graphs/**",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1",
         "samples/graphs/**"
       ],
-      "resources": "cpu",
+      "resources": "gpu",
       "est-seconds": 30
     }
   ],
