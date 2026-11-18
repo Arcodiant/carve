@@ -129,7 +129,7 @@ internal static class ArmStages
     /// The arm exported into <c>game/Content/models/arm.glb</c> (skinned, with <c>Curl</c>), then <c>render_glb</c> at Bulk 0, 0.5 and 1 from +z
     /// against <c>render</c> at the same weights, under D-6's frame rule (Orcward's <see cref="Comparison"/>). Frames 1 and 2 are the twins of Bulk 0
     /// and 1; Bulk 0.5 has none among T-105's frames, so a render is taken. A control (the file at Bulk 1 against the model at rest) must fail the rule.
-    /// <c>CARVE_MORPH_BREAK=glbweights</c> leaves <c>targets</c> out of <c>render_glb</c>.
+    /// <c>CARVE_MORPH_BREAK=glbweights</c> leaves <c>targets</c> out of <c>render_glb</c>, and <c>glbclipweights</c> only where it is given a <c>clip</c>.
     /// </summary>
     private static async Task ExportAndCompareAsync(ScenarioDriver driver, List<ScenarioFrame> shots)
     {
@@ -144,8 +144,7 @@ internal static class ArmStages
         var selected = await CallTextAsync(driver, "select", new { kind = "faces", where = "non_planar", mesh = "mesh" });
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "select-non-planar-mesh.txt"), selected);
         var nonPlanar = System.Text.Json.JsonDocument.Parse(selected).RootElement.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
-        var warned = result.IndexOf("warning(s): ", StringComparison.Ordinal);
-        var problem = warned < 0 ? "no warnings" : NotPlanarFold.Check(result[(warned + "warning(s): ".Length)..], new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = nonPlanar });
+        var problem = NotPlanarFold.CheckExport(result, new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = nonPlanar });
         if (problem is not null) driver.Fail($"export arm.glb: {problem}");
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "export-arm.glb.txt"), result);
 
@@ -169,6 +168,21 @@ internal static class ArmStages
             Record(name, "good", twin, frame);
         }
 
+        // Morph before skin through the engine: the file at Curl's end with Bulk 1 against render of frame 6 (the same clip, time, weight and view).
+        // The controls: Bulk 0 posed in the file against the same render, and (below) the file's Bulk 1 posed against the rest.
+        Dictionary<string, object> Posed(double weight, bool withTargets = true)
+        {
+            var posed = new Dictionary<string, object> { ["path"] = glb, ["view"] = "+z", ["projection"] = "orthographic", ["clip"] = "Curl", ["time"] = 1.0 };
+            if (withTargets && Break is not ("glbweights" or "glbclipweights")) posed["targets"] = W(("Bulk", weight));
+            return posed;
+        }
+
+        var curlGlb = await driver.CaptureToolAsync("render_glb", "arm-11-glb-curl-bulk-1-z", Posed(1));
+        glbFrames.Add(curlGlb);
+        Record("arm-11-glb-curl-bulk-1-z", "good", shots[5], curlGlb);
+        var curlControl = await driver.CaptureToolAsync("render_glb", "control-glb-curl-bulk-0-z", Posed(0));
+        Record("curl-bulk-0-glb-against-curl-bulk-1-render", "control", shots[5], curlControl);
+
         var control = await driver.CaptureToolAsync("render_glb", "control-glb-bulk-1-z", new Dictionary<string, object> { ["path"] = glb, ["view"] = "+z", ["projection"] = "orthographic", ["targets"] = W(("Bulk", 1)) });
         Record("bulk-1-glb-against-the-rest", "control", shots[0], control);
         CheckDifferenceOf(driver, glbFrames);
@@ -178,7 +192,7 @@ internal static class ArmStages
         foreach (var r in rows) tsv.AppendJoin('\t', r.Name, r.Kind, r.Differing, r.Total, r.LargestPatch, r.Fails).Append('\n');
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "differences.tsv"), tsv.ToString());
         foreach (var r in rows.Where(r => r.Kind == "good" && r.Fails)) driver.Fail($"{r.Name}: render_glb differs from render in {r.Differing} of {r.Total} pixels, largest patch {r.LargestPatch} (D-6's rule: 0.5 % or a patch of {Comparison.PatchLimit})");
-        if (!rows.Single(r => r.Kind == "control").Fails) driver.Fail("the control (the file at Bulk 1 against the rest) passes the frame rule, so the rule cannot tell the weights apart");
+        foreach (var r in rows.Where(r => r.Kind == "control" && !r.Fails)) driver.Fail($"the control {r.Name} passes the frame rule, so the rule cannot tell the weights apart");
     }
 
     private static void CheckDifferenceOf(ScenarioDriver driver, List<ScenarioFrame> frames)

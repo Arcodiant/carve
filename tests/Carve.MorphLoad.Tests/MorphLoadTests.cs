@@ -114,9 +114,7 @@ public class MorphLoadTests
         Assert.DoesNotContain("replaced", result);
         var selected = File.ReadAllText(Path.Combine(RunFolder, "work", "select-non-planar-mesh.txt"));
         var faces = System.Text.Json.JsonDocument.Parse(selected).RootElement.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
-        var warned = result.IndexOf("warning(s): ", StringComparison.Ordinal);
-        Assert.True(warned >= 0, "the arm exports with not-planar warnings");
-        Assert.Null(NotPlanarFold.Check(result[(warned + "warning(s): ".Length)..], new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = faces }));
+        Assert.Null(NotPlanarFold.CheckExport(result, new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = faces }));
     }
 
     [SkippableOrRun]
@@ -146,10 +144,14 @@ public class MorphLoadTests
     {
         var rows = File.ReadAllLines(Path.Combine(RunFolder, "differences.tsv")).Skip(1).Select(l => l.Split('\t')).ToArray();
         var good = rows.Where(r => r[1] == "good").ToArray();
-        Assert.Equal(3, good.Length);
+        // Three at Curl's rest, and arm-11 posed at Curl's end (morph before skin through the engine).
+        Assert.Equal(4, good.Length);
+        Assert.Contains(good, r => r[0] == "arm-11-glb-curl-bulk-1-z");
         Assert.All(good, r => Assert.Equal("False", r[5]));
-        var control = Assert.Single(rows, r => r[1] == "control");
-        Assert.Equal("True", control[5]);
+        var controls = rows.Where(r => r[1] == "control").ToArray();
+        Assert.Equal(2, controls.Length);
+        Assert.Contains(controls, r => r[0].StartsWith("curl-bulk-0-glb-against-curl-bulk-1", StringComparison.Ordinal));
+        Assert.All(controls, r => Assert.Equal("True", r[5]));
     }
 }
 

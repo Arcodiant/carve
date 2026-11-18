@@ -14,14 +14,14 @@
         {
           "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
         },
-        "samples/leaky-shed.carve",
+        "samples/*.carve",
+        "tests/Carve.Core.Tests/Fixtures/*.carve",
+        "scenarios/Carve.Scenario.Morph/ArmPlan.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
         "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
         "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs",
-        "samples/gatehouse.carve",
-        "samples/barrel.carve",
-        "samples/barrel-textured.carve",
         "samples/textures/*.png"
       ],
       "resources": "cpu",
@@ -421,6 +421,7 @@
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Orcward/ComparisonPng.cs",
+        "scenarios/Carve.Scenario.Soft/NotPlanarFold.cs",
         "tests/Carve.CharacterLoad.Tests/RunContent.cs",
         "samples/arm.carve",
         "samples/arm-lean.carve",

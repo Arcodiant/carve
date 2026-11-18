@@ -19,6 +19,29 @@ public class NotPlanarFoldCheckTests
     [Fact]
     public void The_right_text_passes() => Assert.Null(NotPlanarFold.Check(Good(), Counts));
 
+    private static readonly Dictionary<string, IReadOnlyList<int>> None = new() { ["mesh"] = [] };
+    private static readonly Dictionary<string, IReadOnlyList<int>> Two = new() { ["mesh"] = [3, 7] };
+
+    [Fact]
+    public void A_clean_export_passes_when_select_finds_none() =>
+        Assert.Null(NotPlanarFold.CheckExport("exported arm.glb, 1 clip(s) 'Curl'", None));
+
+    [Fact]
+    public void A_clean_export_fails_when_select_finds_faces() =>
+        Assert.NotNull(NotPlanarFold.CheckExport("exported arm.glb, 1 clip(s) 'Curl'", Two));
+
+    [Fact]
+    public void Warnings_for_the_selected_faces_pass_the_export_check() =>
+        Assert.Null(NotPlanarFold.CheckExport($"exported arm.glb; warning(s): mesh 'mesh': faces[3]: {Plane}; mesh 'mesh': faces[7]: {Plane}", Two));
+
+    [Fact]
+    public void Warnings_when_select_finds_none_fail_the_export_check() =>
+        Assert.NotNull(NotPlanarFold.CheckExport($"exported arm.glb; warning(s): mesh 'mesh': faces[3]: {Plane}", None));
+
+    [Fact]
+    public void Another_warning_fails_the_export_check() =>
+        Assert.NotNull(NotPlanarFold.CheckExport("exported arm.glb; warning(s): the model has 6000 triangles, above the 5000 a game character should keep to", None));
+
     [Fact]
     public void A_fold_that_does_not_add_up_fails() =>
         Assert.NotNull(NotPlanarFold.Check(Good().Replace("and 3 more", "and 2 more"), Counts));
