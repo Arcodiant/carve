@@ -55,7 +55,7 @@ Every plan, for a milestone or a task, keeps these:
 - **The mesh is polygons**, triangles are a derived view for render and export, never stored. Work persists in a native
   Carve file; `.glb` is what reaches a game.
 - **The product has no window.** Every look is an offscreen render.
-- **The Carve file is versioned JSON geometry**, read back bit-exact, each model written in the lowest version that holds it (2; 3 shading; 4 holes and tombstones; 5 UVs; 6 materials; 8 morph targets, sparse deltas by vertex id, T-101; 7 the part tree and kept levels, `parts` after `meshes` and `levels` in a mesh, T-92; a part tree beside morph targets is refused until RV-64 is ruled), so a model without the newer things is written byte for byte as before; the `.glb` export takes its normals from `Shading` (a flat mesh's are its faces', a smooth one's are per corner, D-6, T-42) and is written with SharpGLTF (D-1, M-3).
+- **The Carve file is versioned JSON geometry**, read back bit-exact, each model written in the lowest version that holds it (2; 3 shading; 4 holes and tombstones; 5 UVs; 6 materials; 8 morph targets, sparse deltas by vertex id, T-101; 7 the part tree and kept levels, `parts` after `meshes` and `levels` in a mesh, T-92; 9 a part tree beside morph targets, version 8 with version 7's `parts` and `levels`, a level keeping its targets, T-132), so a model without the newer things is written byte for byte as before; the `.glb` export takes its normals from `Shading` (a flat mesh's are its faces', a smooth one's are per corner, D-6, T-42) and is written with SharpGLTF (D-1, M-3).
 
 The rest are decided in D-1 as they settle; add them here when they do.
 

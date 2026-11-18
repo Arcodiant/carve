@@ -136,19 +136,6 @@ public class PartTreeFileTests
         Assert.Equal(text, CarveFile.Write(Read(text)));
     }
 
-    [Fact]
-    public void A_part_tree_beside_morph_targets_is_refused_until_RV_64_is_ruled()
-    {
-        var morphed = Model.Of("a", TestMeshes.Cube().WithTargets(MorphTargets.Of([MorphTarget.Of("Bulge", new Dictionary<int, Vector3> { [0] = new(0, 1, 0) })])));
-        Assert.StartsWith("{\n  \"carve\": 8,\n", CarveFile.Write(morphed));
-        var placed = morphed.WithPart(morphed.FindPart("a")! with { Translation = new(1, 0, 0) });
-        var problem = CarveFile.VersionProblem(placed);
-        Assert.NotNull(problem);
-        Assert.Contains("part tree and morph targets (on 'a')", problem);
-        Assert.Contains("RV-64", problem);
-        Assert.Equal(problem + " (Parameter 'model')", Assert.Throws<ArgumentException>(() => CarveFile.Write(placed)).Message);
-    }
-
     // ---- Every committed file, byte for byte ----------------------------------------------------------------------------
 
     private static string RepoRoot()
@@ -223,7 +210,7 @@ public class PartTreeFileTests
         { "levels in version 8", "meshes[0].levels", "unknown key" },
     };
 
-    private static void Mutate(string which, JsonObject file)
+    internal static void Mutate(string which, JsonObject file)
     {
         var parts = file["parts"]!.AsArray();
         JsonObject Part(int i) => parts[i]!.AsObject();

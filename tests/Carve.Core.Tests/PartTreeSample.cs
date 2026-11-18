@@ -24,4 +24,18 @@ public static class PartTreeSample
             .WithPart(new Part("Copy") { Parent = "Body", Translation = new(0, 0, 3), InstanceOf = "Arm" });
         return model;
     }
+    /// <summary>A Bulge target on a mesh: vertex 0 moved up, vertex 6 out (T-132).</summary>
+    public static MorphTargets Bulge(string name = "Bulge") =>
+        MorphTargets.Of([MorphTarget.Of(name, new Dictionary<int, Vector3> { [0] = new(0, 0.25f, 0), [6] = new(0.1f, 0, -0.30000001f) })])!;
+
+    /// <summary>
+    /// <see cref="Tree"/> with morph targets (T-132): Body's live mesh and its level 1 keep a Bulge (level 0 has none), and Arm's
+    /// live mesh has a Wave; the version 9 sample.
+    /// </summary>
+    public static Model TargetedTree()
+    {
+        var model = Tree();
+        model = model.With("Body", model.Find("Body")!.WithTargets(Bulge())).WithLevel("Body", 1);
+        return model.With("Arm", model.Find("Arm")!.WithTargets(Bulge("Wave")));
+    }
 }
