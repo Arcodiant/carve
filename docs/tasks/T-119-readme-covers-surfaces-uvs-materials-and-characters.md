@@ -4,7 +4,7 @@ description: >-
 ---
 # T-119 — README covers surfaces, UVs, materials and characters
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
