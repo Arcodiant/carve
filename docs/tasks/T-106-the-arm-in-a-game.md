@@ -4,7 +4,7 @@ description: >-
 ---
 # T-106 — The arm in a game
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
