@@ -14,6 +14,8 @@ description: >-
 
 **Depends on:** T-106
 
+**Verify:** server-unit
+
 ## Goal
 
 Agents who have never seen Carve's docs give a model dials and ship it, from the tool descriptions alone. This
@@ -53,4 +55,7 @@ ound-1\`: transcripts, summaries, prompts, `.mcp.json`, `limb.carve`, `limb-b.ca
 - **No description changed after the round** for what the agents did. One was changed after it, by ruling, for the export result below.
 - **`export` names the targets it wrote (the person's ruling, 2026-11-18; a code change in T-104's area, made here).** In `src/Carve.Server/ExportTool.cs`, `TargetsPart(model)` adds `, N morph target(s) 'A', 'B' in glTF target order` to the result line of the model, skinned and piece modes, from `Model.TargetNames` (what `GlbTargets` writes; a piece's model holds only its own meshes, so its own targets). A model with no targets adds the empty string: its result text is unchanged byte for byte. Clips mode has no mesh and no targets. The description gained one sentence saying so, with the example `2 morph target(s) 'Girth', 'Slim' in glTF target order`; the existing worked examples show no targets, so none was edited.
 - **Test** (`tests/Carve.Server.Tests/ExportTargetsResultTests.cs`, unit): a cube exported with no targets has no "morph" in its result; after two `define_target` calls the result holds the example text above, and the exported file's `MorphTargets.TargetNames` through the loader is `[Girth, Slim]`. Shown failing: with the part always added, the no-target export fails ("0 morph target(s)  in glTF"); with the names reversed, the targets export fails on the result text. Both restored, passing.
-- **Not checked.** No second round, no new frames (none needed for this change), no `server-regression` run (the verify did not require it).
+- **Not checked.** No second round, no new frames (none needed for this change), no `server-regression` run (the verify did not require it). The `**Verify:**` line was added afterwards (RV-64, Opus 5.5) to record the scope the verify ran:
+  `server-unit`, which holds `ExportTargetsResultTests`. `server-regression` first ran over the export change in the
+  milestone's verify after the rebase onto T-71 (see M-21's retrospective). RV-64 also added the skinned and piece
+  result lines' test.
