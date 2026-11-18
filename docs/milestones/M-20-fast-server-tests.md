@@ -4,7 +4,7 @@ description: >-
 ---
 # M-20 — Fast server tests
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *Server tool checks run in-process as unit tests, and server-regression runs only before landing on main*
 
