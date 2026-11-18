@@ -8,3 +8,4 @@
 - T-103: render and check take target weights, applied before skinning, and check reports a target that flips, collapses or cracks faces at weight 1
 - T-108: render_glb draws a .glb at chosen target weights through the engine's MorphWeights, and the model viewer takes starting weights and, in its window, a live weight slider
 - T-105: samples/arm.carve, an arm with Bulk and Lean targets, built, subdivided, rigged, checked and seen at its weights through the tools in scenario-morph
+- T-106: The arm exported and loaded through the engine, compared with Carve's preview at three weights, and driven live with a weight slider in the model viewer
