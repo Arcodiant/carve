@@ -17,6 +17,7 @@
         "samples/*.carve",
         "tests/Carve.Core.Tests/Fixtures/*.carve",
         "scenarios/Carve.Scenario.Morph/ArmPlan.cs",
+        "scenarios/Carve.Scenario.Soft/NotPlanarFold.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",

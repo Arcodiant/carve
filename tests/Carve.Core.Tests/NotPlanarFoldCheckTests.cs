@@ -1,7 +1,7 @@
 using Carve.Scenario.Soft;
 using Xunit;
 
-namespace Carve.SoftLoad.Tests;
+namespace Carve.Core.Tests;
 
 /// <summary>The soft export's warning check, shown to pass the right text and to fail each wrong one (T-72). Needs no run folder.</summary>
 [Trait("Tier", "unit")]
