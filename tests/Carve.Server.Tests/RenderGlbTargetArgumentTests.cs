@@ -50,6 +50,26 @@ public sealed class RenderGlbTargetArgumentTests() : TempFolderTests("carve-rend
     }
 
     [Fact]
+    public async Task Render_glb_tells_every_bad_entry_in_one_call_as_render_does_and_before_a_path_error()
+    {
+        using var carve = await StartWithBulgeAsync();
+        var glb = TextOf(await carve.CallToolAsync("render_glb", """{"path":"nowhere.glb","targets":{"Bulge":"half","Other":2,"Third":1e999}}"""));
+        Assert.Contains("targets.Bulge: expected a number", glb);
+        Assert.Contains("targets.Other: weight 2 is outside 0 to 1", glb);
+        Assert.Contains("targets.Third: the weight is not a finite number", glb);
+        Assert.DoesNotContain("no file at", glb);
+    }
+
+    [Fact]
+    public async Task A_refused_weight_is_never_prepared_as_a_number_even_without_its_words()
+    {
+        var errors = new List<string>();
+        var glb = await PrepareAsync(errors, [new("Bulge", float.NaN)], new Dictionary<string, string>());
+        Assert.Null(glb);
+        Assert.Equal("targets.Bulge: the weight is not a finite number", Assert.Single(errors));
+    }
+
+    [Fact]
     public async Task Render_glb_with_a_good_weight_goes_on_to_the_engine()
     {
         using var carve = await StartWithBulgeAsync();

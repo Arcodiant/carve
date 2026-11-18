@@ -89,28 +89,31 @@ internal static class RenderGlbTool
         var problems = new List<string>();
         var (clipName, clipTime) = ReadClip(clip, time, problems);
         var weights = ReadTargets(targets, problems, out var weightRefusals);
-        if (problems.Count > 0) return Failed(Name, problems);
+
+        // What is knowable before the file is read is told before any path error: the clip and time, a target's type, and a weight that is not a number or is outside 0 to 1.
+        // Only a target's name waits for the file, so with no target to check there the problems stand alone, and with one they are told together with what the file adds (as render and check tell every bad entry).
+        var known = () => Failed(Name, [.. problems, .. weightRefusals.Values]);
+        if (weights is not { Count: > 0 } && problems.Count > 0) return Failed(Name, problems);
 
         await status.WhenSettled.WaitAsync(cancellationToken);
 
-        // The file's target names are known only to the engine's loader, so a refused weight is told at once when there is no engine, and otherwise after the names are checked.
-        if (status.FaultMessage is { } fault) return weightRefusals.Count > 0 ? Failed(Name, weightRefusals.Values.ToList()) : Error(fault);
+        if (status.FaultMessage is { } fault) return problems.Count + weightRefusals.Count > 0 ? known() : Error(fault);
 
         var file = ToolPaths.Resolve(Name, path, ".glb", out var pathError, toolFolder.Directory, verb: "reads");
-        if (file is null) return Error(pathError!);
-        if (Directory.Exists(file.FullPath)) return Error($"{Name}: {file.FullPath} is a folder, not a file");
-        if (!File.Exists(file.FullPath)) return Error($"{Name}: no file at {file.FullPath}");
+        if (file is null) return problems.Count + weightRefusals.Count > 0 ? known() : Error(pathError!);
+        if (Directory.Exists(file.FullPath)) return problems.Count + weightRefusals.Count > 0 ? known() : Error($"{Name}: {file.FullPath} is a folder, not a file");
+        if (!File.Exists(file.FullPath)) return problems.Count + weightRefusals.Count > 0 ? known() : Error($"{Name}: no file at {file.FullPath}");
 
         byte[] bytes;
         try { bytes = await File.ReadAllBytesAsync(file.FullPath, cancellationToken); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
         {
-            return Error($"{Name}: could not read {file.FullPath}: {e.Message}");
+            return problems.Count + weightRefusals.Count > 0 ? known() : Error($"{Name}: could not read {file.FullPath}: {e.Message}");
         }
 
         // The engine-fault check above must come first: an engine-less host (the test harness) has no loader registered.
         if (services.GetService<IModelGeometryLoader>() is not { } loader)
-            return Error($"{Name}: no IModelGeometryLoader is registered, so the .glb cannot be read.");
+            return problems.Count + weightRefusals.Count > 0 ? known() : Error($"{Name}: no IModelGeometryLoader is registered, so the .glb cannot be read.");
         var glb = GlbScene.Prepare(loader, bytes, clipName, clipTime, problems, weights, weightRefusals);
         if (glb is null) return Failed(Name, problems);
 
@@ -174,8 +177,13 @@ internal static class RenderGlbTool
                 continue;
             }
 
-            // The name still goes to the file's check, with a weight that is never drawn: the name is told before its weight.
-            if (TargetWeightsArgument.WeightRefusal($"targets.{property.Name}", property.Value, out var weight) is { } refusal) refusals[property.Name] = refusal;
+            // The name still goes to the file's check, with a weight that is never drawn (NaN, which GlbScene.Prepare refuses on its own): the name is told before its weight.
+            if (TargetWeightsArgument.WeightRefusal($"targets.{property.Name}", property.Value, out var weight) is { } refusal)
+            {
+                refusals[property.Name] = refusal;
+                weight = float.NaN;
+            }
+
             weights.Add(new(property.Name, weight));
         }
 

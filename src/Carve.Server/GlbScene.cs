@@ -80,7 +80,9 @@ internal sealed class GlbScene
             {
                 if (Array.IndexOf(names, t.Key) >= 0)
                 {
+                    // A weight that is not finite is never carried on to the draw as a number: it is refused here even when its words were lost.
                     if (weightRefusals is not null && weightRefusals.TryGetValue(t.Key, out var refusal)) errors.Add(refusal);
+                    else if (!float.IsFinite(t.Value)) errors.Add($"targets.{t.Key}: the weight is not a finite number");
                     continue;
                 }
 

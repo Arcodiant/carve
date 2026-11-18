@@ -153,6 +153,41 @@ public class RenderGlbTargetsTests
         Assert.DoesNotContain("outside 0 to 1", both);
     }
 
+    [Theory]
+    [InlineData("""{"Bulge":2}""", "targets.Bulge: weight 2 is outside 0 to 1")]
+    [InlineData("""{"Bulge":1e999}""", "targets.Bulge: the weight is not a finite number")]
+    public async Task A_known_target_with_a_refused_weight_is_refused_and_nothing_is_drawn(string targets, string expected)
+    {
+        using var carve = await StartAsync();
+        var file = $"weight-{Math.Abs(targets.GetHashCode())}.glb";
+        await ExportCylinderAsync(carve, file);
+
+        // RV-65: the refused weight must never be carried on to the draw as 0, so it is checked on the real engine.
+        var result = await carve.CallToolAsync("render_glb", $$"""{"path":"{{file}}","targets":{{targets}}}""");
+        Assert.Contains(expected, Refused(result));
+        Assert.DoesNotContain("image/png", result.GetRawText());
+    }
+
+    [Fact]
+    public async Task Every_bad_entry_is_told_in_one_call_and_a_weight_is_told_before_a_path_error()
+    {
+        using var carve = await StartAsync();
+        await ExportCylinderAsync(carve, "several.glb");
+
+        var several = Refused(await carve.CallToolAsync("render_glb", """{"path":"several.glb","targets":{"Bulge":"half","Other":2,"Bulg":1e999}}"""));
+        Assert.Contains("targets.Bulge: expected a number", several);
+        Assert.Contains("targets.Other: the file has no target named 'Other'", several);
+        Assert.Contains("targets.Bulg: the file has no target named 'Bulg'", several);
+        Assert.DoesNotContain("outside 0 to 1", several);
+
+        // Before a path error: a weight is told, as before a7c00c6; the name of a target waits for the file.
+        var missing = Refused(await carve.CallToolAsync("render_glb", """{"path":"missing.glb","targets":{"Bulge":2}}"""));
+        Assert.Contains("targets.Bulge: weight 2 is outside 0 to 1", missing);
+        Assert.DoesNotContain("no file at", missing);
+        var named = Refused(await carve.CallToolAsync("render_glb", """{"path":"missing.glb","targets":{"Nope":0.5}}"""));
+        Assert.Contains("no file at", named);
+    }
+
     /// <summary>
     /// D-6's frame rule (Orcward's): a pixel differs when its luma differs past 4 of 255; a frame fails past 0.5 % of its
     /// pixels differing or with an 8-connected patch of them past 50.
