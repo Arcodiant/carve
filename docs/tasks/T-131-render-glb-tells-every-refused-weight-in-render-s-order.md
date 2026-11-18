@@ -22,7 +22,7 @@ For the same `targets`, `render_glb` gives the same refusal lines as `render` an
 
 ## Scope
 
-- **Unreadable file.** When the bytes are read but the engine's loader cannot parse them (`GlbScene.Prepare`'s `loader.Parse` catch), the type, non-finite and out-of-range weight refusals that `ReadTargets` holds are told with the path line. Today only the path line is told. Name checks still need a readable file.
+- **Unreadable file.** When the bytes are read but the engine's loader cannot parse them (`GlbScene.Prepare`'s `loader.Parse` catch), the out-of-range and non-finite weight refusals that `ReadTargets` holds in `weightRefusals` are told with the path line. Today they are dropped; type errors, and clip and time problems, are already told there, since they are in `problems` with the path line. Name checks still need a readable file.
 - **Order.** Entries are told in object order, each with its type, weight or name line, as `TargetWeightsArgument` does for `render` and `check`. Today every type error comes before every weight or name line.
 - **Tests.**
   - A regression test on the real engine with an unparseable `.glb`: `{"Bulge":-0.5}` names the weight and the path.
