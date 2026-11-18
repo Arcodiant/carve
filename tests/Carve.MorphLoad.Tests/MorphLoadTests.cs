@@ -2,6 +2,7 @@ using System.Numerics;
 using Carve.Core;
 using Carve.LoadChecks;
 using Empyrean;
+using Carve.Scenario.Soft;
 using Xunit;
 using Model = Carve.Core.Model;
 using PolygonMesh = Carve.Core.PolygonMesh;
@@ -109,12 +110,25 @@ public class MorphLoadTests
     public void The_export_is_clean()
     {
         var result = File.ReadAllText(Path.Combine(RunFolder, "work", "export-arm.glb.txt"));
-        // The smoothed quads are slightly off their planes, which the export says once per face; nothing else may be said.
+        // Only not-planar warnings (the person's ruling of 2026-11-18), folded by T-72: the named faces and the fold add up to select's count.
         Assert.DoesNotContain("replaced", result);
-        if (result.Contains("warning(s): "))
-        {
-            Assert.All(result.Split("warning(s): ")[1].Split("; "), w => Assert.Contains("planar", w));
-        }
+        var selected = File.ReadAllText(Path.Combine(RunFolder, "work", "select-non-planar-mesh.txt"));
+        var faces = System.Text.Json.JsonDocument.Parse(selected).RootElement.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
+        var warned = result.IndexOf("warning(s): ", StringComparison.Ordinal);
+        Assert.True(warned >= 0, "the arm exports with not-planar warnings");
+        Assert.Null(NotPlanarFold.Check(result[(warned + "warning(s): ".Length)..], new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = faces }));
+    }
+
+    [SkippableOrRun]
+    public void A_wrong_count_of_not_planar_faces_fails_the_fold_check()
+    {
+        var result = File.ReadAllText(Path.Combine(RunFolder, "work", "export-arm.glb.txt"));
+        var faces = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(RunFolder, "work", "select-non-planar-mesh.txt"))).RootElement
+            .GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
+        var warnings = result[(result.IndexOf("warning(s): ", StringComparison.Ordinal) + "warning(s): ".Length)..];
+        Assert.NotNull(NotPlanarFold.Check(warnings, new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = [.. faces, faces.Max() + 1] }));
+        Assert.NotNull(NotPlanarFold.Check(warnings, new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = faces[1..] }));
+        Assert.NotNull(NotPlanarFold.Check(warnings + "; the model has 6000 triangles, above the 5000 a game character should keep to", new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = faces }));
     }
 
     [SkippableOrRun]

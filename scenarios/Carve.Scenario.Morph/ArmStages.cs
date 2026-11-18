@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Text.Json;
 using Carve.Debug;
 using Carve.Scenario.Orcward;
+using Carve.Scenario.Soft;
 using static Carve.Scenario.Crate.CrateBuild;
 
 namespace Carve.Scenario.Morph;
@@ -137,9 +138,15 @@ internal static class ArmStages
         var glb = Path.Combine(models, "arm.glb");
         var result = await CallTextAsync(driver, "export", new { path = glb });
         if (result.Contains("replaced") || !result.Contains("exported arm.glb") || !result.Contains("1 clip(s) 'Curl'")) driver.Fail($"export arm.glb: expected a new skinned file with Curl, got {result}");
-        // The smoothed quads are slightly off their planes (subdivide): export says so, once per face. Nothing else may be said.
-        if (result.Contains("warning(s): ") && result.Split("warning(s): ")[1].Split("; ").Any(w => !w.Contains("planar")))
-            driver.Fail($"export arm.glb: only planarity warnings are expected, got {result}");
+        // The smoothed quads are slightly off their planes (subdivide). By T-72's rule and the person's ruling of 2026-11-18 only not-planar
+        // warnings are accepted: the mesh names its first 10 and folds the rest, and the two add up to what select's non_planar finds.
+        // Any other warning fails. (The rule itself is T-127's.)
+        var selected = await CallTextAsync(driver, "select", new { kind = "faces", where = "non_planar", mesh = "mesh" });
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "select-non-planar-mesh.txt"), selected);
+        var nonPlanar = System.Text.Json.JsonDocument.Parse(selected).RootElement.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
+        var warned = result.IndexOf("warning(s): ", StringComparison.Ordinal);
+        var problem = warned < 0 ? "no warnings" : NotPlanarFold.Check(result[(warned + "warning(s): ".Length)..], new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = nonPlanar });
+        if (problem is not null) driver.Fail($"export arm.glb: {problem}");
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "export-arm.glb.txt"), result);
 
         var rows = new List<Comparison.Result>();

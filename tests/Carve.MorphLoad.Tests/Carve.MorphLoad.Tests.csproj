@@ -22,6 +22,7 @@
   <ItemGroup>
     <!-- The run-folder and sample helpers of the character checks, linked and not copied. -->
     <Compile Include="../Carve.CharacterLoad.Tests/RunContent.cs" Link="RunContent.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Soft/NotPlanarFold.cs" Link="NotPlanarFold.cs" />
   </ItemGroup>
 
 </Project>
