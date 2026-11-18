@@ -4,7 +4,7 @@ description: >-
 ---
 # T-89 — Tool behaviour checks as unit tests
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
