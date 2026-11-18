@@ -56,7 +56,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         },
     }, "folder");
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? folder = null, JsonElement? size = null, JsonElement? outputs = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? folder = null, JsonElement? size = null, JsonElement? outputs = null, CancellationToken cancellationToken = default)
     {
         if (Unknown("export", context, "folder", "size", "outputs") is { } unknown) return unknown;
         if (!TryText("export", "folder", folder, out var folderText, out var bad)) return bad!;
@@ -68,8 +68,10 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
             graph = open;
         }
         // The graph is a value, so it is evaluated outside the store's lock and the other tools answer while an export
-        // runs (minutes at 8192). Exports take turns, as two could write the same files.
-        lock (Exports)
+        // runs (minutes at 8192). Exports take turns, as two could write the same files. A cancelled call
+        // (notifications/cancelled) stops between bands, writing nothing more, and gives up its turn.
+        Exports.Wait(cancellationToken);
+        try
         {
             var faults = GraphValidator.Validate(graph, registry);
             if (faults.Count > 0)
@@ -124,8 +126,10 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                 {
                     evaluator.Evaluate(role, pixels, (band, y0, rows) =>
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         for (var y = y0; y < y0 + rows; y++) OutputPacking.PackRow(role, band, y, rgba.AsSpan(y * pixels * 4, pixels * 4));
                     });
+                    cancellationToken.ThrowIfCancellationRequested();
                     using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
                         new StbImageWriteSharp.ImageWriter().WritePng(rgba, pixels, pixels, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, stream);
@@ -144,7 +148,11 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
             }
             return Line($"export: wrote {Count(lines.Count, "file")} to {target} at size {pixels}\n" + string.Join("\n", lines));
         }
+        finally
+        {
+            Exports.Release();
+        }
     }
 
-    private static readonly object Exports = new();
+    private static readonly SemaphoreSlim Exports = new(1, 1);
 }

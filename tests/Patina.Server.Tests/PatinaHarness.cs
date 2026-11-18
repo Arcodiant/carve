@@ -90,6 +90,20 @@ internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
     public Task<JsonElement> CallToolAsync(string name, string arguments, CancellationToken cancellationToken) =>
         SendAsync("tools/call", new JsonObject { ["name"] = name, ["arguments"] = JsonNode.Parse(arguments) }, cancellationToken);
 
+    /// <summary>A tools/call sent with the id <paramref name="id"/>, so a test can cancel it by that id.</summary>
+    public Task CallToolWithIdAsync(string id, string name, string arguments, CancellationToken cancellationToken) =>
+        _client!.SendRequestAsync(
+            new JsonRpcRequest { Id = new RequestId(id), Method = "tools/call", Params = new JsonObject { ["name"] = name, ["arguments"] = JsonNode.Parse(arguments) } },
+            cancellationToken);
+
+    /// <summary>Sends notifications/cancelled for the request with <paramref name="id"/> by hand, as the reviewer's stdio probe did.</summary>
+    public Task CancelAsync(string id) =>
+        _client!.SendMessageAsync(new JsonRpcNotification
+        {
+            Method = "notifications/cancelled",
+            Params = new JsonObject { ["requestId"] = id, ["reason"] = "test" },
+        });
+
     public async ValueTask DisposeAsync()
     {
         if (_client is not null) await _client.DisposeAsync();
@@ -99,7 +113,8 @@ internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
 
     private async Task<JsonElement> SendAsync(string method, JsonNode? parameters, CancellationToken cancellationToken = default)
     {
-        // Cancelling the token sends notifications/cancelled for the request, as a client does.
+        // Cancelling the token stops the wait only: the SDK's client (2.3.0) sends no notifications/cancelled for it
+        // (RV-68; the tap showed none), so a test that cancels a call on the server uses CancelAsync.
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cancel.CancelAfter(TimeSpan.FromSeconds(30));
         var response = await _client!.SendRequestAsync(new JsonRpcRequest { Method = method, Params = parameters }, cancel.Token);

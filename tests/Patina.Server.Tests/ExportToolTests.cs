@@ -164,4 +164,33 @@ public class ExportToolTests
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"get_graph and swatch waited {watch.Elapsed} behind the export");
         Assert.False(Results.IsError(await export));
     }
+
+    [Fact]
+    public async Task An_export_named_in_notifications_cancelled_stops_and_writes_nothing()
+    {
+        using var folder = new TempFolder();
+        await using var patina = await OpenPlanks(folder.Path);
+
+        using var end = new CancellationTokenSource();
+        // Some 20 s to run in a debug build. notifications/cancelled is sent by hand: the SDK's client (2.3.0) sends
+        // none when its token is cancelled, but a client over stdio does, as the reviewer's probe did.
+        var export = patina.CallToolWithIdAsync("big-export", "export", """{"folder":"big","size":4096,"outputs":["base_colour"]}""", end.Token);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await patina.CancelAsync("big-export");
+        await AssertStopped(patina, folder.Path);
+        // A cancelled request gets no answer; the client stops waiting for one here.
+        end.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => export);
+    }
+
+    /// <summary>The cancelled export has given up its turn (a small export answers at once) and wrote no file.</summary>
+    private static async Task AssertStopped(PatinaHarness patina, string folder)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        Assert.False(Results.IsError(await patina.CallToolAsync("export", """{"folder":"small","size":32,"outputs":["base_colour"]}""", TestContext.Current.CancellationToken)));
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"a 32 px export waited {watch.Elapsed} behind the cancelled one");
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        Assert.False(File.Exists(Path.Combine(folder, "big", "base_colour.png")), "the cancelled export wrote its file");
+        Assert.False(File.Exists(Path.Combine(folder, "big", "base_colour.png.writing")), "the cancelled export left its temporary file");
+    }
 }
