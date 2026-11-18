@@ -63,6 +63,13 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review c
   `VerticalCosine`. `src/Carve.Server/RenderLights.cs` went; `ViewFraming.LightOrientation`, `UpFor` and `VerticalCosine`
   delegate to it; `RenderSystem` and `PbrEqualityTests` pass `ViewFraming.LightOrientation(RenderView.Front)`; the test
   project no longer links the old file. Nothing else in `Carve.Hosting` or `Carve.Server` changed.
+- **After finish: the milestone's refactor pass.** Run by the cairn process before review and verified by `cairn milestone
+  M-27 verify`, three commits changed what the bullet above describes, keeping every value: `cabbfad` dropped
+  `ViewFraming.VerticalCosine` (unused once `UpFor` moved; the cone is read only inside `RenderLights`); `ee8608e` dropped
+  `PbrMaterials.Sampler`, leaving `TextureUpload.Sampler` the one sampler (T-111's As built); `01cb4b2` made
+  `RenderLights.FrontDirection` (1.6, 1.2, 2.2) public, and `ViewFraming.FrontDirection` now reads it rather than holding its
+  own copy. RV-68's answer since made `AmbientIntensity` and `DirectionalIntensity` `internal const` and `VerticalCosine`
+  `private` (f44e507). So `ViewFraming.LightOrientation` and `UpFor` delegate to `RenderLights`, and `FrontDirection` reads it.
 - **The sphere.** `SwatchSystem.Build` calls `RenderLights.Add` with `SwatchCamera.Light` = `RenderLights.Orientation(Eye)`
   (the camera on +z, +y up), so the light sits where carve keeps it relative to its camera. The sheet's sphere label is now
   `sphere, Pbr, carve lights, angle 0`; `swatch`'s description and the README's patina paragraph say how it is lit.

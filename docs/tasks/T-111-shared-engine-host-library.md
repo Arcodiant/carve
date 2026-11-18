@@ -94,7 +94,8 @@ Moves to `src/Carve.Hosting` (namespace `Carve.Hosting`):
   server did not.
 - **`RenderSky`** (the fixed sky), public.
 - **`TextureUpload`**: `PbrMaterials.Sampler` and the upload rule (RGBA8 pixels; sRGB for colour, linear for data;
-  mipmaps on). `PbrMaterials` keeps decoding the PNG and caching, and calls it.
+  mipmaps on). `PbrMaterials` keeps decoding the PNG and caching, and calls it. (Since the milestone's refactor pass
+  (ee8608e) `PbrMaterials` keeps no `Sampler` of its own: its summary names `TextureUpload.Sampler`.)
 - **Offscreen render plumbing a second server needs**, cut from carve's own types with no change of calls or order:
   `OffscreenTarget` (the resolved, 4x multisampled and depth targets of one size, made in the order
   `RenderComposition` makes them, and the five pipeline steps it declares for them), `OffscreenRequest<TSpec, TFrame>`
@@ -166,7 +167,8 @@ await `WhenSettled`, refuse with `FaultMessage` if set, post, then `Task.WhenAny
   `Carve.Server` because its light turns with carve's views; a server that wants carve's light writes the same two
   components.
 - Textures: `TextureUpload.Create(resources, rgba8, width, height, srgb)` (sRGB for colour, linear for data, mipmaps,
-  `TextureUpload.Sampler`), from pixels; no PNG needed. Materials are the engine's `Material.Pbr`.
+  `TextureUpload.Sampler`, the one sampler: `PbrMaterials.Sampler` went in the refactor pass, ee8608e), from pixels; no
+  PNG needed. Materials are the engine's `Material.Pbr`.
 - A queue: requests derive from `OffscreenRequest<TSpec, TFrame>` (`Spec`, `Result`, `Complete`, `Fail`), held in an
   `OffscreenQueue<TRequest>` (`Enqueue` from a tool, `TryPeek`/`TryTake` on the frame thread). What is due when is the
   server's own (carve's is `RenderPump`: store versions, looks, glb).
