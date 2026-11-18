@@ -55,7 +55,8 @@
         {
           "dotnet-closure": "tests/Patina.Server.Tests/Patina.Server.Tests.csproj"
         },
-        "tests/Carve.Server.Tests/ProductReferenceGuard.cs"
+        "tests/Carve.Server.Tests/ProductReferenceGuard.cs",
+        "samples/graphs/**"
       ],
       "resources": "cpu",
       "est-seconds": 200
