@@ -15,16 +15,13 @@ namespace Carve.Server;
 /// <remarks>
 /// Textures are uploaded as the loader uploads a model's images with <c>generateMipmaps: true</c> (ruling 1, 2026-11-16):
 /// decoded to RGBA8, base colour and emissive as <see cref="TextureFormat.Rgba8Srgb"/>, the other maps as
-/// <see cref="TextureFormat.Rgba8Unorm"/>, with a full mip chain and <see cref="Sampler"/>. They are owned textures, released
+/// <see cref="TextureFormat.Rgba8Unorm"/>, with a full mip chain and <see cref="TextureUpload.Sampler"/>. They are owned textures, released
 /// as <see cref="IGraphicsResourceManager"/> and <see cref="Material"/> require: each material is held by an
 /// <see cref="IAssetHolder"/> of its own, so its material-table entry is reclaimed when the holder is disposed, and a texture
 /// is destroyed only after every material holding it has gone.
 /// </remarks>
 internal sealed class PbrMaterials(IGraphicsResourceManager resources, ITextureLoader loader, IAssetResidency? residency = null)
 {
-    /// <summary>The sampler the engine gives a texture loaded with <c>generateMipmaps: true</c> and no sampler: trilinear, repeat, anisotropy 1.</summary>
-    public static readonly SamplerDescription Sampler = TextureUpload.Sampler;
-
     // A PNG used both as colour and as data is two textures, keyed by its bytes' SHA-256 and the colour space.
     private readonly Dictionary<(string Hash, bool Srgb), Texture> _textures = [];
     // Keyed by every field, the textures' bytes included (a Carve material's equality); the holder is null without residency.
