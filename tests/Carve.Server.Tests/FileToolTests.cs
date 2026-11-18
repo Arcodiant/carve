@@ -41,17 +41,25 @@ public abstract class TempFolderTests : IDisposable
     }
 }
 
-/// <summary>A test class that calls a file tool through the real server, with its temp folder as the working directory.</summary>
+/// <summary>A test class that calls a file tool, with its temp folder as the working directory: on <see cref="ToolHarness"/> through <c>StartAsync</c>, or through the real process through <c>StartProcessAsync</c> for a regression test.</summary>
 public abstract class FileToolTests(string prefix) : TempFolderTests(prefix)
 {
-    /// <summary>Starts carve and defines <paramref name="mesh"/>: the example cube by default, nothing when null.</summary>
+    /// <summary>Starts the harness and defines <paramref name="mesh"/>: the example cube by default, nothing when null.</summary>
     private protected async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(string? mesh = "cube")
     {
         var carve = new ToolHarness(workingDirectory: Root);
-        await carve.InitializeAsync();
-        var tools = await carve.ListToolsAsync();
-        if (mesh is not null) Assert.False(IsError(await carve.CallToolAsync("define_mesh", mesh == "cube" ? Cube(tools) : mesh)));
-        return (carve, tools);
+        try
+        {
+            await carve.InitializeAsync();
+            var tools = await carve.ListToolsAsync();
+            if (mesh is not null) Assert.False(IsError(await carve.CallToolAsync("define_mesh", mesh == "cube" ? Cube(tools) : mesh)));
+            return (carve, tools);
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     /// <summary>As <see cref="StartAsync"/> but through the real process, for a regression test that renders or needs the process.</summary>

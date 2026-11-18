@@ -20,10 +20,11 @@
   </ItemGroup>
 
   <!--
-    carve is referenced, under the alias "carve" so its types never clash with the product files linked below, for one
-    reason: the unit harness (ToolHarness.cs, T-87) serves the real tools in this process through CarveServer.AddTools,
-    the registration Program.cs makes. Everything else still starts carve as a real process (CarveProcess), so those
-    tests see what ships; the product's own references stay guarded by ProductReferenceGuard.
+    carve is referenced, under the alias "carve" so its types never clash with the product files linked below. The unit
+    harness (ToolHarness.cs, T-87) serves the real tools in this process through CarveServer.AddTools, the registration
+    Program.cs makes, and a few unit classes (GameLimitsTests, ToolPathsTests, the export tests) use its types directly.
+    The regression tests still start carve as a real process (CarveProcess), so they see what ships; the product's own
+    references stay guarded by ProductReferenceGuard.
   -->
   <ItemGroup>
     <ProjectReference Include="../../src/Carve.Server/Carve.Server.csproj" Aliases="carve" />

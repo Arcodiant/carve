@@ -24,10 +24,18 @@ public sealed class GetWeightsToolDefinitionTests
     private static async Task<ToolHarness> StartAsync()
     {
         var carve = new ToolHarness();
-        await carve.InitializeAsync();
-        Ok(await carve.CallToolAsync("define_mesh", Cube));
-        Ok(await carve.CallToolAsync("define_skeleton", Chain));
-        return carve;
+        try
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", Cube));
+            Ok(await carve.CallToolAsync("define_skeleton", Chain));
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     [Fact]

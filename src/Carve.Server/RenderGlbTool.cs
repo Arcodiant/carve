@@ -97,7 +97,10 @@ internal static class RenderGlbTool
             return Error($"{Name}: could not read {file.FullPath}: {e.Message}");
         }
 
-        var glb = GlbScene.Prepare(services.GetRequiredService<IModelGeometryLoader>(), bytes, clipName, clipTime, problems);
+        // The engine-fault check above must come first: an engine-less host (the test harness) has no loader registered.
+        if (services.GetService<IModelGeometryLoader>() is not { } loader)
+            return Error($"{Name}: no IModelGeometryLoader is registered, so the .glb cannot be read.");
+        var glb = GlbScene.Prepare(loader, bytes, clipName, clipTime, problems);
         if (glb is null) return Failed(Name, problems);
 
         var targetVector = target is null ? (System.Numerics.Vector3?)null : RenderTool.Vector(target);

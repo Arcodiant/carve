@@ -39,7 +39,7 @@ I checked the following and found nothing wrong with them. Program.cs registers 
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** no change needed: it matches `render` (`RenderTool.cs:359`), and on the harness the fault must come first, since the loader is not there. The behaviour change is recorded in T-87's `### As built`.
 
 ### IModelGeometryLoader is fetched from the service provider at call time
 
@@ -51,7 +51,7 @@ I checked the following and found nothing wrong with them. Program.cs registers 
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed: `RenderGlbTool.cs` uses `GetService<IModelGeometryLoader>()` and returns a tool error naming the missing loader, with a comment that the engine-fault check above must come first on an engine-less host.
 
 ### `Rooted` and `ToolPaths.Resolve` can disagree on rooted-but-relative limits paths
 
@@ -63,7 +63,7 @@ I checked the following and found nothing wrong with them. Program.cs registers 
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed: `Rooted` in `GameLimits.cs` uses `Path.GetFullPath(relative, baseDirectory)` when a base directory is set; a null base is unchanged.
 
 ### Harness leaks a started host when a test helper throws
 
@@ -75,7 +75,7 @@ I checked the following and found nothing wrong with them. Program.cs registers 
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: every helper that starts a `ToolHarness` and then calls into it (28 `StartAsync`-style helpers, e.g. `CheckToolTests`, `FileToolTests.StartAsync`, `NamedMeshTests`, `SkinnedExportToolTests.StartChainAsync`) now disposes the harness on an exception and rethrows.
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -91,7 +91,7 @@ Answers to the brief's questions: a change to a product tool file does trigger `
 - **Fix:** add both samples to `server-unit`'s inputs.
 - **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed: `tests.json` adds `samples/leaky-shed.carve` and `samples/gardener.carve` to `server-unit`'s inputs. The other unit-tier classes read only `Fixtures/*.png` (already an input), the closure's own files and `README.md`/csprojs, so no other sample needed adding.
 
 ### The rule's list of what only server-regression covers is incomplete
 
@@ -101,7 +101,7 @@ Answers to the brief's questions: a change to a product tool file does trigger `
 - **Fix:** either name "export read back through the engine loader" in the rule, or move `UvExportTests` and `PbrReleaseTests` to `unit`.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: CLAUDE.md's rule also names "the exported `.glb` read back through the engine's loader" (`UvExportTests`, `PbrReleaseTests`), and T-104's `**Verify:**` is `server-unit, server-regression` again. Neither class moved.
 
 ### Layout row misdescribes the regression tier
 
@@ -112,7 +112,7 @@ Answers to the brief's questions: a change to a product tool file does trigger `
 - **Consequence:** A reader looking for the guard's suite, or deciding Verify from this row, is misled.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: CLAUDE.md's `tests/Carve.Server.Tests` row now says what is unit (tool behaviour and definitions on `ToolHarness`, the no-extension guard) and what is regression (stdio, extension loading, the debug extension, rendering, the loader read-back of exports, the process-vs-harness tests).
 
 ### T-90's survey of open items missed four items; the record still says it found none
 
@@ -121,7 +121,7 @@ Answers to the brief's questions: a change to a product tool file does trigger `
 - **Consequence:** The as-built record and the retrospective are false. They also hide that the open-items query T-90 used misses milestone members, which matters for the next sweep like this.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: T-90's `### As built` has a dated (2026-11-17) correction naming T-94, T-103, T-104 and T-108, and the retrospective's T-90 bullet and its linked-copies bullet (`ToolPaths.cs`, `GameLimits.cs` removed) are corrected. The cause could not be told from the record: `cairn list task --status Open` returns all four today.
 
 ### csproj comment and FileToolTests summary no longer true after the refactor
 
@@ -133,7 +133,7 @@ Answers to the brief's questions: a change to a product tool file does trigger `
 - **Consequence:** Misleading comments in the exact place a future change to the "tests see what ships" policy would start.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed: the csproj comment and the `FileToolTests` summaries now say the harness is the unit path, a few unit classes use carve's types directly, and the regression tests start the process.
 
 No problems found in how `render_glb` or `FileToolTests` changed from both sides. Regression subclasses use `StartProcessAsync`, and `render_glb` is registered in `AddTools`.
 
@@ -171,7 +171,7 @@ Diff: `git diff origin/main...HEAD -- tests/Carve.Server.Tests` (the merge base 
 - **Consequence:** for these tools the "one end-to-end case per family" only shows that argument validation runs the same through the process. Their real edit paths never run through `Program.cs`, so a process-only difference there would not be caught. Asserting `!IsError` on the calls meant to succeed would expose this.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: `ToolFamiliesThroughProcessTests` gives the edit, cut, bridge and select families valid arguments (`extrude` `distance`, `select` `kind`/`where`, a bridge between two equal loops, `merge_faces` on connected faces) and asserts `IsError` equals the expected value on both sides beside the JSON equality. Two refusal cases stay, marked `Refused: true`.
 
 ### Written files are compared one way only
 
@@ -180,7 +180,7 @@ Diff: `git diff origin/main...HEAD -- tests/Carve.Server.Tests` (the merge base 
 - **Consequence:** a file that only the process writes, for example one that a cwd-relative path sends somewhere else, is never noticed. Comparing both directory listings would close this.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed: the test lists both directories (the same set of relative paths) and then compares bytes.
 
 ### A third copy of the crate-and-lid start, reusing the process helper's name
 
@@ -189,7 +189,7 @@ Diff: `git diff origin/main...HEAD -- tests/Carve.Server.Tests` (the merge base 
 - **Consequence:** the moved test bodies read as unchanged only because the name now resolves to a different helper. A reader cannot tell from the call site which server the test uses. `FileToolTests.StartAsync`/`StartProcessAsync` are also near-duplicates, because `IToolCaller` lacks `InitializeAsync`/`ListToolsAsync`.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed: `NamedMeshDefinitionTests` drops its private copy and uses `NamedMeshTests.StartWithCrateAndLidOnHarnessAsync`. skipped: the `FileToolTests.StartAsync`/`StartProcessAsync` near-duplication stays, because `IToolCaller` has no `InitializeAsync`/`ListToolsAsync` to share a body through, and merging them would widen it for two helpers.
 
 Apart from these, no lost, duplicated, renamed, loosened or wrongly tiered test was found. The moves are faithful.
 

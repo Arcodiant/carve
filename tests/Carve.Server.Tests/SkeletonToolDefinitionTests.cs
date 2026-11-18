@@ -13,8 +13,16 @@ public class SkeletonToolDefinitionTests
     private static async Task<ToolHarness> StartAsync()
     {
         var carve = new ToolHarness();
-        await carve.InitializeAsync();
-        return carve;
+        try
+        {
+            await carve.InitializeAsync();
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task<string> DescriptionAsync(ToolHarness carve, string tool) =>

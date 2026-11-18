@@ -24,9 +24,17 @@ public sealed class ProjectUvsToolTests
     private static async Task<ToolHarness> StartAsync(string mesh = Cube)
     {
         var carve = new ToolHarness();
-        await carve.InitializeAsync();
-        Ok(await carve.CallToolAsync("define_mesh", mesh));
-        return carve;
+        try
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", mesh));
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task<string> Refused(ToolHarness carve, string arguments)

@@ -19,9 +19,17 @@ public sealed class UvToolDefinitionTests() : TempFolderTests("carve-uvs")
     private static async Task<ToolHarness> StartAsync(string mesh = Cube, string? root = null)
     {
         var carve = new ToolHarness(workingDirectory: root);
-        await carve.InitializeAsync();
-        Ok(await carve.CallToolAsync("define_mesh", mesh));
-        return carve;
+        try
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", mesh));
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     private static string Pairs(JsonElement list) => string.Join(" ", list.EnumerateArray().Select(p => $"{p[0]}-{p[1]}"));

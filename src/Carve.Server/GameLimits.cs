@@ -169,7 +169,7 @@ public sealed record LimitsSource(GameLimits Limits, string? Path, bool Found, I
     {
         error = null;
         // A relative argument is looked at from baseDirectory, as ToolPaths.Resolve reads it; null is the working directory.
-        string Rooted(string relative) => baseDirectory is null ? relative : System.IO.Path.Combine(baseDirectory, relative);
+        string Rooted(string relative) => baseDirectory is null ? relative : System.IO.Path.GetFullPath(relative, baseDirectory);
         var from = System.IO.Path.GetDirectoryName(target)!;
         string? path = null;
         if (argument is not null)

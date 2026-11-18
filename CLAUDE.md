@@ -80,7 +80,7 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `tools/Carve.SampleTextures` | Engine-free console app that writes `samples/textures/`, the textured barrel's eight 256 x 256 PNGs, from `TextureSet.cs` (integer-hash noise, fixed seed, no clock); `dotnet run --project tools/Carve.SampleTextures` remakes them, and `SampleTexturesTests` in `tests/Carve.Core.Tests` keeps the committed files equal to it pixel for pixel |
 | `samples/textures` | The eight barrel textures (`staves-*`, `iron-*`, `end-grain-*`, `rune-emissive`), committed output of the generator |
 | `tests/Carve.Core.Tests` | xunit tests of the kernel, incl. the engine-free guard; it references `Carve.Debug` and links four scenario files (`ShedChecks.cs`, `ShedGeometry.cs`, `CutsGeometry.cs`, `GatehousePlan.cs`) so that `GatehouseGeometry` works the gatehouse's and the cuts' counts with the scenarios' own camera and ray test |
-| `tests/Carve.Server.Tests` | xunit tests of the server: `unit` tests of what a tool answers run on `ToolHarness`, which serves the same tools in the test process with no engine (`CarveServer.AddTools`, carve referenced under the alias `carve`); the `regression` tests start the real `carve` and cover the stdio transport, extension loading, the debug extension and rendering (incl. the no-extension guard), plus one case per tool family end to end (`ToolFamiliesThroughProcessTests`) |
+| `tests/Carve.Server.Tests` | xunit tests of the server: `unit` tests of what a tool answers run on `ToolHarness`, which serves the same tools in the test process with no engine (`CarveServer.AddTools`, carve referenced under the alias `carve`); `unit` also holds the definition tests and the no-extension guard (`ProductReferencesNoExtensionTests`); the `regression` tests cover the stdio transport, extension loading, the debug extension, rendering, the exported `.glb` read back through the engine's loader (`UvExportTests`, `PbrReleaseTests`, no process), and the process-vs-harness end-to-end tests (`ToolFamiliesThroughProcessTests`, `ToolHarnessMatchesProcessTests`) |
 | `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
 | `tests/Carve.ModelViewer.Tests` | The viewer on its own fixture cube, through `run-viewer.ps1`; suite `viewer-cube` |
 | `tests/Carve.ExportViewer.Tests` | The checks on what the viewer made of the exported crate, the last step of suite `scenario-export`. They read the run folder in `CARVE_EXPORT_RUN` and are skipped when it is unset, so `dotnet test Carve.slnx` passes without it |
@@ -131,7 +131,7 @@ one that starts `carve` or needs a device is `regression`, and `unit` means abou
 `Carve.slnx` and gets a `regression` suite in `tests.json`.
 
 A task or bug's `**Verify:**` names `server-regression` only when it changes something that suite
-alone covers: the stdio transport, extension loading, the debug extension or rendering. Tool behaviour is
+alone covers: the stdio transport, extension loading, the debug extension, rendering, or the exported `.glb` read back through the engine's loader (`UvExportTests`, `PbrReleaseTests` hold it). Tool behaviour is
 covered by `server-unit` (`ToolHarness` runs the tools in the test process). The milestone's landing on `main`
 runs `server-regression` anyway, so a regression a task's verify did not run is caught there.
 

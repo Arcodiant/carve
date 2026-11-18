@@ -29,10 +29,18 @@ public sealed class MergeBridgeToolTests() : TempFolderTests("carve-merge-bridge
     private async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(string tool)
     {
         var carve = new ToolHarness(workingDirectory: Root);
-        await carve.InitializeAsync();
-        var tools = await carve.ListToolsAsync();
-        Ok(await carve.CallToolAsync("define_mesh", Input(tools, tool)));
-        return (carve, tools);
+        try
+        {
+            await carve.InitializeAsync();
+            var tools = await carve.ListToolsAsync();
+            Ok(await carve.CallToolAsync("define_mesh", Input(tools, tool)));
+            return (carve, tools);
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task CheckedClean(ToolHarness carve, bool closed, params string[] problems)

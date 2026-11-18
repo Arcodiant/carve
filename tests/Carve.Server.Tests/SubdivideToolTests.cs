@@ -19,9 +19,17 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
     private async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync()
     {
         var carve = new ToolHarness(workingDirectory: Root);
-        await carve.InitializeAsync();
-        var tools = await carve.ListToolsAsync();
-        return (carve, tools);
+        try
+        {
+            await carve.InitializeAsync();
+            var tools = await carve.ListToolsAsync();
+            return (carve, tools);
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     [Fact]

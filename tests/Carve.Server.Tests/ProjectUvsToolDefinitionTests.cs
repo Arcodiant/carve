@@ -19,9 +19,17 @@ public sealed class ProjectUvsToolDefinitionTests
     private static async Task<ToolHarness> StartAsync(string mesh = Cube)
     {
         var carve = new ToolHarness();
-        await carve.InitializeAsync();
-        Ok(await carve.CallToolAsync("define_mesh", mesh));
-        return carve;
+        try
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", mesh));
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     private static float[] Floats(JsonElement list) => [.. list.EnumerateArray().Select(x => x.GetSingle())];

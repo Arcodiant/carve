@@ -100,6 +100,7 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`).
   `initialize` 370-413 ms over three runs (2.2 s on the first, disk-cold run); one harness start 14-21 ms once the
   test process has JIT-compiled the host, about 280 ms for the very first harness in a fresh test process. The unit
   harness tests ran 20-90 ms each.
+- **Behaviour change of the shipped carve (RV-59):** `render_glb` now reports an engine fault ahead of path and file errors, as `render` does; before, a missing file or a bad clip name was answered first. On the harness the fault must come first, since the loader is not there.
 
 Not checked: the harness under Release; any tool's result compared with the process's beyond the five in the
 regression test and `tools/list`; extension hooks (by ruling 3, not on the harness). The process path was checked by

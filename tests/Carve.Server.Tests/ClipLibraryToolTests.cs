@@ -18,8 +18,16 @@ public sealed class ClipLibraryToolTests() : TempFolderTests("carve-clip-library
     private async Task<ToolHarness> StartAsync()
     {
         var carve = new ToolHarness(workingDirectory: Root);
-        await carve.InitializeAsync();
-        return carve;
+        try
+        {
+            await carve.InitializeAsync();
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     [Fact]

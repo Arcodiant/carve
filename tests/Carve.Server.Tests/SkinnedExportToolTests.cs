@@ -32,19 +32,27 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
     internal static async Task<ToolHarness> StartChainAsync(string folder, bool weighUpper = true)
     {
         var carve = new ToolHarness(workingDirectory: folder);
-        await carve.InitializeAsync();
-        Ok(await carve.CallToolAsync("define_mesh", Cube("lower", 0.2f)));
-        Ok(await carve.CallToolAsync("define_mesh", Cube("upper", 1.2f)));
-        Ok(await carve.CallToolAsync("define_skeleton", Chain));
-        Ok(await carve.CallToolAsync("set_weights", """{"mesh":"lower","vertices":[0,1,2,3,4,5,6,7],"weights":{"base":1}}"""));
-        if (weighUpper)
-            Ok(await carve.CallToolAsync("set_weights", """{"mesh":"upper","vertices":[0,1,2,3,4,5,6,7],"weights":{"joint":0.75,"base":0.25}}"""));
-        else
-            Ok(await carve.CallToolAsync("set_weights", """{"mesh":"upper","vertices":[0,1,2,4,5,7],"weights":{"joint":1}}"""));
-        Ok(await carve.CallToolAsync("define_clip", Wave));
-        Ok(await carve.CallToolAsync("define_clip",
-            """{"name":"nod","duration":0.8,"channels":{"base":{"translation":{"interpolation":"STEP","keys":[{"time":0.2,"value":[0,0.1,0]}]}}}}"""));
-        return carve;
+        try
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", Cube("lower", 0.2f)));
+            Ok(await carve.CallToolAsync("define_mesh", Cube("upper", 1.2f)));
+            Ok(await carve.CallToolAsync("define_skeleton", Chain));
+            Ok(await carve.CallToolAsync("set_weights", """{"mesh":"lower","vertices":[0,1,2,3,4,5,6,7],"weights":{"base":1}}"""));
+            if (weighUpper)
+                Ok(await carve.CallToolAsync("set_weights", """{"mesh":"upper","vertices":[0,1,2,3,4,5,6,7],"weights":{"joint":0.75,"base":0.25}}"""));
+            else
+                Ok(await carve.CallToolAsync("set_weights", """{"mesh":"upper","vertices":[0,1,2,4,5,7],"weights":{"joint":1}}"""));
+            Ok(await carve.CallToolAsync("define_clip", Wave));
+            Ok(await carve.CallToolAsync("define_clip",
+                """{"name":"nod","duration":0.8,"channels":{"base":{"translation":{"interpolation":"STEP","keys":[{"time":0.2,"value":[0,0.1,0]}]}}}}"""));
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     [Fact]

@@ -53,7 +53,9 @@
         "scenarios/**/*.csproj",
         "spikes/**/*.csproj",
         "samples/gardener-soft.carve",
-        "samples/gatehouse.carve"
+        "samples/gatehouse.carve",
+        "samples/leaky-shed.carve",
+        "samples/gardener.carve"
       ],
       "resources": "cpu",
       "est-seconds": 24

@@ -25,10 +25,18 @@ public sealed class UnwrapToolTests
     private static async Task<ToolHarness> StartAsync(bool seams = true)
     {
         var carve = new ToolHarness();
-        await carve.InitializeAsync();
-        Ok(await carve.CallToolAsync("define_mesh", BarrelArguments()));
-        if (seams) Ok(await carve.CallToolAsync("mark_edges", Seams));
-        return carve;
+        try
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", BarrelArguments()));
+            if (seams) Ok(await carve.CallToolAsync("mark_edges", Seams));
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task<string> RefusedUnchanged(ToolHarness carve, string arguments)

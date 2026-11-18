@@ -52,13 +52,21 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     internal static async Task<(ToolHarness Carve, JsonElement Tools)> StartWithCrateAndLidOnHarnessAsync(string? folder = null)
     {
         var carve = new ToolHarness(workingDirectory: folder);
-        await carve.InitializeAsync();
-        var tools = await carve.ListToolsAsync();
-        var example = TwoMeshExample(tools);
-        Assert.Equal(["define_mesh", "define_mesh", "move"], example.Select(e => e.Tool));
-        Ok(await carve.CallToolAsync(example[0].Tool, example[0].Arguments));
-        Ok(await carve.CallToolAsync(example[1].Tool, example[1].Arguments));
-        return (carve, tools);
+        try
+        {
+            await carve.InitializeAsync();
+            var tools = await carve.ListToolsAsync();
+            var example = TwoMeshExample(tools);
+            Assert.Equal(["define_mesh", "define_mesh", "move"], example.Select(e => e.Tool));
+            Ok(await carve.CallToolAsync(example[0].Tool, example[0].Arguments));
+            Ok(await carve.CallToolAsync(example[1].Tool, example[1].Arguments));
+            return (carve, tools);
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     internal static float[] Point(JsonElement mesh, int vertex) =>

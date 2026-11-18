@@ -14,10 +14,18 @@ public class SelectToolDefinitionTests
     private static async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(bool define = true)
     {
         var carve = new ToolHarness();
-        await carve.InitializeAsync();
-        var tools = await carve.ListToolsAsync();
-        if (define) await OkAsync(carve, "define_mesh", ToolList.Cube(tools));
-        return (carve, tools);
+        try
+        {
+            await carve.InitializeAsync();
+            var tools = await carve.ListToolsAsync();
+            if (define) await OkAsync(carve, "define_mesh", ToolList.Cube(tools));
+            return (carve, tools);
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task<string> OkAsync(ToolHarness carve, string tool, string arguments)

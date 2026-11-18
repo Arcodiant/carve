@@ -10,8 +10,16 @@ public class CheckToolTests
     private static async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync()
     {
         var carve = new ToolHarness();
-        await carve.InitializeAsync();
-        return (carve, await carve.ListToolsAsync());
+        try
+        {
+            await carve.InitializeAsync();
+            return (carve, await carve.ListToolsAsync());
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     private static JsonElement Ok(JsonElement result)

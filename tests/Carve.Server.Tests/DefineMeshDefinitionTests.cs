@@ -17,9 +17,17 @@ public class DefineMeshDefinitionTests
     private static async Task<(ToolHarness, string Cube)> StartAsync()
     {
         var carve = new ToolHarness();
-        await carve.InitializeAsync();
-        var description = (await ToolAsync(carve)).GetProperty("description").GetString()!;
-        return (carve, description[(description.IndexOf(Marker, StringComparison.Ordinal) + Marker.Length)..]);
+        try
+        {
+            await carve.InitializeAsync();
+            var description = (await ToolAsync(carve)).GetProperty("description").GetString()!;
+            return (carve, description[(description.IndexOf(Marker, StringComparison.Ordinal) + Marker.Length)..]);
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
     [Fact]

@@ -36,25 +36,13 @@ public sealed class NamedMeshDefinitionTests() : TempFolderTests("carve-named")
         return TextOf(result);
     }
 
-    private static async Task<(ToolHarness Carve, JsonElement Tools)> StartWithCrateAndLidAsync(string? folder = null)
-    {
-        var carve = new ToolHarness(workingDirectory: folder);
-        await carve.InitializeAsync();
-        var tools = await carve.ListToolsAsync();
-        var example = TwoMeshExample(tools);
-        Assert.Equal(["define_mesh", "define_mesh", "move"], example.Select(e => e.Tool));
-        Ok(await carve.CallToolAsync(example[0].Tool, example[0].Arguments));
-        Ok(await carve.CallToolAsync(example[1].Tool, example[1].Arguments));
-        return (carve, tools);
-    }
-
     private static float[] Point(JsonElement mesh, int vertex) =>
         [.. mesh.GetProperty("vertices")[vertex].GetProperty("at").EnumerateArray().Select(x => x.GetSingle())];
 
     [Fact]
     public async Task The_worked_example_moves_the_lid_alone_and_leaving_mesh_out_is_refused_with_the_names()
     {
-        var (carve, tools) = await StartWithCrateAndLidAsync();
+        var (carve, tools) = await NamedMeshTests.StartWithCrateAndLidOnHarnessAsync();
         using var _ = carve;
         var move = TwoMeshExample(tools)[2].Arguments;
         var unnamed = move.Replace("\"mesh\":\"lid\",", "", StringComparison.Ordinal);
