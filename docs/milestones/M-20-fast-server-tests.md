@@ -133,6 +133,20 @@ assertions, on the same inputs.
 - The linked product files in `Carve.Server.Tests` that the `carve.dll` reference makes redundant.
 - **T-86** (`server-regression` times out on a loaded machine) stays open. A smaller suite helps it, but does not settle it.
 
+**After the person's go (2026-11-17 to 2026-11-18).**
+
+- **Rebase (Sonnet 5.5):** `main` had moved to 0.11.3 (CI, README, newly planned M-21 items). The rebase was clean. Under T-90's rule, T-104 dropped `server-regression`; T-94, T-103 and T-108 kept it. RV-59 later restored it to T-104 when the rule was widened.
+- **Refactor pass (Sonnet 5.5):** T-88's copies of `StartAsync`, `Ok` and `Refused` folded back into `FileToolTests` in four classes. `ToolPaths.cs` and `GameLimits.cs` are no longer linked copies; the tests take them from carve.dll, where they were already public. The other linked files depend on each other and stay.
+- **Review round 1, RV-59:** three Opus 5.5 reviewers (the product code, the test moves, the whole diff) gave 12 findings: 1 Major, 7 Minor, 4 Nits. The test-moves reviewer compared all 549 test methods with `main` mechanically, and none was lost, loosened or wrongly tiered. The Major: two samples the moved unit tests read were inputs of `server-regression` only, so an edit to one could land on a stale carried pass. A Sonnet 5.5 agent answered all 12. Two of them:
+  - the CLAUDE.md rule now also names the exported `.glb` read back through the engine's loader;
+  - `render_glb` now reports an engine fault before a bad path. That was kept, since it matches `render` and the harness needs it, and it is recorded in T-87.
+- **Review round 2, RV-60 (Opus 5.5):** the family end-to-end test's answer did not hold. The fix claimed an `IsError` assertion that was never written, and five calls meant to succeed were refused on both sides, so no `.glb` was ever written. The person chose an Opus 5.5 fix and one more round. That agent made every family succeed, the export write a `.glb` on both sides, and the assertion real, shown failing when an expectation is flipped. It also corrected 228 to 223 (T-89 had counted before its rebase onto T-88).
+- **Review round 3, RV-61 (Opus 5.5):** both answers held. One Minor finding was answered with no change: the labelled 4-vs-3 bridge refusal has three reasons, but the loop-count check is asserted by message at unit tier.
+- **`cairn milestone M-20 verify` (2026-11-18, at d54ce31):** VERIFY PASS, with `review` current at RV-61. All 17 suites passed, every one carried from an earlier run on the same inputs.
+- **Next time:**
+  - A fix agent's `fixed` answer needs checking against the code, not its own words. RV-59's family-test answer described an assertion that did not exist.
+  - Asking for test counts sent one fix agent into a raw `dotnet test` pass over both suites, beside cairn's own runs. Ask for counts only where cairn reports them.
+
 **Test report** (`cairn test report --since 2d`):
 
 - `server-regression` is still most of the slot time, as expected while the milestone and M-19 ran it at every verify.
