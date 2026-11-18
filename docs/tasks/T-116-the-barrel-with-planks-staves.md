@@ -78,3 +78,31 @@ left as it is.
 - **Stave colours clear the lit threshold.** Mid-stave texels run (142..179, 94..118, 53..67), per-stave tones 0.82..1.18 of the base;
   see the probe above for the lit values.
 - Not done, as the Scope says: M-7's `staves` (no roughness map) is untouched.
+
+### As built (Sonnet 5.5)
+
+`scenarios/Carve.Scenario.Planks` (suite `scenario-planks`, `gpu`; `scripts/run-planks-scenario.ps1`), `tests/Carve.PlanksLoad.Tests` (a project of its own, as
+the linking was cleaner; recorded in CLAUDE.md's Layout), `samples/barrel-planks.carve` (the scenario's own saved file, texture paths relative:
+`graphs/planks/*.png` and `textures/*.png`). M-7's scenario, barrel, generator, frames and `samples/textures/` are untouched; no patina file and nothing
+under `samples/graphs/` changed.
+
+- **Frames:** `planks-front`, `planks-back`, `planks-top`, `planks-gap` (head on to the boundary of two stave columns, zoom 4) and `planks-sheet`, each pixel
+  worked from `get_mesh` and the texels by M-7's `MaterialsSampler.cs` and `MaterialsChecks.cs` (linked). `check` is silent; save, reopen
+  (`planks-front` and `planks-gap` byte-identical) and export are clean.
+- **New checks (`PlanksChecks.cs`), no new threshold:** the gap texels (T-112's red < 90) of the close-up (5168 samples, brightest 34) all read darker
+  than every stave sample (darkest 128); staves differ in tone, each pair of faces predicted 12 (M-7's `M`) or more apart by `ColourRule.Lit` from the
+  planks' own texels must read apart the same way, with at least one such pair per frame; and the PNGs' gaps are checked 3 texels each side at start.
+- **Breaks (`CARVE_PLANKS_BREAK`), each fails:** `t77-base` (tone order, front), `roughness-base` (a rune-like orange pixel in back, the stave being
+  red-orange; the gap rule would also catch it, it is reached later), `mirror` (rune not where predicted, front). Run with `-NoBuild` by hand, not part of the suite.
+- **Tests:** the saved file equals the sample by content; the sample binds the planks' maps to `staves` and `rune-stave` and M-7's textures to the rest;
+  the exported `.glb` loads four materials, two of them with the planks' four maps.
+- **Not checked:** the frames themselves (a later agent looks at them); the viewer (M-7's step 2 is not repeated); the roughness map's specular is not predicted
+  (the lit rule is `ColourRule`'s roughness-1 model; only its inequalities are used, see Research).
+
+### Hand-off (Sonnet 5.5, build agent)
+
+Done: everything above, committed (`cf020f0`), `cairn task T-116 verify` PASS (core-unit, patina-unit, server-unit, scenario-planks, scenario-materials).
+Left: the frame review (its own agent opens every frame, then Waystone for the person), then `cairn task T-116 finish`. I opened no frame.
+Frames: job `J-20261118-084506-0372f8` (scenario-planks, commit `cf020f0`), fetched with `cairn test artifacts J-20261118-084506-0372f8`; a copy
+is in `D:\Repos\carve\branches\task\T-116\artifacts\job-J-20261118-084506-0372f8\planks\frames\` (gitignored).
+Worth looking for: the gap close-up (dark 6-texel gaps, staves in visibly different tones), the roughness map's specular on the wood, the rune.
