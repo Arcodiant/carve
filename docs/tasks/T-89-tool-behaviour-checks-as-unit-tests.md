@@ -82,6 +82,8 @@ every result must be the same JSON and every written file byte-equal.
 **Timings (this machine, loaded by sibling runs).** Before: server-unit 370 tests, 4 s test time / 9 s wall; server-regression 603 tests,
 10 min 30 s. After: server-unit 746 tests, 17 s test time / 20 s wall (no case at or over 1 s); server-regression 228 tests, 7 min 6 s (7 min 10 s wall).
 
+**After the rebase onto T-88.** Conflicts in `DefineMeshTests`, `KnifeToolTests`, `LoopCutToolTests`, `MergeBridgeToolTests`, `NamedMeshTests`, `PlaneCutToolTests` and `UnwrapToolTests` (T-88 cut the definition tests out; this member converted the classes) were resolved by taking T-88's side and re-applying the conversion and splits on it; the server-unit count is then 751.
+
 **Not checked.** `PbrReleaseTests` and `UvExportTests` (regression, no process, not in the spec) were left as they are, not examined for a unit move. No scenario or frames (none needed). The `finish` queued run was not compared case-by-case with the old one beyond the
 counts: 370 + 603 = 973 before; after, unit 746 + regression 228 = 974, the difference being the one added end-to-end test (and the
 new classes holding cases moved, not copied).

@@ -12,7 +12,7 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     internal const string Names = "'crate', 'lid'";
 
     /// <summary>The define_mesh, define_mesh, move calls of define_mesh's two-mesh worked example.</summary>
-    private static (string Tool, string Arguments)[] TwoMeshExample(JsonElement tools)
+    internal static (string Tool, string Arguments)[] TwoMeshExample(JsonElement tools)
     {
         var text = ToolList.Description(tools, "define_mesh");
         var at = text.IndexOf("Worked example (two meshes):", StringComparison.Ordinal);
