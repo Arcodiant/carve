@@ -230,6 +230,14 @@ Decided by the person at M-21's planning (2026-11-16), on the planner's recommen
 - **Names.** A target name is non-empty, holds no `:` (as a mesh name), is unique in its mesh, and is case-sensitive. The same name on two meshes of a model is one dial: one glTF target at export and one weight in `render`, the model's targets being the union of names in first-definition order.
 - **Evaluation** is `base + Σ wᵢ·deltaᵢ`, targets added in definition order so the sum is the same bits every time. The morph comes **before** skinning, as glTF and Empyrean do it.
 - **Normal deltas are never stored.** The export computes them from `Shading`, at weight 1 minus at rest.
+- **In the `.glb`** (T-104), every export mode that writes a mesh (model, skinned, piece) writes one glTF target per
+  name of the union on every primitive: dense `POSITION` and `NORMAL` deltas, no `TANGENT`, `mesh.weights` all 0,
+  and the names in `mesh.extras.targetNames`, which is where Empyrean's `ParsedMorphTargets.TargetNames` reads them
+  (probed against 0.129.0's loader). A primitive whose Carve mesh lacks a name gets zero deltas for it. Two corners
+  share a written vertex only when their deltas agree too, so coplanar flat faces that a target bends apart, or
+  coincident vertices it opens, are written apart. Every mesh is a primitive of the one glTF mesh (engine need 4),
+  so Empyrean's refusal of targets on two or more glTF meshes is never met. A clips file has no mesh and so no
+  targets; a model without targets writes the bytes it wrote before.
 - **Every edit keeps targets.** `move` carries a target with its base; `extrude`'s new vertices copy their source's delta; `delete` drops a deleted vertex's delta; `merge_faces` and `bridge` keep targets; `plane_cut`, `loop_cut` and `knife` blend deltas by the stencils that blend weights. `subdivide` is exact: Catmull-Clark, crease rules included, is linear in positions, so each new vertex's delta takes its position's stencil, and the subdivided target equals the subdivided base plus the subdivided delta. `define_mesh` or `open` replacing a mesh that has targets is refused, naming them, unless `drop_targets: true`.
 - **`check`** reports each target at weight 1: `target-flips-face` (a face's normal against its rest normal below 0), `target-collapses-face` (a face become zero-area) and `target-opens-mesh` (vertices coincident at rest come apart).
 - **Out of scope:** corrective targets and morph weights in clips.
