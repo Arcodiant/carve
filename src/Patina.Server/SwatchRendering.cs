@@ -34,6 +34,9 @@ public static class SwatchCamera
     public static Matrix4x4 View => Matrix4x4.CreateLookAt(Eye, Vector3.Zero, Vector3.UnitY);
 
     public static Matrix4x4 Projection => Matrix4x4.CreatePerspectiveFieldOfView(FieldOfViewY, 1f, Near, Far);
+
+    /// <summary>The directional light's orientation: carve's light, kept where carve keeps it relative to the camera.</summary>
+    public static Quaternion Light => RenderLights.Orientation(Eye);
 }
 
 /// <summary>patina's offscreen pipeline: the sphere's 512 target and the 512 label atlas, both on Carve's slate.</summary>
@@ -62,7 +65,8 @@ internal sealed class SwatchComposition(IGraphicsResourceManager resources) : IR
 
 /// <summary>
 /// The sphere scene, on the frame thread: the engine's UV sphere wearing a <see cref="Material.Pbr"/> made of the outputs,
-/// lit by <see cref="RenderSky"/> alone, seen by <see cref="SwatchCamera"/>. One request a frame.
+/// lit by carve's <see cref="RenderLights"/> (ambient, the fixed sky, the camera-relative directional light), seen by
+/// <see cref="SwatchCamera"/>. One request a frame.
 /// </summary>
 internal sealed class SwatchSystem(
     ISceneManager scenes,
@@ -107,8 +111,9 @@ internal sealed class SwatchSystem(
     private void Build()
     {
         scenes.CreateScene(Scene);
-        var sky = scenes.CreateEntity(Scene);
-        entities.AddComponent(sky, RenderSky.Sky);
+        // Carve's lights (T-128): the ambient, the fixed sky and the directional light, placed relative to this camera
+        // (on +z, +y up) as carve places it relative to its own, so the sphere shows a material as carve's render does.
+        RenderLights.Add(scenes, entities, Scene, SwatchCamera.Light);
 
         // The headless host does not apply a camera's projection, so it is set here by hand.
         var camera = scenes.CreateEntity(Scene);

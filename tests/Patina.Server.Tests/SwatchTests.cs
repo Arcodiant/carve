@@ -125,7 +125,7 @@ public class SwatchTests
         Array.Fill(atlas, (byte)255);
         var labels = SwatchSheet.Labels("planks.texgraph   64 px   seed 77", OutputRoles.All, 0);
         Assert.Equal(["planks.texgraph   64 px   seed 77", "base_colour", "base_colour 3 x 3", "normal", "normal 3 x 3", "roughness", "roughness 3 x 3",
-            "occlusion", "occlusion 3 x 3", "sphere, Pbr, fixed sky, angle 0"], labels);
+            "occlusion", "occlusion 3 x 3", "sphere, Pbr, carve lights, angle 0"], labels);
         var extents = labels.Select(_ => new Vector2(40, 12)).ToList();
         var (pixels, layout) = SwatchSheet.Compose(images, size, sphere, atlas, extents);
 

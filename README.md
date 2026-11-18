@@ -197,7 +197,9 @@ At 8192 it works in bounded memory but takes minutes for four outputs.
 
 `swatch` shows the open graph: by default a sheet with a column per output (flat
 over tiled 3 x 3, to show seams) beside a sphere wearing all of them through the
-engine's PBR material under Carve's fixed sky; or `view` `flat`, `tiled` or
+engine's PBR material lit as Carve's `render` lights a model (its ambient light,
+fixed sky and the directional light that keeps its place beside the camera, so a
+smooth material shows a highlight); or `view` `flat`, `tiled` or
 `sphere` alone, at a `size` from 32 to 2048, the sphere turned by `angle`.
 patina needs a Vulkan device to draw the sphere and the sheet; flat and tiled
 need none.

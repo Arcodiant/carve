@@ -31,7 +31,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         + "each output flat on top and tiled 3 x 3 below in 256 px cells, beside a 512 px sphere wearing all of them, under a title strip with the file, size and seed. "
         + "flat is one output's texels exactly, size px a side; tiled is its 3 x 3 repeat (3 x size, scaled down to at most 1536 px), to show seams; "
         + "sphere is the engine's UV sphere (u once around, v from the top pole) drawn with a PBR material made of the outputs (base colour sRGB, roughness as metallic-roughness with metallic 0, normal and occlusion linear, mipmaps on; a missing role uses the material's default), "
-        + "lit by Carve's fixed sky alone on Carve's dark slate, from a fixed camera, 512 px. "
+        + "lit as Carve's render lights a model (its ambient light, fixed sky and directional light, placed relative to the camera as Carve places it) on Carve's dark slate, from a fixed camera, 512 px. "
         + "output: a role, for flat and tiled (default the first role the graph has). size: the evaluation size, a power of two from 32 to 2048 (default the graph's size, at most 2048; for larger PNGs use export). "
         + "angle: the sphere's turn about y in degrees, for sheet and sphere (default 0; counter-clockwise seen from above). Refused while the graph has a fault. Changes nothing.\n"
         + "Worked example, with the planks open (samples/graphs/planks.texgraph): swatch " + Worked + " returns an image and:\n" + WorkedResult;

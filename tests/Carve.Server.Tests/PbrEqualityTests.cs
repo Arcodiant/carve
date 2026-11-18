@@ -87,7 +87,7 @@ internal static class EngineHost
                 if (_shots is null)
                 {
                     scenes.CreateScene(Scene);
-                    _light = RenderLights.Add(scenes, entities, Scene);
+                    _light = RenderLights.Add(scenes, entities, Scene, ViewFraming.LightOrientation(RenderView.Front));
                     foreach (var size in RenderComposition.Sizes)
                     {
                         var camera = scenes.CreateEntity(Scene);

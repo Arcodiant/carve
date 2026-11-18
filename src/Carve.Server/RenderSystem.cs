@@ -115,7 +115,7 @@ internal sealed class RenderSystem(
     {
         scenes.CreateScene(Scene);
 
-        _light = RenderLights.Add(scenes, entities, Scene);
+        _light = RenderLights.Add(scenes, entities, Scene, ViewFraming.LightOrientation(RenderView.Front));
 
         // The near and far here are placeholders: each view sets the whole projection by hand,
         // because the headless host does not apply a camera's projection.

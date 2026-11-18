@@ -50,7 +50,7 @@ public static class ViewFraming
     public const float Margin = 0.08f;
 
     /// <summary>Within this cone of vertical, up is -Z: CreateLookAt returns NaN looking along up.</summary>
-    public static readonly float VerticalCosine = MathF.Cos(MathF.PI / 180f);
+    public static readonly float VerticalCosine = RenderLights.VerticalCosine;
 
     internal static readonly Vector3 FrontDirection = new(1.6f, 1.2f, 2.2f);
 
@@ -66,9 +66,6 @@ public static class ViewFraming
         ["+z"] = Vector3.UnitZ,
         ["-z"] = -Vector3.UnitZ,
     };
-
-    /// <summary>The agreed look in the front view: top bright, +Z middling, +X dark.</summary>
-    private static readonly Matrix4x4 FrontLight = Matrix4x4.CreateRotationX(-0.9f) * Matrix4x4.CreateRotationY(0.6f);
 
     public static ViewFrame Frame(Vector3 half, RenderView view) => Frame(half, CameraSpec.ForView(view));
 
@@ -126,20 +123,14 @@ public static class ViewFraming
     }
 
     /// <summary>
-    /// The light keeps its place relative to the camera: the front light, turned by whatever turns
-    /// the front camera into this one. A world-fixed light would leave the far faces ambient-only.
+    /// The light keeps its place relative to the camera (<see cref="RenderLights.Orientation"/>, shared with patina's swatch).
     /// </summary>
-    public static Quaternion LightOrientation(Vector3 direction)
-    {
-        Matrix4x4.Invert(LookRotation(Vector3.Normalize(direction)), out var cameraToWorld);
-        return Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(
-            FrontLight * LookRotation(Vector3.Normalize(FrontDirection)) * cameraToWorld));
-    }
+    public static Quaternion LightOrientation(Vector3 direction) => RenderLights.Orientation(direction);
 
     public static Quaternion LightOrientation(RenderView view) => LightOrientation(CameraSpec.ForView(view).Direction);
 
     /// <summary>+Y, or -Z when the unit direction is within 1 degree of vertical.</summary>
-    public static Vector3 UpFor(Vector3 direction) => MathF.Abs(direction.Y) > VerticalCosine ? -Vector3.UnitZ : Vector3.UnitY;
+    public static Vector3 UpFor(Vector3 direction) => RenderLights.UpFor(direction);
 
     /// <summary>World to camera, rotation only.</summary>
     private static Matrix4x4 LookRotation(Vector3 direction) =>

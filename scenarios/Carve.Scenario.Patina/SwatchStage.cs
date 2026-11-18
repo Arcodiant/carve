@@ -35,8 +35,10 @@ namespace Carve.Scenario.Patina;
 /// than <see cref="SlateInside"/> are (a dark pixel can match it by chance).</item>
 /// <item><b>Stave order</b>: between two angles, at the same pixels (the same light, since the sphere is round), the stave
 /// that reads lighter is the one whose texels are lighter, for every pair of staves whose tones differ by 3 % or more.</item>
+/// <item><b>Highlight</b> (T-128): a grey sphere at roughness 0 has a peak luma at least <see cref="HighlightStep"/> above the same
+/// sphere at roughness 1: the directional light's highlight, which a smooth material shows and a rough one spreads out.</item>
 /// </list>
-/// The thresholds were probed on the planks' own colours (T-114's As built).
+/// The thresholds were probed on the planks' own colours (T-114's As built), and Dark, In band and Highlight again under carve's lights (T-128's).
 /// </remarks>
 internal sealed class SwatchStage : IPatinaStage
 {
@@ -45,10 +47,11 @@ internal sealed class SwatchStage : IPatinaStage
     public const float SilhouetteMargin = 1.5f;
     public const float Facing = 0.5f;
     public const double SlateInside = 0.001;
-    public const double DarkMax = 52;
-    public const double BandLow = 58;
-    public const double BandHigh = 110;
+    public const double DarkMax = 66;
+    public const double BandLow = 80;
+    public const double BandHigh = 128;
     public const double ToneStep = 0.03;
+    public const double HighlightStep = 40;
     /// <summary>Carve's slate, (0.03, 0.035, 0.04) linear, through half floats and sRGB, as a frame shows it.</summary>
     private static readonly byte[] Slate = [.. new[] { 0.03f, 0.035f, 0.04f }.Select(v =>
     {
@@ -112,6 +115,27 @@ internal sealed class SwatchStage : IPatinaStage
             """);
         var seam = await driver.CaptureToolAsync("swatch", "swatch-tiled-seam", new { view = "tiled", output = "base_colour" });
         CheckSeamless(checks, "the seam graph", seam, 128, expectSeam: true);
+
+        // The highlight (T-128): a grey sphere at roughness 0 shows the directional light's highlight, one at roughness 1 does not.
+        var peaks = new Dictionary<int, double>();
+        foreach (var roughness in new[] { 0, 1 })
+        {
+            await checks.CallAsync("define_graph", """
+                {"graph":{"version":1,"size":64,"seed":1,"nodes":{
+                  "grey":{"type":"colour","params":{"colour":"#808080"}},
+                  "ramp":{"type":"gradient","params":{"axis":"u","repeat":1}},
+                  "flat":{"type":"levels","inputs":{"in":"ramp"},"params":{"out_low":ROUGHNESS,"out_high":ROUGHNESS}},
+                  "base":{"type":"output","inputs":{"in":"grey"},"params":{"role":"base_colour"}},
+                  "rough":{"type":"output","inputs":{"in":"flat"},"params":{"role":"roughness"}}}}}
+                """.Replace("ROUGHNESS", roughness.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
+            var lit = await driver.CaptureToolAsync("swatch", $"swatch-sphere-roughness-{roughness}", new { view = "sphere" });
+            peaks[roughness] = PeakLuma(lit);
+        }
+        File.WriteAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), _measured.ToString()
+            + "\nangle_a\tangle_b\tstave pairs (a/b:pixels:measured difference:texel difference)\n" + Order
+            + string.Create(CultureInfo.InvariantCulture, $"\nhighlight\tpeak_luma_roughness_0\tpeak_luma_roughness_1\tstep\n\t{peaks[0]:0.0}\t{peaks[1]:0.0}\t{peaks[0] - peaks[1]:0.0}\n"));
+        checks.Check(peaks[0] - peaks[1] >= HighlightStep,
+            $"swatch: the roughness-0 sphere's peak luma {peaks[0]:0.0} is not {HighlightStep} above the roughness-1 sphere's {peaks[1]:0.0}: no highlight");
 
         await BreaksAsync(driver, checks, sample, evaluator, read, spheres, sheet, small, tiled, seam);
     }
@@ -260,6 +284,14 @@ internal sealed class SwatchStage : IPatinaStage
 
     /// <summary>The texel under the centre of destination pixel <paramref name="at"/> of <paramref name="to"/>, from <paramref name="from"/>.</summary>
     private static int Under(int at, int to, int from) => (int)Math.Floor((at + 0.5) * from / to);
+
+    /// <summary>The brightest pixel's luma: on a sphere view, the sphere's (the slate is darker than any lit face).</summary>
+    private static double PeakLuma(ScenarioFrame frame)
+    {
+        var peak = 0.0;
+        for (var at = 0; at < frame.Pixels.Length; at += 4) peak = Math.Max(peak, Luma(frame.Pixels.AsSpan(at, 4)));
+        return peak;
+    }
 
     private static double Luma(ReadOnlySpan<byte> p) => 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
 

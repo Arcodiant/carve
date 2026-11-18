@@ -144,7 +144,7 @@ public static class SwatchSheet
     /// <summary>The labels in atlas order: the title, then per column the flat and the tiled cell's, then the sphere's.</summary>
     public static IReadOnlyList<string> Labels(string title, IReadOnlyList<OutputRole> roles, float angle) =>
         [title, .. roles.SelectMany(r => new[] { OutputRoles.Name(r), OutputRoles.Name(r) + " 3 x 3" }),
-            $"sphere, Pbr, fixed sky, angle {angle.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}"];
+            $"sphere, Pbr, carve lights, angle {angle.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}"];
 
     /// <param name="images">Each output's RGBA, <paramref name="size"/> a side, in role order.</param>
     /// <param name="sphere">The sphere view, <see cref="SwatchImages.SphereCell"/> a side, RGBA.</param>
