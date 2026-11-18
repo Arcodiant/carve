@@ -131,7 +131,7 @@ public class PartTreeTests
         Assert.Null(model.Target("Wheel_R", out var problem));
         Assert.Equal("mesh: 'Wheel_R' is an instance of 'Wheel'; edit 'Wheel', and every instance follows", problem);
         Assert.Null(model.Target("Axle", out problem));
-        Assert.Equal("mesh: 'Axle' is an empty part with no geometry; define_mesh mesh=Axle gives it some", problem);
+        Assert.Equal("mesh: 'Axle' is an empty part with no geometry; define_mesh name=Axle gives it some", problem);
         Assert.Equal("Wheel", model.Target("Wheel", out problem)!.Name);
         Assert.Null(problem);
         Assert.Null(model.Target("Nope", out problem));

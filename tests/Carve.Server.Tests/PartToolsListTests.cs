@@ -9,13 +9,13 @@ namespace Carve.Server.Tests;
 /// <summary>
 /// T-93: tools/list is unchanged for every tool that was there before M-9's part tools, apart from the agreed sentences.
 /// The digest is of every other tool's whole entry (name, description, schema) with the agreed sentences taken out, taken
-/// on the code before T-93 (commit 98beeca, the same product code as a2b8878).
+/// on the code before T-93: origin/milestone/M-9 at 6e2626f (Merge task/T-92), whose save and open texts T-92 changed.
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "EF74CB6CD79C71BEC5C5C84F22B620E3AE2DC523E607248109E6C7DA9F31D0C7";
+    private const string Before = "DF48786CE7D7172F113E12A47BCE97A35CF4AEBE03EB1C47C2958A6AD670B20E";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level"];
 
@@ -44,5 +44,29 @@ public class PartToolsListTests
         await carve.InitializeAsync();
         var digest = Digest(await carve.ListToolsAsync());
         Assert.True(digest == Before, $"tools/list digest {digest}");
+    }
+
+    /// <summary>The digest takes the agreed sentences out, so it cannot see one go missing; this pins where each one is.</summary>
+    [Fact]
+    public async Task Each_agreed_sentence_is_in_its_tools_description_once()
+    {
+        await using var carve = new ToolHarness();
+        await carve.InitializeAsync();
+        var texts = (await carve.ListToolsAsync()).EnumerateArray()
+            .ToDictionary(t => t.GetProperty("name").GetString()!, t => t.GetProperty("description").GetString()!);
+        string[] partSpace = ["bridge", "define_target", "delete", "extrude", "knife", "loop_cut", "merge_faces", "move", "plane_cut", "select", "subdivide"];
+        foreach (var (name, text) in texts)
+        {
+            Assert.True(Count(text, carve::Carve.Server.PartTexts.PartSpace) == (partSpace.Contains(name) ? 1 : 0), $"{name}: PartSpace sentence count");
+            Assert.True(Count(text, carve::Carve.Server.PartTexts.DefineMesh) == (name == "define_mesh" ? 1 : 0), $"{name}: DefineMesh sentence count");
+            Assert.True(Count(text, carve::Carve.Server.PartTexts.Check) == (name == "check" ? 1 : 0), $"{name}: Check sentence count");
+        }
+    }
+
+    private static int Count(string text, string sentence)
+    {
+        var n = 0;
+        for (var at = text.IndexOf(sentence, StringComparison.Ordinal); at >= 0; at = text.IndexOf(sentence, at + sentence.Length, StringComparison.Ordinal)) n++;
+        return n;
     }
 }
