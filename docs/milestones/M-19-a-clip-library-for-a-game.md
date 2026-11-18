@@ -4,7 +4,7 @@ description: >-
 ---
 # M-19 — A clip library for a game
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *Clips-only export, loop and in-place checks, and proof that a game's load of the .glb matches Carve's own preview*
 
