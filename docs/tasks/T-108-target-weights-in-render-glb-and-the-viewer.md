@@ -49,7 +49,7 @@ component and its GPU morph-before-skin. A person can drag a dial live.
   `render` at the same weights (only the person loosens it); a key or panel change from the sketch.
 - Sonnet.
 
-### As built (so far; the render comparison and finish are left, see Hand-off)
+### As built
 
 Built by Claude Sonnet 5.5.
 
@@ -73,27 +73,15 @@ Built by Claude Sonnet 5.5.
   caps unmoved; unchanged frame; refusals) and `ViewerTargetsTests` (viewer-cube: a cube whose top `Sink`s 0.3, points checked at weights
   0, 0.5 and 1; refusals; `view.json`), `WeightPanelTests`. Each fails with the `MorphWeights` line removed (shown: render_glb ratio 1
   against 1.36 to 1.44; the viewer's half-weight points stayed wall).
-
-### Hand-off
-
-Checkpoint (about 60 calls). Model: Sonnet 5.5. Code is committed; `cairn task T-108 verify` ran every suite green except clean-tree
-(before this commit).
-
-Done: everything under As built.
-
-Left:
-1. **Compare with `render` under D-6's frame rule.** T-103 had not landed on `milestone/M-21` (its commit 911c081 is on `task/T-103`), so
-   `render`'s `targets` does not exist in this branch. After `git rebase origin/milestone/M-21`, add a test drawing the cylinder with
-   `render` and `render_glb` at `Bulge` 0 and 1 (luma past 4 of 255, a frame fails past 0.5 % or a patch past 50; `Comparison` in the
-   Orcward scenario is the rule, `ComparisonPng.cs`). Any difference beyond that rule goes to the person.
-2. Rebase, rebuild, `verify`, fix what the rebase broke in a commit of its own, T-106 call list (below), `cairn lint`, `finish`.
-3. **The person's look**: the window panel. My one window-mode run (`artifacts/window/`, the exported cylinder, `--targets Bulge=0.6`)
-   shows the panel drawn top left with the bar and 0.60 and the key line, but another window covered part of the screenshot, so I
-   did not judge the layout, and no key was pressed (no input is scripted); Tab, arrows, Space and 0 are checked only through
-   `WeightPanel`'s tests. The person's live try is T-106's.
-
-Surprising: `scripts/run-viewer.ps1` cannot pass `--Empyrean:Graphics:VirtualSurface=false` (PowerShell takes `--Empyrean:` as a
-parameter and the viewer says `unknown argument "--Empyrean"`); I ran the viewer's dll with `dotnet exec` instead. Not fixed.
-
-T-106 calls: `render_glb` with `targets` (`{"Bulk":0.5}`), and `dotnet exec spikes/Carve.ModelViewer/bin/Debug/net10.0/Carve.ModelViewer.dll
---content <folder> --model models/arm.glb --out <out> --Empyrean:Graphics:VirtualSurface=false --targets Bulk=0.5` for the slider.
+- **Comparison with `render`** (`RenderGlbTargetsTests`, after rebasing onto T-103): the cylinder drawn by `render` (`targets`) and by
+  `render_glb` of the exported file at `Bulge` 0, 0.5 and 1, under D-6's frame rule (luma past 4 of 255, frame fails past 0.5 % or a patch
+  past 50): 0 of 262144 pixels differ at every weight, so no difference to put to the person. A control (the file at 1 against the
+  model at 0) fails the rule.
+- **Not checked / the person's look.** The window panel: one window-mode run of mine (the exported cylinder, `--targets Bulge=0.6`)
+  showed the panel top left with the bar, 0.60 and the key line, but another window covered part of the screenshot, so I did not judge
+  the layout; no key was pressed (no input is scripted); Tab, arrows, Space and 0 are checked only through `WeightPanel`'s tests. The
+  person's live try is T-106's. `scripts/run-viewer.ps1` cannot pass `--Empyrean:Graphics:VirtualSurface=false` (PowerShell reads it
+  as a parameter); I ran the viewer's dll with `dotnet exec`. Not fixed.
+- **T-106 calls:** `render_glb` with `targets` (`{"Bulk":0.5}`), and `dotnet exec spikes/Carve.ModelViewer/bin/Debug/net10.0/Carve.ModelViewer.dll
+  --content <folder> --model models/arm.glb --out <out> --Empyrean:Graphics:VirtualSurface=false --targets Bulk=0.5` for the slider.
+- Model: Sonnet 5.5.

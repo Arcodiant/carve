@@ -153,4 +153,76 @@ public class RenderGlbTargetsTests
         Assert.Contains("targets.Bulge: expected a number", Refused(await carve.CallToolAsync("render_glb", """{"path":"refuse.glb","targets":{"Bulge":"half"}}""")));
         Assert.Contains("targets: expected an object", Refused(await carve.CallToolAsync("render_glb", """{"path":"refuse.glb","targets":[0.5]}""")));
     }
+
+    /// <summary>
+    /// D-6's frame rule (Orcward's): a pixel differs when its luma differs past 4 of 255; a frame fails past 0.5 % of its
+    /// pixels differing or with an 8-connected patch of them past 50.
+    /// </summary>
+    private static (int Differing, int Patch) Measure(ImageResult a, ImageResult b)
+    {
+        Assert.Equal((a.Width, a.Height), (b.Width, b.Height));
+        var w = a.Width;
+        var differs = new bool[w * a.Height];
+        var count = 0;
+        for (var p = 0; p < differs.Length; p++)
+        {
+            var i = p * 4;
+            var d = 0.2126 * (a.Data[i] - b.Data[i]) + 0.7152 * (a.Data[i + 1] - b.Data[i + 1]) + 0.0722 * (a.Data[i + 2] - b.Data[i + 2]);
+            if (Math.Abs(d) > 4) { differs[p] = true; count++; }
+        }
+
+        var seen = new bool[differs.Length];
+        var stack = new Stack<int>();
+        var largest = 0;
+        for (var start = 0; start < differs.Length; start++)
+        {
+            if (!differs[start] || seen[start]) continue;
+            var size = 0;
+            seen[start] = true;
+            stack.Push(start);
+            while (stack.Count > 0)
+            {
+                var p = stack.Pop();
+                size++;
+                for (var dy = -1; dy <= 1; dy++)
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    int nx = p % w + dx, ny = p / w + dy;
+                    if (nx < 0 || ny < 0 || nx >= w || ny >= a.Height) continue;
+                    var n = ny * w + nx;
+                    if (differs[n] && !seen[n]) { seen[n] = true; stack.Push(n); }
+                }
+            }
+
+            largest = Math.Max(largest, size);
+        }
+
+        return (count, largest);
+    }
+
+    [Fact]
+    public async Task The_exported_file_at_a_weight_matches_render_of_the_model_at_the_same_weight_under_the_frame_rule()
+    {
+        using var carve = await StartAsync();
+        await ExportCylinderAsync(carve, "agree.glb");
+
+        var results = new List<string>();
+        foreach (var weight in new[] { 0.0, 0.5, 1.0 })
+        {
+            var w = weight.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var model = Decode(Png(await carve.CallToolAsync("render", $$"""{"targets":{"Bulge":{{w}}},{{Front}}}"""), $"agree-{w}-render"));
+            var file = Decode(Png(await carve.CallToolAsync("render_glb", $$"""{"path":"agree.glb","targets":{"Bulge":{{w}}},{{Front}}}"""), $"agree-{w}-glb"));
+            var (differing, patch) = Measure(model, file);
+            results.Add($"weight {w}: {differing} of {model.Width * model.Height} pixels differ, largest patch {patch}");
+            Assert.True(differing * 200L <= model.Width * model.Height && patch <= 50, results[^1]);
+        }
+
+        File.WriteAllLines(Path.Combine(Frames, "agree.txt"), results);
+
+        // The rule can fail: the file at weight 1 against the model at weight 0 is a different shape.
+        var rest = Decode(Png(await carve.CallToolAsync("render", $$"""{"targets":{"Bulge":0},{{Front}}}"""), "agree-control-render"));
+        var full = Decode(Png(await carve.CallToolAsync("render_glb", $$"""{"path":"agree.glb","targets":{"Bulge":1},{{Front}}}"""), "agree-control-glb"));
+        var (cd, cp) = Measure(rest, full);
+        Assert.True(cd * 200L > rest.Width * rest.Height || cp > 50, $"control: {cd} pixels, patch {cp}");
+    }
 }
