@@ -9,13 +9,14 @@ namespace Carve.Server.Tests;
 /// <summary>
 /// T-93: tools/list is unchanged for every tool that was there before M-9's part tools, apart from the agreed sentences.
 /// The digest is of every other tool's whole entry (name, description, schema) with the agreed sentences taken out, taken
-/// on the code before T-93: origin/milestone/M-9 at 6e2626f (Merge task/T-92), whose save and open texts T-92 changed.
+/// on the code before T-93: origin/milestone/M-9 at 6e2626f (Merge task/T-92), whose save and open texts T-92 changed;
+/// taken again for T-132 (Opus 5.5), whose save and open texts name version 9 and drop T-92's refusal of a part tree beside targets.
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "DF48786CE7D7172F113E12A47BCE97A35CF4AEBE03EB1C47C2958A6AD670B20E";
+    private const string Before = "EBD17198E644DBC221163DA4999E52FC07FD8B2FC0E92784BB18922BB197E453";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level"];
 
