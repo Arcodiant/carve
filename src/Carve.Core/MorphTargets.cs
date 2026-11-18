@@ -45,9 +45,6 @@ public sealed class MorphTarget
         return new MorphTarget(name, kept);
     }
 
-    /// <summary>This target under another name.</summary>
-    public MorphTarget Renamed(string name) => new(name, _deltas);
-
     /// <summary>This target with no delta on <paramref name="vertices"/> (a deleted vertex drops its delta).</summary>
     public MorphTarget Without(IEnumerable<int> vertices)
     {
@@ -301,13 +298,6 @@ public sealed class MorphTargets
         var gone = vertices.ToArray();
         return new MorphTargets(_targets.Select(t => t.Without(gone)).ToArray());
     }
-
-    /// <summary>
-    /// Every target mapped through <paramref name="map"/>, a function from each target to its new deltas: for an edit that
-    /// works deltas as it works positions.
-    /// </summary>
-    public MorphTargets Select(Func<MorphTarget, IEnumerable<KeyValuePair<int, Vector3>>> map) =>
-        new(_targets.Select(t => MorphTarget.Of(t.Name, map(t))).ToArray());
 
     /// <summary>
     /// The positions at <paramref name="weights"/> (target name to weight): <c>base + Σ wᵢ·deltaᵢ</c>, each vertex summed in

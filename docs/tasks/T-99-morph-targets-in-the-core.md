@@ -100,8 +100,9 @@ Built by Claude Opus 5.5 (the stronger model the Notes ask for).
   - Changing (T-100, T-102): `MorphTarget.Of(name, deltas)` (unchecked, for edits carrying a checked target),
     `MorphTarget.Without(vertices)`, `MorphTargets.Of(targets)` (null for none; throws on a bad or repeated name),
     `MorphTargets.With(target, out replaced)` (replaced in place or added last), `MorphTargets.With(targets?, target)`,
-    `MorphTargets.Without(name)` (null when none left), `MorphTargets.WithoutVertices(ids)`,
-    `MorphTargets.Select(t => deltas)` (an edit working each target's deltas by its own stencils).
+    `MorphTargets.Without(name)` (null when none left), `MorphTargets.WithoutVertices(ids)`. A
+    `MorphTargets.Select(t => deltas)` for the per-edit carriage, and `MorphTarget.Renamed(name)`, were removed after the
+    rebase onto T-71 left them with no caller (RV-64); the `Targets` layer does the carrying.
   - Evaluating: `PolygonMesh.Morphed(IReadOnlyDictionary<string, float>)` (a copy to draw: no weights, no targets);
     `MorphTargets.Apply(positions, weights)`; `Skinning.Posed(model, pose, targets)` morphs every mesh with targets,
     even with no skeleton, then skins (`null` targets is the old `Posed(model, pose)`). T-103 calls this.
