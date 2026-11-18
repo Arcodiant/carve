@@ -13,7 +13,7 @@ public class GraphToolTests
     private static string Ops(params string[] operations) => "{\"operations\":[" + string.Join(",", operations) + "]}";
 
     [Fact]
-    public async Task Tools_list_gives_the_seven_tools_in_order_each_closed_to_other_arguments()
+    public async Task Tools_list_gives_the_nine_tools_in_order_each_closed_to_other_arguments()
     {
         await using var patina = await PatinaHarness.StartAsync();
         var tools = (await patina.ListToolsAsync()).EnumerateArray().ToList();

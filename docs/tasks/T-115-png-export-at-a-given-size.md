@@ -80,6 +80,6 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`).
   `ExportBoundedMemoryTests` (regression). `ExportStage` (scenario): byte equality at 256, 1024 sampled against 256 at matching uv,
   then the size, role and folder errors. The three named breaks are caught by these: roughness in R or a flipped normal green change
   the bytes against the samples (which T-112's tests hold to the graph), and a wrong size fails the 256 byte equality, the `WxH` in
-  each line and the 1024 size check. Tools-list asserts in T-113's tests now compare the first seven names and then `Contains("export")`,
-  so a sibling's tool added after does not break them.
+  each line and the 1024 size check. The tools-list asserts (`GraphToolTests` and `PatinaProcessTests`) compare every name, in order:
+  T-115 first loosened them to the first seven names and `Contains("export")`, and T-114's rebase made them exact again, nine tools.
 - `scenario-patina` now also lists `samples/graphs/**` as an input.
