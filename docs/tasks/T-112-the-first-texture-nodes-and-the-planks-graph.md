@@ -4,7 +4,7 @@ description: >-
 ---
 # T-112 — The first texture nodes and the planks graph
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
