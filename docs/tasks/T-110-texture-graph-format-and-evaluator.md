@@ -4,7 +4,7 @@ description: >-
 ---
 # T-110 — Texture graph format and evaluator
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
