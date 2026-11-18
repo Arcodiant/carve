@@ -22,6 +22,7 @@ public sealed class KnifeTool(ModelStore store)
         + "Bad input (a point off the surface, which gives its distance and the nearest surface point; a point inside two overlapping faces; two consecutive points sharing no face; a segment that leaves its face or passes through one of its holes; an open path ending inside a face; too few points; an argument knife does not take) "
         + "is a tool error that lists every problem; the mesh is left unchanged and nothing is added to undo. One undo step undoes the whole cut. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to cut. "
+        + PartSpaceText
         + "Worked examples on define_mesh's unit cube, whose front face is z = 1: a door outline up from the front face's bottom edge splits the door off it (12 vertices, 7 faces), "
         + "and a closed square inside the front face cuts out an inner face and leaves the front holed (12 vertices, 7 faces):\n"
         + ExampleMarker + """{"points":[[0.35,0,1],[0.35,0.7,1],[0.65,0.7,1],[0.65,0,1]]}""" + "\n"

@@ -26,6 +26,7 @@ public sealed class BridgeTool(ModelStore store)
         + "Bad input (a loop that is not a cycle of open edges, loops of unequal count, a vertex in both loops, windings no quad agrees with) "
         + "is a tool error that lists every problem by element; the mesh is left unchanged and nothing is added to undo. One bridge is one undo step. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to bridge in. "
+        + PartSpaceText
         + "Worked example: two unit squares 1 apart facing each other (face 0 at z = 0 facing +Z, face 1 at z = 1 facing -Z), bridged into a box: four new faces, created:{faces:[2,3,4,5]}, each facing in, as the squares do, so the box is closed and check finds it inside-out (squares facing away from each other give a box facing out):\n"
         + MergeFacesTool.DefineMarker + Squares + "\n"
         + ExampleMarker + """{"loops":[[0,1,2,3],[4,5,6,7]]}""";

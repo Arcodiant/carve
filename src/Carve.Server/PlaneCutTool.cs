@@ -22,6 +22,7 @@ public sealed class PlaneCutTool(ModelStore store)
         + "Bad input (a zero or non-finite normal, a non-finite point, a plane that touches no face, a cut that would leave nothing, faces with keep above or below, an unknown or deleted face, an argument plane_cut does not take) "
         + "is a tool error that lists every problem; the mesh is left unchanged and nothing is added to undo. One undo step undoes the whole cut. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to cut. "
+        + PartSpaceText
         + "Worked example on define_mesh's unit cube: a cut at y = 0.5 keeping below with fill gives a half-height closed box (8 vertices, 6 faces):\n"
         + ExampleMarker + """{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}""";
 

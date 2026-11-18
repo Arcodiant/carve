@@ -67,6 +67,7 @@ public sealed class DefineTargetTool(ModelStore store, ToolFolder toolFolder)
         + "a file that cannot be read or is not a Carve file (as open says), a file_mesh the file does not have (its meshes are listed), "
         + "or a mesh in the file whose topology differs, which names the FIRST difference (for example faces[12][2]: vertex 40 here, 41 in the other mesh). "
         + "Needs a mesh, from define_mesh or open, first. delete_target removes a target; get_mesh lists a mesh's targets and, with target, reads one back. "
+        + PartSpaceText
         + "Worked example on define_mesh's unit cube, a bulge: the four top vertices (2, 3, 6, 7) rise to y = 1.3 and spread out a tenth, the other four stay where they are:\n"
         + ExampleMarker + BulgeExample + "\n"
         + "Worked example from a file, after saving an edited copy of the cube as cube-lean.carve (move the top face, then save that path, then undo): "
