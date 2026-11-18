@@ -16,7 +16,7 @@ internal sealed class RenderComposition(IGraphicsResourceManager resources) : IR
 
     public static readonly Vector4 Background = new(0.03f, 0.035f, 0.04f, 1f);
 
-    private readonly Dictionary<int, TargetSet> _targets = [];
+    private readonly Dictionary<int, OffscreenTarget> _targets = [];
 
     /// <summary>The tag joining the camera of a size to its stage.</summary>
     public static string CameraTag(int size) => $"render-{size}";
@@ -31,31 +31,18 @@ internal sealed class RenderComposition(IGraphicsResourceManager resources) : IR
     {
         foreach (var size in Sizes)
         {
-            var targets = Targets(size);
-            builder
-                .DeclareRenderTarget(targets.Resolved, size, size, out var resolved, $"carve-resolved-{size}")
-                .DeclareRenderTarget(targets.Multisampled, size, size, out var multisampled, $"carve-multisampled-{size}")
-                .DeclareRenderTarget(targets.Depth, size, size, out var depth, $"carve-depth-{size}")
-                .AddClearColor(multisampled, Background)
-                .AddClearDepth(depth, context.DepthConvention)
-                .Add(new SceneRenderStage(multisampled, depth, cameraTag: CameraTag(size), resolveOutput: resolved))
-                .AddImmediate(resolved, context.CreateImmediateSurface(), immediateTag: LabelTag(size));
+            Targets(size).Declare(builder, context, "carve", Background, CameraTag(size), LabelTag(size));
         }
     }
 
-    private TargetSet Targets(int size)
+    private OffscreenTarget Targets(int size)
     {
         if (!_targets.TryGetValue(size, out var targets))
         {
-            targets = new TargetSet(
-                resources.CreateRenderTarget(size, size, TextureFormat.Rgba16Float, RenderTargetUsage.ColorAttachment | RenderTargetUsage.TransferSource),
-                resources.CreateRenderTarget(size, size, TextureFormat.Rgba16Float, RenderTargetUsage.ColorAttachment, sampleCount: 4),
-                resources.CreateRenderTarget(size, size, TextureFormat.Depth32Float, RenderTargetUsage.DepthStencilAttachment, sampleCount: 4));
+            targets = new OffscreenTarget(resources, size);
             _targets.Add(size, targets);
         }
 
         return targets;
     }
-
-    private sealed record TargetSet(Texture Resolved, Texture Multisampled, Texture Depth);
 }

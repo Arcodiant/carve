@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Logging;
 
-namespace Carve.Server;
+namespace Carve.Hosting;
 
 /// <summary>Writes one log file for this process. A file that cannot be opened only loses the file.</summary>
 internal sealed class FileLoggerProvider : ILoggerProvider
 {
     private readonly StreamWriter? _writer;
 
-    public FileLoggerProvider(string path)
+    public FileLoggerProvider(string path, string serverName)
     {
         try
         {
@@ -18,7 +18,7 @@ internal sealed class FileLoggerProvider : ILoggerProvider
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            Console.Error.WriteLine($"carve: no log file at {path}: {e.Message}");
+            Console.Error.WriteLine($"{serverName}: no log file at {path}: {e.Message}");
         }
     }
 

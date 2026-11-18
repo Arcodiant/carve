@@ -65,7 +65,8 @@ The rest are decided in D-1 as they settle; add them here when they do.
 |---|---|
 | `src/Carve.Core` | Engine-free modelling kernel |
 | `src/Carve.Extensibility` | The public extension API: `ICarveExtension`, `CarveHostBuilderContext` |
-| `src/Carve.Server` | The shipped product, the `carve` MCP server |
+| `src/Carve.Hosting` | The engine host both MCP servers run through (T-111): `EngineHost.RunAsync` (configuration layering, logs to stderr and the temp folder, extension loading and hooks, the stdio transport, the engine thread and `EngineStatus`), the fixed sky (`RenderSky`), the texture upload rule (`TextureUpload`) and the offscreen render plumbing (`OffscreenTarget`, `OffscreenFrame`, `OffscreenQueue`, `OffscreenRequest`); references the extension API and the engine only, no extension and no Carve code |
+| `src/Carve.Server` | The shipped product, the `carve` MCP server: its tools, its looks (`RenderComposition`, `RenderSystem`, `RenderPump`), `ModelStore` and export; `Program.cs` is one `EngineHost.RunAsync` call with carve's name and registrations |
 | `src/Patina.Graphs` | Engine-free texture graphs (D-7, T-110): the `.texgraph` format read back bit-exact, validation into `GraphFault`s naming node and port, the node registry (`Nodes/`, one file per type), banded deterministic evaluation (`Evaluation/`) and output packing and PNGs (`Imaging/`) |
 | `extensions/Carve.Debug` | The debug extension: in-memory transport, `ScenarioDriver`, fixed clock and seed, run folder. Referenced by nothing in `src/` |
 | `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views, four cube frames by direction and zoom, and the sizes, orthographic and axis-view frames; `Cube` links the Crate's `CrateBuild.cs` for the front-view check `CheckFrontOrder`, which the crate and export frames share |

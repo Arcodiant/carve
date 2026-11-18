@@ -1,4 +1,4 @@
-namespace Carve.Server;
+namespace Carve.Hosting;
 
 /// <summary>
 /// Where the engine has got to. A failure of the engine itself lands here: the process and MCP

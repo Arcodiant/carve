@@ -15,6 +15,8 @@ internal static class Paths
 
     public static string CarveDll { get; } = Output("src/Carve.Server", "carve.dll");
 
+    public static string HostingDll { get; } = Output("src/Carve.Hosting", "Carve.Hosting.dll");
+
     public static string DebugExtensionDll { get; } = Output("extensions/Carve.Debug", "Carve.Debug.dll");
 
     public static string TinyScenarioDll { get; } = Output("tests/Carve.Scenario.Tiny", "Carve.Scenario.Tiny.dll");

@@ -174,7 +174,7 @@ internal sealed class ViewerSystem(
 
         if (options.Sky)
         {
-            // The same fixed sky as Carve's render (RenderSky.Sky in src/Carve.Server is this expression; the viewer links no Carve code, so it is repeated here), unchanged: its own sun, baked once, and it does not follow the viewer's sun below.
+            // The same fixed sky as Carve's render (RenderSky.Sky in src/Carve.Hosting is this expression; the viewer links no Carve code, so it is repeated here), unchanged: its own sun, baked once, and it does not follow the viewer's sun below.
             entities.AddComponent(scenes.CreateEntity(Scene), ProceduralSky.Default);
         }
 

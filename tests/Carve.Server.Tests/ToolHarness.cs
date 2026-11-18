@@ -10,7 +10,7 @@ using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using CarveServer = carve::Carve.Server.CarveServer;
-using EngineStatus = carve::Carve.Server.EngineStatus;
+using EngineStatus = Carve.Hosting.EngineStatus;
 
 namespace Carve.Server.Tests;
 
