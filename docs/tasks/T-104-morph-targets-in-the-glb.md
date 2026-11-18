@@ -4,7 +4,7 @@ description: >-
 ---
 # T-104 — Morph targets in the glb
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
