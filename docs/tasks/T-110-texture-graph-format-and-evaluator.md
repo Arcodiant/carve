@@ -181,6 +181,14 @@ about 2.5 s, suite `patina-unit`.
   not JSON, has not the shape, or has an unknown version, a bad size or seed; otherwise the graph with all its faults.
   `GraphValidator.Validate(graph, registry)` re-checks a graph after an edit; `new GraphEvaluator` throws
   `GraphFaultException` (with `.Faults`) on a faulty graph.
+- **Kind checks and no cascade (RV-68, person's ruling 2026-11-18).** Every input whose source is a node of a known type
+  is checked for kinds, even when another input of that node is at fault, so a greyscale/colour mismatch shows at the
+  edit that makes it. What cannot be checked stays unchecked: an input whose source is missing, of unknown type or on a
+  cycle, and what its kind would decide. `GraphValidator.Kinds` tries each such input as greyscale and as colour; a
+  node's output kind is known only when every try agrees (a blend with a colour `a` gives colour whatever `b` is), and
+  a node type's own input check is reported only when every try gives it. A graph may so report more faults at once
+  than before; T-117's plant (`grained`'s `mask` naming `grain_2`) still gives its one fault
+  (`PlanksGraphTests.T117sPlantInThePlanksGivesItsOneFault`), and no worked example or test of T-110's or T-113's changed.
 - **Encoding.** `OutputImage.Make(evaluator, role, size)` gives `Rgba` and `Png`; packing is
   `Imaging.OutputPacking` (base_colour sRGB, normal `127.5 + 127.5 n`, roughness R 255 / G / B 0, occlusion grey),
   rounding away from zero. Colour channels in the graph hold sRGB-encoded values (no transfer function, so no `Pow`).

@@ -151,6 +151,22 @@ public class GraphToolTests
     }
 
     [Fact]
+    public async Task A_kind_mismatch_behind_another_input_s_fault_is_refused_at_the_edit_that_makes_it()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+        // base's b names no node; its a is colour, so base gives colour whatever b becomes.
+        var defined = await patina.Ok("define_graph", """{"graph":{"version":1,"size":64,"seed":5,"nodes":{"c":{"type":"colour"},"n":{"type":"noise"},"base":{"type":"blend","inputs":{"a":"c","b":"zzz"}},"out":{"type":"output","inputs":{"in":"base"}}}}}""");
+        Assert.Contains("; 1 fault:\n- node 'base' input 'b'", defined);
+
+        var said = await patina.Refused("edit_graph", Ops(
+            """{"op":"set_node","node":"h","type":"height_to_normal","inputs":{"height":"base"}}""",
+            """{"op":"set_node","node":"nout","type":"output","inputs":{"in":"h"},"params":{"role":"normal"}}"""));
+        Assert.Equal("edit_graph: nothing changed: the operations would leave 1 new fault:\n- node 'h' input 'height': takes greyscale, but 'base' gives colour", said);
+
+        Assert.EndsWith("no faults: it evaluates", await patina.Ok("edit_graph", Ops("""{"op":"connect","node":"base","port":"b","from":"n"}""")));
+    }
+
+    [Fact]
     public async Task Save_adds_the_extension_says_replaced_and_takes_the_path_as_the_graph_s()
     {
         using var folder = new TempFolder();

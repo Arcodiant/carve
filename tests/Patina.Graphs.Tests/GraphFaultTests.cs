@@ -149,6 +149,27 @@ public class GraphFaultTests
     }
 
     [Fact]
+    public void AnInputIsKindCheckedEvenWhenAnotherInputOfItsNodeIsAtFault()
+    {
+        // base's b names no node, but its a is colour, so base gives colour whatever b becomes: h's greyscale height is wrong now.
+        var read = TexGraphFile.Read("""{ "version": 1, "size": 32, "seed": 7, "nodes": { "c": { "type": "colour" }, "g": { "type": "noise" }, "base": { "type": "blend", "inputs": { "a": "c", "b": "zzz", "mask": "c" } }, "h": { "type": "height_to_normal", "inputs": { "height": "base" } }, "o": { "type": "output", "inputs": { "in": "h" }, "params": { "role": "normal" } } } }""");
+        Assert.Equal([("base", "b"), ("base", "mask"), ("h", "height")], read.Faults.Select(f => (f.Node, f.Port)));
+        Assert.Contains("names 'zzz', which is not a node", read.Faults[0].Message);
+        Assert.Equal("node 'base' input 'mask': takes greyscale, but 'c' gives colour", read.Faults[1].Message);
+        Assert.Equal("node 'h' input 'height': takes greyscale, but 'base' gives colour", read.Faults[2].Message);
+    }
+
+    [Theory]
+    [InlineData("zzz")] // names no node
+    [InlineData("x")]   // a node of unknown type
+    public void WhatAnInputAtFaultWouldDecideIsNotKindChecked(string b)
+    {
+        // base's a is greyscale, so whether base gives colour turns on b: neither h nor the output is kind-checked.
+        var read = TexGraphFile.Read($$"""{ "version": 1, "size": 32, "seed": 7, "nodes": { "x": { "type": "nosie" }, "g": { "type": "noise" }, "base": { "type": "blend", "inputs": { "a": "g", "b": "{{b}}" } }, "h": { "type": "height_to_normal", "inputs": { "height": "base" } }, "o": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "roughness" } }, "p": { "type": "output", "inputs": { "in": "h" }, "params": { "role": "normal" } } } }""");
+        Assert.Equal(b == "x" ? ["x"] : ["base", "x"], read.Faults.Select(f => f.Node)); // x's own unknown type is a fault either way
+    }
+
+    [Fact]
     public void AnUnknownRoleIsNotAlsoCountedAsTheDefaultRole()
     {
         var read = TexGraphFile.Read("""{ "version": 1, "size": 32, "seed": 7, "nodes": { "c": { "type": "colour" }, "a": { "type": "output", "inputs": { "in": "c" } }, "b": { "type": "output", "inputs": { "in": "c" }, "params": { "role": "albedo" } } } }""");

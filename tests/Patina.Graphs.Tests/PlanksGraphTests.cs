@@ -30,6 +30,20 @@ public class PlanksGraphTests
         return read.Graph!;
     }
 
+    [Fact]
+    public void T117sPlantInThePlanksGivesItsOneFault()
+    {
+        // T-117's starter: grained takes a mask from a new grain2 noise, misnamed grain_2. Every other input is still kind-checked, and holds.
+        var text = File.ReadAllText(GraphPath())
+            .Replace("\"inputs\": { \"a\": \"toned\", \"b\": \"grain\" }", "\"inputs\": { \"a\": \"toned\", \"b\": \"grain\", \"mask\": \"grain_2\" }")
+            .Replace("\"wood\": {", "\"grain2\": { \"type\": \"noise\" }, \"wood\": {");
+        var read = TexGraphFile.Read(text);
+        Assert.True(read.Loaded, read.Error?.ToString());
+        var fault = Assert.Single(read.Faults);
+        Assert.StartsWith("node 'grained' input 'mask': names 'grain_2', which is not a node; the nodes are ", fault.Message);
+        Assert.Contains(", grain2, ", fault.Message);
+    }
+
     private static byte[] Committed(OutputRole role)
     {
         var path = Path.Combine(Root(), "samples", "graphs", "planks", OutputRoles.Name(role) + ".png");

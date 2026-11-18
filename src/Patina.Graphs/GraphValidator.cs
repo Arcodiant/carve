@@ -9,7 +9,9 @@ namespace Patina.Graphs;
 /// the range), an input port the type has not (listing its inputs), a source that is not a node (listing the ids) or
 /// names a port that node has not, a required input missing; then each cycle (naming the nodes on it), each input
 /// given the wrong kind (greyscale where colour is wanted, or the other way), two outputs with one role, and no output
-/// at all. A fault does not cascade: a node whose input is already at fault is not checked for kinds.
+/// at all. Every input whose source is a node of a known type is checked for kinds, even when another input of its node
+/// is at fault; a fault does not cascade: an input whose source is missing, of unknown type or on a cycle is not kind-checked,
+/// nor is anything its kind would decide (a port whose kind it could change, and what that port feeds).
 /// </summary>
 public static class GraphValidator
 {
@@ -40,6 +42,7 @@ public static class GraphValidator
                     a.Fault(id, null, name, $"node '{id}' parameter '{name}' {wrong}");
             }
             var resolved = new ResolvedNode(id, type, new NodeParameters(type, node.Params));
+            resolved.Connected.UnionWith(node.Inputs.Keys);
             var faultsBefore = a.Faults.Count;
             var sourceOfUnknownType = false;
             foreach (var (port, source) in node.Inputs)
@@ -60,7 +63,7 @@ public static class GraphValidator
                     continue;
                 }
                 var targetType = registry.Find(target.Type);
-                if (targetType is null) { sourceOfUnknownType = true; continue; } // its own fault says so, and this input is not worked
+                if (targetType is null) { sourceOfUnknownType = true; continue; } // its own fault says so, and this input is not kind-checked
                 if (fromPort is null)
                 {
                     if (targetType.Outputs.Count == 1) fromPort = targetType.Outputs[0];
@@ -161,7 +164,6 @@ public static class GraphValidator
     private static void Kinds(GraphAnalysis a)
     {
         var done = new HashSet<string>();
-        var known = new HashSet<string>();
 
         void Visit(string id)
         {
@@ -169,12 +171,18 @@ public static class GraphValidator
             var node = a.Nodes[id];
             foreach (var (source, _) in node.Sources.Values)
                 if (a.Nodes.ContainsKey(source) && !a.Cyclic.Contains(source)) Visit(source);
-            if (a.Cyclic.Contains(id) || node.InputsAtFault) return;
+            if (a.Cyclic.Contains(id)) return;
+
+            // What each input carries where its source's kind is known; an input that is at fault, or whose source's kind
+            // is not known, could carry either, so every way it could go is tried and only what holds for all of them is said.
             var inputs = new Dictionary<string, PortKind>();
-            foreach (var (port, (source, sourcePort)) in node.Sources)
+            var unknown = new List<string>();
+            foreach (var input in node.Type.Inputs)
             {
-                if (!known.Contains(source)) return; // an upstream fault: no cascade
-                inputs[port] = a.Nodes[source].OutputKinds[sourcePort];
+                if (node.Sources.TryGetValue(input.Name, out var from) && a.Nodes[from.Node].OutputKinds.TryGetValue(from.Port, out var gives))
+                    inputs[input.Name] = gives;
+                else if (node.Connected.Contains(input.Name) || input.Required)
+                    unknown.Add(input.Name);
             }
             foreach (var (port, gives) in inputs)
             {
@@ -182,19 +190,35 @@ public static class GraphValidator
                 if (takes != PortKind.Any && takes != gives)
                     a.Fault(id, port, null, $"node '{id}' input '{port}': takes {PortKinds.Name(takes)}, but '{node.Sources[port].Node}' gives {PortKinds.Name(gives)}");
             }
-            foreach (var (port, message) in node.Type.CheckInputKinds(inputs, node.Parameters))
+
+            var ways = Ways(inputs, unknown);
+            List<(string Port, string Message)>? always = null;
+            foreach (var way in ways)
+            {
+                var found = node.Type.CheckInputKinds(way, node.Parameters).Where(f => inputs.ContainsKey(f.Port)).ToList();
+                always = always is null ? found : [.. always.Where(found.Contains)];
+            }
+            foreach (var (port, message) in always!)
                 a.Fault(id, port, null, $"node '{id}' input '{port}': {message}");
             foreach (var port in node.Type.Outputs)
             {
-                var kind = node.Type.OutputKind(port, inputs, node.Parameters);
-                if (kind == PortKind.Any) throw new InvalidOperationException($"type '{node.Type.Name}' gives port '{port}' no kind");
-                node.OutputKinds[port] = kind;
+                var kinds = ways.Select(way => node.Type.OutputKind(port, way, node.Parameters)).Distinct().ToList();
+                if (kinds.Contains(PortKind.Any)) throw new InvalidOperationException($"type '{node.Type.Name}' gives port '{port}' no kind");
+                if (kinds.Count == 1) node.OutputKinds[port] = kinds[0];
             }
-            known.Add(id);
-            a.Order.Add(id);
+            if (unknown.Count == 0 && !node.InputsAtFault) a.Order.Add(id);
         }
 
         foreach (var id in a.Nodes.Keys.Order(StringComparer.Ordinal)) Visit(id);
+    }
+
+    /// <summary>The inputs as they are, with each unknown one given each kind it could carry: one way when none is unknown.</summary>
+    private static List<Dictionary<string, PortKind>> Ways(Dictionary<string, PortKind> inputs, List<string> unknown)
+    {
+        var ways = new List<Dictionary<string, PortKind>> { inputs };
+        foreach (var port in unknown)
+            ways = [.. ways.SelectMany(w => new[] { PortKind.Grey, PortKind.Colour }.Select(k => new Dictionary<string, PortKind>(w) { [port] = k }))];
+        return ways;
     }
 
     private static void Outputs(GraphAnalysis a)
@@ -241,6 +265,9 @@ internal sealed class ResolvedNode(string id, NodeType type, NodeParameters para
     public Dictionary<string, (string Node, string Port)> Sources { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, PortKind> OutputKinds { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>An input of this node is at fault (a bad port, source or a required one missing) or names a node of unknown type, so its kinds are not worked.</summary>
+    /// <summary>The input ports the graph connects, whether or not their source resolved.</summary>
+    public HashSet<string> Connected { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>An input of this node is at fault (a bad port, source or a required one missing) or names a node of unknown type, so the node is not put in the evaluation order.</summary>
     public bool InputsAtFault { get; set; }
 }
