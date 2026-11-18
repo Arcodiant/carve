@@ -132,7 +132,7 @@ public class RenderGlbTargetsTests
     }
 
     [Fact]
-    public async Task Targets_the_file_lacks_or_weights_outside_0_to_1_are_refused_naming_the_target()
+    public async Task Targets_the_file_lacks_are_refused_naming_the_target()
     {
         using var carve = await StartAsync();
         await ExportCylinderAsync(carve, "refuse.glb");
@@ -147,11 +147,10 @@ public class RenderGlbTargetsTests
         Assert.Contains("targets.Bulge", none);
         Assert.Contains("no morph targets", none);
 
-        // The range render and check refuse (the person's ruling, 2026-11-18): 0 to 1, naming the target.
-        Assert.Contains("targets.Bulge: weight 1.5 is outside 0 to 1", Refused(await carve.CallToolAsync("render_glb", """{"path":"refuse.glb","targets":{"Bulge":1.5}}""")));
-        Assert.Contains("targets.Bulge: weight -0.25 is outside 0 to 1", Refused(await carve.CallToolAsync("render_glb", """{"path":"refuse.glb","targets":{"Bulge":-0.25}}""")));
-        Assert.Contains("targets.Bulge: expected a number", Refused(await carve.CallToolAsync("render_glb", """{"path":"refuse.glb","targets":{"Bulge":"half"}}""")));
-        Assert.Contains("targets: expected an object", Refused(await carve.CallToolAsync("render_glb", """{"path":"refuse.glb","targets":[0.5]}""")));
+        // The name is told before the weight, as render tells it; the weight's own refusals are RenderGlbTargetArgumentTests, on the harness.
+        var both = Refused(await carve.CallToolAsync("render_glb", """{"path":"refuse.glb","targets":{"Nope":2}}"""));
+        Assert.Contains("targets.Nope: the file has no target named 'Nope'", both);
+        Assert.DoesNotContain("outside 0 to 1", both);
     }
 
     /// <summary>
