@@ -345,7 +345,7 @@ public sealed class Model
             // An instance or an empty is a part with no geometry of its own to edit (M-9).
             problem = part.InstanceOf is { } source
                 ? $"mesh: '{name}' is an instance of '{source}'; edit '{source}', and every instance follows"
-                : $"mesh: '{name}' is an empty part with no geometry; define_mesh mesh={name} gives it some";
+                : $"mesh: '{name}' is an empty part with no geometry; define_mesh name={name} gives it some";
             return null;
         }
         if (found is null)

@@ -58,7 +58,7 @@ public sealed class PartPieceToolTests() : FileToolTests("carve-parts")
 
     [Theory]
     [InlineData("Copy", "mesh: 'Copy' is an instance of 'Arm'; edit 'Arm', and every instance follows")]
-    [InlineData("Empty", "mesh: 'Empty' is an empty part with no geometry; define_mesh mesh=Empty gives it some")]
+    [InlineData("Empty", "mesh: 'Empty' is an empty part with no geometry; define_mesh name=Empty gives it some")]
     public async Task Save_mesh_of_an_instance_or_an_empty_is_a_tool_error(string name, string expected)
     {
         using var carve = await StartWithTreeAsync();
