@@ -112,6 +112,10 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review c
   52), *in band* (luma 58..110), *silhouette* (all-miss pixels are slate within 1; at most 0.1 % of all-hit pixels slate),
   *stave order* (between two angles, at the same pixels, the lighter-reading stave is the one with lighter texels,
   for stave pairs whose texel tones differ by 3 % or more).
+- **The texels the checks predict from** (RV-68, the person's ruling of 2026-11-18): first the scenario evaluated the graph
+  itself through a reference to `Patina.Graphs`, outside CLAUDE.md's scenario rule. It no longer does: the reference is gone, and
+  the texels come from the approved PNGs in `samples/graphs/planks/` at 256 and from patina's own `export` of the open graph
+  into the run folder (`swatch-texels-64`, `swatch-texels-128`); evaluation correctness stays with `patina-unit`'s hand-worked tests.
 - **Probed on the planks** (`swatch-checks.tsv` of every run): gap pixels luma at most 31.7 / 36.7 / 39.6 (angles 200 /
   0 / 90); stave pixels 70.2 .. 87.5; inside pixels reading slate 9, 6, 0 of about 139 600 (dark lower-limb gap pixels,
   1 level off the slate, which is why that rule is a fraction). The thresholds 52 and 58..110 leave about 12 levels each
