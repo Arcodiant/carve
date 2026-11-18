@@ -73,3 +73,11 @@ Second agent (Opus 5.5), 2026-11-18: the rover and `RoverGeometry`.
 - **Coplanar faces, a reading of the spec to confirm.** No two faces of different parts share a plane facing the same way. Two pairs share a plane facing opposite ways, as the sketch places them: the Cab's bottom and the Mast's bottom on the Chassis's top at y 0.8 (`Chassis[3] Cab[2]`, `Chassis[3] Mast[2]`). Each lies between two solids, so neither can be seen or fight in depth; the test pins exactly those two, at level 0, 1, live and with the mast turned. Scope's line reads "no two faces ... coplanar and overlapping", which these break literally. No part was moved.
 - **Envelopes:** silent at level 0, at level 1, after the hub edit and with the mast turned. `LowerAxle` gives the one warning `Axle_F`, parent `Chassis`, y, below, by 0.3 (within 1e-5). The float sums at the bounds (Axle_F's placed −0.05, the Mast's placed 1.75) land on or inside.
 - **Tests:** `RoverGeometry` (58 cases, `unit`). Ten breaks of the rover's content were added to `break-table.tsv` in the evidence folder, each failing at least one of them (24 rows in all).
+
+### Hand-off
+
+From the second agent (Opus 5.5), stopped before `finish` on one question for the person.
+
+- **Done and committed:** `RoverSpec` (two files) and `RoverGeometry`, the counts and bounds above, ten break rows. `verify` passes and `cairn lint` is clean.
+- **Question:** Scope asks that "no two faces of different parts are coplanar and overlapping". The sketch's Cab and Mast sit on the Chassis's top, so their bottoms share its plane at y 0.8, facing the other way and hidden between solids. The test pins exactly those two pairs and checks that no pair faces the same way. Is that the intended reading? If it is, run `finish` (and delete this section). If not, the sketch must change (a part moved, or the bottoms removed), which is the person's call.
+- **Left:** the answer, then `finish`. Not checked: any tool, file or frame use of `RoverSpec` (T-92 to T-96).
