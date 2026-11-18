@@ -172,7 +172,7 @@ public static class Skinning
             result = result.With(name, mesh.Weights is null ? mesh
                 : mesh.WithVertices(Positions(mesh, skeleton, pose), CornerNormals(mesh, skeleton, pose)));
         }
-        return result;
+        return result.WithPartsFrom(model);
     }
 
     /// <summary>The model with every mesh that has targets morphed to <paramref name="targets"/>, its weights kept so that it can be skinned.</summary>
@@ -183,7 +183,7 @@ public static class Skinning
         if (model.Skeleton is { } skeleton) result = result.WithSkeleton(skeleton);
         foreach (var (name, mesh) in model.Meshes)
             result = result.With(name, mesh.Targets is null ? mesh : mesh.Morphed(targets).WithWeights(mesh.Weights));
-        return result;
+        return result.WithPartsFrom(model);
     }
 
     /// <summary>Where each bone's head is in model space in <paramref name="pose"/>, by bone index (bone world transform of the pose; a bone it leaves out rests).</summary>

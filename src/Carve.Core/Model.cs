@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Carve.Core;
 
 /// <summary>One mesh of a <see cref="Model"/> and the name it goes by.</summary>
@@ -16,17 +18,21 @@ public sealed class Model
     public const string DefaultName = "mesh";
 
     /// <summary>The model with no meshes.</summary>
-    public static readonly Model Empty = new([], null, [], []);
+    public static readonly Model Empty = new([], null, [], [], []);
 
     private readonly NamedMesh[] _meshes;
+    private readonly Part[] _parts;
     private PolygonMesh? _combined;
+    private Part[]? _preOrder;
+    private Occurrence[]? _live;
 
     private readonly Clip[] _clips;
     private readonly Material[] _materials;
 
-    private Model(NamedMesh[] meshes, Skeleton? skeleton, Clip[] clips, Material[] materials)
+    private Model(NamedMesh[] meshes, Skeleton? skeleton, Clip[] clips, Material[] materials, Part[] parts)
     {
         _meshes = meshes;
+        _parts = parts;
         Skeleton = skeleton;
         _clips = clips;
         _materials = materials;
@@ -55,11 +61,14 @@ public sealed class Model
         replaced = at >= 0;
         var next = replaced ? (Material[])_materials.Clone() : [.. _materials, null!];
         next[replaced ? at : next.Length - 1] = material;
-        return new Model(_meshes, Skeleton, _clips, next);
+        return new Model(_meshes, Skeleton, _clips, next, _parts);
     }
 
+    /// <summary>This model with <paramref name="source"/>'s part records, for a copy rebuilt mesh by mesh under the same names (<see cref="Skinning.Posed"/>), so it is placed as its source is.</summary>
+    internal Model WithPartsFrom(Model source) => new(_meshes, Skeleton, _clips, _materials, source._parts);
+
     /// <summary>The empty model's meshes with these materials, for a model rebuilt mesh by mesh (<see cref="Skinning.Posed"/>).</summary>
-    internal Model WithMaterials(IReadOnlyList<Material> materials) => new(_meshes, Skeleton, _clips, [.. materials]);
+    internal Model WithMaterials(IReadOnlyList<Material> materials) => new(_meshes, Skeleton, _clips, [.. materials], _parts);
 
     /// <summary>The material names, quoted and comma-separated, in definition order.</summary>
     public string ListMaterialNames() => NameList.Quoted(_materials.Select(m => m.Name));
@@ -80,7 +89,7 @@ public sealed class Model
         var at = System.Array.FindIndex(_clips, c => c.Name == clip.Name);
         var next = at >= 0 ? (Clip[])_clips.Clone() : [.. _clips, null!];
         next[at >= 0 ? at : next.Length - 1] = clip;
-        return new Model(_meshes, Skeleton, next, _materials);
+        return new Model(_meshes, Skeleton, next, _materials, _parts);
     }
 
     /// <summary>The model with <paramref name="clips"/> in place of its clips.</summary>
@@ -90,11 +99,11 @@ public sealed class Model
         ArgumentNullException.ThrowIfNull(clips);
         if (clips.GroupBy(c => c.Name).FirstOrDefault(g => g.Count() > 1) is { } twice)
             throw new ArgumentException($"two clips are named '{twice.Key}'; clip names must be unique", nameof(clips));
-        return new Model(_meshes, Skeleton, [.. clips], _materials);
+        return new Model(_meshes, Skeleton, [.. clips], _materials, _parts);
     }
 
     /// <summary>The model without the clip called <paramref name="name"/> (unchanged when there is none).</summary>
-    public Model WithoutClip(string name) => new(_meshes, Skeleton, System.Array.FindAll(_clips, c => c.Name != name), _materials);
+    public Model WithoutClip(string name) => new(_meshes, Skeleton, System.Array.FindAll(_clips, c => c.Name != name), _materials, _parts);
 
     /// <summary>The meshes in definition order.</summary>
     public IReadOnlyList<NamedMesh> Meshes { get; }
@@ -106,7 +115,7 @@ public sealed class Model
     public Model WithSkeleton(Skeleton skeleton)
     {
         ArgumentNullException.ThrowIfNull(skeleton);
-        return new Model(_meshes, skeleton, _clips, _materials);
+        return new Model(_meshes, skeleton, _clips, _materials, _parts);
     }
 
     /// <summary>The names in definition order.</summary>
@@ -125,17 +134,20 @@ public sealed class Model
     /// The model with <paramref name="mesh"/> under <paramref name="name"/>: it replaces the mesh of that name in its
     /// place, or is added after the others when the name is new.
     /// </summary>
-    /// <exception cref="ArgumentException">The name is null or empty, or a face uses a material the model does not define.</exception>
+    /// <exception cref="ArgumentException">The name is null or empty, a face uses a material the model does not define, or the name is an instance's (T-91).</exception>
     public Model With(string name, PolygonMesh mesh)
     {
         if (NameProblem(name) is { } problem) throw new ArgumentException(problem, nameof(name));
         ArgumentNullException.ThrowIfNull(mesh);
         if (MaterialsUsedBy(mesh).FirstOrDefault(n => FindMaterial(n) is null) is { } undefined)
             throw new ArgumentException($"a face uses the material '{undefined}', which the model does not define", nameof(mesh));
+        if (FindPart(name) is { InstanceOf: { } source })
+            throw new ArgumentException($"mesh: '{name}' is an instance of '{source}'; edit '{source}', and every instance follows", nameof(name));
         var at = System.Array.FindIndex(_meshes, m => m.Name == name);
         var next = at >= 0 ? (NamedMesh[])_meshes.Clone() : [.. _meshes, null!];
         next[at >= 0 ? at : next.Length - 1] = new NamedMesh(name, mesh);
-        return new Model(next, Skeleton, _clips, _materials);
+        // A mesh with no part record yet is a top-level part at the origin (M-9: every mesh is a part).
+        return new Model(next, Skeleton, _clips, _materials, FindPart(name) is null ? [.. _parts, Part.Of(name)] : _parts);
     }
 
     /// <summary>
@@ -154,8 +166,18 @@ public sealed class Model
     /// material is not among them (<c>meshes[0].materials</c>).
     /// </summary>
     public static (Model? Model, IReadOnlyList<MeshError> Errors) Create(IReadOnlyList<NamedMesh> meshes, Skeleton? skeleton, IReadOnlyList<Clip> clips,
-        IReadOnlyList<Material> materials)
+        IReadOnlyList<Material> materials) => Create(meshes, skeleton, clips, materials, []);
+
+    /// <summary>
+    /// <see cref="Create(IReadOnlyList{NamedMesh}, Skeleton?, IReadOnlyList{Clip}, IReadOnlyList{Material})"/> with part records
+    /// (T-91), which adds every problem of each part by where it is (<c>parts[3].parent</c>, <c>parts[0].rotation</c>): its own
+    /// (<see cref="Part.Problems"/>), a name given twice, and how it sits in the model (<see cref="PartProblems"/>). The parts
+    /// come in the order given, then each mesh with no record, in mesh order, as a plain top-level part (<see cref="Part.Of"/>).
+    /// </summary>
+    public static (Model? Model, IReadOnlyList<MeshError> Errors) Create(IReadOnlyList<NamedMesh> meshes, Skeleton? skeleton, IReadOnlyList<Clip> clips,
+        IReadOnlyList<Material> materials, IReadOnlyList<Part> parts)
     {
+        ArgumentNullException.ThrowIfNull(parts);
         ArgumentNullException.ThrowIfNull(meshes);
         ArgumentNullException.ThrowIfNull(clips);
         ArgumentNullException.ThrowIfNull(materials);
@@ -188,7 +210,28 @@ public sealed class Model
         for (var i = 0; i < clips.Count; i++)
             if (!clipNames.Add(clips[i].Name))
                 errors.Add(new MeshError($"clips[{i}].name", $"two clips are named '{clips[i].Name}'; clip names must be unique"));
-        return errors.Count > 0 ? (null, errors) : (new Model([.. meshes], skeleton, [.. clips], [.. materials]), errors);
+        // The first part of each name is kept; then each mesh with no record, in mesh order, as a plain top-level part.
+        var byName = new Dictionary<string, Part>(StringComparer.Ordinal);
+        foreach (var part in parts)
+        {
+            ArgumentNullException.ThrowIfNull(part, nameof(parts));
+            if (NameProblem(part.Name) is null) byName.TryAdd(part.Name, part);
+        }
+        Part[] all = [.. byName.Values, .. meshes.Where(m => NameProblem(m.Name) is null && !byName.ContainsKey(m.Name)).Select(m => Part.Of(m.Name)).DistinctBy(p => p.Name)];
+        byName = all.ToDictionary(p => p.Name, StringComparer.Ordinal);
+        var owners = meshes.Select(m => m.Name).ToHashSet(StringComparer.Ordinal);
+        for (var i = 0; i < parts.Count; i++)
+        {
+            var at = $"parts[{i}].";
+            errors.AddRange(Part.Problems(parts[i]).Select(p => new MeshError(at + p.Field, p.Problem)));
+            if (!byName.TryGetValue(parts[i].Name ?? "", out var kept)) continue;
+            if (!ReferenceEquals(kept, parts[i]))
+                errors.Add(new MeshError(at + "name", $"a part named '{parts[i].Name}' comes earlier; part names must be unique"));
+            else
+                errors.AddRange(Placement(parts[i], n => byName.GetValueOrDefault(n), owners.Contains, () => NameList.Quoted(all.Select(p => p.Name)), materialNames.Contains)
+                    .Select(p => new MeshError(at + p.Field, p.Problem)));
+        }
+        return errors.Count > 0 ? (null, errors) : (new Model([.. meshes], skeleton, [.. clips], [.. materials], all), errors);
     }
 
     /// <summary>
@@ -203,7 +246,8 @@ public sealed class Model
         if (found is null) return null;
         var used = MaterialsUsedBy(found.Mesh).ToHashSet(StringComparer.Ordinal);
         var materials = System.Array.FindAll(_materials, m => used.Contains(m.Name));
-        return found.Mesh.Weights is null ? new Model([found], null, [], materials) : new Model([found], Skeleton, _clips, materials);
+        Part[] part = [Part.Of(name)];
+        return found.Mesh.Weights is null ? new Model([found], null, [], materials, part) : new Model([found], Skeleton, _clips, materials, part);
     }
 
     /// <summary>
@@ -218,6 +262,11 @@ public sealed class Model
     {
         ArgumentNullException.ThrowIfNull(source);
         problem = null;
+        if (FindPart(name) is { InstanceOf: { } instanced })
+        {
+            problem = $"mesh: '{name}' is an instance of '{instanced}'; edit '{instanced}', and every instance follows";
+            return null;
+        }
         var found = System.Array.Find(source._meshes, m => m.Name == name);
         if (found is null)
         {
@@ -291,6 +340,14 @@ public sealed class Model
         }
 
         var found = System.Array.Find(_meshes, m => m.Name == name);
+        if (found is null && FindPart(name) is { } part)
+        {
+            // An instance or an empty is a part with no geometry of its own to edit (M-9).
+            problem = part.InstanceOf is { } source
+                ? $"mesh: '{name}' is an instance of '{source}'; edit '{source}', and every instance follows"
+                : $"mesh: '{name}' is an empty part with no geometry; define_mesh mesh={name} gives it some";
+            return null;
+        }
         if (found is null)
         {
             problem = _meshes.Length == 0
@@ -310,16 +367,218 @@ public sealed class Model
     /// <summary>The names, quoted and comma-separated, in definition order.</summary>
     public string ListNames() => NameList.Quoted(_meshes.Select(m => m.Name));
 
+    // ---- The part tree (D-2, M-9, T-91) ------------------------------------------------------------------------------
+
     /// <summary>
-    /// Where the mesh named <paramref name="name"/> starts in <see cref="Combined"/>: the vertices and faces of the
-    /// meshes before it. Null when there is no such mesh.
+    /// Every part in pre-order: each top-level part in definition order, each followed by its children (and theirs), siblings
+    /// in definition order. Every named mesh is a part; a mesh with no part record is <see cref="Part.Of"/> its name.
+    /// </summary>
+    public IReadOnlyList<Part> Parts => LazyInitializer.EnsureInitialized(ref _preOrder, PreOrder);
+
+    /// <summary>The part called <paramref name="name"/> (a named mesh, an empty or an instance), or null.</summary>
+    public Part? FindPart(string name) => System.Array.Find(_parts, p => p.Name == name);
+
+    /// <summary>The part names, quoted and comma-separated, in definition order.</summary>
+    public string ListPartNames() => NameList.Quoted(_parts.Select(p => p.Name));
+
+    private Part[] PreOrder()
+    {
+        var children = _parts.Where(p => p.Parent is not null).ToLookup(p => p.Parent!, StringComparer.Ordinal);
+        var order = new List<Part>(_parts.Length);
+        void Visit(Part p)
+        {
+            order.Add(p);
+            foreach (var child in children[p.Name]) Visit(child);
+        }
+        foreach (var top in _parts.Where(p => p.Parent is null)) Visit(top);
+        return [.. order];
+    }
+
+    /// <summary>
+    /// What is wrong with <paramref name="part"/> in this model, in place of any part of its name, each by its field: its own
+    /// problems (<see cref="Part.Problems"/>), a parent that does not exist or would make the part its own ancestor, an
+    /// <c>instance_of</c> on a part that owns geometry or naming a part that has none (or is itself an instance), levels on an
+    /// instance or an empty, and a level whose faces use a material the model does not define. Empty when it can be placed.
+    /// </summary>
+    public IReadOnlyList<(string Field, string Problem)> PartProblems(Part part)
+    {
+        ArgumentNullException.ThrowIfNull(part);
+        var own = Part.Problems(part);
+        if (own.Any(p => p.Field == "name")) return own;
+        return [.. own, .. Placement(part, n => n == part.Name ? part : FindPart(n), n => Find(n) is not null,
+            ListPartNames, n => FindMaterial(n) is not null)];
+    }
+
+    private static IEnumerable<(string Field, string Problem)> Placement(Part part, Func<string, Part?> find, Func<string, bool> owns,
+        Func<string> list, Func<string, bool> materialDefined)
+    {
+        if (part.Parent is { } parent)
+        {
+            if (find(parent) is null) yield return ("parent", $"no part named '{parent}'; the parts are {list()}");
+            else
+            {
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                for (var at = parent; at is not null && seen.Add(at); at = find(at)?.Parent)
+                    if (at == part.Name)
+                    {
+                        yield return ("parent", $"'{part.Name}' would be its own ancestor");
+                        break;
+                    }
+            }
+        }
+        if (part.InstanceOf is { } source)
+        {
+            if (owns(part.Name)) yield return ("instance_of", "an instance cannot also own geometry");
+            else if (source == part.Name) yield return ("instance_of", $"'{part.Name}' cannot be an instance of itself");
+            else if (find(source) is not { } shown) yield return ("instance_of", $"no part named '{source}'; the parts are {list()}");
+            else if (shown.InstanceOf is { } further)
+                yield return ("instance_of", $"'{source}' is itself an instance of '{further}'; name '{further}', the part that owns the geometry");
+            else if (!owns(source)) yield return ("instance_of", $"'{source}' has no geometry");
+        }
+        if (part.Levels.Count > 0)
+        {
+            if (part.InstanceOf is { } shows)
+                yield return ("levels", $"'{part.Name}' is an instance of '{shows}', and shows the levels of '{shows}'; keep levels on '{shows}'");
+            else if (!owns(part.Name)) yield return ("levels", $"'{part.Name}' is an empty part with no geometry to keep a level of");
+        }
+        for (var i = 0; i < part.Levels.Count; i++)
+            if (part.Levels[i]?.Mesh is { } mesh && MaterialsUsedBy(mesh).FirstOrDefault(n => !materialDefined(n)) is { } undefined)
+                yield return ($"levels[{i}]", $"a face uses the material '{undefined}', which the model does not define");
+    }
+
+    /// <summary>The model with <paramref name="part"/>: it replaces the part of that name in its place, or is added after the others (an empty, or an instance).</summary>
+    /// <exception cref="ArgumentException">The part has a problem (<see cref="PartProblems"/>), as <c>field: problem</c>.</exception>
+    public Model WithPart(Part part) =>
+        WithPart(part, out var problem) ?? throw new ArgumentException(problem, nameof(part));
+
+    /// <summary>
+    /// The model with <paramref name="part"/>, as <see cref="WithPart(Part)"/>, or null with <paramref name="problem"/> the first
+    /// of <see cref="PartProblems"/> as <c>field: problem</c> (<c>parent: no part named 'Axel_F'; the parts are ...</c>).
+    /// </summary>
+    public Model? WithPart(Part part, out string? problem)
+    {
+        ArgumentNullException.ThrowIfNull(part);
+        problem = PartProblems(part) is [var (field, first), ..] ? $"{field}: {first}" : null;
+        if (problem is not null) return null;
+        var at = System.Array.FindIndex(_parts, p => p.Name == part.Name);
+        var next = at >= 0 ? (Part[])_parts.Clone() : [.. _parts, null!];
+        next[at >= 0 ? at : next.Length - 1] = part;
+        return new Model(_meshes, Skeleton, _clips, _materials, next);
+    }
+
+    /// <summary>The model with the part <paramref name="name"/>'s live mesh kept as level <paramref name="level"/> (as <see cref="WithLevel(string, int, out string?)"/>).</summary>
+    /// <exception cref="ArgumentException">The level cannot be kept, as <c>field: problem</c>.</exception>
+    public Model WithLevel(string name, int level) =>
+        WithLevel(name, level, out var problem) ?? throw new ArgumentException(problem, nameof(level));
+
+    /// <summary>
+    /// The model with the live mesh of the part <paramref name="name"/> snapshotted as level <paramref name="level"/> (M-9,
+    /// kept levels): N must be 0 or more and at least the part's newest kept level, and an equal N replaces it. Null, with
+    /// <paramref name="problem"/> saying why, when there is no such part, it is an instance or an empty, or N is too low.
+    /// </summary>
+    public Model? WithLevel(string name, int level, out string? problem)
+    {
+        var part = FindPart(name);
+        var newest = part?.NewestLevel?.Number;
+        problem = part is null ? $"part: no part named '{name}'; the parts are {ListPartNames()}"
+            : part.InstanceOf is { } source ? $"part: '{name}' is an instance of '{source}'; keep a level of '{source}', and every instance shows it"
+            : Find(name) is null ? $"part: '{name}' is an empty part with no geometry to keep as a level"
+            : level < 0 ? $"level: {level} is negative; a level number is 0 or more"
+            : newest > level ? $"level: the newest kept level of '{name}' is {newest}; a new level must be {newest} or more ({newest} replaces it)"
+            : null;
+        if (problem is not null) return null;
+        var kept = new PartLevel(level, Find(name)!);
+        PartLevel[] levels = newest == level ? [.. part!.Levels.Take(part.Levels.Count - 1), kept] : [.. part!.Levels, kept];
+        return WithPart(part with { Levels = levels });
+    }
+
+    /// <summary>The matrix from the part <paramref name="name"/>'s space to the model's (row vectors: a point's model position is <c>Vector3.Transform(p, matrix)</c>), or null when there is no such part.</summary>
+    public Matrix4x4? WorldTransform(string name)
+    {
+        if (FindPart(name) is not { } part) return null;
+        var world = part.LocalTransform;
+        var seen = new HashSet<string>(StringComparer.Ordinal) { name };
+        for (var p = part.Parent is null ? null : FindPart(part.Parent); p is not null && seen.Add(p.Name); p = p.Parent is null ? null : FindPart(p.Parent))
+            world *= p.LocalTransform;
+        return world;
+    }
+
+    /// <summary>The newest kept level ≤ <paramref name="level"/> of the part <paramref name="name"/> (an instance's are its source's), or null when it has none or there is no such part.</summary>
+    public PolygonMesh? LevelMesh(string name, int level) =>
+        FindPart(name) is { } part ? FindPart(part.InstanceOf ?? name)?.LevelAt(level)?.Mesh : null;
+
+    /// <summary>
+    /// Every envelope warning (M-9: never a refusal), parts in pre-order: a part's live geometry (every live vertex, in its own
+    /// space; an instance's is its source's) leaving its own envelope, then its envelope placed in its parent's space (the
+    /// axis-aligned box of its transformed corners) leaving the parent's envelope; each only where both are there to compare.
+    /// Axes x, y, z, below before above. On the bound counts as inside (M-4's rule).
+    /// </summary>
+    public IReadOnlyList<EnvelopeWarning> EnvelopeWarnings()
+    {
+        var warnings = new List<EnvelopeWarning>();
+        foreach (var part in Parts)
+        {
+            if (part.Envelope is not { } envelope) continue;
+            if (Find(part.InstanceOf ?? part.Name) is { } mesh)
+            {
+                var live = Enumerable.Range(0, mesh.Vertices.Count).Where(v => !mesh.IsVertexDeleted(v)).Select(v => mesh.Vertices[v]).ToArray();
+                if (live.Length > 0) Leaves(part.Name, null, Bounds(live), envelope, warnings);
+            }
+            if (part.Parent is { } parent && FindPart(parent)?.Envelope is { } outer)
+            {
+                var local = part.LocalTransform;
+                var corners = Enumerable.Range(0, 8).Select(i => Vector3.Transform(new Vector3(
+                    (i & 1) == 0 ? envelope.Min.X : envelope.Max.X, (i & 2) == 0 ? envelope.Min.Y : envelope.Max.Y,
+                    (i & 4) == 0 ? envelope.Min.Z : envelope.Max.Z), local)).ToArray();
+                Leaves(part.Name, parent, Bounds(corners), outer, warnings);
+            }
+        }
+        return warnings;
+    }
+
+    private static PartEnvelope Bounds(Vector3[] points) =>
+        new(points.Aggregate(Vector3.Min), points.Aggregate(Vector3.Max));
+
+    private static void Leaves(string part, string? parent, PartEnvelope box, PartEnvelope envelope, List<EnvelopeWarning> warnings)
+    {
+        foreach (var axis in Part.Axes)
+        {
+            var below = Part.Component(envelope.Min, axis) - Part.Component(box.Min, axis);
+            var above = Part.Component(box.Max, axis) - Part.Component(envelope.Max, axis);
+            if (below > 0) warnings.Add(new EnvelopeWarning(part, parent, axis, false, below));
+            if (above > 0) warnings.Add(new EnvelopeWarning(part, parent, axis, true, above));
+        }
+    }
+
+    /// <summary>One drawn occurrence: the part, the mesh it shows, and the matrix that places it in the model.</summary>
+    private readonly record struct Occurrence(Part Part, PolygonMesh Mesh, Matrix4x4 World);
+
+    /// <summary>
+    /// Every drawn occurrence in pre-order (<see cref="Parts"/>): each part with geometry, and each instance as its source's,
+    /// at its own world transform; live meshes when <paramref name="level"/> is null, else each part's <see cref="LevelMesh"/>
+    /// (a part with no level ≤ N is not drawn). An empty draws nothing.
+    /// </summary>
+    private Occurrence[] Occurrences(int? level)
+    {
+        var result = new List<Occurrence>();
+        foreach (var part in Parts)
+        {
+            var mesh = level is { } n ? LevelMesh(part.Name, n) : Find(part.InstanceOf ?? part.Name);
+            if (mesh is not null) result.Add(new Occurrence(part, mesh, WorldTransform(part.Name)!.Value));
+        }
+        return [.. result];
+    }
+
+    /// <summary>
+    /// Where the part named <paramref name="name"/>'s own occurrence starts in <see cref="Combined"/>: the vertices and faces
+    /// of the occurrences before it. Null when there is no such part, or it is an empty and draws nothing.
     /// </summary>
     public (int Vertices, int Faces)? OffsetOf(string name)
     {
         int vertices = 0, faces = 0;
-        foreach (var (each, mesh) in _meshes)
+        foreach (var (part, mesh, _) in LazyInitializer.EnsureInitialized(ref _live, () => Occurrences(null)))
         {
-            if (each == name) return (vertices, faces);
+            if (part.Name == name) return (vertices, faces);
             vertices += mesh.Vertices.Count;
             faces += mesh.Faces.Count;
         }
@@ -327,18 +586,32 @@ public sealed class Model
     }
 
     /// <summary>
-    /// Every mesh as one, for drawing them together and taking bounds over all of them: the meshes' vertices and faces
-    /// in definition order, each mesh's ids offset past the ones before, its colours, materials, UVs, seams and morph targets with them (a target name on two meshes is one target). A model of one mesh gives that mesh itself, so
-    /// it draws exactly as before; an empty model gives null.
+    /// Every drawn occurrence as one mesh placed in the model's space, for drawing them together and taking bounds over all
+    /// of them: in pre-order (<see cref="Parts"/>), each part with geometry at its world transform and each instance as a copy
+    /// of its source at the instance's, each occurrence's ids offset past the ones before, its colours, materials, UVs, seams
+    /// and morph targets with them (a target name on two meshes is one target; deltas turn and scale with the part). A smooth
+    /// mesh moved by a transform carries its corner normals by the inverse transpose. A model of untransformed top-level parts
+    /// gives exactly what it gave before parts: one mesh gives that mesh itself; an empty model gives null.
     /// </summary>
-    public PolygonMesh? Combined => _meshes.Length switch
+    public PolygonMesh? Combined => Joined(LazyInitializer.EnsureInitialized(ref _live, () => Occurrences(null)), ref _combined);
+
+    /// <summary>As <see cref="Combined"/> for kept level <paramref name="level"/>: each part's newest kept level ≤ N (<see cref="LevelMesh"/>), a part with none not drawn. Null when nothing is drawn.</summary>
+    public PolygonMesh? CombinedAt(int level)
     {
-        0 => null,
-        1 => _meshes[0].Mesh,
-        _ => LazyInitializer.EnsureInitialized(ref _combined, Combine),
+        PolygonMesh? none = null;
+        return Joined(Occurrences(level), ref none);
+    }
+
+    private static PolygonMesh? Joined(Occurrence[] occurrences, ref PolygonMesh? cache) => occurrences switch
+    {
+        [] => null,
+        [var only] when only.World.IsIdentity => only.Mesh,
+        _ => LazyInitializer.EnsureInitialized(ref cache, () => Combine(occurrences)),
     };
 
-    private PolygonMesh Combine()
+    private static Vector3 Normalised(Vector3 v) => v == Vector3.Zero ? v : Vector3.Normalize(v);
+
+    private static PolygonMesh Combine(Occurrence[] occurrences)
     {
         var vertices = new List<System.Numerics.Vector3>();
         var faces = new List<Face>();
@@ -352,10 +625,14 @@ public sealed class Model
         var seams = new List<(int, int)>();
         // One target per name across the meshes (a name is one dial), in first-definition order, each mesh's ids offset.
         var targets = new List<(string Name, List<KeyValuePair<int, System.Numerics.Vector3>> Deltas)>();
-        var posed = _meshes.Any(m => m.Mesh.PosedCorners is not null);
-        var smooth = _meshes.Any(m => m.Mesh.ShadingMode == ShadingMode.Smooth);
-        foreach (var (_, mesh) in _meshes)
+        // A smooth mesh moved by a transform gives its own corner normals (the inverse transpose), so they are carried as a posed copy's.
+        var posed = occurrences.Any(o => o.Mesh.PosedCorners is not null || (!o.World.IsIdentity && o.Mesh.ShadingMode == ShadingMode.Smooth));
+        var smooth = occurrences.Any(o => o.Mesh.ShadingMode == ShadingMode.Smooth);
+        foreach (var (_, mesh, world) in occurrences)
         {
+            var moved = !world.IsIdentity;
+            var normals = Matrix4x4.Identity;
+            if (moved && Matrix4x4.Invert(world, out var inverse)) normals = Matrix4x4.Transpose(inverse);
             var offset = vertices.Count;
             if (mesh.Style is { } style)
             {
@@ -374,12 +651,18 @@ public sealed class Model
             {
                 var at = targets.FindIndex(t => t.Name == target.Name);
                 if (at < 0) targets.Add((target.Name, []));
-                targets[at < 0 ? ^1 : at].Deltas.AddRange(target.Offset(offset).Deltas);
+                var deltas = target.Offset(offset).Deltas;
+                targets[at < 0 ? ^1 : at].Deltas.AddRange(moved ? deltas.Select(d => KeyValuePair.Create(d.Key, Vector3.TransformNormal(d.Value, world))) : deltas);
             }
-            vertices.AddRange(mesh.Vertices);
+            if (moved)
+                vertices.AddRange(mesh.Vertices.Select((v, i) => mesh.IsVertexDeleted(i) ? v : Vector3.Transform(v, world)));
+            else vertices.AddRange(mesh.Vertices);
             deleted.AddRange(Enumerable.Range(0, mesh.Vertices.Count).Select(mesh.IsVertexDeleted));
             faces.AddRange(mesh.Faces.Select(f => f.Map(v => v + offset)));
-            if (posed) corners.AddRange(Shading.CornersOf(mesh));
+            if (posed)
+                corners.AddRange(moved
+                    ? Shading.CornersOf(mesh).Select(face => face.Select(n => Normalised(Vector3.TransformNormal(n, normals))).ToArray())
+                    : Shading.CornersOf(mesh));
             flat.AddRange(Enumerable.Repeat(mesh.ShadingMode != ShadingMode.Smooth, mesh.Faces.Count));
             if (!smooth) continue;
             // Shading is per mesh: a flat piece of a mixed model has every edge hard, a smooth piece its own.
