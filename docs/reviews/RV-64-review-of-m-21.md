@@ -166,7 +166,9 @@ description: >-
 - **Consequence:** For the same bad input, the three tools give different answers, and one of them tells the agent "expected a number" when it gave a number. This goes against the ruling that the three tools agree.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `TargetWeightsArgument.WeightRefusal` is shared by `render`, `check` and `render_glb`, so `1e999` and `1e39` give `targets.<name>: the weight is not a finite number` in all three; `render_glb` hands `GlbScene.Prepare` every name and its refusal and Prepare tells an unknown name before its weight (`{"Nope":2}` names `Nope`). Where no engine can check names the weight refusal is told at once. Unit tests: `RenderGlbTargetArgumentTests` (harness for the words, the CPU parser for the order), `RenderGlbTargetsTests` keeps the loader case, commit a7c00c6.
 
 ### `check`'s "against the rest mesh" and "not zero-area at rest" have no test that fails without them
 
@@ -178,7 +180,9 @@ description: >-
 - **Consequence:** Either rule could regress silently.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `TargetWeightsTests` gained `Check_at_a_weight_still_judges_a_target_against_the_rest_mesh_...` and `A_face_with_no_area_at_rest_is_not_reported_...`; the first fails with `CheckTool` passing the morphed mesh as rest, the second with `if (restHas)` dropped (each run failing and the source restored), commit 870bf3c.
 
 ### Only the GPU scenario catches `render` dropping the morph when a pose is given
 
@@ -187,7 +191,9 @@ description: >-
 - **Consequence:** The "morph before skin" path of `render` is guarded only by a GPU regression suite. A unit test on the fake scene could hold it.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `RenderPumpTests.A_pose_and_target_weights_draw_the_morph_first_and_then_the_skin` posts a pose and targets on the fake scene and checks the shown mesh is morphed then skinned; it fails with `Skinning.Posed(snapshot.Model, pose)` (run failing, source restored), commit e741625.
 
 ### `render_glb`'s `targets` with `clip` is untested, so its morph-before-skin is unverified
 
@@ -205,7 +211,9 @@ description: >-
 - **Consequence:** `server-unit` would not catch a change to the ruled 0 to 1 range in `render_glb`.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** Range, non-finite, type and non-object refusals are now `RenderGlbTargetArgumentTests` on `ToolHarness` (they come before the engine wait); the regression class keeps the name refusals that need the loader, commit c673656.
 
 ### `get_mesh`'s target example is out of place and not marked, so it is never run
 
@@ -214,7 +222,9 @@ description: >-
 - **Consequence:** An agent reading the description gets a confused layout, and the target example could drift without any test noticing.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** The target example follows the cube example's output with its own introduction and `ExampleMarker`; the examples theory defines the bulge for `get_mesh` and runs both, and a test compares the shown output with the tool's; `TargetToolTests` reads the marked example. Commits bb542f7 and 09301dd.
 
 ### `define_mesh`'s `drop_targets` refusal is checked outside the store lock
 
@@ -223,7 +233,9 @@ description: >-
 - **Consequence:** Under concurrent tool calls, targets can be lost without the refusal the design promises. The window is narrow.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** New `ModelStore.Define` overload takes the refusal and runs it with the push under the write lock, as `open`'s do; `ModelStoreTests` shows a competing writer cannot land inside the refusal and a refusal pushes nothing; T-102's As built corrected, commit 2dc8635.
 
 ### `tests.json` is missing linked source files from the new suites' inputs
 
@@ -250,7 +262,9 @@ description: >-
 - **Consequence:** The record of where the approved frames are is unreadable.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** Both paths are plain text again (`G:\My Drive\artifacts\carve\M-21\T-105\round-1` in T-105 and the T-107 equivalent `G:\My Drive\artifacts\carve\M-21\T-107\round-1\`; T-107 had the same loss in its scratch folder, now `%TEMP%\carve-m21-acceptance\round-1\`), with no control character left in either file, commit 0de8af0.
 
 ## Findings: the Core (claude-opus-5-5)
 
