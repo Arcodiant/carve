@@ -4,7 +4,7 @@ description: >-
 ---
 # T-107 — Morph targets acceptance run
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
