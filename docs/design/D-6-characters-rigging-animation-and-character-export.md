@@ -220,6 +220,23 @@ D-5's modifier question stays open for bevel. A later move to a modifier would c
 **Alternatives:** a subdivision modifier kept in the file, which keeps the base mesh low-poly.
 **Would change if:** agents want to keep editing the coarse cage after subdividing.
 
+### Morph targets
+
+**Certainty:** Leaning · **Strictness:** Rule
+
+Decided by the person at M-21's planning (2026-11-16), on the planner's recommendation; T-99 built the Core type.
+
+- **A target is sparse position deltas.** A mesh holds named targets in definition order, each a map from vertex id to a delta from the base position. A vertex not listed has a zero delta, and a delta of exactly (0,0,0) is never stored. Absolute positions are never stored. The Carve file stores the sparse deltas by vertex id, in a new version; the `.glb` writes dense accessors.
+- **Names.** A target name is non-empty, holds no `:` (as a mesh name), is unique in its mesh, and is case-sensitive. The same name on two meshes of a model is one dial: one glTF target at export and one weight in `render`, the model's targets being the union of names in first-definition order.
+- **Evaluation** is `base + Σ wᵢ·deltaᵢ`, targets added in definition order so the sum is the same bits every time. The morph comes **before** skinning, as glTF and Empyrean do it.
+- **Normal deltas are never stored.** The export computes them from `Shading`, at weight 1 minus at rest.
+- **Every edit keeps targets.** `move` carries a target with its base; `extrude`'s new vertices copy their source's delta; `delete` drops a deleted vertex's delta; `merge_faces` and `bridge` keep targets; `plane_cut`, `loop_cut` and `knife` blend deltas by the stencils that blend weights. `subdivide` is exact: Catmull-Clark, crease rules included, is linear in positions, so each new vertex's delta takes its position's stencil, and the subdivided target equals the subdivided base plus the subdivided delta. `define_mesh` or `open` replacing a mesh that has targets is refused, naming them, unless `drop_targets: true`.
+- **`check`** reports each target at weight 1: `target-flips-face` (a face's normal against its rest normal below 0), `target-collapses-face` (a face become zero-area) and `target-opens-mesh` (vertices coincident at rest come apart).
+- **Out of scope:** corrective targets and morph weights in clips.
+
+**Alternatives:** absolute positions per target, which round-trip a sculpted shape exactly but are dense and do not ride along with edits; dense deltas, which waste the file on the vertices a target does not move.
+**Would change if:** a game needs corrective targets or weights keyed in clips, or the float rounding of a delta (at most one unit in the last place, T-99) shows in a real model.
+
 ### UVs stay possible
 
 **Certainty:** Settled · **Strictness:** Guideline

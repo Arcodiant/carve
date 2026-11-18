@@ -58,7 +58,7 @@ public sealed class PolygonMesh
 
     private PolygonMesh(Vector3[] vertices, Face[] faces, FaceStyle? style = null, VertexWeights? weights = null,
         MeshShade? shade = null, Vector3[][]? corners = null, bool[]? flatFaces = null, bool[]? deletedVertices = null,
-        MeshUvs? uvs = null)
+        MeshUvs? uvs = null, MorphTargets? targets = null)
     {
         _deletedVertices = deletedVertices is not null && Array.IndexOf(deletedVertices, true) >= 0 ? deletedVertices : null;
         LiveVertexCount = vertices.Length - (_deletedVertices?.Count(d => d) ?? 0);
@@ -71,6 +71,7 @@ public sealed class PolygonMesh
         Style = style is { IsEmpty: false } ? style : null;
         Weights = weights is { IsEmpty: false } ? weights : null;
         Uvs = uvs is { IsEmpty: false } ? uvs : null;
+        Targets = targets is { Count: > 0 } ? targets : null;
         Vertices = Array.AsReadOnly(vertices);
         Faces = Array.AsReadOnly(faces);
     }
@@ -81,7 +82,7 @@ public sealed class PolygonMesh
     public FaceStyle? Style { get; }
 
     /// <summary>This mesh, its geometry shared, with <paramref name="style"/> in place of its own (null or empty for none).</summary>
-    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights, Shade, PosedCorners, FlatFaces, _deletedVertices, Uvs);
+    public PolygonMesh WithStyle(FaceStyle? style) => new(_vertices, _faces, style, Weights, Shade, PosedCorners, FlatFaces, _deletedVertices, Uvs, Targets);
 
     /// <summary>The mesh's shading and hard edges (D-6, Smooth shading is per mesh); null for flat with no hard edge marked.</summary>
     public MeshShade? Shade { get; }
@@ -93,7 +94,7 @@ public sealed class PolygonMesh
     public IReadOnlyList<(int Lo, int Hi)> HardEdges => Shade?.Hard ?? [];
 
     /// <summary>This mesh, its geometry shared, with <paramref name="shade"/> in place of its own (null for flat with no hard edges).</summary>
-    public PolygonMesh WithShade(MeshShade? shade) => new(_vertices, _faces, Style, Weights, shade, PosedCorners, null, _deletedVertices, Uvs);
+    public PolygonMesh WithShade(MeshShade? shade) => new(_vertices, _faces, Style, Weights, shade, PosedCorners, null, _deletedVertices, Uvs, Targets);
 
     /// <summary>
     /// Corner normals given for a posed copy (<see cref="Skinning"/>), by face and then by position in the face's loop;
@@ -122,14 +123,29 @@ public sealed class PolygonMesh
     internal PolygonMesh WithVertices(IReadOnlyList<Vector3> vertices, Vector3[][]? corners)
     {
         if (vertices.Count != _vertices.Length) throw new ArgumentException("one position per vertex", nameof(vertices));
-        return new PolygonMesh(vertices.ToArray(), _faces, Style, null, Shade, corners, null, _deletedVertices, Uvs);
+        return new PolygonMesh(vertices.ToArray(), _faces, Style, null, Shade, corners, null, _deletedVertices, Uvs, Targets);
     }
 
     /// <summary>The vertices' bone weights by vertex id (D-6, Weights); null when no vertex has any.</summary>
     public VertexWeights? Weights { get; }
 
     /// <summary>This mesh, its geometry shared, with <paramref name="weights"/> in place of its own (null or empty for none).</summary>
-    public PolygonMesh WithWeights(VertexWeights? weights) => new(_vertices, _faces, Style, weights, Shade, PosedCorners, null, _deletedVertices, Uvs);
+    public PolygonMesh WithWeights(VertexWeights? weights) => new(_vertices, _faces, Style, weights, Shade, PosedCorners, null, _deletedVertices, Uvs, Targets);
+
+    /// <summary>The mesh's morph targets (D-6, Morph targets) in definition order; null when it has none.</summary>
+    public MorphTargets? Targets { get; }
+
+    /// <summary>This mesh, its geometry and every other attribute shared, with <paramref name="targets"/> in place of its own (null for none). Unchecked: a target is checked when it is made (<see cref="MorphTarget"/>).</summary>
+    public PolygonMesh WithTargets(MorphTargets? targets) => new(_vertices, _faces, Style, Weights, Shade, PosedCorners, FlatFaces, _deletedVertices, Uvs, targets);
+
+    /// <summary>
+    /// The mesh at <paramref name="weights"/> (target name to weight): its positions <c>base + Σ wᵢ·deltaᵢ</c>
+    /// (<see cref="MorphTargets.Apply"/>), as <see cref="WithVertices(IReadOnlyList{Vector3})"/> gives them: unchecked, faces,
+    /// style, shading and UVs kept, no weights, and no targets (it is a copy to draw, already morphed). A name the mesh does
+    /// not have is ignored; the tools refuse one. A mesh with no targets gives its own positions.
+    /// </summary>
+    public PolygonMesh Morphed(IReadOnlyDictionary<string, float> weights) =>
+        new(Targets?.Apply(_vertices, weights) ?? _vertices, _faces, Style, null, Shade, null, null, _deletedVertices, Uvs);
 
     /// <summary>The faces' corner UVs and the seams (T-53, <see cref="MeshUvs"/>); null when no face is mapped and no edge is a seam.</summary>
     public MeshUvs? Uvs { get; }
@@ -138,7 +154,7 @@ public sealed class PolygonMesh
     public IReadOnlyList<(int Lo, int Hi)> Seams => Uvs?.Seams ?? [];
 
     /// <summary>This mesh, its geometry and every other attribute shared, with <paramref name="uvs"/> in place of its own (null or empty for none). Unchecked: <see cref="MeshUvs.Check"/> is the guard.</summary>
-    public PolygonMesh WithUvs(MeshUvs? uvs) => new(_vertices, _faces, Style, Weights, Shade, PosedCorners, FlatFaces, _deletedVertices, uvs);
+    public PolygonMesh WithUvs(MeshUvs? uvs) => new(_vertices, _faces, Style, Weights, Shade, PosedCorners, FlatFaces, _deletedVertices, uvs, Targets);
 
     /// <summary>
     /// The vertex slots; a vertex's id is its position here, so <c>Count</c> is a slot count, tombstones included. A

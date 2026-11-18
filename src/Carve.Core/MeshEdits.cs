@@ -319,7 +319,7 @@ public static class MeshEdits
     /// and moves to its vertex point, each face keeps its id as its first child, and face points, edge points and the
     /// other children are appended (see <see cref="Subdivision"/> for the order and the sharp-edge rules). Hard edges stay
     /// creased and are carried to both halves; children take their face's colour and groups; weights are blended by
-    /// each point's own stencil and capped at four. Two levels are exactly one level done twice.
+    /// each point's own stencil and capped at four; morph targets' deltas take each point's stencil exactly as its position does. Two levels are exactly one level done twice.
     /// </summary>
     public static EditResult Subdivide(PolygonMesh mesh, int levels)
     {
