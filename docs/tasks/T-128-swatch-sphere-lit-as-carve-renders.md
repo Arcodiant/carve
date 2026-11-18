@@ -84,15 +84,24 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review c
   the sheets differ only inside the sphere cell (x >= 1074, y 27..494: the sphere and its label); spheres 0, 90, 200 changed;
   the two roughness frames new. The verify run's frames equal local run 3's by hash.
 
-### Hand-off
-
-- **Done:** code, checks, thresholds (approved), verify `VERIFY PASS` at 439b8b8 (patina-unit, server-unit, scenario-cube,
-  -crate, -sky, -materials, -planks, -patina, server-regression on Mantorok; patina-regression on Xellotath), frame guard above.
-- **Left:** the frame review, by its own agent: job `J-20261118-174636-f1be3b` (`scenario-patina`, Mantorok), frames in
-  `artifacts/T-128/after/scenario-patina/patina/` of this worktree (or `cairn test artifacts J-20261118-174636-f1be3b`). To open
-  and judge: `swatch-sphere-0`, `-90`, `-200`, `swatch-sphere-roughness-0`, `-roughness-1`, and the sphere cell of
-  `swatch-sheet-256` and `-64` (the rest are byte-identical to the approved T-114 set). Then the person's approval of the
-  changed set, and `finish`.
-- **Not checked:** no frame opened by this agent. The roughness-0 peak is 255 (clipped), so the highlight's size or shape is
-  not measured, only that it is there.
-- **Surprising:** nothing broke in carve; the gap rule had only 2 levels to spare under the new light before it was widened.
+- **Verify** `VERIFY PASS` at 439b8b8 (patina-unit, server-unit, scenario-cube, -crate, -sky, -materials, -planks, -patina,
+  server-regression on Mantorok; patina-regression on Xellotath).
+- **Frame review** by Claude Opus 5.5 (`claude-opus-5-5`), second agent, of job `J-20261118-174636-f1be3b` (`scenario-patina`,
+  Mantorok). By hash against the pass before: flat normal 256, tiled base 128 and the seam frame the same; spheres 0, 90, 200
+  and both sheets changed; the two roughness frames new. Each changed frame opened once (the sheets as a crop of the sphere
+  cell, x 1032..1543):
+  - *sphere 0*: lit, broad shading brightest top-centre and darker toward the lower right; the three gaps dark and crisp, the
+    staves' grain readable; whole on the slate (x 43..468), facets at the limb as before. No sharp glint, as the planks'
+    roughness (0.57..0.78) would give.
+  - *sphere 90*: as 0, the stave tones shifted with the turn; gaps and staves read.
+  - *sphere 200*: two gaps either side of a wide stave, the same light; reads, whole.
+  - *grey, roughness 0*: a small white highlight, 21 pixels at luma 250 or more, x 251..255, y 197..201, just above centre on
+    the vertical midline. Carve's light worked through `RenderLights.Orientation` puts the half vector at (-0.01, 0.24, 0.97)
+    in camera space, a highlight at about (254, 205) on this sphere's 212 px radius: where carve would put it. The peak clips
+    at 255; a light Fresnel rim of sky at the limb.
+  - *grey, roughness 1*: smooth top-to-bottom gradient, no highlight (peak 128.1).
+  - *sheet 256 and 64, sphere cell*: the label `sphere, Pbr, carve lights, angle 0` reads; the sphere matches sphere 0, the 64
+    one a little softer in grain; whole, slate round it.
+- **Person**: Waystone round 2 (`G:\My Drive\artifacts\carve\M-27\T-128\round-2`, the five spheres and both cell crops,
+  told the roughness-0 peak clips at 255): **approved**, no notes.
+- **Not checked**: the highlight's size or shape (clipped); carve's own frames were not opened, only held by hash.
