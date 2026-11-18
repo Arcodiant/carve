@@ -584,10 +584,12 @@
         },
         "samples/graphs/**",
         "scripts/run-scenario.ps1",
-        "scripts/bounded-run.ps1",
-        "samples/graphs/**"
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
       "est-seconds": 30
     }
   ],
