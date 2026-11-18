@@ -8,3 +8,4 @@
 - T-116: samples/barrel-planks.carve: M-7's barrel with its staves from the planks graph, in a scenario of its own
 - T-114: patina's swatch: the sheet, flat, tiled 3 x 3 and a sphere through Material.Pbr under Carve's fixed sky
 - T-117: Fresh agents build a wood material in patina from the tool descriptions alone, recover from a broken starter graph and put it on the barrel
+- T-128: patina's sphere swatch lit by carve's ambient and directional lights as well as the fixed sky, so a swatch shows a material as carve's render does

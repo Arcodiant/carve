@@ -4,7 +4,7 @@ description: >-
 ---
 # T-128 — Swatch sphere lit as carve renders
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
