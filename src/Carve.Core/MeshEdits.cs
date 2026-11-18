@@ -343,7 +343,8 @@ public static class MeshEdits
         var result = PolygonMesh.Create(level.Vertices, level.Faces.Select(f => f.Length == 0 ? Face.Deleted : (Face)f), gone);
         if (!result.Succeeded) return EditResult.Refused(result.Errors);
         var carried = level.Mesh;
-        var made = result.Mesh!.WithStyle(carried.Style).WithWeights(carried.Weights).WithShade(carried.Shade).WithUvs(carried.Uvs);
+        var made = result.Mesh!.WithStyle(carried.Style).WithWeights(carried.Weights).WithShade(carried.Shade).WithUvs(carried.Uvs)
+            .WithTargets(carried.Targets?.WithoutVertices(gone));
         var moved = mesh.LiveVertices.Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
         return EditResult.Made(made, moved,
             Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).Where(v => !made.IsVertexDeleted(v)).ToArray(),
