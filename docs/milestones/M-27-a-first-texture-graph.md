@@ -134,5 +134,6 @@ set before it lands. There is no sound or motion, so there is no real-time pass.
 - [ ] [T-115](../tasks/T-115-png-export-at-a-given-size.md) — patina's export writes each output as a PNG at any power of two to 8192, in bounded memory
 - [ ] [T-116](../tasks/T-116-the-barrel-with-planks-staves.md) — samples/barrel-planks.carve: M-7's barrel with its staves from the planks graph, in a scenario of its own
 - [ ] [T-117](../tasks/T-117-texture-graph-acceptance-run.md) — Fresh agents build a wood material in patina from the tool descriptions alone, recover from a broken starter graph and put it on the barrel
+- [ ] [T-128](../tasks/T-128-swatch-sphere-lit-as-carve-renders.md) — patina's sphere swatch lit by carve's ambient and directional lights as well as the fixed sky (added 2026-11-18 by the person's ruling after T-117)
 
 ## Retrospective
