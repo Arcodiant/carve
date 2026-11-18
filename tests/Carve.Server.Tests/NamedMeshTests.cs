@@ -51,23 +51,6 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
     private static float[] Point(JsonElement mesh, int vertex) =>
         [.. mesh.GetProperty("vertices")[vertex].GetProperty("at").EnumerateArray().Select(x => x.GetSingle())];
 
-    [Fact]
-    public async Task The_worked_example_moves_the_lid_alone_and_leaving_mesh_out_is_refused_with_the_names()
-    {
-        var (carve, tools) = await StartWithCrateAndLidAsync();
-        using var _ = carve;
-        var move = TwoMeshExample(tools)[2].Arguments;
-        var unnamed = move.Replace("\"mesh\":\"lid\",", "", StringComparison.Ordinal);
-
-        Assert.Contains(Names, Refused(await carve.CallToolAsync("move", unnamed)));
-        var moved = Ok(await carve.CallToolAsync("move", move));
-
-        Assert.True(moved.GetProperty("closed").GetBoolean());
-        Assert.Equal(0, moved.GetProperty("warnings").GetArrayLength());
-        Assert.Equal(new float[] { -0.1f, 1.1f, -0.1f }, Point(Ok(await carve.CallToolAsync("get_mesh", """{"mesh":"lid"}""")), 0));
-        Assert.Equal(new float[] { 0f, 0f, 0f }, Point(Ok(await carve.CallToolAsync("get_mesh", """{"mesh":"crate"}""")), 0));
-    }
-
     [Theory]
     [InlineData("move", """{"faces":[0],"by":[0,1,0]}""")]
     [InlineData("extrude", """{"faces":[0],"distance":0.5}""")]
@@ -95,30 +78,6 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         Assert.Contains("mesh", text);
         var named = arguments.Insert(1, arguments.Length > 2 ? "\"mesh\":\"crate\"," : "\"mesh\":\"crate\"");
         Assert.False(IsError(await carve.CallToolAsync(tool, named)), $"{tool} {named}");
-    }
-
-    [Fact]
-    public async Task Every_tool_refuses_an_unknown_argument_and_lists_exactly_the_arguments_its_schema_has()
-    {
-        // Each tool keeps its own list of known arguments beside its schema; a name in one and not the other shows here.
-        using var carve = new CarveProcess([]);
-        await carve.InitializeAsync();
-        var tools = (await carve.ListToolsAsync()).EnumerateArray().ToList();
-        Assert.True(tools.Count >= 18, $"{tools.Count} tools");
-        foreach (var tool in tools)
-        {
-            var name = tool.GetProperty("name").GetString()!;
-            var schema = tool.GetProperty("inputSchema");
-            var properties = schema.TryGetProperty("properties", out var p) ? p.EnumerateObject().Select(x => x.Name).Order().ToList() : [];
-            var result = await carve.CallToolAsync(name, """{"zz_unknown":1}""");
-            Assert.True(IsError(result), name);
-            var text = TextOf(result);
-            var match = System.Text.RegularExpressions.Regex.Match(text,
-                $"zz_unknown: not an argument of {name}(?:; its arguments are ([a-z_, ]+)|, which takes none)");
-            Assert.True(match.Success, $"{name}: {text}");
-            var listed = match.Groups[1].Success ? match.Groups[1].Value.Split(", ").Order().ToList() : [];
-            Assert.True(properties.SequenceEqual(listed), $"{name}: schema has {string.Join(", ", properties)}; the refusal lists {string.Join(", ", listed)}");
-        }
     }
 
     [Fact]

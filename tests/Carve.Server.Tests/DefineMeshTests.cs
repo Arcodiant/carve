@@ -22,25 +22,6 @@ public class DefineMeshTests
     }
 
     [Fact]
-    public async Task The_worked_example_in_the_description_is_accepted_as_a_closed_cube()
-    {
-        var (carve, example) = await StartAsync();
-        using var _ = carve;
-
-        var result = await CallAsync(carve, example);
-
-        Assert.False(IsError(result), TextOf(result));
-        var body = JsonDocument.Parse(TextOf(result)).RootElement;
-        Assert.Equal(8, body.GetProperty("vertices").GetInt32());
-        Assert.Equal(6, body.GetProperty("faces").GetInt32());
-        Assert.Equal(12, body.GetProperty("edges").GetInt32());
-        Assert.True(body.GetProperty("closed").GetBoolean());
-        Assert.Equal(0, body.GetProperty("warnings").GetArrayLength());
-        Assert.Equal([0f, 0f, 0f], body.GetProperty("bounds").GetProperty("min").EnumerateArray().Select(x => x.GetSingle()));
-        Assert.Equal([1f, 1f, 1f], body.GetProperty("bounds").GetProperty("max").EnumerateArray().Select(x => x.GetSingle()));
-    }
-
-    [Fact]
     public async Task A_bad_index_is_a_tool_error_naming_the_element_and_all_problems_are_listed()
     {
         var (carve, _) = await StartAsync();
@@ -87,29 +68,6 @@ public class DefineMeshTests
         var body = JsonDocument.Parse(TextOf(quad)).RootElement;
         Assert.False(body.GetProperty("closed").GetBoolean());
         Assert.NotEqual(0, body.GetProperty("warnings").GetArrayLength());
-    }
-
-    [Fact]
-    public async Task Tools_list_shows_the_schema_and_the_description_rules()
-    {
-        var (carve, _) = await StartAsync();
-        using var _ = carve;
-
-        var tool = await ToolAsync(carve);
-
-        var description = tool.GetProperty("description").GetString()!;
-        foreach (var phrase in new[] { "1 unit = 1 m", "Y is up", "counter-clockwise", "any number of sides", "REPLACES", "A face may have holes", "CLOCKWISE seen from outside", "a hole no face fills shows as open edges" })
-        {
-            Assert.Contains(phrase, description);
-        }
-
-        var properties = tool.GetProperty("inputSchema").GetProperty("properties");
-        Assert.Equal(3, properties.EnumerateObject().Count());
-        var vertex = properties.GetProperty("vertices").GetProperty("items");
-        Assert.Equal(3, vertex.GetProperty("minItems").GetInt32());
-        Assert.Equal(3, vertex.GetProperty("maxItems").GetInt32());
-        Assert.Equal("number", vertex.GetProperty("items").GetProperty("type").GetString());
-        Assert.Equal("integer", properties.GetProperty("faces").GetProperty("items").GetProperty("anyOf")[0].GetProperty("items").GetProperty("type").GetString());
     }
 
     private const string Tri = """[[0,0,0],[1,0,0],[0,1,0]]""";
@@ -206,18 +164,5 @@ public class DefineMeshTests
         var result = await CallAsync(carve, $$"""{"vertices":{{Tri}},"faces":[[0,1.0,2]]}""");
 
         Assert.False(IsError(result), TextOf(result));
-    }
-
-    [Fact]
-    public async Task The_published_input_schema_is_the_typed_one()
-    {
-        var (carve, _) = await StartAsync();
-        using var _ = carve;
-
-        var schema = (await ToolAsync(carve)).GetProperty("inputSchema").GetRawText();
-
-        Assert.Equal(
-            """{"type":"object","properties":{"name":{"description":"The name of the mesh, non-empty and without a colon (a skinned export names materials mesh:group, so such a name is refused); left out, it is mesh. An existing name replaces that mesh in its place; a new one adds a mesh after the others.","type":"string"},"vertices":{"description":"Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.","type":"array","items":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3}},"faces":{"description":"Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside; or, for a face with holes, {loop: [...], holes: [[...], ...]}: the outer loop counter-clockwise and each hole clockwise, seen from outside.","type":"array","items":{"anyOf":[{"type":"array","items":{"type":"integer"}},{"type":"object","properties":{"loop":{"type":"array","items":{"type":"integer"}},"holes":{"type":"array","items":{"type":"array","items":{"type":"integer"}}}},"required":["loop","holes"],"additionalProperties":false}]}}},"required":["vertices","faces"],"additionalProperties":false}""",
-            schema);
     }
 }

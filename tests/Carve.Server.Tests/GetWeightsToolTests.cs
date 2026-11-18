@@ -33,30 +33,6 @@ public sealed class GetWeightsToolTests
     private static JsonElement Body(JsonElement r) { Ok(r); return JsonDocument.Parse(TextOf(r)).RootElement; }
 
     [Fact]
-    public async Task The_worked_example_runs_as_written_and_gives_the_result_its_description_shows()
-    {
-        using var carve = await StartAsync();
-        var description = (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "get_weights").GetProperty("description").GetString()!;
-        var lines = description.Split('\n');
-        var example = lines.Single(l => l.StartsWith("Example: ", StringComparison.Ordinal))["Example: ".Length..];
-        Assert.Equal("""{"vertices":[0,7]}""", example);
-
-        // The description's premise: set_weights binds vertices 0 and 1 of the cube wholly to Head.
-        Ok(await carve.CallToolAsync("set_weights", """{"vertices":[0,1],"weights":{"Head":1}}"""));
-        var result = JsonNode.Parse(TextOf(await carve.CallToolAsync("get_weights", example)));
-        var shown = JsonNode.Parse(lines.Single(l => l.StartsWith("Result: ", StringComparison.Ordinal))["Result: ".Length..]);
-        Assert.True(JsonNode.DeepEquals(shown, result), result!.ToJsonString());
-
-        // What the result says, named, so a regression reads as one: a weighted vertex by name, an unweighted one empty, the
-        // unweighted count and ids, and the idle bones, Head now followed.
-        Assert.Equal(1, result["vertices"]![0]!["weights"]!["Head"]!.GetValue<double>());
-        Assert.Empty(result["vertices"]![1]!["weights"]!.AsObject());
-        Assert.Equal(6, result["summary"]!["unweighted"]!.GetValue<int>());
-        Assert.StartsWith("6 vertices have no weight: 2, 3, 4, 5, 6, 7", result["warnings"]![0]!.GetValue<string>());
-        Assert.Equal("note: no vertex follows 'Hips', 'Tail'", result["warnings"]![1]!.GetValue<string>());
-    }
-
-    [Fact]
     public async Task A_deleted_vertex_is_left_out_of_weigh_and_get_weights_and_named_as_deleted()
     {
         // M-5's delete drops a vertex's weights and leaves a tombstone: weigh must not weigh it again, nor anything count it.

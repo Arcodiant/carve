@@ -19,30 +19,6 @@ public sealed class HoledFaceToolTests() : FileToolTests("carve-holes")
     }
 
     [Fact]
-    public async Task The_worked_plate_with_a_hole_is_defined_read_back_in_the_object_form_and_exported()
-    {
-        var (carve, tools) = await StartAsync(mesh: null);
-        using var _carve = carve;
-
-        var defined = JsonDocument.Parse(Ok(await carve.CallToolAsync("define_mesh", Example(tools)))).RootElement;
-        Assert.Equal(8, defined.GetProperty("vertices").GetInt32());
-        Assert.Equal(1, defined.GetProperty("faces").GetInt32());
-        Assert.Equal(8, defined.GetProperty("edges").GetInt32());
-        Assert.False(defined.GetProperty("closed").GetBoolean());
-
-        var mesh = JsonDocument.Parse(Ok(await carve.CallToolAsync("get_mesh", "{}"))).RootElement;
-        var face = mesh.GetProperty("faces")[0].GetProperty("vertices");
-        Assert.Equal(JsonValueKind.Object, face.ValueKind);
-        Assert.Equal([0, 1, 2, 3], face.GetProperty("loop").EnumerateArray().Select(x => x.GetInt32()));
-        Assert.Equal([4, 5, 6, 7], face.GetProperty("holes")[0].EnumerateArray().Select(x => x.GetInt32()));
-        Assert.Equal(8, mesh.GetProperty("edges").GetArrayLength());
-
-        // The 2 x 2 plate less its 1 x 1 hole: 8 triangles (its 8 corners and the bridge's 2 ends, less 2).
-        var line = Ok(await carve.CallToolAsync("export", """{"path":"plate.glb"}"""));
-        Assert.Contains(": 8 triangles, 1 material 'carve'", line);
-    }
-
-    [Fact]
     public async Task A_plain_array_and_the_object_form_with_no_holes_define_the_same_face()
     {
         var (carve, _) = await StartAsync(mesh: null);

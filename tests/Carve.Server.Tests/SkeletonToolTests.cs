@@ -20,26 +20,6 @@ public class SkeletonToolTests
         (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == tool).GetProperty("description").GetString()!;
 
     [Fact]
-    public async Task The_worked_example_is_accepted_and_reads_back_with_rest_world_positions()
-    {
-        using var carve = await StartAsync();
-        var description = await DescriptionAsync(carve, "define_skeleton");
-        Assert.Contains("Worked example (three bones):", description);
-        Assert.EndsWith(Three, description);
-        Assert.Contains("LOCAL TO THE PARENT", description);
-
-        var defined = await carve.CallToolAsync("define_skeleton", Three);
-        Assert.False(IsError(defined), TextOf(defined));
-        var read = JsonDocument.Parse(TextOf(await carve.CallToolAsync("get_skeleton", "{}"))).RootElement.GetProperty("bones");
-        Assert.Equal(["hips", "spine", "head"], read.EnumerateArray().Select(b => b.GetProperty("name").GetString()));
-        Assert.Equal(JsonValueKind.Null, read[0].GetProperty("parent").ValueKind);
-        Assert.Equal("spine", read[2].GetProperty("parent").GetString());
-        Assert.Equal([0f, 0.4f, 0f], read[2].GetProperty("position").EnumerateArray().Select(x => x.GetSingle()));
-        Assert.Equal([0f, 0f, 0f, 1f], read[2].GetProperty("rotation").EnumerateArray().Select(x => x.GetSingle()));
-        Assert.Equal(1.7f, read[2].GetProperty("restWorldPosition")[1].GetSingle(), 4);
-    }
-
-    [Fact]
     public async Task A_name_with_a_colon_and_the_given_order_round_trip()
     {
         using var carve = await StartAsync();

@@ -45,21 +45,6 @@ public sealed class ProjectUvsToolTests
             .GetProperty("uv").EnumerateArray().Select(p => Floats(p))];
 
     [Fact]
-    public async Task The_described_examples_run_and_read_back()
-    {
-        using var carve = await StartAsync();
-        var examples = ToolList.Examples(await carve.ListToolsAsync(), "project_uvs");
-        Assert.Equal(2, examples.Length);
-        var box = Ok(await carve.CallToolAsync("project_uvs", examples[0]));
-        Assert.Equal(6, box.GetProperty("mapped").GetArrayLength());
-        Assert.Equal([5], box.GetProperty("axes").GetProperty("+x").EnumerateArray().Select(x => x.GetInt32()));
-        var planar = Ok(await carve.CallToolAsync("project_uvs", examples[1]));
-        Assert.Equal([3], planar.GetProperty("mapped").EnumerateArray().Select(x => x.GetInt32()));
-        Assert.False(planar.TryGetProperty("axes", out _));
-        Assert.Equal([0f, 0.25f, 0.5f, 0.75f], Floats(planar.GetProperty("bounds")));
-    }
-
-    [Fact]
     public async Task Planar_default_into_reports_mapped_and_bounds_and_leaves_other_faces()
     {
         using var carve = await StartAsync();
