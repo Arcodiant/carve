@@ -1,8 +1,11 @@
 # Security policy
 
 Carve is a local tool: an MCP server that an agent on your own machine starts
-over stdio. It reads and writes the files an agent names, relative to the folder
-it was started in, and opens no network port.
+over stdio. It opens no network port, and it is not a sandbox: it runs with your
+permissions and reads and writes whatever files the agent names (a relative path
+is taken from the folder it was started in, an absolute path is used as given),
+writes a log to the temp folder, and loads and runs the extension assemblies its
+configuration lists.
 
 ## Reporting a vulnerability
 

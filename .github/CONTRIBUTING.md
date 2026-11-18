@@ -16,8 +16,9 @@ dotnet test tests/Carve.Server.Tests --filter "Tier!=regression"
 
 The build treats warnings as errors. The regression tier and the scenarios under
 `scenarios/` render through Vulkan and need a GPU; `tests.json` lists every suite
-and its command, and `scripts/verify.ps1` runs the full check. CI runs only the
-two unit suites above, so say in your pull request whether you ran the GPU suites.
+and its command, and `scripts/verify.ps1` builds, runs every test project and the
+cube scenario. CI runs only the two unit suites above, so say in your pull request
+whether you ran the GPU suites.
 
 ## Conventions
 

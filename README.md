@@ -36,8 +36,8 @@ dotnet test tests/Carve.Server.Tests --filter "Tier!=regression"
 
 Those two suites need no GPU and are what CI runs. The regression tier and the
 scenarios under `scenarios/` render for real and need a Vulkan device;
-`tests.json` lists every suite and how to run it, and `scripts/verify.ps1`
-runs the full check.
+`tests.json` lists every suite and how to run it; `scripts/verify.ps1` builds,
+runs every test project and the cube scenario.
 
 ## From an empty file to a game
 

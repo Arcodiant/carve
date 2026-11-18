@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-55 — Review of T-109
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** T-109
 
@@ -35,13 +35,13 @@ description: >-
 
 It also loads, as code, the extension assemblies its configuration lists (`src/Carve.Server/Program.cs:33`). A security policy is the one document where a reader takes "relative to the folder it was started in" as a promise of confinement. It should say that paths are not confined (relative ones resolve from the start folder) and that the extensions it is configured with run as code. "Opens no network port" holds: the transport is stdio.
 
-**Outcome:** —
+**Outcome:** fixed: SECURITY.md now says Carve is not a sandbox: relative paths from the start folder, absolute paths as given, a temp-folder log, and the extension assemblies its configuration lists run as code.
 
 ### README and CONTRIBUTING say `scripts/verify.ps1` runs the full check; it runs one scenario
 
 `.github/CONTRIBUTING.md:18-19` and `README.md:38-40`, the sentence after "`tests.json` lists every suite". Rubric point 1. `scripts/verify.ps1` builds the solution, runs `dotnet test Carve.slnx`, and runs only the `cube` scenario (`scripts/verify.ps1:14-22`). It does not run the other twelve scenario suites in `tests.json` (`scenario-sky`, `-rig`, `-crate`, `-uvs`, `-shed`, `-export`, `-character`, `-soft`, `-materials`, `-cuts`, `-gatehouse`, `-orcward`). CONTRIBUTING asks contributors to "say in your pull request whether you ran the GPU suites", and they will read "the full check" as all of them. Say what it runs (every test project and the cube scenario), or point at `tests.json`'s `run` lines for the rest.
 
-**Outcome:** —
+**Outcome:** fixed: both now say `scripts/verify.ps1` builds, runs every test project and the cube scenario.
 
 ### The CI workflow has never run
 
@@ -52,7 +52,7 @@ From reading it, I expect it to pass:
 - I checked every class in `tests/Carve.Server.Tests` without `[Trait("Tier", "regression")]` for GPU use (`EngineHost`, `CarveProcess`, Vulkan, Glfw). The only hit is `RenderPumpTests` (tagged `unit`), which uses a fake `IRenderScene` and a fake `IModelGeometryLoader` and no device.
 - `Carve.Core.Tests` references no engine package.
 
-**Outcome:** —
+**Outcome:** fixed: As built now says the workflow's first run, on the push to `main` at `finish`, is its check.
 
 ## Summary
 
