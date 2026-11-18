@@ -34,7 +34,7 @@ description: >-
 - **Consequence:** the call does not pin the loop-count refusal. If that check were dropped or broken on either side, the call would still be refused for the other seven problems, and the test would still pass. The JSON comparison would catch a difference between the sides in the text, but not a check that is missing on both. Only a real equal-count refusal would cover it, for example placed before the first `bridge` with a loop of 3 that is a cycle of open edges. The cut family's labelled refusal (`merge_faces {"faces":[0,1]}`) has one problem, the stated one ("must be connected by shared edges").
 - **Severity:** Minor
 
-**Outcome:** no change needed: the family test's job is that the process and the harness answer alike, which holds for this call on both sides; the loop-count refusal itself is pinned at unit tier by MergeBridgeToolDefinitionTests (line 127, refused with "4 and 3" on a mesh where it is the only problem), so a break in that check fails there.
+**Outcome:** no change needed: the family test's job is that the process and the harness answer alike, which holds for this call on both sides; the loop-count refusal itself is pinned at unit tier by MergeBridgeToolDefinitionTests (line 127 asserts the refusal names "4 and 3"), so a break in that check fails there.
 
 ## Summary
 
