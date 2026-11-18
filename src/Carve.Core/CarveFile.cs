@@ -23,7 +23,7 @@ public sealed class CarveFileResult
     /// <summary>The model the file holds, every mesh, vertex, face, bone and clip in its place, or null when the file was refused.</summary>
     public Model? Model { get; }
 
-    /// <summary>The version the file was read as, 1 to 6, or 0 when the file was refused.</summary>
+    /// <summary>The version the file was read as, 1 to 6 or 8, or 0 when the file was refused.</summary>
     public int Version { get; }
 
     /// <summary>The model's only mesh, or null when the file was refused or holds several.</summary>
@@ -43,7 +43,7 @@ public sealed class CarveFileResult
 /// skeleton and the clips), read back bit-exact with every vertex, face and bone at its id. Undo history is not saved.
 /// </summary>
 /// <remarks>
-/// <para><see cref="Write(Model, string)"/> gives version 6 (T-74) for a model with a material, else version 5 (T-53) for a model with UVs or seams on some mesh, else version 4 (T-63) for a model with a holed face or a tombstone, and otherwise what earlier builds gave
+/// <para><see cref="Write(Model, string)"/> gives version 8 (T-101) for a model with a morph target on some mesh, else version 6 (T-74) for a model with a material, else version 5 (T-53) for a model with UVs or seams on some mesh, else version 4 (T-63) for a model with a holed face or a tombstone, and otherwise what earlier builds gave
 /// (version 3 with a smooth mesh or a hard edge, else version 2, byte for byte): the lowest version that holds the model,
 /// as the person ruled (2026-11-11). Version 4 is version 3 with faces that may have holes: a face is
 /// either a plain array of vertex ids, its outer loop, or the object <c>{"loop": [...], "holes": [[...], ...]}</c>, as
@@ -60,6 +60,11 @@ public sealed class CarveFileResult
 /// relative to the file's folder with <c>/</c> separators); and, after <c>colours</c> in a mesh, <c>materials</c>
 /// (<c>[{"material": name, "faces": [...]}, ...]</c>, grouped by name and ordered by first face), left out when no face has one.
 /// It is written only when the model has a material, so every other model is written as before, byte for byte.
+/// Version 8 (T-101) is version 6 with, after the last key of a mesh (<c>seams</c> when there are seams), <c>targets</c>: one
+/// object per line in definition order, <c>{"name": ..., "deltas": {"&lt;id&gt;": [dx, dy, dz], ...}}</c>, ids ascending, each
+/// delta written as positions are and read back bit-exact; a delta of (0, 0, 0) is never written. It is written only when some
+/// mesh has a target, so every other model is written as before, byte for byte. Version 7 is M-9's part tree (T-92), which
+/// this build neither writes nor reads.
 /// Version 3 (T-42) added, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or <c>"smooth"</c>) and
 /// <c>hard_edges</c> (vertex-id pairs, lower id first, in order).
 /// Version 2: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
@@ -67,7 +72,7 @@ public sealed class CarveFileResult
 /// <c>weights</c>; two-space indent, one vertex, face, colour, group, weighted vertex, bone or clip key per line, <c>\n</c>
 /// line ends and a newline at the end. Each float is the shortest text that reads back to the same <see cref="float"/>,
 /// each weight the shortest that reads back to the same <see cref="double"/>.</para>
-/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2 to 6, keys in any order and
+/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2 to 6 and 8, keys in any order and
 /// any whitespace, and holds the file to exactly what the tools accept: geometry to <see cref="PolygonMesh.Create"/>, bones
 /// to <see cref="Skeleton.Create"/>, weights to <see cref="VertexWeights.Raw"/>, clips to <see cref="Clip.Create"/>, the
 /// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.
@@ -79,10 +84,10 @@ public sealed class CarveFileResult
 public static class CarveFile
 {
     /// <summary>The version <see cref="Write"/> writes.</summary>
-    public const int Version = 6;
+    public const int Version = 8;
 
     /// <summary>The versions <see cref="Read(string)"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6];
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6, 8];
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
@@ -95,6 +100,9 @@ public static class CarveFile
     private const string MaterialsKey = "materials";
     private static readonly string[] FileKeysV6 = [VersionKey, MaterialsKey, "meshes", "skeleton", "clips"];
     private static readonly string[] MeshKeysV6 = ["name", VerticesKey, FacesKey, "colours", MaterialsKey, "groups", "weights", "shading", "hard_edges", "uvs", "seams"];
+    private const string TargetsKey = "targets";
+    private static readonly string[] MeshKeysV8 = [.. MeshKeysV6, TargetsKey];
+    private static readonly string[] TargetKeys = ["name", "deltas"];
     private static readonly string[] MaterialUseKeys = ["material", "faces"];
     private static readonly string[] MaterialFactorKeys = ["base_colour", "metallic", "roughness", "emissive", "occlusion", "double_sided"];
     private static readonly string[] MaterialKeys = ["name", .. MaterialFactorKeys, .. new Material("m").Textures.Select(t => t.Field)];
@@ -119,7 +127,7 @@ public static class CarveFile
         return Write(Model.Of(Model.DefaultName, mesh));
     }
 
-    /// <summary>The file's text for a model, version 2 to 6 as the remarks say. The same model always gives the same text.</summary>
+    /// <summary>The file's text for a model, version 2 to 6 or 8 as the remarks say. The same model always gives the same text.</summary>
     /// <exception cref="ArgumentException">A material has a texture, whose path needs the file's folder: use <see cref="Write(Model, string)"/>.</exception>
     public static string Write(Model model)
     {
@@ -172,7 +180,9 @@ public static class CarveFile
         // tombstone (T-64), so a model a version 2 or 3 file can hold is still written as before, byte for byte (T-42's rule and its tests).
         // Version 5 only when a mesh has UVs or seams (T-53, the person's ruling 2026-11-13).
         // Version 6 only when the model has a material (T-74), so every model without one is written as before, byte for byte.
-        var version = model.Materials.Count > 0 ? Version
+        // Version 8 only when a mesh has a morph target (T-101); version 7 is M-9's part tree (T-92), not written by this build.
+        var version = model.Meshes.Any(m => m.Mesh.Targets is not null) ? Version
+            : model.Materials.Count > 0 ? 6
             : model.Meshes.Any(m => m.Mesh.Uvs is not null) ? 5
             : model.Meshes.Any(m => m.Mesh.HasTombstones || m.Mesh.Faces.Any(f => f.HasHoles)) ? 4
             : model.Meshes.Any(m => m.Mesh.Shade is not null) ? 3 : 2;
@@ -251,13 +261,20 @@ public static class CarveFile
         var uvs = mesh.Uvs ?? MeshUvs.None;
         var mapped = uvs.MappedFaces;
         var seams = uvs.Seams;
-        w.List(3, "hard_edges", hard.Count, i => Ids([hard[i].Lo, hard[i].Hi]), mapped.Count > 0 || seams.Count > 0 ? "," : "");
+        var targets = mesh.Targets;
+        w.List(3, "hard_edges", hard.Count, i => Ids([hard[i].Lo, hard[i].Hi]), mapped.Count > 0 || seams.Count > 0 || targets is not null ? "," : "");
         // Version 5 (T-53): "uvs" and "seams", each left out when empty.
         if (mapped.Count > 0)
             w.List(3, "uvs", mapped.Count, i => $"{{\"face\": {mapped[i].ToString(CultureInfo.InvariantCulture)}, \"uv\": [{string.Join(", ", uvs.Of(mapped[i])!.Select(Uv))}]}}",
-                seams.Count > 0 ? "," : "");
-        if (seams.Count > 0) w.List(3, "seams", seams.Count, i => Ids([seams[i].Lo, seams[i].Hi]), "");
+                seams.Count > 0 || targets is not null ? "," : "");
+        if (seams.Count > 0) w.List(3, "seams", seams.Count, i => Ids([seams[i].Lo, seams[i].Hi]), targets is not null ? "," : "");
+        // Version 8 (T-101): "targets", one per line in definition order, left out when the mesh has none.
+        if (targets is not null) w.List(3, TargetsKey, targets.Count, i => TargetText(targets.All[i]), "");
     }
+
+    /// <summary>A morph target on one line: its name and its sparse deltas by vertex id, ids ascending, each float by its bits.</summary>
+    private static string TargetText(MorphTarget target) =>
+        $"{{\"name\": {Text(target.Name)}, \"deltas\": {{{string.Join(", ", target.Deltas.Select(d => $"\"{d.Key.ToString(CultureInfo.InvariantCulture)}\": {Vector(d.Value)}"))}}}}}";
 
     private static string Uv(Vector2 uv) => $"[{Number(uv.X)}, {Number(uv.Y)}]";
 
@@ -410,7 +427,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) is (2 or 3 or 4 or 5 or 6) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3 or 4 or 5 or 6 or 8) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
         }
     }
 
@@ -670,7 +687,7 @@ public static class CarveFile
     private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, int version, List<string> materialNames, List<MeshError> errors)
     {
         var before = errors.Count;
-        if (Fields(item, at, "a mesh", version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
+        if (Fields(item, at, "a mesh", version >= 8 ? MeshKeysV8 : version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
         var name = Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         f.TryGetValue(VerticesKey, out var vs);
         f.TryGetValue(FacesKey, out var fs);
@@ -794,9 +811,62 @@ public static class CarveFile
         if (version >= 3) shade = ReadShade(f, at, mesh, errors);
         MeshUvs? uvs = null;
         if (version >= 5) uvs = ReadUvs(f, at, mesh, errors);
+        MorphTargets? targets = null;
+        if (version >= 8) targets = ReadTargets(f, at, mesh, errors);
 
         if (errors.Count > before || name is null) return null;
-        return new NamedMesh(name, mesh.WithStyle(style).WithWeights(VertexWeights.Of(weights)).WithShade(shade).WithUvs(uvs));
+        return new NamedMesh(name, mesh.WithStyle(style).WithWeights(VertexWeights.Of(weights)).WithShade(shade).WithUvs(uvs).WithTargets(targets));
+    }
+
+    /// <summary>
+    /// Version 8's <c>targets</c> (T-101), optional: each <c>{"name": ..., "deltas": {"&lt;id&gt;": [dx, dy, dz], ...}}</c>, checked
+    /// as <see cref="MorphTarget.FromDeltas"/> checks it, every fault named by element: a bad or repeated name, a key that is
+    /// not a vertex id or names a vertex the mesh lacks or has deleted, a non-finite number, and a zero delta (never written).
+    /// </summary>
+    private static MorphTargets? ReadTargets(Dictionary<string, JsonElement> f, string at, PolygonMesh mesh, List<MeshError> errors)
+    {
+        if (!f.TryGetValue(TargetsKey, out var ts) || List(ts, $"{at}.{TargetsKey}", errors) is not { } list) return null;
+        var targets = new List<MorphTarget>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var k = 0;
+        foreach (var entry in list.EnumerateArray())
+        {
+            var e = Invariant($"{at}.{TargetsKey}[{k++}]");
+            var before = errors.Count;
+            if (Fields(entry, e, "a target", TargetKeys, errors) is not { } tf) continue;
+            var name = Required(tf, e, "name", "a target", errors) is { } n ? Str(n, $"{e}.name", errors) : null;
+            if (name is not null && MorphTarget.NameProblem(name) is { } bad) errors.Add(new MeshError($"{e}.name", bad));
+            else if (name is not null && !names.Add(name)) errors.Add(new MeshError($"{e}.name", $"a target named '{name}' comes earlier; target names must be unique in a mesh"));
+            if (Required(tf, e, "deltas", "a target", errors) is not { } ds) continue;
+            if (ds.ValueKind != JsonValueKind.Object)
+            {
+                errors.Add(new MeshError($"{e}.deltas", $"deltas is {Describe(ds)}; it is an object of vertex id to [dx, dy, dz]"));
+                continue;
+            }
+            var deltas = new List<KeyValuePair<int, Vector3>>();
+            var seen = new HashSet<int>();
+            var good = true;
+            foreach (var (key, value) in Pairs(ds, $"{e}.deltas", errors, ref good))
+            {
+                var d = $"{e}.deltas.{key}";
+                if (!int.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id.ToString(CultureInfo.InvariantCulture) != key)
+                {
+                    errors.Add(new MeshError(d, $"'{key}' is not a vertex id: each key of deltas is a vertex id written in decimal, as \"12\""));
+                    continue;
+                }
+                if (mesh.VertexProblem(id) is { } problem) { errors.Add(new MeshError(d, problem)); continue; }
+                if (!seen.Add(id)) { errors.Add(new MeshError(d, Invariant($"vertex {id} is given a delta earlier in this target; give each vertex once"))); continue; }
+                if (Floats(value, d, 3, "a delta is three numbers, [dx, dy, dz]", errors) is not { } xyz) continue;
+                var delta = new Vector3(xyz[0], xyz[1], xyz[2]);
+                if (delta == Vector3.Zero) errors.Add(new MeshError(d, Invariant($"the delta of vertex {id} is zero, and a zero delta is never written: leave the vertex out")));
+                else deltas.Add(KeyValuePair.Create(id, delta));
+            }
+            if (errors.Count > before || name is null) continue;
+            var made = MorphTarget.FromDeltas(mesh, name, deltas);
+            if (made.Target is { } target) targets.Add(target);
+            else errors.AddRange(made.Errors.Select(x => new MeshError($"{e}.{x.Element}", x.Message)));
+        }
+        return errors.Count > 0 ? null : MorphTargets.Of(targets);
     }
 
     /// <summary>Version 5's <c>uvs</c> and <c>seams</c> (T-53), each optional; every fault named by element.</summary>

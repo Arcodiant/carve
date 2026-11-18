@@ -63,6 +63,32 @@ public sealed class ModelStore
     }
 
     /// <summary>
+    /// As <see cref="OpenModel(Model, string)"/>, unless <paramref name="refuse"/> gives a reason for the current model, checked
+    /// under the same lock (open's refusal to replace morph targets, T-101): then null, pushing nothing, with that reason.
+    /// </summary>
+    public ModelSnapshot? OpenModel(Model model, string tool, Func<Model, string?> refuse, out string? problem)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        lock (_write)
+        {
+            problem = refuse(_current.Model);
+            return problem is null ? PushLocked(model, tool) : null;
+        }
+    }
+
+    /// <summary>As <see cref="OpenMesh(Model, string, string, out string?)"/>, unless <paramref name="refuse"/> gives a reason for the current model, checked under the same lock.</summary>
+    public ModelSnapshot? OpenMesh(Model file, string name, string tool, Func<Model, string?> refuse, out string? problem)
+    {
+        lock (_write)
+        {
+            problem = refuse(_current.Model);
+            if (problem is not null) return null;
+            var next = _current.Model.WithMeshFrom(file, name, out problem);
+            return next is null ? null : PushLocked(next, tool);
+        }
+    }
+
+    /// <summary>
     /// Takes the mesh <paramref name="name"/> from <paramref name="file"/> into the current model under the lock, as one step
     /// (<see cref="Model.WithMeshFrom"/>). Null, pushing nothing, with <paramref name="problem"/> saying why, when the file
     /// has no such mesh or its weights name bones the current skeleton does not have.
