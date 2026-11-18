@@ -28,7 +28,7 @@ public sealed class PbrReleaseTests
     {
         Material? built = null;
         var count = 0;
-        EngineHost.Run(kit =>
+        InProcessEngine.Run(kit =>
         {
             var pbr = new PbrMaterials(kit.Resources, kit.Textures, kit.Residency);
             built = pbr.Of(Both);
@@ -55,7 +55,7 @@ public sealed class PbrReleaseTests
         var data = MeshBridge.ToSubmeshedMeshData(mesh, space, out _, out _);
 
         var log = new List<(string When, int Textures, int Held, int Materials, int TableUsed)>();
-        EngineHost.Run(kit =>
+        InProcessEngine.Run(kit =>
         {
             var pbr = new PbrMaterials(kit.Resources, kit.Textures, kit.Residency);
             void Note(string when) => log.Add((when, kit.Resources.Residency.TextureCount, pbr.TextureCount, pbr.MaterialCount,
@@ -64,7 +64,7 @@ public sealed class PbrReleaseTests
             var textured = new[] { pbr.Of(Both) };
             var plain = new[] { pbr.Of(Plain) };
             Note("built");
-            var shots = new List<EngineHost.Shot>
+            var shots = new List<InProcessEngine.Shot>
             {
                 // Both drawn, so each takes its material-table entry; then the entity draws only the plain one.
                 new(gpu, textured, half, RenderView.Front),
