@@ -73,7 +73,7 @@ The arm, exactly as approved (sketch: M-21's *Decided at planning*):
 
 ### As built
 
-Built by Claude Sonnet 5.5 (the implementer). The frames are judged by a separate review agent (see Hand-off).
+Built by Claude Sonnet 5.5 (the implementer). The frames were judged by a separate review agent, also Claude Sonnet 5.5.
 
 - **What T-106 reads.** `samples/arm.carve` (a version 8 file, one mesh `mesh`: 338 vertices, 336 quads, smooth, targets `Bulk` and
   `Lean`, skeleton Shoulder > Elbow > Wrist with the Wrist at x 0.6 in the world (rest positions are local: 0, 0.3, 0.3), clip `Curl`:
@@ -111,13 +111,5 @@ Built by Claude Sonnet 5.5 (the implementer). The frames are judged by a separat
 
 - **Existing frames**: the cylinder's 12 morph frames are byte-identical to the untouched code's (`sha256` of each file); the other scenarios were not run (no tool or product code changed).
 - Engine needs: none. Files outside the worktree: none (evidence: `~\artifacts\carve\M-21\T-105\`).
-- Not checked: the frames by eye (the review agent's); `render_glb` of the arm (T-106); the scenario with the whole `server-regression` suite.
-
-### Hand-off
-
-Model: Claude Sonnet 5.5. Code is committed and `cairn task T-105 verify` passed (server-unit, core-unit, scenario-morph); the branch is rebased on origin/milestone/M-21 (T-108 landed, no conflicts) and what is left is the frame review by a separate agent, then `finish`.
-
-- **Frames to judge** (13 files, none opened by the implementer): `/c/Users/andre/artifacts/carve/M-21/T-105/run` (copied from `artifacts/scenarios/morph/4/frames/`): `arm-1-rest-z`, `arm-2-bulk-1-z`, `arm-3-bulk-half-lean-half-z`, `arm-4-lean-1-z`, `arm-5-bulk-1-front`, `arm-6-curl-1-bulk-1-z`, `arm-7-bad-1-normals-z`, and the six `-reopened` copies (byte-equal to 1 to 6, asserted by the scenario). To look for: Bulk thickens upper arm and forearm but not the elbow (rings 4 and 5) or the wrist (ring 9, 10); Lean is thinner all along; the mixed frame between them; the curled forearm stands up from the elbow (+Y) with Bulk's thickness; in frame 7 a spike under the arm at x 0.12 and the normals look; the corner view is the same arm from `front`. Then send the set to the person with `mcp__waystone__review` (copy to `G:\My Drive\artifacts\carve\M-21\T-105\round-1`).
-- **Done**: arm, targets, rig, clip, fault, frames as agreed (nothing in the agreed arm, targets, rig or frame list changed); samples; `ArmGeometry` Core test; CLAUDE.md layout rows; tests.json inputs; Verify line.
-- **Deviations to know** (not changes to the agreed items): the arm stage runs before the cylinder in the same scenario (a model cannot be emptied), the cylinder's `define_mesh` takes `drop_targets`, and the cylinder's frames are byte-identical; Wrist's local rest position is 0.3 (world 0.6); the +z frames are orthographic like T-103's; frame 7's silhouette probes next to the spike are filtered to the ray test's sure ones.
-- **Left**: frame review; `cairn lint`; `cairn task T-105 finish`. Not run: `server-regression`.
+- **Frame review** (Claude Sonnet 5.5, separate agent): the seven distinct frames opened and judged against the sketch (Bulk thickens upper arm and forearm, not elbow or wrist; Lean thinner; mixed between; Curl stands the forearm up with Bulk's thickness; Bad spike under the arm at x 0.12); the six `-reopened` copies are byte-equal to frames 1 to 6 by sha256. Sent to the person as `G:\My Drivertifacts\carve\M-21\T-105ound-1`: **approved**, no notes, the departures above accepted.
+- Not checked: `render_glb` of the arm (T-106); the scenario with the whole `server-regression` suite.
