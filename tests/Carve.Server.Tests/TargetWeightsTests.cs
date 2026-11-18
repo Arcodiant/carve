@@ -137,6 +137,37 @@ public sealed class TargetWeightsTests() : TempFolderTests("carve-target-weights
     }
 
     [Fact]
+    public async Task Check_at_a_weight_still_judges_a_target_against_the_rest_mesh_not_the_mesh_at_that_weight()
+    {
+        using var carve = await StartAsync(Cube);
+        await Target(carve, "Inside", Inside);
+
+        // Inside at weight 1 lowers the top to y 0.5, so the sides are still faces; judged from that mesh, weight 1 would take the top to y 0 and
+        // collapse them. Judged from rest, as it must be, the same four sides turn over and none collapses.
+        var body = Body(await carve.CallToolAsync("check", """{"targets":{"Inside":1}}"""));
+        var flips = Problems(body, "target-flips-face");
+        Assert.Single(flips);
+        Assert.Contains("4 faces turn against the rest normal: faces[0], faces[1], faces[4], faces[5];", flips[0]);
+        Assert.Empty(Problems(body, "target-collapses-face"));
+    }
+
+    [Fact]
+    public async Task A_face_with_no_area_at_rest_is_not_reported_as_a_target_collapsing_it()
+    {
+        // Face 0 is a quad; face 1 a triangle whose corners lie on a line, so it has no area at rest and none at weight 1.
+        // define_mesh and move refuse a face with no area, so the triangle is drawn with some and its corner then set onto its line in the store.
+        using var carve = await StartAsync("""{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[5,0,0],[6,0,0],[7,1,0]],"faces":[[0,1,2,3],[4,5,6]]}""");
+        var drawn = carve.Store.Current.Mesh!;
+        carve.Store.Replace(drawn.WithVertices([.. drawn.Vertices.Take(6), new System.Numerics.Vector3(7, 0, 0)]));
+        await Target(carve, "Flat", """{"2":[1,0,0],"3":[0,0,0]}""");
+
+        var collapsed = Problems(Body(await carve.CallToolAsync("check", "{}")), "target-collapses-face");
+        Assert.Single(collapsed);
+        Assert.Contains("1 face has no area but had some at rest: faces[0];", collapsed[0]);
+        Assert.DoesNotContain("faces[1]", collapsed[0]);
+    }
+
+    [Fact]
     public async Task A_mesh_with_no_targets_checks_as_it_always_did()
     {
         using var carve = await StartAsync(Cube);
