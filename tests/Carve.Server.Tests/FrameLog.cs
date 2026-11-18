@@ -54,15 +54,21 @@ internal static class FrameLog
     /// <summary>The test that made the call, so a differing frame can be traced to it.</summary>
     private static string Test => TestContext.Current.Test?.TestDisplayName ?? "-";
 
-    /// <summary>Each distinct frame once, as <c>server-regression-frames/&lt;hash&gt;.png</c> beside the table.</summary>
-    private static void Keep(string file, string hash, byte[] png)
+    /// <summary>
+    /// Each distinct frame once, as <c>server-regression-frames/&lt;hash&gt;.png</c> beside the table. Under the lock:
+    /// overlapping calls answer on their own threads, often with the same frame, and two writers of one file collide.
+    /// </summary>
+    internal static void Keep(string file, string hash, byte[] png)
     {
-        var folder = Path.Combine(Path.GetDirectoryName(file)!, "server-regression-frames");
-        Directory.CreateDirectory(folder);
-        var path = Path.Combine(folder, hash + ".png");
-        if (!System.IO.File.Exists(path))
+        lock (Writing)
         {
-            System.IO.File.WriteAllBytes(path, png);
+            var folder = Path.Combine(Path.GetDirectoryName(file)!, "server-regression-frames");
+            Directory.CreateDirectory(folder);
+            var path = Path.Combine(folder, hash + ".png");
+            if (!System.IO.File.Exists(path))
+            {
+                System.IO.File.WriteAllBytes(path, png);
+            }
         }
     }
 
