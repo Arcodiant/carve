@@ -38,6 +38,21 @@ public class PlanksGraphTests
         return image.Data;
     }
 
+    // The built-in nodes, height_to_normal's radius among them, give the same bytes in any band height as in one band.
+    [Theory]
+    [InlineData(OutputRole.BaseColour)]
+    [InlineData(OutputRole.Normal)]
+    [InlineData(OutputRole.Roughness)]
+    [InlineData(OutputRole.Occlusion)]
+    public void ThePlanksGiveTheSameBytesBandedAsWhole(OutputRole role)
+    {
+        const int size = 64;
+        var g = Planks();
+        var whole = OutputImage.Rgba8(new GraphEvaluator(g), role, size, bandRows: size);
+        foreach (var rows in new[] { 1, 3, 7, 32 })
+            Assert.True(whole.AsSpan().SequenceEqual(OutputImage.Rgba8(new GraphEvaluator(g), role, size, bandRows: rows)), $"{OutputRoles.Name(role)} in bands of {rows} rows differs from one band");
+    }
+
     [Fact]
     public void TheGraphIsSizedAt256WithAllFourOutputs()
     {
