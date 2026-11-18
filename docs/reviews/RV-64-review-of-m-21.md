@@ -202,7 +202,9 @@ description: >-
 - **Consequence:** If `MorphWeights` and `SkinnedPose` on one entity do not combine as claimed, nothing here fails.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `scenario-morph` now draws `render_glb` of the exported arm with `clip` Curl at time 1 and `targets` Bulk 1 (`arm-11-glb-curl-bulk-1-z`, `ArmStages.cs` `ExportAndCompareAsync`) against frame 6 of `render` at the same pose, weight and view: 0 of 262144 pixels differ under D-6's rule. A control, `render_glb` at Bulk 0 posed against that render, differs in 11258 pixels (largest patch 4116) and must fail the rule; `Every_render_glb_frame_passes_the_frame_rule_and_the_control_fails_it` now expects the four good rows and both controls. `CARVE_MORPH_BREAK=glbclipweights` (no `targets` when a `clip` is given) fails the run: `arm-11-glb-curl-bulk-1-z: render_glb differs from render in 11258 of 262144 pixels`. The 30 earlier frames are byte-identical by hash to a run before the change. Written on Sonnet 5.5, commit 86c10c7.
 
 ### `render_glb`'s range and type refusals are tested only at regression tier
 
@@ -244,7 +246,9 @@ description: >-
 - **Consequence:** A change to the not-planar fold or to the arm's ray test does not re-trigger the suites that depend on it.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `core-unit` now lists `scenarios/Carve.Scenario.Morph/ArmPlan.cs`, `scenarios/Carve.Scenario.Crate/CameraPixels.cs` and the globs `samples/*.carve` and `tests/Carve.Core.Tests/Fixtures/*.carve` (the files `Every_committed_file_rereads_and_rewrites_equal` reads; the named sample entries it replaces are covered); `scenario-morph` lists `scenarios/Carve.Scenario.Soft/NotPlanarFold.cs`. The `Compile Include` links of the three projects hold no other file the suites miss. Commit 86c10c7.
 
 ### The not-planar pin fails if the export becomes clean
 
@@ -253,7 +257,9 @@ description: >-
 - **Consequence:** If T-127 or a subdivide change makes the quads planar, the scenario fails on a correct product.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** New `NotPlanarFold.CheckExport` takes the export text: no warnings passes when select finds no non-planar face and fails when it finds some; with warnings it is the existing `Check`, so any other warning still fails. `ArmStages.cs` and `The_export_is_clean` use it; `NotPlanarFoldCheckTests` (unit) shows a clean export passing with none selected and failing with some, warnings failing with none selected, and another warning failing. Commit 86c10c7.
 
 ### Garbled control characters in an As built path
 
