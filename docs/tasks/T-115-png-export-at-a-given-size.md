@@ -4,7 +4,7 @@ description: >-
 ---
 # T-115 — PNG export at a given size
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
