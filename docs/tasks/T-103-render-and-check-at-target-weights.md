@@ -55,7 +55,7 @@ mesh before it ever reaches a game.
 - `scenario-morph` does not exist until T-103 adds it to `tests.json`. Add it to this item's `**Verify:**` line once it is there (`cairn lint` refuses an unknown suite before then).
 - Owns `RenderTool.cs`, `CheckTool.cs`, `MeshHealth.cs`, `tests.json` and `Carve.slnx` in its wave. T-104 runs
   beside it in other files; a conflict that only adds is settled by keeping both sides.
-- Evidence: `C:\Users\andre\artifacts\carve\M-21\T-103\` (absolute; `artifacts/` is ignored and `finish` does
+- Evidence: `~\artifacts\carve\M-21\T-103\` (absolute; `artifacts/` is ignored and `finish` does
   not carry it).
 - **Goes back to the person, stop and ask:** the 0 to 1 weight range (the planner's default, not yet the
   person's ruling); any threshold in the three rules beyond those named; any existing frame that changes.

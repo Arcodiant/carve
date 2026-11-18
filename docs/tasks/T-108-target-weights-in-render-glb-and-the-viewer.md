@@ -44,7 +44,7 @@ component and its GPU morph-before-skin. A person can drag a dial live.
 ## Notes
 
 - Owns `RenderGlbTool.cs`, `GlbScene.cs` (the render side) and the viewer.
-- Evidence: `C:\Users\andre\artifacts\carve\M-21\T-108\`.
+- Evidence: `~\artifacts\carve\M-21\T-108\`.
 - **Goes back to the person, stop and ask:** any difference beyond D-6's frame rule between `render_glb` and
   `render` at the same weights (only the person loosens it); a key or panel change from the sketch.
 - Sonnet.

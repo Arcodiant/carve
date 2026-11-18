@@ -178,7 +178,7 @@ Written 2026-11-13 by the research agent (Opus 5.5) against `milestone/M-6` at `
 
 **Frame and file guard** (T-53 adds no frame and changes no committed file):
 
-1. Before the first code, at `72049e7`, run `cairn task T-53 verify` from `D:\Repos\carve\branches\task\T-53`. Save its frames' `all.sha256` (path-relative, as T-68 did) to `D:\Repos\carve\branches\milestone\M-6\artifacts\review\T-53\frames-before\all.sha256`, and the SHA-256 of every `git ls-files '*.carve'` file to `...\T-53\carve-before.sha256`.
+1. Before the first code, at `72049e7`, run `cairn task T-53 verify` from `branches\task\T-53`. Save its frames' `all.sha256` (path-relative, as T-68 did) to `branches\milestone\M-6\artifacts\review\T-53\frames-before\all.sha256`, and the SHA-256 of every `git ls-files '*.carve'` file to `...\T-53\carve-before.sha256`.
 2. At the hand-off commit, run the same again into `frames-after\` and `carve-after.sha256`. Compare by path: every frame byte-identical, none missing, none new; every `.carve` hash unchanged; `git diff --stat 72049e7 -- samples tests/Carve.Core.Tests/Fixtures` empty.
 3. Give the job ids and the counts in As built.
 

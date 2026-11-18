@@ -189,7 +189,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
     - **The person accepted the new pin (2026-11-16).**
 - **Frames:**
   - Against `main` at 5bc4559, 10 of 16 `scenario-cuts` frames and 23 of 26 `scenario-gatehouse` frames changed under PBR. `scenario-uvs` changed 0 of 22.
-  - **The person approved 16 pairs** (`C:\Users\andre\artifacts\carve\M-19\rebase\round-1`) on 2026-11-16.
+  - **The person approved 16 pairs** (`~\artifacts\carve\M-19\rebase\round-1`) on 2026-11-16.
 - **`cairn milestone M-19 verify` at df70148:** every check but `review` passes, across 15 suites (7 ran, 8 carried). df70148, like 91bb472 and T-82's and T-84's baselines eded55f and 91438b0, is a commit from before a later rebase and not an ancestor of the branch now.
 - **Not checked:**
   - The colour and wall breaks were worked in the light model, not by breaking the product.

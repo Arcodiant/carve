@@ -67,7 +67,7 @@ Failure case: a client that reads the result as the description gives it, `"rota
 
 ## Findings: scenarios and frame checks
 
-Reviewer: Opus 5.5 (claude-opus-5-5). The worktree is `C:\repos\carve\branches\milestone\M-19` at e07fc76, and the diff is `720a6fa...HEAD`. Paths below are relative to the worktree.
+Reviewer: Opus 5.5 (claude-opus-5-5). The worktree is `branches\milestone\M-19` at e07fc76, and the diff is `720a6fa...HEAD`. Paths below are relative to the worktree.
 
 ### Orcward's luma rule cannot see the trousers drawn in the band's red (or the reverse)
 `scenarios/Carve.Scenario.Orcward/ComparisonPng.cs:28-30`, `OrcwardScenario.cs:198-222`. Rubric points 1 and 2.
@@ -81,7 +81,7 @@ The scenario therefore does not show that "a game's load matches the preview" in
 
 ### `ColourRule.cs` is missing from the inputs of six suites that compile it, `scenario-sky` among them
 `tests.json:104-123` (`scenario-sky`), `:425-452` (`scenario-orcward`), and the `scenario-character`, `scenario-soft`, `scenario-shed` and `scenario-uvs` entries. Rubric point 6.
-cairn's `dotnet-closure` follows `ProjectReference`s and project folders only (`C:\repos\cairn\scripts\cairn\generators.py`). It does not follow linked `<Compile Include="../...">` items, which is why these entries list `CrateBuild.cs`, `GardenerSpec.cs` and so on by hand.
+cairn's `dotnet-closure` follows `ProjectReference`s and project folders only (`<cairn>\scripts\cairn\generators.py`). It does not follow linked `<Compile Include="../...">` items, which is why these entries list `CrateBuild.cs`, `GardenerSpec.cs` and so on by hand.
 `ColourRule.cs` is linked by the Sky, Orcward, Character, Soft, Shed and Uvs projects. The Character, Shed and Uvs links are new in this diff. Only `scenario-cuts` and `scenario-gatehouse` list it.
 Failure case: change `SkyLight`'s coefficients or `Light`. `scenario-sky` exists to hold `ColourRule` to the measured sky, yet it carries its pass, and so do Orcward, Character, Soft, Shed and Uvs, whose lit-palette and "not highlighted" checks depend on the file.
 

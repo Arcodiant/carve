@@ -84,7 +84,7 @@ Agent: Sonnet (claude-sonnet-5-5).
 - **Tests.** `LoopCutTests` (Core unit, 20) and `LoopCutToolTests` (Server regression, 2). Core: the cube's closed ring; an open strip stopping at its ends, started on an end rung and on a middle rung; a triangle stop; a holed face stop; two fractions; the side kept across a quad whose loop runs the other way (from vertex 0 or 3 on the cube, and a trapezoid strip with a reversed quad); ids (8..11, 6..9, `split` kept id first) and determinism; weights blended at the fraction; each refusal, incl. a mid-ring non-manifold edge.
 - **Cuts stage** (`scenarios/Carve.Scenario.Cuts/LoopCutStage.cs`, one line in `CutsStages.cs`): the 1 x 2 x 1 box, `loop_cut {edge:[0,3], at:[0.45,0.55]}` (16 vertices, 14 faces, closed, each split face three pieces, new vertices at y 0.9 and 1.1 from get_mesh), frame `loop-cut-wireframe` from `[0.6, 0.35, 1]` with the 8 loop edges highlighted (the existing `Look`, `Line` and `NotLine` checks, as `PlaneCutStage` uses them), then the band's front face extruded by 0.1 (20 vertices, 18 faces, z = 1.1 from get_mesh) and frame `loop-cut-band-extruded` shaded (probes on the band's front, top and right; the same-shade-per-face and background checks). No new pixel check or threshold.
 
-**Breaks** (each applied alone by `C:/Users/andre/AppData/Local/Temp/t66/breaks.py`, then restored; `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-66/breaks.log`):
+**Breaks** (each applied alone by `%TEMP%/t66/breaks.py`, then restored; `branches/milestone/M-5/artifacts/review/T-66/breaks.log`):
 
   | Check | Break | Result |
   |---|---|---|
@@ -105,7 +105,7 @@ Agent: Sonnet (claude-sonnet-5-5).
   | Cuts: ring round all four sides; both loops; loops where the fractions say; highlight set | each broken | run failed |
   | Cuts: the band out by 0.1 | distance 0.05 | first run passed (the ray test follows the geometry), so the z check from get_mesh was added; rerun failed |
 
-**Frames.** `cairn task T-66 verify` passed (ran 10, carried 1) on `60ed146`. The seven scenario runs (jobs `J-20261112-161347-5a96e6` to `-161409-643ce0`, each `carve@60ed146`) were fetched by job id into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-66/frames-60ed146/`, 135 frames, listed in `all.sha256` there. Against T-65's `frames-aae1140/all.sha256` (133 frames; T-67 had landed nothing): none differs, none is missing. Two new, the same hashes as the local run:
+**Frames.** `cairn task T-66 verify` passed (ran 10, carried 1) on `60ed146`. The seven scenario runs (jobs `J-20261112-161347-5a96e6` to `-161409-643ce0`, each `carve@60ed146`) were fetched by job id into `branches/milestone/M-5/artifacts/review/T-66/frames-60ed146/`, 135 frames, listed in `all.sha256` there. Against T-65's `frames-aae1140/all.sha256` (133 frames; T-67 had landed nothing): none differs, none is missing. Two new, the same hashes as the local run:
 
   | Frame | sha256 |
   |---|---|

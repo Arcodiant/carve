@@ -30,7 +30,7 @@ proves the descriptions teach the job.
 - **Plant:** the brief's second file has one face wound the other way, a topology mismatch the error names. The
   agent can fix it without guessing the person's intent (M-4 and M-5 lessons). Recovery is judged by the error
   being understood and the file fixed.
-- Evidence: transcripts, the `.carve` and `.glb`, and frames, in `C:\Users\andre\artifacts\carve\M-21\T-107\`.
+- Evidence: transcripts, the `.carve` and `.glb`, and frames, in `~\artifacts\carve\M-21\T-107\`.
   The frames go to the person.
 - A description changed after a round is listed with its reason.
 

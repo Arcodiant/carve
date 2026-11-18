@@ -19,11 +19,25 @@ path to where this repo is checked out):
 }
 ```
 
-It needs the .NET SDK, the Empyrean package feed (the local feed `empyrean-local` in
-`NuGet.config`, `http://localhost:5555/v3/index.json`; without it `dotnet run` cannot restore),
-and a Vulkan device (a GPU with a current driver); there
-is no window, every look is an offscreen render. If no device is found the
-server stays up and the `render` tool says so.
+It needs the [.NET 10 SDK](https://dotnet.microsoft.com/download) and a Vulkan
+device (a GPU with a current driver). Every package, including the
+[Empyrean](https://www.nuget.org/packages/Arcodiant.Empyrean) engine, comes from
+nuget.org, so the first `dotnet run` restores everything. There is no window;
+every look is an offscreen render. If no device is found the server stays up
+and the `render` tool says so.
+
+## Build and test
+
+```
+dotnet build Carve.slnx
+dotnet test tests/Carve.Core.Tests --filter "Tier!=regression"
+dotnet test tests/Carve.Server.Tests --filter "Tier!=regression"
+```
+
+Those two suites need no GPU and are what CI runs. The regression tier and the
+scenarios under `scenarios/` render for real and need a Vulkan device;
+`tests.json` lists every suite and how to run it; `scripts/verify.ps1` builds,
+runs every test project and the cube scenario.
 
 ## From an empty file to a game
 
@@ -76,3 +90,7 @@ Each of these edits the mesh in place and appends new ids at the end; each examp
 - `bridge` joins two open loops of vertices with a band of faces, which closes an opening left by `delete`; on `bridge`'s own example, two unit squares facing each other, this makes a box: `{"loops":[[0,1,2,3],[4,5,6,7]]}`.
 
 A window through a wall is `knife` on the front and the back, `delete` of both pieces, then `bridge` of the two loops.
+
+## License
+
+Carve is released under the [MIT license](LICENSE).

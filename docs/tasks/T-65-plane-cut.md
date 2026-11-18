@@ -125,7 +125,7 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
 
 **Tests.** `tests/Carve.Core.Tests/FaceSplitTests.cs` (unit, 15): the cube's top split in two with its neighbours taking the new vertices and keeping their ids, closed; a triangle cut through a vertex (corner 0 on the cut, corner 1 decides); the id rule on a square both ways off corner 0 and on both diagonals, and on a hexagon cut 0-3 and 1-3, where corners 0 and 1 are both on the cut and corner 2 decides; a holed plate cut through the hole (the hole loop in both outlines, areas 6 and 6) and beside it (the hole kept in the piece around it, both ways round); a vertex on a shared edge made once when the two faces give it from opposite ends; the tolerance (a point at half of it is the vertex, at twice it new, two points closer than it one vertex); determinism over two runs of three cuts; colour, groups, smooth mode and split hard edges carried, the new edge soft; weights blended by fraction, capped at four and renormalised; a segment along an edge or to itself splitting nothing; every refusal's text, the one-piece refusal for a lone bridge to a hole and for the same bridge beside a cut that does divide the face; a failed split leaving the mesh and reporting no split, and `move` reporting none. `DeleteToolTests` (server regression) checks `split` is `[]` in delete's report. Core 636 passed, server unit 279 and `DeleteToolTests` 2 passed, by `dotnet test` here.
 
-**Breaks** (each applied alone by `C:/Users/andre/AppData/Local/Temp/t65/breaks.py`, built with warnings as errors, `FaceSplitTests` or `DeleteToolTests` run, restored; output in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/breaks.log`):
+**Breaks** (each applied alone by `%TEMP%/t65/breaks.py`, built with warnings as errors, `FaceSplitTests` or `DeleteToolTests` run, restored; output in `branches/milestone/M-5/artifacts/review/T-65/breaks.log`):
 
   | Check | Break | Result |
   |---|---|---|
@@ -155,7 +155,7 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
   | `Split` lists the kept id first | the kept id left out | 3 fail |
   | every report carries `split` | the key left out of `MeshToolSupport.Edit` | 1 fails (`DeleteToolTests`) |
 
-**Frames:** none taken. Nothing here changes a frame: the report gains a key, and no stage cuts yet. The hash check against T-64's 127 (`D:/repos/carve/branches/milestone/M-5/artifacts/review/T-64/frames-737853a/all.sha256`) is for the agent that runs the GPU suites.
+**Frames:** none taken. Nothing here changes a frame: the report gains a key, and no stage cuts yet. The hash check against T-64's 127 (`branches/milestone/M-5/artifacts/review/T-64/frames-737853a/all.sha256`) is for the agent that runs the GPU suites.
 
 **The person's rulings (2026-11-12), on the first agent's hand-off:**
 
@@ -201,7 +201,7 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
     - the faces `Fill` away from lines;
     - on the faces turned to the camera, the three cut edges in sight are `Line` orange and every other edge in sight is `NotLine` orange. These are the crate's highlight checks, over the faces' fill, not over the background.
 
-**Breaks** (each applied alone by `C:/Users/andre/AppData/Local/Temp/t65/breaks2.py`, built with warnings as errors, `PlaneCutTests`, `PlaneCutToolTests` or the Cuts scenario run on this machine, then restored; output appended to `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/breaks.log`):
+**Breaks** (each applied alone by `%TEMP%/t65/breaks2.py`, built with warnings as errors, `PlaneCutTests`, `PlaneCutToolTests` or the Cuts scenario run on this machine, then restored; output appended to `branches/milestone/M-5/artifacts/review/T-65/breaks.log`):
 
   | Check | Break | Result |
   |---|---|---|
@@ -235,7 +235,7 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
 
   The one `undo` step per call has no break of its own. It is the store's one `Edit`, as for every edit tool, and `PlaneCutToolTests` checks that one `undo` restores the cube.
 
-**Frames:** the Cuts scenario was run on this machine (`scripts/run-scenario.ps1 cuts`, outcome passed) on `69f9afa`. Its six existing frames are byte-identical to T-64's `cuts-frames.sha256`. The run's nine frames and their list are in `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/cuts-local-69f9afa/`.
+**Frames:** the Cuts scenario was run on this machine (`scripts/run-scenario.ps1 cuts`, outcome passed) on `69f9afa`. Its six existing frames are byte-identical to T-64's `cuts-frames.sha256`. The run's nine frames and their list are in `branches/milestone/M-5/artifacts/review/T-65/cuts-local-69f9afa/`.
 
 **The person's rulings (2026-11-12), on the second agent's hand-off:**
 
@@ -247,11 +247,11 @@ First agent: Opus (claude-opus-5-5). **`FaceSplit` with its tests, `EditResult.S
 
 **Third agent: Opus (claude-opus-5-5).** Recorded the rulings, added the non-manifold test and its break, and ran the GPU suites on the final code commit.
 
-**Frames (GPU run of `3a809ec`, whose last code commit is `e3c1ca9`):** `cairn task T-65 verify` passed, ran 8, carried 3. The shed, cuts, export, character and soft runs (jobs `J-20261112-151319-1f83cc` to `-151327-d2c189`, each `carve@3a809ec`) were fetched with `cairn test artifacts` into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/frames-e3c1ca9/`, with their list in `all.sha256` there. Their 51 frames that T-64's 127 also has are byte-identical. The three new ones match the local run: `plane-cut-below-back` `fc88fdeb...`, `plane-cut-below-front` `81c9a77d...`, `plane-cut-both-wireframe` `d1bcda5a...`. T-68 had landed nothing on `origin/milestone/M-5`, so no T-68 frames are in the baseline. **Not hash-checked on this commit:** cube (32 frames) and crate (44). Verify carried them from `40a51d5` (their inputs unchanged), and `cairn test artifacts scenario-cube` returns the latest run, which was T-68's (`1cccc9a`), not this member's. The `40a51d5` job ids are not in the local queue records. A forced fresh run was not tried, since `cairn test submit` carries them again.
+**Frames (GPU run of `3a809ec`, whose last code commit is `e3c1ca9`):** `cairn task T-65 verify` passed, ran 8, carried 3. The shed, cuts, export, character and soft runs (jobs `J-20261112-151319-1f83cc` to `-151327-d2c189`, each `carve@3a809ec`) were fetched with `cairn test artifacts` into `branches/milestone/M-5/artifacts/review/T-65/frames-e3c1ca9/`, with their list in `all.sha256` there. Their 51 frames that T-64's 127 also has are byte-identical. The three new ones match the local run: `plane-cut-below-back` `fc88fdeb...`, `plane-cut-below-front` `81c9a77d...`, `plane-cut-both-wireframe` `d1bcda5a...`. T-68 had landed nothing on `origin/milestone/M-5`, so no T-68 frames are in the baseline. **Not hash-checked on this commit:** cube (32 frames) and crate (44). Verify carried them from `40a51d5` (their inputs unchanged), and `cairn test artifacts scenario-cube` returns the latest run, which was T-68's (`1cccc9a`), not this member's. The `40a51d5` job ids are not in the local queue records. A forced fresh run was not tried, since `cairn test submit` carries them again.
 
 **Fourth agent: Opus (claude-opus-5-5).** Rebased onto `origin/milestone/M-5` after T-68 landed (`merge_faces`, `bridge`, `MergeBridgeStage`). Two add-only conflicts, both sides kept: `Program.cs`'s tool list (`PlaneCutTool` after `BridgeTool`) and `CutsStages.cs` (`PlaneCutStage` after `MergeBridgeStage`). The rebased tree built with no warnings and the unit suites passed here (Core 676, Server 662, ModelViewer 15), so the rebase needed no fix commit.
 
-**Frames (GPU run of `aae1140`, the rebased last code commit):** `cairn task T-65 verify` passed, ran 10, carried 1 (viewer-cube, from `99c846e`). Cube and crate ran fresh, which settles the third agent's open question. The seven scenario runs (jobs `J-20261112-153155-852077` to `J-20261112-153206-0bbf28`, the `job` line of each `output.log` reading `carve@aae1140...`) were fetched by job id into `D:/repos/carve/branches/milestone/M-5/artifacts/review/T-65/frames-aae1140/`, 133 frames, listed in `all.sha256` there. The baseline is T-64's 127 (`T-64/frames-737853a/all.sha256`) plus T-68's three new Cuts frames (`bridge-slab`, `bridge-slab-ortho`, `merge-plate-wireframe`, from `T-68/frames-990b937/all.sha256`), 130 in all. All 130 are byte-identical, none is missing, and there are three new ones, each the same hash as the local and `e3c1ca9` runs:
+**Frames (GPU run of `aae1140`, the rebased last code commit):** `cairn task T-65 verify` passed, ran 10, carried 1 (viewer-cube, from `99c846e`). Cube and crate ran fresh, which settles the third agent's open question. The seven scenario runs (jobs `J-20261112-153155-852077` to `J-20261112-153206-0bbf28`, the `job` line of each `output.log` reading `carve@aae1140...`) were fetched by job id into `branches/milestone/M-5/artifacts/review/T-65/frames-aae1140/`, 133 frames, listed in `all.sha256` there. The baseline is T-64's 127 (`T-64/frames-737853a/all.sha256`) plus T-68's three new Cuts frames (`bridge-slab`, `bridge-slab-ortho`, `merge-plate-wireframe`, from `T-68/frames-990b937/all.sha256`), 130 in all. All 130 are byte-identical, none is missing, and there are three new ones, each the same hash as the local and `e3c1ca9` runs:
 
   | Frame | sha256 |
   |---|---|
