@@ -183,34 +183,21 @@ the sky's new home.
 **One visible difference, not behaviour:** the engine thread's log lines carry the category `Carve.Hosting.EngineThread`
 where they said `Carve.Server.EngineThread`. No test or script reads it.
 
-### Hand-off
+**Frame guard: holds.** Evidence in `artifacts/T-111/` (ignored, in this worktree): `frames-before.tsv` and
+`frames-after.tsv` (991 rows each, built by `hashtable.py <root> <out>` from `before/` and `after/`), and the two
+logged `server-regression` runs `before2/` and `after2/`.
+- *Scenario suites:* all 466 PNG rows of the 15 suites are byte-identical, before (the start commit, on Xellotath)
+  against after (6be5cf6, or 543ca50 for sky, rig and crate, whose later commits touch only test code and docs; on
+  Mantorok).
+- *`server-regression`:* `tools/list` is the same two hashes in every run. The set of distinct (request, frame) pairs
+  is identical in `before/` (484fab5), `before2/` (41e38fd: 484fab5's tree with only the test-name logger) and
+  `after2/` (14afce8). Leaving out two tests, the whole table, counts included, is identical between `before2/` and
+  `after2/`. The two are timing races in the tests, seen on the before tree too: `RenderTests.A_render_after_define_mesh_returned_shows_that_mesh_with_renders_overlapping`
+  sends `render {}` while meshes are being defined, so which of three frames each render shows depends on timing
+  (`before/` and `before2/`, the same product code, differ in those counts: 79/82/78 against 82/81/76; this was the
+  "24a160af against 16ed43a9" difference); and `NamedMeshTests.A_render_with_the_lids_ids_drawn_on_a_later_model_is_refused_...`
+  renders until a race refuses one, so how many succeed varies (6be5cf6's one extra row; `after2/`, with the same
+  product code, does not have it).
 
-Handed off at the 60-call checkpoint by Claude Opus 5.5 (`claude-opus-5-5`); the code is committed, the frame guard is
-not yet settled.
-
-- **Done.** `src/Carve.Hosting` built and carve hosting through it (6be5cf6); guard extended; CLAUDE.md Layout rows;
-  `**Verify:**` names `server-regression`; the As built above states the host API. Builds clean; the guard,
-  `ToolHarnessTests` and `RenderPumpTests` pass locally (64 tests); `cairn lint` clean. Not yet run: `cairn task T-111
-  verify`.
-- **Frame evidence** in `artifacts/T-111/` (ignored, in this worktree): `before/<suite>/` the carried artifacts of every
-  scenario suite at the start commit (Xellotath) and the `server-regression` table at 484fab5 (Mantorok);
-  `frames-before.tsv` (990 rows) built by `hashtable.py <root> <out>`; `after/server-regression/` from 6be5cf6.
-- **Open: two differences in the server-regression table**, 484fab5 against 6be5cf6, both on Mantorok, `tools/list`
-  identical (11 rows): (1) one `render {}` frame, sent twice in a row with the same image, hashes `24a160af...` before
-  and `16ed43a9...` after; (2) one more `render {"view":"front","mesh":"lid","labels":"faces"}` frame after, from
-  `NamedMeshTests.A_render_with_the_lids_ids_drawn_on_a_later_model_is_refused_...`, a loop that renders until a race
-  refuses one, so its count varies by timing (not a frame change). (1) is not yet traced to a test: 14afce8 makes the
-  log name the test and keep each distinct frame as `server-regression-frames/<hash>.png`, and two runs were queued to
-  find it: `J-20261118-062354-cbcdeb` (commit 41e38fd, ref `refs/t111/before`: 484fab5's tree with only that logger)
-  and `J-20261118-062356-55d4df` (14afce8). Next: `cairn test wait` both, `cairn test artifacts <job> --out
-  artifacts/T-111/{before2,after2}/server-regression`, diff the tables with the test-name column, open the two frames
-  (cropped) and decide whether it is a timing-dependent test (then rerun to show it varies on the before tree too) or a
-  real change (then **stop and ask**, per the Notes).
-- **Scenario suites** queued at 6be5cf6 (J-20261118-061131-939a5f to -061151-2ed4bd, plus core-unit -061212-f26c04);
-  later commits touch only test code and docs, so they carry. Fetch each with `cairn test artifacts <suite> --out
-  artifacts/T-111/after/<suite>`, run `hashtable.py after frames-after.tsv` and diff the PNG rows against
-  `frames-before.tsv`. The before frames came from Xellotath; if an after job ran on another runner, a difference may be
-  the machine, so compare like with like (rerun the before commit on the same runner if needed).
-- **Surprising.** `server-regression` frames had no record at all, hence the test-only `FrameLog`. The guard's
-  allowed set had to gain `Carve.Hosting` (forbidden names unchanged); I judged that the change the Scope asks for,
-  not a loosening; say so if the person reads it otherwise.
+Finished by Claude Opus 5.5 (`claude-opus-5-5`), the second agent: it settled the frame guard above; no product code
+changed after 6be5cf6.
