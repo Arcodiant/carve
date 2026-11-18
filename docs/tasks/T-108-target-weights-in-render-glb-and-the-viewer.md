@@ -77,6 +77,7 @@ Built by Claude Sonnet 5.5.
   `render_glb` of the exported file at `Bulge` 0, 0.5 and 1, under D-6's frame rule (luma past 4 of 255, frame fails past 0.5 % or a patch
   past 50): 0 of 262144 pixels differ at every weight, so no difference to put to the person. A control (the file at 1 against the
   model at 0) fails the rule.
+- **Order of `render_glb`'s refusals (RV-65, Sonnet 5.5).** Told before any path error, as before a7c00c6: the clip and time, a target's type, and a weight that is not a number or is outside 0 to 1. Only a target's name waits for the file, since only the engine's loader knows the names. One call tells every bad entry, as `render` and `check` do: with a file, a type error and each entry's name or weight (a name before its weight); with no file or no engine, the types and weights without the names. With no `targets` to check, the clip and time problems stand alone as before. A refused weight is handed to `GlbScene.Prepare` as NaN, which `Prepare` refuses by itself, so it can never be drawn as 0.
 - **Not checked / the person's look.** The window panel: one window-mode run of mine (the exported cylinder, `--targets Bulge=0.6`)
   showed the panel top left with the bar, 0.60 and the key line, but another window covered part of the screenshot, so I did not judge
   the layout; no key was pressed (no input is scripted); Tab, arrows, Space and 0 are checked only through `WeightPanel`'s tests. The
