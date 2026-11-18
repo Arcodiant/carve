@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-102
 
-**Verify:** server-unit, server-regression, scenario-morph
+**Verify:** core-unit, server-unit, server-regression, scenario-morph
 
 ## Goal
 
@@ -117,3 +117,7 @@ Built by Claude Sonnet 5.5 (the implementer). The frames are judged by a separat
 - Engine needs: none. Files outside the worktree: none.
 - **Frame review**: a separate review agent (Claude Sonnet 5.5) opened the 10 distinct frames (the 12 hold two pairs of byte-equal files) and found each as the spec and As built say; then sent all 12 to the person with `mcp__waystone__review` (copied to `G:/My Drive/artifacts/carve/M-21/T-103/round-1`). **Verdict: approved**, including the two deviations (a 2 m cylinder rather than 1 m; Pinch reshaped so it can flip faces). The Pinch frames run off the top of the frame because framing stays on the rest bounds, as designed.
 - Not checked: morph-after-skin and a mirrored camera (the cylinder cannot show either; T-105's arm does).
+- `core-unit` was added to the `**Verify:**` line afterwards (RV-64, Opus 5.5), as T-103 changed `MeshHealth.Create`
+  on every path and made `Skinning.Morphed` public. Cairn already required it, since a member's verify requires
+  every `unit` suite whose inputs it changed; the line now says so. The three new rules are tested through the
+  `check` tool (`TargetWeightsTests`), with no Core-level test of their own.
