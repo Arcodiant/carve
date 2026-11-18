@@ -99,10 +99,11 @@ under `samples/graphs/` changed.
 - **Not checked:** the frames themselves (a later agent looks at them); the viewer (M-7's step 2 is not repeated); the roughness map's specular is not predicted
   (the lit rule is `ColourRule`'s roughness-1 model; only its inequalities are used, see Research).
 
-### Hand-off (Sonnet 5.5, build agent)
+#### Frame review (Sonnet 5.5 build; reviewed by a frame-review agent on Sonnet 5.5; job J-20261118-084506-0372f8, commit cf020f0)
 
-Done: everything above, committed (`cf020f0`), `cairn task T-116 verify` PASS (core-unit, patina-unit, server-unit, scenario-planks, scenario-materials).
-Left: the frame review (its own agent opens every frame, then Waystone for the person), then `cairn task T-116 finish`. I opened no frame.
-Frames: job `J-20261118-084506-0372f8` (scenario-planks, commit `cf020f0`), fetched with `cairn test artifacts J-20261118-084506-0372f8`; a copy
-is in `D:\Repos\carve\branches\task\T-116\artifacts\job-J-20261118-084506-0372f8\planks\frames\` (gitignored).
-Worth looking for: the gap close-up (dark 6-texel gaps, staves in visibly different tones), the roughness map's specular on the wood, the rune.
+- front: octagonal barrel, staves warm brown with visibly different tones, dark vertical gaps between them, orange rune clear on the front stave, blue-grey iron hoops with orange rust patches, end-grain rings on the top cap.
+- back: same staves and gaps, no rune; bottom cap rings and hoops as expected.
+- top: concentric rings on the cap, octagon edge clean.
+- gap close-up: two staves side by side, left lighter than right, gap clearly darker and several texels wide each side; wood faintly streaked, specular from the roughness map is subtle (soft sheen, no hot spots); hoop below.
+- sheet: four views consistent with the single frames.
+- Reopened frames were hash-checked by the scenario (byte-identical), not opened. Person approved all five frames in Waystone (round 1, copy at G:\My Drivertifacts\carve\M-27\T-116ound-1). No code change was needed.
