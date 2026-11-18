@@ -261,7 +261,9 @@ I read `scenarios/Carve.Scenario.Patina` (all stages, `SwatchSphere.cs`), `scena
 
 **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** both checks now use `ExportMatch.cs` (in the scenario, linked by `tests/Patina.Server.Tests`; no project reference): each 256 texel, per RGB channel, within 4 levels of the mean of the four 1024 texels at its centre (rows and columns 4x+1..4x+2), the rule the person approved on 2026-11-18 (5e69528). Each fault is made on the 1024 picture and must fail, in `ExportStage` and in the new unit test `ExportToolTests.The_matching_uv_rule_fails_a_shifted_a_mirrored_and_a_flat_picture`. Measured (largest difference, good / half-tile shift / u-mirror / flat): base colour 2.0 / 31 / 26.5 / 109, roughness 1.0 / 45 / 40.5 / 27, occlusion 0.5 / 0.5 / 0.5 / 86, so occlusion is held to the flat map only (it is its own half-tile shift and u-mirror, the same picture). The normal is not under the rule: its good 1024 export differs by 30 (a question for the person, not settled here). `scenario-patina`'s frames are byte-identical by SHA-256 with J-20261118-224331-da0eec
 
 ### `tiled-shift` on the sheet is caught by the rolled labels, not by the shift; the real fault is invisible in the normal and occlusion columns
 
