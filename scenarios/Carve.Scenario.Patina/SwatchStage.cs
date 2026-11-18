@@ -175,19 +175,26 @@ internal sealed class SwatchStage : IPatinaStage
             CheckStaveOrder(probe, mirrored, spheres, 90, 200);
         }, ["stave order 0 against 200:", "stave order 90 against 200:"]);
 
-        // tiled-shift: the repeat moved half a tile in x and y: the 1:1 tiled views rolled by half a tile, the sheets' tiled
-        // cells (three tiles to 256 px) by the whole pixel nearest it, 43.
+        // tiled-shift: the repeat moved half a tile in x and y: the 1:1 tiled views rolled by half a tile; the sheets' tiled
+        // cells drawn with every texel half a tile (size / 2 texels) along, below the label band only, so that a cell fails for
+        // its texels and never for a moved label. An image the shift leaves unchanged cannot show it (the planks' normal and
+        // occlusion, a bevel repeating 8 times across and constant down); only the roles it changes are named, and the
+        // others are written to swatch-breaks.txt as blind to it.
+        var visible = sheets.ToDictionary(s => s.Size, s => names.Where(r => Shifted(read, r, s.Size)).ToArray());
         Caught("tiled-shift", probe =>
         {
             CheckExact(probe, "tiled base_colour 128", Rolled(tiled, 64), 384, 384, (x, y) => Texel(read, "base_colour", 128, x % 128, y % 128));
             CheckSeamless(probe, "the seam graph", Rolled(seam, 64), 128, expectSeam: true);
             foreach (var (frame, size) in sheets)
             {
-                var shifted = Tampered(frame, (x, y) => y < 282 || x >= count * 258 || x % 258 >= 256 ? (x, y)
-                    : (x - x % 258 + (x % 258 + 43) % 256, 282 + (y - 282 + 43) % 256));
+                var shifted = Drawn(frame, (x, y) => y < 282 + LabelBand || x >= count * 258 || x % 258 >= 256 ? null
+                    : Texel(read, names[x / 258], size, (Under(x % 258, 256, 3 * size) + size / 2) % size, (Under(y - 282, 256, 3 * size) + size / 2) % size).ToArray());
                 CheckSheet(probe, shifted, read, size, null);
             }
-        }, [@"^swatch: tiled base_colour 128:", "^swatch: the seam graph:", .. sheets.SelectMany(s => names.Select(r => $"sheet {s.Size} {r} tiled:"))]);
+        }, [@"^swatch: tiled base_colour 128:", "^swatch: the seam graph:", .. sheets.SelectMany(s => visible[s.Size].Select(r => $"sheet {s.Size} {r} tiled:"))]);
+        foreach (var (_, size) in sheets)
+            log.AppendLine($"  (sheet {size}: blind to a half-tile shift, the image unchanged by it: {string.Join(", ", names.Except(visible[size]).DefaultIfEmpty("none"))})");
+        checks.Check(visible.Values.All(v => v.Contains("base_colour")), "swatch: the planks' base colour does not change under a half-tile shift, so tiled-shift proves nothing on the sheet");
 
         // roughness-as-base: the roughness image where the sphere's base colour goes: a graph whose base colour output is the
         // planks' roughness, drawn through the tools and judged against the planks.
@@ -230,6 +237,25 @@ internal sealed class SwatchStage : IPatinaStage
             }
         }
         return new ScenarioFrame(frame.Name, frame.Path, frame.Png, frame.Width, frame.Height, pixels, frame.Caption);
+    }
+
+    /// <summary>A copy of <paramref name="frame"/> whose pixel (x, y) is <paramref name="drawn"/>(x, y), or the frame's own where that is null.</summary>
+    private static ScenarioFrame Drawn(ScenarioFrame frame, Func<int, int, byte[]?> drawn)
+    {
+        var pixels = (byte[])frame.Pixels.Clone();
+        for (var y = 0; y < frame.Height; y++)
+            for (var x = 0; x < frame.Width; x++)
+                if (drawn(x, y) is { } p) Buffer.BlockCopy(p, 0, pixels, (y * frame.Width + x) * 4, 3);
+        return new ScenarioFrame(frame.Name, frame.Path, frame.Png, frame.Width, frame.Height, pixels, frame.Caption);
+    }
+
+    /// <summary>Whether moving <paramref name="role"/>'s image at <paramref name="size"/> half a tile in x and y changes any texel.</summary>
+    private static bool Shifted(Readback read, string role, int size)
+    {
+        for (var y = 0; y < size; y++)
+            for (var x = 0; x < size; x++)
+                if (!Texel(read, role, size, x, y).SequenceEqual(Texel(read, role, size, (x + size / 2) % size, (y + size / 2) % size))) return true;
+        return false;
     }
 
     /// <summary>A copy of <paramref name="frame"/> rolled by <paramref name="shift"/> pixels in x and y, as the repeat moved.</summary>
