@@ -150,7 +150,7 @@ viewer window (real-time pass only, not in captures):
   - The arm sample is built through the tools (T-105), loaded in the engine and driven by the person (T-106), and fresh agents did the whole job from the descriptions (T-107).
 - **Exactness held without a loosened check.**
   - Subdivide of base plus delta equals subdivided base plus subdivided delta within 1e-6 of the diagonal, on the arm cage and the creased cylinder at levels 1 and 2 (T-99).
-  - Every edit matches the edit of the morphed mesh within 1e-6 (T-100).
+  - Every edit matches the edit of the morphed mesh within 1e-6 (T-100). T-100 measured this on its own per-edit carriage, which the rebase onto T-71 replaced. The same tests now run against `StandardLayers.Targets` on T-71's layer registry and pass there, in `core-unit` at every verify after the person's go.
   - `render_glb` of the export equals `render` with 0 of 262,144 px differing, at Bulge 0, 0.5 and 1 (T-108) and at the arm's Bulk 0, 0.5 and 1 (T-106). A control pair fails D-6's rule in both.
 - **Every existing frame stayed byte-identical.** T-103 hashed 419 frames over 13 scenarios against a baseline build. T-105 hashed the cylinder's 12. Files without targets export byte-identically (T-104, four pinned hashes), and save byte-identically (T-101, every committed `.carve` rewritten).
 - **Every check was shown failing on a broken product.** Each member records its own, for example:
@@ -168,9 +168,9 @@ viewer window (real-time pass only, not in captures):
 - **Acceptance (T-107).** One round of two `claude -p` sessions on Opus 5.5, on plain `carve` with `--allowedTools "mcp__carve__*" --tools ""`.
   - The plant fired: `faces[7][0]: vertex 7 here, 13 in the other mesh`.
   - Session 2 opened, subdivided, checked at weights, rendered and exported a `.glb` with both targets, and its `render_glb` frames were byte-identical to `render`'s.
-- **`cairn milestone M-21 verify` (2026-11-18, at c5832ab, before this retrospective)** passed every check but `review`, which comes after the person's go:
+- **`cairn milestone M-21 verify` (2026-11-18, at c5832ab, before this retrospective)** passed every check but `review`, which comes after the person's go. c5832ab is the tree before the rebase onto `main` and T-71, and is on no branch now; the verifies of the code that ships are under *After the person's go*:
   - 10/10 members done and merged;
-  - all 18 suites pass, 16 ran and 2 carried, `server-regression` 294 s on Xellotath.
+  - all 18 suites of that tree pass, 16 ran and 2 carried, `server-regression` 294 s on Xellotath.
 - **Models:**
 
   | Member | Model | Agents |
@@ -188,7 +188,7 @@ viewer window (real-time pass only, not in captures):
 
   No rework was traced to the cheaper tier. Every second agent was a planned review agent or a stop for the person.
 
-**Rulings the person gave during the milestone** (each recorded in the member's As built):
+**Rulings the person gave during the milestone** (each recorded in the As built of the member named against it; T-104's record of the vertex split was added in answer to RV-64, and the weight range is D-6's rule since then too):
 
 - **Weight range** (asked before T-103's dispatch): `render`, `check` and `render_glb` refuse a weight outside [0, 1], naming the target. Carve stores no range; a game drives the exported morphs however it likes.
 - **Vertex split in the `.glb`** (T-104 landed it, asked afterwards): corners merge in the export only when their deltas agree too, so a model with targets can write more vertices than without. Kept.
@@ -207,7 +207,7 @@ viewer window (real-time pass only, not in captures):
 
   The person's approval carried no separate ruling on them.
 - **T-108 waited on T-103.** Its `render` comparison needed T-103's `targets`, so its continuation was held for one landing.
-- **Small product changes outside a member's listed files:** two `ModelStore.cs` overloads (T-101, for open's check under the write lock); `Skinning.Morphed` made public (T-103); `export`'s target names (T-107, by ruling).
+- **Small product changes outside a member's listed files:** two `ModelStore.cs` overloads (T-101, for open's check under the write lock); `Skinning.Morphed` made public (T-103); `export`'s target names (T-107, by ruling). The rebase onto `main` and the refactor pass added two commits that belong to no member and carry the targets themselves: f3e5e88 moved them onto T-71's layer registry (`LayerRegistry.cs`'s `BlendDeltas`, `ReblendDeltas` and `StandardLayers.Targets`; `MeshEdits.Subdivide`, `EditResult.cs`, `Subdivision.cs`), and 8653926 put the layer in `LayerRegistry.Standard` and edited `AttributeLayerTests`. T-100's own product commit, d456c0d, now holds only its tests and As built.
 - **`finish` again could not remove any member's worktree folder.** `branches/task/T-99` to `T-108` are unregistered from git and left on disk for the person to delete.
 - **The orchestrator misreported once.** It called T-104 done before it had landed, and corrected it in the next message. Report a member only from `plan`.
 
@@ -221,8 +221,22 @@ viewer window (real-time pass only, not in captures):
 **Known and left.**
 
 - **T-127**: not-planar warnings on smooth meshes (the arm's 49, the soft gardener's too).
-- **M-9's T-92** will need to read version 8, and a file with both parts and targets needs a version above both (T-101's As built).
+- **M-9's T-92** will need to read version 8, as its Scope now says, and which version holds a file with both parts and targets is left open for the person at M-9's planning (T-101's As built, RV-64).
 - Corrective targets and morph weights in clips stay out, as decided at planning.
+
+**After the person's go (2026-11-18).**
+
+- **Rebase onto `main` (Opus 5.5):** `main` had T-71's attribute layers and 0.12.1. Two commits conflicted and were settled with T-71's structure. The targets' carriage moved onto T-71's layer registry in f3e5e88 (`LayerRules.BlendDeltas` and `ReblendDeltas`, `StandardLayers.Targets`, `MeshEdits.Subdivide`), a commit that belongs to no member. Verify then passed every check but `review`: 17 suites ran and 1 carried, `server-regression` 251 s on Mantorok, `scenario-morph` 19 s on Xellotath.
+- **Refactor pass (Sonnet 5.5):** by the person's ruling, the targets layer moved into `LayerRegistry.Standard` (8653926, which also edited `AttributeLayerTests`), and T-99's and T-100's As built were corrected for the rebase (efa52d9). Verify passed again: 17 ran and 1 carried, `server-regression` 425 s on Xellotath, `scenario-morph` 20 s on Xellotath.
+- **Review round 1, RV-64:** four Opus 5.5 reviewers, split by area (the Core; persistence and export; tools, rendering and the viewer) plus the whole diff, gave 26 findings: 1 Major, 18 Minor, 7 Nits. The Major: this retrospective cited a verify of the tree before the rebase, and left the rebase's product commits out. The claims it named now say which code they are about (*As planned*, *Rulings* and *Not as planned* above), and this part records the verifies after the rebase. Two agents answered the persistence, whole-diff and Core findings, the second (Opus 5.5) writing this part and the outcomes:
+  - the code fixes are `FromPositions` refusing a non-finite delta, the dead `MorphTarget.Renamed` and `MorphTargets.Select` removed, a knife-inside-a-face test with a target that is not affine, and a test of the skinned and piece export result lines;
+  - the rest corrected the record: T-100's As built and its broken-product table against `StandardLayers.Targets`, T-103's and T-107's Verify lines, T-108's `Depends on:`, the vertex-split ruling in T-104, D-6's Intent and weight-range rule, and T-92's Scope, which now reads version 8 and leaves the parts-plus-targets version open for the person at M-9's planning;
+  - the viewer's `--targets` Nit was skipped: only a starting weight cannot be given for a name holding `,` or `=`, and the window's weight panel still lists and drives such a target.
+  The tools, rendering and viewer findings are answered by a further agent.
+- **`cairn milestone M-21 verify` (2026-11-18, at 2fbdc23, every fix above in it):** passed every check but `review`, still open while RV-64's tools section is answered: 10/10 members done and merged; 17 suites ran and 1 carried, failed 0; `core-unit` 25 s, `server-unit` 19 s, `scenario-morph` 19 s and `server-regression` 255 s, all on Mantorok. `viewer-cube` was carried from c5832ab on Xellotath, its inputs unchanged since.
+- **Next time:**
+  - Re-run the milestone's verify after a rebase that moves product code, and cite that run, not the one before it.
+  - Name the commits a rebase adds outside every member, since no member's As built will.
 
 **Next time.**
 
