@@ -56,9 +56,14 @@ fault from the error alone, look at its material, export it, and texture the bar
 
 ### As built
 
-Run by Claude Sonnet 5.5 (`claude-sonnet-5-5`). The fresh agent in both rounds reported **claude-opus-5-5** in its init line:
-the default model with no `--model` flag is Opus 5.5 here, not the Sonnet the Notes expected. Not finished: the person's review
-of round 2 is "Rejected" with two questions (below); `finish` waits on their answer.
+Run by Claude Sonnet 5.5 (`claude-sonnet-5-5`) for the rounds; this closing pass (rulings, rebase, finish) by Claude Opus 5.5. The fresh agent in both rounds reported **claude-opus-5-5** in its init line:
+the default model with no `--model` flag is Opus 5.5 here, not the Sonnet the Notes expected. **Finished on round 2** (person's ruling, 2026-11-18): both rounds met every pass criterion; the person rejected both reviews on how the material looks, not on the tools, and no description change is proposed.
+
+**Rulings (2026-11-18).**
+1. T-117 finishes on round 2. Round 1 was rejected as: darker, but the texture very coarse and little visible difference from the normal or roughness. Round 2 was rejected with the two questions below.
+2. **Roughness was investigated** by a separate Opus 5.5 research agent: **no defect**. The roughness map reaches `Material.Pbr`'s metallic-roughness slot correctly in both servers (linear upload, roughness in G, factor 1). The look comes from (a) patina's sphere swatch being lit by the fixed sky alone, whose probe has no sun disc, while carve's render also has an ambient light (0.25) and a directional light (0.9, `src/Carve.Server/RenderLights.cs`), and (b) the planks' roughness being high and narrow (0.57 to 0.78). **Correction to this member's own note below:** the "0.45 mean / 6 max" figure for roughness 0 against 1 did not reproduce (the research measured mean 2.35 and max 104 on the same test, and mean 22.6 on a crop of one stave), and carve's render is not sky-only. The person ruled the swatch sphere be lit as carve renders, in a new member **T-128** of this milestone; the planks graph stays as it is.
+3. The rune plank is T-116's separate `rune-stave` material, untouched by the prompt: by design.
+4. **Run conditions to carry into the next acceptance plan:** the person approved adding `--allowedTools "mcp__carve__*" "mcp__patina__*"`; the fresh agent ran on Opus 5.5 as the default model.
 
 **Prompt checks before round 1.** Size 512 is in the power-of-two list. patina's `export` folder is relative to patina's working
 directory, carve's texture paths to the `.carve` file; both servers start in the round folder, so `textures/wood/` is the same place for both
@@ -82,10 +87,10 @@ little visible difference from the normal or roughness.
 **Round 2** (prompt `prompt2.txt`: items 1 and 6 changed to ask for finer grain, relief and roughness visible in a close render, and a close render; not a tool or condition change). 28 calls, the same fault understood and fixed in
 its first edit; three `swatch` iterations (it saw the normal saturating and eased it), two `export`s, a re-`define_material` after the second (it knew carve reads PNGs when the material is defined), `check` clean, a front and a close render, both saved. Pass items all met again; stave middles (90,80,74) and (73,65,60) against the same reference. The person **rejected** with two questions:
 1. *Why is the rune plank notably brighter?* The `rune-stave` material is a separate material (T-116's sample) with the planks' own textures from `graphs/planks/` and emissive `#FF8020`; the prompt names `staves` only, so it is untouched (the agent said so in round 1). By design, not a fault.
-2. *Is roughness rendering correctly?* Measured on a copy of round 2's barrel, solid grey base and a solid roughness map of 0 against 1 (render at 512, a stave away from the rune): the mean differs by 0.45 and the largest pixel by 6 of 255, so the roughness map has a small effect in these renders (T-116's review also called its specular "subtle"; the sky is the only light). I cannot tell from this whether that is the engine's PBR lighting under a uniform sky or a defect, so I reserved no bug; it is the person's call.
+2. *Is roughness rendering correctly?* Measured on a copy of round 2's barrel, solid grey base and a solid roughness map of 0 against 1 (render at 512, a stave away from the rune): the mean differs by 0.45 and the largest pixel by 6 of 255, [Superseded: that measurement did not reproduce and the sky is not the only light; see ruling 2. No defect.]
 
 **Description changes proposed:** none from this run: the agent misread nothing. One note: `define_material`'s roughness/base colour factors multiply the maps; both agents knew it. 
 
-**Not checked:** the exported `.glb` and the viewer; round 3; any change to the tool descriptions. Engine needs: none recorded; the roughness question above stands.
+**Not checked:** the exported `.glb` and the viewer; round 3; any change to the tool descriptions. Engine needs: none recorded; the roughness question is answered (ruling 2).
 
 **Evidence:** `G:\My Drive\artifacts\carve\M-27\T-117\round-1\`, `round-2\` and `round-0-refused\` (transcripts, prompts, round folders, frames, key points). Local: `%TEMP%\carve-m27-acceptance\` (reference, tools).
