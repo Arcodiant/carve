@@ -70,7 +70,7 @@ public sealed class MorphTarget
     /// <summary>
     /// A target from absolute positions, one per vertex slot of <paramref name="mesh"/> (a tombstone's slot is skipped):
     /// the delta is <c>given - base</c> in float. Refused, by <c>name</c> or <c>positions</c> / <c>positions[id]</c>, for
-    /// a bad name, the wrong count, or a non-finite coordinate.
+    /// a bad name, the wrong count, a non-finite coordinate, or a delta that is not finite.
     /// </summary>
     public static MorphTargetResult FromPositions(PolygonMesh mesh, string? name, IReadOnlyList<Vector3> positions)
     {
@@ -89,14 +89,16 @@ public sealed class MorphTarget
         {
             if (mesh.IsVertexDeleted(v)) continue;
             if (!IsFinite(positions[v])) errors.Add(new MeshError(MeshEdits.Invariant($"positions[{v}]"), NotFinite));
-            else deltas.Add(KeyValuePair.Create(v, positions[v] - mesh.Vertices[v]));
+            else if (positions[v] - mesh.Vertices[v] is var d && !IsFinite(d)) errors.Add(new MeshError(MeshEdits.Invariant($"positions[{v}]"), DeltaNotFinite));
+            else deltas.Add(KeyValuePair.Create(v, d));
         }
         return errors.Count > 0 ? new MorphTargetResult(null, errors) : new MorphTargetResult(Of(name!, deltas), []);
     }
 
     /// <summary>
     /// A target from absolute positions of some vertices (vertex id to position); the rest keep a zero delta. Refused, by
-    /// <c>positions[id]</c>, for an id the mesh does not have or has deleted, or a non-finite coordinate.
+    /// <c>positions[id]</c>, for an id the mesh does not have or has deleted, a non-finite coordinate, or a delta that is
+    /// not finite.
     /// </summary>
     public static MorphTargetResult FromPositions(PolygonMesh mesh, string? name, IEnumerable<KeyValuePair<int, Vector3>> positions)
     {
@@ -182,6 +184,8 @@ public sealed class MorphTarget
 
     private const string NotFinite = "a coordinate is not finite";
 
+    private const string DeltaNotFinite = "the delta from the base position is not finite (the two are too far apart for a float)";
+
     private static bool IsFinite(Vector3 p) => float.IsFinite(p.X) && float.IsFinite(p.Y) && float.IsFinite(p.Z);
 
     private static MorphTargetResult Sparse(PolygonMesh mesh, string? name, IEnumerable<KeyValuePair<int, Vector3>> given, string at,
@@ -195,7 +199,8 @@ public sealed class MorphTarget
             var where = MeshEdits.Invariant($"{at}[{v}]");
             if (mesh.VertexProblem(v) is { } problem) errors.Add(new MeshError(where, problem));
             else if (!IsFinite(p)) errors.Add(new MeshError(where, NotFinite));
-            else deltas.Add(KeyValuePair.Create(v, delta(v, p)));
+            else if (delta(v, p) is var d && !IsFinite(d)) errors.Add(new MeshError(where, DeltaNotFinite));
+            else deltas.Add(KeyValuePair.Create(v, d));
         }
         return errors.Count > 0 ? new MorphTargetResult(null, errors) : new MorphTargetResult(Of(name!, deltas), []);
     }

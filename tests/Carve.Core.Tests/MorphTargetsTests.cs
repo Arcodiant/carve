@@ -118,6 +118,20 @@ public class MorphTargetsTests
     }
 
     [Fact]
+    public void Positions_whose_delta_overflows_a_float_are_refused_by_the_slot_full_or_sparse()
+    {
+        // RV-64: two finite coordinates far apart subtract to infinity in float; the file could not write it (T-101).
+        var cube = Cube();
+        var far = cube.WithVertices(cube.Vertices.Select((p, v) => v == 2 ? new Vector3(-3e38f, p.Y, p.Z) : p).ToArray());
+        var given = far.Vertices.ToArray();
+        given[2] = new Vector3(3e38f, given[2].Y, given[2].Z);
+        Assert.True(float.IsInfinity(given[2].X - far.Vertices[2].X));
+        const string Overflow = "positions[2]: the delta from the base position is not finite (the two are too far apart for a float)";
+        Assert.Equal(Overflow, Refusal(MorphTarget.FromPositions(far, "Far", given)));
+        Assert.Equal(Overflow, Refusal(MorphTarget.FromPositions(far, "Far", new Dictionary<int, Vector3> { [2] = given[2] })));
+    }
+
+    [Fact]
     public void Sparse_deltas_are_kept_as_given_and_refused_by_deltas_id()
     {
         var cube = Cube();
