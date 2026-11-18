@@ -143,5 +143,10 @@ Done: code, tests and scenario committed; `verify` run (output at the hand-off r
 fresh agent (8 frames, below), putting the thresholds above to the person, then `finish`. Not opened by this agent: any
 frame. Frames of the clean local run: `artifacts/scenarios/patina/5/frames/` in this worktree (`swatch-sheet-256`,
 `swatch-sheet-64`, `swatch-flat-normal-256`, `swatch-tiled-base-128`, `swatch-sphere-0`, `-90`, `-200`,
-`swatch-tiled-seam`); the verify job's id and frame folder are added below once it has run.
+`swatch-tiled-seam`). **The verify run to review:** job `J-20261118-100559-862909` (`scenario-patina` at 726ef57,
+Mantorok, pass); its frames copied to `artifacts/T-114/verify-job/patina/frames/` in this worktree (fetch again with
+`cairn test artifacts J-20261118-100559-862909`; not `cairn test artifacts scenario-patina`, which gives T-115's newest
+job). T-115 also edits `scenario-patina`'s stages and is running beside this: the rebase onto it will touch
+`PatinaStages.cs`, `Program.cs`'s tool list, the tool-list checks (`GraphStage`, `GraphToolTests`,
+`PatinaProcessTests`) and the README; keep both sides (swatch and export both in the lists).
 
