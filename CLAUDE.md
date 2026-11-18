@@ -37,6 +37,11 @@ Every plan, for a milestone or a task, keeps these:
 - **`Carve.Server` is presentation and transport**: the MCP surface, rendering,
   export. If it is deciding what an edit does to a mesh, that belongs in the
   Core.
+- **`Patina.Graphs` is engine-free too**: no engine or `Arcodiant.*` package, no
+  `System.Random`, no wall clock; only `StbImageWriteSharp` for PNGs. Texture
+  graphs evaluate the same on patina and in Carve (D-7), so evaluation is
+  deterministic and banded. `PatinaGraphsIsEngineFreeTests` enforces it. Node
+  types are registered in `NodeRegistry`, never switched on.
 - **Stdout belongs to MCP.** On the stdio transport nothing but protocol goes to
   stdout; logs go to stderr or the temp folder.
 
@@ -61,6 +66,7 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `src/Carve.Core` | Engine-free modelling kernel |
 | `src/Carve.Extensibility` | The public extension API: `ICarveExtension`, `CarveHostBuilderContext` |
 | `src/Carve.Server` | The shipped product, the `carve` MCP server |
+| `src/Patina.Graphs` | Engine-free texture graphs (D-7, T-110): the `.texgraph` format read back bit-exact, validation into `GraphFault`s naming node and port, the node registry (`Nodes/`, one file per type), banded deterministic evaluation (`Evaluation/`) and output packing and PNGs (`Imaging/`) |
 | `extensions/Carve.Debug` | The debug extension: in-memory transport, `ScenarioDriver`, fixed clock and seed, run folder. Referenced by nothing in `src/` |
 | `scenarios/Carve.Scenario.<Name>` | One project per scenario, run by `run-scenario.ps1`; `Cube` is the first: a cube, an L-block, a long box, both views, four cube frames by direction and zoom, and the sizes, orthographic and axis-view frames; `Cube` links the Crate's `CrateBuild.cs` for the front-view check `CheckFrontOrder`, which the crate and export frames share |
 | `scenarios/Carve.Scenario.Crate` | The crate: one cube built into a crate with `move` and `extrude` only, five views, undo and error paths, then the wireframe, normals and highlight frames (`CrateLooks.cs`, projecting points with `CameraPixels.cs`) and the labelled frames and contact sheets (`CrateLabels.cs`), the checker look (`CrateChecker.cs`, `CheckerColours.cs`) and the UV layout look laid with `project_uvs box` (`CrateUvLayout.cs`, every pixel worked from the UVs by `UvLayoutPixels.cs`); its colour rule (`ColourRule.cs`: T-82's PBR light, the measured sky and the specular) is linked by the Shed, Cuts, Gatehouse, Uvs, Character, Soft, Orcward and Sky scenarios; suite `scenario-crate` |
@@ -83,6 +89,7 @@ The rest are decided in D-1 as they settle; add them here when they do.
 | `tests/Carve.Core.Tests` | xunit tests of the kernel, incl. the engine-free guard; it references `Carve.Debug` and links four scenario files (`ShedChecks.cs`, `ShedGeometry.cs`, `CutsGeometry.cs`, `GatehousePlan.cs`) so that `GatehouseGeometry` works the gatehouse's and the cuts' counts with the scenarios' own camera and ray test |
 | `tests/Carve.Server.Tests` | xunit tests of the server: `unit` tests of what a tool answers run on `ToolHarness`, which serves the same tools in the test process with no engine (`CarveServer.AddTools`, carve referenced under the alias `carve`); `unit` also holds the definition tests and the no-extension guard (`ProductReferencesNoExtensionTests`); the `regression` tests cover the stdio transport, extension loading, the debug extension, rendering, the exported `.glb` read back through the engine's loader (`UvExportTests`, `PbrReleaseTests`, no process), and the process-vs-harness end-to-end tests (`ToolFamiliesThroughProcessTests`, `ToolHarnessMatchesProcessTests`) |
 | `tests/Carve.Server.Tests.Extension` | The extension the loader tests load, on the public API alone |
+| `tests/Patina.Graphs.Tests` | xunit `unit` tests of `Patina.Graphs`: the round trip, every fault, determinism and banding with test node types registered from outside (`TestNodes.cs`), the packing, and the engine-free guard; suite `patina-unit` |
 | `tests/Carve.ModelViewer.Tests` | The viewer on its own fixture cube, through `run-viewer.ps1`; suite `viewer-cube` |
 | `tests/Carve.ExportViewer.Tests` | The checks on what the viewer made of the exported crate, the last step of suite `scenario-export`. They read the run folder in `CARVE_EXPORT_RUN` and are skipped when it is unset, so `dotnet test Carve.slnx` passes without it |
 | `tests/Carve.CharacterLoad.Tests` | The checks on the character scenario's run folder, the last step of suite `scenario-character`: the content folder read through `IModelGeometryLoader.Load` (the hat piece against the body's bones), `HumanoidRoleMap.Synty`, and `samples/gardener.carve` compared by content; `RunContent.cs`, the content-folder reading, is linked by `tests/Carve.SoftLoad.Tests` too. They read the run folder in `CARVE_CHARACTER_RUN` and are skipped when it is unset, so `dotnet test Carve.slnx` passes without it |

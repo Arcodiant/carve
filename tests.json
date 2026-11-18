@@ -29,6 +29,19 @@
       "est-seconds": 30
     },
     {
+      "id": "patina-unit",
+      "tier": "unit",
+      "build": "solution",
+      "run": "dotnet test tests/Patina.Graphs.Tests/Patina.Graphs.Tests.csproj -c Debug --no-build --filter Tier!=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Patina.Graphs.Tests/Patina.Graphs.Tests.csproj"
+        }
+      ],
+      "resources": "cpu",
+      "est-seconds": 15
+    },
+    {
       "id": "server-unit",
       "tier": "unit",
       "build": "solution",
