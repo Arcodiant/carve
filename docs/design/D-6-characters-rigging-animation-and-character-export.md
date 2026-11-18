@@ -14,7 +14,7 @@ description: >-
 
 An agent on a game authors an original animated character in Carve: a body and costume pieces on one skeleton, coloured and soft-shaded, with looping clips. The source is a committed text file, and the `.glb` built from it loads in Empyrean with no conversion. Skinning faults are seen in Carve's own renders before export.
 
-Milestones planned against this doc: [M-16](../milestones/M-16-a-character-that-moves.md), [M-17](../milestones/M-17-rig-it-well.md), [M-18](../milestones/M-18-soft-characters.md) [M-19](../milestones/M-19-a-clip-library-for-a-game.md) and [M-21](../milestones/M-21-morph-targets.md).
+Milestones planned against this doc: [M-16](../milestones/M-16-a-character-that-moves.md), [M-17](../milestones/M-17-rig-it-well.md), [M-18](../milestones/M-18-soft-characters.md), [M-19](../milestones/M-19-a-clip-library-for-a-game.md) and [M-21](../milestones/M-21-morph-targets.md).
 
 **Out of scope:** animation events (`*.events.json`), humanoid role maps (`*.humanoid.json`), IK. Morph targets were out of scope until M-21 planned them; see *Morph targets* below.
 
