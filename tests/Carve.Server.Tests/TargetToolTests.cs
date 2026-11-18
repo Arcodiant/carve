@@ -72,8 +72,8 @@ public sealed class TargetToolTests() : TempFolderTests("carve-targets")
         Assert.Equal([0f, 0f, 0f], Floats(plain.GetProperty("vertices")[0].GetProperty("at")));
 
         // The example in get_mesh's description.
-        var line = ToolList.Description(tools, "get_mesh").Split('\n').Single(l => l.Contains("reading a target", StringComparison.Ordinal));
-        var asked = Ok(await carve.CallToolAsync("get_mesh", line[line.IndexOf('{', StringComparison.Ordinal)..]));
+        var example = Assert.Single(ToolList.Examples(tools, "get_mesh"), e => e.Contains("target", StringComparison.Ordinal));
+        var asked = Ok(await carve.CallToolAsync("get_mesh", example));
         var positions = asked.GetProperty("target").GetProperty("positions");
         Assert.Equal("Bulge", asked.GetProperty("target").GetProperty("name").GetString());
         Assert.Equal(["2", "3", "6", "7"], positions.EnumerateObject().Select(p => p.Name).ToArray());
