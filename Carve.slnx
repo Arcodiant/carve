@@ -8,6 +8,7 @@
   <Project Path="scenarios/Carve.Scenario.Export/Carve.Scenario.Export.csproj" />
   <Project Path="scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj" />
   <Project Path="scenarios/Carve.Scenario.Character/Carve.Scenario.Character.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Morph/Carve.Scenario.Morph.csproj" />
   <Project Path="scenarios/Carve.Scenario.Soft/Carve.Scenario.Soft.csproj" />
   <Project Path="scenarios/Carve.Scenario.Acceptance/Carve.Scenario.Acceptance.csproj" />
   <Project Path="scenarios/Carve.Scenario.Orcward/Carve.Scenario.Orcward.csproj" />

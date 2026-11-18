@@ -50,6 +50,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     private PolygonMesh? _shown;
     private Model? _shownModel;
     private Pose? _shownPose;
+    private TargetWeights? _shownTargets;
     private string? _shownWeights;
     private GlbScene? _shownGlb;
 
@@ -138,6 +139,14 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
+            // So are the target weights: another set puts the mesh in the scene again, morphed.
+            if (!Equals(next.Spec.Targets, _shownTargets))
+            {
+                _shownTargets = next.Spec.Targets;
+                ShowMesh(store.Current);
+                continue;
+            }
+
             // So is the bone whose weights are drawn.
             if (next.Spec.Weights != _shownWeights)
             {
@@ -170,9 +179,13 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             // then the mesh is shown shaded, and only a weights request for that bone fails, at the head of the queue.
             var heat = _shownWeights is null || WeightHeat.Refusal(snapshot.Model, _shownWeights) is not null
                 ? null : WeightHeat.Of(snapshot.Model, _shownWeights);
-            if (_shownPose is { } pose && snapshot.Model.Skeleton is not null)
+            if ((_shownPose is not null && snapshot.Model.Skeleton is not null) || _shownTargets is not null)
             {
-                var posed = Skinning.Posed(snapshot.Model, pose).Combined!;
+                // The morph comes before the skin. With no pose only the morph is applied, so the mesh is not skinned at rest.
+                var morphed = _shownTargets is { } weights ? weights.ByName : null;
+                var posed = (_shownPose is { } pose && snapshot.Model.Skeleton is not null
+                    ? Skinning.Posed(snapshot.Model, pose, morphed)
+                    : Skinning.Morphed(snapshot.Model, morphed!)).Combined!;
                 if (heat is null) scene.ShowMesh(posed, drawn);
                 else scene.ShowMesh(posed, drawn, heat);
             }

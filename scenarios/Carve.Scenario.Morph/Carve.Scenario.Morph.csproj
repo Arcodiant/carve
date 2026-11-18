@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Morph targets (M-21): a cylinder with Bulge and Pinch seen at target weights through the real tools. T-105 adds the arm as later stages. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Morph</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The crate scenario's call helpers, linked and not copied. -->
+    <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
+  </ItemGroup>
+
+</Project>

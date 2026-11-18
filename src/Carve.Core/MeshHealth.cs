@@ -62,7 +62,13 @@ public sealed class MeshHealth
     /// has a texture and which has no UVs is warned of by the material's name (replacing the generic unmapped warning, in a mesh
     /// with no UVs too), and a material the mesh uses with an occlusion strength but no occlusion map is warned of (T-75).
     /// </summary>
-    public static MeshHealth Create(PolygonMesh mesh, IReadOnlyList<Material> materials)
+    public static MeshHealth Create(PolygonMesh mesh, IReadOnlyList<Material> materials) => Create(mesh, materials, mesh);
+
+    /// <summary>
+    /// As <see cref="Create(PolygonMesh, IReadOnlyList{Material})"/> for <paramref name="mesh"/> (which may be the rest mesh
+    /// morphed to some weights), with the targets of <paramref name="rest"/> checked at weight 1 against <paramref name="rest"/> (T-103).
+    /// </summary>
+    public static MeshHealth Create(PolygonMesh mesh, IReadOnlyList<Material> materials, PolygonMesh rest)
     {
         var report = MeshReport.Create(mesh);
         var triangles = Triangulator.Triangulate(mesh);
@@ -77,6 +83,7 @@ public sealed class MeshHealth
         }
         AddCoincidentVertices(mesh, problems);
         AddDuplicateFaces(mesh, problems);
+        AddTargetProblems(rest, problems);
 
         var size = report.BoundsMax - report.BoundsMin;
         var stats = new HealthStats(
@@ -215,6 +222,90 @@ public sealed class MeshHealth
                 first[key] = j;
         }
     }
+
+    /// <summary>How many ids a target problem names before the rest are a count (the fold M-19's T-72 made for not-planar faces).</summary>
+    public const int NamedTargetIds = 10;
+
+    /// <summary>
+    /// Each target of <paramref name="mesh"/> at weight 1 (its other targets at 0) against the mesh at rest, one problem per target
+    /// and rule that finds anything, in the target's definition order: <c>target-flips-face</c> (a face's normal has a negative dot
+    /// product with its rest normal), <c>target-collapses-face</c> (zero-area by <see cref="PolygonMesh.ZeroAreaTolerance"/>, and
+    /// not at rest) and <c>target-opens-mesh</c> (vertices exactly coincident at rest, as <c>coincident-vertices</c> has it, and
+    /// apart at weight 1).
+    /// </summary>
+    private static void AddTargetProblems(PolygonMesh mesh, List<HealthProblem> problems)
+    {
+        if (mesh.Targets is not { } targets) return;
+        var coincident = CoincidentAtRest(mesh);
+        foreach (var target in targets.All)
+        {
+            var element = $"targets['{target.Name}']";
+            var full = mesh.Morphed(new Dictionary<string, float> { [target.Name] = 1f });
+            var flips = new List<int>();
+            var collapses = new List<int>();
+            foreach (var f in mesh.LiveFaces)
+            {
+                var loop = mesh.Faces[f].Loop;
+                var before = PolygonMesh.NewellVector(mesh.Vertices, loop);
+                var after = PolygonMesh.NewellVector(full.Vertices, loop);
+                var restHas = PolygonMesh.HasArea(before, PolygonMesh.FaceSize(mesh.Vertices, loop));
+                if (!PolygonMesh.HasArea(after, PolygonMesh.FaceSize(full.Vertices, loop)))
+                {
+                    if (restHas) collapses.Add(f);
+                    continue;
+                }
+                if (before.X * after.X + before.Y * after.Y + before.Z * after.Z < 0) flips.Add(f);
+            }
+
+            var opens = new List<(int Vertex, int First)>();
+            foreach (var (j, i) in coincident)
+                if (!SamePosition(full.Vertices[j], full.Vertices[i])) opens.Add((j, i));
+
+            if (flips.Count > 0)
+                problems.Add(new HealthProblem("target-flips-face", element, MeshEdits.Invariant(
+                    $"at weight 1 {Count(flips.Count, "face")} turn{(flips.Count == 1 ? "s" : "")} against the rest normal: {Ids("faces", flips)}; the face is inside-out in the game; move the target's vertices so the face keeps its side")));
+            if (collapses.Count > 0)
+                problems.Add(new HealthProblem("target-collapses-face", element, MeshEdits.Invariant(
+                    $"at weight 1 {Count(collapses.Count, "face")} {(collapses.Count == 1 ? "has" : "have")} no area but had some at rest: {Ids("faces", collapses)}; a degenerate face lights and skins as noise; keep each face's corners apart")));
+            if (opens.Count > 0)
+                problems.Add(new HealthProblem("target-opens-mesh", element, MeshEdits.Invariant(
+                    $"at weight 1 {Count(opens.Count, "vertex", "vertices")} that share a position at rest come apart, so the surface cracks: {IdsWithFirst(opens)}; give the vertices that share a position the same delta")));
+        }
+    }
+
+    private static string Count(int n, string one, string? many = null) => $"{n} {(n == 1 ? one : many ?? one + "s")}";
+
+    private static string Ids(string noun, List<int> ids)
+    {
+        var shown = string.Join(", ", ids.Take(NamedTargetIds).Select(i => $"{noun}[{i}]"));
+        return ids.Count > NamedTargetIds ? $"{shown} and {ids.Count - NamedTargetIds} more" : shown;
+    }
+
+    private static string IdsWithFirst(List<(int Vertex, int First)> opens)
+    {
+        var shown = string.Join(", ", opens.Take(NamedTargetIds).Select(o => $"vertices[{o.Vertex}] from vertices[{o.First}]"));
+        return opens.Count > NamedTargetIds ? $"{shown} and {opens.Count - NamedTargetIds} more" : shown;
+    }
+
+    /// <summary>Each live vertex that is at the same position as a lower one at rest (the rule of <c>coincident-vertices</c>), with the first at that position.</summary>
+    private static List<(int Vertex, int First)> CoincidentAtRest(PolygonMesh mesh)
+    {
+        var first = new Dictionary<(int, int, int), int>();
+        var result = new List<(int, int)>();
+        foreach (var j in mesh.LiveVertices)
+        {
+            var v = mesh.Vertices[j];
+            var key = (Bits(v.X), Bits(v.Y), Bits(v.Z));
+            if (first.TryGetValue(key, out var i)) result.Add((j, i));
+            else first[key] = j;
+        }
+        return result;
+    }
+
+    // Adding +0 turns -0 into 0 and changes no other float, so equal floats have equal bits.
+    private static int Bits(float f) => BitConverter.SingleToInt32Bits(f + 0f);
+
+    private static bool SamePosition(Vector3 a, Vector3 b) => Bits(a.X) == Bits(b.X) && Bits(a.Y) == Bits(b.Y) && Bits(a.Z) == Bits(b.Z);
 
     /// <summary>The same set of vertex ids in any order or rotation. A face never repeats a vertex, so the sorted ids are the set.</summary>
     private static void AddDuplicateFaces(PolygonMesh mesh, List<HealthProblem> problems)

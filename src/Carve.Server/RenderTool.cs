@@ -26,6 +26,7 @@ internal static class RenderTool
         schema["properties"]!["highlight"] = HighlightSchema();
         schema["properties"]!["views"] = ViewsSchema();
         schema["properties"]!["pose"] = PoseSchema();
+        schema["properties"]!["targets"] = TargetWeightsArgument.Schema();
         schema["properties"]!["clip"] = new JsonObject
         {
             ["description"] = "Draws the model posed by this clip (define_clip) at 'time'. Not with pose. Framing stays on the rest pose.",
@@ -235,6 +236,7 @@ internal static class RenderTool
         + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; labels other than 'none', 'faces', 'vertices' or 'both'; "
         + "views together with view, direction, zoom or target; fewer than 2 views or more than 6; an entry of views that is neither a view name nor an object with 'view' or 'direction', or one with both; an entry's view, direction, zoom or target that would be an error on its own, named by its place, e.g. 'the 3rd listed entry'; columns other than 1, 2 or 3; an argument render does not take; a sheet whose tiles would show different meshes, because the mesh changed while it was drawn on each of 3 tries (\"The mesh changed while the sheet was drawn, on each of 3 tries, so its tiles would show different meshes; call render again once the edits have settled.\"); labels or highlight given with 'mesh' among several meshes, when an edit lands while the frame is drawn, since their ids may then name other elements (\"The model changed while the frame was drawn, so the ids given for mesh '<name>' may name other elements; call render again once the edits have settled.\"). "
         + "'pose' draws the model posed by its skeleton: an object of bone name to {rotation: [x, y, z, w], translation: [x, y, z]}, each part optional and absolute (local to the parent, replacing the rest value; a bone or part left out rests), skinned by the weights set_weights or weigh gave. A vertex with no weight stays where it is. The camera frames the REST pose, so the frame does not move between poses and a pose that swings far can leave it. Errors: a bone the skeleton lacks, a rotation that is not a unit quaternion, no skeleton. "
+        + "'targets' draws the model at morph target weights (define_target): an object of target name to weight, 0 to 1, applied to every mesh that has a target of that name, before the pose or clip skins it, so a morphed arm bends at the elbow. It works with pose, clip and time, views sheets and every look except uvs; the camera frames the REST bounds, so the frame does not move with the weights, and the normals are worked out from the morphed positions. Errors: a name no mesh has (the targets are listed), a weight below 0 or above 1 or not a number. "
         + "'bones' draws the skeleton over the model, in the pose or clip of the frame: magenta lines, 3 pixels wide, over the model and not hidden by it. A bone with children is a line from its head to each child's head; a leaf bone is a line along its parent's direction for half its parent's length; every head has a dot; a lone bone with no parent and no child is a dot. 'bone_labels' (needs bones: true) writes each bone's name white on a dark backing, up and to the right of its head; names crowd on a dense skeleton, so use size 1024 or zoom. The caption says 'bones' or 'bones, bone labels' after the labels and highlight. Both are independent of labels, highlight, mode and mesh. Errors: bones or bone_labels with no skeleton, bone_labels without bones: true. "
         + "'weights' is a bone's name: the model is drawn unlit, each face corner coloured by that bone's weight at its vertex: dark blue at 0, through green at 0.5, to red at 1, so red is what the bone wholly moves and blue what it leaves alone. A vertex with no weight at all (not even to another bone) is magenta, and magenta means the vertex needs fixing: call set_weights or weigh, since export refuses it. It follows the frame's pose or clip, replaces mode (not with wireframe, normals or checker), and draws on the model's faces, so with bones: true the magenta bone lines are on top of the same magenta a bad vertex has: tell them apart by shape, the bone lines being thin lines with dots at the joints and an unweighted vertex a patch of a face. The caption says 'weights <bone>' where the mode would be. Errors: no skeleton, a bone the skeleton lacks (the bones are listed). "
         + "'clip' and 'time' draw the model as the clip of that name (define_clip) poses it at that time in seconds, interpolated as define_clip says; framed on the rest pose like pose. Errors: clip together with pose, clip without time or time without clip, no clip of that name, a time outside 0 to the clip's duration. "
@@ -268,12 +270,13 @@ internal static class RenderTool
         JsonElement? pose = null,
         JsonElement? clip = null,
         JsonElement? time = null,
+        JsonElement? targets = null,
         [Description("true draws the skeleton over the model, in the frame's pose: a line from each bone's head to each child's head, a dot on every head, and a leaf bone as a line along its parent's direction for half its parent's length. Magenta, drawn over the model and not hidden by it.")] bool? bones = null,
         [Description("true writes each bone's name beside its head, white on a dark backing. Needs bones: true.")] bool? bone_labels = null,
         [Description("A bone's name: draws the model unlit with that bone's weight at each vertex, dark blue at 0 through green (0.5) to red at 1; a vertex with no weight at all is magenta and needs fixing (set_weights or weigh). Needs a skeleton; follows pose or clip; not with mode wireframe, normals or checker.")] string? weights = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "bones", "bone_labels", "weights") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "targets", "bones", "bone_labels", "weights") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -345,6 +348,7 @@ internal static class RenderTool
         var meshName = MeshName(mesh, problems);
         var posed = ReadPose(pose, problems);
         var (clipName, clipTime) = ReadClip(clip, time, pose, problems);
+        var morph = TargetWeightsArgument.Read(targets, store.Current.Model, problems);
         var listed = HighlightLists(highlight, problems);
         if (problems.Count > 0)
         {
@@ -447,7 +451,7 @@ internal static class RenderTool
         async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
             var rendering = Task.WhenAll(tiles
-                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton, Weights = weights })));
+                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Targets = morph, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton, Weights = weights })));
 
             // The frame thread drains the queue; once it has ended, nothing will.
             await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
@@ -509,6 +513,7 @@ internal static class RenderTool
         ("views", "the layout is one image of one mesh"),
         ("columns", "the layout is one image of one mesh"),
         ("pose", "UVs do not move with a pose"),
+        ("targets", "UVs do not move with a target"),
         ("clip", "UVs do not move with a clip"),
         ("time", "UVs do not move with a clip"),
         ("bones", "the layout draws no skeleton"),

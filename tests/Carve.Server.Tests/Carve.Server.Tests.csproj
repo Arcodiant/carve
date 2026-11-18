@@ -45,6 +45,7 @@
     <Compile Include="../../src/Carve.Server/ViewFraming.cs" Link="ViewFraming.cs" />
     <Compile Include="../../src/Carve.Server/RenderQueue.cs" Link="RenderQueue.cs" />
     <Compile Include="../../src/Carve.Server/RenderPump.cs" Link="RenderPump.cs" />
+    <Compile Include="../../src/Carve.Server/TargetWeights.cs" Link="TargetWeights.cs" />
     <Compile Include="../../src/Carve.Server/WeightHeat.cs" Link="WeightHeat.cs" />
     <Compile Include="../../src/Carve.Server/LookMeshes.cs" Link="LookMeshes.cs" />
     <Compile Include="../../src/Carve.Server/CheckerTexture.cs" Link="CheckerTexture.cs" />

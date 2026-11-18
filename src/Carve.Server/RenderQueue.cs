@@ -30,6 +30,9 @@ internal sealed record RenderSpec(
     /// <summary>The pose to draw the model in; null is the rest pose. Compared by value.</summary>
     public Carve.Core.Pose? Pose { get; init; }
 
+    /// <summary>The morph target weights to draw the model at, applied before the pose; null is every target at 0. Compared by value.</summary>
+    internal TargetWeights? Targets { get; init; }
+
     /// <summary>A sheet tile's caption, written on the image; a single render has none.</summary>
     public string? TileCaption { get; init; }
 

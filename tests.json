@@ -404,6 +404,28 @@
       "est-seconds": 30
     },
     {
+      "id": "scenario-morph",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 morph -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Morph/Carve.Scenario.Morph.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
+    },
+    {
       "id": "scenario-gatehouse",
       "tier": "regression",
       "build": "solution",

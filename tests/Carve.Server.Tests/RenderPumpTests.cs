@@ -110,6 +110,34 @@ public class RenderPumpTests
     }
 
     [Fact]
+    public void Target_weights_draw_the_morphed_mesh_and_the_rest_again_when_they_go()
+    {
+        var pump = Started();
+        var rest = Mesh();
+        var target = MorphTarget.FromPositions(rest, "Tall", new Dictionary<int, Vector3> { [2] = rest.Vertices[2] + new Vector3(0, 1, 0) }).Target!;
+        _store.Replace(rest.WithTargets(MorphTargets.Of([target])));
+        var front = CameraSpec.ForView(RenderView.Front);
+
+        _ = _queue.Post(new RenderSpec(front) { Targets = new TargetWeights(new Dictionary<string, float> { ["Tall"] = 0.5f }) });
+        for (var i = 0; i < 6; i++) pump.Step();
+        Assert.Equal(rest.Vertices[2].Y + 0.5f, _scene.Shown!.Vertices[2].Y, 1e-6f);
+        Assert.Null(_scene.Shown.Targets);
+
+        _ = _queue.Post(new RenderSpec(front));
+        for (var i = 0; i < 6; i++) pump.Step();
+        Assert.Equal(rest.Vertices[2], _scene.Shown!.Vertices[2]);
+    }
+
+    [Fact]
+    public void Equal_target_weights_are_equal_and_different_ones_are_not()
+    {
+        TargetWeights W(float w) => new(new Dictionary<string, float> { ["A"] = w });
+        Assert.Equal(W(0.5f), W(0.5f));
+        Assert.NotEqual(W(0.5f), W(0.25f));
+        Assert.NotNull(W(0.5f));
+    }
+
+    [Fact]
     public void A_version_change_leaves_the_request_queued_for_a_later_step()
     {
         var pump = Started();

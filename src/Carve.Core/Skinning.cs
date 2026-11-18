@@ -176,7 +176,7 @@ public static class Skinning
     }
 
     /// <summary>The model with every mesh that has targets morphed to <paramref name="targets"/>, its weights kept so that it can be skinned.</summary>
-    private static Model Morphed(Model model, IReadOnlyDictionary<string, float> targets)
+    public static Model Morphed(Model model, IReadOnlyDictionary<string, float> targets)
     {
         if (model.Meshes.All(m => m.Mesh.Targets is null)) return model;
         var result = Model.Empty.WithMaterials(model.Materials);
