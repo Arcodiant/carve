@@ -16,6 +16,8 @@
     <!-- The crate scenario's call helpers, linked and not copied. -->
     <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
     <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <!-- Orcward's frame rule (D-6) and review image, linked and not copied (T-106). -->
+    <Compile Include="../Carve.Scenario.Orcward/ComparisonPng.cs" Link="ComparisonPng.cs" />
     <!-- The committed samples, which the scenario compares with what it saves. -->
     <Content Include="../../samples/arm.carve" Link="arm.carve" CopyToOutputDirectory="PreserveNewest" Condition="Exists('../../samples/arm.carve')" />
     <Content Include="../../samples/arm-lean.carve" Link="arm-lean.carve" CopyToOutputDirectory="PreserveNewest" Condition="Exists('../../samples/arm-lean.carve')" />

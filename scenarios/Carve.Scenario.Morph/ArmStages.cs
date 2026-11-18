@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Text.Json;
 using Carve.Debug;
+using Carve.Scenario.Orcward;
 using static Carve.Scenario.Crate.CrateBuild;
 
 namespace Carve.Scenario.Morph;
@@ -116,8 +117,68 @@ internal static class ArmStages
         await ExpectToolErrorAsync(driver, "render", new { targets = W(("Bulk", 1.2)) }, "targets.Bulk", "outside 0 to 1");
         await ExpectToolErrorAsync(driver, "check", new { targets = W(("Lean", -0.5)) }, "targets.Lean", "outside 0 to 1");
 
+        // ---- the arm in a game: exported with Curl, drawn by the engine at three weights against render (T-106) ----
+        await ExportAndCompareAsync(driver, shots);
+
         // The clip goes, so that the cylinder's own skeleton can be defined after the arm.
         await CallJsonAsync(driver, "delete_clip", new { name = "Curl" });
+    }
+
+    /// <summary>
+    /// The arm exported into <c>game/Content/models/arm.glb</c> (skinned, with <c>Curl</c>), then <c>render_glb</c> at Bulk 0, 0.5 and 1 from +z
+    /// against <c>render</c> at the same weights, under D-6's frame rule (Orcward's <see cref="Comparison"/>). Frames 1 and 2 are the twins of Bulk 0
+    /// and 1; Bulk 0.5 has none among T-105's frames, so a render is taken. A control (the file at Bulk 1 against the model at rest) must fail the rule.
+    /// <c>CARVE_MORPH_BREAK=glbweights</c> leaves <c>targets</c> out of <c>render_glb</c>.
+    /// </summary>
+    private static async Task ExportAndCompareAsync(ScenarioDriver driver, List<ScenarioFrame> shots)
+    {
+        var models = Path.Combine(driver.RunFolder, "game", "Content", "models");
+        Directory.CreateDirectory(models);
+        var glb = Path.Combine(models, "arm.glb");
+        var result = await CallTextAsync(driver, "export", new { path = glb });
+        if (result.Contains("replaced") || !result.Contains("exported arm.glb") || !result.Contains("1 clip(s) 'Curl'")) driver.Fail($"export arm.glb: expected a new skinned file with Curl, got {result}");
+        // The smoothed quads are slightly off their planes (subdivide): export says so, once per face. Nothing else may be said.
+        if (result.Contains("warning(s): ") && result.Split("warning(s): ")[1].Split("; ").Any(w => !w.Contains("planar")))
+            driver.Fail($"export arm.glb: only planarity warnings are expected, got {result}");
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "export-arm.glb.txt"), result);
+
+        var rows = new List<Comparison.Result>();
+        void Record(string name, string kind, ScenarioFrame viaRender, ScenarioFrame viaGlb)
+        {
+            var r = Comparison.Measure(name, kind, viaRender, viaGlb);
+            rows.Add(r);
+            Comparison.WriteTriptych(Path.Combine(driver.RunFolder, "compare", $"{kind}-{name}.png"), viaRender, viaGlb);
+        }
+
+        var halfRender = await driver.CaptureAsync("arm-9-twin-bulk-half-z", new { view = "+z", projection = "orthographic", targets = W(("Bulk", 0.5)) });
+        var twins = new (string Name, double Weight, ScenarioFrame Twin)[] { ("arm-8-glb-bulk-0-z", 0, shots[0]), ("arm-9-glb-bulk-half-z", 0.5, halfRender), ("arm-10-glb-bulk-1-z", 1, shots[1]) };
+        var glbFrames = new List<ScenarioFrame>();
+        foreach (var (name, weight, twin) in twins)
+        {
+            var args = new Dictionary<string, object> { ["path"] = glb, ["view"] = "+z", ["projection"] = "orthographic" };
+            if (Break != "glbweights") args["targets"] = W(("Bulk", weight));
+            var frame = await driver.CaptureToolAsync("render_glb", name, args);
+            glbFrames.Add(frame);
+            Record(name, "good", twin, frame);
+        }
+
+        var control = await driver.CaptureToolAsync("render_glb", "control-glb-bulk-1-z", new Dictionary<string, object> { ["path"] = glb, ["view"] = "+z", ["projection"] = "orthographic", ["targets"] = W(("Bulk", 1)) });
+        Record("bulk-1-glb-against-the-rest", "control", shots[0], control);
+        CheckDifferenceOf(driver, glbFrames);
+
+        var tsv = new System.Text.StringBuilder();
+        tsv.AppendJoin('\t', "name", "kind", "differing", "total", "largest_patch", "fails").Append('\n');
+        foreach (var r in rows) tsv.AppendJoin('\t', r.Name, r.Kind, r.Differing, r.Total, r.LargestPatch, r.Fails).Append('\n');
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "differences.tsv"), tsv.ToString());
+        foreach (var r in rows.Where(r => r.Kind == "good" && r.Fails)) driver.Fail($"{r.Name}: render_glb differs from render in {r.Differing} of {r.Total} pixels, largest patch {r.LargestPatch} (D-6's rule: 0.5 % or a patch of {Comparison.PatchLimit})");
+        if (!rows.Single(r => r.Kind == "control").Fails) driver.Fail("the control (the file at Bulk 1 against the rest) passes the frame rule, so the rule cannot tell the weights apart");
+    }
+
+    private static void CheckDifferenceOf(ScenarioDriver driver, List<ScenarioFrame> frames)
+    {
+        for (var i = 0; i < frames.Count; i++)
+            for (var j = i + 1; j < frames.Count; j++)
+                if (frames[i].Pixels.AsSpan().SequenceEqual(frames[j].Pixels)) driver.Fail($"{frames[j].Name} draws the same as {frames[i].Name}, pixel for pixel");
     }
 
     private static Dictionary<string, double> W(params (string, double)[] w) => w.ToDictionary(p => p.Item1, p => p.Item2);
