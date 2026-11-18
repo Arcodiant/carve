@@ -27,7 +27,7 @@ public sealed class ToolHarnessTests : IDisposable
         var names = tools.EnumerateArray().Select(t => t.GetProperty("name").GetString()).ToList();
         Assert.Contains("define_mesh", names);
         Assert.Contains("render", names);
-        Assert.Equal(34, names.Count);
+        Assert.Equal(36, names.Count);
         Assert.All(tools.EnumerateArray(), t => Assert.False(t.GetProperty("inputSchema").GetProperty("additionalProperties").GetBoolean()));
     }
 
