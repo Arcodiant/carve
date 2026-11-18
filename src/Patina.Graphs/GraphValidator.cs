@@ -41,6 +41,7 @@ public static class GraphValidator
             }
             var resolved = new ResolvedNode(id, type, new NodeParameters(type, node.Params));
             var faultsBefore = a.Faults.Count;
+            var sourceOfUnknownType = false;
             foreach (var (port, source) in node.Inputs)
             {
                 if (type.Input(port) is null)
@@ -59,7 +60,7 @@ public static class GraphValidator
                     continue;
                 }
                 var targetType = registry.Find(target.Type);
-                if (targetType is null) continue; // its own fault says so
+                if (targetType is null) { sourceOfUnknownType = true; continue; } // its own fault says so, and this input is not worked
                 if (fromPort is null)
                 {
                     if (targetType.Outputs.Count == 1) fromPort = targetType.Outputs[0];
@@ -82,7 +83,7 @@ public static class GraphValidator
             }
             foreach (var input in type.Inputs.Where(p => p.Required && !node.Inputs.ContainsKey(p.Name)))
                 a.Fault(id, input.Name, null, $"node '{id}' input '{input.Name}': {type.Name} needs it connected, and it is not");
-            resolved.InputsAtFault = a.Faults.Skip(faultsBefore).Any(f => f.Port is not null);
+            resolved.InputsAtFault = sourceOfUnknownType || a.Faults.Skip(faultsBefore).Any(f => f.Port is not null);
             a.Nodes[id] = resolved;
         }
 
@@ -238,6 +239,6 @@ internal sealed class ResolvedNode(string id, NodeType type, NodeParameters para
     public Dictionary<string, (string Node, string Port)> Sources { get; } = new(StringComparer.Ordinal);
     public Dictionary<string, PortKind> OutputKinds { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>An input of this node is at fault (a bad port, source or a required one missing), so its kinds are not worked.</summary>
+    /// <summary>An input of this node is at fault (a bad port, source or a required one missing) or names a node of unknown type, so its kinds are not worked.</summary>
     public bool InputsAtFault { get; set; }
 }

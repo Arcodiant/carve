@@ -134,4 +134,17 @@ public class GraphFaultTests
         var read = TexGraphFile.Read("""{ "version": 1, "size": 256, "seed": 7, "nodes": { "wood": { "type": "colour", "params": { "colour": "#aa7040" } }, "out": { "type": "output", "inputs": { "in": "wood" } } } }""");
         Assert.Empty(read.Faults);
     }
+
+    [Theory]
+    [InlineData(""" "l": { "type": "levels", "inputs": { "in": "x" } }, "o": { "type": "output", "inputs": { "in": "l" } } """)]
+    [InlineData(""" "c": { "type": "colour" }, "l": { "type": "blend", "inputs": { "a": "x", "b": "c" } }, "o": { "type": "output", "inputs": { "in": "l" } } """)]
+    [InlineData(""" "c": { "type": "colour" }, "l": { "type": "blend", "inputs": { "a": "c", "b": "x" } }, "o": { "type": "output", "inputs": { "in": "l" } } """)]
+    public void AnInputFromANodeOfUnknownTypeIsOnlyThatNodesFault(string nodes)
+    {
+        var read = TexGraphFile.Read($$"""{ "version": 1, "size": 32, "seed": 7, "nodes": { "x": { "type": "nosie" }, {{nodes}} } }""");
+        Assert.True(read.Loaded);
+        var fault = Assert.Single(read.Faults);
+        Assert.Equal("x", fault.Node);
+        Assert.Contains("unknown type 'nosie'", fault.Message);
+    }
 }
