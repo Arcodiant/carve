@@ -19,14 +19,14 @@ public sealed class OffscreenTarget
         Depth = resources.CreateRenderTarget(size, size, TextureFormat.Depth32Float, RenderTargetUsage.DepthStencilAttachment, sampleCount: 4);
     }
 
-    public int Size { get; }
+    internal int Size { get; }
 
     /// <summary>What <see cref="OffscreenFrame.ReadAsync"/> reads.</summary>
     public Texture Resolved { get; }
 
-    public Texture Multisampled { get; }
+    internal Texture Multisampled { get; }
 
-    public Texture Depth { get; }
+    internal Texture Depth { get; }
 
     /// <summary>
     /// Declares the three targets (named <c>&lt;prefix&gt;-resolved-&lt;size&gt;</c>, <c>-multisampled-</c>, <c>-depth-</c>),

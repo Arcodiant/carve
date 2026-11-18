@@ -21,16 +21,13 @@ public sealed class EngineHostOptions
     {
         ["Empyrean:Time:FixedDeltaTime"] = "0.05",
         ["Empyrean:Time:PaceToFixedStep"] = "true",
-    };
+    }.AsReadOnly();
 
     /// <summary>The MCP server name (<c>serverInfo.name</c>), and the prefix of every line the host writes to stderr.</summary>
     public required string Name { get; init; }
 
     /// <summary>The server's own assembly: its version is <c>serverInfo.version</c>.</summary>
     public required Assembly Product { get; init; }
-
-    /// <summary>The log file is <c>&lt;temp&gt;/&lt;prefix&gt;-&lt;process id&gt;.log</c>. Null is the name.</summary>
-    public string? LogFilePrefix { get; init; }
 
     /// <summary>The lowest configuration source, below extensions, the environment and the command line.</summary>
     public IReadOnlyDictionary<string, string?> Defaults { get; init; } = EngineDefaults;
@@ -77,7 +74,7 @@ public static class EngineHost
         // Stdout belongs to MCP.
         builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Logging.AddProvider(new FileLoggerProvider(
-            Path.Combine(Path.GetTempPath(), $"{options.LogFilePrefix ?? name}-{Environment.ProcessId}.log"), name));
+            Path.Combine(Path.GetTempPath(), $"{name}-{Environment.ProcessId}.log"), name));
 
         IReadOnlyList<ICarveExtension> extensions;
         try

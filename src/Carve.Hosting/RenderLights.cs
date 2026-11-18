@@ -11,13 +11,13 @@ namespace Carve.Hosting;
 public static class RenderLights
 {
     /// <summary>The ambient light's intensity (white).</summary>
-    public const float AmbientIntensity = 0.25f;
+    internal const float AmbientIntensity = 0.25f;
 
     /// <summary>The directional light's intensity (white).</summary>
-    public const float DirectionalIntensity = 0.9f;
+    internal const float DirectionalIntensity = 0.9f;
 
     /// <summary>Within this cone of vertical, up is -Z: CreateLookAt returns NaN looking along up.</summary>
-    public static readonly float VerticalCosine = MathF.Cos(MathF.PI / 180f);
+    private static readonly float VerticalCosine = MathF.Cos(MathF.PI / 180f);
 
     /// <summary>
     /// Carve's front camera direction (target to eye). The light's place relative to the camera is defined in this view:
