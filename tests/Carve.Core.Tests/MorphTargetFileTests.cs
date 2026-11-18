@@ -166,7 +166,7 @@ public sealed class MorphTargetFileTests
     [Fact]
     public void Version_7_holds_no_targets()
     {
-        // Version 7 is the part tree (T-92), which has no targets key: which version holds both is RV-64's open question.
+        // Version 7 is the part tree (T-92), which has no targets key: version 9 holds both (T-132).
         var read = CarveFile.Read(Text().Replace("\"carve\": 8", "\"carve\": 7"));
         Assert.Contains(read.Errors, e => e.Element == "meshes[0].targets" && e.Message.Contains("unknown key"));
         Assert.Contains(7, CarveFile.ReadableVersions);

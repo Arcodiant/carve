@@ -180,8 +180,8 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
         Assert.Contains("file: the text is not JSON: at line 3, column ", bad);
         await NothingChanged(carve, before);
 
-        File.WriteAllText(Path.Combine(Root, "future.carve"), """{"carve": 9, "vertices": [], "faces": []}""");
-        Assert.Contains("carve: version 9 is not one this build reads; it reads versions 1, 2, 3, 4, 5, 6, 7 and 8", Refused(await carve.CallToolAsync("open", """{"path":"future.carve"}""")));
+        File.WriteAllText(Path.Combine(Root, "future.carve"), """{"carve": 10, "vertices": [], "faces": []}""");
+        Assert.Contains("carve: version 10 is not one this build reads; it reads versions 1, 2, 3, 4, 5, 6, 7, 8 and 9", Refused(await carve.CallToolAsync("open", """{"path":"future.carve"}""")));
         await NothingChanged(carve, before);
 
         File.WriteAllText(Path.Combine(Root, "face.carve"), """{"carve": 1, "vertices": [[0,0,0],[1,0,0],[0,1,0]], "faces": [[0,1,5]]}""");

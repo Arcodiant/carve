@@ -70,8 +70,11 @@ public sealed class CarveFileResult
 /// key of a mesh, <c>levels</c>: <c>[{"level": N, "vertices": ..., ...}, ...]</c>, each kept level a whole mesh with the keys
 /// of a version 6 mesh but its name, ascending, left out when none is kept. An empty or an instance has no mesh. It is
 /// written only when some part has a parent, a transform, an envelope, <c>instance_of</c>, <c>moves</c> or a kept level, so
-/// every other model is written as before, byte for byte; a model with a part tree and a morph target is refused
-/// (<see cref="VersionProblem"/>).
+/// every other model is written as before, byte for byte.
+/// Version 9 (T-132) is version 8 with version 7's additions: <c>parts</c> after <c>meshes</c>, and <c>levels</c> after the
+/// last key of a mesh (after <c>targets</c> when it has any), each kept level holding the keys of a version 8 mesh but its
+/// name, so a level keeps its targets (the person's ruling, 2026-11-18). It adds no key of its own, and is written only when
+/// the model has both a part tree (<see cref="HasPartTree"/>) and a morph target on a mesh or a kept level.
 /// Version 3 (T-42) added, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or <c>"smooth"</c>) and
 /// <c>hard_edges</c> (vertex-id pairs, lower id first, in order).
 /// Version 2: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
@@ -94,10 +97,16 @@ public static class CarveFile
     public const int Version = 8;
 
     /// <summary>The versions <see cref="Read(string)"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6, 7, 8];
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
     /// <summary>The version that holds a part tree and kept levels (M-9, T-92).</summary>
     public const int PartTreeVersion = 7;
+
+    /// <summary>The version that holds a part tree and kept levels beside morph targets (M-9, T-132).</summary>
+    public const int PartsAndTargetsVersion = 9;
+
+    /// <summary>Whether <paramref name="version"/> holds <c>parts</c> and <c>levels</c>: 7 and 9.</summary>
+    private static bool HoldsParts(int version) => version is PartTreeVersion or PartsAndTargetsVersion;
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
@@ -118,6 +127,9 @@ public static class CarveFile
     private static readonly string[] FileKeysV7 = [VersionKey, MaterialsKey, "meshes", PartsKey, "skeleton", "clips"];
     private static readonly string[] MeshKeysV7 = [.. MeshKeysV6, LevelsKey];
     private static readonly string[] LevelKeys = ["level", .. MeshKeysV6.Skip(1)];
+    // Version 9 (T-132): version 8 with version 7's additions; "levels" after "targets", and a level holds targets as a mesh does.
+    private static readonly string[] MeshKeysV9 = [.. MeshKeysV8, LevelsKey];
+    private static readonly string[] LevelKeysV9 = ["level", .. MeshKeysV8.Skip(1)];
     private static readonly string[] PartRecordKeys = ["name", "parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves"];
     private static readonly string[] EnvelopeKeys = ["min", "max"];
     private static readonly string[] TargetKeys = ["name", "deltas"];
@@ -200,9 +212,10 @@ public static class CarveFile
         // Version 6 only when the model has a material (T-74), so every model without one is written as before, byte for byte.
         // Version 8 only when a mesh has a morph target (T-101). Version 7 only when some part is not a plain top-level mesh at the
         // origin: a parent, a transform, an envelope, instance_of, moves or a kept level (T-92, the person's ruling 2026-11-17).
-        if (VersionProblem(model) is { } problem) throw new ArgumentException(problem, nameof(model));
-        var version = HasPartTree(model) ? PartTreeVersion
-            : model.Meshes.Any(m => m.Mesh.Targets is not null) ? Version
+        // Version 9 only when the model needs both: a part tree and a morph target, on a mesh or a kept level (T-132).
+        var targeted = model.Meshes.Any(m => m.Mesh.Targets is not null) || model.Parts.Any(p => p.Levels.Any(l => l.Mesh.Targets is not null));
+        var version = HasPartTree(model) ? targeted ? PartsAndTargetsVersion : PartTreeVersion
+            : targeted ? Version
             : model.Materials.Count > 0 ? 6
             : model.Meshes.Any(m => m.Mesh.Uvs is not null) ? 5
             : model.Meshes.Any(m => m.Mesh.HasTombstones || m.Mesh.Faces.Any(f => f.HasHoles)) ? 4
@@ -213,12 +226,12 @@ public static class CarveFile
         w.Open(1, "\"meshes\": [", model.Meshes.Count == 0, ",");
         for (var i = 0; i < model.Meshes.Count; i++)
         {
-            WriteMesh(w, model.Meshes[i], model.Skeleton, version, version == PartTreeVersion ? model.FindPart(model.Meshes[i].Name)!.Levels : []);
+            WriteMesh(w, model.Meshes[i], model.Skeleton, version, HoldsParts(version) ? model.FindPart(model.Meshes[i].Name)!.Levels : []);
             w.Line(2, i < model.Meshes.Count - 1 ? "}," : "}");
         }
         w.Close(1, "],", model.Meshes.Count == 0);
-        // Version 7 (T-92): every part's record, one per line in pre-order, so the tree and its order come back as they were.
-        if (version == PartTreeVersion) w.List(1, PartsKey, model.Parts.Count, i => PartText(model.Parts[i]), ",");
+        // Version 7 (T-92) and 9 (T-132): every part's record, one per line in pre-order, so the tree and its order come back as they were.
+        if (HoldsParts(version)) w.List(1, PartsKey, model.Parts.Count, i => PartText(model.Parts[i]), ",");
 
         if (model.Skeleton is not { } skeleton) w.Line(1, "\"skeleton\": null,");
         else
@@ -251,7 +264,8 @@ public static class CarveFile
         w.Line(3, $"\"name\": {Text(name)},");
         WriteMeshKeys(w, 3, mesh, skeleton, version, levels.Count > 0 ? "," : "");
         if (levels.Count == 0) return;
-        // Version 7 (T-92): "levels", after the mesh's last key, each kept level a whole mesh as version 6 writes one, but its name.
+        // Version 7 (T-92): "levels", after the mesh's last key, each kept level a whole mesh as version 6 writes one, but its name;
+        // in version 9 (T-132) as version 8 writes one, so a level's targets are its last key.
         w.Line(3, $"\"{LevelsKey}\": [");
         for (var i = 0; i < levels.Count; i++)
         {
@@ -321,22 +335,6 @@ public static class CarveFile
     {
         ArgumentNullException.ThrowIfNull(model);
         return model.Parts.Any(p => !p.IsPlain);
-    }
-
-    /// <summary>
-    /// Why no version can hold <paramref name="model"/>, or null: a part tree beside morph targets, since version 7 holds no
-    /// targets and version 8 no parts or levels. Which version holds both is the person's open question (RV-64), so such a
-    /// model is refused rather than written without one of them.
-    /// </summary>
-    public static string? VersionProblem(Model model)
-    {
-        ArgumentNullException.ThrowIfNull(model);
-        if (!HasPartTree(model)) return null;
-        var targeted = model.Meshes.Where(m => m.Mesh.Targets is not null
-            || model.FindPart(m.Name)!.Levels.Any(l => l.Mesh.Targets is not null)).Select(m => m.Name).ToArray();
-        return targeted.Length == 0 ? null
-            : $"the model has a part tree and morph targets (on {NameList.Quoted(targeted)}), and no Carve file version holds both yet: version 7 holds the part tree and kept levels, version 8 the targets (an open question, RV-64); "
-                + "save the meshes with targets alone (save mesh=), or remove the targets or the tree";
     }
 
     /// <summary>A part's record on one line: name, parent, translation, rotation, scale, then envelope, instance_of and moves when it has them.</summary>
@@ -504,7 +502,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) is (2 or 3 or 4 or 5 or 6 or 7 or 8) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3 or 4 or 5 or 6 or 7 or 8 or 9) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
         }
     }
 
@@ -594,7 +592,7 @@ public static class CarveFile
     private static CarveFileResult ReadVersion2(JsonElement root, int version, string? folder, string? only)
     {
         var errors = new List<MeshError>();
-        var fields = Fields(root, "", Invariant($"a version {version} Carve file"), version == PartTreeVersion ? FileKeysV7 : version >= 6 ? FileKeysV6 : FileKeys, errors)!;
+        var fields = Fields(root, "", Invariant($"a version {version} Carve file"), HoldsParts(version) ? FileKeysV7 : version >= 6 ? FileKeysV6 : FileKeys, errors)!;
         var used = only is null || version < 6 ? null : MaterialsUsedBy(fields, only);
 
         // The materials first, since faces name them (T-74); a name is known even when the rest of its material is not.
@@ -664,9 +662,9 @@ public static class CarveFile
             }
         }
 
-        // Version 7 (T-92): every part's record, after the meshes and before the skeleton, as the file writes it.
+        // Version 7 (T-92) and 9 (T-132): every part's record, after the meshes and before the skeleton, as the file writes it.
         var parts = new List<Part>();
-        if (version == PartTreeVersion && Required(fields, "", PartsKey, "a version 7 Carve file", errors) is { } ps && List(ps, PartsKey, errors) is { } partList)
+        if (HoldsParts(version) && Required(fields, "", PartsKey, Invariant($"a version {version} Carve file"), errors) is { } ps && List(ps, PartsKey, errors) is { } partList)
         {
             var i = 0;
             foreach (var item in partList.EnumerateArray())
@@ -794,7 +792,8 @@ public static class CarveFile
         Dictionary<string, PartLevel[]>? levels = null, bool level = false)
     {
         var before = errors.Count;
-        if (Fields(item, at, level ? "a level" : "a mesh", level ? LevelKeys : version == PartTreeVersion ? MeshKeysV7 : version >= 8 ? MeshKeysV8 : version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
+        if (Fields(item, at, level ? "a level" : "a mesh", level ? version == PartsAndTargetsVersion ? LevelKeysV9 : LevelKeys
+            : version == PartsAndTargetsVersion ? MeshKeysV9 : version == PartTreeVersion ? MeshKeysV7 : version >= 8 ? MeshKeysV8 : version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
         var name = level ? "" : Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         f.TryGetValue(VerticesKey, out var vs);
         f.TryGetValue(FacesKey, out var fs);
@@ -920,9 +919,10 @@ public static class CarveFile
         if (version >= 5) uvs = ReadUvs(f, at, mesh, errors);
         MorphTargets? targets = null;
         if (version >= 8) targets = ReadTargets(f, at, mesh, errors);
-        // Version 7 (T-92): the part's kept levels, each a whole mesh as a version 6 mesh holds it.
+        // Version 7 (T-92): the part's kept levels, each a whole mesh as a version 6 mesh holds it; in version 9 (T-132), as a
+        // version 8 mesh holds it, targets and all.
         PartLevel[]? kept = null;
-        if (!level && version == PartTreeVersion && f.TryGetValue(LevelsKey, out var ls))
+        if (!level && HoldsParts(version) && f.TryGetValue(LevelsKey, out var ls))
             kept = ReadLevels(ls, $"{at}.{LevelsKey}", skeleton, skeletonGood, version, materialNames, errors);
 
         if (errors.Count > before || name is null) return null;
