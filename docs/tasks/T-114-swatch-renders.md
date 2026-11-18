@@ -134,8 +134,35 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review c
   with no GPU and the sphere and sheet are refused with the fault), the worked example, the tool lists in
   `GraphToolTests`, `PatinaProcessTests` and `GraphStage`. `scenario-patina` is now `gpu` (and reads
   `samples/graphs/**`); `patina-regression` stays `cpu`: its process test only lists tools, nothing renders.
-- **Not changed**: the root `CLAUDE.md` layout row for `Patina.Server` still lists the seven T-113 tools; it should
-  gain `swatch` (left to the person: an agent may not edit `CLAUDE.md` on another agent's word).
+- **`CLAUDE.md`**: the `Patina.Server` Layout row now lists `swatch` (the person approved it in the round-1 review).
+- **Frame review** (Claude Opus 5.5, `claude-opus-5-5`, the frame-review agent), of job `J-20261118-100559-862909`
+  (hashes equal to the local run's `artifacts/scenarios/patina/5/frames/`). Every frame opened whole:
+  - `swatch-sheet-256` (1544 x 538): title strip `planks.texgraph   256 px   seed 77` (the graph's seed; the planning
+    sketch's "seed 7" was a placeholder). Columns in role order: base_colour, normal, roughness, occlusion, each label
+    in its cell's top-left on the dark backing; flat above, `<role> 3 x 3` below; 2 px slate gutters. The tiled cells
+    show 24 staves with even gaps and no seam at the thirds. Sphere cell on the right, labelled
+    `sphere, Pbr, fixed sky, angle 0`, on the slate.
+  - `swatch-sheet-64`: the same layout; the cells are 4 x nearest blocks of the 64 texels; the normal is fainter (the
+    bevel is about one texel at 64), the sphere softer. Nothing out of place.
+  - `swatch-flat-normal-256`: eight bevels; sampled, the texels left of a gap (x 28..30) read red 183..196 (+x tilt) and
+    those right of it (x 1..2) red 59 (-x), green 128 throughout: the bevel falls into the gap from both sides.
+  - `swatch-tiled-base-128` (384 x 384): 24 staves, gaps one width, no visible seam on either axis.
+  - `swatch-sphere-0`, `-90`, `-200` (512): the faceted 32-sector UV sphere, centred, whole, on the slate; staves brown
+    with darker gaps (a bluish sky rim along the gap bevels), lit evenly with a little darkening toward the limb and the
+    lower half; no highlight to speak of (the planks' roughness is high and narrow). 0 and 90 put the gaps at the same
+    pixels, as a quarter turn is two staves; they differ only in the staves' tones (55 357 pixels past 4 levels, at most
+    12), which is what *stave order* reads. 200 moves the gaps by 4 4/9 staves: two gaps either side of the centre
+    instead of one on it.
+  - `swatch-tiled-seam`: grey noise with a hard dark-to-light step at each tile column (x 128, 256) and none across the
+    rows: the visible seam the *seamless* check must fail on.
+- **The person's review** (round 1, `G:\My Drive\artifacts\carve\M-27\T-114\round-1`, Waystone, 2026-11-18):
+  **approved**, frames and the open point as put: *dark* luma <= 52, *in band* 58..110, the 22-row label band left out of
+  the exact check, the silhouette's 0.1 % of inside pixels as slate, and the `CLAUDE.md` row. Note on the whole: "Looks
+  fine, but the roughness isn't very apparent on the sphere renders" (not a change asked; the planks' roughness texels
+  sit in a narrow high band, so the sphere is matte all over).
+- **Rulings by the person** (via the orchestrator, 2026-11-18): `PATINA_SWATCH_BREAK` / `SwatchBreak` must move out of the
+  patina product to the scenario or test side (CLAUDE.md's no-debug-in-product rule); no engine need for the sphere's UV
+  mapping, `SwatchSphere.cs` stands.
 
 ### Hand-off
 
