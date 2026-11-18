@@ -111,3 +111,74 @@ Guards: `ProductReferenceGuard`'s allowed set gains `Carve.Hosting` (carve now r
 `Carve.Hosting`'s project and built assembly reach no extension. Frames: `server-regression` frames had no record, so
 the first commit adds `FrameLog` (tests only), which writes every frame and `tools/list` the real process sends, by
 hash, under `CAIRN_ARTIFACTS`; the before table is that commit's queued run, product code untouched.
+
+### As built
+
+Built by Claude Opus 5.5 (`claude-opus-5-5`).
+
+**What moved.** As the research pass lists, with no change of calls or their order. `src/Carve.Hosting` (namespace
+`Carve.Hosting`) references `Carve.Extensibility`, `Arcodiant.Empyrean.Graphics`, `ModelContextProtocol` and
+`Microsoft.Extensions.Hosting`, and no Carve code besides the extension API. `ExtensionLoader`, `ExtensionLoadException`,
+`FileLoggerProvider` and `EngineThread` are internal to it; the rest below is public. `Carve.Server` references it, with
+a global `using Carve.Hosting`; `tests/Carve.Server.Tests` uses it the same way and no longer links `RenderSky.cs`.
+
+**The host API** (T-113 and T-114 build on this and do not edit `Carve.Hosting`):
+
+```csharp
+return await EngineHost.RunAsync(args, new EngineHostOptions
+{
+    Name = "patina",                       // serverInfo.name, and the "patina: " prefix of the host's stderr lines
+    Product = typeof(Program).Assembly,    // serverInfo.version is this assembly's version
+    LogFilePrefix = null,                  // optional; the log is <temp>/<prefix or Name>-<pid>.log
+    Defaults = EngineHostOptions.EngineDefaults, // optional; the lowest configuration source (fixed 0.05 s step, paced)
+    AddServer = server =>                  // EngineHostContext: Services, Mcp (IMcpServerBuilder), Configuration
+    {
+        server.Mcp.WithTools([...]);                              // tools
+        server.Services.AddSingleton<OffscreenQueue<MyRequest>>(); // services the tools and systems share
+        server.Services.AddSingleton<MyComposition>();            // the render pipeline
+        server.Services.UseRenderPipeline<MyComposition>();
+        server.Services.AddSystem<MySystem>();                    // systems
+    },
+});
+```
+
+The order inside `RunAsync` is carve's `Program.cs` before the move: defaults, environment, command line; console log to
+stderr and the file log; `Carve:Extensions` loaded (a load failure is `<name>: <message>` and exit 1); `AddMcpServer`;
+`ToolCollection ??= []`; each extension's `ConfigureHost` with the environment and command line added on top after each
+(a throwing hook is exit 1); `AddEmpyreanCore`, `AddEmpyreanGraphicsHeadlessCore`, `AddEmpyreanConfiguration`; the stdio
+transport unless an extension registered an `ITransport`; **`AddServer`**; `EngineStatus` if the server did not register
+one (`TryAddSingleton`); `EngineThread`; build, start, `OnStarted` hooks, wait for shutdown, `Environment.ExitCode`. So
+the debug extension, its in-memory transport, `ScenarioDriver` and any scenario load into a second server unchanged.
+
+**Engine state for tools.** `EngineStatus` (singleton): `WhenSettled` (ready or faulted), `FaultMessage`, `WhenStopped`,
+and `EngineStatus.Faulted(message)` for an in-process harness with no engine. A tool that renders does what carve's do:
+await `WhenSettled`, refuse with `FaultMessage` if set, post, then `Task.WhenAny(frame, status.WhenStopped)`.
+
+**What a second server supplies for an offscreen render.**
+- A pipeline: an `IRenderPipelineConfigurator` holding one `OffscreenTarget(resources, size)` per size (resolved
+  `Rgba16Float` with `TransferSource`, 4x MSAA colour, 4x MSAA `Depth32Float`) and calling
+  `target.Declare(builder, context, prefix, background, cameraTag, immediateTag?)` from `Compose` (declares the three,
+  clears colour and depth, the scene stage for cameras tagged `cameraTag` resolved into `Resolved`, and an immediate
+  surface tagged `immediateTag` if given).
+- A scene: a system that creates a scene, a camera per tag (`AddCamera3D` and a `RenderTag`; the headless host does not
+  apply a camera's projection, so the system sets it), its lights, and `entities.AddComponent(sky, RenderSky.Sky)` for
+  carve's fixed sky. The ambient (0.25) and directional (0.9) lights are carve's `RenderLights`, which stays in
+  `Carve.Server` because its light turns with carve's views; a server that wants carve's light writes the same two
+  components.
+- Textures: `TextureUpload.Create(resources, rgba8, width, height, srgb)` (sRGB for colour, linear for data, mipmaps,
+  `TextureUpload.Sampler`), from pixels; no PNG needed. Materials are the engine's `Material.Pbr`.
+- A queue: requests derive from `OffscreenRequest<TSpec, TFrame>` (`Spec`, `Result`, `Complete`, `Fail`), held in an
+  `OffscreenQueue<TRequest>` (`Enqueue` from a tool, `TryPeek`/`TryTake` on the frame thread). What is due when is the
+  server's own (carve's is `RenderPump`: store versions, looks, glb).
+- A read: in the system's `Update`, `OffscreenFrame.ReadAsync(renderer, readback, target.Resolved)` (asks the readback,
+  then `RenderFrame`), and complete the request from its continuation. The pixels are linear `RenderTargetPixels`; the
+  server encodes them (carve's `ToDecodedImage` and PNG writing stay in `Carve.Server`).
+
+**Guards.** `ProductReferenceGuard`'s allowed set gains `Carve.Hosting` (needed: carve references it, and any other
+`Carve.*` name is still forbidden); three new `unit` tests check that `Carve.Hosting`'s project, project closure and
+built assembly reach no extension, that its only Carve reference is `Carve.Extensibility`, and that carve references it.
+`CoreIsEngineFreeTests` and the viewer's no-Carve-code test are unchanged; only a comment in `ViewerSystem.cs` names
+the sky's new home.
+
+**One visible difference, not behaviour:** the engine thread's log lines carry the category `Carve.Hosting.EngineThread`
+where they said `Carve.Server.EngineThread`. No test or script reads it.

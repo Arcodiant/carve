@@ -32,8 +32,10 @@ internal static class FrameLog
             if (item.TryGetProperty("type", out var type) && type.GetString() == "image" &&
                 item.TryGetProperty("data", out var data))
             {
-                Append(file, $"{tool}\t{Hash(Encoding.UTF8.GetBytes(arguments))}\t{index}\t" +
-                             Hash(Convert.FromBase64String(data.GetString()!)));
+                var png = Convert.FromBase64String(data.GetString()!);
+                var hash = Hash(png);
+                Append(file, $"{tool}\t{Hash(Encoding.UTF8.GetBytes(arguments))}\t{index}\t{hash}\t{Test}");
+                Keep(file, hash, png);
             }
 
             index++;
@@ -45,7 +47,22 @@ internal static class FrameLog
     {
         if (File is { } file)
         {
-            Append(file, $"tools/list\t-\t-\t{Hash(Encoding.UTF8.GetBytes(tools.GetRawText()))}");
+            Append(file, $"tools/list\t-\t-\t{Hash(Encoding.UTF8.GetBytes(tools.GetRawText()))}\t{Test}");
+        }
+    }
+
+    /// <summary>The test that made the call, so a differing frame can be traced to it.</summary>
+    private static string Test => TestContext.Current.Test?.TestDisplayName ?? "-";
+
+    /// <summary>Each distinct frame once, as <c>server-regression-frames/&lt;hash&gt;.png</c> beside the table.</summary>
+    private static void Keep(string file, string hash, byte[] png)
+    {
+        var folder = Path.Combine(Path.GetDirectoryName(file)!, "server-regression-frames");
+        Directory.CreateDirectory(folder);
+        var path = Path.Combine(folder, hash + ".png");
+        if (!System.IO.File.Exists(path))
+        {
+            System.IO.File.WriteAllBytes(path, png);
         }
     }
 
