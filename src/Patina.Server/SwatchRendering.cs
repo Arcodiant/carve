@@ -36,27 +36,6 @@ public static class SwatchCamera
     public static Matrix4x4 Projection => Matrix4x4.CreatePerspectiveFieldOfView(FieldOfViewY, 1f, Near, Far);
 }
 
-/// <summary>
-/// The test switch <c>PATINA_SWATCH_BREAK</c>, read once: each value breaks swatch in one way so the scenario's checks can
-/// be shown failing (T-114's table of breaks). Unset, as everywhere but those runs, nothing changes.
-/// </summary>
-public static class SwatchBreak
-{
-    public static readonly string? Value = Environment.GetEnvironmentVariable("PATINA_SWATCH_BREAK") is { Length: > 0 } b ? b : null;
-
-    /// <summary>The sheet's columns in reverse role order.</summary>
-    public static bool RoleOrder => Value == "role-order";
-
-    /// <summary>The sphere's u flipped (every texture mirrored left to right before upload).</summary>
-    public static bool FlipU => Value == "u-flip";
-
-    /// <summary>The tiled views shifted half a tile.</summary>
-    public static bool TiledShift => Value == "tiled-shift";
-
-    /// <summary>The roughness image bound as the sphere's base colour.</summary>
-    public static bool RoughnessAsBase => Value == "roughness-as-base";
-}
-
 /// <summary>patina's offscreen pipeline: the sphere's 512 target and the 512 label atlas, both on Carve's slate.</summary>
 internal sealed class SwatchComposition(IGraphicsResourceManager resources) : IRenderPipelineConfigurator
 {
@@ -223,9 +202,7 @@ internal sealed class SwatchSystem(
 
         Texture? Upload(OutputRole role, bool srgb)
         {
-            var source = SwatchBreak.RoughnessAsBase && role == OutputRole.BaseColour ? OutputRole.Roughness : role;
-            if (!spec.Images.TryGetValue(source, out var rgba)) return null;
-            if (SwatchBreak.FlipU) rgba = SwatchImages.Mirrored(rgba, spec.Size);
+            if (!spec.Images.TryGetValue(role, out var rgba)) return null;
             var texture = TextureUpload.Create(resources, rgba, spec.Size, spec.Size, srgb);
             made.Add(texture);
             return texture;

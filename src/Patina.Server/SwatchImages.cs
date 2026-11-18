@@ -63,18 +63,17 @@ public static class SwatchImages
 
     /// <summary>
     /// The 3 x 3 repeat of the <paramref name="size"/>-square image, nearest-scaled to <paramref name="to"/> a side.
-    /// <paramref name="shift"/> moves the repeat by that many texels in x and y (zero but for the break switch).
     /// </summary>
-    public static byte[] Tiled(byte[] rgba, int size, int to, int shift = 0)
+    public static byte[] Tiled(byte[] rgba, int size, int to)
     {
         var pixels = new byte[to * to * 4];
         var across = 3 * size;
         for (var y = 0; y < to; y++)
         {
-            var sy = (Nearest(y, to, across) + shift) % size;
+            var sy = Nearest(y, to, across) % size;
             for (var x = 0; x < to; x++)
             {
-                var sx = (Nearest(x, to, across) + shift) % size;
+                var sx = Nearest(x, to, across) % size;
                 Buffer.BlockCopy(rgba, (sy * size + sx) * 4, pixels, (y * to + x) * 4, 4);
             }
         }
@@ -83,20 +82,6 @@ public static class SwatchImages
 
     /// <summary>The tiled view's side for an evaluation size: 3 x size, at most <see cref="MaxTiled"/>.</summary>
     public static int TiledSide(int size) => Math.Min(3 * size, MaxTiled);
-
-    /// <summary>The image left to right mirrored, for the u-flip break.</summary>
-    public static byte[] Mirrored(byte[] rgba, int size)
-    {
-        var pixels = new byte[rgba.Length];
-        for (var y = 0; y < size; y++)
-        {
-            for (var x = 0; x < size; x++)
-            {
-                Buffer.BlockCopy(rgba, (y * size + size - 1 - x) * 4, pixels, (y * size + x) * 4, 4);
-            }
-        }
-        return pixels;
-    }
 
     /// <summary>A linear colour as a frame shows it, as carve's sheets work it out.</summary>
     public static byte[] Srgb(Vector4 linear)
@@ -165,9 +150,8 @@ public static class SwatchSheet
     /// <param name="sphere">The sphere view, <see cref="SwatchImages.SphereCell"/> a side, RGBA.</param>
     /// <param name="atlas">The label atlas, <see cref="LabelAtlas.Size"/> a side, RGBA, in <see cref="Labels"/>' order.</param>
     /// <param name="extents">Each label's text extent in pixels, as the font measured it.</param>
-    /// <param name="tiledShift">Zero but for the break switch.</param>
     public static (byte[] Pixels, SheetLayout Layout) Compose(IReadOnlyList<byte[]> images, int size, byte[] sphere,
-        byte[] atlas, IReadOnlyList<Vector2> extents, int tiledShift = 0)
+        byte[] atlas, IReadOnlyList<Vector2> extents)
     {
         var layout = new SheetLayout(images.Count);
         var width = layout.Width;
@@ -209,7 +193,7 @@ public static class SwatchSheet
         {
             var left = layout.ColumnLeft(column);
             Place(SwatchImages.Flat(images[column], size, SwatchImages.Cell), SwatchImages.Cell, left, SheetLayout.FlatTop);
-            Place(SwatchImages.Tiled(images[column], size, SwatchImages.Cell, tiledShift), SwatchImages.Cell, left, SheetLayout.TiledTop);
+            Place(SwatchImages.Tiled(images[column], size, SwatchImages.Cell), SwatchImages.Cell, left, SheetLayout.TiledTop);
             Label(1 + 2 * column, left + LabelAtlas.Padding, SheetLayout.FlatTop + LabelAtlas.Padding, true);
             Label(2 + 2 * column, left + LabelAtlas.Padding, SheetLayout.TiledTop + LabelAtlas.Padding, true);
         }

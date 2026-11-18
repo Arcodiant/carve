@@ -113,14 +113,14 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
                 return Image(texels, size, size, $"swatch flat: {OutputRoles.Name(role)} of {name}, {size} x {size} px, exact texels");
             }
             var side = SwatchImages.TiledSide(size);
-            var tiled = SwatchImages.Tiled(texels, size, side, SwatchBreak.TiledShift ? size / 2 : 0);
+            var tiled = SwatchImages.Tiled(texels, size, side);
             var scaled = side == 3 * size ? "exact texels" : $"nearest-scaled from {3 * size} px";
             return Image(tiled, side, side, $"swatch tiled: {OutputRoles.Name(role)} of {name}, 3 x 3 of {size} px, {side} x {side} px, {scaled}");
         }
 
         var images = roles.ToDictionary(r => r, r => OutputImage.Rgba8(evaluator, r, size));
         var title = $"{(path is null ? "unsaved graph" : name)}   {size} px   seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}";
-        var columns = SwatchBreak.RoleOrder ? roles.Reverse().ToList() : roles.ToList();
+        var columns = roles.ToList();
         var labels = view == "sheet" ? SwatchSheet.Labels(title, columns, angle) : null;
 
         await status.WhenSettled.WaitAsync(cancellationToken);
@@ -138,8 +138,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
             return Image(frame.Sphere, SwatchImages.SphereCell, SwatchImages.SphereCell,
                 $"swatch sphere: {name} at {size} px on the engine's UV sphere, angle {angleText}, {SwatchImages.SphereCell} x {SwatchImages.SphereCell} px");
         }
-        var (sheet, layout) = SwatchSheet.Compose([.. columns.Select(r => images[r])], size, frame.Sphere, frame.Atlas!, frame.Extents!,
-            SwatchBreak.TiledShift ? size / 2 : 0);
+        var (sheet, layout) = SwatchSheet.Compose([.. columns.Select(r => images[r])], size, frame.Sphere, frame.Atlas!, frame.Extents!);
         return Image(sheet, layout.Width, layout.Height,
             $"swatch sheet: {name}, {size} px, seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}; columns {string.Join(", ", columns.Select(OutputRoles.Name))}, flat over tiled 3 x 3; sphere at angle {angleText}; {layout.Width} x {layout.Height} px");
     }

@@ -1,11 +1,15 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Carve.Debug;
+using ModelContextProtocol.Protocol;
 using Patina.Graphs;
 using Patina.Graphs.Evaluation;
 using Patina.Graphs.Imaging;
 using Patina.Graphs.Nodes;
+using StbImageSharp;
 
 namespace Carve.Scenario.Patina;
 
@@ -64,6 +68,7 @@ internal sealed class SwatchStage : IPatinaStage
         checks.Check(built.TrimEnd('\n') == sample.Replace("\r\n", "\n").TrimEnd('\n'), "swatch: the planks built through the tools are not samples/graphs/planks.texgraph by content");
         var graph = TexGraphFile.Read(built, NodeRegistry.BuiltIn).Graph!;
         var evaluator = new GraphEvaluator(graph, NodeRegistry.BuiltIn);
+        var read = new Readback(evaluator);
 
         // Refusals.
         var big = await checks.CallAsync("swatch", """{"size":4096}""", refused: true);
@@ -73,9 +78,9 @@ internal sealed class SwatchStage : IPatinaStage
 
         // The single views.
         var normal = await driver.CaptureToolAsync("swatch", "swatch-flat-normal-256", new { view = "flat", output = "normal", size = 256 });
-        CheckExact(checks, "flat normal 256", normal, 256, 256, (x, y) => Texel(evaluator, OutputRole.Normal, 256, x, y));
+        CheckExact(checks, "flat normal 256", normal, 256, 256, (x, y) => Texel(read, OutputRole.Normal, 256, x, y));
         var tiled = await driver.CaptureToolAsync("swatch", "swatch-tiled-base-128", new { view = "tiled", output = "base_colour", size = 128 });
-        CheckExact(checks, "tiled base_colour 128", tiled, 384, 384, (x, y) => Texel(evaluator, OutputRole.BaseColour, 128, x % 128, y % 128));
+        CheckExact(checks, "tiled base_colour 128", tiled, 384, 384, (x, y) => Texel(read, OutputRole.BaseColour, 128, x % 128, y % 128));
         CheckSeamless(checks, "tiled base_colour 128", tiled, 128, expectSeam: false);
 
         var spheres = new Dictionary<float, ScenarioFrame>();
@@ -83,17 +88,17 @@ internal sealed class SwatchStage : IPatinaStage
         {
             var frame = await driver.CaptureToolAsync("swatch", $"swatch-sphere-{angle.ToString(CultureInfo.InvariantCulture)}", new { view = "sphere", angle });
             spheres[angle] = frame;
-            CheckSphere(checks, frame, evaluator, 256, angle);
+            CheckSphere(checks, frame, read, 256, angle);
         }
-        CheckStaveOrder(checks, evaluator, spheres, 0, 90);
-        CheckStaveOrder(checks, evaluator, spheres, 0, 200);
-        CheckStaveOrder(checks, evaluator, spheres, 90, 200);
+        CheckStaveOrder(checks, read, spheres, 0, 90);
+        CheckStaveOrder(checks, read, spheres, 0, 200);
+        CheckStaveOrder(checks, read, spheres, 90, 200);
 
         // The sheet at 256 and 64.
         var sheet = await driver.CaptureToolAsync("swatch", "swatch-sheet-256", new { });
-        CheckSheet(checks, sheet, evaluator, 256, spheres[0]);
+        CheckSheet(checks, sheet, read, 256, spheres[0]);
         var small = await driver.CaptureToolAsync("swatch", "swatch-sheet-64", new { size = 64 });
-        CheckSheet(checks, small, evaluator, 64, null);
+        CheckSheet(checks, small, read, 64, null);
 
         File.WriteAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), _measured.ToString() + "\nangle_a\tangle_b\tstave pairs (a/b:pixels:measured difference:texel difference)\n" + Order);
 
@@ -107,7 +112,109 @@ internal sealed class SwatchStage : IPatinaStage
             """);
         var seam = await driver.CaptureToolAsync("swatch", "swatch-tiled-seam", new { view = "tiled", output = "base_colour" });
         CheckSeamless(checks, "the seam graph", seam, 128, expectSeam: true);
+
+        await BreaksAsync(driver, checks, sample, evaluator, read, spheres, sheet, small, tiled, seam);
     }
+
+    /// <summary>
+    /// The breaks (T-114's table), each a fault swatch could have, made here and never in patina: the scenario tampers with a
+    /// frame it read back, or with the texels it predicts from, or gives the tools a wrong graph, then runs the same checks on a
+    /// <see cref="PatinaChecks"/> of its own. Each break must fail every check named for it (patterns over the failures).
+    /// Writes <c>swatch-breaks.txt</c>, what each break failed, into the run folder. No frame is captured.
+    /// </summary>
+    private async Task BreaksAsync(ScenarioDriver driver, PatinaChecks checks, string sample, GraphEvaluator evaluator, Readback read,
+        Dictionary<float, ScenarioFrame> spheres, ScenarioFrame sheet, ScenarioFrame small, ScenarioFrame tiled, ScenarioFrame seam)
+    {
+        var log = new StringBuilder();
+        void Caught(string name, Action<PatinaChecks> run, IEnumerable<string> by)
+        {
+            var probe = new PatinaChecks(driver);
+            run(probe);
+            log.AppendLine("== " + name);
+            foreach (var failure in probe.Failures) log.AppendLine("  " + failure);
+            foreach (var pattern in by)
+                checks.Check(probe.Failures.Any(f => Regex.IsMatch(f, pattern)), $"swatch: the break {name} was not caught by /{pattern}/");
+        }
+        var count = OutputRoles.All.Count;
+        var names = OutputRoles.All.Select(OutputRoles.Name).ToList();
+        var sheets = new[] { (Frame: sheet, Size: 256), (Frame: small, Size: 64) };
+
+        // role-order: the sheet's columns in reverse role order, labels and all: the cells swapped in the sheets read back.
+        foreach (var (frame, size) in sheets)
+        {
+            var swapped = Tampered(frame, (x, y) => y < SheetTop || x >= count * 258 || x % 258 >= 256 ? (x, y) : ((count - 1 - x / 258) * 258 + x % 258, y));
+            Caught($"role-order, sheet {size}", probe => CheckSheet(probe, swapped, read, size, null),
+                names.SelectMany(r => new[] { $"sheet {size} {r} flat:", $"sheet {size} {r} tiled:" }));
+        }
+
+        // u-flip: the sphere's u the other way round: the texels predicted from mirrored, against the frames as drawn.
+        var mirrored = new Readback(evaluator, mirrorU: true);
+        Caught("u-flip", probe =>
+        {
+            CheckStaveOrder(probe, mirrored, spheres, 0, 200);
+            CheckStaveOrder(probe, mirrored, spheres, 90, 200);
+        }, ["stave order 0 against 200:", "stave order 90 against 200:"]);
+
+        // tiled-shift: the repeat moved half a tile in x and y: the 1:1 tiled views rolled by half a tile, the sheets' tiled
+        // cells (three tiles to 256 px) by the whole pixel nearest it, 43.
+        Caught("tiled-shift", probe =>
+        {
+            CheckExact(probe, "tiled base_colour 128", Rolled(tiled, 64), 384, 384, (x, y) => Texel(read, OutputRole.BaseColour, 128, x % 128, y % 128));
+            CheckSeamless(probe, "the seam graph", Rolled(seam, 64), 128, expectSeam: true);
+            foreach (var (frame, size) in sheets)
+            {
+                var shifted = Tampered(frame, (x, y) => y < 282 || x >= count * 258 || x % 258 >= 256 ? (x, y)
+                    : (x - x % 258 + (x % 258 + 43) % 256, 282 + (y - 282 + 43) % 256));
+                CheckSheet(probe, shifted, read, size, null);
+            }
+        }, [@"^swatch: tiled base_colour 128:", "^swatch: the seam graph:", .. sheets.SelectMany(s => names.Select(r => $"sheet {s.Size} {r} tiled:"))]);
+
+        // roughness-as-base: the roughness image where the sphere's base colour goes: a graph whose base colour output is the
+        // planks' roughness, drawn through the tools and judged against the planks.
+        var graph = JsonNode.Parse(sample)!;
+        graph["nodes"]!["base_out"]!["inputs"]!["in"] = "roughness";
+        await checks.CallAsync("define_graph", JsonSerializer.Serialize(new { graph }));
+        var wrong = new Dictionary<float, ScenarioFrame>();
+        foreach (var angle in spheres.Keys)
+        {
+            var result = await driver.CallAsync("swatch", new { view = "sphere", angle });
+            var image = result.Content.OfType<ImageContentBlock>().FirstOrDefault();
+            checks.Check(result.IsError is not true && image is not null, $"swatch: the roughness-as-base sphere at {angle} was not drawn");
+            if (image is null) return;
+            var png = image.DecodedData.ToArray();
+            var decoded = ImageResult.FromMemory(png, ColorComponents.RedGreenBlueAlpha);
+            wrong[angle] = new ScenarioFrame($"roughness-as-base-{angle}", "", png, decoded.Width, decoded.Height, decoded.Data, null);
+        }
+        Caught("roughness-as-base", probe =>
+        {
+            foreach (var (angle, frame) in wrong) CheckSphere(probe, frame, read, 256, angle);
+            CheckStaveOrder(probe, read, wrong, 0, 200);
+        }, [.. spheres.Keys.SelectMany(a => new[] { $"sphere {a}: .* not dark", $"sphere {a}: .* out of band" }), "stave order 0 against 200:"]);
+
+        File.WriteAllText(Path.Combine(driver.RunFolder, "swatch-breaks.txt"), log.ToString());
+    }
+
+    /// <summary>The sheet's cells start below the title strip.</summary>
+    private const int SheetTop = 24;
+
+    /// <summary>A copy of <paramref name="frame"/> whose pixel (x, y) is the frame's at <paramref name="from"/>(x, y).</summary>
+    private static ScenarioFrame Tampered(ScenarioFrame frame, Func<int, int, (int X, int Y)> from)
+    {
+        var pixels = new byte[frame.Pixels.Length];
+        for (var y = 0; y < frame.Height; y++)
+        {
+            for (var x = 0; x < frame.Width; x++)
+            {
+                var (sx, sy) = from(x, y);
+                Buffer.BlockCopy(frame.Pixels, (sy * frame.Width + sx) * 4, pixels, (y * frame.Width + x) * 4, 4);
+            }
+        }
+        return new ScenarioFrame(frame.Name, frame.Path, frame.Png, frame.Width, frame.Height, pixels, frame.Caption);
+    }
+
+    /// <summary>A copy of <paramref name="frame"/> rolled by <paramref name="shift"/> pixels in x and y, as the repeat moved.</summary>
+    private static ScenarioFrame Rolled(ScenarioFrame frame, int shift) =>
+        Tampered(frame, (x, y) => ((x + shift) % frame.Width, (y + shift) % frame.Height));
 
     private static string RepoRoot()
     {
@@ -116,20 +223,40 @@ internal sealed class SwatchStage : IPatinaStage
         return directory?.FullName ?? throw new InvalidOperationException("Carve.slnx not found above the scenario");
     }
 
-    private static readonly Dictionary<(OutputRole, int), byte[]> Texels = [];
-
-    private static byte[] Image(GraphEvaluator evaluator, OutputRole role, int size)
+    /// <summary>
+    /// What the checks read back and predict from: the open graph's texels, evaluated here, and what each sphere angle is judged
+    /// to show. A break tampers with it: <paramref name="mirrorU"/> mirrors every image left to right, as if the sphere's u ran
+    /// the other way.
+    /// </summary>
+    private sealed class Readback(GraphEvaluator evaluator, bool mirrorU = false)
     {
-        if (!Texels.TryGetValue((role, size), out var image))
+        private readonly Dictionary<(OutputRole, int), byte[]> _images = [];
+
+        public Dictionary<float, Judged[]> Judged { get; } = [];
+
+        public byte[] Image(OutputRole role, int size)
         {
-            image = OutputImage.Rgba8(evaluator, role, size);
-            Texels[(role, size)] = image;
+            if (!_images.TryGetValue((role, size), out var image))
+            {
+                image = OutputImage.Rgba8(evaluator, role, size);
+                if (mirrorU)
+                {
+                    var mirrored = new byte[image.Length];
+                    for (var y = 0; y < size; y++)
+                        for (var x = 0; x < size; x++)
+                            Buffer.BlockCopy(image, (y * size + size - 1 - x) * 4, mirrored, (y * size + x) * 4, 4);
+                    image = mirrored;
+                }
+                _images[(role, size)] = image;
+            }
+            return image;
         }
-        return image;
     }
 
-    private static ReadOnlySpan<byte> Texel(GraphEvaluator evaluator, OutputRole role, int size, int x, int y) =>
-        Image(evaluator, role, size).AsSpan((y * size + x) * 4, 4);
+    private static byte[] Image(Readback read, OutputRole role, int size) => read.Image(role, size);
+
+    private static ReadOnlySpan<byte> Texel(Readback read, OutputRole role, int size, int x, int y) =>
+        Image(read, role, size).AsSpan((y * size + x) * 4, 4);
 
     /// <summary>The texel under the centre of destination pixel <paramref name="at"/> of <paramref name="to"/>, from <paramref name="from"/>.</summary>
     private static int Under(int at, int to, int from) => (int)Math.Floor((at + 0.5) * from / to);
@@ -204,7 +331,7 @@ internal sealed class SwatchStage : IPatinaStage
             $"swatch: {what}: the mean step across tile boundaries is {meanAcross:0.00} against {meanInside:0.00} inside, so the tiled check {(seamless ? "passed" : "failed")}{(expectSeam ? "; it must fail on a seam" : "")}");
     }
 
-    private void CheckSheet(PatinaChecks checks, ScenarioFrame frame, GraphEvaluator evaluator, int size, ScenarioFrame? sphere)
+    private void CheckSheet(PatinaChecks checks, ScenarioFrame frame, Readback read, int size, ScenarioFrame? sphere)
     {
         var roles = OutputRoles.All;
         var width = roles.Count * 258 + 512;
@@ -218,9 +345,9 @@ internal sealed class SwatchStage : IPatinaStage
             var role = roles[column];
             var left = column * 258;
             CheckRegion(checks, $"sheet {size} {OutputRoles.Name(role)} flat", frame, left, 24, 256, 256, LabelBand,
-                (x, y) => Texel(evaluator, role, size, Under(x, 256, size), Under(y, 256, size)));
+                (x, y) => Texel(read, role, size, Under(x, 256, size), Under(y, 256, size)));
             CheckRegion(checks, $"sheet {size} {OutputRoles.Name(role)} tiled", frame, left, 282, 256, 256, LabelBand,
-                (x, y) => Texel(evaluator, role, size, Under(x, 256, 3 * size) % size, Under(y, 256, 3 * size) % size));
+                (x, y) => Texel(read, role, size, Under(x, 256, 3 * size) % size, Under(y, 256, 3 * size) % size));
             checks.Check(Bright(frame, left, 24, 256, LabelBand) && Bright(frame, left, 282, 256, LabelBand), $"swatch: sheet {size} column {column} has no label text");
         }
         checks.Check(Bright(frame, 0, 0, 512, 24), $"swatch: sheet {size} has no title text");
@@ -256,18 +383,16 @@ internal sealed class SwatchStage : IPatinaStage
     /// <summary>Per pixel of a sphere frame: what it can be judged as, and the stave it shows.</summary>
     private sealed record Judged(Kind Kind, int Stave, SwatchSphere.Hit? Hit, bool Inside, bool Outside);
 
-    private static readonly Dictionary<float, Judged[]> JudgedFrames = [];
-
     private static readonly StringBuilder Order = new();
 
-    private static Judged[] Judge(GraphEvaluator evaluator, int size, float angle)
+    private static Judged[] Judge(Readback read, int size, float angle)
     {
-        if (JudgedFrames.TryGetValue(angle, out var judged)) return judged;
+        if (read.Judged.TryGetValue(angle, out var judged)) return judged;
         var sphere = new SwatchSphere(angle);
         const int n = SwatchSphere.Size;
         var hits = new SwatchSphere.Hit?[n + 1, n + 1];
         for (var y = 0; y <= n; y++) for (var x = 0; x <= n; x++) hits[x, y] = sphere.Trace(x + 0.5f, y + 0.5f);
-        var base_ = Image(evaluator, OutputRole.BaseColour, size);
+        var base_ = Image(read, OutputRole.BaseColour, size);
         Kind KindAt(int tx, int ty)
         {
             var red = base_[(ty * size + tx) * 4];
@@ -305,11 +430,11 @@ internal sealed class SwatchStage : IPatinaStage
                 judged[y * n + x] = new Judged(kind, stave, hit, inside, outside);
             }
         }
-        JudgedFrames[angle] = judged;
+        read.Judged[angle] = judged;
         return judged;
     }
 
-    private void CheckSphere(PatinaChecks checks, ScenarioFrame frame, GraphEvaluator evaluator, int size, float angle)
+    private void CheckSphere(PatinaChecks checks, ScenarioFrame frame, Readback read, int size, float angle)
     {
         const int n = SwatchSphere.Size;
         if (frame.Width != n || frame.Height != n)
@@ -317,7 +442,7 @@ internal sealed class SwatchStage : IPatinaStage
             checks.Check(false, $"swatch: the sphere at {angle} is {frame.Width} x {frame.Height}, not {n} x {n}");
             return;
         }
-        var judged = Judge(evaluator, size, angle);
+        var judged = Judge(read, size, angle);
         var faults = new List<string>();
         void Note(int x, int y, string where)
         {
@@ -351,13 +476,13 @@ internal sealed class SwatchStage : IPatinaStage
     /// The stave order rule between angles <paramref name="a"/> and <paramref name="b"/>: at pixels judged stave in both, grouped
     /// by the pair of staves they show, the lighter-reading group in each frame is the one whose texels are lighter.
     /// </summary>
-    private static void CheckStaveOrder(PatinaChecks checks, GraphEvaluator evaluator, Dictionary<float, ScenarioFrame> frames, float a, float b)
+    private static void CheckStaveOrder(PatinaChecks checks, Readback read, Dictionary<float, ScenarioFrame> frames, float a, float b)
     {
         const int n = SwatchSphere.Size;
         var size = 256;
-        var ja = Judge(evaluator, size, a);
-        var jb = Judge(evaluator, size, b);
-        var base_ = Image(evaluator, OutputRole.BaseColour, size);
+        var ja = Judge(read, size, a);
+        var jb = Judge(read, size, b);
+        var base_ = Image(read, OutputRole.BaseColour, size);
         // Each stave's tone: the mean luma of its stave texels.
         var tone = new double[8];
         var count = new int[8];
