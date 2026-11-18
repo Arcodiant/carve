@@ -52,3 +52,47 @@ rounds).
 - **Draws new frames, so plan the frame review as its own agent**, as T-114 did. Treat Waystone's "Commented" as
   unanswered until the person says approved.
 - Opus: it touches the shared host library and carve's frame guard.
+
+### As built
+
+Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review checkpoint.
+
+- **Shared lights.** `src/Carve.Hosting/RenderLights.cs` (public): `AmbientIntensity` 0.25, `DirectionalIntensity` 0.9,
+  `Add(scenes, entities, scene, orientation)` (ambient, `RenderSky.Sky`, directional, in carve's order), `Orientation(cameraDirection)`
+  (carve's front light, turned by whatever turns carve's front camera into this one: the code moved as it was), `UpFor`,
+  `VerticalCosine`. `src/Carve.Server/RenderLights.cs` went; `ViewFraming.LightOrientation`, `UpFor` and `VerticalCosine`
+  delegate to it; `RenderSystem` and `PbrEqualityTests` pass `ViewFraming.LightOrientation(RenderView.Front)`; the test
+  project no longer links the old file. Nothing else in `Carve.Hosting` or `Carve.Server` changed.
+- **The sphere.** `SwatchSystem.Build` calls `RenderLights.Add` with `SwatchCamera.Light` = `RenderLights.Orientation(Eye)`
+  (the camera on +z, +y up), so the light sits where carve keeps it relative to its camera. The sheet's sphere label is now
+  `sphere, Pbr, carve lights, angle 0`; `swatch`'s description and the README's patina paragraph say how it is lit.
+- **Checks** (`SwatchStage.cs`; `SwatchSphere.cs` unchanged, it predicts texels, never a lit shade). Probed on Xellotath
+  (local runs `artifacts/scenarios/patina/1..3`), put to the person (Waystone round 1, `G:\My Drive\artifacts\carve\M-27\T-128\round-1\thresholds.txt`)
+  and **approved**: *dark* 52 -> 66 (gap luma max now 50.0 / 43.0 / 42.3 at 0 / 90 / 200), *in band* 58..110 -> 80..128
+  (staves now 92.0..124.0, 92.3..115.8, 94.5..122.3), and a new *highlight* rule: a #808080 sphere at roughness 0 has a peak
+  luma at least 40 above the same at roughness 1. **Measured: 255.0 against 128.1, a step of 126.9.** It adds two frames,
+  `swatch-sphere-roughness-0` and `-1`. The four breaks are still caught (the scenario fails otherwise): `roughness-as-base`'s
+  staves read 132.1..193.0 and its gaps far above 66.
+- **Frame guard: holds.** Before: the start commit 4384202, every GPU suite (`artifacts/T-128/before-jobs.txt`), all on
+  Mantorok. After: 439b8b8, every suite also on Mantorok (`after-jobs.txt`), so like runner against like. Tables by
+  `artifacts/T-128/compare.py before after` (SHA-256 of every PNG). All 16 carve scenario suites' frames byte-identical
+  (466 rows: sky 138, orcward 76, crate 69, cube 32, gatehouse 26, materials 23, uvs 22, character 21, planks 17, cuts 16,
+  soft 11, shed 10, rig 9, export 7, viewer-cube 6, ... none changed, none missing). `server-regression`: 527 against 524
+  rows; every differing (request, frame) row is in T-111's two timing races (the `lids_ids ... is_refused` test, whose
+  missing frame `e4dc71b7...` is one of its own renders); outside them the table is identical.
+- **Patina frames**: flat normal 256, tiled base 128 and the seam frame byte-identical to the carried pass before;
+  the sheets differ only inside the sphere cell (x >= 1074, y 27..494: the sphere and its label); spheres 0, 90, 200 changed;
+  the two roughness frames new. The verify run's frames equal local run 3's by hash.
+
+### Hand-off
+
+- **Done:** code, checks, thresholds (approved), verify `VERIFY PASS` at 439b8b8 (patina-unit, server-unit, scenario-cube,
+  -crate, -sky, -materials, -planks, -patina, server-regression on Mantorok; patina-regression on Xellotath), frame guard above.
+- **Left:** the frame review, by its own agent: job `J-20261118-174636-f1be3b` (`scenario-patina`, Mantorok), frames in
+  `artifacts/T-128/after/scenario-patina/patina/` of this worktree (or `cairn test artifacts J-20261118-174636-f1be3b`). To open
+  and judge: `swatch-sphere-0`, `-90`, `-200`, `swatch-sphere-roughness-0`, `-roughness-1`, and the sphere cell of
+  `swatch-sheet-256` and `-64` (the rest are byte-identical to the approved T-114 set). Then the person's approval of the
+  changed set, and `finish`.
+- **Not checked:** no frame opened by this agent. The roughness-0 peak is 255 (clipped), so the highlight's size or shape is
+  not measured, only that it is there.
+- **Surprising:** nothing broke in carve; the gap rule had only 2 levels to spare under the new light before it was widened.
