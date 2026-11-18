@@ -4,7 +4,7 @@ description: >-
 ---
 # T-106 — The arm in a game
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P2
 
@@ -13,6 +13,8 @@ description: >-
 **Batch:** — (standalone)
 
 **Depends on:** T-105, T-104, T-108
+
+**Verify:** scenario-morph
 
 ## Goal
 
@@ -46,3 +48,32 @@ preview, and driven live by a person in the viewer's window.
 - **Goes back to the person, stop and ask:** any loaded-versus-preview difference beyond the frame rule; anything
   the person's pass finds.
 - Sonnet. The review agent is separate.
+
+### As built
+
+Built by Claude Sonnet 5.5 (the implementer); the real-time pass and frame review by a separate Claude Sonnet 5.5 agent, who finished it.
+
+- **Export.** `ArmStages.ExportAndCompareAsync` (`scenarios/Carve.Scenario.Morph`), run at the end of the arm's stages (after `Bad` is deleted, before `Curl`
+  is deleted for the cylinder): `export` of the arm into `game/Content/models/arm.glb` of the run folder, skinned, 3 bones, clip `Curl`, 672 triangles.
+  Suite `scenario-morph` now runs `scripts/run-morph-scenario.ps1` (scenario, then the checks) and is on this item's `**Verify:**` line.
+- **Frames 8 to 10** (`arm-8-glb-bulk-0-z`, `arm-9-glb-bulk-half-z`, `arm-10-glb-bulk-1-z`): `render_glb` of the export, `+z`, orthographic, with
+  `targets` Bulk 0, 0.5 and 1, each against `render` at the same weights under D-6's frame rule (Orcward's `Comparison`, linked as `ComparisonPng.cs`).
+  Twins: frame 1 for Bulk 0 and frame 2 for Bulk 1 (T-105's frames); Bulk 0.5 alone has none, so the scenario takes one (`arm-9-twin-bulk-half-z`).
+  **Result: 0 of 262144 pixels differ at all three weights.** Frames 8 and 10 are byte-identical (sha256) to T-105's approved frames 1 and 2; frame 9 differs
+  from its twin in some bytes but in no pixel past the rule's luma threshold. A control (the file at Bulk 1 against the model at rest) fails the rule
+  (11318 pixels, patch 4058). `differences.tsv` and `compare/*.png` (render | render_glb | difference) are in the run folder.
+- **Load checks** (`tests/Carve.MorphLoad.Tests`, regression, 6 tests, read `CARVE_MORPH_RUN`, link `RunContent.cs`): `Load` gives `TargetNames` `[Bulk, Lean]`,
+  `DefaultWeights` 0, no `Warnings`, three bones and `Curl`; every position and normal delta of every loaded vertex equals Carve's exactly (the T-104 test's
+  method, on the scenario's saved `work/arm.carve`); `samples/arm.carve` and `arm-lean.carve` equal the saved files by content; `differences.tsv` holds.
+- **Not-planar warnings (the person's ruling, 2026-11-18).** The export reports not-planar faces (the subdivided, smoothed quads), folded by T-72: 10 named, the rest one line. The scenario
+  and the load check accept only not-planar warnings and assert the folded face count equals what `select faces where non_planar` names, as `scenario-soft` does (`NotPlanarFold` linked; the
+  scenario writes `work/select-non-planar-mesh.txt`). Any other warning fails. Shown failing: with the select file one face short, `The_export_is_clean` fails; a test also fails the check
+  with a count one over, one under and a foreign warning added. The loader's own `Warnings` is still empty. The rule itself is T-127, outside M-21.
+- **Broken product shown.** `CARVE_MORPH_BREAK=glbweights` (`render_glb` sent no `targets`) fails the scenario: `arm-9-glb-bulk-half-z draws the same as arm-8-glb-bulk-0-z, pixel for pixel`.
+- CLAUDE.md's layout table has `Carve.MorphLoad.Tests`, `run-morph-scenario.ps1` and the extended Morph row.
+- Engine needs: none. Files outside the worktree: the content folder copied to `G:\My Drive\artifacts\carve\M-21\T-106\round-1\game\` for the person's viewer run.
+- Not checked: the viewer window (no input is scripted); only a headless viewer run on the exported arm with `--targets Bulk=0.5,Lean=0.25` (it loads, 672 triangles). No frame image was opened by me; the three comparisons are pixel counts.
+
+- **The person's verdicts.** Real-time pass in the viewer on `arm.glb` (Bulk, Lean, Curl, instructions in `round-1/viewer-pass.md`): approved. Frames 8 to 10 and their triptychs (`round-2`): approved. Frames 8 and 10 are byte-identical to T-105's approved frames 1 and 2, frame 9 has 0 differing pixels against its twin.
+- **Model.** Sonnet 5.5 throughout; the review and finish were a separate Sonnet 5.5 agent.
+- **Not checked.** Nothing scripts the viewer window; the person's pass is the check.

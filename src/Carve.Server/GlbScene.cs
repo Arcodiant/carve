@@ -16,8 +16,9 @@ namespace Carve.Server;
 /// </summary>
 internal sealed class GlbScene
 {
-    private GlbScene(byte[] bytes, Matrix4x4[]? palette, DrawnSpace space, Vector3 drawnHalf, int vertices, int triangles, IReadOnlyList<string> warnings)
+    private GlbScene(byte[] bytes, Matrix4x4[]? palette, DrawnSpace space, Vector3 drawnHalf, int vertices, int triangles, IReadOnlyList<string> warnings, IReadOnlyList<KeyValuePair<string, float>> targetWeights)
     {
+        TargetWeights = targetWeights;
         Bytes = bytes;
         Palette = palette;
         Space = space;
@@ -28,6 +29,9 @@ internal sealed class GlbScene
     }
 
     public byte[] Bytes { get; }
+
+    /// <summary>The target weights asked for, name to weight, in the order given; each name is resolved once by the frame thread with <c>MorphTargetSet.IndexOfTarget</c>. Empty with no <c>targets</c>.</summary>
+    public IReadOnlyList<KeyValuePair<string, float>> TargetWeights { get; }
 
     public Matrix4x4[]? Palette { get; }
 
@@ -52,10 +56,10 @@ internal sealed class GlbScene
 
     /// <summary>
     /// Parses <paramref name="bytes"/> with the engine's geometry loader (on the CPU, so off the frame thread) and poses it
-    /// at <paramref name="clip"/> and <paramref name="time"/>; the problems, in the words of the arguments, are added to
+    /// at <paramref name="clip"/> and <paramref name="time"/>; <paramref name="weightRefusals"/> (target name to the refusal of its weight) are reported for the names the file has; the problems, in the words of the arguments, are added to
     /// <paramref name="errors"/> and null returned.
     /// </summary>
-    public static GlbScene? Prepare(IModelGeometryLoader loader, byte[] bytes, string? clip, float time, List<string> errors)
+    public static GlbScene? Prepare(IModelGeometryLoader loader, byte[] bytes, string? clip, float time, List<string> errors, IReadOnlyList<KeyValuePair<string, float>>? targets = null, IReadOnlyDictionary<string, string>? weightRefusals = null)
     {
         ParsedModel parsed;
         try
@@ -66,6 +70,28 @@ internal sealed class GlbScene
         {
             errors.Add($"path: the engine's loader could not read the file: {e.GetBaseException().Message}");
             return null;
+        }
+
+        if (targets is { Count: > 0 })
+        {
+            var names = parsed.MorphTargets?.TargetNames ?? [];
+            // A name is checked before its weight, as render checks them: an unknown target is named even when its weight is out of range too.
+            foreach (var t in targets)
+            {
+                if (Array.IndexOf(names, t.Key) >= 0)
+                {
+                    // A weight that is not finite is never carried on to the draw as a number: it is refused here even when its words were lost.
+                    if (weightRefusals is not null && weightRefusals.TryGetValue(t.Key, out var refusal)) errors.Add(refusal);
+                    else if (!float.IsFinite(t.Value)) errors.Add($"targets.{t.Key}: the weight is not a finite number");
+                    continue;
+                }
+
+                errors.Add(names.Length == 0
+                    ? $"targets.{t.Key}: the file has no morph targets, so there is no weight to give; give no targets to draw it as it is"
+                    : $"targets.{t.Key}: the file has no target named '{t.Key}'; the targets are {Carve.Core.NameList.Quoted(names)}");
+            }
+
+            if (errors.Count > 0) return null;
         }
 
         Matrix4x4[]? palette = null;
@@ -121,7 +147,7 @@ internal sealed class GlbScene
 
         var indices = parsed.Skin is { } withIndices ? withIndices.SkinnedMeshData.Indices!.Length : parsed.MeshData.Indices!.Length;
         var space = DrawnSpace.Of(min, max);
-        return new GlbScene(bytes, palette, space, space.Apply(max), count, indices / 3, parsed.Warnings ?? [])
+        return new GlbScene(bytes, palette, space, space.Apply(max), count, indices / 3, parsed.Warnings ?? [], targets ?? [])
         {
             BoundsMin = min,
             BoundsMax = max,

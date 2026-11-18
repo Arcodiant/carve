@@ -4,7 +4,7 @@ description: >-
 ---
 # T-99 — Morph targets in the Core
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P2
 
@@ -75,3 +75,54 @@ and keep targets exactly through `subdivide`. Every other M-21 task builds on th
 - **Goes back to the person, stop and ask:** any change to D-1's id rule; a target name rule beyond the one above;
   the 1e-6 tolerance if it cannot be met; storing absolute positions instead of deltas.
 - Write in As built: the API names T-100 to T-104 call, and whether delta-of-the-sum rounding ever showed.
+
+### As built
+
+> 2026-11-18: the rebase onto T-71 moved the carriage. `Subdivision.Level` no longer has a `Targets` field: the
+> `StandardLayers.Targets` layer in `LayerRegistry.Standard` carries the deltas (`LayerRules.BlendDeltas` and
+> `ReblendDeltas`), through `Subdivision.Once`'s provenance. The text below was written before.
+
+Built by Claude Opus 5.5 (the stronger model the Notes ask for).
+
+- **Type.** `src/Carve.Core/MorphTargets.cs`: `MorphTarget` (a name and sparse deltas, `SortedDictionary<int, Vector3>`;
+  a zero delta is never stored), `MorphTargetResult` (`Target`, `Errors`, `Succeeded`) and `MorphTargets` (the mesh's
+  set, never empty, in definition order). `PolygonMesh.Targets` is null for none; `WithTargets(...)` sets it, and
+  `WithStyle`, `WithShade`, `WithWeights`, `WithUvs` and `WithVertices` all carry it.
+- **API that T-100 to T-104 call.**
+  - Making: `MorphTarget.FromPositions(mesh, name, IReadOnlyList<Vector3>)` (full; tombstone slots skipped),
+    `MorphTarget.FromPositions(mesh, name, IEnumerable<KeyValuePair<int, Vector3>>)` (sparse, `positions[<id>]`),
+    `MorphTarget.FromDeltas(mesh, name, sparse deltas)` (the file reader, T-101; `deltas[<id>]`),
+    `MorphTarget.FromMesh(mesh, name, other)` (first difference by `MorphTarget.TopologyDifference(mesh, other)`),
+    `MorphTarget.NameProblem(name)`. Every refusal is a `MeshError`, as `PolygonMesh.Create`'s.
+  - Reading: `MorphTarget.Name`, `.Deltas` (ascending ids), `.Count`, `.DeltaOf(v)`; `MorphTargets.All`, `.Names`,
+    `.Count`, `.Find(name)`, `.ListNames()`; `Model.TargetNames` (the union across meshes in first-definition order,
+    for T-104's glTF target list and T-103's refusals).
+  - Changing (T-100, T-102): `MorphTarget.Of(name, deltas)` (unchecked, for edits carrying a checked target),
+    `MorphTarget.Without(vertices)`, `MorphTargets.Of(targets)` (null for none; throws on a bad or repeated name),
+    `MorphTargets.With(target, out replaced)` (replaced in place or added last), `MorphTargets.With(targets?, target)`,
+    `MorphTargets.Without(name)` (null when none left), `MorphTargets.WithoutVertices(ids)`. A
+    `MorphTargets.Select(t => deltas)` for the per-edit carriage, and `MorphTarget.Renamed(name)`, were removed after the
+    rebase onto T-71 left them with no caller (RV-64); the `Targets` layer does the carrying.
+  - Evaluating: `PolygonMesh.Morphed(IReadOnlyDictionary<string, float>)` (a copy to draw: no weights, no targets);
+    `MorphTargets.Apply(positions, weights)`; `Skinning.Posed(model, pose, targets)` morphs every mesh with targets,
+    even with no skeleton, then skins (`null` targets is the old `Posed(model, pose)`). T-103 calls this.
+- **Sum.** Each vertex is summed in double from its base, targets in definition order, and rounded once; a vertex no
+  given target moves keeps its base bits, and all weights 0 gives the base exactly.
+- **Subdivide.** Each new vertex's delta is its position's own `Stencil` over the
+  level's dense deltas (same terms, same order; now `LayerRules.BlendDeltas` on the `Targets` layer). `MeshEdits.Subdivide` drops deltas on tombstones. Exact within 1e-6 of
+  the bounding-box diagonal on the arm cage (Bulk) and the hard-rimmed cylinder (both rims hard, one side edge hard, so
+  creases and corners), at levels 1 and 2. The 1e-6 tolerance was met; nothing was loosened.
+- **`Model.Combined`** offsets each mesh's target ids by its vertex offset and joins a name used on two meshes into one
+  target, in first-definition order.
+- **Delta-of-the-sum rounding did show.** A target from absolute positions stores `given - base` rounded to float. When
+  the given coordinate is within a factor of 2 of the base (same sign) the subtraction is exact (Sterbenz) and weight 1
+  gives the position back bit for bit; the arm's Lean (x0.8) and Bulk (x1.35) do. Further away (x3.7, x0.001) weight 1
+  came back up to one unit in the last place (of the larger of base and given) off, for example 0.1036 given and
+  0.103599995 back. Both are pinned by tests. Storing absolute positions would remove it, but that goes back to the
+  person (Notes); I recommend deltas as decided, since glTF stores float deltas and the game rounds the same way.
+- **Broken product shown.** With each face point's delta given the face-point stencil of the next face (the wrong
+  face), the exactness test failed in all four cases (arm level 1: worst vertex 0.0140 apart against a tolerance of
+  6.3e-7; arm level 2: 0.0227; cylinder level 1: 0.0558; cylinder level 2: 0.0871), and so did the tombstone test.
+  Restored, all pass.
+- **Not checked:** nothing visible (Core only, no frames). The edits other than `subdivide` do not carry targets yet:
+  `PolygonMesh.Edit` and `Create` make a mesh without them, as they make one without UVs. That is T-100.

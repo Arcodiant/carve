@@ -25,6 +25,10 @@
     <Compile Include="../../scenarios/Carve.Scenario.Shed/ShedGeometry.cs" Link="Gatehouse/ShedGeometry.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Cuts/CutsGeometry.cs" Link="Gatehouse/CutsGeometry.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs" Link="Gatehouse/GatehousePlan.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Morph/ArmPlan.cs" Link="Arm/ArmPlan.cs" />
+    <!-- The soft export's warning check, shared with the soft scenario and its checks; NotPlanarFoldCheckTests runs it on the CPU (RV-65). -->
+    <Compile Include="../../scenarios/Carve.Scenario.Soft/NotPlanarFold.cs" Link="Soft/NotPlanarFold.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Crate/CameraPixels.cs" Link="Arm/CameraPixels.cs" />
   </ItemGroup>
 
 </Project>

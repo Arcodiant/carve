@@ -319,7 +319,7 @@ public static class MeshEdits
     /// and moves to its vertex point, each face keeps its id as its first child, and face points, edge points and the
     /// other children are appended (see <see cref="Subdivision"/> for the order and the sharp-edge rules). Hard edges stay
     /// creased and are carried to both halves; children take their face's colour and groups; weights are blended by
-    /// each point's own stencil and capped at four. Two levels are exactly one level done twice.
+    /// each point's own stencil and capped at four; morph targets' deltas take each point's stencil exactly as its position does. Two levels are exactly one level done twice.
     /// </summary>
     public static EditResult Subdivide(PolygonMesh mesh, int levels)
     {
@@ -343,7 +343,8 @@ public static class MeshEdits
         var result = PolygonMesh.Create(level.Vertices, level.Faces.Select(f => f.Length == 0 ? Face.Deleted : (Face)f), gone);
         if (!result.Succeeded) return EditResult.Refused(result.Errors);
         var carried = level.Mesh;
-        var made = result.Mesh!.WithStyle(carried.Style).WithWeights(carried.Weights).WithShade(carried.Shade).WithUvs(carried.Uvs);
+        var made = result.Mesh!.WithStyle(carried.Style).WithWeights(carried.Weights).WithShade(carried.Shade).WithUvs(carried.Uvs)
+            .WithTargets(carried.Targets?.WithoutVertices(gone));
         var moved = mesh.LiveVertices.Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
         return EditResult.Made(made, moved,
             Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).Where(v => !made.IsVertexDeleted(v)).ToArray(),

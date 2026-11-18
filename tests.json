@@ -14,14 +14,15 @@
         {
           "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
         },
-        "samples/leaky-shed.carve",
+        "samples/*.carve",
+        "tests/Carve.Core.Tests/Fixtures/*.carve",
+        "scenarios/Carve.Scenario.Morph/ArmPlan.cs",
+        "scenarios/Carve.Scenario.Soft/NotPlanarFold.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
         "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
         "scenarios/Carve.Scenario.Gatehouse/GatehousePlan.cs",
-        "samples/gatehouse.carve",
-        "samples/barrel.carve",
-        "samples/barrel-textured.carve",
         "samples/textures/*.png"
       ],
       "resources": "cpu",
@@ -396,6 +397,38 @@
         "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
+    },
+    {
+      "id": "scenario-morph",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-morph-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Morph/Carve.Scenario.Morph.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.MorphLoad.Tests/Carve.MorphLoad.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Orcward/ComparisonPng.cs",
+        "scenarios/Carve.Scenario.Soft/NotPlanarFold.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
+        "samples/arm.carve",
+        "samples/arm-lean.carve",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-morph-scenario.ps1"
       ],
       "resources": "gpu",
       "requires": [

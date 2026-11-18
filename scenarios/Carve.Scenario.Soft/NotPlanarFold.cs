@@ -18,6 +18,19 @@ public static partial class NotPlanarFold
     private static partial Regex NamedLine();
 
     /// <summary>
+    /// The problem with an export's result text, or null when it is right: with no "warning(s): " the export is clean, which meets the
+    /// rule only when select finds no non_planar face either; with warnings, <see cref="Check(string, IReadOnlyDictionary{string, IReadOnlyList{int}})"/>.
+    /// </summary>
+    public static string? CheckExport(string exportResult, IReadOnlyDictionary<string, IReadOnlyList<int>> nonPlanarIdsByMesh)
+    {
+        const string Prefix = "warning(s): ";
+        var at = exportResult.IndexOf(Prefix, StringComparison.Ordinal);
+        if (at >= 0) return Check(exportResult[(at + Prefix.Length)..], nonPlanarIdsByMesh);
+        var selected = nonPlanarIdsByMesh.Values.Sum(v => v.Count);
+        return selected == 0 ? null : $"the export has no warnings, but select finds {selected} non_planar faces";
+    }
+
+    /// <summary>
     /// The problem with <paramref name="warnings"/> (the text after "warning(s): "), or null when it is right, against the ids
     /// <c>select faces where non_planar</c> gives per mesh: as <see cref="Check(string, IReadOnlyDictionary{string, int})"/>, and
     /// the named faces are select's lowest ids, the first <see cref="Named"/> in id order (T-72's reading as landed, RV-52).

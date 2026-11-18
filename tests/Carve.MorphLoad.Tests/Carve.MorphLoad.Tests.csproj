@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The check step of suite scenario-morph: reads the arm's content folder as a game would. Run by scripts/run-morph-scenario.ps1. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.MorphLoad.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
+    <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
+    <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
+    <PackageReference Include="Arcodiant.Empyrean.Animation" Version="$(EmpyreanVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The run-folder and sample helpers of the character checks, linked and not copied. -->
+    <Compile Include="../Carve.CharacterLoad.Tests/RunContent.cs" Link="RunContent.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Soft/NotPlanarFold.cs" Link="NotPlanarFold.cs" />
+  </ItemGroup>
+
+</Project>

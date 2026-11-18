@@ -282,6 +282,15 @@ internal sealed class RenderSystem(
             entities.AddComponent(entity, new SkinnedPose { Palette = palette });
         }
 
+        if (glb.TargetWeights.Count > 0)
+        {
+            // Each name resolved once, as the engine's guide says; the weights dense and index-parallel to the file's targets.
+            var set = model.MorphTargets ?? throw new InvalidOperationException("The file has no morph targets.");
+            var weights = new float[set.TargetCount];
+            foreach (var (name, weight) in glb.TargetWeights) weights[set.IndexOfTarget(name)] = weight;
+            entities.AddComponent(entity, new MorphWeights { Weights = weights });
+        }
+
         _glbEntity = entity;
         _glb = glb;
         ShowModel(false);

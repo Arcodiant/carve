@@ -55,6 +55,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         + "Example: export {path: 'models/orc.hat.glb', mode: 'piece', meshes: ['Hat']}, loaded beside models/orc.glb. The meshes keep the model's order. "
         + "It is refused, writing nothing, for an empty or missing meshes list, a name that is not a mesh (the error lists the model's mesh names) and a model with no skeleton; a vertex with no weight in a chosen mesh is refused as in the model mode, and allow_unweighted: true applies. "
         + "A piece warns on the game's max_triangles and max_submeshes as the model mode does, not on height, and reads and writes the limits file as model mode does. "
+        + "A model with morph targets (define_target) writes each as a glTF morph target, and the result line names them in glTF target order, for example \"2 morph target(s) 'Girth', 'Slim' in glTF target order\"; a model with none says nothing of targets. "
         + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
         + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
         + "Worked example of a material: define_material {name: 'wood', base_colour: '#C8A06E', roughness: 0.6, base_colour_texture: 'wood.png'}, project_uvs, set_material {faces: [0, 1], material: 'wood'}, then export: the .glb holds primitives 'carve' and 'wood', 'wood' with baseColorTexture holding wood.png's bytes, the result line says 2 materials 'carve', 'wood', and the game's loader reads 'wood' back as that material. "
@@ -165,7 +166,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
         var warnings = source.Limits.Warnings(model, triangles.Count, GlbExport.MaterialNames(mesh, model.Materials).Length);
-        return Line(Summary(mesh, GlbExport.MaterialNames(mesh, model.Materials), target, replaced, triangles.Count, source.Describe(written: false), warnings,
+        return Line(Summary(mesh, GlbExport.MaterialNames(mesh, model.Materials), target, replaced, triangles.Count, TargetsPart(model) + source.Describe(written: false), warnings,
             [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model)]));
     }
 
@@ -223,7 +224,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         if (glb.BoundToRoot > 0)
             line += $"; allow_unweighted: {N(glb.BoundToRoot)} vertices with no weight were bound to the first root bone '{skeleton.Bones[0].Name}'";
 
-        line += source.Describe(written: false);
+        line += TargetsPart(model) + source.Describe(written: false);
         var warnings = source.Limits.Warnings(model, glb.Triangles, glb.Primitives, wholeBody: !asPiece).ToList();
         warnings.AddRange(GlbExport.UvWarnings(model));
         warnings.AddRange(GlbExport.MaterialUvWarnings(model));
@@ -231,6 +232,13 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         foreach (var piece in model.Meshes)
             warnings.AddRange(MeshWarningFold.Lines(MeshReport.Create(piece.Mesh).Warnings).Select(w => $"mesh '{piece.Name}': " + w.ReplaceLineEndings(" ")));
         return Line(line + WarningsSuffix(warnings));
+    }
+
+    /// <summary>T-107: the morph targets written, by name in glTF target order; empty (nothing added to the result) for a model with none.</summary>
+    private static string TargetsPart(Model model)
+    {
+        var names = model.TargetNames;
+        return names.Count == 0 ? "" : $", {names.Count.ToString(CultureInfo.InvariantCulture)} morph target(s) {NameList.Quoted(names)} in glTF target order";
     }
 
     /// <summary>The result line; numbers are culture-invariant.</summary>

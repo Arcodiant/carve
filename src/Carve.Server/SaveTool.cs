@@ -63,6 +63,7 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         + "It does not hold the undo history (open starts from the file as one step), a current file name (carve remembers none: give the path every time) or any render setting. "
         + "The .glb that export writes is only for the game, and has no faces to edit. "
         + "Materials (define_material) are saved too, as a version 6 file's materials list and each mesh's face materials; a model with none is written as it always was. A texture is saved as a path relative to the .carve file's folder, so keep the PNG files with the file or below it; save does not copy them, and open reads them again from those paths. "
+        + "Morph targets are saved too, each mesh's as a version 8 file's targets (sparse deltas by vertex id, read back bit-exact); with mesh, that mesh's targets; a model with none is written as it always was. "
         + "With mesh, only the materials that mesh's faces use are written. A texture that has no relative path from the file's folder (on another drive) refuses the save, naming the material and the field. "
         + "The file is versioned JSON (version 2), keys always in one order, one vertex, face, colour, group, weighted vertex, bone or clip key per line, so the same model always gives the same bytes and a diff shows what changed: "
         + "meshes [{name, vertices, faces, colours [{colour, faces}], groups [{name, faces}], weights [{vertex, bones {bone: weight}}]}], skeleton [{name, parent, position, rotation}] or null, "

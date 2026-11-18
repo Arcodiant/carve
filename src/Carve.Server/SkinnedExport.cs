@@ -59,12 +59,16 @@ public static class SkinnedExport
         if (model.Skeleton is null) throw new ArgumentException("the model has no skeleton", nameof(model));
         var uvs = model.Meshes.Any(m => GlbExport.HasUvs(m.Mesh))
             || GlbExport.Textured(GlbExport.UsedBy(model.Meshes.Select(m => m.Mesh), model.Materials));
+        if (GlbTargets.For(model.TargetNames) is { } targets)
+            return uvs
+                ? Write<Tagged<VertexTexture1>>(model, name, (m, f, v, n, p) => new(new VertexTexture1(GlbExport.UvAt(m, f, v)), targets.Tag(p!, f, v, n)), targets)
+                : Write<Tagged<VertexEmpty>>(model, name, (_, f, v, n, p) => new(default, targets.Tag(p!, f, v, n)), targets);
         return uvs
-            ? Write<VertexTexture1>(model, name, (m, f, v) => new VertexTexture1(GlbExport.UvAt(m, f, v)))
-            : Write<VertexEmpty>(model, name, (_, _, _) => default);
+            ? Write<VertexTexture1>(model, name, (m, f, v, _, _) => new VertexTexture1(GlbExport.UvAt(m, f, v)), null)
+            : Write<VertexEmpty>(model, name, (_, _, _, _, _) => default, null);
     }
 
-    private static SkinnedGlb Write<TvM>(Model model, string name, Func<PolygonMesh, int, int, TvM> texture)
+    private static SkinnedGlb Write<TvM>(Model model, string name, Func<PolygonMesh, int, int, Vector3, GlbTargets.Piece?, TvM> texture, GlbTargets? targets)
         where TvM : struct, IVertexMaterial
     {
         var skeleton = model.Skeleton!;
@@ -82,6 +86,7 @@ public static class SkinnedExport
             var mesh = piece.Mesh;
             var triangles = Triangulator.Triangulate(mesh);
             var corners = Shading.CornersOf(mesh);
+            var deltas = targets?.Of(mesh);
             var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, TvM, VertexJoints4>>();
             foreach (var p in Primitives(piece, taken))
             {
@@ -108,10 +113,11 @@ public static class SkinnedExport
                 var face = mesh.Faces[t.Face];
                 var at = corners[t.Face];
                 var primitive = primitives[GlbExport.KeyOf(mesh, t.Face)];
+                var (na, nb, nc) = (at[face.CornerOf(t.A)], at[face.CornerOf(t.B)], at[face.CornerOf(t.C)]);
                 primitive.AddTriangle(
-                    Vertex(mesh, t.A, at[face.CornerOf(t.A)], texture(mesh, t.Face, t.A)),
-                    Vertex(mesh, t.B, at[face.CornerOf(t.B)], texture(mesh, t.Face, t.B)),
-                    Vertex(mesh, t.C, at[face.CornerOf(t.C)], texture(mesh, t.Face, t.C)));
+                    Vertex(mesh, t.A, na, texture(mesh, t.Face, t.A, na, deltas)),
+                    Vertex(mesh, t.B, nb, texture(mesh, t.Face, t.B, nb, deltas)),
+                    Vertex(mesh, t.C, nc, texture(mesh, t.Face, t.C, nc, deltas)));
             }
             triangleCount += triangles.Count;
             boundToRoot += mesh.LiveVertices.Count(v => mesh.Weights?.Has(v) != true);
@@ -119,6 +125,7 @@ public static class SkinnedExport
 
         var meshNode = scene.CreateNode(name);
         meshNode.Mesh = root.CreateMesh(builder);
+        targets?.Write(root, meshNode.Mesh, GlbTargets.TagsOf(builder.Primitives));
         meshNode.Skin = skin;
         GlbRig.WriteClips(root, skeleton, joints, model.Clips);
 

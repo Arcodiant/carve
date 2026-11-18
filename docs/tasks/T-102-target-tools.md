@@ -4,7 +4,7 @@ description: >-
 ---
 # T-102 — Target tools
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P2
 
@@ -47,3 +47,32 @@ file of the same topology, as fps-arms makes them.
 - **Goes back to the person, stop and ask:** a new argument beyond these; taking deltas instead of absolute
   positions; any change to an existing tool's result shape other than `get_mesh`'s new `targets`.
 - Sonnet.
+
+### As built
+
+Built by Claude Sonnet 5.5.
+
+- **`define_target`** (`src/Carve.Server/DefineTargetTool.cs`). Arguments: `name` (required), `mesh` (optional), and exactly
+  one of `positions` and `file`; `file_mesh` only with `file`. `positions` is absolute, never deltas: an array of
+  `[x,y,z]` one per vertex slot (`null` at a deleted slot; a non-null there is ignored; `null` at a live vertex is
+  refused) or an object `{"<id>": [x,y,z]}`. `file` resolves as `open` does (`.carve`, relative to the tool folder);
+  `file_mesh` defaults to the target mesh's own name, else the file's only mesh, else the refusal lists the file's meshes.
+  The file's own targets are ignored. Result JSON: `{mesh, name, vertices (count moved), largest_move (metres),
+  replaced (bool), targets:[names in order]}`. A same name replaces in place (`replaced:true`). One undo step (tool name
+  `define_target`). Refusals use T-99's `MeshError` texts: `name: ...`, `positions[7]: ...`, `positions: N positions given;
+  the mesh has M vertex slots ...`, `vertices: 8 here, 5 in the other mesh` (first topology difference). Both or neither
+  of `positions` and `file` is a tool error.
+- **`delete_target`**: `{name, mesh?}` -> `{mesh, deleted, targets:[names left]}`. An unknown name says
+  `target: this mesh has no target 'X'; its targets are 'A', 'B'` (or `it has no targets`). One undo step.
+- **`get_mesh`**: new optional `target`. Adds `targets:[{name, vertices}]` only when the mesh has any (a mesh with none
+  reports exactly what it did), and with `target:"<name>"` also `target:{name, positions:{"<id>":[x,y,z]}}`, base plus
+  delta summed in double and rounded once, ids ascending, sparse. An unknown name is a refusal listing the targets.
+- **`define_mesh`**: new optional `drop_targets` (bool). Replacing a mesh that has targets without it is refused:
+  `name: the mesh 'm' has the morph targets 'A', 'B', which replacing it would drop; give drop_targets: true ...`.
+  A new name, or a mesh with no targets, is unaffected. The result shape is unchanged. (`open`'s matching refusal is T-101.)
+- Tests: `tests/Carve.Server.Tests/TargetToolTests.cs` (unit, `ToolHarness`); `ToolHarnessTests` tool count 36 -> 38;
+  `DefineMeshDefinitionTests` schema string gains `drop_targets` after `faces`.
+- Store: `define_target` and `delete_target` use `ModelStore.Rework`, which holds the write lock and pushes one step. `define_mesh`'s `drop_targets` refusal was first made before `store.Define`, outside the lock, so a `define_target` landing between them was dropped unasked; RV-64 added a `ModelStore.Define` overload that takes the refusal and runs it under the write lock (as T-101's `OpenModel`/`OpenMesh` do for `open`), tested in `ModelStoreTests`.
+- Not checked: no frames and no real-process run (unit tier only); T-101's file reader is not yet under `file`, so the
+  rebase may need `CarveFile.Read`'s signature checked.
+- Model: Claude Sonnet 5.5.

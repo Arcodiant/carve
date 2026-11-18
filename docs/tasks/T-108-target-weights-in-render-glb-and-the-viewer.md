@@ -4,7 +4,7 @@ description: >-
 ---
 # T-108 — Target weights in render_glb and the viewer
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P2
 
@@ -12,7 +12,7 @@ description: >-
 
 **Batch:** — (standalone)
 
-**Depends on:** T-104
+**Depends on:** T-103, T-104
 
 **Verify:** server-regression, viewer-cube
 
@@ -48,3 +48,41 @@ component and its GPU morph-before-skin. A person can drag a dial live.
 - **Goes back to the person, stop and ask:** any difference beyond D-6's frame rule between `render_glb` and
   `render` at the same weights (only the person loosens it); a key or panel change from the sketch.
 - Sonnet.
+
+### As built
+
+Built by Claude Sonnet 5.5.
+
+- **`render_glb` `targets`** (`RenderGlbTool.cs`, `GlbScene.cs`, `RenderSystem.cs`): an object of name to weight. `GlbScene.Prepare`
+  checks each name against `ParsedModel.MorphTargets.TargetNames`; `RenderSystem.ShowGlb` resolves each name once with
+  `MorphTargetSet.IndexOfTarget` and writes a dense `MorphWeights` on the drawn entity beside `SkinnedPose`, so the engine blends
+  morph before skin, with or without `clip`. Without `targets` no component is added, and a frame is byte-identical (a test holds it,
+  and that `{"Bulge":0}` draws the same pixels).
+- **Range.** The person ruled (2026-11-18) that `render` and `check` refuse weights outside [0, 1], naming the target. `render_glb`
+  takes the same range so the tools agree: `targets.Bulge: weight 1.5 is outside 0 to 1`. A non-number, a name the file lacks
+  (the file's names are listed) and weights for a file with no targets are refused in the same `targets.<name>:` form that T-103's
+  `TargetWeightsArgument` uses.
+- **Viewer** (`spikes/Carve.ModelViewer`): `--targets Bulk=0.5,Lean=0` (each 0 to 1, a name once) sets the starting weights in
+  headless and window runs, through `MorphWeights` resolved by `IndexOfTarget`; a name the file lacks, a file with no targets or a
+  weight outside 0 to 1 stops the run with a message. `view.json` gains `targets` only when the option is given. `run-viewer.ps1`
+  passes the word after `--targets` as it is. In window mode (`--Empyrean:Graphics:VirtualSurface=false`) the captures are made first,
+  with no panel, then the window stays open with `WeightPanel`: a top-left panel, a row per target (`>` on the selected one, a 20-cell
+  bar as in the sketch, the weight to 2 places), keys Tab, Left/Right (-/+0.05), Space (adds an `Animator` on the file's first clip and
+  toggles `Playing`), 0 (all weights to 0). The viewer's project gained `Empyrean.Ui` and `Empyrean.Animation`.
+- **Tests.** `RenderGlbTargetsTests` (regression: T-103's cylinder with `Bulge` exported; middle-row silhouette width ratio 1.2 and 1.4,
+  caps unmoved; unchanged frame; refusals) and `ViewerTargetsTests` (viewer-cube: a cube whose top `Sink`s 0.3, points checked at weights
+  0, 0.5 and 1; refusals; `view.json`), `WeightPanelTests`. Each fails with the `MorphWeights` line removed (shown: render_glb ratio 1
+  against 1.36 to 1.44; the viewer's half-weight points stayed wall).
+- **Comparison with `render`** (`RenderGlbTargetsTests`, after rebasing onto T-103): the cylinder drawn by `render` (`targets`) and by
+  `render_glb` of the exported file at `Bulge` 0, 0.5 and 1, under D-6's frame rule (luma past 4 of 255, frame fails past 0.5 % or a patch
+  past 50): 0 of 262144 pixels differ at every weight, so no difference to put to the person. A control (the file at 1 against the
+  model at 0) fails the rule.
+- **Order of `render_glb`'s refusals (RV-65, Sonnet 5.5).** Told before any path error, as before a7c00c6: the clip and time, a target's type, and a weight that is not a number or is outside 0 to 1. Only a target's name waits for the file, since only the engine's loader knows the names. One call tells every bad entry, as `render` and `check` do: with a file, a type error and each entry's name or weight (a name before its weight); with no file or no engine, the types and weights without the names. With no `targets` to check, the clip and time problems stand alone as before. A refused weight is handed to `GlbScene.Prepare` as NaN, which `Prepare` refuses by itself, so it can never be drawn as 0.
+- **Not checked / the person's look.** The window panel: one window-mode run of mine (the exported cylinder, `--targets Bulge=0.6`)
+  showed the panel top left with the bar, 0.60 and the key line, but another window covered part of the screenshot, so I did not judge
+  the layout; no key was pressed (no input is scripted); Tab, arrows, Space and 0 are checked only through `WeightPanel`'s tests. The
+  person's live try is T-106's. `scripts/run-viewer.ps1` cannot pass `--Empyrean:Graphics:VirtualSurface=false` (PowerShell reads it
+  as a parameter); I ran the viewer's dll with `dotnet exec`. Not fixed.
+- **T-106 calls:** `render_glb` with `targets` (`{"Bulk":0.5}`), and `dotnet exec spikes/Carve.ModelViewer/bin/Debug/net10.0/Carve.ModelViewer.dll
+  --content <folder> --model models/arm.glb --out <out> --Empyrean:Graphics:VirtualSurface=false --targets Bulk=0.5` for the slider.
+- Model: Sonnet 5.5.

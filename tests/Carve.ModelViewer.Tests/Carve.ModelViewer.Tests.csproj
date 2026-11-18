@@ -14,6 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The panel's state and text are engine-free: the keys act on it here as they do in the window. -->
+    <Compile Include="../../spikes/Carve.ModelViewer/WeightPanel.cs" Link="WeightPanel.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Built first and run as a process through run-viewer.ps1; its code is not referenced. -->
     <ProjectReference Include="../../spikes/Carve.ModelViewer/Carve.ModelViewer.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>

@@ -340,9 +340,9 @@ public class AttributeLayerTests
     [Fact]
     public void The_standard_registry_carries_its_layers_in_a_fixed_order_and_refuses_a_second_of_one_name()
     {
-        Assert.Equal(["colour", "material", "groups", "weights", "hard", "uvs", "seams"], LayerRegistry.Standard.Layers.Select(l => l.Name));
+        Assert.Equal(["colour", "material", "groups", "weights", "hard", "uvs", "seams", "targets"], LayerRegistry.Standard.Layers.Select(l => l.Name));
         Assert.Equal(
-            [LayerElement.Face, LayerElement.Face, LayerElement.Face, LayerElement.Vertex, LayerElement.Edge, LayerElement.Corner, LayerElement.Edge],
+            [LayerElement.Face, LayerElement.Face, LayerElement.Face, LayerElement.Vertex, LayerElement.Edge, LayerElement.Corner, LayerElement.Edge, LayerElement.Vertex],
             LayerRegistry.Standard.Layers.Select(l => l.Element));
         Assert.Throws<ArgumentException>(() => LayerRegistry.Standard.With(StandardLayers.Colour));
     }

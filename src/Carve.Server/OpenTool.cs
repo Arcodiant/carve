@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -35,15 +36,28 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         + "(at most 20, sorted, and a count of the rest), or says there are none or that the folder does not exist, so correct the path from that list; "
         + "a file that cannot be read (access denied, a locked file); a file that is not a Carve file: not JSON (with line and column), an unknown version, "
         + "a file with no meshes and no skeleton, or anything the tools themselves would refuse (a bad vertex or face, colour, group, bone, weight or clip), each problem listed by where it is, e.g. meshes[0].faces[3][3]; "
-        + "with mesh, a name that is empty or holds ':' (\"mesh: a mesh name must not contain ':' ...\"); a name a version 2 file has no mesh of (the file's meshes are listed, or it is said to have none), or weights on bones the model's skeleton lacks (they are listed). "
+        + "with mesh, a name that is empty or holds ':' (\"mesh: a mesh name must not contain ':' ...\"); a name a version 2 file has no mesh of (the file's meshes are listed, or it is said to have none), or weights on bones the model's skeleton lacks (they are listed); "
+        + "an open that would replace a mesh that has morph targets (with mesh, the model's mesh of that name; without, any mesh of the model), naming the targets, unless drop_targets is true (undo brings them back either way). A file's morph targets come with its meshes, bit-exact. "
         + "The whole sequence from an empty file to a game is the worked example in save's description.\n"
         + ExampleMarker + SaveTool.WorkedFile;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<OpenTool>("open", Text, WithMesh(PathSchema("The .carve file to read, absolute or relative to carve's working directory."), OpenMeshText));
+    private const string DropTargetsText =
+        "true to replace a mesh that has morph targets, dropping them (undo brings them back). Left out or false, an open that would replace a mesh with targets is refused, naming them.";
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null)
+    public static McpServerTool Create()
     {
-        if (PathAndMeshArguments("open", context, path, mesh, out var text, out var name) is { } refused) return refused;
+        var schema = WithMesh(PathSchema("The .carve file to read, absolute or relative to carve's working directory."), OpenMeshText);
+        schema["properties"]!.AsObject()["drop_targets"] = new JsonObject { ["description"] = DropTargetsText, ["type"] = "boolean" };
+        return MeshToolSupport.Create<OpenTool>("open", Text, schema);
+    }
+
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null, JsonElement? drop_targets = null)
+    {
+        var errors = UnknownArguments("open", context, "path", "mesh", "drop_targets");
+        var text = RequiredString("path", path, errors);
+        var name = MeshName(mesh, errors);
+        var drop = OptionalBool("drop_targets", drop_targets, errors);
+        if (errors.Count > 0) return Failed("open", errors);
 
         var target = ToolPaths.Resolve("open", text, SaveTool.Extension, out var pathError, toolFolder.Directory, verb: "reads");
         if (target is null) return Error(pathError!);
@@ -69,8 +83,12 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         // A version 1 file holds one unnamed mesh (read as 'mesh'): with a name, that mesh is placed under it.
         if (name is not null && read.Version == 1) file = Model.Of(name, file.Meshes[0].Mesh);
         ModelSnapshot? opened;
-        if (name is null) opened = store.OpenModel(file, "open");
-        else if ((opened = store.OpenMesh(file, name, "open", out var problem)) is null) return Failed("open", [problem!]);
+        Func<Model, string?> refuse = current => drop ? null : TargetsReplaced(current, name);
+        if (name is null)
+        {
+            if ((opened = store.OpenModel(file, "open", refuse, out var problem)) is null) return Failed("open", [problem!]);
+        }
+        else if ((opened = store.OpenMesh(file, name, "open", refuse, out var problem)) is null) return Failed("open", [problem!]);
 
         var model = opened.Model;
         var body = new Dictionary<string, object> { ["path"] = target.FullPath };
@@ -90,6 +108,22 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
             body["clips"] = model.Clips.Select(c => c.Name).ToArray();
         }
         return Ok(body);
+    }
+
+    /// <summary>
+    /// Why the open would lose morph targets (T-101), or null: the model's mesh <paramref name="name"/> has targets, or, with no
+    /// name, some mesh of the model has. Undo brings them back after an open with drop_targets, so nothing is lost for good.
+    /// </summary>
+    internal static string? TargetsReplaced(Model current, string? name)
+    {
+        var lost = current.Meshes.Where(m => (name is null || m.Name == name) && m.Mesh.Targets is not null).ToArray();
+        if (lost.Length == 0) return null;
+        if (name is not null)
+            return $"drop_targets: the model's mesh '{name}' has the morph target(s) {lost[0].Mesh.Targets!.ListNames()}, which opening mesh '{name}' would replace; "
+                + "pass drop_targets: true to replace it and drop them (undo brings them back)";
+        var listed = string.Join("; ", lost.Select(m => $"mesh '{m.Name}': {m.Mesh.Targets!.ListNames()}"));
+        return $"drop_targets: opening the whole file replaces the model, and its morph targets would be lost ({listed}); "
+            + "pass drop_targets: true to replace them (undo brings them back), or open one mesh with mesh";
     }
 
     /// <summary>The missing-file error: the resolved path and the .carve files that are in its folder.</summary>

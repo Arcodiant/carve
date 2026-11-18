@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Carve.Core;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -10,7 +11,7 @@ public sealed class CheckTool(ModelStore store)
 {
     public const string Text =
         "Checks the current mesh's health: what is wrong by element id, what it measures, and what a game will make of it. Call it before you export or call a model done. "
-        + "Takes one optional argument, mesh, the name of the mesh to check, which may be left out while the model has one mesh; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
+        + "Takes the optional argument mesh, the name of the mesh to check, which may be left out while the model has one mesh, and the optional targets; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
         + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume, uvs:{mapped, unmapped}}}. "
         + "ok is true when there are no problems and no warnings; notes never make it false. "
         + "A shell is a set of faces joined by shared edges; shells[k] counts from the shell with the lowest face id. "
@@ -18,6 +19,11 @@ public sealed class CheckTool(ModelStore store)
         + "inside-out: a closed shell wound the wrong way round, so a game culls its faces and it is invisible. It is reported when the shell's signed volume is below -1e-6 times the cube of its bounds' diagonal, so a flat two-sided sheet, whose volume is rounding noise of either sign, is not. Reverse every face loop of that shell and call define_mesh again. "
         + "coincident-vertices: two vertices at exactly the same position, compared as floats with no tolerance, so -0 and 0 are the same, as in select; the surfaces look joined but are not, so they z-fight and waste vertices; call define_mesh again with one vertex and every face using it. "
         + "duplicate-face: two faces with the same vertices in any order; they z-fight and waste triangles, and the doubled edges also show among the warnings below; call define_mesh again without the extra face. "
+        + "A mesh with morph targets (define_target) is also checked at each target's weight 1 against the rest mesh, one problem for each target and rule that finds anything, naming the target as targets['Pinch'] and the first 10 ids, then a count: "
+        + "target-flips-face: a face whose normal at weight 1 has a negative dot product with its rest normal, so it points the other way in the game; "
+        + "target-collapses-face: a face with no area at weight 1 (below 1e-9 times the square of its bounds' diagonal) that has some at rest; "
+        + "target-opens-mesh: two vertices at exactly the same position at rest, which coincident-vertices names, that are apart at weight 1, so the surface cracks. "
+        + "The optional targets, an object of target name to weight 0 to 1 as render takes (a name no mesh has, or a weight outside 0 to 1, is a tool error), checks the mesh morphed to those weights: its stats and every other check are of that shape, while the target rules above still compare weight 1 with the rest mesh. "
         + "Warnings, the same ones define_mesh and the edits report. "
         + "\"edge belongs to only one face\": an open edge, a hole; collision built from the mesh breaks later. "
         + "\"edge is shared by N faces\": a non-manifold edge, which breaks collision the same way; call define_mesh again without the extra face. "
@@ -38,16 +44,22 @@ public sealed class CheckTool(ModelStore store)
         + ExampleMarker + "{}\n"
         + """Output: {"ok":true,"problems":[],"warnings":[],"notes":["size 1 x 1 x 1 m","base at y = 0","origin inside the bounds"],"stats":{"vertices":8,"faces":6,"edges":12,"triangles":12,"shells":1,"closed":true,"bounds":{"min":[0,0,0],"max":[1,1,1]},"size":[1,1,1],"area":6,"volume":1}}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<CheckTool>("check", Text, WithMesh(null));
-
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null)
+    public static McpServerTool Create() => MeshToolSupport.Create<CheckTool>("check", Text, WithMesh(new JsonObject
     {
-        var errors = UnknownArguments("check", context, "mesh");
+        ["type"] = "object",
+        ["properties"] = new JsonObject { ["targets"] = TargetWeightsArgument.Schema() },
+    }));
+
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? targets = null)
+    {
+        var errors = UnknownArguments("check", context, "mesh", "targets");
         var name = MeshName(mesh, errors);
+        var weights = TargetWeightsArgument.Read(targets, store.Current.Model, errors);
         if (errors.Count > 0) return Failed("check", errors);
         if (Target(store, "check", name, out var error) is not { } target) return error!;
 
-        var health = MeshHealth.Create(target, store.Current.Model.Materials);
+        // The mesh is checked at the weights given; its targets are checked at weight 1 against the mesh at rest either way.
+        var health = MeshHealth.Create(weights is null ? target : target.Morphed(weights.ByName), store.Current.Model.Materials, target);
         var stats = health.Stats;
         // In this order; uvs is left out for a mesh with none, so its output is what it always was.
         var shown = new Dictionary<string, object?>

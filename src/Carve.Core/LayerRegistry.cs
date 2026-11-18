@@ -5,7 +5,7 @@ namespace Carve.Core;
 /// <summary>
 /// The attribute layers an edit carries, in order (T-71). Every edit in the kernel describes where its elements came from
 /// (<see cref="EditProvenance"/>) and calls <see cref="Carry"/> on <see cref="Standard"/>, so a mesh's colours, materials,
-/// groups, weights, hard edges, UVs and seams carry through every edit by one mechanism. Immutable.
+/// groups, weights, hard edges, UVs, seams and morph targets carry through every edit by one mechanism. Immutable.
 /// </summary>
 public sealed class LayerRegistry
 {
@@ -19,7 +19,7 @@ public sealed class LayerRegistry
     /// <summary>The layers every mesh has, in the order they are carried (<see cref="StandardLayers"/>).</summary>
     public static LayerRegistry Standard { get; } = Empty
         .With(StandardLayers.Colour).With(StandardLayers.Material).With(StandardLayers.Groups)
-        .With(StandardLayers.Weights).With(StandardLayers.Hard).With(StandardLayers.Uvs).With(StandardLayers.Seams);
+        .With(StandardLayers.Weights).With(StandardLayers.Hard).With(StandardLayers.Uvs).With(StandardLayers.Seams).With(StandardLayers.Targets);
 
     public IReadOnlyList<AttributeLayer> Layers => _layers;
 
@@ -154,6 +154,46 @@ public static class LayerRules
         return BlendWeights(origin, source, out value);
     }
 
+    /// <summary>
+    /// The morph targets rule (T-100): a blend's delta in each target is its stencil over the sources' deltas, worked as the
+    /// stencil works a position (<see cref="Stencil.Apply"/>: summed in double, over its divisor, rounded once; one term
+    /// gives its delta exactly), so a target stays the edit of the morphed mesh. An offset vertex (an extrude's ring)
+    /// copies its source's deltas. A source with no value adds a zero delta.
+    /// </summary>
+    public static bool BlendDeltas(VertexOrigin origin, IReadOnlyDictionary<int, Vector3[]> source, out Vector3[] value)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+        ArgumentNullException.ThrowIfNull(source);
+        value = [];
+        var count = source.Values.FirstOrDefault()?.Length ?? 0;
+        if (count == 0) return false;
+        if (origin.Kind == VertexOriginKind.Offset)
+        {
+            var from = origin.Sources.Terms[0].Element;
+            value = source.TryGetValue(from, out var own) ? [.. own] : new Vector3[count];
+            return true;
+        }
+        value = new Vector3[count];
+        for (var k = 0; k < count; k++) value[k] = origin.Sources.Apply(new DeltaView(source, k));
+        return true;
+    }
+
+    /// <summary>A vertex keeps its deltas when it moves, and takes the morph targets rule when it is re-made as a blend (subdivide).</summary>
+    public static bool ReblendDeltas(int vertex, VertexOrigin? origin, Vector3[] current, IReadOnlyDictionary<int, Vector3[]> source, out Vector3[] value)
+    {
+        if (origin is null) { value = current; return true; }
+        return BlendDeltas(origin, source, out value);
+    }
+
+    /// <summary>One target's deltas by vertex id, a vertex with none reading zero, for a stencil to work.</summary>
+    private sealed class DeltaView(IReadOnlyDictionary<int, Vector3[]> source, int target) : IReadOnlyList<Vector3>
+    {
+        public Vector3 this[int index] => source.TryGetValue(index, out var d) ? d[target] : Vector3.Zero;
+        public int Count => source.Count == 0 ? 0 : source.Keys.Max() + 1;
+        public IEnumerator<Vector3> GetEnumerator() => Enumerable.Range(0, Count).Select(i => this[i]).GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     /// <summary>2D values equal bit for bit (a merge's UVs, the person's ruling 3c, 2026-11-13).</summary>
     public static IEqualityComparer<Vector2> SameBits { get; } = new BitwiseVector2();
 
@@ -217,6 +257,21 @@ public static class StandardLayers
         m => m.Seams.ToDictionary(e => e, _ => true),
         (_, edited, values) => edited.WithUvs((edited.Uvs ?? MeshUvs.None).WithOnlySeams(values.Where(p => p.Value).Select(p => p.Key))),
         LayerRules.InheritFromSplitEdge);
+
+    /// <summary>
+    /// A vertex's deltas in every morph target, in the targets' definition order (D-6, T-99, T-100): a new vertex takes its
+    /// stencil over its sources' deltas as its position does, an extrude's ring copies the corner it stands over, a re-made
+    /// one (subdivide) takes its stencil, a moved one keeps its own, and a deleted vertex's deltas go. Every live vertex is
+    /// read, a zero delta too, so a re-made vertex with none is blended; a zero delta is not stored.
+    /// </summary>
+    public static VertexLayer<Vector3[]> Targets { get; } = new("targets", [],
+        m => m.Targets is { } t
+            ? m.LiveVertices.ToDictionary(v => v, v => t.All.Select(x => x.DeltaOf(v)).ToArray())
+            : Empty<int, Vector3[]>(),
+        (source, edited, values) => source.Targets is { } t
+            ? edited.WithTargets(MorphTargets.Of(t.All.Select((x, k) => MorphTarget.Of(x.Name, values.Select(p => KeyValuePair.Create(p.Key, p.Value[k]))))))
+            : edited,
+        LayerRules.BlendDeltas, LayerRules.ReblendDeltas);
 
     private static Dictionary<int, string[]> GroupsByFace(FaceStyle? style)
     {

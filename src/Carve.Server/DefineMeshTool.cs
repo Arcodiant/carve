@@ -21,6 +21,7 @@ public sealed class DefineMeshTool(ModelStore store)
         "Defines one mesh of the model: a polygon mesh, given by vertex coordinates and faces that index them, under a name (name, default \"mesh\"). "
         + "A model holds named meshes in the order they were first defined. A call with a name the model already has REPLACES that mesh entirely; a new name ADDS a mesh. "
         + "Either is one step for undo, and a call that fails leaves the model unchanged. "
+        + "Replacing a mesh that has morph targets (see define_target) is refused, naming them, because the new mesh would lose them; give drop_targets: true to replace it and drop them anyway. "
         + "The other tools take mesh, the name of the mesh to work on, which may be left out while the model has one mesh; render draws every mesh together. "
         + "Coordinates are in metres (1 unit = 1 m, as export writes them) and Y is up. "
         + "Each face lists vertex indices (0-based) wound counter-clockwise when seen from outside the solid, "
@@ -62,6 +63,8 @@ public sealed class DefineMeshTool(ModelStore store)
 
     private const string NameText =
         "The name of the mesh, non-empty and without a colon (a skinned export names materials mesh:group, so such a name is refused); left out, it is mesh. An existing name replaces that mesh in its place; a new one adds a mesh after the others.";
+
+    private const string DropTargetsText = "Default false. Replacing a mesh that has morph targets is refused unless this is true, which drops the targets with the old mesh. Has no effect on a new name or a mesh with no targets.";
 
     private const string VerticesText = "Vertex positions, each exactly three numbers [x, y, z]. In metres (1 unit = 1 m); Y is up.";
     private const string FacesText = "Faces, each a list of at least 3 indices into vertices, counter-clockwise seen from outside; "
@@ -125,13 +128,19 @@ public sealed class DefineMeshTool(ModelStore store)
                         }),
                 },
             },
+            ["drop_targets"] = new JsonObject
+            {
+                ["description"] = DropTargetsText,
+                ["type"] = "boolean",
+            },
         },
         ["required"] = new JsonArray("vertices", "faces"),
     };
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? vertices = null, JsonElement? faces = null, JsonElement? name = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? vertices = null, JsonElement? faces = null, JsonElement? name = null, JsonElement? drop_targets = null)
     {
-        var errors = UnknownArguments("define_mesh", context, "name", "vertices", "faces");
+        var errors = UnknownArguments("define_mesh", context, "name", "vertices", "faces", "drop_targets");
+        var dropTargets = OptionalBool("drop_targets", drop_targets, errors);
         var meshName = DefinedName(name, errors);
         var shapeBad = new HashSet<string>();
         var points = new List<Vector3>();
@@ -170,7 +179,13 @@ public sealed class DefineMeshTool(ModelStore store)
         if (errors.Count > 0) return Failed("define_mesh", errors);
 
         var mesh = result.Mesh!;
-        store.Define(meshName!, mesh, "define_mesh");
+        // The refusal is made under the store's write lock, with the push, so a define_target landing between them is not dropped unasked.
+        if (store.Define(meshName!, mesh, "define_mesh",
+                model => !dropTargets && model.Find(meshName!)?.Targets is { } targets
+                    ? $"name: the mesh '{meshName}' has the morph targets {targets.ListNames()}, which replacing it would drop; give drop_targets: true to replace it anyway, or a new name to add a mesh"
+                    : null,
+                out var refusal) is null)
+            return Failed("define_mesh", [refusal!]);
         var body = Report(mesh);
         body["deleted"] = Deleted(DeletedElements.None);
         body["split"] = Split([]);

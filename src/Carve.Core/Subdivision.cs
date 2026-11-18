@@ -4,7 +4,7 @@ namespace Carve.Core;
 
 /// <summary>
 /// One level of Catmull-Clark subdivision (D-6, Subdivide is a destructive edit), by D-1's id rules. Every new point is a
-/// stencil, a weighted sum of this level's vertices, and the same stencil gives its position and its bone weights.
+/// stencil, a weighted sum of this level's vertices, and the same stencil gives its position, its bone weights and its morph targets' deltas.
 /// </summary>
 /// <remarks>
 /// <para><b>Ids.</b> Vertex <c>v</c> keeps its id and moves to its vertex point. Appended after it: one face point per face,

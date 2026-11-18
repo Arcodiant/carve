@@ -154,8 +154,17 @@ public static class Skinning
     /// matrices, so a posed flat face is lit by its skinned corners and not by its posed polygon's own normal (D-6).
     /// A model with no skeleton comes back unchanged.
     /// </summary>
-    public static Model Posed(Model model, Pose pose)
+    public static Model Posed(Model model, Pose pose) => Posed(model, pose, null);
+
+    /// <summary>
+    /// As <see cref="Posed(Model, Pose)"/>, with every mesh first morphed to <paramref name="targets"/> (target name to weight,
+    /// <see cref="PolygonMesh.Morphed"/>): the morph comes <b>before</b> skinning, as glTF and Empyrean do it, and the rest
+    /// corner normals are the morphed mesh's. A mesh with targets comes back morphed, without targets, even with no skeleton.
+    /// Null <paramref name="targets"/> is <see cref="Posed(Model, Pose)"/>. Names no mesh has are ignored; the tools refuse them.
+    /// </summary>
+    public static Model Posed(Model model, Pose pose, IReadOnlyDictionary<string, float>? targets)
     {
+        if (targets is not null) model = Morphed(model, targets);
         if (model.Skeleton is not { } skeleton) return model;
         var result = Model.Empty.WithMaterials(model.Materials);
         foreach (var (name, mesh) in model.Meshes)
@@ -163,6 +172,17 @@ public static class Skinning
             result = result.With(name, mesh.Weights is null ? mesh
                 : mesh.WithVertices(Positions(mesh, skeleton, pose), CornerNormals(mesh, skeleton, pose)));
         }
+        return result;
+    }
+
+    /// <summary>The model with every mesh that has targets morphed to <paramref name="targets"/>, its weights kept so that it can be skinned.</summary>
+    public static Model Morphed(Model model, IReadOnlyDictionary<string, float> targets)
+    {
+        if (model.Meshes.All(m => m.Mesh.Targets is null)) return model;
+        var result = Model.Empty.WithMaterials(model.Materials);
+        if (model.Skeleton is { } skeleton) result = result.WithSkeleton(skeleton);
+        foreach (var (name, mesh) in model.Meshes)
+            result = result.With(name, mesh.Targets is null ? mesh : mesh.Morphed(targets).WithWeights(mesh.Weights));
         return result;
     }
 

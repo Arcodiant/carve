@@ -45,6 +45,7 @@
     <Compile Include="../../src/Carve.Server/ViewFraming.cs" Link="ViewFraming.cs" />
     <Compile Include="../../src/Carve.Server/RenderQueue.cs" Link="RenderQueue.cs" />
     <Compile Include="../../src/Carve.Server/RenderPump.cs" Link="RenderPump.cs" />
+    <Compile Include="../../src/Carve.Server/TargetWeights.cs" Link="TargetWeights.cs" />
     <Compile Include="../../src/Carve.Server/WeightHeat.cs" Link="WeightHeat.cs" />
     <Compile Include="../../src/Carve.Server/LookMeshes.cs" Link="LookMeshes.cs" />
     <Compile Include="../../src/Carve.Server/CheckerTexture.cs" Link="CheckerTexture.cs" />
@@ -58,6 +59,7 @@
     <Compile Include="../../src/Carve.Server/SheetComposer.cs" Link="SheetComposer.cs" />
     <Compile Include="../../src/Carve.Server/TargetCheck.cs" Link="TargetCheck.cs" />
     <Compile Include="../../src/Carve.Server/GlbExport.cs" Link="GlbExport.cs" />
+    <Compile Include="../../src/Carve.Server/GlbTargets.cs" Link="GlbTargets.cs" />
     <!-- T-78's equality test hosts the engine in this process with Carve's own composition, lights, sky and material function. -->
     <Compile Include="../../src/Carve.Server/RenderComposition.cs" Link="RenderComposition.cs" />
     <Compile Include="../../src/Carve.Server/RenderSky.cs" Link="RenderSky.cs" />

@@ -11,6 +11,38 @@ public class ModelStoreTests
         TestMeshes.Make([Vector3.Zero, Vector3.UnitX, Vector3.UnitY], [[0, 1, 2]]);
 
     [Fact]
+    public void A_define_with_a_refusal_decides_under_the_write_lock_and_pushes_nothing_when_refused()
+    {
+        var store = new ModelStore();
+        store.Replace(Triangle());
+        var version = store.Current.Version;
+
+        // Another writer started inside the refusal cannot land until the define is done, so what the refusal saw is what is replaced.
+        ModelSnapshot? other = null;
+        Thread? writer = null;
+        var landedInside = true;
+        var done = store.Define("mesh", Triangle(), "define_mesh", _ =>
+        {
+            writer = new Thread(() => other = store.Replace(Triangle()));
+            writer.Start();
+            landedInside = writer.Join(300);
+            return null;
+        }, out var none);
+
+        Assert.Null(none);
+        Assert.NotNull(done);
+        Assert.False(landedInside);
+        Assert.Equal(version + 1, done.Version);
+        writer!.Join();
+        Assert.Equal(version + 2, other!.Version);
+
+        var before = store.Current.Version;
+        Assert.Null(store.Define("mesh", Triangle(), "define_mesh", _ => "refused", out var problem));
+        Assert.Equal("refused", problem);
+        Assert.Equal(before, store.Current.Version);
+    }
+
+    [Fact]
     public void Starts_empty_at_version_zero_and_each_replace_adds_one()
     {
         var store = new ModelStore();

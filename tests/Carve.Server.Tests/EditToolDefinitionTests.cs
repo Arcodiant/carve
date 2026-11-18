@@ -6,6 +6,9 @@ namespace Carve.Server.Tests;
 [Trait("Tier", "unit")]
 public class EditToolDefinitionTests
 {
+    /// <summary>define_target's worked example on the cube.</summary>
+    private const string Bulge = """{"name":"Bulge","positions":{"2":[1.1,1.3,-0.1],"3":[-0.1,1.3,-0.1],"6":[1.1,1.3,1.1],"7":[-0.1,1.3,1.1]}}""";
+
     private static async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(bool define = true)
     {
         var carve = new ToolHarness();
@@ -43,10 +46,38 @@ public class EditToolDefinitionTests
     {
         var (carve, tools) = await StartAsync();
         using var _ = carve;
+        // get_mesh's target example is shown after define_target's bulge on the cube.
+        if (tool == "get_mesh") Ok(await carve.CallToolAsync("define_target", Bulge));
 
         var examples = Examples(tools, tool);
         Assert.NotEmpty(examples);
         foreach (var example in examples) ExpectCleanClosed(Ok(await carve.CallToolAsync(tool, example)));
+    }
+
+    [Fact]
+    public async Task The_get_mesh_target_example_is_one_of_its_examples_and_reads_the_bulge_as_its_output_shows()
+    {
+        var (carve, tools) = await StartAsync();
+        using var _ = carve;
+        Ok(await carve.CallToolAsync("define_target", Bulge));
+
+        var example = Assert.Single(Examples(tools, "get_mesh"), e => e.Contains("target"));
+        var body = Ok(await carve.CallToolAsync("get_mesh", example));
+        var target = body.GetProperty("target");
+        Assert.Equal("Bulge", target.GetProperty("name").GetString());
+        Assert.Equal(new[] { "2", "3", "6", "7" }, target.GetProperty("positions").EnumerateObject().Select(p => p.Name));
+        Assert.Equal(1.3f, target.GetProperty("positions").GetProperty("2")[1].GetSingle(), 1e-6f);
+        Assert.Equal(4, body.GetProperty("targets")[0].GetProperty("vertices").GetInt32());
+
+        // What the description shows is what the tool gives.
+        const string marker = "With the target, the output also holds: ";
+        var shown = JsonDocument.Parse(Description(tools, "get_mesh").Split('\n').Single(l => l.StartsWith(marker, StringComparison.Ordinal))[marker.Length..]).RootElement;
+        Assert.Equal(JsonSerializer.Serialize(shown.GetProperty("targets")), JsonSerializer.Serialize(body.GetProperty("targets")));
+        Assert.Equal(JsonSerializer.Serialize(shown.GetProperty("target")), JsonSerializer.Serialize(target));
+
+        // It sits after the cube example's output, not between that example's introduction and its call.
+        var text = tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "get_mesh").GetProperty("description").GetString()!;
+        Assert.True(text.IndexOf("Output: {\"vertices\"", StringComparison.Ordinal) < text.IndexOf("reading a target", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -162,7 +193,7 @@ public class EditToolDefinitionTests
             Assert.Contains("Worked example", Description(tools, name));
         foreach (var name in new[] { "define_mesh", "render", "move", "extrude", "get_mesh", "undo" })
             Assert.False(Tool(tools, name).GetProperty("inputSchema").GetProperty("additionalProperties").GetBoolean(), name);
-        Assert.Equal(["view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "bones", "bone_labels", "weights"],
+        Assert.Equal(["view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "targets", "bones", "bone_labels", "weights"],
             Tool(tools, "render").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name));
         Assert.Contains("ids are the positions given here", Description(tools, "define_mesh"));
     }
