@@ -56,7 +56,7 @@
         "samples/gatehouse.carve"
       ],
       "resources": "cpu",
-      "est-seconds": 12
+      "est-seconds": 24
     },
     {
       "id": "server-regression",
@@ -83,7 +83,7 @@
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 260
+      "est-seconds": 338
     },
     {
       "id": "scenario-cube",
