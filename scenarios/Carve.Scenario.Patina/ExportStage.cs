@@ -7,7 +7,8 @@ namespace Carve.Scenario.Patina;
 /// <summary>
 /// T-115's stage, export end to end on the real patina: open samples/graphs/planks.texgraph, export it at its own size
 /// (256) into the run folder and compare each PNG with samples/graphs/planks/*.png byte for byte, name the slots, export
-/// at 1024 and check by sampling at matching uv that it is the same picture at four times the resolution, then the error
+/// at 1024 and check by ExportMatch's rule that it is the same picture at four times the resolution (and that the rule
+/// catches a half-tile shift, a u-mirror and a flat map made on it), then the error
 /// paths: a size that is not a power of two, a role the graph has no output for, and a folder that is a file.
 /// </summary>
 internal sealed class ExportStage : IPatinaStage
@@ -31,7 +32,8 @@ internal sealed class ExportStage : IPatinaStage
             checks.Check(result.Contains($"- {role}.png: 256x256, {expected.Length} bytes, slot {slot}", StringComparison.Ordinal), $"export: the answer has no line for {role}: {result}");
         }
 
-        // The same picture at four times the resolution: each 256 texel against the 1024 texel at its centre.
+        // The same picture at four times the resolution under ExportMatch's rule: each 256 texel against the mean of the
+        // four 1024 texels at its centre, per RGB channel, within 4 levels; then a shift, a mirror and a flat map must fail.
         var large = Path.Combine(driver.RunFolder, "export-1024");
         var big = await checks.CallAsync("export", JsonSerializer.Serialize(new { folder = large, size = 1024, outputs = new[] { "base_colour", "occlusion" } }));
         checks.Check(big.StartsWith($"export: wrote 2 files to {large} at size 1024\n", StringComparison.Ordinal), "export: the 1024 export said " + big);
@@ -41,12 +43,16 @@ internal sealed class ExportStage : IPatinaStage
             var a = Decode(Path.Combine(small, role + ".png"));
             var b = Decode(Path.Combine(large, role + ".png"));
             checks.Check(a.Width == 256 && b.Width == 1024 && b.Height == 1024, $"export: {role} sizes are {a.Width} and {b.Width}x{b.Height}, not 256 and 1024");
-            if (b.Width != 1024) continue;
-            double sum = 0;
-            for (var y = 0; y < 256; y++)
-                for (var x = 0; x < 256; x++)
-                    sum += Math.Abs(a.Data[(y * 256 + x) * 4 + 1] - b.Data[((y * 4 + 2) * 1024 + x * 4 + 2) * 4 + 1]);
-            checks.Check(sum / (256 * 256) < 25, $"export: {role} at 1024 is not the 256 picture at matching uv (mean difference {sum / (256 * 256):0.0})");
+            if (b.Width != 1024 || b.Height != 1024 || a.Width != 256 || a.Height != 256) continue;
+            var largest = ExportMatch.LargestDifference(a.Data, 256, b.Data, 1024);
+            checks.Check(largest <= ExportMatch.Tolerance, $"export: {role} at 1024 is not the 256 picture at matching uv (largest difference {largest:0.0}, allowed {ExportMatch.Tolerance})");
+
+            // The rule shown failing: each fault made on the 1024 picture must be caught.
+            foreach (var (fault, data) in ExportMatch.Faults(role, b.Data, 1024))
+            {
+                var wrong = ExportMatch.LargestDifference(a.Data, 256, data, 1024);
+                checks.Check(wrong > ExportMatch.Tolerance, $"export: {role} at 1024 with a {fault} passed the matching-uv rule (largest difference {wrong:0.0})");
+            }
         }
 
         // The error paths: each says what is allowed, and writes nothing.

@@ -27,4 +27,9 @@
     <Compile Include="../Carve.Server.Tests/ProductReferenceGuard.cs" Link="ProductReferenceGuard.cs" />
   </ItemGroup>
 
+  <!-- RV-68's matching-uv rule for an export at a larger size, shared with the Patina scenario's export stage (a file link, no project reference). -->
+  <ItemGroup>
+    <Compile Include="../../scenarios/Carve.Scenario.Patina/ExportMatch.cs" Link="ExportMatch.cs" />
+  </ItemGroup>
+
 </Project>

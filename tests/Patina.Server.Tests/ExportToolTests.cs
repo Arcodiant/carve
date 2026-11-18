@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Carve.Scenario.Patina;
 using StbImageSharp;
 
 namespace Patina.Server.Tests;
@@ -75,12 +76,30 @@ public class ExportToolTests
         Assert.Equal((1024, 1024), PngSize(Path.Combine(folder.Path, "b", "base_colour.png")));
         var a = Decode(Path.Combine(folder.Path, "a", "base_colour.png"));
         var b = Decode(Path.Combine(folder.Path, "b", "base_colour.png"));
-        var f = b.Width / a.Width;
-        double sum = 0;
-        for (var y = 0; y < a.Height; y++)
-            for (var x = 0; x < a.Width; x++)
-                sum += Math.Abs(a.Data[(y * a.Width + x) * 4] - b.Data[((y * f + f / 2) * b.Width + x * f + f / 2) * 4]);
-        Assert.True(sum / (a.Width * a.Height) < 40, "1024 is not the 256 picture at matching uv");
+        var largest = ExportMatch.LargestDifference(a.Data, 256, b.Data, 1024);
+        Assert.True(largest <= ExportMatch.Tolerance, $"1024 is not the 256 picture at matching uv (largest difference {largest:0.0})");
+    }
+
+    /// <summary>RV-68: the matching-uv rule passes the good 1024 export and fails a half-tile shift, a u-mirror and a flat map of it (occlusion: the flat map; normal is not under the rule, see ExportMatch).</summary>
+    [Fact]
+    public async Task The_matching_uv_rule_fails_a_shifted_a_mirrored_and_a_flat_picture()
+    {
+        using var folder = new TempFolder();
+        await using var patina = await OpenPlanks(folder.Path);
+        await patina.Ok("export", """{"folder":"a","size":256}""");
+        await patina.Ok("export", """{"folder":"b","size":1024}""");
+
+        foreach (var role in new[] { "base_colour", "roughness", "occlusion" })
+        {
+            var a = Decode(Path.Combine(folder.Path, "a", role + ".png"));
+            var b = Decode(Path.Combine(folder.Path, "b", role + ".png"));
+            Assert.True(ExportMatch.Matches(a.Data, 256, b.Data, 1024), $"{role}: the good 1024 export fails the rule (largest difference {ExportMatch.LargestDifference(a.Data, 256, b.Data, 1024):0.0})");
+            foreach (var (fault, data) in ExportMatch.Faults(role, b.Data, 1024))
+            {
+                var wrong = ExportMatch.LargestDifference(a.Data, 256, data, 1024);
+                Assert.True(wrong > ExportMatch.Tolerance, $"{role}: a {fault} passed the rule (largest difference {wrong:0.0})");
+            }
+        }
     }
 
     private static ImageResult Decode(string path) => ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);

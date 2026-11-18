@@ -41,7 +41,8 @@
         {
           "dotnet-closure": "tests/Patina.Server.Tests/Patina.Server.Tests.csproj"
         },
-        "tests/Carve.Server.Tests/ProductReferenceGuard.cs"
+        "tests/Carve.Server.Tests/ProductReferenceGuard.cs",
+        "scenarios/Carve.Scenario.Patina/ExportMatch.cs"
       ],
       "resources": "cpu",
       "est-seconds": 15
@@ -56,6 +57,7 @@
           "dotnet-closure": "tests/Patina.Server.Tests/Patina.Server.Tests.csproj"
         },
         "tests/Carve.Server.Tests/ProductReferenceGuard.cs",
+        "scenarios/Carve.Scenario.Patina/ExportMatch.cs",
         "samples/graphs/**"
       ],
       "resources": "cpu",
