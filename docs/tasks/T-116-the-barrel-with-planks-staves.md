@@ -4,7 +4,7 @@ description: >-
 ---
 # T-116 — The barrel with planks staves
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
@@ -106,4 +106,5 @@ under `samples/graphs/` changed.
 - top: concentric rings on the cap, octagon edge clean.
 - gap close-up: two staves side by side, left lighter than right, gap clearly darker and several texels wide each side; wood faintly streaked, specular from the roughness map is subtle (soft sheen, no hot spots); hoop below.
 - sheet: four views consistent with the single frames.
-- Reopened frames were hash-checked by the scenario (byte-identical), not opened. Person approved all five frames in Waystone (round 1, copy at G:\My Drivertifacts\carve\M-27\T-116ound-1). No code change was needed.
+- Reopened frames were hash-checked by the scenario (byte-identical), not opened. Person approved all five frames in Waystone (round 1, copy at G:\My Drivertifacts\carve\M-27\T-116
+ound-1). No code change was needed.

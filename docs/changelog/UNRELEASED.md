@@ -5,3 +5,4 @@
 - T-112: noise, gradient, levels, blend and height_to_normal, and samples/graphs/planks.texgraph with its PNGs kept equal to the graph
 - T-113: patina, a second MCP server: define_graph, edit_graph, get_graph, save, open, push_snapshot and pop_snapshot
 - T-115: patina's export writes each output as a PNG at any power of two to 8192, in bounded memory
+- T-116: samples/barrel-planks.carve: M-7's barrel with its staves from the planks graph, in a scenario of its own
