@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="Carve.Hosting" />
     <Using Include="Carve.Server.Tests.CarveProcess" Static="true" />
     <Using Include="Carve.Server.Tests.ToolList" Static="true" />
   </ItemGroup>
@@ -60,7 +61,6 @@
     <Compile Include="../../src/Carve.Server/GlbExport.cs" Link="GlbExport.cs" />
     <!-- T-78's equality test hosts the engine in this process with Carve's own composition, lights, sky and material function. -->
     <Compile Include="../../src/Carve.Server/RenderComposition.cs" Link="RenderComposition.cs" />
-    <Compile Include="../../src/Carve.Server/RenderSky.cs" Link="RenderSky.cs" />
     <Compile Include="../../src/Carve.Server/RenderLights.cs" Link="RenderLights.cs" />
     <Compile Include="../../src/Carve.Server/PbrMaterials.cs" Link="PbrMaterials.cs" />
     <Compile Include="../../src/Carve.Server/GlbRig.cs" Link="GlbRig.cs" />

@@ -475,8 +475,7 @@ internal sealed class RenderSystem(
             DrawOverlay(request.Spec);
 
             // Complete by the time RenderFrame returns; the continuation runs on the thread pool.
-            var read = readback.ReadAsync(composition.Target(request.Spec.Size));
-            renderer.RenderFrame();
+            var read = OffscreenFrame.ReadAsync(renderer, readback, composition.Target(request.Spec.Size));
             _composed = true;
             _ = read.ContinueWith(
                 task =>

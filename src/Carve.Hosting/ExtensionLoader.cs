@@ -4,7 +4,7 @@ using System.Runtime.Loader;
 using Carve.Extensibility;
 using Microsoft.Extensions.Configuration;
 
-namespace Carve.Server;
+namespace Carve.Hosting;
 
 /// <summary>A listed extension could not be used. Fatal: the message names the path.</summary>
 internal sealed class ExtensionLoadException(string message, Exception? inner = null)

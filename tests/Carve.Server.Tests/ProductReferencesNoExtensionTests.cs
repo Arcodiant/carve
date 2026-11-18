@@ -54,6 +54,31 @@ public class ProductReferencesNoExtensionTests
         Assert.Empty(ProductReferenceGuard.FindInOutputFolder(Path.GetDirectoryName(Paths.CarveDll)!, extensions));
     }
 
+    // The shared host (T-111) is product too: checked as carve is, in its project, its closure and its built assembly.
+    [Fact]
+    public void The_host_library_references_no_extension()
+    {
+        var extensions = ProductReferenceGuard.ExtensionProjects(Paths.RepoRoot).ToList();
+        var project = Path.Combine(Paths.RepoRoot, "src/Carve.Hosting/Carve.Hosting.csproj");
+
+        Assert.Empty(ProductReferenceGuard.FindInProject(File.ReadAllText(project)));
+        Assert.Empty(ProductReferenceGuard.FindInProjectClosure(project, extensions));
+        Assert.Empty(ProductReferenceGuard.FindInAssembly(Paths.HostingDll, extensions));
+    }
+
+    [Fact]
+    public void The_host_library_references_no_Carve_code_but_the_extension_api()
+    {
+        var carve = ProductReferenceGuard.ReferencesOf(Paths.HostingDll)
+            .Where(name => name.StartsWith("Carve.", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(["Carve.Extensibility"], carve);
+    }
+
+    [Fact]
+    public void The_built_product_hosts_through_the_host_library() =>
+        Assert.Contains("Carve.Hosting", ProductReferenceGuard.ReferencesOf(Paths.CarveDll));
+
     [Fact]
     public void The_closure_check_fails_on_an_extension_reached_through_another_project()
     {

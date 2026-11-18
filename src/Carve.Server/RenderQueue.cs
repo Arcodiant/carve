@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Empyrean;
 
 namespace Carve.Server;
@@ -50,41 +49,25 @@ internal sealed record RenderSpec(
 }
 
 /// <summary>One asked-for render, waiting for the frame thread.</summary>
-internal sealed class RenderRequest(RenderSpec spec, long postedVersion)
+internal sealed class RenderRequest(RenderSpec spec, long postedVersion) : OffscreenRequest<RenderSpec, RenderedFrame>(spec)
 {
-    private readonly TaskCompletionSource<RenderedFrame> _result = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    public RenderSpec Spec => spec;
-
     /// <summary>The store's version at the post: the oldest mesh this request may show.</summary>
     public long PostedVersion => postedVersion;
 
     /// <summary>The version of the mesh the frame thread drew it on, set as it is served.</summary>
     public long ServedVersion { get; set; }
-
-    public Task<RenderedFrame> Result => _result.Task;
-
-    public void Complete(RenderedFrame frame) => _result.TrySetResult(frame);
-
-    public void Fail(Exception exception) => _result.TrySetException(exception);
 }
 
 /// <summary>
 /// From the tool to the frame thread. Needs no engine service, so a tool can resolve it with no
 /// device; the frames it returns do carry engine pixels.
 /// </summary>
-internal class RenderQueue(ModelStore store)
+internal class RenderQueue(ModelStore store) : OffscreenQueue<RenderRequest>
 {
-    private readonly ConcurrentQueue<RenderRequest> _requests = new();
-
     public Task<RenderedFrame> Post(RenderSpec spec)
     {
         var request = new RenderRequest(spec, store.Current.Version);
-        _requests.Enqueue(request);
+        Enqueue(request);
         return request.Result;
     }
-
-    public virtual bool TryPeek(out RenderRequest? request) => _requests.TryPeek(out request);
-
-    public bool TryTake(out RenderRequest? request) => _requests.TryDequeue(out request);
 }

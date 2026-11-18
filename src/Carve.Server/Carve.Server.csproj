@@ -19,6 +19,11 @@
   <ItemGroup>
     <ProjectReference Include="../Carve.Core/Carve.Core.csproj" />
     <ProjectReference Include="../Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../Carve.Hosting/Carve.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Carve.Hosting" />
   </ItemGroup>
 
 </Project>

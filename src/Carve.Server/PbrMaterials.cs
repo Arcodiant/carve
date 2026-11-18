@@ -23,8 +23,7 @@ namespace Carve.Server;
 internal sealed class PbrMaterials(IGraphicsResourceManager resources, ITextureLoader loader, IAssetResidency? residency = null)
 {
     /// <summary>The sampler the engine gives a texture loaded with <c>generateMipmaps: true</c> and no sampler: trilinear, repeat, anisotropy 1.</summary>
-    public static readonly SamplerDescription Sampler = new(TextureFilter.Linear, TextureFilter.Linear, TextureFilter.Linear,
-        TextureAddressMode.Repeat, TextureAddressMode.Repeat, TextureAddressMode.Repeat, 1f, SamplerDescription.NoLodClamp, 0f, 0f);
+    public static readonly SamplerDescription Sampler = TextureUpload.Sampler;
 
     // A PNG used both as colour and as data is two textures, keyed by its bytes' SHA-256 and the colour space.
     private readonly Dictionary<(string Hash, bool Srgb), Texture> _textures = [];
@@ -84,8 +83,7 @@ internal sealed class PbrMaterials(IGraphicsResourceManager resources, ITextureL
         var key = (GlbExport.HashOf(texture), srgb);
         if (_textures.TryGetValue(key, out var made)) return made;
         var image = loader.DecodeCpu(texture.Png.ToArray());
-        made = resources.CreateTexture(image.Pixels, image.Width, image.Height,
-            srgb ? TextureFormat.Rgba8Srgb : TextureFormat.Rgba8Unorm, Sampler, generateMipmaps: true);
+        made = TextureUpload.Create(resources, image.Pixels, image.Width, image.Height, srgb);
         _textures[key] = made;
         return made;
     }
