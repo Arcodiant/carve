@@ -69,7 +69,8 @@ Built by Claude Opus 5.5 (the stronger model the Notes ask for).
   carries a tag (`Tagged<T>`, never written) naming its set of deltas, and two corners merge only when their deltas
   agree too. A model with targets therefore writes more vertices than the same model without them where a target bends
   coplanar flat faces apart (the 3x3 flat grid test). This is how "per exported vertex" stays exact. It never touches a
-  file without targets, but the person may want to see it.
+  file without targets, but the person may want to see it. The person ruled on it after T-104 landed (recorded here for RV-64, Opus 5.5):
+  kept, as built. Corners merge in the export only when their deltas agree too.
 - **Unchanged without targets.** No target, no tag, no `Tagged<T>`: the code path is the old one. Four SHA-256 hashes
   (static and skinned, flat and smooth, a cube and a grid) were taken from the export with this change stashed and
   pinned in `A_model_without_targets_exports_the_bytes_it_did`. They match after the change.
