@@ -273,7 +273,9 @@ I read `scenarios/Carve.Scenario.Patina` (all stages, `SwatchSphere.cs`), `scena
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the sheets' tiled cells are no longer rolled with their labels: each is drawn with every texel half a tile (size / 2 texels) along, below the label band only, so a cell fails for its texels (0315b77). The break names only the roles the shift changes, worked from the texels (base_colour and roughness at 256 and 64), and writes the blind ones to `swatch-breaks.txt` ("blind to a half-tile shift ...: normal, occlusion"); a check fails the run if base colour were ever blind. In the run the four named cells fail with 57 883 to 59 276 pixels not their texel, the 1:1 tiled view and the seam graph as before; T-114's break table says so
 
 ### The planks `mirror` break mirrors the camera, not u on the side
 
@@ -285,7 +287,9 @@ I read `scenarios/Carve.Scenario.Patina` (all stages, `SwatchSphere.cs`), `scena
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `CARVE_PLANKS_BREAK=mirror` no longer moves the camera: the checks predict from 1 - u on the 32 cylindrical faces, the frames as the tools drew them (367dc9e). The break run fails at the front on the rune check, "only 0 P2 samples of RuneOn, at least 8 needed": the mirrored u puts the rune's emissive texels off the rune faces' part of the texture. The good run's 7 frames are byte-identical to `J-20261118-220417-8d35ab`'s; T-116's As built says so
 
 ### `scenario-patina` is a `gpu` suite with no `requires: ["vulkan"]`
 
@@ -297,7 +301,9 @@ I read `scenarios/Carve.Scenario.Patina` (all stages, `SwatchSphere.cs`), `scena
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `scenario-patina` declares `"requires": ["vulkan"]` and lists `samples/graphs/**` once (e86c5d0); a suite's declaration has no test of its own
 
 ### `patina-regression`'s inputs miss `samples/graphs/**`, which its test reads
 
@@ -309,7 +315,9 @@ I read `scenarios/Carve.Scenario.Patina` (all stages, `SwatchSphere.cs`), `scena
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** patina-regression's inputs list `samples/graphs/**` (e9a9eef), as under the Patina.Server finding; a suite's inputs have no test of their own
 
 ### Scenario Patina references the product library `Patina.Graphs`, outside "Writing a scenario", unrecorded
 
@@ -321,7 +329,9 @@ I read `scenarios/Carve.Scenario.Patina` (all stages, `SwatchSphere.cs`), `scena
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the reference is dropped, as the person ruled (2026-11-18), and CLAUDE.md's rule kept: `Carve.Scenario.Patina.csproj` no longer references `Patina.Graphs` and no file there uses it; `SwatchStage`'s `Readback` takes the planks' texels from the approved `samples/graphs/planks/*.png` at 256 and from patina's own `export` of the open graph into the run folder at 64 and 128 (`swatch-texels-64`, `-128`); T-114's As built records it (e2b9f62). Evaluation correctness stays with `patina-unit`'s hand-worked tests. scenario-patina passes, its 10 frames byte-identical by SHA-256 to `J-20261118-221415-aefb54`'s
 
 ### The branch is not on `origin/main` 6ae5a22, so its `tests.json` is set against an older main
 
@@ -333,7 +343,7 @@ I read `scenarios/Carve.Scenario.Patina` (all stages, `SwatchSphere.cs`), `scena
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** no change needed: the milestone has since been rebased onto `origin/main` at `a494e1f`, with M-21; `git merge-base HEAD origin/main` is `a494e1f`, so `tests.json` is set against that main and `scenario-morph` and core-unit's inputs are in it
 
 ### `samples/graphs/**` is listed twice in `scenario-patina`'s inputs
 
@@ -345,7 +355,9 @@ I read `scenarios/Carve.Scenario.Patina` (all stages, `SwatchSphere.cs`), `scena
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** one entry is gone (e86c5d0), with the `requires` above
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -361,7 +373,9 @@ I read `git diff origin/main...HEAD` (48 commits) for the seams between members:
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `scenario-patina` declares `"requires": ["vulkan"]` and lists `samples/graphs/**` once (e86c5d0); a suite's declaration has no test of its own
 
 ### CLAUDE.md's Layout stops at T-113 for patina's scenario and tests, and omits what T-128 moved into Carve.Hosting
 
@@ -377,7 +391,9 @@ I read `git diff origin/main...HEAD` (48 commits) for the seams between members:
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the four rows match the tree (0872c93): `Carve.Hosting` names `RenderLights`; patina's scenario names `ExportStage.cs`, `SwatchStage.cs` and `SwatchSphere.cs`; patina's tests name both regression classes (`ExportBoundedMemoryTests` does start the real patina, as `PatinaProcessTests` does); `samples/` names `barrel-planks.carve` and `samples/graphs/`. A doc has no test of its own
 
 ### Carve.Scenario.Patina references Patina.Graphs, against CLAUDE.md's scenario rule, with no ruling recorded
 
@@ -389,7 +405,9 @@ I read `git diff origin/main...HEAD` (48 commits) for the seams between members:
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the reference is dropped, as the person ruled (2026-11-18), and CLAUDE.md's rule kept: `Carve.Scenario.Patina.csproj` no longer references `Patina.Graphs` and no file there uses it; `SwatchStage`'s `Readback` takes the planks' texels from the approved `samples/graphs/planks/*.png` at 256 and from patina's own `export` of the open graph into the run folder at 64 and 128 (`swatch-texels-64`, `-128`); T-114's As built records it (e2b9f62). Evaluation correctness stays with `patina-unit`'s hand-worked tests. scenario-patina passes, its 10 frames byte-identical by SHA-256 to `J-20261118-221415-aefb54`'s
 
 ## Summary
 
