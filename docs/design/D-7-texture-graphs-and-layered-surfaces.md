@@ -94,9 +94,15 @@ Every mask on a layer is given by exact arguments with a checkable result: a `se
 
 ## Open questions
 
-- **The server's name.** If it is not Carve, what is it called? M-27 needs an answer before its first task.
-- **The graph file format.** Its extension, and how nodes, ports, parameters and outputs are written.
-- **The first node set.** M-27 plans six to eight nodes; which ones?
-- **Resolution.** How a graph states its size, and whether the server and Carve may evaluate at a different one.
+- ~~**The server's name.**~~ Answered at M-27's planning (2026-11-17, by the person): `patina`.
+- ~~**The graph file format.**~~ Answered at M-27's planning: versioned JSON with the extension `.texgraph`. Nodes are
+  keyed by an id, an input names `"<id>"` or `"<id>.<port>"`, and outputs are `output` nodes with a role (T-110).
+- ~~**The first node set.**~~ Answered at M-27's planning: `noise`, `gradient`, `levels`, `blend`, `colour`,
+  `height_to_normal` and `output` (T-110, T-112).
+- **Resolution.** Partly answered at M-27's planning: a graph states a default `size`, every parameter is relative to
+  the image, and patina may evaluate at any power of two up to 8192 (swatches up to 2048). What size Carve evaluates
+  a graph material at is still M-29's to decide.
+- **Hosting.** Answered at M-27's planning: both servers host through a shared `Carve.Hosting` library extracted from
+  `Carve.Server` (T-111), and patina loads the same extensions as carve.
 - **How quality is judged.** Value checks catch broken textures, not ugly ones. Whether swatch renders let an agent judge a texture well enough is for M-27's and M-28's acceptance runs to show.
 - **M-24's outputs as graph inputs.** M-24 is planned to write bakes as PNGs. M-29 needs them as mesh-input nodes; whether M-24 provides both, or M-29 wraps its PNGs, is for whichever is planned first.
