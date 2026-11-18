@@ -23,7 +23,7 @@ public static class RenderLights
     /// Carve's front camera direction (target to eye). The light's place relative to the camera is defined in this view:
     /// <see cref="FrontLight"/> there gives the agreed look, top bright, +Z middling, +X dark.
     /// </summary>
-    private static readonly Vector3 FrontDirection = new(1.6f, 1.2f, 2.2f);
+    public static readonly Vector3 FrontDirection = new(1.6f, 1.2f, 2.2f);
 
     /// <summary>The light's orientation in the front view.</summary>
     private static readonly Matrix4x4 FrontLight = Matrix4x4.CreateRotationX(-0.9f) * Matrix4x4.CreateRotationY(0.6f);

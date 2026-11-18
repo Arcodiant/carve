@@ -49,7 +49,7 @@ public static class ViewFraming
     /// <summary>The part of the frame left clear on each side, at the tightest edge.</summary>
     public const float Margin = 0.08f;
 
-    internal static readonly Vector3 FrontDirection = new(1.6f, 1.2f, 2.2f);
+    internal static readonly Vector3 FrontDirection = RenderLights.FrontDirection;
 
     /// <summary>The names <c>view</c> takes, each with its direction: the two corners, then head-on along each axis.</summary>
     public static readonly IReadOnlyDictionary<string, Vector3> NamedViews = new Dictionary<string, Vector3>
