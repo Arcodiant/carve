@@ -4,7 +4,7 @@ description: >-
 ---
 # M-27 — A first texture graph
 
-**Status:** Planned
+**Status:** Active
 
 **Depends on:** M-20
 
