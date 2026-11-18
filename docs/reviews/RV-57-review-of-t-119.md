@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-57 — Review of T-119
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** T-119
 
@@ -36,7 +36,9 @@ and 3 is y = 1 (top). Faces 0 to 3 are back, front, bottom and top, so they are 
 The four vertical sides are `[0,1,4,5]`. Either change the README's ids or rename the group. The
 tool description has the same error, and a docs-only task cannot fix it, so it needs a follow-up bug.
 
-**Outcome:** —
+**Outcome:** fixed
+
+The README's example is now `[0,1,4,5]`, named as the -Z, +Z, -X and +X faces; the tool description's error is B-6.
 
 ### The materials walkthrough departs from set_material's example, which is wrong itself
 
@@ -49,7 +51,9 @@ left without UVs as "0, 1, 4 and 5". The README should keep its version. The dep
 in set_material's description, should be recorded in the task (see the tracker finding below), and a
 bug should be filed against the description.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Kept the README's correct `[1,3]`, recorded the departure in T-119's Notes, and filed B-6 for set_material's description.
 
 ### The character examples use bone names that the skeleton above them does not have
 
@@ -64,7 +68,9 @@ skeleton lacks" and set_weights on "an unknown bone name". The Cutting section s
 examples run on (README.md:83), but this section does not. Either say that each example comes from
 its own tool's description on that tool's model, or rename the examples so they share one skeleton.
 
-**Outcome:** —
+**Outcome:** fixed
+
+The section now states one figure (meshes `body` and `hat`, the hips/spine/head skeleton) and every example uses it: weigh on `body`, set_weights binding the hat's 8 vertices to `head`, a `nod` clip on `head`, the piece and render_glb on `figure`.
 
 ### The define_clip example leaves out where `interpolation` goes
 
@@ -74,7 +80,9 @@ works, because LINEAR is the default, but a reader can no longer see that interp
 channel part (`rotation: {interpolation, keys}`) rather than per clip. Keep the field as the tool's
 example has it, or say where it goes.
 
-**Outcome:** —
+**Outcome:** fixed
+
+The clip example carries `"interpolation":"LINEAR"`, and the text says each channel part has its own interpolation.
 
 ### Game limits: where export finds the file is wrong, and how to create one is missing
 
@@ -85,7 +93,9 @@ are no limit warnings, and `write_limits: true` creates the file with starting n
 told that export warns on limits has no way, from the README, to get a limits file in the first
 place. Mention `limits` and `write_limits`.
 
-**Outcome:** —
+**Outcome:** fixed
+
+The README says export takes the first `carve-limits.json` in the .glb's folder or above it, or the one `limits` names, and that `write_limits: true` creates it.
 
 ### Re-exporting needs `overwrite: true`, and the README never says so
 
@@ -95,7 +105,9 @@ its schema). The README's workflow is "edit the `.carve` file and export again" 
 new export-mode examples (line 154) follow the same pattern, so the second export of any model
 fails. This is outside T-119's Scope, so it may be skipped here and taken up as a follow-up.
 
-**Outcome:** —
+**Outcome:** fixed
+
+The walkthrough's export step says a second export needs `"overwrite":true`; one clause, directly needed by the re-export the README describes.
 
 ### The barrel sample's materials are named loosely
 
@@ -103,7 +115,9 @@ README.md:127 (Correctness, nit). The README says "wood, iron, end-grain and run
 samples/barrel-textured.carve names them `staves`, `iron`, `end-grain` and `rune-stave`. Since two
 of the four are given by their real names, give all four that way.
 
-**Outcome:** —
+**Outcome:** fixed
+
+Named `staves`, `iron`, `end-grain` and `rune-stave`.
 
 ### The task file has no As built or Notes
 
@@ -113,7 +127,9 @@ set_material's example and the two tool-description errors it found (define_grou
 that the follow-up bugs are not lost. Status In Progress is right for a branch not yet finished, and
 `cairn lint` is clean.
 
-**Outcome:** —
+**Outcome:** fixed
+
+T-119 has Notes recording both departures and B-6, and an As built.
 
 ## Summary
 
