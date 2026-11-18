@@ -247,7 +247,7 @@ In 88644c5.
 
 **Severity:** Major
 
-`tests.json:260-281` (scenario-cuts) and `tests.json:283-310` (scenario-gatehouse). Rubric point: suite inputs that miss a linked file. cairn's `dotnet-closure` is only the project directories, following `ProjectReference`s (`D:\Repos\cairn\scripts\cairn\generators.py:159-174`). It does not include `<Compile Include=... Link=...>` files from other directories. That is why the other suites list their links by hand (scenario-soft lists `RunContent.cs`, line 247). Three are missing:
+`tests.json:260-281` (scenario-cuts) and `tests.json:283-310` (scenario-gatehouse). Rubric point: suite inputs that miss a linked file. cairn's `dotnet-closure` is only the project directories, following `ProjectReference`s (`<cairn>\scripts\cairn\generators.py:159-174`). It does not include `<Compile Include=... Link=...>` files from other directories. That is why the other suites list their links by hand (scenario-soft lists `RunContent.cs`, line 247). Three are missing:
 
 - **scenario-cuts** omits `scenarios/Carve.Scenario.Crate/ColourRule.cs`, linked by `Carve.Scenario.Cuts.csproj:23`. It drives `KnifeStage.Predicted` and `CutsChecks.Predict`.
 - **scenario-gatehouse** omits `scenarios/Carve.Scenario.Cuts/CutsChecks.cs`. The refactor `dc27cde` added that link (`Carve.Scenario.Gatehouse.csproj:20`) but did not add it to the inputs. The gatehouse takes `Predict`, `Summary`, `ToVector` and `Expect` from it.

@@ -59,5 +59,5 @@ Run on Sonnet 5.5 (claude-sonnet-5-5), one agent.
 | camera flipped in y (front) | rig-patch-before: the patch face reads blue, expected magenta |
 | hat camera mirrored in x | rig-hat-before: brim near the stray vertex reads blue, expected red |
 
-- **Review**: round-1 (`C:/Users/andre/artifacts/carve/M-17/T-41/round-1`, the eight before/after frames) approved by the person.
+- **Review**: round-1 (`~/artifacts/carve/M-17/T-41/round-1`, the eight before/after frames) approved by the person.
 - **Not checked**: posed frames of the faults; clips are not defined in this scenario. Engine needs: none.

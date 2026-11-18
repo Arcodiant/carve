@@ -237,8 +237,7 @@ The version-matched Empyrean docs ship inside each package. Find the cache with
 
 The engine version is pinned once, in `Directory.Build.props` (`EmpyreanVersion`,
 plus any per-package patch pin with a comment saying why), never as a literal in a
-`.csproj`. The feed is the local BaGet at `http://localhost:5555/v3/index.json`
-(docker-compose at `D:\repos\baget`).
+`.csproj`. The packages come from nuget.org; the repo has no `NuGet.config`.
 
 When Carve needs something the engine is missing, record it as an **engine need**:
 add a row to D-1's *Engine needs* table (number, what is missing, priority, the

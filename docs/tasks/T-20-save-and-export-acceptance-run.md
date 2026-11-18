@@ -77,7 +77,7 @@ How many calls each session took, and whether it used `undo` or `render`, are re
 
 ### As built
 
-Run on **Claude Sonnet 5.5** (`claude-sonnet-5-5`). The `claude -p` sessions ran on Claude Opus 5.5 (`claude-opus-5-5`, from each transcript's init event), with `--strict-mcp-config`, an `.mcp.json` of plain `carve` only (`dotnet run --project` on this worktree) and `--allowedTools "mcp__carve__*"`, from `%TEMP%\carve-m3-acceptance\round-N\` (an empty `game/Content/models/`). Prompts word for word as in the spec. Transcripts, final `get_mesh` results, `crate.carve` after each session, the `.glb` and viewer output (`front`, `minus-x`, `view.json`) are in `D:\Repos\carve\branches\milestone\M-3\artifacts\m3-acceptance\round-N\`; `run-round.sh`, `summarize.py`, `meshcmp.py` are beside them.
+Run on **Claude Sonnet 5.5** (`claude-sonnet-5-5`). The `claude -p` sessions ran on Claude Opus 5.5 (`claude-opus-5-5`, from each transcript's init event), with `--strict-mcp-config`, an `.mcp.json` of plain `carve` only (`dotnet run --project` on this worktree) and `--allowedTools "mcp__carve__*"`, from `%TEMP%\carve-m3-acceptance\round-N\` (an empty `game/Content/models/`). Prompts word for word as in the spec. Transcripts, final `get_mesh` results, `crate.carve` after each session, the `.glb` and viewer output (`front`, `minus-x`, `view.json`) are in `branches\milestone\M-3\artifacts\m3-acceptance\round-N\`; `run-round.sh`, `summarize.py`, `meshcmp.py` are beside them.
 
 **No description, README or code changed.** Only D-1's *Tool shape* question was updated with the run.
 

@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    # Windows, like the development machines. Hosted runners have no Vulkan device,
+    # so only the unit suites run here; the regression tier and scenarios need a GPU.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Carve.slnx
+
+      - name: Build (warnings as errors)
+        run: dotnet build Carve.slnx -c Debug --no-restore
+
+      - name: core-unit
+        run: dotnet test tests/Carve.Core.Tests/Carve.Core.Tests.csproj -c Debug --no-build --filter "Tier!=regression"
+
+      - name: server-unit
+        run: dotnet test tests/Carve.Server.Tests/Carve.Server.Tests.csproj -c Debug --no-build --filter "Tier!=regression"

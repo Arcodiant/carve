@@ -24,7 +24,7 @@ The gardener shows no stray skin colour at the top of the arm.
 
 ## Scope
 
-- **The fault:** in T-47's review round 1 (`C:\Users\andre\artifacts\carve\M-19\T-47\round-1`), the person noted on "glb Walk 0 s +x": "Something wrong with the top of the arm - there's a little piece of flesh colour at the top instead of green". `render`'s own frame of the same `.carve` at the same clip and time shows the same patch, so it comes from the gardener as built in `scenarios/Carve.Scenario.Character/GardenerSpec.cs` (T-47 suspected the arm lathe or the torso's neck band), not from either renderer. Find the cause and fix it there.
+- **The fault:** in T-47's review round 1 (`~\artifacts\carve\M-19\T-47\round-1`), the person noted on "glb Walk 0 s +x": "Something wrong with the top of the arm - there's a little piece of flesh colour at the top instead of green". `render`'s own frame of the same `.carve` at the same clip and time shows the same patch, so it comes from the gardener as built in `scenarios/Carve.Scenario.Character/GardenerSpec.cs` (T-47 suspected the arm lathe or the torso's neck band), not from either renderer. Find the cause and fix it there.
 - **Everything built from it** follows: `samples/gardener.carve` and `samples/gardener-soft.carve` (kept equal by content), and the character, soft and rig scenarios' frames and their pixel checks, and T-47's `RenderGlbTests` if they read the region.
 - **Existing frames:** only frames showing the fixed region may change. Hash every suite's frames before and after, and list each changed frame with why. Every other frame stays byte-identical.
 - **Review:** the changed frames, before and after, cropped to the shoulder, through `mcp__waystone__review`.

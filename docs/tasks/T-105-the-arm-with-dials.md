@@ -65,7 +65,7 @@ The arm, exactly as approved (sketch: M-21's *Decided at planning*):
 ## Notes
 
 - `scenario-morph` does not exist until T-103 adds it to `tests.json`. Add it to this item's `**Verify:**` line once it is there (`cairn lint` refuses an unknown suite before then).
-- Evidence: `C:\Users\andre\artifacts\carve\M-21\T-105\`.
+- Evidence: `~\artifacts\carve\M-21\T-105\`.
 - Work the numbers through every check before the scenario is written (M-4 and M-7 retrospectives).
 - **Goes back to the person, stop and ask:** any change to the agreed arm, targets, rig or frame list; a pixel
   check that cannot pass as specified; any existing frame that changes.

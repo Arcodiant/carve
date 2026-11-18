@@ -42,7 +42,7 @@ preview, and driven live by a person in the viewer's window.
 ## Notes
 
 - `scenario-morph` does not exist until T-103 adds it to `tests.json`. Add it to this item's `**Verify:**` line once it is there (`cairn lint` refuses an unknown suite before then).
-- Evidence: `C:\Users\andre\artifacts\carve\M-21\T-106\`.
+- Evidence: `~\artifacts\carve\M-21\T-106\`.
 - **Goes back to the person, stop and ask:** any loaded-versus-preview difference beyond the frame rule; anything
   the person's pass finds.
 - Sonnet. The review agent is separate.

@@ -59,7 +59,7 @@ Plans against [D-6](../design/D-6-characters-rigging-animation-and-character-exp
 
   Every stop was for something only the person could decide. Asking before dispatch would have saved at least one agent. The orchestrator did that for T-44 (the sample and the levels), and T-44 ran in one agent.
 - **Subagents have no question tool.** `AskUserQuestion` is not available to them, so each open rule costs a stop, a hand-off and a continuation. Only `mcp__waystone__review` reaches the person from inside a member.
-- **The `G:` drive does not exist on this machine.** Review frames went to `C:\Users\andre\artifacts\carve\M-18\T-<n>\round-N` instead. T-42's first round was reviewed from the Temp folder.
+- **The `G:` drive does not exist on this machine.** Review frames went to `~\artifacts\carve\M-18\T-<n>\round-N` instead. T-42's first round was reviewed from the Temp folder.
 - **`finish` could not remove its worktree in any member.** It must run from inside the worktree, and the folder was then the agent's working directory.
   - `branches/task/T-42`, `T-43` and `T-44` are unregistered from git and left on disk for the person to delete. T-43's agent was refused permission to delete its own.
   - Scratch also remains in `C:\tmp\t43break`, `C:\tmp\t43cube` and `%TEMP%\t42*`.

@@ -260,7 +260,7 @@ T-80 moved `BarrelSpec` out of `UvsScenario.cs` so it could be linked. Nothing i
 **Rubric:** 7 Tracker hygiene
 **Severity:** Minor
 
-`D:\Repos\carve\branches\milestone\M-7\artifacts\review\T-80\` exists but is empty, and `D:\Repos\carve\branches\task\T-80\` is empty. The Retrospective says that folder "holds the only copy of evidence ... T-80's hash tables and break-run folders". `G:\My Drive\artifacts\carve\M-7\T-80\` holds only the frame and texture review rounds. So nothing on disk now backs the hash guard (229 PNGs) or the break table (vflip, rune-column, metallic, mirror, and sky removed). As built and the Retrospective should say the evidence is lost, or point to where it now is.
+`branches\milestone\M-7\artifacts\review\T-80\` exists but is empty, and `branches\task\T-80\` is empty. The Retrospective says that folder "holds the only copy of evidence ... T-80's hash tables and break-run folders". `G:\My Drive\artifacts\carve\M-7\T-80\` holds only the frame and texture review rounds. So nothing on disk now backs the hash guard (229 PNGs) or the break table (vflip, rune-column, metallic, mirror, and sky removed). As built and the Retrospective should say the evidence is lost, or point to where it now is.
 
 **Outcome:** fixed
 
