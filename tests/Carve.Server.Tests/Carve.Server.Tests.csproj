@@ -19,9 +19,19 @@
     <Using Include="Carve.Server.Tests.ToolList" Static="true" />
   </ItemGroup>
 
-  <!-- Built first and started as real processes, never linked: the tests see what ships. -->
+  <!--
+    carve is referenced, under the alias "carve" so its types never clash with the product files linked below. The unit
+    harness (ToolHarness.cs, T-87) serves the real tools in this process through CarveServer.AddTools, the registration
+    Program.cs makes, and a few unit classes (GameLimitsTests, ToolPathsTests, the export tests) use its types directly.
+    The regression tests still start carve as a real process (CarveProcess), so they see what ships; the product's own
+    references stay guarded by ProductReferenceGuard.
+  -->
   <ItemGroup>
-    <ProjectReference Include="../../src/Carve.Server/Carve.Server.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/Carve.Server/Carve.Server.csproj" Aliases="carve" />
+  </ItemGroup>
+
+  <!-- Built first and started as real processes, never linked. -->
+  <ItemGroup>
     <ProjectReference Include="../Carve.Server.Tests.Extension/Carve.Server.Tests.Extension.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../Carve.Scenario.Tiny/Carve.Scenario.Tiny.csproj" ReferenceOutputAssembly="false" />
@@ -57,8 +67,6 @@
     <Compile Include="../../src/Carve.Server/SkinnedExport.cs" Link="SkinnedExport.cs" />
     <Compile Include="../../src/Carve.Server/ClipsExport.cs" Link="ClipsExport.cs" />
     <Compile Include="../../src/Carve.Server/PieceExport.cs" Link="PieceExport.cs" />
-    <Compile Include="../../src/Carve.Server/ToolPaths.cs" Link="ToolPaths.cs" />
-    <Compile Include="../../src/Carve.Server/GameLimits.cs" Link="GameLimits.cs" />
     <Compile Include="../../src/Carve.Server/GlbScene.cs" Link="GlbScene.cs" />
     <Compile Include="../../src/Carve.Server/SurfaceMaterial.cs" Link="SurfaceMaterial.cs" />
     <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />

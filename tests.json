@@ -53,10 +53,12 @@
         "scenarios/**/*.csproj",
         "spikes/**/*.csproj",
         "samples/gardener-soft.carve",
-        "samples/gatehouse.carve"
+        "samples/gatehouse.carve",
+        "samples/leaky-shed.carve",
+        "samples/gardener.carve"
       ],
       "resources": "cpu",
-      "est-seconds": 12
+      "est-seconds": 24
     },
     {
       "id": "server-regression",
@@ -83,7 +85,7 @@
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 260
+      "est-seconds": 338
     },
     {
       "id": "scenario-cube",

@@ -4,7 +4,7 @@ using Empyrean;
 namespace Carve.Server.Tests;
 
 /// <summary>T-76: <c>export</c> through the real server of a cube with a textured material, loaded back through the engine's parser.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class MaterialExportToolTests() : FileToolTests("carve-export-material")
 {
     [Fact]

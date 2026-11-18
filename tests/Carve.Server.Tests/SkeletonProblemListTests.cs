@@ -3,12 +3,12 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>RV-24 A4: a bone that cannot be read adds no false problem to the list, and its true ones still show.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public class SkeletonProblemListTests
 {
     private static async Task<string> RefusalAsync(string bones)
     {
-        using var carve = new CarveProcess([]);
+        using var carve = new ToolHarness();
         await carve.InitializeAsync();
         var result = await carve.CallToolAsync("define_skeleton", "{\"bones\":" + bones + "}");
         Assert.True(IsError(result), TextOf(result));

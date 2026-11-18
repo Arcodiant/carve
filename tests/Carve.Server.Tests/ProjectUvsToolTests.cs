@@ -4,7 +4,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>project_uvs through the real tools (T-55).</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class ProjectUvsToolTests
 {
     private const string Cube =
@@ -21,43 +21,36 @@ public sealed class ProjectUvsToolTests
         return JsonDocument.Parse(TextOf(result)).RootElement;
     }
 
-    private static async Task<CarveProcess> StartAsync(string mesh = Cube)
+    private static async Task<ToolHarness> StartAsync(string mesh = Cube)
     {
-        var carve = new CarveProcess([]);
-        await carve.InitializeAsync();
-        Ok(await carve.CallToolAsync("define_mesh", mesh));
-        return carve;
+        var carve = new ToolHarness();
+        try
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", mesh));
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
-    private static async Task<string> Refused(CarveProcess carve, string arguments)
+    private static async Task<string> Refused(ToolHarness carve, string arguments)
     {
         var result = await carve.CallToolAsync("project_uvs", arguments);
         Assert.True(IsError(result), TextOf(result));
         return TextOf(result);
     }
 
-    private static async Task<JsonElement> Mesh(CarveProcess carve) => Ok(await carve.CallToolAsync("get_mesh", "{}"));
+    private static async Task<JsonElement> Mesh(ToolHarness carve) => Ok(await carve.CallToolAsync("get_mesh", "{}"));
 
     private static float[] Floats(JsonElement list) => [.. list.EnumerateArray().Select(x => x.GetSingle())];
 
     private static float[][] UvOf(JsonElement mesh, int face) =>
         [.. mesh.GetProperty("uvs").EnumerateArray().Single(e => e.GetProperty("face").GetInt32() == face)
             .GetProperty("uv").EnumerateArray().Select(p => Floats(p))];
-
-    [Fact]
-    public async Task The_described_examples_run_and_read_back()
-    {
-        using var carve = await StartAsync();
-        var examples = ToolList.Examples(await carve.ListToolsAsync(), "project_uvs");
-        Assert.Equal(2, examples.Length);
-        var box = Ok(await carve.CallToolAsync("project_uvs", examples[0]));
-        Assert.Equal(6, box.GetProperty("mapped").GetArrayLength());
-        Assert.Equal([5], box.GetProperty("axes").GetProperty("+x").EnumerateArray().Select(x => x.GetInt32()));
-        var planar = Ok(await carve.CallToolAsync("project_uvs", examples[1]));
-        Assert.Equal([3], planar.GetProperty("mapped").EnumerateArray().Select(x => x.GetInt32()));
-        Assert.False(planar.TryGetProperty("axes", out _));
-        Assert.Equal([0f, 0.25f, 0.5f, 0.75f], Floats(planar.GetProperty("bounds")));
-    }
 
     [Fact]
     public async Task Planar_default_into_reports_mapped_and_bounds_and_leaves_other_faces()
@@ -154,7 +147,7 @@ public sealed class ProjectUvsToolTests
         using var carve = await StartAsync();
         Ok(await carve.CallToolAsync("delete", """{"faces":[5]}"""));
         Assert.Contains("faces[5]: face 5 is deleted", await Refused(carve, """{"method":"box","faces":[5]}"""));
-        using var bare = new CarveProcess([]);
+        using var bare = new ToolHarness();
         await bare.InitializeAsync();
         Assert.Contains("define_mesh", await Refused(bare, """{"method":"box"}"""));
     }

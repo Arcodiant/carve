@@ -1,3 +1,7 @@
+extern alias carve;
+
+using GameLimits = carve::Carve.Server.GameLimits;
+using LimitsSource = carve::Carve.Server.LimitsSource;
 using System.Numerics;
 using Carve.Core;
 using Carve.Core.Tests;

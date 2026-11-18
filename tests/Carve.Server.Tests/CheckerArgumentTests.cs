@@ -188,7 +188,7 @@ public sealed class CheckerArgumentTests() : FileToolTests("carve-checker-args")
     [Fact]
     public async Task The_checker_examples_upright_list_is_unflipped_and_its_mirrored_one_flipped()
     {
-        var (carve, tools) = await StartAsync();
+        var (carve, tools) = await StartProcessAsync();
         using var _ = carve;
         var text = Description(tools, "render");
         var start = text.IndexOf("Example: on define_mesh's unit cube, face 1 is [4,5,6,7]", StringComparison.Ordinal);

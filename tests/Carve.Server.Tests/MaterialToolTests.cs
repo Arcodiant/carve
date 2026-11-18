@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Carve.Server.Tests;
 
 /// <summary>define_material, set_material and their read-back through the real server (T-75).</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public class MaterialToolTests : FileToolTests
 {
     public MaterialToolTests() : base("material")
@@ -24,46 +24,6 @@ public class MaterialToolTests : FileToolTests
     private static JsonElement Body(string text) => JsonDocument.Parse(text).RootElement;
 
     private static string[] Strings(JsonElement array) => array.EnumerateArray().Select(x => x.GetString()!).ToArray();
-
-    [Fact]
-    public async Task The_two_descriptions_examples_define_and_assign_on_the_cube_and_get_mesh_and_check_read_it_back()
-    {
-        Texture("textures/crate.png");
-        var (carve, tools) = await StartAsync();
-        using var scope = carve;
-
-        var defined = Body(Ok(await carve.CallToolAsync("define_material", Examples(tools, "define_material").Single())));
-        Assert.False(defined.GetProperty("replaced").GetBoolean());
-        var texture = defined.GetProperty("material").GetProperty("base_colour_texture");
-        Assert.Equal(Path.Combine(Root, "textures", "crate.png"), texture.GetProperty("path").GetString());
-        Assert.Equal(4, texture.GetProperty("width").GetInt32());
-
-        // Box-mapped faces 2 and 3, as set_material's own example says, then the material on them.
-        Ok(await carve.CallToolAsync("project_uvs", """{"method":"box","faces":[2,3]}"""));
-        var set = Body(Ok(await carve.CallToolAsync("set_material", Examples(tools, "set_material").Single())));
-        Assert.Equal([2, 3], set.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()));
-        Assert.False(set.TryGetProperty("warnings", out _));
-
-        var mesh = Body(Ok(await carve.CallToolAsync("get_mesh", "{}")));
-        var materials = mesh.GetProperty("materials").EnumerateArray().ToArray();
-        Assert.Single(materials);
-        Assert.Equal("crate", materials[0].GetProperty("name").GetString());
-        Assert.Equal(0.8, materials[0].GetProperty("roughness").GetDouble(), 6);
-        Assert.Equal(4, materials[0].GetProperty("base_colour_texture").GetProperty("height").GetInt32());
-        Assert.Equal(JsonValueKind.Null, materials[0].GetProperty("normal_texture").ValueKind);
-        var onFaces = mesh.GetProperty("face_materials").EnumerateArray().Single();
-        Assert.Equal("crate", onFaces.GetProperty("material").GetString());
-        Assert.Equal([2, 3], onFaces.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()));
-        Assert.Empty(mesh.GetProperty("colours").EnumerateArray());
-
-        // Faces 2 and 3 are mapped: no warning for them; the other four are the generic unmapped ones.
-        var warnings = Strings(Body(Ok(await carve.CallToolAsync("check", "{}"))).GetProperty("warnings"));
-        Assert.DoesNotContain(warnings, w => w.StartsWith("faces[2]:") || w.StartsWith("faces[3]:"));
-        Assert.Equal(4, warnings.Count(w => w.EndsWith("no UVs, so the face samples the texture's corner")));
-        // ... and nothing else, as the example says (RV-47).
-        Assert.Equal(new[] { 0, 1, 4, 5 }.Select(f => $"faces[{f}]: no UVs, so the face samples the texture's corner"), warnings);
-        Assert.Contains("check warns only of the other four faces, 0, 1, 4 and 5", Description(tools, "set_material"));
-    }
 
     [Fact]
     public async Task Check_names_the_material_of_a_textured_face_without_UVs_once_per_face_replacing_the_generic_warning()

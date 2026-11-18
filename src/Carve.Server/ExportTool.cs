@@ -9,7 +9,7 @@ using static Carve.Server.MeshToolSupport;
 
 namespace Carve.Server;
 
-public sealed class ExportTool(ModelStore store)
+public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
 {
     public const string Extension = ".glb";
 
@@ -136,11 +136,11 @@ public sealed class ExportTool(ModelStore store)
         var mesh = model.Combined;
         if (mesh is null && !clips) return Error("export: " + NoMesh); // clips mode needs no mesh (the person, 2026-11-09)
 
-        var target = ToolPaths.Resolve("export", text, Extension, out var pathError);
+        var target = ToolPaths.Resolve("export", text, Extension, out var pathError, toolFolder.Directory);
         if (target is null) return Error(pathError!);
 
         // T-51: the game's limits, read and checked before anything is written.
-        var source = LimitsSource.Find("export", limitsPath, writeLimits, target.FullPath, out var limitsError);
+        var source = LimitsSource.Find("export", limitsPath, writeLimits, target.FullPath, out var limitsError, toolFolder.Directory);
         if (source is null) return Error(limitsError!);
 
         var written = clips ? Clips(model, target, replace, source)

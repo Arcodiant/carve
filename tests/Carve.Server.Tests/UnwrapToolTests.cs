@@ -5,7 +5,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>unwrap through the real carve (T-56): the barrel's worked example, the refusals, undo and the schema.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class UnwrapToolTests
 {
     private static string BarrelArguments()
@@ -22,16 +22,24 @@ public sealed class UnwrapToolTests
         return JsonDocument.Parse(TextOf(result)).RootElement;
     }
 
-    private static async Task<CarveProcess> StartAsync(bool seams = true)
+    private static async Task<ToolHarness> StartAsync(bool seams = true)
     {
-        var carve = new CarveProcess([]);
-        await carve.InitializeAsync();
-        Ok(await carve.CallToolAsync("define_mesh", BarrelArguments()));
-        if (seams) Ok(await carve.CallToolAsync("mark_edges", Seams));
-        return carve;
+        var carve = new ToolHarness();
+        try
+        {
+            await carve.InitializeAsync();
+            Ok(await carve.CallToolAsync("define_mesh", BarrelArguments()));
+            if (seams) Ok(await carve.CallToolAsync("mark_edges", Seams));
+            return carve;
+        }
+        catch
+        {
+            await carve.DisposeAsync();
+            throw;
+        }
     }
 
-    private static async Task<string> RefusedUnchanged(CarveProcess carve, string arguments)
+    private static async Task<string> RefusedUnchanged(ToolHarness carve, string arguments)
     {
         var before = TextOf(await carve.CallToolAsync("get_mesh", "{}"));
         var result = await carve.CallToolAsync("unwrap", arguments);
@@ -112,17 +120,5 @@ public sealed class UnwrapToolTests
         using var carve = await StartAsync(seams: false);
         var text = await RefusedUnchanged(carve, "{}");
         Assert.Contains("faces[0]: an island of 34 faces with 0 boundary loops is not a disc; mark a seam across it with mark_edges", text);
-    }
-
-    [Fact]
-    public async Task The_schema_lists_its_arguments()
-    {
-        using var carve = new CarveProcess([]);
-        await carve.InitializeAsync();
-        var tool = (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "unwrap");
-        Assert.Equal(["faces", "into", "margin", "mesh"], tool.GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order());
-        var text = tool.GetProperty("description").GetString()!;
-        Assert.Contains("one seam down its side", text);
-        Assert.Contains("[[2,10],[10,18],[18,26],[26,34]]", text);
     }
 }

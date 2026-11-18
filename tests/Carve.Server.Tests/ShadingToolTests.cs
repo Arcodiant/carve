@@ -60,7 +60,7 @@ public class ShadingNormalsTests
 }
 
 /// <summary>set_shading and mark_edges through the real tools: their results, refusals, undo and the file.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class ShadingToolTests() : TempFolderTests("carve-shading")
 {
     private const string Cube =
@@ -79,7 +79,7 @@ public sealed class ShadingToolTests() : TempFolderTests("carve-shading")
     [Fact]
     public async Task Shading_and_marks_set_report_undo_and_survive_a_save_and_open()
     {
-        using var carve = new CarveProcess([], workingDirectory: Root);
+        using var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         Ok(await carve.CallToolAsync("define_mesh", Cube));
 
@@ -110,7 +110,7 @@ public sealed class ShadingToolTests() : TempFolderTests("carve-shading")
     [Fact]
     public async Task A_bad_shading_or_edge_is_refused_naming_it_and_changes_nothing()
     {
-        using var carve = new CarveProcess([], workingDirectory: Root);
+        using var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         Assert.True(IsError(await carve.CallToolAsync("set_shading", """{"shading":"smooth"}""")));
         Ok(await carve.CallToolAsync("define_mesh", Cube));

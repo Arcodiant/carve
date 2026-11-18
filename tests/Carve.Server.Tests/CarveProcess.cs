@@ -38,7 +38,7 @@ internal static class Paths
 }
 
 /// <summary>The real <c>carve</c>, started by a test and stopped by it, speaking raw JSON-RPC lines.</summary>
-internal sealed class CarveProcess : IDisposable
+internal sealed class CarveProcess : IToolCaller, IDisposable
 {
     public static readonly TimeSpan Answer = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan Exit = TimeSpan.FromSeconds(5);
@@ -217,4 +217,10 @@ internal sealed class CarveProcess : IDisposable
             }
         }
     }
+}
+
+/// <summary>What a test helper needs of a server: <see cref="CarveProcess"/> (the real process) and <see cref="ToolHarness"/> (in this process) both call a tool this way.</summary>
+internal interface IToolCaller
+{
+    Task<System.Text.Json.JsonElement> CallToolAsync(string name, string arguments);
 }

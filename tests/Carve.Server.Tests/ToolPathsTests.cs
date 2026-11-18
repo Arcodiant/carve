@@ -1,3 +1,8 @@
+extern alias carve;
+
+using ToolPaths = carve::Carve.Server.ToolPaths;
+using ToolPath = carve::Carve.Server.ToolPath;
+
 namespace Carve.Server.Tests;
 
 /// <summary>The path rules export (and save and open) keep, on a temp folder.</summary>
