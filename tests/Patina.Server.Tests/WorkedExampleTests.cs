@@ -88,7 +88,7 @@ public class WorkedExampleTests
     [Fact]
     public void Every_description_has_a_worked_example()
     {
-        foreach (var text in new[] { DefineGraphTool.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn), EditGraphTool.Text, GetGraphTool.Text, SaveTool.Text, OpenTool.Text, PushSnapshotTool.Text, PopSnapshotTool.Text })
+        foreach (var text in new[] { DefineGraphTool.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn), EditGraphTool.Text, GetGraphTool.Text, SaveTool.Text, OpenTool.Text, PushSnapshotTool.Text, PopSnapshotTool.Text, ExportTool.Text })
             Assert.Contains("Worked example", text);
     }
 

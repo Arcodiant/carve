@@ -26,6 +26,7 @@ public partial class Program
         OpenTool.Create(),
         PushSnapshotTool.Create(),
         PopSnapshotTool.Create(),
+        ExportTool.Create(),
     ];
 
     /// <summary>

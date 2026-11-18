@@ -14,5 +14,6 @@ internal static class PatinaStages
     public static readonly IReadOnlyList<IPatinaStage> All =
     [
         new GraphStage(),
+        new ExportStage(),
     ];
 }

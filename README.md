@@ -188,6 +188,13 @@ its node and its port or parameter. A graph with faults can be opened and fixed
 with `edit_graph`, but not saved. `samples/graphs/planks.texgraph` is a whole
 material to open.
 
+`export` writes the open graph's outputs as `<folder>/<role>.png` at a size you
+name, a power of two from 32 to 8192 (default the graph's own), ready for a
+carve material's texture slots: `base_colour.png` for `base_colour_texture`,
+`normal.png` for `normal_texture`, `roughness.png` (a glTF metallic-roughness
+image) for `metallic_roughness_texture`, `occlusion.png` for `occlusion_texture`.
+At 8192 it works in bounded memory but takes minutes for four outputs.
+
 ## License
 
 Carve is released under the [MIT license](LICENSE).

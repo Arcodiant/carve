@@ -58,7 +58,7 @@
         "tests/Carve.Server.Tests/ProductReferenceGuard.cs"
       ],
       "resources": "cpu",
-      "est-seconds": 20
+      "est-seconds": 200
     },
     {
       "id": "server-unit",
@@ -544,7 +544,8 @@
           "dotnet-closure": "src/Patina.Server/Patina.Server.csproj"
         },
         "scripts/run-scenario.ps1",
-        "scripts/bounded-run.ps1"
+        "scripts/bounded-run.ps1",
+        "samples/graphs/**"
       ],
       "resources": "cpu",
       "est-seconds": 30

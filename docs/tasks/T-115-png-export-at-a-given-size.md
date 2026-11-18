@@ -14,6 +14,8 @@ description: >-
 
 **Depends on:** T-112, T-113
 
+**Verify:** patina-unit, patina-regression, scenario-patina
+
 ## Goal
 
 `export` writes the open graph's outputs as PNGs at a size the agent names, from 32 to 8192, ready for a Carve
@@ -50,3 +52,34 @@ material's texture slots.
 - Adds to `Program.cs`'s tool list, `PatinaStages.cs`, the README's patina section and `tests.json` beside T-114: a
   conflict there only adds, so keep both sides.
 - **Verify line:** at planning, `cairn lint` accepts only suites already in `tests.json`, so this file names none it will add. Once patina-unit and scenario-patina (T-113 adds them) are in `tests.json`, add them to this file's `**Verify:**` line (creating the line if there is none), with the task's other suites.
+
+### As built
+
+Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`).
+
+- **`export`** (`src/Patina.Server/ExportTool.cs`, one line in `Program.Tools`): `folder` (required, relative to patina's working
+  directory, created), `size` (default the graph's), `outputs` (default all the graph has). Writes `<folder>/<role>.png` through a
+  temporary file moved into place, answers with one line a file (`WxH`, bytes, `(replaced)`, slot: `base_colour_texture`,
+  `normal_texture`, `metallic_roughness_texture` for roughness, `occlusion_texture`). Refused, writing nothing, for a graph with a
+  fault (the faults listed), a size outside the power-of-two list (T-110's `SizesText`), an unknown role or one the graph has no
+  output for, an empty `outputs`, and a folder it cannot create or write (names the folder and the system's reason). The answer
+  carries no time, so a result is the same every run.
+- **Memory.** One RGBA8 buffer (256 MB at 8192) is made once and reused for each output; each output is evaluated into it by T-110's
+  bands and encoded by `ImageWriter` straight into its file (no PNG byte array), then a compacting GC runs before the next output.
+  A first version that made an `OutputImage` per output (a new 256 MB array and a PNG array each) peaked at 2097 MB for the process
+  and failed the 2 GB bound; the reuse and the collect brought it to 1565 MB, so the bound stayed at 2 GB.
+- **Measured at 8192** (`ExportBoundedMemoryTests`, regression tier, the real patina over stdio, the planks, all four outputs, Debug
+  build, on Claude Sonnet 5.5's run on this machine): **154.7 s** and a **peak working set of 1565 MB**. Each PNG is 2.6 to 3.2 MB.
+  The time is far over the planning probe's "tens of seconds": the encode is about 10 s an output, so most of the time is the
+  evaluation (the nodes work through bounds-checked `Band` texel access, as T-110's As built warned). `export`'s description says
+  minutes, not seconds, and advises a client with a short call timeout to ask for one or two outputs at a time. Speeding the
+  evaluation is a change to `Patina.Graphs` (not this member's); worth a follow-up. `patina-regression`'s `est-seconds` is now 200.
+  The test writes its numbers to `patina-export-8192.txt` in the temp folder.
+- **Tests.** `ExportToolTests` (11 unit: bytes equal to `samples/graphs/planks/*.png` at 256, slot names, a size and roles with
+  `(replaced)`, 1024 against 256 at matching uv, six bad sizes, the refusals, an unwritable folder, the worked example),
+  `ExportBoundedMemoryTests` (regression). `ExportStage` (scenario): byte equality at 256, 1024 sampled against 256 at matching uv,
+  then the size, role and folder errors. The three named breaks are caught by these: roughness in R or a flipped normal green change
+  the bytes against the samples (which T-112's tests hold to the graph), and a wrong size fails the 256 byte equality, the `WxH` in
+  each line and the 1024 size check. Tools-list asserts in T-113's tests now compare the first seven names and then `Contains("export")`,
+  so a sibling's tool added after does not break them.
+- `scenario-patina` now also lists `samples/graphs/**` as an input.
