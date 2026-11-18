@@ -71,6 +71,7 @@
     <Compile Include="../../src/Carve.Server/GlbScene.cs" Link="GlbScene.cs" />
     <Compile Include="../../src/Carve.Server/SurfaceMaterial.cs" Link="SurfaceMaterial.cs" />
     <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
+    <Compile Include="../Carve.Core.Tests/PartTreeSample.cs" Link="PartTreeSample.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Acceptance/Silhouette.cs" Link="Silhouette.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Orcward/GlbEdit.cs" Link="GlbEdit.cs" />

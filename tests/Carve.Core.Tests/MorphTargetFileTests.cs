@@ -164,14 +164,13 @@ public sealed class MorphTargetFileTests
     }
 
     [Fact]
-    public void Version_7_is_not_read_by_this_build()
+    public void Version_7_holds_no_targets()
     {
+        // Version 7 is the part tree (T-92), which has no targets key: which version holds both is RV-64's open question.
         var read = CarveFile.Read(Text().Replace("\"carve\": 8", "\"carve\": 7"));
-        var error = Assert.Single(read.Errors);
-        Assert.Equal("carve", error.Element);
-        Assert.Contains("version 7 is not one this build reads", error.Message);
+        Assert.Contains(read.Errors, e => e.Element == "meshes[0].targets" && e.Message.Contains("unknown key"));
+        Assert.Contains(7, CarveFile.ReadableVersions);
         Assert.Contains(8, CarveFile.ReadableVersions);
-        Assert.DoesNotContain(7, CarveFile.ReadableVersions);
     }
 
     /// <summary>

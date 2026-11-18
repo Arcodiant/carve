@@ -681,4 +681,62 @@ public sealed class Model
             : styled.WithUvs(MeshUvs.None.WithFaces(uvFaces).WithSeams(seams, seam: true));
         return targets.Count == 0 ? mapped : mapped.WithTargets(MorphTargets.Of(targets.Select(t => MorphTarget.Of(t.Name, t.Deltas))));
     }
+
+    // ---- Pieces of a part tree (T-92) ---------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The piece <c>save mesh=</c> writes (T-92, the person's ruling at M-9's planning): the part <paramref name="name"/>'s own
+    /// geometry and kept levels as a top-level part at the origin, without its parent, transform, envelope, children or
+    /// instances; the materials its live mesh and its levels use; and, as <see cref="Piece"/>, the skeleton and clips when
+    /// it or a level has weights. Null with <paramref name="problem"/> as <see cref="Target"/> gives it for a name that is
+    /// not a part with geometry (an instance or an empty is named as one).
+    /// </summary>
+    public Model? PartPiece(string name, out string? problem)
+    {
+        if (Target(name, out problem) is not { } found)
+        {
+            problem ??= "mesh: the model has no meshes yet";
+            return null;
+        }
+        var levels = FindPart(name)?.Levels ?? [];
+        PolygonMesh[] all = [found.Mesh, .. levels.Select(l => l.Mesh)];
+        var used = all.SelectMany(MaterialsUsedBy).ToHashSet(StringComparer.Ordinal);
+        var materials = System.Array.FindAll(_materials, m => used.Contains(m.Name));
+        Part[] part = [Part.Of(name) with { Levels = levels }];
+        return all.All(m => m.Weights is null) ? new Model([found], null, [], materials, part) : new Model([found], Skeleton, _clips, materials, part);
+    }
+
+    /// <summary>
+    /// This model with the part <paramref name="name"/>'s own geometry and kept levels taken from <paramref name="source"/>, as
+    /// <c>open mesh=</c> takes a piece (T-92): it replaces the geometry and levels of this model's part of that name and keeps
+    /// that part's placement (parent, transform, envelope, moves), or is added as a new top-level part. Each level comes as
+    /// <see cref="WithMeshFrom"/> brings the live mesh (weights by bone name, materials added or matched). Null with
+    /// <paramref name="problem"/> when the name is an instance or an empty here or in the file, or as <see cref="WithMeshFrom"/> refuses.
+    /// </summary>
+    public Model? WithPartPieceFrom(Model source, string name, out string? problem)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        problem = NotGeometry(this, "the model's", "open into", name) ?? NotGeometry(source, "the file's", "open", name);
+        if (problem is not null) return null;
+        var levels = source.FindPart(name)?.Levels ?? [];
+        var target = this;
+        var kept = new List<PartLevel>(levels.Count);
+        foreach (var level in levels)
+        {
+            if (target.WithMeshFrom(source.With(name, level.Mesh), name, out problem) is not { } next)
+            {
+                problem = problem!.Replace("mesh: the file's mesh", FormattableString.Invariant($"mesh: level {level.Number} of the file's mesh"), StringComparison.Ordinal);
+                return null;
+            }
+            target = next;
+            kept.Add(new PartLevel(level.Number, target.Find(name)!));
+        }
+        if (target.WithMeshFrom(source, name, out problem) is not { } placed) return null;
+        return placed.WithPart(placed.FindPart(name)! with { Levels = kept });
+
+        static string? NotGeometry(Model model, string whose, string verb, string name) =>
+            model.FindPart(name) is not { } part || model.Find(name) is not null ? null
+            : part.InstanceOf is { } shown ? $"mesh: {whose} part '{name}' is an instance of '{shown}', with no geometry of its own; {verb} '{shown}', and every instance follows"
+            : $"mesh: {whose} part '{name}' is an empty part with no geometry; a piece is one part's own geometry, so name a part that has some";
+    }
 }
