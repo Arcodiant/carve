@@ -74,48 +74,36 @@ opens one texture graph, and can push and pop snapshots of it to try a change an
 - Runs beside T-112. The two touch no common file except `tests.json`, where a conflict only adds.
 - **Verify line:** at planning, `cairn lint` accepts only suites already in `tests.json`, so this file names none it will add. Once patina-unit and scenario-patina are in `tests.json`, add them to this file's `**Verify:**` line (creating the line if there is none), with the task's other suites.
 
-### Hand-off
+### As built
 
-Written by Claude Opus 5.5 (`claude-opus-5-5`) at the call checkpoint (about 60 calls). Everything is committed in
-`task/T-113`; `verify` has not been run, because T-112 has not landed on `origin/milestone/M-27` yet.
+Built by Claude Opus 5.5 (`claude-opus-5-5`) to the call checkpoint, finished by a second agent, also on Claude Opus 5.5
+(`claude-opus-5-5`), after T-112 landed.
 
-**Done.**
-- `src/Patina.Server` (exe `patina`): `Program.cs` hosts through `EngineHost.RunAsync` (`Name = "patina"`) and holds
-  the tool list, `Program.Tools(registry)`, and `Program.AddTools(services, mcp, baseDirectory)` (store, registry,
-  tool folder, tools), which the unit harness calls too. `GraphStore` (open graph, path, snapshot stack, one lock a
-  call). Tools: `define_graph`, `edit_graph`, `get_graph`, `save`, `open`, `push_snapshot`, `pop_snapshot`
-  (`DefineGraphTool.cs`, `EditGraphTool.cs`, `FileTools.cs`), helpers in `ToolSupport.cs`. define_graph's list of
-  node types is written from the registry by `NodeCatalogue` (ports, parameters with `ParamSpec.Describe()` and
-  defaults), with one hand-written line per type in T-112's words.
-- `tests/Patina.Server.Tests`: `PatinaHarness` (in-process), `WorkedExampleTests` (every description's examples,
-  held to the description's own constants), `GraphToolTests` (refusals, all-or-nothing, file rules), `SnapshotTests`,
-  `PatinaProcessTests` (regression: real patina over stdio) and `PatinaReferencesNoExtensionTests` (carve's
-  `ProductReferenceGuard.cs` linked).
-- `scenarios/Carve.Scenario.Patina` (`PatinaStages.cs`, `GraphStage.cs`), `run-scenario.ps1 -Server carve|patina`,
-  suites `patina-unit` (now both test dlls in one `dotnet test`), `patina-regression` and `scenario-patina` (both
-  `cpu`), README's patina section, CLAUDE.md Layout rows, `Carve.slnx`.
+- **`src/Patina.Server`** (exe `patina`): `Program.cs` is one `EngineHost.RunAsync` call (`Name = "patina"`) and holds the
+  tool list, `Program.Tools(registry)`, and `Program.AddTools(services, mcp, baseDirectory)` (store, registry, tool
+  folder, tools), which the unit harness calls too. `GraphStore` holds the open graph, its path and the snapshot stack,
+  one lock a call. Tools `define_graph`, `edit_graph` (`DefineGraphTool.cs`, `EditGraphTool.cs`), `get_graph`, `save`,
+  `open`, `push_snapshot`, `pop_snapshot` (`FileTools.cs`), helpers in `ToolSupport.cs`. define_graph's list of node
+  types is written from the registry by `NodeCatalogue` (ports, parameters with `ParamSpec.Describe()` and defaults),
+  with one hand-written line per type, checked against T-112's nodes as landed (names, parameters, ranges and
+  behaviour all match; no rename was needed).
+- **Tests** (`tests/Patina.Server.Tests`, 66): `PatinaHarness` (in-process), `WorkedExampleTests` (every description's
+  examples, held to the description's own constants), `GraphToolTests`, `SnapshotTests`, `PatinaProcessTests`
+  (regression: the real patina over stdio) and `PatinaReferencesNoExtensionTests` (carve's `ProductReferenceGuard.cs`
+  linked). After the rebase onto T-112 all 66 pass; the fault text quoted in the worked examples was already T-110's,
+  so no constant changed.
+- **Scenario**: `scenarios/Carve.Scenario.Patina` (`PatinaStages.cs`, `GraphStage.cs`), `run-scenario.ps1 -Server
+  carve|patina`. Suites `patina-unit` (both test dlls in one `dotnet test`), `patina-regression` and `scenario-patina`.
+- **`cpu` checked.** patina opens the engine's headless Vulkan device at start, but no tool awaits `EngineStatus`, and
+  `EngineThread` catches a failed device and keeps the process serving. Run here with the Vulkan driver hidden
+  (`VK_ICD_FILENAMES` and `VK_DRIVER_FILES` set to a missing file), the log shows `Engine faulted ... is a Vulkan device
+  available?` and both `patina-regression` and `scenario-patina` still pass, so both stay `cpu`. T-114, the first to
+  render, must move `scenario-patina` (and `patina-regression` if it renders) to `gpu`.
+- **edit_graph's rule for a new fault**: a fault counts as new by its place (node, port, parameter), not its message,
+  since messages list ids an edit may add; so an edit that only changes the kind of a fault already at that place is
+  let through.
 
-**Checked.** The solution builds warnings-as-errors. Of 66 tests in `Patina.Server.Tests`, every one passes except
-the six `WorkedExampleTests` that use T-112's node types (`noise`, `blend`), which fail with unknown-type faults, as
-expected until T-112 lands; the stdio regression test passes (patina starts, names itself, lists seven tools, round
-trips a file). `run-scenario.ps1 patina -Server patina` runs on the real patina (exit code and run folder come back;
-the planted-file checks pass; the rest wait for T-112's nodes). The two-dll `dotnet test` form of `patina-unit` runs
-both projects.
-
-**Left.**
-1. Once T-112 is on `origin/milestone/M-27`, `git rebase origin/milestone/M-27` (expect only-add conflicts in
-   `tests.json`, `Carve.slnx` and CLAUDE.md: keep both). Then run `Patina.Server.Tests`: the worked-example results
-   (`DefineGraphTool.WorkedFaultyResult`, `EditGraphTool.WorkedRefusedResult`) quote T-110's fault text as I expect
-   it (`node 'out' input 'in': names 'bsae', which is not a node; the nodes are base, out, tone, wood`); if the real
-   text differs, correct the constant (the description quotes it), never the test. Check `GraphStage`'s and the
-   tests' fault strings the same way.
-2. `cairn task T-113 verify` until clean; then `### As built` (with what T-114 and T-115 need: a tool is a class with
-   a static `Create()` and a `Run`, made with `ToolSupport.Create<T>`, and one line in `Program.Tools`; a stage is a
-   class implementing `IPatinaStage` in its own file and one line in `PatinaStages.All`), `cairn lint`, `finish`.
-
-**Surprising.** I could not test the worked examples against T-112's in-progress node files: copying them from T-112's
-worktree into this one was refused by the permission classifier, so those six tests are unchecked. Patina opens a
-Vulkan device at start (the engine's headless graphics) though no tool renders; `scenario-patina` and
-`patina-regression` are marked `cpu` as the Scope says, which is untested on a runner with no device. edit_graph
-counts a fault as new by its place (node, port, parameter), not its message, since messages list ids an edit may add;
-so an edit that only changes the kind of a fault already at that place is let through.
+**For T-114 and T-115.** A tool is a class with a static `Create()` (given the `NodeRegistry` if it needs one) built on `ToolSupport.Create<T>`,
+plus one line in `Program.Tools` in `src/Patina.Server/Program.cs`; its worked examples go in constants on the class
+and a test in `WorkedExampleTests` runs each as written. A stage is a class implementing `IPatinaStage` in its own file
+under `scenarios/Carve.Scenario.Patina`, plus one line in `PatinaStages.All`.
