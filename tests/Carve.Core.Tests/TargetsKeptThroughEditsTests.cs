@@ -213,4 +213,31 @@ public class TargetsKeptThroughEditsTests
         var a = cut.Targets!.Find("A")!;
         Assert.Equal(Vector3.Lerp(a.DeltaOf(4), a.DeltaOf(5), 0.5f).Y, a.DeltaOf(8).Y, 1e-6);
     }
+
+    [Fact]
+    public void KnifePointInsideAFaceBlendsATargetThatIsNotAffineByTheTriangleThePointLiesIn()
+    {
+        // RV-64: an affine target gives the same delta under any blend that reproduces the point, so this one is not affine
+        // over the top face (only corners 4 and 6 move, by different amounts). The stencil rule for an interior point is the
+        // barycentric blend of the corners of the face triangle it lies in, the stencil that blends its weights.
+        var plain = Cube();
+        var corners = new Dictionary<int, Vector3> { [4] = new(0, 0, 0.6f), [6] = new(0, 0.2f, -0.3f) };
+        var cube = plain.WithTargets(MorphTargets.Of([MorphTarget.Of("C", corners)]));
+        var at = new Vector3(0.4f, 0.5f, 1);
+        var r = Knife.Cut(cube, [new(0.5f, 0, 1), at, new(0.5f, 1, 1)]);
+        var cut = Ok(r.Edit);
+        Assert.Equal(new Vector3(0.4f, 0.5f, 1), cut.Vertices[10]);
+
+        var lies = Triangulator.TriangulateFace(plain, 1).Select(t =>
+        {
+            var (a, b, c) = (plain.Vertices[t.A], plain.Vertices[t.B], plain.Vertices[t.C]);
+            double Orient(Vector3 p, Vector3 q, Vector3 o) => ((double)q.X - p.X) * ((double)o.Y - p.Y) - ((double)q.Y - p.Y) * ((double)o.X - p.X);
+            var area = Orient(a, b, c);
+            return (t, Wa: Orient(at, b, c) / area, Wb: Orient(a, at, c) / area, Wc: Orient(a, b, at) / area);
+        }).Single(x => x.Wa >= 0 && x.Wb >= 0 && x.Wc >= 0);
+        Vector3 D(int v) => corners.TryGetValue(v, out var d) ? d : Vector3.Zero;
+        var expected = D(lies.t.A) * (float)lies.Wa + D(lies.t.B) * (float)lies.Wb + D(lies.t.C) * (float)lies.Wc;
+        var got = cut.Targets!.Find("C")!.DeltaOf(10);
+        Assert.True((got - expected).Length() <= 1e-6, $"vertex 10's delta {got}, the stencil rule gives {expected}");
+    }
 }
