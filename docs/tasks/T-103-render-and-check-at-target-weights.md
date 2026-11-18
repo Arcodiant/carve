@@ -4,7 +4,7 @@ description: >-
 ---
 # T-103 — Render and check at target weights
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 

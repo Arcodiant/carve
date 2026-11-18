@@ -5,3 +5,4 @@
 - T-100: move, extrude, delete, merge_faces, bridge, plane_cut, loop_cut and knife keep a mesh's targets, new vertices taking their deltas from the vertices they come from
 - T-101: The Carve file stores each mesh's targets as sparse deltas in a new version, read back bit-exact, and open refuses to replace a mesh's targets unless asked
 - T-104: export writes each target's position and normal deltas and its name as glTF morph targets, read back through the engine's loader
+- T-103: render and check take target weights, applied before skinning, and check reports a target that flips, collapses or cracks faces at weight 1
