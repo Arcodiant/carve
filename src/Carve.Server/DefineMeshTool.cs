@@ -179,9 +179,13 @@ public sealed class DefineMeshTool(ModelStore store)
         if (errors.Count > 0) return Failed("define_mesh", errors);
 
         var mesh = result.Mesh!;
-        if (!dropTargets && store.Current.Model.Find(meshName!)?.Targets is { } targets)
-            return Failed("define_mesh", [$"name: the mesh '{meshName}' has the morph targets {targets.ListNames()}, which replacing it would drop; give drop_targets: true to replace it anyway, or a new name to add a mesh"]);
-        store.Define(meshName!, mesh, "define_mesh");
+        // The refusal is made under the store's write lock, with the push, so a define_target landing between them is not dropped unasked.
+        if (store.Define(meshName!, mesh, "define_mesh",
+                model => !dropTargets && model.Find(meshName!)?.Targets is { } targets
+                    ? $"name: the mesh '{meshName}' has the morph targets {targets.ListNames()}, which replacing it would drop; give drop_targets: true to replace it anyway, or a new name to add a mesh"
+                    : null,
+                out var refusal) is null)
+            return Failed("define_mesh", [refusal!]);
         var body = Report(mesh);
         body["deleted"] = Deleted(DeletedElements.None);
         body["split"] = Split([]);

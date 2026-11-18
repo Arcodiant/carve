@@ -46,6 +46,19 @@ public sealed class ModelStore
         }
     }
 
+    /// <summary>
+    /// As <see cref="Define(string, PolygonMesh, string)"/>, unless <paramref name="refuse"/> gives a reason for the current model, checked
+    /// under the same lock (define_mesh's refusal to drop morph targets, as open's is): then null, pushing nothing, with that reason.
+    /// </summary>
+    public ModelSnapshot? Define(string name, PolygonMesh mesh, string tool, Func<Model, string?> refuse, out string? problem)
+    {
+        lock (_write)
+        {
+            problem = refuse(_current.Model);
+            return problem is null ? PushLocked(_current.Model.With(name, mesh), tool) : null;
+        }
+    }
+
     /// <summary>Puts <paramref name="mesh"/> in the model under the default name as the result of <paramref name="tool"/>.</summary>
     public ModelSnapshot Push(PolygonMesh mesh, string tool) => Define(Model.DefaultName, mesh, tool);
 

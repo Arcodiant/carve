@@ -72,7 +72,7 @@ Built by Claude Sonnet 5.5.
   A new name, or a mesh with no targets, is unaffected. The result shape is unchanged. (`open`'s matching refusal is T-101.)
 - Tests: `tests/Carve.Server.Tests/TargetToolTests.cs` (unit, `ToolHarness`); `ToolHarnessTests` tool count 36 -> 38;
   `DefineMeshDefinitionTests` schema string gains `drop_targets` after `faces`.
-- Store: no new `ModelStore` method; both tools use `ModelStore.Rework`, which holds the write lock and pushes one step.
+- Store: `define_target` and `delete_target` use `ModelStore.Rework`, which holds the write lock and pushes one step. `define_mesh`'s `drop_targets` refusal was first made before `store.Define`, outside the lock, so a `define_target` landing between them was dropped unasked; RV-64 added a `ModelStore.Define` overload that takes the refusal and runs it under the write lock (as T-101's `OpenModel`/`OpenMesh` do for `open`), tested in `ModelStoreTests`.
 - Not checked: no frames and no real-process run (unit tier only); T-101's file reader is not yet under `file`, so the
   rebase may need `CarveFile.Read`'s signature checked.
 - Model: Claude Sonnet 5.5.
