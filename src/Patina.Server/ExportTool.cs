@@ -102,7 +102,15 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                 roles = [.. OutputRoles.All.Where(chosen.Contains)];
             }
 
-            var target = Path.GetFullPath(folderText, toolFolder.Directory ?? Environment.CurrentDirectory);
+            string target;
+            try
+            {
+                target = Path.GetFullPath(folderText, toolFolder.Directory ?? Environment.CurrentDirectory);
+            }
+            catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                return Error($"export: could not write to folder {JsonSerializer.Serialize(folderText)}: {e.Message}");
+            }
             try
             {
                 Directory.CreateDirectory(target);

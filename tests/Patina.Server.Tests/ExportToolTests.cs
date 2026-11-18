@@ -138,6 +138,18 @@ public class ExportToolTests
     }
 
     [Fact]
+    public async Task A_folder_with_a_character_a_path_may_not_hold_is_named_with_the_reason()
+    {
+        using var folder = new TempFolder();
+        await using var patina = await OpenPlanks(folder.Path);
+
+        var error = await patina.Refused("export", JsonSerializer.Serialize(new { folder = "a\0b", size = 32 }));
+
+        Assert.StartsWith("export: could not write to folder " + JsonSerializer.Serialize("a\0b") + ": ", error);
+        Assert.Empty(Directory.GetFileSystemEntries(folder.Path));
+    }
+
+    [Fact]
     public async Task The_worked_example_gives_the_description_s_lines()
     {
         using var folder = new TempFolder();
