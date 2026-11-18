@@ -220,6 +220,7 @@ viewer window (real-time pass only, not in captures):
 
 **Known and left.**
 
+- **T-131**: `render_glb` tells every refused weight, in `render`'s order (RV-66, filed by the person's ruling).
 - **T-127**: not-planar warnings on smooth meshes (the arm's 49, the soft gardener's too).
 - **M-9's T-92** will need to read version 8, as its Scope now says, and which version holds a file with both parts and targets is left open for the person at M-9's planning (T-101's As built, RV-64).
 - Corrective targets and morph weights in clips stay out, as decided at planning.
@@ -240,11 +241,12 @@ viewer window (real-time pass only, not in captures):
   - bb542f7 and 09301dd: `get_mesh`'s target example, marked and run; 2dc8635: `define_mesh` refuses to drop targets under the store's write lock (`ModelStore`, `DefineMeshTool`);
   - 0de8af0 and 3d4167b: the T-105 and T-107 artifact paths and the outcomes; 86c10c7: `scenario-morph` draws a posed `render_glb` frame, `tests.json` inputs, and `NotPlanarFold.CheckExport` with its pin.
 - **`cairn milestone M-21 verify` (2026-11-18, at b9310b5, those answers in it):** passed every check but `review`: 18 ran, 0 carried, failed 0; `server-regression` 239 s on Mantorok, `scenario-morph` 26 s on Xellotath.
-- **Review round 2, RV-65** (two Opus 5.5 reviewers, one on the tools, rendering and viewer answers and one on the Core, persistence, export and whole-diff answers): 6 findings, 2 Minor and 4 Nits, all answered by a further agent (Sonnet 5.5) and left Open for a round 3:
+- **Review round 2, RV-65** (two Opus 5.5 reviewers, one on the tools, rendering and viewer answers and one on the Core, persistence, export and whole-diff answers): 6 findings, 2 Minor and 4 Nits, all answered by a further agent (Sonnet 5.5); RV-65 was then set Answered and checked in round 3:
   - `render_glb` can no longer draw a refused weight as 0 (it is NaN to `GlbScene.Prepare`, which refuses it), with a real-engine test shown failing under the reviewer's mutation, and it tells every bad entry and a weight before a path error (RV-65 findings 1 and 2; T-108's As built has the order);
   - `NotPlanarFoldCheckTests` moved into `core-unit`, so a CPU suite pins the not-planar ruling (finding 3);
   - this part now covers the tools answers and the verifies after them (finding 4); T-107's As built and D-6's list were corrected (findings 5 and 6).
-- **`cairn milestone M-21 verify` (2026-11-18, at 14ff762, every fix of RV-65 in it; the one to cite last):** passed every check but `review`, still open for round 3: 10/10 members done and merged; 18 suites ran and 0 carried, failed 0; `core-unit` 18 s, `server-unit` 23 s, `scenario-morph` 18 s on Mantorok, `server-regression` 251 s on Mantorok. The commits after it change documents only.
+- **`cairn milestone M-21 verify` (2026-11-18, at 14ff762, every fix of RV-65 in it; the one to cite last):** passed every check but `review`, which then awaited round 3: 10/10 members done and merged; 18 suites ran and 0 carried, failed 0; `core-unit` 18 s, `server-unit` 23 s, `scenario-morph` 18 s on Mantorok, `server-regression` 251 s on Mantorok. The commits after it change documents only.
+- **Review round 3, RV-66** (one Opus 5.5 reviewer, on RV-65's answers): 2 Nits. RV-65 findings 1 and 3 to 6 held under the reviewer's own mutations on the real engine. The first Nit continued the `render_glb` refusal-order thread of RV-64 and RV-65: a weight is not told for a `.glb` the engine cannot parse, and type errors are listed before weight lines. Having survived two rounds, it went to the person, who ruled to file it as **T-131** (off-milestone) rather than run another fix round; nothing is drawn in either case. The second Nit, this part calling RV-65 Open, was fixed here. A round 4 (RV-67) checked those two answers.
 - **Next time:**
   - Re-run the milestone's verify after a rebase that moves product code, and cite that run, not the one before it.
   - Name the commits a rebase adds outside every member, since no member's As built will.
