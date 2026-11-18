@@ -41,4 +41,26 @@ public sealed class ExportTargetsResultTests() : TempFolderTests("carve-export-t
         var parsed = GlbExportTests.Parser.Parse(File.ReadAllBytes(Path.Combine(Root, "dials.glb")), Empyrean.ModelFormat.Gltf);
         Assert.Equal(["Girth", "Slim"], parsed.MorphTargets!.TargetNames);
     }
+
+    [Fact]
+    public async Task A_skinned_export_names_the_targets_and_a_piece_names_only_its_own()
+    {
+        // RV-64: the skinned and piece result lines go through Skinned, not the static path above.
+        using var carve = await SkinnedExportToolTests.StartChainAsync(Root);
+        Assert.False(IsError(await carve.CallToolAsync("define_target", """{"mesh":"upper","name":"Bend","positions":{"0":[0.3,1,0]}}""")));
+
+        var skinned = await carve.CallToolAsync("export", """{"path":"chain.glb"}""");
+        Assert.False(IsError(skinned), TextOf(skinned));
+        Assert.Contains("skinned", TextOf(skinned));
+        Assert.Contains("1 morph target(s) 'Bend' in glTF target order", TextOf(skinned));
+
+        var upper = await carve.CallToolAsync("export", """{"path":"chain.upper.glb","mode":"piece","meshes":["upper"]}""");
+        Assert.False(IsError(upper), TextOf(upper));
+        Assert.Contains("as a piece", TextOf(upper));
+        Assert.Contains("1 morph target(s) 'Bend' in glTF target order", TextOf(upper));
+
+        var lower = await carve.CallToolAsync("export", """{"path":"chain.lower.glb","mode":"piece","meshes":["lower"]}""");
+        Assert.False(IsError(lower), TextOf(lower));
+        Assert.DoesNotContain("morph", TextOf(lower));
+    }
 }
