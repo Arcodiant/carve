@@ -73,7 +73,7 @@ description: >-
 
 **Outcome:** fixed
 
-**Fix:** M-21's retrospective, "After the person's go", now says what the tools-section answers changed (e741625 to 86c10c7), the verify at b9310b5 that passed every check but `review` (18 ran, 0 carried, `server-regression` 239 s on Mantorok, `scenario-morph` 26 s on Xellotath), this round and how it was answered, and ends on the fresh verify of this round, the one to cite last (the commit that writes it is in `git log` under this finding).
+**Fix:** M-21's retrospective, "After the person's go", now says what the tools-section answers changed (e741625 to 86c10c7), the verify at b9310b5 that passed every check but `review` (18 ran, 0 carried, `server-regression` 239 s on Mantorok, `scenario-morph` 26 s on Xellotath), this round and how it was answered, and ends on the fresh verify of this round, the one to cite last (a commit 968bb67).
 
 ### T-107's As built says `server-regression` first ran over the export change after the rebase; the pre-rebase verify ran it
 
