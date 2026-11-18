@@ -413,6 +413,44 @@
       "est-seconds": 120
     },
     {
+      "id": "scenario-planks",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-planks-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Planks/Carve.Scenario.Planks.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.PlanksLoad.Tests/Carve.PlanksLoad.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Materials/MaterialsSampler.cs",
+        "scenarios/Carve.Scenario.Materials/MaterialsChecks.cs",
+        "scenarios/Carve.Scenario.Uvs/UvsScene.cs",
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "tools/Carve.SampleTextures/TextureSet.cs",
+        "tools/Carve.SampleTextures/Png.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
+        "samples/barrel.carve",
+        "samples/barrel-planks.carve",
+        "samples/textures/*.png",
+        "samples/graphs/planks/*.png",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-planks-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 90
+    },
+    {
       "id": "scenario-cuts",
       "tier": "regression",
       "build": "solution",

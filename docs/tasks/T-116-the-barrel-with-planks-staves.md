@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-112
 
-**Verify:** core-unit, scenario-materials
+**Verify:** core-unit, scenario-materials, scenario-planks
 
 ## Goal
 
@@ -61,3 +61,20 @@ left as it is.
 - Touches no patina file. It adds its suite to `tests.json` and a row to CLAUDE.md, and a conflict with the patina
   tasks there only adds.
 - **Verify line:** at planning, `cairn lint` accepts only suites already in `tests.json`, so this file names none it will add. Once scenario-planks is in `tests.json`, add it to this file's `**Verify:**` line (creating the line if there is none), with the task's other suites.
+
+### Research (Sonnet 5.5, before any frame)
+
+- **M-7's lit prediction holds with a roughness map; no new threshold, no skipped check.** `MaterialsChecks` asks of stave wood only
+  `Max >= T (80)` and `R >= G + 12 >= B + 24`; it never predicts a specular. The roughness map (G 146..199, so roughness 0.57..0.78
+  against M-7's scalar 1; B 0, so metallic 0 with the default factor) only changes the specular, which is added equally to all three
+  channels. Probed with `ColourRule.Lit` (its `Roughness` made a variable in a throwaway copy, not in the repo) over the planks'
+  darkest tone (0.817 of (170,112,64)), 72 azimuths, three tilts, the front, back, top and viewer cameras, at roughness 1, 0.78
+  and 0.57: the worst stave reads (112,81,60), so R-G >= 29, G-B >= 21 and max channel >= 110, against 12, 12 and 80, and the three
+  roughnesses give the same worst case. The planks' darkest mid texel is (142,94,53), no darker than that probe.
+- **Gaps are 3 texels each side, in every row** (the scenario checks it from the PNG before it opens anything: `PlankTexels.GapProblem`,
+  red < 90 as T-112 defines it; and no texel 6 or more from a boundary is dark). A P2 footprint (half-width 2, 5 texels) fits in the
+  6-wide gap only where a pixel spans 0.67 texel or less, so the gap is judged in a close-up (zoom 4, head on to the boundary), not
+  in the 512 px frames.
+- **Stave colours clear the lit threshold.** Mid-stave texels run (142..179, 94..118, 53..67), per-stave tones 0.82..1.18 of the base;
+  see the probe above for the lit values.
+- Not done, as the Scope says: M-7's `staves` (no roughness map) is untouched.
