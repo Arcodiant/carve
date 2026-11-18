@@ -20,6 +20,7 @@ public sealed class DeleteTool(ModelStore store)
         + "Bad input (no vertices and no faces, an unknown or already deleted id, a delete that would take every face, since a mesh keeps at least one face as define_mesh requires, an argument delete does not take) "
         + "is a tool error that lists every problem by element; the mesh is left unchanged and nothing is added to undo. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to delete from. "
+        + PartSpaceText
         + "Worked example on define_mesh's unit cube: deleting the top face (face 3, y = 1) leaves an open box, deleted:{vertices:[], faces:[3]}:\n"
         + ExampleMarker + """{"faces":[3]}""";
 

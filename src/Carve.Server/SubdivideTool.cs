@@ -24,6 +24,7 @@ public sealed class SubdivideTool(ModelStore store)
         + "triangles is for weighing against a game's budget, which export warns on from the game's carve-limits.json; subdivide gives no game-limit warning of its own. "
         + "Bad input (levels missing, not a whole number or outside 1 to 3, an argument subdivide does not take) is a tool error; the mesh is left unchanged and nothing is added to undo. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to subdivide. "
+        + PartSpaceText
         + "Worked example on define_mesh's unit cube, one level:\n"
         + ExampleMarker + """{"levels":1}""";
 

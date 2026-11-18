@@ -88,6 +88,12 @@ internal static class MeshToolSupport
         "The name of the mesh to work on, as given to define_mesh. May be left out when the model has one mesh; "
         + "left out while it has several, the call is a tool error that lists the names.";
 
+    /// <summary>
+    /// The sentence every edit tool and select share (T-93): in a part tree, <c>mesh</c> names a part with geometry, and
+    /// coordinates are in that part's own space.
+    /// </summary>
+    public const string PartSpaceText = PartTexts.PartSpace;
+
     /// <summary>The schema of the <c>mesh</c> argument, added to <paramref name="properties"/>; returns the schema it was added to.</summary>
     public static JsonObject WithMesh(JsonObject? schema, string text = MeshText)
     {

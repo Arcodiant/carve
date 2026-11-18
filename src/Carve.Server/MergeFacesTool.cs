@@ -28,6 +28,7 @@ public sealed class MergeFacesTool(ModelStore store)
         + "Bad input (fewer than two faces, an unknown, deleted or repeated id, faces not connected, mixed winding, a result that is not one face, such as faces touching at a vertex only or closing a shell) "
         + "is a tool error that lists every problem by element; the mesh is left unchanged and nothing is added to undo. One merge is one undo step. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to merge in. "
+        + PartSpaceText
         + "Worked example: a unit cube split round its middle (y = 0.5), exactly as loop_cut's own worked example leaves define_mesh's cube, merging the two pieces of its front (+Z, faces 1 and 7) back into face 1, deleted:{vertices:[], faces:[7]}:\n"
         + DefineMarker + CutCube + "\n"
         + ExampleMarker + """{"faces":[1,7]}""";

@@ -391,6 +391,20 @@ public sealed class ModelStore
         }
     }
 
+    /// <summary>
+    /// Runs <paramref name="change"/> on the current model under the write lock and pushes the model it gives as one step of
+    /// <paramref name="tool"/> (the part tools, T-93). Null, pushing nothing, with <paramref name="problem"/> saying why, when
+    /// it gives no model.
+    /// </summary>
+    public ModelSnapshot? Change(string tool, Func<Model, (Model? Next, string? Problem)> change, out string? problem)
+    {
+        lock (_write)
+        {
+            (var next, problem) = change(_current.Model);
+            return next is null ? null : PushLocked(next, tool);
+        }
+    }
+
     /// <summary>Steps back one change, or null when there is nothing older.</summary>
     public UndoResult? Undo()
     {
