@@ -41,6 +41,9 @@ public sealed class MorphScenario : IScenario
 
     public async Task RunAsync(ScenarioDriver driver)
     {
+        // The arm with dials (T-105) first, on the empty model, so that its samples hold the arm alone; the cylinder then replaces its mesh.
+        await ArmStages.RunAsync(driver);
+
         await DefineCylinderAsync(driver);
 
         // Bulge: the middle ring (vertices 8 to 15) 1.4x about the axis.
@@ -134,7 +137,7 @@ public sealed class MorphScenario : IScenario
                 faces.Add([Sides * i + k, Sides * i + (k + 1) % Sides, Sides * (i + 1) + (k + 1) % Sides, Sides * (i + 1) + k]);
         faces.Add(Enumerable.Range(0, Sides).Reverse().ToArray());
         faces.Add(Enumerable.Range(2 * Sides, Sides).ToArray());
-        await CallJsonAsync(driver, "define_mesh", new { vertices, faces });
+        await CallJsonAsync(driver, "define_mesh", new { vertices, faces, drop_targets = true });
         await CallJsonAsync(driver, "set_shading", new { shading = "smooth" });
         var hard = Enumerable.Range(0, Sides)
             .SelectMany(k => new[] { new[] { k, (k + 1) % Sides }, new[] { 2 * Sides + k, 2 * Sides + (k + 1) % Sides } })

@@ -416,6 +416,9 @@
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "samples/arm.carve",
+        "samples/arm-lean.carve",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],
