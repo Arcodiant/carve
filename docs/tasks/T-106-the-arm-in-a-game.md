@@ -51,7 +51,7 @@ preview, and driven live by a person in the viewer's window.
 
 ### As built
 
-Built by Claude Sonnet 5.5 (the implementer). Not finished: the person's real-time pass and the frame review are still to do (see Hand-off).
+Built by Claude Sonnet 5.5 (the implementer); the real-time pass and frame review by a separate Claude Sonnet 5.5 agent, who finished it.
 
 - **Export.** `ArmStages.ExportAndCompareAsync` (`scenarios/Carve.Scenario.Morph`), run at the end of the arm's stages (after `Bad` is deleted, before `Curl`
   is deleted for the cylinder): `export` of the arm into `game/Content/models/arm.glb` of the run folder, skinned, 3 bones, clip `Curl`, 672 triangles.
@@ -65,24 +65,15 @@ Built by Claude Sonnet 5.5 (the implementer). Not finished: the person's real-ti
 - **Load checks** (`tests/Carve.MorphLoad.Tests`, regression, 6 tests, read `CARVE_MORPH_RUN`, link `RunContent.cs`): `Load` gives `TargetNames` `[Bulk, Lean]`,
   `DefaultWeights` 0, no `Warnings`, three bones and `Curl`; every position and normal delta of every loaded vertex equals Carve's exactly (the T-104 test's
   method, on the scenario's saved `work/arm.carve`); `samples/arm.carve` and `arm-lean.carve` equal the saved files by content; `differences.tsv` holds.
-- **One thing found, not a difference from the preview.** The export's own report lists 49 `face is not planar` warnings (the subdivided, smoothed quads are
-  0.0005 to 0.0015 off their planes) and a no-limits note. The scenario and the checks accept only planarity warnings in the export text; the loader's
-  `Warnings` is empty. Nothing was loosened (the spec's "no warnings" is the loader's), but the person may want to know the arm exports with planarity notes.
+- **Not-planar warnings (the person's ruling, 2026-11-18).** The export reports not-planar faces (the subdivided, smoothed quads), folded by T-72: 10 named, the rest one line. The scenario
+  and the load check accept only not-planar warnings and assert the folded face count equals what `select faces where non_planar` names, as `scenario-soft` does (`NotPlanarFold` linked; the
+  scenario writes `work/select-non-planar-mesh.txt`). Any other warning fails. Shown failing: with the select file one face short, `The_export_is_clean` fails; a test also fails the check
+  with a count one over, one under and a foreign warning added. The loader's own `Warnings` is still empty. The rule itself is T-127, outside M-21.
 - **Broken product shown.** `CARVE_MORPH_BREAK=glbweights` (`render_glb` sent no `targets`) fails the scenario: `arm-9-glb-bulk-half-z draws the same as arm-8-glb-bulk-0-z, pixel for pixel`.
 - CLAUDE.md's layout table has `Carve.MorphLoad.Tests`, `run-morph-scenario.ps1` and the extended Morph row.
 - Engine needs: none. Files outside the worktree: the content folder copied to `G:\My Drive\artifacts\carve\M-21\T-106\round-1\game\` for the person's viewer run.
 - Not checked: the viewer window (no input is scripted); only a headless viewer run on the exported arm with `--targets Bulk=0.5,Lean=0.25` (it loads, 672 triangles). No frame image was opened by me; the three comparisons are pixel counts.
 
-### Hand-off
-
-Model: Claude Sonnet 5.5. Done: export, load checks, frames 8 to 10 compared with `render`, CLAUDE.md. Left: (1) the person's real-time pass, (2) the frame review (a separate agent, then
-the person's answer to `mcp__waystone__review` with frames 8 to 10), (3) `cairn task T-106 finish` from this worktree once the pass is answered.
-
-Viewer launch (window mode; `run-viewer.ps1` cannot pass the flag), from `D:\Repos\carve\branches\task\T-106`:
-
-```
-dotnet exec spikes/Carve.ModelViewer/bin/Debug/net10.0/Carve.ModelViewer.dll --content "G:\My Drive\artifacts\carve\M-21\T-106\round-1\game\Content" --model models/arm.glb --out "$env:TEMP\t106-view" --Empyrean:Graphics:VirtualSurface=false --targets Bulk=0.5
-```
-
-Keys: Tab next target, Left/Right -/+0.05, Space play/stop `Curl`, 0 all weights to 0. For the person to judge: Bulk grows smoothly (upper arm and forearm thicken, elbow and wrist do not),
-no crack at the elbow while Curl plays with Bulk or Lean up, the Lean dial thins the arm, and the bar and number follow the keys. Anything found goes back to the person.
+- **The person's verdicts.** Real-time pass in the viewer on `arm.glb` (Bulk, Lean, Curl, instructions in `round-1/viewer-pass.md`): approved. Frames 8 to 10 and their triptychs (`round-2`): approved. Frames 8 and 10 are byte-identical to T-105's approved frames 1 and 2, frame 9 has 0 differing pixels against its twin.
+- **Model.** Sonnet 5.5 throughout; the review and finish were a separate Sonnet 5.5 agent.
+- **Not checked.** Nothing scripts the viewer window; the person's pass is the check.
