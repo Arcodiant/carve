@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Morph targets (M-21): a cylinder with Bulge and Pinch seen at target weights through the real tools. T-105 adds the arm as later stages. -->
+  <!-- Morph targets (M-21): a cylinder with Bulge and Pinch seen at target weights through the real tools. T-105 adds the arm as stages that run before the cylinder. -->
   <PropertyGroup>
     <RootNamespace>Carve.Scenario.Morph</RootNamespace>
     <IsPackable>false</IsPackable>
