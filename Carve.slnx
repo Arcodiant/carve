@@ -15,6 +15,7 @@
   <Project Path="scenarios/Carve.Scenario.Rig/Carve.Scenario.Rig.csproj" />
   <Project Path="scenarios/Carve.Scenario.Cuts/Carve.Scenario.Cuts.csproj" />
   <Project Path="scenarios/Carve.Scenario.Gatehouse/Carve.Scenario.Gatehouse.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj" />
   <Project Path="tools/Carve.SampleTextures/Carve.SampleTextures.csproj" />
   <Project Path="tools/Patina.SampleGraphs/Patina.SampleGraphs.csproj" />
   <Project Path="tests/Carve.CharacterLoad.Tests/Carve.CharacterLoad.Tests.csproj" />
@@ -30,6 +31,7 @@
   <Project Path="src/Carve.Hosting/Carve.Hosting.csproj" />
   <Project Path="src/Carve.Server/Carve.Server.csproj" />
   <Project Path="src/Patina.Graphs/Patina.Graphs.csproj" />
+  <Project Path="src/Patina.Server/Patina.Server.csproj" />
   <Project Path="tests/Carve.Core.Tests/Carve.Core.Tests.csproj" />
   <Project Path="tests/Carve.ExportViewer.Tests/Carve.ExportViewer.Tests.csproj" />
   <Project Path="tests/Carve.ModelViewer.Tests/Carve.ModelViewer.Tests.csproj" />
@@ -37,4 +39,5 @@
   <Project Path="tests/Carve.Server.Tests/Carve.Server.Tests.csproj" />
   <Project Path="tests/Carve.Server.Tests.Extension/Carve.Server.Tests.Extension.csproj" />
   <Project Path="tests/Patina.Graphs.Tests/Patina.Graphs.Tests.csproj" />
+  <Project Path="tests/Patina.Server.Tests/Patina.Server.Tests.csproj" />
 </Solution>

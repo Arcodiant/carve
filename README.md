@@ -158,6 +158,36 @@ A character is a model with a skeleton, bone weights and clips. `export` then wr
 
 `export` also warns when a model passes a game's limits on triangles, submeshes or height, read from the first `carve-limits.json` found in the `.glb`'s folder or a folder above it (or the one `limits` names). `write_limits: true` creates the file with starting numbers to edit. `samples/gardener.carve` is a rigged, animated character, and `samples/gardener-soft.carve` is the same character subdivided and smoothed.
 
+## patina: texture graphs
+
+`patina` is a second MCP server, beside carve, for texture graphs (D-7): an agent
+defines a graph of nodes (`noise`, `gradient`, `levels`, `blend`,
+`height_to_normal`, `colour`, `output`), edits it, reads it back, and saves it
+as a `.texgraph` file. Add it to the same `.mcp.json`, next to carve's entry:
+
+```json
+{
+  "mcpServers": {
+    "carve": {
+      "command": "dotnet",
+      "args": ["run", "--project", "C:/path/to/carve/src/Carve.Server", "--no-launch-profile"]
+    },
+    "patina": {
+      "command": "dotnet",
+      "args": ["run", "--project", "C:/path/to/carve/src/Patina.Server", "--no-launch-profile"]
+    }
+  }
+}
+```
+
+Its tools: `define_graph` (the whole graph, as a `.texgraph` body), `edit_graph`
+(a list of operations, all or nothing: `set_node`, `remove_node`, `connect`,
+`disconnect`, `set_params`, `set`), `get_graph`, `save`, `open`, and
+`push_snapshot` / `pop_snapshot` to try a change and go back. Every fault names
+its node and its port or parameter. A graph with faults can be opened and fixed
+with `edit_graph`, but not saved. `samples/graphs/planks.texgraph` is a whole
+material to open.
+
 ## License
 
 Carve is released under the [MIT license](LICENSE).

@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-    Builds, then runs one scenario on the real carve with the debug extension stacked under it.
+    Builds, then runs one scenario on the real carve (or patina) with the debug extension stacked under it.
 .DESCRIPTION
     The scenario is the project Carve.Scenario.<Name>, under scenarios/ or tests/. The run folder's
-    path is the only thing on this script's stdout, and the exit code is carve's: 0 passed,
-    non-zero failed, 124 if it was stopped for running out of time. Everything else, carve's stderr
-    included, goes to stderr. Set Carve:Debug:* with -CarveArguments.
+    path is the only thing on this script's stdout, and the exit code is the server's: 0 passed,
+    non-zero failed, 124 if it was stopped for running out of time. Everything else, the server's
+    stderr included, goes to stderr. Set Carve:Debug:* with -CarveArguments. -Server patina runs
+    the scenario on patina.dll (src/Patina.Server) with the same --Carve:Extensions:N arguments.
 #>
 [CmdletBinding()]
 param(
@@ -13,7 +14,8 @@ param(
     [string]$Configuration = 'Debug',
     [int]$TimeoutSeconds = 300,
     [switch]$NoBuild,
-    [string[]]$CarveArguments = @()
+    [string[]]$CarveArguments = @(),
+    [ValidateSet('carve', 'patina')][string]$Server = 'carve'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,10 +37,13 @@ if (-not $scenario) {
     exit 2
 }
 
-$carveProject = Join-Path $root 'src/Carve.Server/Carve.Server.csproj'
+$serverProject, $serverDll = switch ($Server) {
+    'patina' { (Join-Path $root 'src/Patina.Server/Patina.Server.csproj'), 'patina.dll' }
+    default { (Join-Path $root 'src/Carve.Server/Carve.Server.csproj'), 'carve.dll' }
+}
 $debugProject = Join-Path $root 'extensions/Carve.Debug/Carve.Debug.csproj'
 if (-not $NoBuild) {
-    foreach ($project in @($carveProject, $debugProject, $scenario)) {
+    foreach ($project in @($serverProject, $debugProject, $scenario)) {
         dotnet build $project -c $Configuration --nologo -v q 2>&1 | ForEach-Object { Write-Err $_ }
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
@@ -50,7 +55,7 @@ function Get-Output([string]$project, [string]$file) {
 
 $scenarioFile = Split-Path $scenario -Leaf
 $arguments = @(
-    'exec', (Get-Output $carveProject 'carve.dll'),
+    'exec', (Get-Output $serverProject $serverDll),
     "--Carve:Extensions:0=$(Get-Output $debugProject 'Carve.Debug.dll')",
     "--Carve:Extensions:1=$(Get-Output $scenario ($scenarioFile -replace '\.csproj$', '.dll'))"
 ) + $CarveArguments
@@ -65,7 +70,7 @@ $code = $run.Code
 $run.Stderr | ForEach-Object { Write-Err $_ }
 
 if ($run.StdoutBytes -ne 0) {
-    Write-Err "run-scenario: carve wrote $($run.StdoutBytes) bytes to stdout, which belongs to MCP; it wrote:"
+    Write-Err "run-scenario: $Server wrote $($run.StdoutBytes) bytes to stdout, which belongs to MCP; it wrote:"
     $run.Stdout | ForEach-Object { Write-Err "  $_" }
     if ($code -eq 0) { $code = 1 }
 }

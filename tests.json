@@ -32,15 +32,33 @@
       "id": "patina-unit",
       "tier": "unit",
       "build": "solution",
-      "run": "dotnet test tests/Patina.Graphs.Tests/Patina.Graphs.Tests.csproj -c Debug --no-build --filter Tier!=regression",
+      "run": "dotnet test tests/Patina.Graphs.Tests/bin/Debug/net10.0/Patina.Graphs.Tests.dll tests/Patina.Server.Tests/bin/Debug/net10.0/Patina.Server.Tests.dll --filter Tier!=regression",
       "inputs": [
         {
           "dotnet-closure": "tests/Patina.Graphs.Tests/Patina.Graphs.Tests.csproj"
         },
-        "samples/graphs/**"
+        "samples/graphs/**",
+        {
+          "dotnet-closure": "tests/Patina.Server.Tests/Patina.Server.Tests.csproj"
+        },
+        "tests/Carve.Server.Tests/ProductReferenceGuard.cs"
       ],
       "resources": "cpu",
       "est-seconds": 15
+    },
+    {
+      "id": "patina-regression",
+      "tier": "regression",
+      "build": "solution",
+      "run": "dotnet test tests/Patina.Server.Tests/Patina.Server.Tests.csproj -c Debug --no-build --filter Tier=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Patina.Server.Tests/Patina.Server.Tests.csproj"
+        },
+        "tests/Carve.Server.Tests/ProductReferenceGuard.cs"
+      ],
+      "resources": "cpu",
+      "est-seconds": 20
     },
     {
       "id": "server-unit",
@@ -512,6 +530,24 @@
         "vulkan"
       ],
       "est-seconds": 120
+    },
+    {
+      "id": "scenario-patina",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj"
+        },
+        {
+          "dotnet-closure": "src/Patina.Server/Patina.Server.csproj"
+        },
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "cpu",
+      "est-seconds": 30
     }
   ],
   "todo": []
