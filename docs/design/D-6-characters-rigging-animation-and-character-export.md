@@ -14,9 +14,9 @@ description: >-
 
 An agent on a game authors an original animated character in Carve: a body and costume pieces on one skeleton, coloured and soft-shaded, with looping clips. The source is a committed text file, and the `.glb` built from it loads in Empyrean with no conversion. Skinning faults are seen in Carve's own renders before export.
 
-Milestones planned against this doc: [M-16](../milestones/M-16-a-character-that-moves.md), [M-17](../milestones/M-17-rig-it-well.md), [M-18](../milestones/M-18-soft-characters.md) and [M-19](../milestones/M-19-a-clip-library-for-a-game.md).
+Milestones planned against this doc: [M-16](../milestones/M-16-a-character-that-moves.md), [M-17](../milestones/M-17-rig-it-well.md), [M-18](../milestones/M-18-soft-characters.md) [M-19](../milestones/M-19-a-clip-library-for-a-game.md) and [M-21](../milestones/M-21-morph-targets.md).
 
-**Out of scope:** animation events (`*.events.json`), humanoid role maps (`*.humanoid.json`), morph targets, IK.
+**Out of scope:** animation events (`*.events.json`), humanoid role maps (`*.humanoid.json`), IK. Morph targets were out of scope until M-21 planned them; see *Morph targets* below.
 
 ### What the planning probe found
 
@@ -240,6 +240,7 @@ Decided by the person at M-21's planning (2026-11-16), on the planner's recommen
   targets; a model without targets writes the bytes it wrote before.
 - **Every edit keeps targets.** `move` carries a target with its base; `extrude`'s new vertices copy their source's delta; `delete` drops a deleted vertex's delta; `merge_faces` and `bridge` keep targets; `plane_cut`, `loop_cut` and `knife` blend deltas by the stencils that blend weights. `subdivide` is exact: Catmull-Clark, crease rules included, is linear in positions, so each new vertex's delta takes its position's stencil, and the subdivided target equals the subdivided base plus the subdivided delta. `define_mesh` or `open` replacing a mesh that has targets is refused, naming them, unless `drop_targets: true`.
 - **`check`** reports each target at weight 1: `target-flips-face` (a face's normal against its rest normal below 0), `target-collapses-face` (a face become zero-area) and `target-opens-mesh` (vertices coincident at rest come apart).
+- **Weights are in [0, 1] where a tool takes them** (the person's ruling, 2026-11-18). `render`, `check` and `render_glb` refuse a weight outside [0, 1], naming the target. Carve stores no range: a game drives the exported morphs however it likes.
 - **Out of scope:** corrective targets and morph weights in clips.
 
 **Alternatives:** absolute positions per target, which round-trip a sculpted shape exactly but are dense and do not ride along with edits; dense deltas, which waste the file on the vertices a target does not move.
