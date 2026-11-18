@@ -108,6 +108,9 @@ public static class MeshEdits
         var addedFaces = new List<Face>();
         var reshaped = new List<KeyValuePair<int, Face>>();
         var extruded = new List<ExtrudedFace>();
+        // Where each new element came from (T-71): a ring vertex stands over its corner, the cap is the face itself corner
+        // by corner, and each wall takes its face's colour and groups and starts unmapped.
+        var provenance = new EditProvenance();
 
         for (var i = 0; i < faceList.Length; i++)
         {
@@ -145,6 +148,9 @@ public static class MeshEdits
                     addedFaces.Add(new[] { old[k], old[(k + 1) % old.Count], lifted[(k + 1) % old.Count], lifted[k] });
             }
             reshaped.Add(KeyValuePair.Create(f, new Face(ids[..loop.Count], hole)));
+            for (var k = 0; k < n; k++) provenance.Vertex(ids[k], VertexOrigin.Offset(face.Corners[k]));
+            provenance.Face(f, new FaceOrigin(f, CornerOriginKind.Position));
+            for (var k = 0; k < n; k++) provenance.Face(firstWall + k, new FaceOrigin(f, CornerOriginKind.None));
             extruded.Add(new ExtrudedFace(f, f, Enumerable.Range(firstWall, n).ToArray(), ids));
         }
 
@@ -157,7 +163,7 @@ public static class MeshEdits
         return EditResult.From(mesh, result, [],
             Enumerable.Range(mesh.Vertices.Count, addedVertices.Count).ToArray(),
             Enumerable.Range(mesh.Faces.Count, addedFaces.Count).ToArray(),
-            extruded);
+            extruded, provenance: provenance);
     }
 
     /// <summary>
@@ -326,8 +332,7 @@ public static class MeshEdits
             return EditResult.Refused(holed.Select(f => new MeshError($"faces[{f}]",
                 "this face has holes, and subdivide does not take a face with holes")).ToList());
 
-        var level = new Subdivision.Level(mesh.Vertices.ToArray(), mesh.Faces.Select(f => f.Loop.ToArray()).ToArray(),
-            mesh.Style, mesh.Weights, mesh.Shade, mesh.Uvs);
+        var level = Subdivision.Start(mesh);
         for (var i = 0; i < levels; i++) level = Subdivision.Once(level);
 
         // Tombstones stay tombstones: a deleted face's slot, and the face point each level makes for it, which no face uses.
@@ -337,7 +342,8 @@ public static class MeshEdits
             .Where(v => mesh.IsVertexDeleted(v) || (v >= mesh.Vertices.Count && !used[v])).ToArray();
         var result = PolygonMesh.Create(level.Vertices, level.Faces.Select(f => f.Length == 0 ? Face.Deleted : (Face)f), gone);
         if (!result.Succeeded) return EditResult.Refused(result.Errors);
-        var made = result.Mesh!.WithStyle(level.Style).WithWeights(level.Weights).WithShade(level.Shade).WithUvs(level.Uvs);
+        var carried = level.Mesh;
+        var made = result.Mesh!.WithStyle(carried.Style).WithWeights(carried.Weights).WithShade(carried.Shade).WithUvs(carried.Uvs);
         var moved = mesh.LiveVertices.Where(v => made.Vertices[v] != mesh.Vertices[v]).ToArray();
         return EditResult.Made(made, moved,
             Enumerable.Range(mesh.Vertices.Count, made.Vertices.Count - mesh.Vertices.Count).Where(v => !made.IsVertexDeleted(v)).ToArray(),

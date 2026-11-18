@@ -20,8 +20,15 @@ namespace Carve.Core;
 /// </remarks>
 internal static class Subdivision
 {
-    /// <summary>A mesh's geometry and its carried attributes, between levels.</summary>
-    internal sealed record Level(Vector3[] Vertices, int[][] Faces, FaceStyle? Style, VertexWeights? Weights, MeshShade? Shade, MeshUvs? Uvs = null);
+    /// <summary>
+    /// A mesh's geometry between levels (a tombstoned face's loop empty), and <see cref="Mesh"/>, the same geometry
+    /// unchecked with every layer carried onto it (T-71).
+    /// </summary>
+    internal sealed record Level(Vector3[] Vertices, int[][] Faces, PolygonMesh Mesh);
+
+    /// <summary>The level a subdivide of <paramref name="mesh"/> starts from (a mesh with no holed face).</summary>
+    internal static Level Start(PolygonMesh mesh) =>
+        new(mesh.Vertices.ToArray(), mesh.Faces.Select(f => f.Loop.ToArray()).ToArray(), mesh);
 
     internal static Level Once(Level input)
     {
@@ -30,7 +37,7 @@ internal static class Subdivision
         var topology = PolygonMesh.Assemble(verts, faces.Select(f => (Face)f).ToArray()).Topology;
         var edges = topology.Edges;
         int v0 = verts.Length, f0 = faces.Length, e0 = edges.Count;
-        var shade = input.Shade;
+        var shade = input.Mesh.Shade;
 
         var sharp = new bool[e0];
         var edgeIndex = new Dictionary<(int, int), int>(e0);
@@ -133,130 +140,33 @@ internal static class Subdivision
             children.Add((f, added));
         }
 
-        var style = input.Style?.Carry(children);
-
-        MeshShade? outShade = null;
-        if (shade is not null)
+        // Where everything came from (T-71): each point is its stencil, each edge is split at its edge point, and child k of
+        // a face takes the face's colour and groups and its corners [k, (k + k+1) / 2, the mean, (k-1 + k) / 2] over the
+        // face's own corners, so UVs are linear in their face and never depend on the positions' stencils. A midpoint sums
+        // from its first corner and the mean from 0, as before, so a negative zero lands where it did (RV-62).
+        var provenance = new EditProvenance();
+        for (var i = 0; i < stencils.Length; i++) provenance.Vertex(i, VertexOrigin.Blend(stencils[i]));
+        for (var e = 0; e < e0; e++) provenance.Split(edges[e].Lo, edges[e].Hi, [v0 + f0 + e]);
+        foreach (var (f, added) in children)
         {
-            var halves = new List<(int, int)>();
-            foreach (var (lo, hi) in shade.Hard)
+            var n = faces[f].Length;
+            var mean = new Stencil(n);
+            for (var c = 0; c < n; c++) mean.Add(c, 1);
+            for (var k = 0; k < n; k++)
             {
-                if (!edgeIndex.TryGetValue((lo, hi), out var e)) continue;
-                halves.Add((lo, v0 + f0 + e));
-                halves.Add((hi, v0 + f0 + e));
-            }
-            outShade = MeshShade.Of(shade.Mode, halves);
-        }
-
-        // UVs are linear in their own face (T-53): child k of a mapped face is [u_k, (u_k + u_k+1) / 2, mean, (u_k-1 + u_k) / 2],
-        // worked in double and rounded once; an unmapped face's children are unmapped. A seam goes to both halves of its edge,
-        // as a hard mark does, but never makes an edge sharp, so positions do not depend on UVs.
-        MeshUvs? outUvs = null;
-        if (input.Uvs is { } uvs)
-        {
-            var mapped = new List<KeyValuePair<int, IReadOnlyList<Vector2>?>>();
-            foreach (var (f, added) in children)
-            {
-                if (uvs.Of(f) is not { } u) continue;
-                var n = u.Count;
-                double mx = 0, my = 0;
-                foreach (var c in u) { mx += c.X; my += c.Y; }
-                var mean = new Vector2((float)(mx / n), (float)(my / n));
-                Vector2 Mid(Vector2 a, Vector2 b) => new((float)(((double)a.X + b.X) / 2), (float)(((double)a.Y + b.Y) / 2));
-                for (var k = 0; k < n; k++)
-                {
-                    Vector2[] child = [u[k], Mid(u[k], u[(k + 1) % n]), mean, Mid(u[(k + n - 1) % n], u[k])];
-                    mapped.Add(KeyValuePair.Create(k == 0 ? f : added[k - 1], (IReadOnlyList<Vector2>?)child));
-                }
-            }
-            var seams = new List<(int, int)>();
-            foreach (var (lo, hi) in uvs.Seams)
-            {
-                if (!edgeIndex.TryGetValue((lo, hi), out var e)) continue;
-                seams.Add((lo, v0 + f0 + e));
-                seams.Add((hi, v0 + f0 + e));
-            }
-            outUvs = MeshUvs.None.WithFaces(mapped).WithSeams(seams, true);
-        }
-
-        VertexWeights? weights = null;
-        if (input.Weights is { } w)
-        {
-            var blended = new List<KeyValuePair<int, Influence[]>>();
-            for (var i = 0; i < stencils.Length; i++)
-            {
-                // An old vertex that had no weights stays unweighted, so skinned export still names it (the person, 2026-11-10).
-                if (i < v0 && !w.Has(i)) continue;
-                if (stencils[i].Blend(w) is { } influences) blended.Add(KeyValuePair.Create(i, influences));
-            }
-            weights = VertexWeights.Of(blended);
-        }
-
-        return new Level(positions, [.. outFaces, .. appended], style, weights, outShade, outUvs);
-    }
-
-    /// <summary>A weighted sum of vertices, kept in the order its terms were first added so its sums are repeatable.</summary>
-    internal sealed class Stencil
-    {
-        private readonly List<int> _order = [];
-        private readonly Dictionary<int, double> _terms = [];
-
-        public void Add(int vertex, double weight)
-        {
-            if (_terms.TryGetValue(vertex, out var had)) _terms[vertex] = had + weight;
-            else
-            {
-                _order.Add(vertex);
-                _terms[vertex] = weight;
+                var next = new Stencil(2, sumsFromFirst: true);
+                next.Add(k, 1);
+                next.Add((k + 1) % n, 1);
+                var previous = new Stencil(2, sumsFromFirst: true);
+                previous.Add((k + n - 1) % n, 1);
+                previous.Add(k, 1);
+                provenance.Face(k == 0 ? f : added[k - 1],
+                    new FaceOrigin(f, CornerOriginKind.Stencils) { CornerStencils = [Stencil.Of(k), next, mean, previous] });
             }
         }
 
-        public void Add(Stencil other, double scale)
-        {
-            foreach (var v in other._order) Add(v, other._terms[v] * scale);
-        }
-
-        public Vector3 Apply(Vector3[] verts)
-        {
-            if (_order.Count == 1) return verts[_order[0]];
-            double x = 0, y = 0, z = 0;
-            foreach (var v in _order)
-            {
-                var c = _terms[v];
-                x += c * verts[v].X; y += c * verts[v].Y; z += c * verts[v].Z;
-            }
-            return new Vector3((float)x, (float)y, (float)z);
-        }
-
-        /// <summary>
-        /// This stencil over the UVs <paramref name="uv"/> gives, summed in double and rounded once (T-53); null when a term's
-        /// vertex has none. A stencil of one term gives that UV exactly.
-        /// </summary>
-        public Vector2? Apply(Func<int, Vector2?> uv)
-        {
-            double x = 0, y = 0;
-            foreach (var v in _order)
-            {
-                if (uv(v) is not { } at) return null;
-                if (_order.Count == 1) return at;
-                var c = _terms[v];
-                x += c * at.X; y += c * at.Y;
-            }
-            return new Vector2((float)x, (float)y);
-        }
-
-        /// <summary>
-        /// The bone weights this stencil blends from <paramref name="weights"/>, capped at four and normalised; an unweighted
-        /// vertex adds nothing, a bone whose blend is not above 0 is dropped, and null when nothing is left.
-        /// </summary>
-        public Influence[]? Blend(VertexWeights weights)
-        {
-            var raw = new SortedDictionary<int, double>();
-            foreach (var v in _order)
-                foreach (var influence in weights.Of(v))
-                    raw[influence.Bone] = raw.GetValueOrDefault(influence.Bone) + _terms[v] * influence.Weight;
-            var positive = raw.Where(p => p.Value > 0).ToDictionary(p => p.Key, p => p.Value);
-            return positive.Count == 0 ? null : VertexWeights.Normalise(positive, out _);
-        }
+        int[][] all = [.. outFaces, .. appended];
+        var edited = PolygonMesh.Assemble(positions, all.Select(f => f.Length == 0 ? Face.Deleted : (Face)f).ToArray());
+        return new Level(positions, all, LayerRegistry.Standard.Carry(input.Mesh, edited, provenance));
     }
 }

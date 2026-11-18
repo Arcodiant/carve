@@ -48,7 +48,8 @@ public static class Bridge
         var partner = Enumerable.Range(0, n).Select(i => second[Mod(pairing.Rotation + pairing.Direction * i, n)]).ToArray();
 
         var quads = new List<Face>();
-        var styledFrom = new List<(int Face, IReadOnlyList<int> Added)>();
+        // Each quad takes the colour and groups of the face on its first-loop edge, and starts unmapped (T-71).
+        var provenance = new EditProvenance();
         var firstRuns = OpenUse(mesh, first[0], first[1 % n]).Runs;
         for (var i = 0; i < n; i++)
         {
@@ -70,13 +71,13 @@ public static class Bridge
                     $"paired with edges[{Math.Min(a0, a1)}-{Math.Max(a0, a1)}]: the faces on the two edges wind so that no quad between them agrees with both, so the bridge could not close the surface")));
                 continue;
             }
-            styledFrom.Add((aFace, [mesh.Faces.Count + quads.Count]));
+            provenance.Face(mesh.Faces.Count + quads.Count, new FaceOrigin(aFace, CornerOriginKind.None));
             quads.Add(quad);
         }
         if (errors.Count > 0) return EditResult.Refused(errors);
 
         var result = mesh.Edit(addedFaces: quads);
-        return EditResult.From(mesh, result, Enumerable.Range(mesh.Faces.Count, n).ToArray(), styledFrom);
+        return EditResult.From(mesh, result, [], [], Enumerable.Range(mesh.Faces.Count, n).ToArray(), [], provenance: provenance);
     }
 
     /// <summary>The least-total-length pairing of <paramref name="second"/> to <paramref name="first"/>, in the stated order of trial (see <see cref="Bridge"/>).</summary>
