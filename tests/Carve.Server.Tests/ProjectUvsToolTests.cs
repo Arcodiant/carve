@@ -4,7 +4,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>project_uvs through the real tools (T-55).</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class ProjectUvsToolTests
 {
     private const string Cube =
@@ -21,22 +21,22 @@ public sealed class ProjectUvsToolTests
         return JsonDocument.Parse(TextOf(result)).RootElement;
     }
 
-    private static async Task<CarveProcess> StartAsync(string mesh = Cube)
+    private static async Task<ToolHarness> StartAsync(string mesh = Cube)
     {
-        var carve = new CarveProcess([]);
+        var carve = new ToolHarness();
         await carve.InitializeAsync();
         Ok(await carve.CallToolAsync("define_mesh", mesh));
         return carve;
     }
 
-    private static async Task<string> Refused(CarveProcess carve, string arguments)
+    private static async Task<string> Refused(ToolHarness carve, string arguments)
     {
         var result = await carve.CallToolAsync("project_uvs", arguments);
         Assert.True(IsError(result), TextOf(result));
         return TextOf(result);
     }
 
-    private static async Task<JsonElement> Mesh(CarveProcess carve) => Ok(await carve.CallToolAsync("get_mesh", "{}"));
+    private static async Task<JsonElement> Mesh(ToolHarness carve) => Ok(await carve.CallToolAsync("get_mesh", "{}"));
 
     private static float[] Floats(JsonElement list) => [.. list.EnumerateArray().Select(x => x.GetSingle())];
 
@@ -139,7 +139,7 @@ public sealed class ProjectUvsToolTests
         using var carve = await StartAsync();
         Ok(await carve.CallToolAsync("delete", """{"faces":[5]}"""));
         Assert.Contains("faces[5]: face 5 is deleted", await Refused(carve, """{"method":"box","faces":[5]}"""));
-        using var bare = new CarveProcess([]);
+        using var bare = new ToolHarness();
         await bare.InitializeAsync();
         Assert.Contains("define_mesh", await Refused(bare, """{"method":"box"}"""));
     }

@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Carve.Server.Tests;
 
 /// <summary>A face with a hole through the real server: define_mesh's object form, get_mesh and export (T-63).</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class HoledFaceToolTests() : FileToolTests("carve-holes")
 {
     private const string HoleMarker = "Worked example (a face with a hole):";

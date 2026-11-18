@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Carve.Server.Tests;
 
 /// <summary>T-51: export warns on the limits of the game it writes into, read from that game's carve-limits.json.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class ExportLimitsToolTests() : FileToolTests("carve-export-limits")
 {
     private string Content => Path.Combine(Root, "game", "Content");

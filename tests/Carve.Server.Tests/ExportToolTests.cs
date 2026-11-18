@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Carve.Server.Tests;
 
 /// <summary>export through the real server, in a temp working directory.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class ExportToolTests() : FileToolTests("carve-export")
 {
     /// <summary>export's result: not an error, and one line.</summary>

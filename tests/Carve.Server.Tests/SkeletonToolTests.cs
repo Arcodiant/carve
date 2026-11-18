@@ -3,20 +3,20 @@ using static Carve.Server.Tests.CarveProcess;
 
 namespace Carve.Server.Tests;
 
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public class SkeletonToolTests
 {
     private const string Three =
         """{"bones":[{"name":"hips","parent":null,"position":[0,1,0],"rotation":[0,0,0,1]},{"name":"spine","parent":"hips","position":[0,0.3,0],"rotation":[0,0,0,1]},{"name":"head","parent":"spine","position":[0,0.4,0],"rotation":[0,0,0,1]}]}""";
 
-    private static async Task<CarveProcess> StartAsync()
+    private static async Task<ToolHarness> StartAsync()
     {
-        var carve = new CarveProcess([]);
+        var carve = new ToolHarness();
         await carve.InitializeAsync();
         return carve;
     }
 
-    private static async Task<string> DescriptionAsync(CarveProcess carve, string tool) =>
+    private static async Task<string> DescriptionAsync(ToolHarness carve, string tool) =>
         (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == tool).GetProperty("description").GetString()!;
 
     [Fact]

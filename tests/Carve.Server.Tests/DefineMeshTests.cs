@@ -2,20 +2,20 @@ using System.Text.Json;
 
 namespace Carve.Server.Tests;
 
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public class DefineMeshTests
 {
     private const string Marker = "Worked example (a unit cube): ";
 
-    private static Task<JsonElement> CallAsync(CarveProcess carve, string arguments) =>
+    private static Task<JsonElement> CallAsync(ToolHarness carve, string arguments) =>
         carve.CallToolAsync("define_mesh", arguments);
 
-    private static async Task<JsonElement> ToolAsync(CarveProcess carve) =>
+    private static async Task<JsonElement> ToolAsync(ToolHarness carve) =>
         (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "define_mesh");
 
-    private static async Task<(CarveProcess, string Cube)> StartAsync()
+    private static async Task<(ToolHarness, string Cube)> StartAsync()
     {
-        var carve = new CarveProcess([]);
+        var carve = new ToolHarness();
         await carve.InitializeAsync();
         var description = (await ToolAsync(carve)).GetProperty("description").GetString()!;
         return (carve, description[(description.IndexOf(Marker, StringComparison.Ordinal) + Marker.Length)..]);
@@ -46,28 +46,6 @@ public class DefineMeshTests
 
         Assert.True(IsError(result));
         Assert.Contains("vertices[1]", TextOf(result));
-    }
-
-    [Fact]
-    public async Task A_failed_call_keeps_the_previous_mesh_and_an_open_quad_succeeds_with_a_warning()
-    {
-        var (carve, cube) = await StartAsync();
-        using var _ = carve;
-
-        await CallAsync(carve, cube);
-        var failed = await CallAsync(carve, """{"vertices":[[0,0,0]],"faces":[[0,1,2]]}""");
-        Assert.True(IsError(failed));
-        Assert.Contains("unchanged", TextOf(failed));
-
-        // The mesh itself, seen through the render caption: still the cube.
-        var render = await carve.CallToolAsync("render", "{}");
-        Assert.Equal("512x512, view front, 8 vertices, 6 faces", TextOf(render, 1));
-
-        var quad = await CallAsync(carve, """{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0]],"faces":[[0,1,2,3]]}""");
-        Assert.False(IsError(quad), TextOf(quad));
-        var body = JsonDocument.Parse(TextOf(quad)).RootElement;
-        Assert.False(body.GetProperty("closed").GetBoolean());
-        Assert.NotEqual(0, body.GetProperty("warnings").GetArrayLength());
     }
 
     private const string Tri = """[[0,0,0],[1,0,0],[0,1,0]]""";
@@ -164,5 +142,46 @@ public class DefineMeshTests
         var result = await CallAsync(carve, $$"""{"vertices":{{Tri}},"faces":[[0,1.0,2]]}""");
 
         Assert.False(IsError(result), TextOf(result));
+    }
+}
+
+/// <summary>define_mesh's one check that reads the mesh back through a render caption: it needs the engine, so the real process.</summary>
+[Trait("Tier", "regression")]
+public class DefineMeshRenderTests
+{
+    private const string Marker = "Worked example (a unit cube): ";
+
+    private static Task<JsonElement> CallAsync(CarveProcess carve, string arguments) =>
+        carve.CallToolAsync("define_mesh", arguments);
+
+    private static async Task<(CarveProcess, string Cube)> StartAsync()
+    {
+        var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        var tool = (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "define_mesh");
+        var description = tool.GetProperty("description").GetString()!;
+        return (carve, description[(description.IndexOf(Marker, StringComparison.Ordinal) + Marker.Length)..]);
+    }
+
+    [Fact]
+    public async Task A_failed_call_keeps_the_previous_mesh_and_an_open_quad_succeeds_with_a_warning()
+    {
+        var (carve, cube) = await StartAsync();
+        using var _ = carve;
+
+        await CallAsync(carve, cube);
+        var failed = await CallAsync(carve, """{"vertices":[[0,0,0]],"faces":[[0,1,2]]}""");
+        Assert.True(IsError(failed));
+        Assert.Contains("unchanged", TextOf(failed));
+
+        // The mesh itself, seen through the render caption: still the cube.
+        var render = await carve.CallToolAsync("render", "{}");
+        Assert.Equal("512x512, view front, 8 vertices, 6 faces", TextOf(render, 1));
+
+        var quad = await CallAsync(carve, """{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0]],"faces":[[0,1,2,3]]}""");
+        Assert.False(IsError(quad), TextOf(quad));
+        var body = JsonDocument.Parse(TextOf(quad)).RootElement;
+        Assert.False(body.GetProperty("closed").GetBoolean());
+        Assert.NotEqual(0, body.GetProperty("warnings").GetArrayLength());
     }
 }

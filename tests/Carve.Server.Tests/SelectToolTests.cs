@@ -4,30 +4,30 @@ using System.Text.RegularExpressions;
 namespace Carve.Server.Tests;
 
 /// <summary>select through the real server: its worked examples, its errors, and a selection feeding the edit tools.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public class SelectToolTests
 {
     private const string Example = "Example: ";
 
     private const string Result = "Result: ";
 
-    private static async Task<(CarveProcess Carve, JsonElement Tools)> StartAsync(bool define = true)
+    private static async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(bool define = true)
     {
-        var carve = new CarveProcess([]);
+        var carve = new ToolHarness();
         await carve.InitializeAsync();
         var tools = await carve.ListToolsAsync();
         if (define) await OkAsync(carve, "define_mesh", ToolList.Cube(tools));
         return (carve, tools);
     }
 
-    private static async Task<string> OkAsync(CarveProcess carve, string tool, string arguments)
+    private static async Task<string> OkAsync(ToolHarness carve, string tool, string arguments)
     {
         var result = await carve.CallToolAsync(tool, arguments);
         Assert.False(CarveProcess.IsError(result), CarveProcess.TextOf(result));
         return CarveProcess.TextOf(result);
     }
 
-    private static async Task<string> RefusedAsync(CarveProcess carve, string arguments)
+    private static async Task<string> RefusedAsync(ToolHarness carve, string arguments)
     {
         var result = await carve.CallToolAsync("select", arguments);
         Assert.True(CarveProcess.IsError(result), CarveProcess.TextOf(result));

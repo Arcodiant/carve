@@ -5,7 +5,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>T-64: <c>delete</c> and <c>get_mesh</c> through the client, and a topless cube exported and read back through the engine's loader.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class DeleteToolTests() : TempFolderTests("carve-delete")
 {
     private static JsonElement Ok(JsonElement result)
@@ -22,9 +22,9 @@ public sealed class DeleteToolTests() : TempFolderTests("carve-delete")
 
     private static int[] Ints(JsonElement e) => e.EnumerateArray().Select(x => x.GetInt32()).ToArray();
 
-    private async Task<(CarveProcess Carve, JsonElement Tools)> StartAsync()
+    private async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync()
     {
-        var carve = new CarveProcess([], workingDirectory: Root);
+        var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         var tools = await carve.ListToolsAsync();
         Ok(await carve.CallToolAsync("define_mesh", ToolList.Cube(tools)));

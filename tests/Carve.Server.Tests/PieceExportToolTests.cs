@@ -5,7 +5,7 @@ using static Carve.Server.Tests.SkinnedExportToolTests;
 namespace Carve.Server.Tests;
 
 /// <summary><c>export</c> with <c>mode: piece</c> through the real <c>carve</c>: the file, the result line and each refusal writing nothing.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class PieceExportToolTests() : TempFolderTests("carve-piece")
 {
     [Fact]
@@ -47,7 +47,7 @@ public sealed class PieceExportToolTests() : TempFolderTests("carve-piece")
     [Fact]
     public async Task A_piece_of_a_model_with_no_skeleton_is_refused()
     {
-        using var carve = new CarveProcess([], workingDirectory: Root);
+        using var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         Ok(await carve.CallToolAsync("define_mesh", Cube("lower", 0.2f)));
         var refused = await carve.CallToolAsync("export", """{"path":"p.glb","mode":"piece","meshes":["lower"]}""");

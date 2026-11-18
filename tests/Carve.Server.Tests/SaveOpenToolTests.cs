@@ -7,7 +7,7 @@ using Carve.Core.Tests;
 namespace Carve.Server.Tests;
 
 /// <summary>save and open through the real server, in a temp working directory.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
 {
     /// <summary>define_mesh's arguments for a mesh, every coordinate in the shortest text that reads back to the same float.</summary>
@@ -19,7 +19,7 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
         return $$"""{"vertices":[{{vertices}}],"faces":[{{faces}}]}""";
     }
 
-    private static async Task ExtrudeAndRaise(CarveProcess carve)
+    private static async Task ExtrudeAndRaise(ToolHarness carve)
     {
         Ok(await carve.CallToolAsync("extrude", """{"faces":[1],"distance":-0.2}"""));
         Ok(await carve.CallToolAsync("move", """{"faces":[3],"by":[0,0.5,0]}"""));
@@ -213,7 +213,7 @@ public sealed class SaveOpenToolTests() : FileToolTests("carve-saveopen")
     }
 
     /// <summary>The mesh is as it was, and undo steps back over the move before it: no step was added.</summary>
-    private static async Task NothingChanged(CarveProcess carve, string mesh)
+    private static async Task NothingChanged(ToolHarness carve, string mesh)
     {
         Assert.Equal(mesh, TextOf(await carve.CallToolAsync("get_mesh", "{}")));
         Assert.Contains("\"undone\":\"move\"", TextOf(await carve.CallToolAsync("undo", "{}")));

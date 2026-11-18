@@ -4,7 +4,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>T-67: <c>knife</c> through the client on <c>define_mesh</c>'s cube, its worked examples, the off-surface error, then <c>check</c>.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class KnifeToolTests() : TempFolderTests("carve-knife")
 {
     private static JsonElement Ok(JsonElement result)
@@ -18,7 +18,7 @@ public sealed class KnifeToolTests() : TempFolderTests("carve-knife")
     [Fact]
     public async Task An_off_surface_point_is_refused_with_its_distance_and_the_nearest_surface_point()
     {
-        using var carve = new CarveProcess([], workingDirectory: Root);
+        using var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         var tools = await carve.ListToolsAsync();
         Ok(await carve.CallToolAsync("define_mesh", ToolList.Cube(tools)));

@@ -3,12 +3,12 @@ using System.Text.Json;
 namespace Carve.Server.Tests;
 
 /// <summary>move, extrude, get_mesh and undo through the real server.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public class EditToolTests
 {
-    private static async Task<(CarveProcess Carve, JsonElement Tools)> StartAsync(bool define = true)
+    private static async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(bool define = true)
     {
-        var carve = new CarveProcess([]);
+        var carve = new ToolHarness();
         await carve.InitializeAsync();
         var tools = await carve.ListToolsAsync();
         if (define) Ok(await carve.CallToolAsync("define_mesh", Cube(tools)));
@@ -33,7 +33,7 @@ public class EditToolTests
         Assert.Equal(0, body.GetProperty("warnings").GetArrayLength());
     }
 
-    private static async Task<string> MeshAsync(CarveProcess carve) => CarveProcess.TextOf(await carve.CallToolAsync("get_mesh", "{}"));
+    private static async Task<string> MeshAsync(ToolHarness carve) => CarveProcess.TextOf(await carve.CallToolAsync("get_mesh", "{}"));
 
     [Fact]
     public async Task Extrude_returns_what_it_created_cap_walls_and_ring()
@@ -229,11 +229,11 @@ public class EditToolTests
 
     // ---- the crate, T-10's 12-call sequence, through the client ----
 
-    private static async Task<JsonElement> CallAsync(CarveProcess carve, string tool, string arguments) =>
+    private static async Task<JsonElement> CallAsync(ToolHarness carve, string tool, string arguments) =>
         Ok(await carve.CallToolAsync(tool, arguments));
 
     /// <summary>The face's highest and lowest edges in Y, as vertex pairs, read from get_mesh.</summary>
-    private static async Task<((int A, int B) Top, (int A, int B) Bottom)> TopAndBottomAsync(CarveProcess carve, int face)
+    private static async Task<((int A, int B) Top, (int A, int B) Bottom)> TopAndBottomAsync(ToolHarness carve, int face)
     {
         var mesh = JsonDocument.Parse(await MeshAsync(carve)).RootElement;
         var y = mesh.GetProperty("vertices").EnumerateArray().Select(v => v.GetProperty("at")[1].GetSingle()).ToArray();

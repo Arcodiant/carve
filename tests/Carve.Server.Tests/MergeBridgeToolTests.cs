@@ -4,7 +4,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>T-68: <c>merge_faces</c> and <c>bridge</c> through the client, each worked example then <c>check</c>, and one undo step each.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class MergeBridgeToolTests() : TempFolderTests("carve-merge-bridge")
 {
     private const string DefineMarker = "define_mesh input: ";
@@ -26,16 +26,16 @@ public sealed class MergeBridgeToolTests() : TempFolderTests("carve-merge-bridge
     private static string Input(JsonElement tools, string name) =>
         ToolList.Description(tools, name).Split('\n').Single(l => l.StartsWith(DefineMarker, StringComparison.Ordinal))[DefineMarker.Length..];
 
-    private async Task<(CarveProcess Carve, JsonElement Tools)> StartAsync(string tool)
+    private async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(string tool)
     {
-        var carve = new CarveProcess([], workingDirectory: Root);
+        var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         var tools = await carve.ListToolsAsync();
         Ok(await carve.CallToolAsync("define_mesh", Input(tools, tool)));
         return (carve, tools);
     }
 
-    private static async Task CheckedClean(CarveProcess carve, bool closed, params string[] problems)
+    private static async Task CheckedClean(ToolHarness carve, bool closed, params string[] problems)
     {
         var check = Ok(await carve.CallToolAsync("check", "{}"));
         Assert.Equal(problems, check.GetProperty("problems").EnumerateArray()

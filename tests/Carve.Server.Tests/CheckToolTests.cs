@@ -4,12 +4,12 @@ using Carve.Core.Tests;
 namespace Carve.Server.Tests;
 
 /// <summary>check through the real server.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public class CheckToolTests
 {
-    private static async Task<(CarveProcess Carve, JsonElement Tools)> StartAsync()
+    private static async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync()
     {
-        var carve = new CarveProcess([]);
+        var carve = new ToolHarness();
         await carve.InitializeAsync();
         return (carve, await carve.ListToolsAsync());
     }

@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Carve.Server.Tests;
 
 /// <summary>define_material, set_material and their read-back through the real server (T-75).</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public class MaterialToolTests : FileToolTests
 {
     public MaterialToolTests() : base("material")

@@ -6,7 +6,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>T-38: <c>get_weights</c> reads back what <c>weigh</c> and <c>set_weights</c> left, and warns of the gaps.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class GetWeightsToolTests
 {
     private static readonly string Cube = JsonSerializer.Serialize(new
@@ -21,9 +21,9 @@ public sealed class GetWeightsToolTests
 
     private static void Ok(JsonElement r) => Assert.False(IsError(r), TextOf(r));
 
-    private static async Task<CarveProcess> StartAsync()
+    private static async Task<ToolHarness> StartAsync()
     {
-        var carve = new CarveProcess([]);
+        var carve = new ToolHarness();
         await carve.InitializeAsync();
         Ok(await carve.CallToolAsync("define_mesh", Cube));
         Ok(await carve.CallToolAsync("define_skeleton", Chain));
@@ -169,7 +169,7 @@ public sealed class GetWeightsToolTests
     [Fact]
     public async Task Weigh_with_no_skeleton_or_an_empty_bones_list_is_a_tool_error_and_no_undo_step()
     {
-        using var bare = new CarveProcess([]);
+        using var bare = new ToolHarness();
         await bare.InitializeAsync();
         Ok(await bare.CallToolAsync("define_mesh", Cube));
         var noSkeleton = await bare.CallToolAsync("weigh", "{}");
@@ -187,7 +187,7 @@ public sealed class GetWeightsToolTests
     [Fact]
     public async Task Without_a_skeleton_or_a_mesh_it_is_a_tool_error()
     {
-        using var carve = new CarveProcess([]);
+        using var carve = new ToolHarness();
         await carve.InitializeAsync();
         Assert.Contains("no mesh", TextOf(await carve.CallToolAsync("get_weights", "{}")));
         Ok(await carve.CallToolAsync("define_mesh", Cube));

@@ -5,7 +5,7 @@ using static Carve.Server.Tests.ToolList;
 namespace Carve.Server.Tests;
 
 /// <summary>subdivide through the real server: its example, counts, the budget warning, undo in one step, and the gardener's path.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
 {
     private static JsonElement Ok(JsonElement result)
@@ -16,9 +16,9 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
 
     private static void Accepted(JsonElement result) => Assert.False(IsError(result), TextOf(result));
 
-    private async Task<(CarveProcess Carve, JsonElement Tools)> StartAsync()
+    private async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync()
     {
-        var carve = new CarveProcess([], workingDirectory: Root);
+        var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         var tools = await carve.ListToolsAsync();
         return (carve, tools);

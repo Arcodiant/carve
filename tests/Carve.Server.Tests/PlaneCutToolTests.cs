@@ -4,7 +4,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>T-65: <c>plane_cut</c> through the client on <c>define_mesh</c>'s cube, its <c>split</c> and <c>deleted</c>, then <c>check</c>.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class PlaneCutToolTests() : TempFolderTests("carve-plane-cut")
 {
     private static JsonElement Ok(JsonElement result)
@@ -18,7 +18,7 @@ public sealed class PlaneCutToolTests() : TempFolderTests("carve-plane-cut")
     [Fact]
     public async Task Keep_both_splits_an_open_mesh_warns_and_bad_input_is_refused()
     {
-        using var carve = new CarveProcess([], workingDirectory: Root);
+        using var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         var tools = await carve.ListToolsAsync();
         Ok(await carve.CallToolAsync("define_mesh", ToolList.Cube(tools)));

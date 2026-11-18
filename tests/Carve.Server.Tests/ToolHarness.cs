@@ -22,7 +22,7 @@ namespace Carve.Server.Tests;
 /// for <c>new CarveProcess([], workingDirectory: Root)</c>, with <see cref="InitializeAsync"/>,
 /// <see cref="ListToolsAsync"/> and <see cref="CallToolAsync"/> giving the same JSON as the process's.
 /// </summary>
-internal sealed class ToolHarness : IDisposable, IAsyncDisposable
+internal sealed class ToolHarness : IToolCaller, IDisposable, IAsyncDisposable
 {
     /// <summary>What render says on the harness.</summary>
     public const string NoEngine = "render: no engine in the unit harness; a render needs carve itself (a regression test on CarveProcess).";

@@ -7,7 +7,7 @@ namespace Carve.Server.Tests;
 /// The not-planar fold (the person's rule, 2026-11-13, "name 10, fold the rest") in each tool's result through the real
 /// server: define_mesh, get_mesh, check, move, open and export on a row of lifted quads, and the leaky shed left as it was.
 /// </summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class NotPlanarFoldToolTests() : FileToolTests("carve-fold")
 {
     private const string Fold = "select faces where non_planar names them";

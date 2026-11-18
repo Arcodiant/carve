@@ -7,7 +7,7 @@ namespace Carve.Server.Tests;
 /// RV-24 B2/D5, the person's ruling of 2026-11-09: a skeleton and clips with no mesh, a clip library, exports in clips
 /// mode, saves as version 2 with "meshes": [] and opens again; model mode, and a save of nothing at all, still need more.
 /// </summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class ClipLibraryToolTests() : TempFolderTests("carve-clip-library")
 {
     private const string Hips = """{"bones":[{"name":"Hips","parent":null,"position":[0,1,0],"rotation":[0,0,0,1]}]}""";
@@ -15,9 +15,9 @@ public sealed class ClipLibraryToolTests() : TempFolderTests("carve-clip-library
 
     private static void Ok(JsonElement result) => Assert.False(IsError(result), TextOf(result));
 
-    private async Task<CarveProcess> StartAsync()
+    private async Task<ToolHarness> StartAsync()
     {
-        var carve = new CarveProcess([], workingDirectory: Root);
+        var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         return carve;
     }

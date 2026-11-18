@@ -4,7 +4,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>T-66: <c>loop_cut</c> through the client on <c>define_mesh</c>'s cube, its <c>split</c>, then <c>check</c> and <c>undo</c>.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class LoopCutToolTests() : TempFolderTests("carve-loop-cut")
 {
     private static JsonElement Ok(JsonElement result)
@@ -18,7 +18,7 @@ public sealed class LoopCutToolTests() : TempFolderTests("carve-loop-cut")
     [Fact]
     public async Task Two_fractions_from_the_other_end_and_bad_input_is_refused_leaving_the_mesh_alone()
     {
-        using var carve = new CarveProcess([], workingDirectory: Root);
+        using var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         var tools = await carve.ListToolsAsync();
         Ok(await carve.CallToolAsync("define_mesh", ToolList.Cube(tools)));

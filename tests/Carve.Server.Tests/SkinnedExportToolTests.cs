@@ -8,7 +8,7 @@ namespace Carve.Server.Tests;
 /// <c>export</c> of a model with a skeleton through the real <c>carve</c>: unweighted vertices refused with the file
 /// untouched, <c>allow_unweighted</c>, the result line, and the same bytes from two <c>carve</c> processes.
 /// </summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
 {
     internal static string Cube(string name, float y) =>
@@ -29,9 +29,9 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
     internal static void Ok(JsonElement result) => Assert.False(IsError(result), TextOf(result));
 
     /// <summary>Two boxes on a two-bone chain; the upper box weighted only when <paramref name="weighUpper"/>; two clips.</summary>
-    internal static async Task<CarveProcess> StartChainAsync(string folder, bool weighUpper = true)
+    internal static async Task<ToolHarness> StartChainAsync(string folder, bool weighUpper = true)
     {
-        var carve = new CarveProcess([], workingDirectory: folder);
+        var carve = new ToolHarness(workingDirectory: folder);
         await carve.InitializeAsync();
         Ok(await carve.CallToolAsync("define_mesh", Cube("lower", 0.2f)));
         Ok(await carve.CallToolAsync("define_mesh", Cube("upper", 1.2f)));
@@ -120,7 +120,7 @@ public sealed class SkinnedExportToolTests() : TempFolderTests("carve-skinned")
     [Fact]
     public async Task Clips_mode_refuses_a_model_with_no_skeleton()
     {
-        using var carve = new CarveProcess([], workingDirectory: Root);
+        using var carve = new ToolHarness(workingDirectory: Root);
         await carve.InitializeAsync();
         Ok(await carve.CallToolAsync("define_mesh", Cube("lower", 0.2f)));
         var refused = await carve.CallToolAsync("export", """{"path":"clips.glb","mode":"clips"}""");

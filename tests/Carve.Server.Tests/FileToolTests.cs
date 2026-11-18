@@ -45,7 +45,17 @@ public abstract class TempFolderTests : IDisposable
 public abstract class FileToolTests(string prefix) : TempFolderTests(prefix)
 {
     /// <summary>Starts carve and defines <paramref name="mesh"/>: the example cube by default, nothing when null.</summary>
-    private protected async Task<(CarveProcess Carve, JsonElement Tools)> StartAsync(string? mesh = "cube")
+    private protected async Task<(ToolHarness Carve, JsonElement Tools)> StartAsync(string? mesh = "cube")
+    {
+        var carve = new ToolHarness(workingDirectory: Root);
+        await carve.InitializeAsync();
+        var tools = await carve.ListToolsAsync();
+        if (mesh is not null) Assert.False(IsError(await carve.CallToolAsync("define_mesh", mesh == "cube" ? Cube(tools) : mesh)));
+        return (carve, tools);
+    }
+
+    /// <summary>As <see cref="StartAsync"/> but through the real process, for a regression test that renders or needs the process.</summary>
+    private protected async Task<(CarveProcess Carve, JsonElement Tools)> StartProcessAsync(string? mesh = "cube")
     {
         var carve = new CarveProcess([], workingDirectory: Root);
         await carve.InitializeAsync();

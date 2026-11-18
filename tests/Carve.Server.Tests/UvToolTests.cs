@@ -4,7 +4,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>set_uvs, mark_edges with seam, and get_mesh's uvs and seams, through the real tools (T-54).</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class UvToolTests() : TempFolderTests("carve-uvs")
 {
     private const string Cube =
@@ -19,15 +19,15 @@ public sealed class UvToolTests() : TempFolderTests("carve-uvs")
         return JsonDocument.Parse(TextOf(result)).RootElement;
     }
 
-    private static async Task<CarveProcess> StartAsync(string mesh = Cube, string? root = null)
+    private static async Task<ToolHarness> StartAsync(string mesh = Cube, string? root = null)
     {
-        var carve = new CarveProcess([], workingDirectory: root);
+        var carve = new ToolHarness(workingDirectory: root);
         await carve.InitializeAsync();
         Ok(await carve.CallToolAsync("define_mesh", mesh));
         return carve;
     }
 
-    private static async Task<string> Refused(CarveProcess carve, string tool, string arguments)
+    private static async Task<string> Refused(ToolHarness carve, string tool, string arguments)
     {
         var result = await carve.CallToolAsync(tool, arguments);
         Assert.True(IsError(result), TextOf(result));

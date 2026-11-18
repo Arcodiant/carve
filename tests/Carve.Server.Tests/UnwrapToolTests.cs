@@ -5,7 +5,7 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>unwrap through the real carve (T-56): the barrel's worked example, the refusals, undo and the schema.</summary>
-[Trait("Tier", "regression")]
+[Trait("Tier", "unit")]
 public sealed class UnwrapToolTests
 {
     private static string BarrelArguments()
@@ -22,16 +22,16 @@ public sealed class UnwrapToolTests
         return JsonDocument.Parse(TextOf(result)).RootElement;
     }
 
-    private static async Task<CarveProcess> StartAsync(bool seams = true)
+    private static async Task<ToolHarness> StartAsync(bool seams = true)
     {
-        var carve = new CarveProcess([]);
+        var carve = new ToolHarness();
         await carve.InitializeAsync();
         Ok(await carve.CallToolAsync("define_mesh", BarrelArguments()));
         if (seams) Ok(await carve.CallToolAsync("mark_edges", Seams));
         return carve;
     }
 
-    private static async Task<string> RefusedUnchanged(CarveProcess carve, string arguments)
+    private static async Task<string> RefusedUnchanged(ToolHarness carve, string arguments)
     {
         var before = TextOf(await carve.CallToolAsync("get_mesh", "{}"));
         var result = await carve.CallToolAsync("unwrap", arguments);
