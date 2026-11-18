@@ -189,7 +189,7 @@ Diff: `git diff origin/main...HEAD -- tests/Carve.Server.Tests` (the merge base 
 
 **Outcome:** fixed
 
-**Fix:** `ToolFamiliesThroughProcessTests` gives the edit, cut, bridge and select families valid arguments (`extrude` `distance`, `select` `kind`/`where`, a bridge between two equal loops, `merge_faces` on connected faces) and asserts `IsError` equals the expected value on both sides beside the JSON equality. Two refusal cases stay, marked `Refused: true`.
+**Fix:** in round 1, `ToolFamiliesThroughProcessTests` gave the edit, bridge and select families valid arguments (`extrude` `distance`, `select` `kind`/`where`, a bridge between two equal loops) and marked two refusal cases `Refused: true`. It did not assert `IsError`: the `Refused` flag was read and never used, and `merge_faces {"faces":[7,1]}`, `define_clip` (a clip on a bone the skeleton lacks), `set_weights` (neither vertices nor group) and both `export` calls were still refused on both sides. Round 2 (RV-60) completed it: the test now asserts `IsError` equals `Refused` on both sides for every call, and those calls succeed (see RV-60's first finding).
 
 ### Written files are compared one way only
 

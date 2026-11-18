@@ -73,7 +73,7 @@ assertions, on the same inputs.
 
   | | Before | After |
   |---|---|---|
-  | `server-regression` cases | 524 at planning (603 counted by T-89 after M-19) | 228 |
+  | `server-regression` cases | 524 at planning (603 counted by T-89 after M-19) | 223 (first recorded as 228, a count from before T-89's rebase onto T-88; RV-60) |
   | `server-regression` per run | about 7 min (J-20261114-054304) | 338 s in T-90's measurement; 368–493 s in later runs on a loaded runner |
   | `server-regression` `est-seconds` | 260 | 338 |
   | `server-unit` cases | 370 | about 751 |

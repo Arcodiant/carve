@@ -41,7 +41,13 @@ description: >-
 - **Consequence:** the success paths of `merge_faces`, `define_clip` and `export` never run through the process. No `.glb` is ever written, so the new two-way listing and byte comparison cover only `m.carve`. Export is the family most likely to differ between the process and the harness, because of the working folder and `ToolFolder`. A difference there still passes. The edit, bridge, delete-and-select, shading and uvs calls do succeed.
 - **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `ToolFamiliesThroughProcessTests` now asserts, for every call and on both sides, that `IsError` equals its `Refused` flag, with a message naming the family, the tool, its arguments, which side, what happened and what was expected (e.g. `cut: merge_faces {"faces":[1,7]} succeeded on the harness; it should have refused`). Arguments were taken from each tool's description. Every call not labelled succeeds on both sides:
+  - cut: `loop_cut {"edge":[0,3],"at":[0.5]}` then `merge_faces {"faces":[1,7]}`, `merge_faces`'s own worked example (the two front pieces share the cut edge);
+  - skeleton, weights and clips: `define_clip` with the wave clip keyed on `Head`, a bone `Chain` has;
+  - save, open and export: `set_weights` on all eight vertices (`Hips`), a `define_clip` on `Head`, then a skinned `export {"path":"out/m.glb"}` and a second `export` with `"overwrite":true` (it replaces the file).
+  The two labelled deliberate refusals are the ones that were there: cut's `merge_faces {"faces":[0,1]}` (not connected) and bridge's 4-vs-3 loops. The test also asserts `out/m.glb` is in the harness listing whenever a family exports, and the listings must be equal, so the process must write it too. Checks run here: flipping the succeeding `merge_faces {"faces":[1,7]}` to `Refused: true` failed the test with the message above (reverted); a temporary print of both listings for the export family gave `harness: m.carve, out\m.glb | process: m.carve, out\m.glb` (reverted). No product change was needed. Nothing else in the test was loosened.
 
 ### server-regression is still recorded as 228 tests; it is 223
 
@@ -56,7 +62,9 @@ description: >-
 - **Consequence:** the record gives a regression total five too high, and the before/after sum in T-89 (746 + 228) mixes two trees. No test is lost.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** T-89 (Timings, After the rebase, Not checked), T-90 (Before and after) and the M-20 retrospective table now give server-regression as 223, each saying why: 228 was counted before T-89's rebase onto T-88 moved five more definition tests to unit (two from `NamedMeshTests`, three from `RenderTests`). T-89's sum reads unit 751 + regression 223 = 974, with 746 + 228 named as the pre-rebase pair.
 
 ## Summary
 
