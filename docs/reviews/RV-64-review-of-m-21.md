@@ -34,7 +34,9 @@ description: >-
 - **Consequence:** two of the three modes the description promises could lose or misname the targets with no test failing. The arm, which the person approved, is a skinned export.
 - **Severity:** Minor
 
-**Outcome:** fixed: `ExportTargetsResultTests.A_skinned_export_names_the_targets_and_a_piece_names_only_its_own` exports a two-mesh chain skinned and as two pieces, and asserts the skinned line and the `upper` piece name `Bend`, and the `lower` piece names no morph target (f7b41dc)
+**Outcome:** fixed
+
+**Fix:** `ExportTargetsResultTests.A_skinned_export_names_the_targets_and_a_piece_names_only_its_own` exports a two-mesh chain skinned and as two pieces, and asserts the skinned line and the `upper` piece name `Bend`, and the `lower` piece names no morph target (f7b41dc).
 
 ### T-92 still plans to read versions 1 to 7; the version-8 handoff is only in T-101's As built
 
@@ -43,7 +45,9 @@ description: >-
 - **Consequence:** the next builder of M-9 reads a Scope that contradicts the code on `main`. `samples/arm.carve` re-reading would catch the refusal of 8, but only as rework. The clash between the two versions is unplanned.
 - **Severity:** Minor
 
-**Outcome:** fixed: T-92's Scope reads versions 1 to 6 and 8 as well as 7, writes version 8 for a model with targets, and leaves which version holds parts plus targets as an open question for the person at M-9's planning (2fbdc23)
+**Outcome:** fixed
+
+**Fix:** T-92's Scope reads versions 1 to 6 and 8 as well as 7, writes version 8 for a model with targets, and leaves which version holds parts plus targets as an open question for the person at M-9's planning (2fbdc23).
 
 ### D-6's Intent still lists morph targets as out of scope
 
@@ -52,7 +56,9 @@ description: >-
 - **Consequence:** the doc says two opposite things about morph targets.
 - **Severity:** Nit
 
-**Outcome:** fixed: D-6's Intent no longer lists morph targets as out of scope, saying M-21 planned them, and M-21 is in its list of milestones planned against it (5b403eb)
+**Outcome:** fixed
+
+**Fix:** D-6's Intent no longer lists morph targets as out of scope, saying M-21 planned them, and M-21 is in its list of milestones planned against it (5b403eb).
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -63,7 +69,9 @@ description: >-
 - **Consequence:** Nothing recorded shows the shipped carriage passed `scenario-morph` or `server-regression`. That matters most for `samples/arm.carve`, which must equal what the scenario saves byte for byte, and those bytes now come from `BlendDeltas`. I ran `core-unit` (1129 passed) and `server-unit` (795 passed) at HEAD in a scratch copy, so the unit tiers hold. The GPU suites were not re-run, as far as the record shows.
 - **Severity:** Major
 
-**Outcome:** fixed: M-21's retrospective has "After the person's go (2026-11-18)", recording the rebase onto main and T-71 (f3e5e88), the refactor pass (8653926, efa52d9) and the verifies after each, RV-64 round 1, and a fresh `cairn milestone M-21 verify` at 2fbdc23 (17 ran, 1 carried, `scenario-morph` 19 s and `server-regression` 255 s on Mantorok); "at c5832ab" and "18 suites" now say they are the tree before the rebase, the 1e-6 claim says T-100 measured the removed carriage and its tests pass on `StandardLayers.Targets`, the changes outside members list f3e5e88 and 8653926, and the Rulings line says T-104's record was added for RV-64 (168ad52)
+**Outcome:** fixed
+
+**Fix:** M-21's retrospective has "After the person's go (2026-11-18)", recording the rebase onto main and T-71 (f3e5e88), the refactor pass (8653926, efa52d9) and the verifies after each, RV-64 round 1, and a fresh `cairn milestone M-21 verify` at 2fbdc23 (17 ran, 1 carried, `scenario-morph` 19 s and `server-regression` 255 s on Mantorok); "at c5832ab" and "18 suites" now say they are the tree before the rebase, the 1e-6 claim says T-100 measured the removed carriage and its tests pass on `StandardLayers.Targets`, the changes outside members list f3e5e88 and 8653926, and the Rulings line says T-104's record was added for RV-64 (168ad52).
 
 ### `core-unit`'s inputs miss files its tests now compile or read
 
@@ -81,7 +89,9 @@ description: >-
 - **Consequence:** The export change has no declared suite. The retrospective admits it never had a `server-regression` run of its own.
 - **Severity:** Minor
 
-**Outcome:** fixed: T-107 has `**Verify:** server-unit`, the scope its verify ran, and its As built says the line was added afterwards and that `server-regression` first ran over the export change in the milestone's verify after the rebase (53dcdeb)
+**Outcome:** fixed
+
+**Fix:** T-107 has `**Verify:** server-unit`, the scope its verify ran, and its As built says the line was added afterwards and that `server-regression` first ran over the export change in the milestone's verify after the rebase (53dcdeb).
 
 ### T-103's Verify omits `core-unit`, though it changed Core
 
@@ -90,7 +100,9 @@ description: >-
 - **Consequence:** The existing Core health tests were not in the declared scope of the change that touched them.
 - **Severity:** Minor
 
-**Outcome:** fixed: T-103's Verify reads `core-unit, server-unit, server-regression, scenario-morph`, and its As built says why and that cairn already required `core-unit` (766764b)
+**Outcome:** fixed
+
+**Fix:** T-103's Verify reads `core-unit, server-unit, server-regression, scenario-morph`, and its As built says why and that cairn already required `core-unit` (766764b).
 
 ### T-108's `Depends on:` leaves out T-103, which it needed
 
@@ -99,7 +111,9 @@ description: >-
 - **Consequence:** The tracker misstates the dependency. The retrospective's own "Next time" calls this out, but the header was not fixed.
 - **Severity:** Minor
 
-**Outcome:** fixed: T-108's header reads `**Depends on:** T-103, T-104`, and M-21's order table says T-108 needs T-103 for its `render` comparison (894dab6)
+**Outcome:** fixed
+
+**Fix:** T-108's header reads `**Depends on:** T-103, T-104`, and M-21's order table says T-108 needs T-103 for its `render` comparison (894dab6).
 
 ### The retrospective says every ruling is in the member's As built; the vertex-split ruling is not
 
@@ -108,7 +122,9 @@ description: >-
 - **Consequence:** A reader of T-104 cannot tell that the split was ruled on.
 - **Severity:** Minor
 
-**Outcome:** fixed: T-104's As built records the person's ruling, kept as built (1c7d597), and the retrospective's Rulings line says that record was added in answer to RV-64
+**Outcome:** fixed
+
+**Fix:** T-104's As built records the person's ruling, kept as built (1c7d597), and the retrospective's Rulings line says that record was added in answer to RV-64.
 
 ### The weight-range ruling is missing from D-6's Morph targets rule
 
@@ -117,7 +133,9 @@ description: >-
 - **Consequence:** A future tool that takes weights has no design entry to follow.
 - **Severity:** Minor
 
-**Outcome:** fixed: D-6's Morph targets rule has "Weights are in [0, 1] where a tool takes them", the person's ruling of 2026-11-18, with Carve storing no range (5b403eb)
+**Outcome:** fixed
+
+**Fix:** D-6's Morph targets rule has "Weights are in [0, 1] where a tool takes them", the person's ruling of 2026-11-18, with Carve storing no range (5b403eb).
 
 ### Stale names after the rebase in T-100's As built and the scenario csproj
 
@@ -126,7 +144,9 @@ description: >-
 - **Consequence:** These point a reader at code that is not there.
 - **Severity:** Nit
 
-**Outcome:** fixed: T-100's As built gives `WithExtrudedDeltas` as first written and now `LayerRules.BlendDeltas`' `Offset` branch (9db81a4), and the scenario csproj comment says the arm stages run before the cylinder (2b3ffc1)
+**Outcome:** fixed
+
+**Fix:** T-100's As built gives `WithExtrudedDeltas` as first written and now `LayerRules.BlendDeltas`' `Offset` branch (9db81a4), and the scenario csproj comment says the arm stages run before the cylinder (2b3ffc1).
 
 ### The viewer's `--targets` cannot take every name Core allows
 
@@ -245,7 +265,9 @@ description: >-
 - **Consequence:** A reader checking the As built against the code finds names that are not there, and the mutation evidence does not cover the code that ships. I re-ran equivalent mutants on the new layer and the tests do still catch them (see the Summary), so the table can be redone from that.
 - **Severity:** Minor
 
-**Outcome:** fixed: T-100's As built gives each removed name as first written and what it is now (`Stencil`, `LayerRules.BlendDeltas`), drops the resolving of earlier new vertices, and has its broken-product table redone against `StandardLayers.Targets` (9db81a4)
+**Outcome:** fixed
+
+**Fix:** T-100's As built gives each removed name as first written and what it is now (`Stencil`, `LayerRules.BlendDeltas`), drops the resolving of earlier new vertices, and has its broken-product table redone against `StandardLayers.Targets` (9db81a4).
 
 ### Knife point inside a face is not checked against the stencil rule, as Scope asks
 
@@ -254,7 +276,9 @@ description: >-
 - **Consequence:** A future change that gives the targets layer a different stencil from the weights layer for an interior point would pass. So would any non-affine case (the case the rule exists for). The code is correct today: one `VertexOrigin.Blend` stencil feeds both layers.
 - **Severity:** Minor
 
-**Outcome:** fixed: `TargetsKeptThroughEditsTests.KnifePointInsideAFaceBlendsATargetThatIsNotAffineByTheTriangleThePointLiesIn` gives a target that is not affine and checks the new interior vertex's delta against the barycentric blend of the triangle the point lies in, within 1e-6 (64e148c)
+**Outcome:** fixed
+
+**Fix:** `TargetsKeptThroughEditsTests.KnifePointInsideAFaceBlendsATargetThatIsNotAffineByTheTriangleThePointLiesIn` gives a target that is not affine and checks the new interior vertex's delta against the barycentric blend of the triangle the point lies in, within 1e-6 (64e148c).
 
 ### Two pieces of target API are dead after the rebase
 
@@ -263,7 +287,9 @@ description: >-
 - **Consequence:** Public surface with no use and no test, and an As built that says it is used.
 - **Severity:** Nit
 
-**Outcome:** fixed: `MorphTarget.Renamed` and `MorphTargets.Select` are removed, and T-99's As built says so and that the `Targets` layer does the carrying (7b7a4fa)
+**Outcome:** fixed
+
+**Fix:** `MorphTarget.Renamed` and `MorphTargets.Select` are removed, and T-99's As built says so and that the `Targets` layer does the carrying (7b7a4fa).
 
 ### A target made from absolute positions can store a non-finite delta
 
@@ -272,7 +298,9 @@ description: >-
 - **Consequence:** `save` would write a file that `open` refuses. This only happens with coordinates near float's limits.
 - **Severity:** Nit
 
-**Outcome:** fixed: `FromPositions` refuses a position whose delta from the base is not finite, naming `positions[id]`, with a test in `MorphTargetsTests` (be52c10)
+**Outcome:** fixed
+
+**Fix:** `FromPositions` refuses a position whose delta from the base is not finite, naming `positions[id]`, with a test in `MorphTargetsTests` (be52c10).
 
 ## Summary
 
