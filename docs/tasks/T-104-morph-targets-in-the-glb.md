@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-102
 
-**Verify:** server-unit, server-regression
+**Verify:** server-unit
 
 ## Goal
 
