@@ -4,7 +4,7 @@ description: >-
 ---
 # T-71 — Attribute layers with interpolation rules
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
