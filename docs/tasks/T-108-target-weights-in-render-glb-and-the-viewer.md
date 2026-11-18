@@ -4,7 +4,7 @@ description: >-
 ---
 # T-108 — Target weights in render_glb and the viewer
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
