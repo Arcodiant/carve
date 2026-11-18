@@ -55,5 +55,5 @@ Built by Claude Sonnet 5.5 (the first agent, which ran round 1, and this continu
 - **Test** (`tests/Carve.Server.Tests/ExportTargetsResultTests.cs`, unit): a cube exported with no targets has no "morph" in its result; after two `define_target` calls the result holds the example text above, and the exported file's `MorphTargets.TargetNames` through the loader is `[Girth, Slim]`. Shown failing: with the part always added, the no-target export fails ("0 morph target(s)  in glTF"); with the names reversed, the targets export fails on the result text. Both restored, passing.
 - **Not checked.** No second round, no new frames (none needed for this change), no `server-regression` run (the verify did not require it). The `**Verify:**` line was added afterwards (RV-64, Opus 5.5) to record the scope the verify ran:
   `server-unit`, which holds `ExportTargetsResultTests`. `server-regression` first ran over the export change in the
-  milestone's verify after the rebase onto T-71 (see M-21's retrospective). RV-64 also added the skinned and piece
+  milestone's verify at c5832ab, before the rebase onto T-71, since that tree already held `TargetsPart` (see M-21's retrospective). RV-64 also added the skinned and piece
   result lines' test.
