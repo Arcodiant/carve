@@ -75,9 +75,9 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review c
   staves read 132.1..193.0 and its gaps far above 66.
 - **Frame guard: holds.** Before: the start commit 4384202, every GPU suite (`artifacts/T-128/before-jobs.txt`), all on
   Mantorok. After: 439b8b8, every suite also on Mantorok (`after-jobs.txt`), so like runner against like. Tables by
-  `artifacts/T-128/compare.py before after` (SHA-256 of every PNG). All 16 carve scenario suites' frames byte-identical
-  (466 rows: sky 138, orcward 76, crate 69, cube 32, gatehouse 26, materials 23, uvs 22, character 21, planks 17, cuts 16,
-  soft 11, shed 10, rig 9, export 7, viewer-cube 6, ... none changed, none missing). `server-regression`: 527 against 524
+  `artifacts/T-128/compare.py before after` (SHA-256 of every PNG). All 15 carve scenario suites' frames byte-identical
+  (483 rows: sky 138, orcward 76, crate 69, cube 32, gatehouse 26, materials 23, uvs 22, character 21, planks 17, cuts 16,
+  soft 11, shed 10, rig 9, export 7, viewer-cube 6; none changed, none missing). `server-regression`: 527 against 524
   rows; every differing (request, frame) row is in T-111's two timing races (the `lids_ids ... is_refused` test, whose
   missing frame `e4dc71b7...` is one of its own renders); outside them the table is identical.
 - **Patina frames**: flat normal 256, tiled base 128 and the seam frame byte-identical to the carried pass before;
