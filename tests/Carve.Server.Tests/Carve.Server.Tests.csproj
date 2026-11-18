@@ -58,6 +58,7 @@
     <Compile Include="../../src/Carve.Server/SheetComposer.cs" Link="SheetComposer.cs" />
     <Compile Include="../../src/Carve.Server/TargetCheck.cs" Link="TargetCheck.cs" />
     <Compile Include="../../src/Carve.Server/GlbExport.cs" Link="GlbExport.cs" />
+    <Compile Include="../../src/Carve.Server/GlbTargets.cs" Link="GlbTargets.cs" />
     <!-- T-78's equality test hosts the engine in this process with Carve's own composition, lights, sky and material function. -->
     <Compile Include="../../src/Carve.Server/RenderComposition.cs" Link="RenderComposition.cs" />
     <Compile Include="../../src/Carve.Server/RenderSky.cs" Link="RenderSky.cs" />

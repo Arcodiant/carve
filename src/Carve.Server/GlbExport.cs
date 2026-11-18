@@ -191,13 +191,22 @@ public static class GlbExport
     public static byte[] Write(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name, IReadOnlyList<CarveMaterial> materials)
     {
         var uvs = HasUvs(mesh) || Textured(UsedBy(mesh is null ? [] : [mesh], materials));
+        if (mesh?.Targets is { } named && GlbTargets.For([.. named.Names]) is { } targets)
+        {
+            var piece = targets.Of(mesh);
+            return uvs
+                ? Write<Tagged<VertexTexture1>>(mesh, triangles, name, materials,
+                    (m, i, v, n) => new(new VertexTexture1(UvAt(m!, i, v)), targets.Tag(piece, i, v, n)), true, targets)
+                : Write<Tagged<VertexEmpty>>(mesh, triangles, name, materials,
+                    (_, i, v, n) => new(default, targets.Tag(piece, i, v, n)), false, targets);
+        }
         return uvs
-            ? Write<VertexTexture1>(mesh, triangles, name, materials, (m, i, v) => new VertexTexture1(UvAt(m!, i, v)), true)
-            : Write<VertexEmpty>(mesh, triangles, name, materials, (_, _, _) => default, false);
+            ? Write<VertexTexture1>(mesh, triangles, name, materials, (m, i, v, _) => new VertexTexture1(UvAt(m!, i, v)), true, null)
+            : Write<VertexEmpty>(mesh, triangles, name, materials, (_, _, _, _) => default, false, null);
     }
 
     private static byte[] Write<TvM>(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name, IReadOnlyList<CarveMaterial> materials,
-        Func<PolygonMesh?, int, int, TvM> texture, bool uvs)
+        Func<PolygonMesh?, int, int, Vector3, TvM> texture, bool uvs, GlbTargets? targets)
         where TvM : struct, IVertexMaterial
     {
         var mesh2 = new MeshBuilder<VertexPositionNormal, TvM, VertexEmpty>(name);
@@ -208,20 +217,24 @@ public static class GlbExport
                 mesh2.UsePrimitive(p.Material is null ? Material(p.Name, p.Colour) : Material(p.Material, images));
 
         // Shading.Triangles is in Triangulator order, so the ids of a triangle's vertices (and so its corners) are read from there.
-        var ids = uvs ? Triangulator.Triangulate(mesh!) : null;
+        // A target's corners are tagged with their deltas, so they need the vertex ids too.
+        var cornered = uvs || targets is not null;
+        var ids = cornered ? Triangulator.Triangulate(mesh!) : null;
         for (var i = 0; i < triangles.Count; i++)
         {
             var t = triangles[i];
             var primitive = primitives[KeyOf(mesh, t.Face)];
             var id = ids?[i] ?? default;
             primitive.AddTriangle(
-                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.A, t.NormalA), uvs ? texture(mesh, t.Face, id.A) : default),
-                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.B, t.NormalB), uvs ? texture(mesh, t.Face, id.B) : default),
-                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.C, t.NormalC), uvs ? texture(mesh, t.Face, id.C) : default));
+                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.A, t.NormalA), cornered ? texture(mesh, t.Face, id.A, t.NormalA) : default),
+                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.B, t.NormalB), cornered ? texture(mesh, t.Face, id.B, t.NormalB) : default),
+                new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.C, t.NormalC), cornered ? texture(mesh, t.Face, id.C, t.NormalC) : default));
         }
 
         var scene = new SceneBuilder();
         scene.AddRigidMesh(mesh2, Matrix4x4.Identity).WithName(name);
-        return scene.ToGltf2().WriteGLB().ToArray();
+        var root = scene.ToGltf2();
+        targets?.Write(root, root.LogicalMeshes[0], GlbTargets.TagsOf(mesh2.Primitives));
+        return root.WriteGLB().ToArray();
     }
 }
