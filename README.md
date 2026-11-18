@@ -91,6 +91,72 @@ Each of these edits the mesh in place and appends new ids at the end; each examp
 
 A window through a wall is `knife` on the front and the back, `delete` of both pieces, then `bridge` of the two loops.
 
+## Several meshes, colours and smooth surfaces
+
+A model holds named meshes. `define_mesh` with a `name` adds a mesh, or replaces the one of that name. Once there is more than one, the other tools take `mesh` to say which to work on, and `render` draws them all together. `define_mesh`'s own description builds a crate and a lid this way.
+
+- `define_group` names a set of faces so that later calls can treat them as one: `{"name":"sides","faces":[0,1,2,3]}`. A face may be in several groups, and an extrude's walls join their face's groups.
+- `set_colour` colours faces, or a group, with sRGB hex: `{"colour":"#C8503C","faces":[0,1]}`. Export writes one matte material per colour.
+- `set_shading` makes a mesh `smooth` (or `flat`, the default): `{"shading":"smooth"}`. Under smooth, `mark_edges` keeps chosen edges creased: `{"edges":[[0,1]],"hard":true}`.
+- `subdivide` rounds a mesh off by Catmull-Clark, 1 to 3 levels: `{"levels":1}`. Every id stays, new ones are appended, and hard edges stay sharp.
+
+`render` and `export` draw the same normals, so a smooth mesh looks the same in the game.
+
+## UVs
+
+A face's UVs are one `[u, v]` per corner. They run as in glTF: (0, 0) is the texture's top-left, and v runs down. Every edit, `undo` and the `.carve` file carry them.
+
+- `set_uvs` gives faces UVs by coordinates. On the unit cube this maps face 0 (corners `[0,3,2,1]`) to the whole texture: `{"faces":[{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]}]}`.
+- `project_uvs` projects faces: `planar` (one side of a thing), `box` (crates, rooms) or `cylindrical` (barrels, posts): `{"method":"box"}`, or `{"method":"planar","view":"+y","faces":[3],"into":[0,0,0.5,1]}` for the top into the left half.
+- `unwrap` cuts the faces at their seams, flattens each island and packs them: `{}`. Mark the seams first with `mark_edges` and `seam`: `{"edges":[[0,3]],"seam":true}`. Each island must lie flat, so a closed box needs enough seams to unfold, and a cylinder needs one down its side and one round each rim. `unwrap`'s description works through a barrel.
+- `render` with `mode` `checker` draws a checker at each face's UVs, with unmapped faces magenta. `mode` `uvs` draws the layout flat, with seams in yellow.
+- `check` warns of unmapped, flipped, zero-area and overlapping UV faces.
+
+`samples/barrel.carve` is the seamed, unwrapped barrel.
+
+## Materials and textures
+
+A material is a named PBR look shared by the whole model; any mesh's faces may use it. A face has either a colour or a material, and setting one clears the other.
+
+1. Give the faces UVs (above): `project_uvs` `{"method":"box","faces":[1,3]}`, the unit cube's front and top.
+2. `define_material` with `base_colour`, `metallic`, `roughness`, `emissive`, `occlusion`, `double_sided` and up to five PNG textures (`base_colour_texture`, `metallic_roughness_texture`, `normal_texture`, `emissive_texture`, `occlusion_texture`): `{"name":"crate","roughness":0.8,"base_colour_texture":"textures/crate.png"}`. Anything left out takes its default, so a bare name is matte white.
+3. `set_material` puts it on faces or a group: `{"material":"crate","faces":[1,3]}`.
+
+Texture paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
+
+`samples/barrel-textured.carve` is the barrel with wood, iron, end-grain and rune materials from `samples/textures/`.
+
+## Characters
+
+A character is a model with a skeleton, bone weights and clips. `export` then writes a skinned `.glb`.
+
+- `define_skeleton` sets every bone, in order, each `{name, parent, position, rotation}` local to its parent, with parents before children:
+
+  ```json
+  {"bones":[{"name":"hips","parent":null,"position":[0,1,0],"rotation":[0,0,0,1]},{"name":"spine","parent":"hips","position":[0,0.3,0],"rotation":[0,0,0,1]},{"name":"head","parent":"spine","position":[0,0.4,0],"rotation":[0,0,0,1]}]}
+  ```
+
+  `get_skeleton` reads the bones back, with where each one rests in model space.
+- `weigh` weights a mesh by distance to the bones: `{"replace":true}`. `set_weights` overrides vertices or a face group by hand: `{"group":"hat","weights":{"Head":1}}`. `get_weights` reads them back and lists any unweighted vertices.
+- `define_clip` makes a named clip from rotation and translation keys per bone. Values are absolute and local to the parent, and interpolation is `LINEAR` or `STEP`:
+
+  ```json
+  {"name":"wave","duration":1,"loop":true,"channels":{"joint":{"rotation":{"keys":[{"time":0,"value":[0,0,0,1]},{"time":0.5,"value":[0,0,0.70710677,0.70710677]},{"time":1,"value":[0,0,0,1]}]}}}}
+  ```
+
+  `get_clips` reads clips back and warns of a looping clip that does not close. `delete_clip` removes one.
+- `render` draws the model in a `pose`, or at a `clip` and `time`: `{"clip":"wave","time":0.5}`. `bones: true` draws the skeleton over it (`bone_labels: true` names the bones), and `weights` with a bone's name shows that bone's weights as heat, with unweighted vertices magenta.
+
+`export` takes a `mode`:
+
+- `model` (the default) writes the skinned mesh, its materials, the skeleton and one animation per clip. It refuses unweighted vertices unless given `allow_unweighted: true`.
+- `clips` writes the skeleton and clips with no mesh. It is one animation file that every character sharing the skeleton can use, and the game loads it with `LoadAnimationSet`.
+- `piece` with `meshes` writes chosen meshes alone, with the whole skeleton in the same order, as a costume part the game swaps at runtime on the body's pose: `{"path":"models/orc.hat.glb","mode":"piece","meshes":["Hat"]}`.
+
+`render_glb` draws an exported `.glb` through the engine's own loader and GPU skinning, at rest or at a `clip` and `time`: `{"path":"models/orc.glb","clip":"Walk","time":0.25}`. A `render_glb` frame and a `render` frame of the same model, view, size, clip and time line up, so the two can be compared.
+
+`export` also warns when a model passes a game's limits on triangles, submeshes or height, read from `carve-limits.json` in the game's content folder. `samples/gardener.carve` is a rigged, animated character, and `samples/gardener-soft.carve` is the same character subdivided and smoothed.
+
 ## License
 
 Carve is released under the [MIT license](LICENSE).
