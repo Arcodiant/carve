@@ -62,7 +62,8 @@ public static class TexGraphFile
             var message = e.Message;
             var cut = message.IndexOf(" LineNumber:", StringComparison.Ordinal);
             if (cut > 0) message = message[..cut];
-            return new(null, new((int)(e.LineNumber ?? 0) + 1, (int)(e.BytePositionInLine ?? 0) + 1, "not JSON: " + message.TrimEnd('.', ' ')), []);
+            var line = (int)(e.LineNumber ?? 0);
+            return new(null, new(line + 1, Column(bytes, line, e.BytePositionInLine ?? 0), "not JSON: " + message.TrimEnd('.', ' ')), []);
         }
         catch (ShapeException e)
         {
@@ -92,9 +93,24 @@ public static class TexGraphFile
         int line = 1, column = 1;
         for (long i = 0; i < offset && i < bytes.Length; i++)
             if (bytes[i] == '\n') { line++; column = 1; }
-            else column++;
+            else if (!IsContinuation(bytes[i])) column++;
         return (line, column);
     }
+
+    /// <summary>The column, counted in characters, of the place <paramref name="bytesIn"/> UTF-8 bytes into line <paramref name="line"/> (from 0).</summary>
+    private static int Column(byte[] bytes, int line, long bytesIn)
+    {
+        long start = 0;
+        for (var seen = 0; seen < line && start < bytes.Length; start++)
+            if (bytes[start] == '\n') seen++;
+        var column = 1;
+        for (var i = start; i < start + bytesIn && i < bytes.Length; i++)
+            if (!IsContinuation(bytes[i])) column++;
+        return column;
+    }
+
+    // A byte after the first of a UTF-8 character: a column counts characters, not bytes.
+    private static bool IsContinuation(byte b) => (b & 0xC0) == 0x80;
 
     private sealed class ShapeException(long offset, string message) : Exception(message)
     {

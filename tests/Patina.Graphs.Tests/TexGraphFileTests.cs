@@ -94,6 +94,16 @@ public class TexGraphFileTests
         Assert.Equal((3, 11), (read.Error!.Line, read.Error.Column)); // the 300
     }
 
+    [Theory]
+    [InlineData("{ \"version\": 1, \"size\": 32, \"seed\": 7, \"nodes\": { \"éé\": { \"type\": 5 } } }", "5")]      // a shape fault
+    [InlineData("{\n  \"version\": 1, \"size\": 32, \"seed\": 7, \"nodes\": { \"éé\": { \"type\": @ } } }", "@")]  // not JSON, on line 2
+    public void ALoadErrorColumnCountsCharactersNotBytes(string text, string at)
+    {
+        var read = TexGraphFile.Read(text);
+        var lineStart = text.LastIndexOf('\n') + 1;
+        Assert.Equal((text.Count(c => c == '\n') + 1, text.IndexOf(at, StringComparison.Ordinal) - lineStart + 1), (read.Error!.Line, read.Error.Column));
+    }
+
     [Fact]
     public void WriteListsNodesInOrdinalOrderWhateverTheDictionarysComparer()
     {
