@@ -80,7 +80,7 @@ internal static class GlbParts
             {
                 // A rotated part under a non-uniform scale: a TRS only when the rotation keeps the scale's axes (a quarter or half turn about one of them).
                 var linear = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateScale(p.Scale);
-                if (!Matrix4x4.Decompose(linear, out var s, out var q, out _) || !Close(Matrix4x4.CreateScale(s) * Matrix4x4.CreateFromQuaternion(q), linear))
+                if (!Trs.Decomposes(linear, out var s, out var q, out _))
                 {
                     problem = $"part '{part.Name}' moves, and the non-uniform scale of its static ancestor '{p.Name}' under its rotation makes a shear, "
                         + "which a glTF node's translation, rotation and scale cannot hold; give that ancestor a uniform scale, mark it moves too, or turn the part so the scale's axes stay its own";
@@ -92,15 +92,6 @@ internal static class GlbParts
             translation = Vector3.Transform(translation, p.LocalTransform);
         }
         return new AffineTransform(scale, rotation, translation);
-    }
-
-    private static bool Close(Matrix4x4 a, Matrix4x4 b)
-    {
-        var tolerance = 1e-5f * MathF.Max(1f, MathF.Max(MathF.Abs(b.M11) + MathF.Abs(b.M22) + MathF.Abs(b.M33), 0f));
-        for (var i = 0; i < 3; i++)
-            for (var j = 0; j < 3; j++)
-                if (MathF.Abs(a[i, j] - b[i, j]) > tolerance) return false;
-        return true;
     }
 
     /// <summary>The file's layout, or null with the refusal (in export's words, without "export: ") when a moving part's transform shears.</summary>

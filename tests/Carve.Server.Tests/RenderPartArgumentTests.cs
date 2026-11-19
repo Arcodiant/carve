@@ -111,7 +111,8 @@ public class RenderPartArgumentTests
         var crate = await CrateUnderScaleAsync(carve, 90);
         Assert.DoesNotContain(crate.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.StartsWith("world:", StringComparison.Ordinal));
         await using var rover = await RoverAsync();
-        foreach (var mesh in new[] { "Chassis", "Wheel_FL", "Cab" })
+        // Every rover part, under the shared test export uses (RV-72).
+        foreach (var mesh in Carve.Rover.RoverSpec.Build().Meshes.Select(m => m.Name))
             Assert.DoesNotContain(Ok(await rover.CallToolAsync("get_mesh", JsonSerializer.Serialize(new { mesh }))).GetProperty("warnings").EnumerateArray(),
                 w => w.GetString()!.StartsWith("world:", StringComparison.Ordinal));
     }
