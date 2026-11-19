@@ -126,3 +126,124 @@ In wave 2, `ModelStore.cs` is shared by T-92 and T-93, for adds only. `Program.c
 - [ ] [T-98](../tasks/T-98-parts-acceptance-run.md) — Fresh agents build a part-tree vehicle from the tool descriptions alone, find a planted envelope fault and export it
 
 ## Retrospective
+
+**As planned.**
+
+- **The slice works end to end, reached through the tools from a plain launch.**
+  - A model is a named tree of parts with transforms, pivots, envelopes, instances and kept levels, in Core (T-91).
+  - The Carve file holds it: version 7, and version 9 beside morph targets (T-92, T-132).
+  - `define_part`, `get_parts` and `keep_level` build and read it, the edit tools target a part, and `check` warns on an envelope (T-93).
+  - `render` draws it placed, by subtree and by level, and `get_mesh` reports placement (T-94).
+  - `export` writes it as glTF nodes, with instances sharing a mesh (T-95).
+  - The rover is built through the tools in `scenario-parts` (T-96), saved as `samples/rover.carve`, shown in M-3's viewer and read back through Empyrean's split load (T-97).
+- **Fresh agents did the job from the descriptions alone** (T-98). One round of `claude -p`, on Opus 5.5:
+  - it found the planted low axle from the envelope warning and fixed it;
+  - it made a moving instanced wheel pair and kept level 0;
+  - it exported a `.glb` that the viewer loads, with the two wheels sharing one mesh in the split load.
+- **Nothing existing changed bytes.**
+  - Every committed `.carve` hashes the same before and after (T-92, T-132).
+  - All 11 existing exported `.glb` files hash the same (T-95, six suites run before and after).
+  - Every existing frame is byte-identical, over 14 of 14 suites (T-94) and in cuts and gatehouse after T-96 changed the shared ray test.
+  - One frame was checked only locally: `NamedMeshTests`' labelled lid, because of B-9's race. The person ruled that enough.
+- **Every new check was shown failing on a broken product.** Each member keeps its break table under `G:\My Drive\artifacts\carve\M-9\T-NN\break-table.tsv`.
+- **The person approved every frame set put to them:**
+  - T-94's five render frames;
+  - T-96's 13 `scenario-parts` frames;
+  - T-97's two viewer frames;
+  - T-98's three.
+- **`cairn milestone M-9 verify` (2026-11-19, at 3fd7c72, before this retrospective)** passed every check but `review`, which comes after the person's go:
+  - 9/9 members done and merged;
+  - all 23 suites pass, 18 ran and 5 carried;
+  - `server-regression` ran 439 s on Xellotath.
+- **Models:**
+
+  | Member | Model | Agents |
+  |---|---|---|
+  | T-91 | Opus 5.5 | 2, as planned (API, then the rover), with three questions |
+  | T-92 | Opus 5.5 | 1 |
+  | T-93 | Opus 5.5 | 2 (the checkpoint, with two questions) |
+  | T-132 | Opus 5.5 | 1 |
+  | T-95 | Opus 5.5 | 2 (the checkpoint) |
+  | Rebase onto `main` (M-27) | Sonnet 5.5 | 1 |
+  | T-94 | Opus 5.5 | 5 (three checkpoints with questions, a fourth for the guard and breaks, then the frame-review agent) |
+  | T-96 | Sonnet 5.5 | 2 (as planned: the build, then the frame-review agent) |
+  | T-97 | Sonnet 5.5 | 2 (a question) |
+  | T-98 | Sonnet 5.5 (inner session Opus 5.5) | 1 |
+
+  No rework was traced to the cheaper tier. Every extra agent was a planned review agent, a checkpoint or a stop for the person.
+
+**Not as planned.**
+
+- **The milestone grew from eight members to nine.** T-132, Carve file version 9, was added on the person's ruling (2026-11-18). RV-64 had left "which version holds parts beside morph targets" for M-9's planning, and the planning never ruled it. T-92 then landed a refusal to save a model with both, without asking. The person chose a version 9 in M-9 over keeping the refusal.
+- **Two members landed choices that were the person's.**
+  - T-92: the refusal above.
+  - T-95 and T-132: re-taking `PartToolsListTests`' tools/list digest when their own spec changed a description. Both checked that only that description moved.
+
+  Both were put to the person afterwards. A brief should name the existing pins a member is likely to hit and say "ask first", rather than leave it to "a change that would loosen a check".
+- **M-27 ran beside M-9 and touched the same render files.** By the person's ruling, T-94 was held until M-27 landed. The milestone was then rebased onto `main` with no conflicts, mid-milestone, while no member was in flight. T-95, paused at a hand-off, moved across with `git rebase --onto` from the old tip. Holding T-94 cost little, since T-95 and T-132 ran in the meantime.
+- **T-94 took five agents.** The plan's frame list could not all be checked as written:
+  - the Axle_F subtree is symmetric, so no mirror check can work from its own framing;
+  - from [1, 0.3, 0] neither hub boss is in sight (0 pixels from that and four other directions);
+  - three probes sat on the front view's line of symmetry;
+  - `ColourRule` misses the dark wheels by 3–4 levels.
+
+  Each came up as a separate stop. As M-19's lesson already said, the frame directions and probes should be worked through the ray test before the frame list is agreed, and every miss put to the person in one question.
+- **Rulings the person gave during the milestone,** each recorded in the As built of the member named:
+  - T-91:
+    - an instance may carry its own envelope;
+    - coplanar contacts between parts are checked by facing, with the two hidden contacts pinned.
+  - T-93:
+    - an existing part's `instance_of` does not change;
+    - the empty-part hint reads `define_mesh name=`.
+  - T-92: `open mesh=` into an empty or an instance stays refused.
+  - T-132: a kept level keeps its targets.
+  - T-95: four export rules, chosen through the review window:
+    - a sheared fold is refused;
+    - nodes are written in pre-order;
+    - limits count what is drawn;
+    - a moving instance with static children gets its own mesh;
+    - targets are written with a split-load warning.
+  - T-94:
+    - `part` with `views` frames the subtree;
+    - mirror and up checks on whole-rover frames only;
+    - four unsettled rules accepted as built;
+    - the Axle_F frame is judged by its inner caps;
+    - tolerance 4 for the dark wheel faces until B-8;
+    - the moved probes;
+    - the lid frame's local evidence.
+  - T-96:
+    - the flip rule (500 / under 100);
+    - `instance-edit` drawn from above;
+    - two helper frames kept.
+  - T-97:
+    - the sample-version test removed ("why are we testing file version?");
+    - the viewer views as chosen;
+    - the 12 materials explained (one per submesh) and pinned.
+
+**Never verified.**
+
+- No member ran an ordinary MCP client against `carve` apart from T-98's acceptance session. Every other tool check is in-process (`ToolHarness`) or a scenario.
+- The split load was checked through the engine's CPU parser only, not a game loading the rover on a device.
+- The windscreen recess is faint in the frames, and T-94's review judged it present from its walls without measuring it. The rear-right wheel is hidden in every agreed frame.
+- `tests/Carve.PartsAcceptance.Tests` is in no suite, as T-49's acceptance project is not, so `verify` warns it uncovered. It runs only on a round folder.
+
+**Known and left.** Filed off-milestone:
+- **B-7:** the weights look misaligns on a model with instances.
+- **B-8:** `ColourRule` predicts low-albedo faces too dark. T-94's and T-96's dark-wheel tolerance goes back to 2 when it is fixed.
+- **B-9:** `NamedMeshTests` stops at its first stale refusal and can skip the labelled lid frame.
+
+Old worktree folders that `finish` could not remove are safe to delete by hand: `branches\task\T-91`, `T-92`, `T-93`, `T-95`, `T-97`, `T-98` and `T-132`, plus `T-94` and `T-96` if still there.
+
+**Test report** (`cairn test report --since 2d`).
+- The window covers M-27's finish as well as M-9, so the two can't be told apart.
+- `server-regression` is most of the slot time: about 27,500 slot-seconds in the window, 31 % carried, with 1 failure found nowhere else (T-94's own new rover tests, real). That is M-20's accepted trade-off at about 440 s a run.
+- `scenario-orcward` failed 3 times, each also caught elsewhere.
+- No flakes were recorded, though 1126 passes' logs could not be read here.
+- Nothing new to file.
+
+**For the next plan.**
+
+- Work every agreed frame through the ray test before the frame list is settled: which features are in sight from each direction, and which checks a symmetric subject can carry. Put every miss to the person in one question.
+- Name in each brief the existing pins and guards a member will likely trip (tools/list digests, sample guards, byte-identity baselines), and say "ask before re-taking".
+- When a design question is carried into a milestone's planning (as RV-64's was), list it in *Open at planning* so the planning rules it.
+- Keep an orchestrator rebase onto `main` for a moment when no member is in flight. A paused member crosses with `--onto` from the old tip.
