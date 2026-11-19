@@ -38,6 +38,10 @@ internal sealed class RenderSystem(
     private Entity? _seamLines;
     private readonly Dictionary<Vector4, Material> _lineMaterials = [];
     private Material? _layoutMaterial;
+    // T-121: the image under the layout, as asked by the view being applied; its textures and materials, and the ones now drawn.
+    private MaterialTexture? _uvImage;
+    private UvImageDraw? _nextUv;
+    private UvImageDraw? _uv;
     private UvWindow _uvWindow = UvWindow.Unit;
     private Vector4 _nextEdgeColour = LookMeshes.Edge;
     private LookHolder<Mesh>? _looks;
@@ -88,6 +92,36 @@ internal sealed class RenderSystem(
     /// </summary>
     private Material LayoutMaterial => _layoutMaterial ??= new Material(
         MaterialFlags.Textured, Vector4.One, Checker, null!, 0, 1, Vector3.Zero, 1, null!, null!, null!, 0, default, null, 0, false);
+
+    /// <summary>
+    /// The image of a <c>uvs</c> look as the engine draws it (T-121), made on the frame thread: the PNG decoded to RGBA8 and
+    /// uploaded as it is (sRGB, so the bytes read back as stored), and again with each channel halved, rounded up
+    /// (<c>(c + 1) / 2</c>), for the padding's ground. SAMPLING, probed with the layout look: both are sampled nearest, with no
+    /// mipmaps and no filtering (<see cref="SamplerDescriptions.PixelArt"/>), so a frame pixel shows the one texel
+    /// <c>floor(uv * size)</c> and never a blend, which is what makes a pixel predictable from the PNG; the sRGB texture and the
+    /// sRGB target round-trip the stored bytes, and the material is unlit, so nothing else touches them.
+    /// </summary>
+    private sealed record UvImageDraw(Texture Full, Texture Half, Material FullMaterial, Material HalfMaterial);
+
+    private UvImageDraw MakeUvImage(MaterialTexture image)
+    {
+        var decoded = textures.DecodeCpu(image.Png.ToArray());
+        var full = decoded.Pixels.ToArray();
+        var half = new byte[full.Length];
+        for (var i = 0; i < full.Length; i++) half[i] = i % 4 == 3 ? full[i] : (byte)((full[i] + 1) / 2);
+        var fullTexture = resources.CreateTexture(full, decoded.Width, decoded.Height, TextureFormat.Rgba8Srgb, SamplerDescriptions.PixelArt, generateMipmaps: false);
+        var halfTexture = resources.CreateTexture(half, decoded.Width, decoded.Height, TextureFormat.Rgba8Srgb, SamplerDescriptions.PixelArt, generateMipmaps: false);
+        static Material Unlit(Texture t) => new(
+            MaterialFlags.Textured, Vector4.One, t, null!, 0, 1, Vector3.Zero, 1, null!, null!, null!, 0, default, null, 0, false);
+        return new UvImageDraw(fullTexture, halfTexture, Unlit(fullTexture), Unlit(halfTexture));
+    }
+
+    private void DestroyUnused(UvImageDraw? draw)
+    {
+        if (draw is null || ReferenceEquals(draw, _uv)) return;
+        resources.Destroy(draw.Full);
+        resources.Destroy(draw.Half);
+    }
 
     public void Initialise()
     {
@@ -146,13 +180,26 @@ internal sealed class RenderSystem(
 
     public IReadOnlyList<Func<Mesh?>> Make(Carve.Core.PolygonMesh mesh, DrawnSpace space, Look look, Highlight highlight, ElementWindow? faces)
     {
+        DestroyUnused(_nextUv);
+        _nextUv = null;
         if (look == Look.Uvs)
         {
             // The layout replaces the model: a flat scene of its own, framed by ApplyView on the window it is drawn in.
-            var layout = UvLayout.Compose(mesh, faces ?? new ElementWindow(0, 0, mesh.Faces.Count), highlight);
+            var layout = UvLayout.Compose(mesh, faces ?? new ElementWindow(0, 0, mesh.Faces.Count), highlight, _uvImage is not null);
             _uvWindow = layout.Window;
             _nextMaterial = LayoutMaterial;
             _nextSubmeshMaterials = null;
+            if (_uvImage is { } image)
+            {
+                _nextUv = MakeUvImage(image);
+                _nextSubmeshMaterials = layout.Groups!.Select(g => g.Group switch
+                {
+                    UvGroup.ImageDimmed => _nextUv.HalfMaterial,
+                    UvGroup.Faces => _nextUv.FullMaterial,
+                    _ => LayoutMaterial,
+                }).ToArray();
+            }
+
             _nextDrawn = [];
             _nextEdgeColour = UvLayout.Edge;
             return
@@ -223,6 +270,9 @@ internal sealed class RenderSystem(
 
         // The entity now draws only the next materials, so any other the model no longer has can go.
         _drawn = _nextDrawn;
+        var goneUv = _uv;
+        _uv = _nextUv;
+        DestroyUnused(goneUv);
         _pbr?.Keep(_materials.Concat(_drawn));
 
         _edgeLines = Swap(_edgeLines, edges, _nextEdgeColour);
@@ -365,7 +415,8 @@ internal sealed class RenderSystem(
 
     public void ApplyView(RenderSpec spec)
     {
-        Looks.Apply(spec.Mode, spec.Highlight, _space, spec.Mode == Look.Uvs ? spec.UvFaces : null);
+        _uvImage = spec.Mode == Look.Uvs ? spec.UvImage : null;
+        Looks.Apply(spec.Mode, spec.Highlight, _space, spec.Mode == Look.Uvs ? spec.UvFaces : null, _uvImage);
         if (spec.Mode == Look.Uvs)
         {
             ApplyLayoutView();

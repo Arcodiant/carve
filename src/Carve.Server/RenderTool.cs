@@ -230,7 +230,7 @@ internal static class RenderTool
         + "Stretched or squashed cells mean stretched UVs; hues running violet to red along u, or the white cell at the wrong corner of an island, mean it is mirrored or turned; magenta is a face with no UVs. UVs outside 0 to 1 repeat the checker. Face colours are not drawn; a highlighted face is the checker in orange. "
         + "Example: on define_mesh's unit cube, face 1 is [4,5,6,7], the +Z face, whose loop starts at vertex 4, its bottom-left corner seen from outside, and runs counterclockwise: bottom-right, top-right, top-left. Given [[0,1],[1,1],[1,0],[0,0]] in that order (from vertex 4), it shows the 64 cells upright, white at its top-left and the hues red to violet left to right, and check reports nothing; given [[1,1],[0,1],[0,0],[1,0]] (also from vertex 4) it shows violet at its top-left and white at its top-right: mirrored, and check reports the face flipped. "
         + "The caption names the mode, and says when no face has UVs: '512x512, view front, checker, no face has UVs, 8 vertices, 6 faces'. "
-        + "'uvs' draws one mesh's UV layout flat, as the texture is laid out: u right, v down, (0,0) top-left, the unit square outlined in white with its corners labelled (0,0), (1,0), (0,1) and (1,1), the window grown, square, to take in UVs outside it, with a margin of a sixteenth of the window each side. The checker is tiled dimmed (40%) across the window; each mapped face is the checker at full brightness where its UVs lie, so bright is texture in use and dim is empty. Every face edge is white and a seam (mark_edges seam) yellow, on both islands it divides. Faces sharing texture overlap exactly, so an overlap shows as edges crossing inside a bright area, not as a colour (check reports overlaps). A face with no UVs is not drawn, and the caption counts them. labels 'faces' writes each face's id at the centre of its UV outline; 'vertices' and 'both' are refused. A highlighted face is solid orange; highlight takes faces only. 'mesh' is required when the model has several meshes. Refused in this mode, each named: view, direction, zoom, target, projection, views, columns, pose, clip, time, bones, bone_labels and weights. A mesh with no UVs is a tool error naming set_uvs, project_uvs and unwrap. Example: a cube after project_uvs box shows six bright squares in a 3 x 2 grid with dim gaps; labels 'faces' names each; a square with the white cell at its top-right rather than its top-left is mirrored. The caption: '512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 72 vertices, 70 faces', the counts the named mesh's. "
+        + "'uvs' draws one mesh's UV layout flat, as the texture is laid out: u right, v down, (0,0) top-left, the unit square outlined in white with its corners labelled (0,0), (1,0), (0,1) and (1,1), the window grown, square, to take in UVs outside it, with a margin of a sixteenth of the window each side. The checker is tiled dimmed (40%) across the window; each mapped face is the checker at full brightness where its UVs lie, so bright is texture in use and dim is empty. Every face edge is white and a seam (mark_edges seam) yellow, on both islands it divides. Faces sharing texture overlap exactly, so an overlap shows as edges crossing inside a bright area, not as a colour (check reports overlaps). A face with no UVs is not drawn, and the caption counts them. labels 'faces' writes each face's id at the centre of its UV outline; 'vertices' and 'both' are refused. A highlighted face is solid orange; highlight takes faces only. 'mesh' is required when the model has several meshes. Refused in this mode, each named: view, direction, zoom, target, projection, views, columns, pose, clip, time, bones, bone_labels and weights. With image (a PNG path), the PNG is drawn under the layout to show a bake or a texture where it lands on the mesh: it covers the unit square, u right and v down, drawn as stored inside the islands (where the checker is bright) and at half brightness outside them, each channel halved, so padding shows as a fringe of island colour on a darker ground; beyond the unit square the dim checker stays. It is sampled nearest, unlit, with no colour conversion (a grey or single-channel PNG shows as grey), and the edges, seams, labels and highlight are drawn over it. The caption names it: 'image wrench.occlusion.png 1024 x 1024'. A PNG that is missing (the folder's PNGs are listed), is not a PNG or is over 4096 is refused as define_material refuses a texture. A mesh with no UVs is a tool error naming set_uvs, project_uvs and unwrap. Example: a cube after project_uvs box shows six bright squares in a 3 x 2 grid with dim gaps; labels 'faces' names each; a square with the white cell at its top-right rather than its top-left is mirrored. The caption: '512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 72 vertices, 70 faces', the counts the named mesh's. "
         + "Tool errors, with the mesh untouched: both 'view' and 'direction' given; a view that is not one of the eight names; a direction of zero or not three finite numbers; "
         + "a zoom outside 1 to 8; a target that is not three finite numbers or lies outside the mesh's bounds; a projection other than 'perspective' or 'orthographic'; a size other than 256, 512 or 1024; a mode other than 'shaded', 'wireframe', 'normals', 'checker' or 'uvs'; a highlight that is not an object, or whose lists are not lists of ids and [a, b] pairs; "
         + "a highlight naming a vertex or face the mesh does not have, or a pair that is not an edge, each listed by element as move does; labels other than 'none', 'faces', 'vertices' or 'both'; "
@@ -265,6 +265,11 @@ internal static class RenderTool
         + "Every mesh is drawn either way. May be left out when the model has one mesh, or when neither labels nor highlight is asked for; "
         + "left out while there are several and they are asked for, the call is a tool error that lists the names. In mode 'uvs', the one mesh drawn, required when there are several.";
 
+    /// <summary>The text of render's <c>image</c> (T-121).</summary>
+    private const string ImageArgumentText =
+        "A PNG path, mode 'uvs' only (refused with any other mode): draws that image under the layout, to see a bake or a texture where it lands on the mesh's UVs. "
+        + "Resolved as define_material's texture paths are (relative to the working directory) and read under its rules: a PNG of 1 to 4096 pixels on each side. A missing file lists the .png files in its folder.";
+
     [McpServerTool(Name = "render"), Description(Text)]
     public static async Task<CallToolResult> Run(
         RequestContext<CallToolRequestParams> context,
@@ -292,16 +297,23 @@ internal static class RenderTool
         [Description("A bone's name: draws the model unlit with that bone's weight at each vertex, dark blue at 0 through green (0.5) to red at 1; a vertex with no weight at all is magenta and needs fixing (set_weights or weigh). Needs a skeleton; follows pose or clip; not with mode wireframe, normals or checker.")] string? weights = null,
         [Description(PartArgumentText)] string? part = null,
         [Description(LevelArgumentText)] int? level = null,
+        [Description(ImageArgumentText)] string? image = null,
+        ToolFolder? toolFolder = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "targets", "bones", "bone_labels", "weights", "part", "level") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "targets", "bones", "bone_labels", "weights", "part", "level", "image") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
 
         if (mode == "uvs")
         {
-            return await RunUvs(context, status, store, queue, size, labels, highlight, mesh, cancellationToken);
+            return await RunUvs(context, status, store, queue, size, labels, highlight, mesh, image, toolFolder?.Directory, cancellationToken);
+        }
+
+        if (image is not null)
+        {
+            return Error($"image: not with mode '{mode ?? "shaded"}'; it is the picture drawn under the layout of mode 'uvs'.");
         }
 
         var sheet = !Absent(views);
@@ -551,12 +563,12 @@ internal static class RenderTool
         }
 
         var frame = frames[0];
-        var image = frame.Pixels.ToDecodedImage();
+        var pixels = frame.Pixels.ToDecodedImage();
         return new CallToolResult
         {
             Content =
             [
-                ImageContentBlock.FromBytes(EncodePng(image.Pixels, image.Width, image.Height), "image/png"),
+                ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
                 new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs, part, level) },
             ],
         };
@@ -589,7 +601,7 @@ internal static class RenderTool
     /// </summary>
     private static async Task<CallToolResult> RunUvs(
         RequestContext<CallToolRequestParams> context, EngineStatus status, ModelStore store, RenderQueue queue,
-        double size, string? labels, JsonElement? highlight, JsonElement? mesh, CancellationToken cancellationToken)
+        double size, string? labels, JsonElement? highlight, JsonElement? mesh, string? image, string? baseDirectory, CancellationToken cancellationToken)
     {
         var given = context.Params?.Arguments;
         bool Given(string name) =>
@@ -615,6 +627,12 @@ internal static class RenderTool
         if (listed.Vertices.Count > 0 || listed.Edges.Count > 0)
         {
             problems.Add("highlight: only faces in mode 'uvs'; a vertex or an edge can lie in several places on the layout");
+        }
+
+        MaterialTexture? picture = null;
+        if (image is not null && !DefineMaterialTool.LoadTexture("render", "image", image, baseDirectory, out picture, out var imageProblem))
+        {
+            problems.Add(imageProblem!);
         }
 
         if (problems.Count > 0)
@@ -653,7 +671,7 @@ internal static class RenderTool
         var faces = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
         var labelled = labels == "faces" ? LabelSet.Faces : LabelSet.None;
         var picked = Highlight.Of([], [], listed.Faces.Select(f => f + offset.Faces));
-        var spec = new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, (int)size, Look.Uvs, labelled) { Highlight = picked, UvFaces = faces };
+        var spec = new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, (int)size, Look.Uvs, labelled) { Highlight = picked, UvFaces = faces, UvImage = picture };
 
         var rendering = queue.Post(spec);
         await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
@@ -676,21 +694,22 @@ internal static class RenderTool
 
         var report = MeshReport.Create(named.Mesh);
         var unmapped = named.Mesh.LiveFaces.Count(f => !named.Mesh.Uvs!.IsMapped(f));
-        var image = frame.Pixels.ToDecodedImage();
+        var pixels = frame.Pixels.ToDecodedImage();
         return new CallToolResult
         {
             Content =
             [
-                ImageContentBlock.FromBytes(EncodePng(image.Pixels, image.Width, image.Height), "image/png"),
-                new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount) },
+                ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
+                new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount, picture) },
             ],
         };
     }
 
     /// <summary>The <c>uvs</c> caption: <c>512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 8 vertices, 6 faces</c>, the named mesh's counts.</summary>
-    internal static string UvCaption(int size, string mesh, LabelSet labels, Highlight highlight, int unmapped, int vertices, int faces)
+    internal static string UvCaption(int size, string mesh, LabelSet labels, Highlight highlight, int unmapped, int vertices, int faces, MaterialTexture? image = null)
     {
         var parts = new List<string> { $"{size}x{size}", $"uvs {mesh}" };
+        if (image is not null) parts.Add($"image {Path.GetFileName(image.Path)} {image.Width} x {image.Height}");
         if (labels == LabelSet.Faces) parts.Add("labels faces");
         if (!highlight.IsEmpty) parts.Add($"highlight {highlight.Counts()}");
         if (unmapped > 0) parts.Add(unmapped == 1 ? "1 face unmapped" : $"{unmapped} faces unmapped");

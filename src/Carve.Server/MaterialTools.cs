@@ -138,13 +138,17 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
     }
 
     /// <summary>Resolves (against <paramref name="baseDirectory"/>, the working directory when null), finds and reads one texture path; false with <paramref name="problem"/> (named by the argument) when it cannot.</summary>
-    private static bool LoadTexture(string field, string path, string? baseDirectory, out MaterialTexture? texture, out string? problem)
+    private static bool LoadTexture(string field, string path, string? baseDirectory, out MaterialTexture? texture, out string? problem) =>
+        LoadTexture("define_material", field, path, baseDirectory, out texture, out problem);
+
+    /// <summary>The same read for any tool that takes a PNG path (T-121: render's <c>image</c>), under M-7's rules and in the same words.</summary>
+    internal static bool LoadTexture(string tool, string field, string path, string? baseDirectory, out MaterialTexture? texture, out string? problem)
     {
         texture = null;
-        var target = ToolPaths.Resolve("define_material", path, ".png", out var pathError, baseDirectory, verb: "reads");
+        var target = ToolPaths.Resolve(tool, path, ".png", out var pathError, baseDirectory, verb: "reads");
         if (target is null)
         {
-            problem = field + ": " + pathError!["define_material: ".Length..];
+            problem = field + ": " + pathError![(tool + ": ").Length..];
             return false;
         }
         if (Directory.Exists(target.FullPath))
@@ -163,7 +167,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
     }
 
     /// <summary>The missing-file error: the resolved path and the .png files that are in its folder.</summary>
-    private static string Missing(ToolPath target)
+    internal static string Missing(ToolPath target)
     {
         var folder = Path.GetDirectoryName(target.FullPath)!;
         var head = $"no file at {target.FullPath}; ";
