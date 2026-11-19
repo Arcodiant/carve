@@ -33,3 +33,6 @@ outlast a client's call timeout. Make evaluation fast enough that `export`'s des
 - Raised by M-27 (T-115's As built and the milestone retrospective, 2026-11-18).
 - `Patina.Graphs` stays engine-free and deterministic: no `System.Random`, clock or `Math.Pow` (T-110, T-112).
 - A parallel evaluator is a design change to determinism; stop and ask before one.
+- **Held for M-28** (2026-11-19, the person's ruling at M-28's planning): T-133 replaces the band evaluator with tiled
+  region-of-interest evaluation. Do not start this task until T-133 has landed, then re-scope it against the tiled
+  evaluator and T-133's 8192 measurements.
