@@ -8,3 +8,4 @@
 - T-94: render draws every part where it is placed, isolates a subtree with part and draws a kept level with level, and get_mesh gives a part's placement
 - T-96: scenario-parts builds the rover through the tools at two levels, turns its mast, edits an instance and shows each in frames worked from the geometry
 - T-97: The rover is saved as samples/rover.carve, exported, shown by the viewer and read back as a split part tree through Empyrean's loader
+- T-98: Fresh agents build a part-tree vehicle from the tool descriptions alone, find a planted envelope fault and export it
