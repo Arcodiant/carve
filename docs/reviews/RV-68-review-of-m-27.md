@@ -55,7 +55,7 @@ I read `git diff origin/main...HEAD` for `src/Carve.Hosting`, `src/Carve.Server`
 
 **Outcome:** fixed
 
-**Fix:** T-128's As built has a bullet for the refactor pass (run by the cairn process before review, verified by `cairn milestone M-27 verify`): `cabbfad` dropped `ViewFraming.VerticalCosine`, `ee8608e` `PbrMaterials.Sampler`, `01cb4b2` made `ViewFraming.FrontDirection` read `RenderLights.FrontDirection`, and f44e507's narrowing; T-111's lines on `PbrMaterials.Sampler` say it went and `TextureUpload.Sampler` is the one sampler (6da63dc). A tracker change, so no test; the merged tree's frames are hashed by `cairn milestone M-27 verify`'s scenarios
+**Fix:** T-128's As built has a bullet for the refactor pass (run by the cairn process before review, verified by `cairn milestone M-27 verify`): `5ebd511` dropped `ViewFraming.VerticalCosine`, `f601bdf` `PbrMaterials.Sampler`, `c73fae1` made `ViewFraming.FrontDirection` read `RenderLights.FrontDirection`, and f44e507's narrowing; T-111's lines on `PbrMaterials.Sampler` say it went and `TextureUpload.Sampler` is the one sampler (6da63dc). A tracker change, so no test; the merged tree's frames are hashed by `cairn milestone M-27 verify`'s scenarios
 
 ### More of Carve.Hosting is public than any second server reads
 
