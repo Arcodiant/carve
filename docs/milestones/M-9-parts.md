@@ -247,3 +247,29 @@ Old worktree folders that `finish` could not remove are safe to delete by hand: 
 - Name in each brief the existing pins and guards a member will likely trip (tools/list digests, sample guards, byte-identity baselines), and say "ask before re-taking".
 - When a design question is carried into a milestone's planning (as RV-64's was), list it in *Open at planning* so the planning rules it.
 - Keep an orchestrator rebase onto `main` for a moment when no member is in flight. A paused member crosses with `--onto` from the old tip.
+
+**After the person's go (2026-11-19).**
+
+- **The rebase onto `main` was a no-op**: `main` had not moved since the mid-milestone rebase.
+- **The refactor pass** (Opus 5.5) made four commits:
+  - `Model.ParentOf` and `Shown` replace seven repeated walks;
+  - one `OffsetOf` path;
+  - shared file-test helpers;
+  - a dead `OpenMesh` overload removed.
+
+  No output changed.
+- **RV-71, round 1:** four Opus 5.5 reviewers, split by area plus one over the whole diff, found 26 findings (3 Major, 14 Minor, 9 Nit). All 26 were fixed by two parallel Opus 5.5 fix agents, A and B, each run as a first agent and a continuation. The three Majors:
+  - a bare empty part was lost by save and open;
+  - whole-model labels landed on every copy of an instanced mesh;
+  - a placed rigged part was skinned in part space by `render` and `weigh`, but in model space by the export.
+
+  The person ruled two:
+  - posed `render` and `weigh` match the export;
+  - `get_mesh` warns when its `world` is inexact.
+
+  The `instance_of` rule moved into Core. No frame, `.glb` or sample changed bytes: B hashed 155 rigged-suite frames, 16 parts frames and 249 `server-regression` frames, and A rewrote all 10 samples.
+- **RV-72, round 2:** 25 of the answers held. Two Nits were new: `get_mesh`'s shear tolerance was looser than export's, and the now-unused `Skinning.Posed` was left. By the person's ruling, both were fixed:
+  - `Trs.Decomposes` is one shared check;
+  - `Posed` is removed;
+  - an always-true material check was replaced by one that catches three breaks.
+- **RV-73, round 3:** one reviewer confirmed both answers, with no findings.
