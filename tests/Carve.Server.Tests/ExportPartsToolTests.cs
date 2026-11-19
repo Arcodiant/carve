@@ -47,6 +47,20 @@ public sealed class ExportPartsToolTests() : FileToolTests("carve-export-parts")
     }
 
     [Fact]
+    public async Task Morph_targets_with_moving_parts_warn_that_a_split_load_refuses_them()
+    {
+        var (carve, _) = await StartAsync(mesh: null);
+        using var _carve = carve;
+        var cube = Carve.Core.Tests.TestMeshes.Cube();
+        var bulged = cube.WithTargets(MorphTargets.Of([MorphTarget.Of("Bulge", [KeyValuePair.Create(0, new Vector3(0, 1, 0))])]));
+        var (model, _) = Model.Create([new("Body", cube), new("Lid", bulged)], null, [], [],
+            [new Part("Body"), new Part("Lid") { Moves = true, Translation = new Vector3(0, 2, 0) }]);
+        carve.Store.OpenModel(model!, "open");
+        var line = Ok(await carve.CallToolAsync("export", """{"path":"lid.glb"}"""));
+        Assert.Contains("a split load (ModelParseOptions SplitParts) refuses a file with morph targets", line);
+    }
+
+    [Fact]
     public async Task The_description_says_how_the_tree_becomes_nodes_with_the_rover()
     {
         var (carve, tools) = await StartAsync(mesh: null);
