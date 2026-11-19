@@ -304,8 +304,8 @@ public class PartTreeFileTests
     }
 
     [Theory]
-    [InlineData("Copy", "mesh: 'Copy' is an instance of 'Arm'; edit 'Arm', and every instance follows")]
-    [InlineData("Empty", "mesh: 'Empty' is an empty part with no geometry; define_mesh name=Empty gives it some")]
+    [InlineData("Copy", "mesh: the model's part 'Copy' is an instance of 'Arm', with no geometry of its own; save 'Arm', and every instance shows it")]
+    [InlineData("Empty", "mesh: the model's part 'Empty' is an empty part with no geometry; a piece is one part's own geometry, so name a part that has some")]
     [InlineData("Nobody", "mesh: no mesh named 'Nobody'; the model's meshes are 'Body', 'Arm'")]
     public void A_piece_of_an_instance_or_an_empty_is_refused(string name, string expected)
     {
