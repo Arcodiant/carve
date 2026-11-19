@@ -370,4 +370,72 @@ public class PartTreeTests
 
     private static string Describe(EnvelopeWarning w) =>
         FormattableString.Invariant($"{w.Part} {w.Axis} {(w.Above ? "above" : "below")} {MathF.Round(w.By, 4)} {w.Parent ?? "own"}");
+    /// <summary>
+    /// RV-71: <see cref="Tree"/> with the Wheel's cube kept as level 0 and its live mesh then a single quad (4 vertices, 1 face),
+    /// so live and level 0 draw different counts. The Body keeps no level, so it is not drawn at level 0.
+    /// </summary>
+    private static Model LevelledTree() => Tree().WithLevel("Wheel", 0)
+        .With("Wheel", TestMeshes.Make([new(0, 0, 0), new(1, 0, 0), new(1, 1, 0), new(0, 1, 0)], [[0, 1, 2, 3]]));
+
+    [Fact]
+    public void SubtreeOf_is_the_part_and_everything_under_it_in_pre_order()
+    {
+        var model = Tree();
+        Assert.Equal(["Body", "Axle", "Wheel", "Wheel_R"], model.SubtreeOf("Body"));
+        Assert.Equal(["Axle", "Wheel", "Wheel_R"], model.SubtreeOf("Axle"));
+        Assert.Equal(["Wheel"], model.SubtreeOf("Wheel"));
+        Assert.Equal(["Wheel_R"], model.SubtreeOf("Wheel_R"));
+        Assert.Empty(model.SubtreeOf("Nope"));
+    }
+
+    [Fact]
+    public void CombinedOf_a_part_draws_only_its_subtree_each_occurrence_at_its_world_placement()
+    {
+        var model = Tree();
+        var c = TestMeshes.CubeVertices;
+        var axle = model.CombinedOf("Axle", null)!;
+        // The Wheel at the Axle's 0.5 up and its own 2 forward; Wheel_R at 2 back and turned 180° about Y (x, z negated).
+        Assert.Equal(16, axle.Vertices.Count);
+        Assert.Equal(12, axle.Faces.Count);
+        for (var v = 0; v < 8; v++)
+        {
+            Assert.Equal(new Vector3(c[v].X, c[v].Y + 0.5f, c[v].Z + 2), axle.Vertices[v]);
+            Assert.Equal(new Vector3(-c[v].X, c[v].Y + 0.5f, -c[v].Z - 2), axle.Vertices[8 + v]);
+        }
+        var body = model.CombinedOf("Body", null)!;
+        Assert.Equal(24, body.Vertices.Count);
+        Assert.Equal(c[0], body.Vertices[0]);
+        Assert.Null(Cube("Body").WithPart(new Part("Empty")).CombinedOf("Empty", null));
+    }
+
+    [Fact]
+    public void CombinedOf_a_level_draws_each_parts_kept_level_and_leaves_out_a_part_with_none()
+    {
+        var model = LevelledTree();
+        // Live: the Body's cube and two quads; level 0: no Body, two cubes (Wheel_R shows its source's level).
+        Assert.Equal((16, 8), (model.CombinedOf(null, null)!.Vertices.Count, model.CombinedOf(null, null)!.Faces.Count));
+        Assert.Equal((16, 12), (model.CombinedOf(null, 0)!.Vertices.Count, model.CombinedOf(null, 0)!.Faces.Count));
+        Assert.Equal((8, 2), (model.CombinedOf("Axle", null)!.Vertices.Count, model.CombinedOf("Axle", null)!.Faces.Count));
+        var kept = model.CombinedOf("Axle", 0)!;
+        Assert.Equal((16, 12), (kept.Vertices.Count, kept.Faces.Count));
+        Assert.Equal(new Vector3(-1, 1.5f, -3), kept.Vertices[8 + 6]);
+        Assert.Null(model.CombinedOf("Nope", 0));
+    }
+
+    [Fact]
+    public void OffsetOf_a_part_within_a_subtree_and_a_level_counts_only_what_is_drawn_before_it()
+    {
+        var model = LevelledTree();
+        Assert.Equal((12, 7), model.OffsetOf("Wheel_R", null, null));
+        Assert.Equal((4, 1), model.OffsetOf("Wheel_R", "Axle", null));
+        Assert.Equal((0, 0), model.OffsetOf("Wheel", "Axle", null));
+        // At level 0 the Body is not drawn and the wheels are cubes.
+        Assert.Equal((8, 6), model.OffsetOf("Wheel_R", null, 0));
+        Assert.Equal((8, 6), model.OffsetOf("Wheel_R", "Axle", 0));
+        Assert.Equal((0, 0), model.OffsetOf("Wheel", null, 0));
+        Assert.Null(model.OffsetOf("Body", null, 0));
+        Assert.Null(model.OffsetOf("Body", "Axle", null));
+        Assert.Null(model.OffsetOf("Axle", "Axle", null));
+        Assert.Null(model.OffsetOf("Wheel", "Wheel_R", null));
+    }
 }
