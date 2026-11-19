@@ -91,7 +91,9 @@ description: >-
 - **Consequence:** An agent picks face ids off a labelled render and gets ids that don't exist, shown on instances. This breaks the T-94 rule that ids are "shown on its own occurrence and not on its instances". No test covers it: the rover has several meshes, so it always takes the windowed path.
 - **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** render aims labels and highlight whenever what is drawn is more than the mesh itself (its instances or its placement), not only when the model has more than one mesh, and windows them on the mesh's own occurrence, with `mesh` named and at a level. `NamedMeshTests.A_single_mesh_with_an_instance_is_labelled_and_highlighted_on_its_own_occurrence_only` holds it (a33a933). (claude-opus-5-5)
 
 ### The frame checks build their expected image with the same Core functions the product draws with
 
@@ -100,7 +102,9 @@ description: >-
 - **Consequence:** The subtree filter and level choice that T-94 adds aren't independently pinned in the server or Core suites. They are caught only by scenario-parts (`part-not-isolated`, `levels-ignored`, built from `get_mesh` and `RoverSpec`'s tree) and by the person's frame review. An offset bug at a level, in labels with `level`, is not covered anywhere: no frame renders labels at a level.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `PartTreeTests` works `SubtreeOf`, `CombinedOf(part, level)` and `OffsetOf(name, part, level)` out by hand on a small tree whose live mesh and kept level differ in counts, so a `CombinedOf` that ignored `part` or `level`, or an `OffsetOf` that counted live meshes at a level, fails in Core whatever the frame checks expect (a5612c0). The frame checks themselves are unchanged. (claude-opus-5-5)
 
 ### The tools/list guard takes T-94's paragraphs out but nothing checks they are there
 
@@ -109,7 +113,9 @@ description: >-
 - **Consequence:** If render's part/level paragraph or get_mesh's placement paragraph were dropped, or added to the wrong tool, both guard tests would still pass, and agents would lose the only text describing `part`, `level`, `parent` and `world`.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `PartToolsListTests.Each_T94_paragraph_is_in_its_tools_description_once` pins render's part and level paragraph and get_mesh's placement paragraph to their tools, once each, as T-93's sentences are (a5612c0). (claude-opus-5-5)
 
 ### get_mesh's `world` is a `Decompose` whose failure is ignored, and a parent's non-uniform scale gives a TRS that is not the transform
 
@@ -118,7 +124,9 @@ description: >-
 - **Consequence:** An agent placing things from `world` gets a wrong rotation or scale on a non-uniformly scaled tree, with no sign of it. The rover doesn't reach this, and nothing tests it.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** by the person's ruling "flag it when inexact": get_mesh checks `Decompose`'s result and that the TRS it gives rebuilds the world matrix. When it doesn't, `warnings` names the part in export's shear words, and the placement paragraph says so in one sentence. Tested by `RenderPartArgumentTests.Get_mesh_warns_when_world_is_a_shear_that_no_translation_rotation_and_scale_holds` and `Get_mesh_gives_no_world_warning_when_the_transform_is_exact` (a32a429). (claude-opus-5-5)
 
 ### get_mesh and check read `store.Current` more than once per call, and get_mesh can throw on a model that changed between the reads
 
@@ -127,7 +135,9 @@ description: >-
 - **Consequence:** It's a rare race, but it can give an unhandled exception, or an output mixing two models. The write side (`ModelStore.Change`) is correctly under the lock.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** get_mesh and check each read `store.Current` once and work from that model throughout (a32a429). No test fails without it: the race between two reads can't be reached from a test without adding a seam to the product. (claude-opus-5-5)
 
 ### "Naming the part to use instead" / "saying which part to keep instead" is not true of an empty part's refusal
 
@@ -182,7 +192,9 @@ description: >-
 - **Consequence:** three Scope points that were ruled on can regress silently: the limits counting, the skinned warning, and the skinned bake keeping its weights.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `ExportPartsToolTests.A_tree_export_counts_its_limits_as_drawn_with_each_instance_its_own_triangles` exports the rover against a limits file: its four shared wheels count as four, 576 triangles, so it warns at 575 and not at 576. `A_skinned_export_of_a_placed_moving_part_warns_of_moves_and_keeps_its_weights` checks that the moves warning is in the result line and that the part is written at its place with its weights kept, so nothing is refused as unweighted (3c40e0b). (claude-opus-5-5)
 
 ### Moving_parts_share_one_glTF_material_per_colour cannot fail on materials
 
@@ -191,7 +203,9 @@ description: >-
 - **Consequence:** the test reads as coverage of the "material sharing" ruling that it doesn't give. Either drop the claim, or test something sharing actually changes (for example, the same `MaterialBuilder` object across meshes).
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the test now exports a body and a moving lid that both draw red, and asserts two materials for three primitives, named as the static file names them. A material per mesh (each named after its mesh, with the shared dictionary dropped) fails it with three materials. Dropping only `Write`'s `shared` dictionary still passes, and that is no gap in the test: SharpGLTF writes content-equal materials once by itself, and the rover gets 6 materials with or without it. The test's comment says so (5456d13). (claude-opus-5-5)
 
 ### T-97's As built break-table path has lost its backslashes to control characters
 
@@ -224,7 +238,9 @@ description: >-
 - **Consequence:** If a weighted mesh has any non-identity part transform (one `define_part` with a translation is enough), `render` with a pose or clip no longer matches what the game draws from the exported file, and `render_glb` against `render` stops agreeing. That breaks CLAUDE.md's "Renders are Empyrean's" rule. `weigh` then weights the part against bones that sit somewhere else. No M-9 sample is both rigged and placed, so no test or frame shows it. B-7 covers only the weights look's ordering.
 - **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** by the person's ruling "match the export": `Skinning.PosedOf` places each occurrence of a weighted mesh at its world transform, weights kept, before skinning it against the model-space skeleton, as `SkinnedExport.Baked` does. render's pose and clip draw through it (`Model.CombinedSkinned`), and weigh measures a placed part where it is drawn. `RenderGlbTests.Render_and_render_glb_agree_on_a_posed_placed_rigged_part` fails without the fix (7.29 % of pixels differ). `GlbPartsTests` adds `A_posed_placed_rigged_part_is_drawn_as_the_skinned_export_bakes_it`, `A_model_with_no_part_transforms_is_drawn_posed_as_before` and `Weigh_weighs_a_placed_part_where_it_is_drawn`. The 155 frames and 17 `.glb` files of scenario-character, soft, rig, orcward and morph are byte-identical before and after (6a30ffe). (claude-opus-5-5)
 
 ### `save mesh=` refuses an instance or an empty with an edit-tool hint, while `open mesh=` has its own piece texts
 
@@ -255,7 +271,9 @@ description: >-
 - **Consequence:** For such a part, `get_mesh`'s `world` does not reproduce where `render` draws it. An agent placing geometry from it gets it wrong, while export calls the same transform impossible.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the same change as "get_mesh's `world` is a `Decompose`…" above: get_mesh warns, in export's shear words, when `world` doesn't rebuild the transform export would refuse (a32a429). (claude-opus-5-5)
 
 ### The part-space sentence is missing from the other tools that take `mesh`, and project_uvs still promises render's view
 
