@@ -103,9 +103,10 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`) to the call checkpoint, finished by
   since messages list ids an edit may add; so an edit that only changes the kind of a fault already at that place is
   let through.
 - **A fault behind another (RV-68, person's ruling 2026-11-18).** The validator kind-checks every input whose source
-  is a node of a known type, even when another input of that node is at fault (T-110's As built), so edit_graph refuses
-  a greyscale/colour mismatch at the edit that makes it, not at the later edit that fixes the other fault
-  (`GraphToolTests.A_kind_mismatch_behind_another_input_s_fault_is_refused_at_the_edit_that_makes_it`). No tool
+  is a node of a known type, even when another input of that node is at fault or the node is on a cycle (T-110's As
+  built), so edit_graph refuses a greyscale/colour mismatch at the edit that makes it, not at the later edit that fixes
+  the other fault (`GraphToolTests.A_kind_mismatch_behind_another_input_s_fault_is_refused_at_the_edit_that_makes_it`,
+  and `GraphToolTests.A_kind_mismatch_on_a_node_on_a_cycle_is_refused_at_the_edit_that_makes_it` for a fault turned into a cycle). No tool
   description stated the old rule or quotes a fault count that changed, so none changed.
 
 **For T-114 and T-115.** A tool is a class with a static `Create()` (given the `NodeRegistry` if it needs one) built on `ToolSupport.Create<T>`,

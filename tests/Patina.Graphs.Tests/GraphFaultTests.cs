@@ -159,6 +159,16 @@ public class GraphFaultTests
         Assert.Equal("node 'h' input 'height': takes greyscale, but 'base' gives colour", read.Faults[2].Message);
     }
 
+    [Fact]
+    public void AnInputFromOffTheCycleIsKindCheckedOnANodeOnACycle()
+    {
+        // base's b comes round the cycle through lv, so what b carries is not known; its mask comes from colour c, off the cycle, and is wrong now.
+        var read = TexGraphFile.Read("""{ "version": 1, "size": 32, "seed": 7, "nodes": { "c": { "type": "colour" }, "base": { "type": "blend", "inputs": { "a": "c", "b": "lv", "mask": "c" } }, "lv": { "type": "levels", "inputs": { "in": "base" } }, "o": { "type": "output", "inputs": { "in": "base" } } } }""");
+        Assert.Equal([("base", "b"), ("base", "mask")], read.Faults.Select(f => (f.Node, f.Port)));
+        Assert.Contains("is on a cycle, base -> lv -> base", read.Faults[0].Message);
+        Assert.Equal("node 'base' input 'mask': takes greyscale, but 'c' gives colour", read.Faults[1].Message);
+    }
+
     [Theory]
     [InlineData("zzz")] // names no node
     [InlineData("x")]   // a node of unknown type

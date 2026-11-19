@@ -183,7 +183,9 @@ about 2.5 s, suite `patina-unit`.
   `GraphFaultException` (with `.Faults`) on a faulty graph.
 - **Kind checks and no cascade (RV-68, person's ruling 2026-11-18).** Every input whose source is a node of a known type
   is checked for kinds, even when another input of that node is at fault, so a greyscale/colour mismatch shows at the
-  edit that makes it. What cannot be checked stays unchecked: an input whose source is missing, of unknown type or on a
+  edit that makes it. This holds for a node on a cycle too (RV-69): its inputs from sources off the cycle are
+  kind-checked (`GraphFaultTests.AnInputFromOffTheCycleIsKindCheckedOnANodeOnACycle`), and it gives its outputs no
+  kind. What cannot be checked stays unchecked: an input whose source is missing, of unknown type or on a
   cycle, and what its kind would decide. `GraphValidator.Kinds` tries each such input as greyscale and as colour; a
   node's output kind is known only when every try agrees (a blend with a colour `a` gives colour whatever `b` is), and
   a node type's own input check is reported only when every try gives it. A graph may so report more faults at once

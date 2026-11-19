@@ -10,7 +10,7 @@ namespace Patina.Graphs;
 /// names a port that node has not, a required input missing; then each cycle (naming the nodes on it), each input
 /// given the wrong kind (greyscale where colour is wanted, or the other way), two outputs with one role, and no output
 /// at all. Every input whose source is a node of a known type is checked for kinds, even when another input of its node
-/// is at fault; a fault does not cascade: an input whose source is missing, of unknown type or on a cycle is not kind-checked,
+/// is at fault or its node is on a cycle; a fault does not cascade: an input whose source is missing, of unknown type or on a cycle is not kind-checked,
 /// nor is anything its kind would decide (a port whose kind it could change, and what that port feeds).
 /// </summary>
 public static class GraphValidator
@@ -171,15 +171,17 @@ public static class GraphValidator
             var node = a.Nodes[id];
             foreach (var (source, _) in node.Sources.Values)
                 if (a.Nodes.ContainsKey(source) && !a.Cyclic.Contains(source)) Visit(source);
-            if (a.Cyclic.Contains(id)) return;
+            var cyclic = a.Cyclic.Contains(id);
 
             // What each input carries where its source's kind is known; an input that is at fault, or whose source's kind
             // is not known, could carry either, so every way it could go is tried and only what holds for all of them is said.
+            // A node on a cycle is checked the same way: an input from the cycle is unknown, so only what its inputs from off
+            // the cycle settle is said, and its own outputs are given no kind (the cycle's inputs would decide them).
             var inputs = new Dictionary<string, PortKind>();
             var unknown = new List<string>();
             foreach (var input in node.Type.Inputs)
             {
-                if (node.Sources.TryGetValue(input.Name, out var from) && a.Nodes[from.Node].OutputKinds.TryGetValue(from.Port, out var gives))
+                if (node.Sources.TryGetValue(input.Name, out var from) && !a.Cyclic.Contains(from.Node) && a.Nodes[from.Node].OutputKinds.TryGetValue(from.Port, out var gives))
                     inputs[input.Name] = gives;
                 else if (node.Connected.Contains(input.Name) || input.Required)
                     unknown.Add(input.Name);
@@ -200,6 +202,7 @@ public static class GraphValidator
             }
             foreach (var (port, message) in always!)
                 a.Fault(id, port, null, $"node '{id}' input '{port}': {message}");
+            if (cyclic) return;
             foreach (var port in node.Type.Outputs)
             {
                 var kinds = ways.Select(way => node.Type.OutputKind(port, way, node.Parameters)).Distinct().ToList();
