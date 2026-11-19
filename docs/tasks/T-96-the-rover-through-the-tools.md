@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-92, T-93, T-94, T-95
 
-**Verify:** core-unit, scenario-parts
+**Verify:** core-unit, scenario-parts, scenario-cuts, scenario-gatehouse
 
 **Perf:** skip: Carve declares no heavy suites
 
@@ -56,7 +56,7 @@ The agreed rover is built through the product's own tools, blockout first and th
 
 ### As built
 
-First agent (Sonnet 5.5), 2026-11-19: the scenario and its checks; the frame review and `finish` are still to come.
+First agent (Sonnet 5.5), 2026-11-19: the scenario and its checks. Frame review (Sonnet 5.5) below.
 
 - **Project** `scenarios/Carve.Scenario.Parts` (in `Carve.slnx`; suite `scenario-parts`, `regression`, gpu, in `tests.json`; Layout row in `CLAUDE.md`; `scenario-parts` added to the `**Verify:**` lines of T-96, T-97 and T-98). It links `RoverSpec.cs` from `tests/Carve.Core.Tests` (typed once), the shed's `ShedChecks.cs` and `ShedGeometry.cs` (camera), the Cuts ray test `CutsGeometry.cs` and `ColourRule.cs`. The scenario cannot reference Core, so `PartsWorld.cs` places the geometry itself: `get_mesh` for each geometry part (live, and levels 0 and 1) placed by the tree in `RoverSpec.Tree` (the mast's rotation tracked by the scenario), then judged by the T-94 rules.
 - **Build through the tools** (`PartsScenario.cs`): `define_part` for the non-instances, `define_mesh` for the blockout boxes and 8-sided wheel, `define_part` for the instances, `set_colour`, `keep_level {level: 0}`; then the 16-sided `define_mesh`, the six `extrude`s of `RoverSpec.Cuts`, `set_colour`, `keep_level {level: 1, parts: [Cab, Lamp, Wheel_FL]}`.
@@ -69,35 +69,23 @@ First agent (Sonnet 5.5), 2026-11-19: the scenario and its checks; the frame rev
 - **Shared file touched:** `scenarios/Carve.Scenario.Cuts/CutsGeometry.cs`, `Solid.FirstHit` works each face's normal once, not once a ray. Same results (no frame of any scenario changes); without it one whole-rover frame took 40 s to judge and the run timed out. The scenario's run is about 170 s locally (112 s queued on Mantorok); `tests.json` passes `-TimeoutSeconds 900` to `run-scenario.ps1`.
 - **For T-97 (run folder and save path):** `artifacts/scenarios/parts/<n>/` (or `<name>/` under `CAIRN_ARTIFACTS` queued) holds `frames/`, `user-data/`, `run.json` and `parts/rover.carve`, the model after the refinement and its two levels (saved before the instance edit and the mast turn, so `Mast` is at its start rotation and the hub boss unmoved). No export is made here.
 
+### Frame review
+
+Frame review agent (Sonnet 5.5), 2026-11-19. **The person's rulings on the questions below (2026-11-19), each on the recommended option:** (1) the flip rule stands as built; (2) `instance-edit` is drawn from above (+y); (3) both helper frames, `part-wheel-plain` and `instance-undone`, are kept.
+
+- **Frame guard.** `CutsGeometry.cs` is linked by `scenario-cuts` (owner), `scenario-gatehouse`, `scenario-parts` and the two unit-test projects (no frames). A fresh run of `scenario-cuts` and `scenario-gatehouse` on the milestone tip (0d8a91c) against T-96's run (93b0159): 16 and 26 frames, every one byte-identical by sha256. `**Verify:**` now names `scenario-cuts` and `scenario-gatehouse`.
+- **Hashes** of all 13 frames match the hand-off. Not opened again: `blockout-front`, `front`, `part-axle-front` (byte-identical to T-94's approved frames), `reopened-front` (= `front`), `instance-undone` (= `top`).
+- `blockout-sheet`: three tiles from +x, +z, +y; plain boxes, 8-sided dark wheels without boss, lamp box on the mast, green chassis, sand cab; the +z tile has cab right, mast left with the lamp pointing right; the +y tile has -Z up, cab right, lamp left. Nothing clipped.
+- `back-left`: the -Z side and rear; cab at left, mast at right (the camera is at -X); lamp points toward +X; light-grey bosses outward on the two -Z wheels; no windscreen in sight; all parts placed.
+- `top`: green chassis, sand cab at +X (right), lamp at -X (left), four dark wheels projecting at the sides with a light-grey boss at each outer end; nothing missing.
+- `mast-turned`: a crop beside `front` shows the lens gone from sight and the lamp now running back from the mast to -Z (away from the camera); the rest as `front`.
+- `instance-edit`: from above, a pixel diff against `top` shows 580 differing pixels at each of the four wheels' bosses (a darker shade where the cap is raised and the walls slant) and nothing else; the outlines do not change, as expected for a +y move seen from +y.
+- `part-wheel-labels`: Wheel_FL's own ids on the visible faces (1 on the boss cap, 34 to 38, 48, 49 on the boss wall, 2 to 6, 16 to 33 on the rim and outer face); `part-wheel-plain`: the same wheel unlabelled with its light-grey boss; `part-wheel-L0`: an 8-sided dark prism, no boss. Nothing inside-out.
+- **No fault found.** The person approved all 13 frames in Waystone ("Approved.", no notes).
+- **Not checked:** the export and the split load (T-95, T-97).
+
 ### Questions for the person
 
 1. **The mirror and up rule on symmetric frames** (above). The rover is symmetric in z, so three frames cannot tell one of the two turns: the +x sheet tile (left for right), and `top` and `instance-edit` (top for bottom; also the sheet's +y tile). The check there is that the other turn tells over 500 pixels and this one tells under 100 (a true symmetry). Recommended: accept as built. The alternatives are to drop the check from those frames, or to give the rover an asymmetric part, which is not this member's to do.
 2. **`instance-edit` is drawn from above.** The sketch gives no direction. From the front, the bosses of `Wheel_FR` and `Wheel_RR` face -Z and the chassis hides them, and no direction sees all four bosses; from above every wheel's moved boss shows, a few pixels wide. Recommended: from above, as built. The alternative is two frames.
 3. **Extra frames** `part-wheel-plain` and `instance-undone` are not on the agreed list; both are helpers for comparisons (the labelled wheel against the plain one, the undo against `top`). Say if they should go.
-
-### Hand-off
-
-First agent (Sonnet 5.5), 2026-11-19, at the checkpoint (code committed, `verify` passing; the frame review and `finish` still to come).
-
-- **Done:** the scenario, its checks, the suite, the break table, `CLAUDE.md`'s row and the Verify lines. `cairn task T-96 verify` runs `core-unit`, `server-unit`, `patina-unit` and `scenario-parts` (112 s on Mantorok) clean once committed.
-- **Left:** (1) the frame review: a separate agent opens each frame below, cropped or scaled, against what it should show. (2) The person's answers to the three questions above. (3) A frame guard: `CutsGeometry.cs` changed (performance only), so the scenarios that link it (`scenario-cuts`, `scenario-gatehouse`, and any other the guard finds by `tests.json`) should be compared by hash with a fresh before-run, as T-94 did. (4) `finish`, run inside the worktree, its output read whole and its `Merge task/T-96` line given.
-- **Frames**, in `G:\My Drive\artifacts\carve\M-9\T-96\round-1\` (copied from the local passing run, `artifacts/scenarios/parts/6`; hashes of the local copies):
-
-| Frame | sha256 | Should show |
-|---|---|---|
-| `blockout-front.png` | `bd11f6dd7ad58eace448b54b30b3ba425f5e5b42f5f9a26480751182ef48c9d0` | T-94's reviewed level 0 frame: plain boxes, four 8-sided dark wheels with no boss, no recess, no lens |
-| `blockout-sheet.png` | `ae06a00c16c069c919392a7970b9f7df8668c5a4bfd0754a66f4fe307869e2ea` | three tiles 1540x512, level 0, from +x, +z and +y (+y with -Z up the tile), each framed on the whole blockout |
-| `front.png` | `3ab4aee283930739139ca9913c613d858752eb12d18c3f44e6fa1c780b9c0910` | T-94's reviewed live frame: sand cab at +X (right), mast and lamp at -X (left) with the yellow recessed lens on the lamp's +X end, 16-sided wheels, light-grey bosses on the +Z side; same as `reopened-front.png` |
-| `back-left.png` | `16ce759b5eb62dd8bcfb452de2a3b1080baa54ea197805c5f81b2797e3d0a9c1` | from [-1, 0.6, -1]: the -Z side and the rear; the windscreen (+X) not in sight; the bosses of the wheels on the -Z side outward |
-| `top.png` | `13ee2ec3c5288cde6f4f9af0d0aa7e393355f9142b128095a873f98832bf84fc` | +y orthographic, -Z up the frame: chassis, cab at +X (right), mast and lamp at -X, four wheels projecting at the sides; same as `instance-undone.png` |
-| `mast-turned.png` | `3ec907c378b362039466561883762fe77cbd97caf5e7ddbaa02a58326774c6ba` | front; the lamp now lies along -Z (away from +X), the rest as `front.png` |
-| `part-axle-front.png` | `8d9e152f9c8e0847b26d46b3d3f887f1c103f555efce8ba7c13a15264ed61d23` | T-94's reviewed axle frame: the two front wheels alone, plain inner caps, no boss in sight |
-| `part-wheel-labels.png` | `2a1520ab95b6862c72bb77f3e491ff9e4ead34bef6a2223c4e1b42736d0d7e67` | 1024, Wheel_FL alone with its face ids 0 to 49 on the visible faces (T-94's labelled frame, larger) |
-| `part-wheel-plain.png` | `fea0bd84c2607bed1add30eb738ad98e94b7b34b07c145350bdf5a57c844b0d2` | the same wheel without labels (helper) |
-| `part-wheel-L0.png` | `1b75253d7201277b1136e3bf5e183b11987b76e1a704c39900c523e734bf7763` | Wheel_FL at level 0: an 8-sided prism, dark, no boss |
-| `reopened-front.png` | `3ab4aee283930739139ca9913c613d858752eb12d18c3f44e6fa1c780b9c0910` | byte-equal to `front.png` |
-| `instance-edit.png` | `14805245f1103e6b04b412eb03f6239c43bcc8b42f73b8084f89422c78ad0500` | from above: as `top.png`, but each of the four wheels' light-grey bosses shows its cap raised 0.1 m (the walls slanted) |
-| `instance-undone.png` | `13ee2ec3c5288cde6f4f9af0d0aa7e393355f9142b128095a873f98832bf84fc` | byte-equal to `top.png` |
-
-- **Checked:** every pixel check passes on the real product; each of the four breaks fails (table above); `reopened-front` equals `front` and `instance-undone` equals `top` by bytes. **Not checked:** by eye, no frame (this agent opened no image); the labelled wheel's ids by reading; the export and the split load (T-95, T-97).
-- **Surprising:** `blockout-front`, `front` and `part-axle-front` match T-94's reviewed hashes exactly, so they need only a glance. The run is slow to judge (about 170 s locally, 112 s queued) because the Cuts ray test did a face normal per ray; now cached.
