@@ -34,7 +34,9 @@ description: >-
 - **Consequence:** an agent can save a model and open it back, and silently lose a part. This happens when it lays out a group or pivot first and gives it children or a placement later, or leaves the empty as a placeholder. A later `define_part parent=E` is then refused with "no part named 'E'". This breaks the spec's "the Carve file holds the tree", and "read back" is not true for this model. A possible fix: a part with no mesh is never plain for the trigger, e.g. `model.Parts.Any(p => !p.IsPlain || model.Find(p.Name) is null)`, plus a trigger case.
 - **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `38472bc`: `CarveFile.HasPartTree` is also true when any part is not plain or has no mesh, so a bare empty is written in the tree and read back. With the reorder fix below it has four tests in `PartTreeFileTests`, each failing without the fix, among them `A_bare_empty_part_comes_back_from_save_and_open`. (claude-opus-5-5)
 
 ### Plain parts defined in a different order from their meshes come back reordered, so `Combined` and `OffsetOf` change across save and open
 
@@ -43,7 +45,9 @@ description: >-
 - **Consequence:** after a save and open, the same model draws and exports (`ExportTool` uses `model.Combined` for a model with no `moves`) with its occurrences in another order. Anything keyed on positions in `Combined` (render offsets, the weights heat runs) differs from before the save. The model is equal by every record, but not "read back as it was". The fix for the finding above (an empty forces the tree) covers only some of this. The order itself needs either a trigger (part order differs from mesh order) or `With`/`Create` keeping the two orders in step.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `38472bc`: `HasPartTree` is also true when the parts are in a different order from the meshes, so the order is written and read back, and `Combined` and `OffsetOf` are the same across save and open; `Plain_parts_in_another_order_than_their_meshes_draw_the_same_after_save_and_open` fails without the fix. (claude-opus-5-5)
 
 ### Core lets an existing part's `instance_of` change; the rule lives only in `define_part`
 
@@ -52,7 +56,9 @@ description: >-
 - **Consequence:** the ruling holds only for callers that go through `define_part`. Any other Core caller, now or later (a future tool, or `WithPartPieceFrom`-style helpers), can break it without a refusal. My view on the refactor pass's question is yes: move it into Core. `WithPart` should refuse a changed `InstanceOf` on an existing record (`instance_of: ... an existing part's instance_of does not change`), keeping the two Server messages' wording. `DefinePartTool` would then only pass the problem through. No current Core caller changes `InstanceOf`, so the move is safe.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `cc6edae`: the comparison with the existing part moved into Core's `PartProblems`, used by `WithPart`, as `("instance_of", ...)`; `define_part` only adds "; give a new name to make an instance". One existing assertion changed: in `PartTreeTests.WithPart_refuses_each_bad_field_by_name`, making an owner an instance now gets the changed-instance_of refusal, because that check runs first. (claude-opus-5-5)
 
 ### `CarveFile`'s doc comments still give the version range as ending at 8
 
@@ -61,7 +67,9 @@ description: >-
 - **Consequence:** the API docs say a version 9 file cannot be read or written. Misleading only.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `5f6d57e`: the three doc comments give the versions as ending at 9. (claude-opus-5-5)
 
 ### `Model.Piece` has no product caller left and silently drops levels
 
@@ -70,7 +78,9 @@ description: >-
 - **Consequence:** this is a second public piece API that differs from the one the product uses. A future caller choosing `Piece` would lose the levels without any error, and the tests that pin `Piece` guard a path `save` no longer takes. Either point those tests at `PartPiece` and drop `Piece`, or document `Piece` as level-less.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `3bbd0b2`: `Model.Piece` and the uncalled `ModelStore.OpenMesh` are removed; their tests now go through `PartPiece`. (claude-opus-5-5)
 
 ## Findings: the part tools and render — T-93, T-94 (claude-opus-5-5)
 
@@ -126,7 +136,9 @@ description: >-
 - **Consequence:** The descriptions promise a pointer the empty-part refusal doesn't give. That's small, but these texts are what agents learn from.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `e7c805f`: the shared part sentence and keep_level's text say only an instance's refusal names a part (its source), and an empty part is refused as having no geometry. (claude-opus-5-5)
 
 ### Open question: the "an existing part's instance_of does not change" rule belongs in Core
 
@@ -135,7 +147,9 @@ description: >-
 - **Consequence:** For now there is one caller, so nothing is wrong today. The rule would be lost silently by the next caller.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `cc6edae`: moved into Core as proposed; see "Core lets an existing part's `instance_of` change". One existing assertion changed: in `PartTreeTests.WithPart_refuses_each_bad_field_by_name`, making an owner an instance now gets the changed-instance_of refusal, because that check runs first. (claude-opus-5-5)
 
 ## Findings: the export, the rover scenario, the sample and acceptance — T-95 to T-98 (claude-opus-5-5)
 
@@ -146,7 +160,9 @@ description: >-
 - **Consequence:** an edit to only one of these files (a rover number in `RoverSpec.cs`, or a `CutsGeometry.FirstHit` change like T-96's) leaves `server-unit`'s fingerprint unchanged. `GlbPartsTests`, `ExportPartsToolTests`, `RoverRenderTests` and the part tool tests are then not re-run, and a cached pass stands for code it never compiled.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `8c32cf2`: `server-unit`'s inputs list `RoverSpec.cs`, `RoverSpec.Model.cs`, `PartTreeSample.cs`, `ColourRule.cs`, `ShedGeometry.cs` and `CutsGeometry.cs`. (claude-opus-5-5)
 
 ### Carve.PartsAcceptance.Tests has no Layout row and is in no suite's inputs, unlike T-49's
 
@@ -155,7 +171,9 @@ description: >-
 - **Consequence:** every suite builds the solution, so a compile break in this project fails all of them. Yet no suite's fingerprint moves when it changes, so a cached result can hide the break until something else changes. Nothing in the docs says the project runs only on an acceptance round's folder.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `8c32cf2`: a CLAUDE.md Layout row for `tests/Carve.PartsAcceptance.Tests`, and the project is a `dotnet-closure` input of `server-unit`, as T-49's are. Its csproj comment no longer names a frame reader it does not link. (claude-opus-5-5)
 
 ### The tree export's ruled limit counting and the skinned moves warning have no tool-level test
 
@@ -182,7 +200,9 @@ description: >-
 - **Consequence:** the evidence path can't be followed or copied, and the file carries control characters.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `8c32cf2`: the bytes 0x07 and 0x08 are `` and `` again, checked by `repr`. (claude-opus-5-5)
 
 ### T-96's As built still says tests.json passes -TimeoutSeconds 900
 
@@ -191,7 +211,9 @@ description: >-
 - **Consequence:** the tracker names the wrong place to change the scenario's timeout.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `8c32cf2`: As built says `tests.json` runs `scripts/run-parts-scenario.ps1 -NoBuild`, whose `-ScenarioTimeoutSeconds` defaults to 900. (claude-opus-5-5)
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -211,7 +233,9 @@ description: >-
 - **Consequence:** An agent saving `Wheel_FR` is told to edit `Wheel_FL`, and one saving `Axle_F` is told to give it geometry with define_mesh. Neither is what save wants. The two halves of one T-92 rule read differently to agents.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `f308a2b`: `Model.PieceProblem(name, verb)` gives one refusal for an instance or an empty, shared by `save mesh=`, `export mode=piece`, `PartPiece` and `WithPartPieceFrom`; `PartPieceToolTests` pins the new texts and `PieceExportToolTests` tests the export's. (claude-opus-5-5)
 
 ### `export mode=piece` on an instance or an empty gives "no mesh named", not save's pointer
 
@@ -220,7 +244,9 @@ description: >-
 - **Consequence:** The same refusal is decided a third way. An agent that sees `Wheel_FR` in `get_parts` is told it does not exist.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `f308a2b`: the piece export goes through `Model.PieceProblem`, so it gives save's pointer; export's piece sentence says so (`e7c805f`). (claude-opus-5-5)
 
 ### get_mesh reports a TRS "world" for a transform that export refuses as a shear
 
@@ -238,7 +264,9 @@ description: >-
 - **Consequence:** On a rotated part, `project_uvs view=front` does not match `render view=front`, and the descriptions contradict each other. Agents get no word that these tools refuse instances and empties.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `e7c805f`: the `PartTarget` sentence is on the other 11 tools that take `mesh`, `PartSpace` is added to `project_uvs`, and its planar wording no longer promises render's view. The tools/list digest was re-taken as `1697322B…`, after a stripping proof gave the old `DCE3D7BA…`. (claude-opus-5-5)
 
 ### CLAUDE.md layout: no row for `tests/Carve.PartsAcceptance.Tests`, and the scenario's frame count is wrong
 
@@ -247,7 +275,9 @@ description: >-
 - **Consequence:** The next agent cannot learn from CLAUDE.md how the parts acceptance checks run, or that they run outside any suite, and the frame count it reads is wrong.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `8c32cf2`: the Layout row for `tests/Carve.PartsAcceptance.Tests` is added; the `Carve.Scenario.Parts` row (and `PartsScenario`'s doc comment) say 13 frames, naming the helper frames `part-wheel-plain` and `instance-undone`. (claude-opus-5-5)
 
 ### Retrospective and changelog wording do not match the record
 
@@ -256,7 +286,9 @@ description: >-
 - **Consequence:** Small inaccuracies in the permanent record.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `8c32cf2`: the retrospective says five export rules; the changelog's T-132 line says a model with both saves as version 9, which holds both. (claude-opus-5-5)
 
 ### `Model.Piece` is left with no product caller after `save` moved to `PartPiece`
 
@@ -265,7 +297,9 @@ description: >-
 - **Consequence:** Dead code, with tests that give false confidence about how `save mesh=` behaves without a part tree.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `3bbd0b2`: removed, with its tests moved to `PartPiece`; see "`Model.Piece` has no product caller left". (claude-opus-5-5)
 
 ## Summary
 
