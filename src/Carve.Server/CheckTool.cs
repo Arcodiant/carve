@@ -55,12 +55,14 @@ public sealed class CheckTool(ModelStore store)
     {
         var errors = UnknownArguments("check", context, "mesh", "targets");
         var name = MeshName(mesh, errors);
-        var weights = TargetWeightsArgument.Read(targets, store.Current.Model, errors);
+        // One snapshot for the whole call: the mesh, its materials and the envelopes all come from the same model (RV-71).
+        var model = store.Current.Model;
+        var weights = TargetWeightsArgument.Read(targets, model, errors);
         if (errors.Count > 0) return Failed("check", errors);
-        if (Target(store, "check", name, out var error) is not { } target) return error!;
+        if (Target(model, "check", name, out var error) is not { } target) return error!;
 
         // The mesh is checked at the weights given; its targets are checked at weight 1 against the mesh at rest either way.
-        var health = MeshHealth.Create(weights is null ? target : target.Morphed(weights.ByName), store.Current.Model.Materials, target);
+        var health = MeshHealth.Create(weights is null ? target : target.Morphed(weights.ByName), model.Materials, target);
         var stats = health.Stats;
         // In this order; uvs is left out for a mesh with none, so its output is what it always was.
         var shown = new Dictionary<string, object?>
@@ -76,7 +78,7 @@ public sealed class CheckTool(ModelStore store)
             ["area"] = stats.Area,
             ["volume"] = stats.Volume,
         };
-        var envelope = store.Current.Model.EnvelopeWarnings().Select(w => w.Message).ToArray();
+        var envelope = model.EnvelopeWarnings().Select(w => w.Message).ToArray();
         if (stats.Uvs is { } uvs) shown["uvs"] = new { mapped = uvs.Mapped, unmapped = uvs.Unmapped };
         return Ok(new
         {

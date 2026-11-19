@@ -29,8 +29,21 @@ public sealed class GetMeshTool(ModelStore store)
 
     /// <summary>T-94's sentences: the part's placement, and level.</summary>
     public const string PlacementText =
-        "The coordinates are the part's own, in its local space, and two keys place it: parent (the part's parent's name, null at the top) and world:{translation:[x,y,z], rotation:[x,y,z,w], scale:[x,y,z]} (the part's space to the model's, its own transform after every ancestor's; a plain mesh's is the identity). "
+        "The coordinates are the part's own, in its local space, and two keys place it: parent (the part's parent's name, null at the top) and world:{translation:[x,y,z], rotation:[x,y,z,w], scale:[x,y,z]} (the part's space to the model's, its own transform after every ancestor's; a plain mesh's is the identity); when an ancestor's non-uniform scale above a rotation makes a shear, world is only the nearest and warnings says so. "
         + "level (0 or more) reads a kept level (keep_level) instead of the live geometry: the newest kept level at or below it, named by level:{given, shown}, e.g. level:{given:3, shown:1}; a part with none is a tool error listing its levels. ";
+
+    /// <summary>The warning when <c>world</c> cannot be the part's transform (RV-71), worded as export's shear refusal.</summary>
+    public static string ShearWarning(string part) =>
+        $"world: the transform of part '{part}' is not a translation, rotation and scale, since a non-uniform scale above a rotation makes a shear, "
+        + "so world only approximates where the part is drawn; give that ancestor a uniform scale, or turn the part so the scale's axes stay its own";
+
+    private static bool Close(System.Numerics.Matrix4x4 a, System.Numerics.Matrix4x4 b)
+    {
+        for (var r = 0; r < 4; r++)
+        for (var c = 0; c < 4; c++)
+            if (MathF.Abs(a[r, c] - b[r, c]) > 1e-4f * MathF.Max(1, MathF.Abs(b[r, c]))) return false;
+        return true;
+    }
 
     public static McpServerTool Create() => MeshToolSupport.Create<GetMeshTool>("get_mesh", Text, WithMesh(new JsonObject
     {
@@ -62,8 +75,9 @@ public sealed class GetMeshTool(ModelStore store)
         var name = MeshName(mesh, errors);
         var targetName = TargetToolSupport.TargetName("target", target, errors);
         if (errors.Count > 0) return Failed("get_mesh", errors);
-        if (Target(store, "get_mesh", name, out var error) is not { } mesh0) return error!;
+        // One snapshot for the whole call: the vertices, parent, world and level all come from the same model (RV-71).
         var model = store.Current.Model;
+        if (Target(model, "get_mesh", name, out var error) is not { } mesh0) return error!;
         var partName = model.Target(name, out _)!.Name;
         PartLevel? shown = null;
         if (levelAsked is { } asking)
@@ -120,8 +134,12 @@ public sealed class GetMeshTool(ModelStore store)
             body[k] = v;
         }
         body["parent"] = model.FindPart(partName)!.Parent!;
-        System.Numerics.Matrix4x4.Decompose(model.WorldTransform(partName)!.Value, out var scale, out var rotation, out var translation);
+        var world = model.WorldTransform(partName)!.Value;
+        var exact = System.Numerics.Matrix4x4.Decompose(world, out var scale, out var rotation, out var translation);
         body["world"] = new { translation = Array(translation), rotation = new[] { rotation.X, rotation.Y, rotation.Z, rotation.W }, scale = Array(scale) };
+        if (!exact || !Close(System.Numerics.Matrix4x4.CreateScale(scale) * System.Numerics.Matrix4x4.CreateFromQuaternion(rotation)
+            * System.Numerics.Matrix4x4.CreateTranslation(translation), world))
+            body["warnings"] = ((IEnumerable<string>)body["warnings"]!).Append(ShearWarning(partName)).ToArray();
         if (shown is not null) body["level"] = new { given = levelAsked, shown = shown.Number };
         return Ok(body);
     }
