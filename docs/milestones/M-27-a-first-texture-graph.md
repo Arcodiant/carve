@@ -270,3 +270,51 @@ No rework was traced to the Sonnet tier. The extra work came from rulings: the b
 - **Acceptance run conditions:** carry `--allowedTools` for both servers, and expect the default model to be Opus.
 - **A member that depends on a sibling's API** (T-113 on T-112's nodes) can start early but should expect to hand off
   until the sibling lands.
+
+**After the person's go (2026-11-18 to 2026-11-19).**
+
+- **Rebase onto `main` (Sonnet 5.5):** clean, 45 commits, no fixes.
+- **Refactor pass (Sonnet 5.5):** three cuts:
+  - the dead `ViewFraming.VerticalCosine`;
+  - the dead `PbrMaterials.Sampler` alias;
+  - one lighting constant written twice, now shared.
+
+  Left, as design changes: the near-duplicate tool plumbing and test harnesses of the two servers.
+- **Review round 1, RV-68:** five Opus 5.5 reviewers, split by area (`Carve.Hosting` and `Carve.Server`;
+  `Patina.Graphs`; `Patina.Server`; the scenarios and checks; the whole diff). 26 findings: 3 Major, 15 Minor, 8 Nit.
+  The Majors:
+  - reading or validating a graph threw on an input from a node of unknown type;
+  - `export` held the graph lock for minutes and ignored cancellation;
+  - the 1024 export check passed a shifted, a mirrored and a flat picture.
+- **`main` moved mid-review.** M-21 landed. A second rebase (Opus 5.5) had one Layout-row conflict. M-21's render
+  changes were in carve's own files, so nothing had to move into `Carve.Hosting`. Frames of five suites, `scenario-morph`
+  among them, were byte-identical with `main`'s.
+- **The person's rulings during the answers:**
+  - **Scenario Patina drops its reference to `Patina.Graphs`.** It takes reference texels through patina's tools and the
+    approved planks PNGs, keeping CLAUDE.md's rule. The person asked first why the rule exists; the answer is in the
+    rule's own text (scenarios are the API's first client and reach the product only through it), and in practice every
+    carve scenario works its predictions out independently.
+  - **The validator kind-checks every input whose source resolves,** even when another input of that node is at fault
+    (from RV-68's `edit_graph` finding; extended to a node on a cycle in round 2).
+  - **The 1024 export rule:** each 256 texel, per channel, within 4 levels of the mean of the four 1024 texels at its
+    centre. For the normal, after an Opus research agent found its 30-level difference is sampling at the planks' kinks
+    and not a defect: 4 where the local step is 4 or less, 32 elsewhere.
+- **Answers:** five Opus 5.5 agents answered RV-68, the first three handing off at the call limit. Export cancellation
+  works on `notifications/cancelled`, which the SDK's client (2.3.0) never sends when its token is cancelled; the test
+  sends it by hand.
+- **Review round 2, RV-69:** two Opus 5.5 reviewers checked the 26 answers against the code and reviewed the second
+  rebase. 23 held. 4 findings (3 Minor, 1 Nit): the cycle case, pre-rebase commit hashes in the As built, roughness
+  unchecked at 1024 in the scenario, and a stale comment. One Opus 5.5 agent fixed all four.
+- **Review round 3, RV-70:** one Opus 5.5 reviewer. All four answers held. One Nit in the docs (a one-stave shift
+  claimed caught that no check makes), corrected by the orchestrator.
+- **`cairn milestone M-27 verify` (2026-11-19, at 4c68375): VERIFY PASS.** The review is current at RV-70. All 22
+  suites pass, 3 ran and 19 carried.
+- **Left:**
+  - scratch probes in `D:\repos\carve\artifacts\RV-68b\`, written at the container root by a fix agent;
+  - `refs/t111/before`;
+  - the unregistered member worktree folders.
+- **Next time:**
+  - **Check `main` just before reserving the review.** M-21 landed while round 1 ran, which made it stale and cost a
+    second rebase.
+  - **Round 1's split by area worked.** Most findings were in the areas the briefs pointed at.
+  - **Checking answers against the code paid off again.** Round 2 found three of 26 answers incomplete.
