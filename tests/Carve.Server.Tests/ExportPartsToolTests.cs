@@ -37,6 +37,28 @@ public sealed class ExportPartsToolTests() : FileToolTests("carve-export-parts")
         Assert.False(File.Exists(Path.Combine(Root, "sheared.glb")));
     }
 
+    /// <summary>
+    /// RV-72: export and get_mesh share one shear test, so a near-uniform ancestor scale that export refuses as a shear
+    /// is one get_mesh warns of (a part turned 30° under an ancestor scaled [1.0002,1,1], the reviewer's case).
+    /// </summary>
+    [Fact]
+    public async Task A_shear_export_refuses_under_a_near_uniform_scale_is_one_get_mesh_warns_of()
+    {
+        var (carve, _) = await StartAsync(mesh: null);
+        using var _carve = carve;
+        var cube = Carve.Core.Tests.TestMeshes.Cube();
+        var (model, _) = Model.Create([new("Base", cube), new("Crate", cube)], null, [], [],
+            [new Part("Base") { Scale = new Vector3(1.0002f, 1, 1) },
+             new Part("Crate") { Parent = "Base", Moves = true, Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 6) }]);
+        carve.Store.OpenModel(model!, "open");
+        var refused = Refused(await carve.CallToolAsync("export", """{"path":"near.glb"}"""));
+        Assert.StartsWith("export: part 'Crate' moves, and the non-uniform scale of its static ancestor 'Base'", refused);
+        Assert.False(File.Exists(Path.Combine(Root, "near.glb")));
+        var crate = System.Text.Json.JsonDocument.Parse(Ok(await carve.CallToolAsync("get_mesh", """{"mesh":"Crate"}"""))).RootElement;
+        Assert.Contains(crate.GetProperty("warnings").EnumerateArray(),
+            w => w.GetString()!.StartsWith("world: the transform of part 'Crate' is not a translation, rotation and scale, since a non-uniform scale above a rotation makes a shear", StringComparison.Ordinal));
+    }
+
     /// <summary>RV-71: the tree export counts the game's limits on the file as drawn, so the four shared wheels are four wheels' triangles.</summary>
     [Fact]
     public async Task A_tree_export_counts_its_limits_as_drawn_with_each_instance_its_own_triangles()

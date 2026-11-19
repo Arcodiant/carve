@@ -37,14 +37,6 @@ public sealed class GetMeshTool(ModelStore store)
         $"world: the transform of part '{part}' is not a translation, rotation and scale, since a non-uniform scale above a rotation makes a shear, "
         + "so world only approximates where the part is drawn; give that ancestor a uniform scale, or turn the part so the scale's axes stay its own";
 
-    private static bool Close(System.Numerics.Matrix4x4 a, System.Numerics.Matrix4x4 b)
-    {
-        for (var r = 0; r < 4; r++)
-        for (var c = 0; c < 4; c++)
-            if (MathF.Abs(a[r, c] - b[r, c]) > 1e-4f * MathF.Max(1, MathF.Abs(b[r, c]))) return false;
-        return true;
-    }
-
     public static McpServerTool Create() => MeshToolSupport.Create<GetMeshTool>("get_mesh", Text, WithMesh(new JsonObject
     {
         ["type"] = "object",
@@ -135,10 +127,9 @@ public sealed class GetMeshTool(ModelStore store)
         }
         body["parent"] = model.FindPart(partName)!.Parent!;
         var world = model.WorldTransform(partName)!.Value;
-        var exact = System.Numerics.Matrix4x4.Decompose(world, out var scale, out var rotation, out var translation);
+        var exact = Trs.Decomposes(world, out var scale, out var rotation, out var translation);
         body["world"] = new { translation = Array(translation), rotation = new[] { rotation.X, rotation.Y, rotation.Z, rotation.W }, scale = Array(scale) };
-        if (!exact || !Close(System.Numerics.Matrix4x4.CreateScale(scale) * System.Numerics.Matrix4x4.CreateFromQuaternion(rotation)
-            * System.Numerics.Matrix4x4.CreateTranslation(translation), world))
+        if (!exact)
             body["warnings"] = ((IEnumerable<string>)body["warnings"]!).Append(ShearWarning(partName)).ToArray();
         if (shown is not null) body["level"] = new { given = levelAsked, shown = shown.Number };
         return Ok(body);
