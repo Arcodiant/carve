@@ -461,7 +461,9 @@ internal static class RenderTool
         (int Vertices, int Faces) offset = (0, 0);
         // With part, labels and highlight left unaimed go to the one part under it with geometry of its own (T-94).
         var aimName = meshName ?? (part is not null && wantsIds ? SoleOwner(current.Model, part) : null);
-        if (aimName is not null || (wantsIds && (part is not null || current.Model.Meshes.Count > 1)))
+        // A single mesh drawn as more than itself (its instances, or its placement) is aimed too: its ids are its own occurrence's (RV-71).
+        var alone = current.Model.Meshes is [var only] && ReferenceEquals(drawn, only.Mesh);
+        if (aimName is not null || (wantsIds && (part is not null || level is not null || !alone)))
         {
             if (current.Model.Target(aimName, out var aimed) is not { } named)
             {
@@ -476,7 +478,7 @@ internal static class RenderTool
                     : $"mesh: '{named.Name}' is not drawn with part '{part}'; the parts under it are {NameList.Quoted(current.Model.SubtreeOf(part!))}"]);
             }
 
-            if (part is null && level is null ? current.Model.Meshes.Count > 1 : !ReferenceEquals(drawn, own))
+            if (!ReferenceEquals(drawn, own))
             {
                 idsIn = own;
                 offset = current.Model.OffsetOf(named.Name, part, level)!.Value;
