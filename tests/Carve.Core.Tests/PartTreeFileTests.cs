@@ -14,7 +14,7 @@ namespace Carve.Core.Tests;
 [Trait("Tier", "unit")]
 public class PartTreeFileTests
 {
-    private static Model Read(string text)
+    internal static Model Read(string text)
     {
         var read = CarveFile.Read(text);
         Assert.True(read.Succeeded, string.Join("; ", read.Errors));
@@ -23,7 +23,7 @@ public class PartTreeFileTests
 
     private static int Bits(float f) => BitConverter.SingleToInt32Bits(f);
 
-    private static string Floats(params float[] values) => string.Join(",", values.Select(v => Bits(v).ToString("x8")));
+    internal static string Floats(params float[] values) => string.Join(",", values.Select(v => Bits(v).ToString("x8")));
 
     /// <summary>A model's content as text: every part's record to the bit, then every mesh and kept level's geometry and looks to the bit.</summary>
     private static string Content(Model model)
@@ -40,15 +40,24 @@ public class PartTreeFileTests
             foreach (var g in style.Groups) sb.Append($"g{g.Name}={string.Join(" ", g.Faces)};");
             sb.Append(m.ShadingMode).Append(';').Append(string.Join(" ", m.HardEdges)).Append('\n');
         }
+        return PartsContent(model, sb, Mesh);
+    }
+
+    /// <summary>
+    /// Every part's record to the bit, in pre-order, each followed by its live mesh and kept levels as <paramref name="mesh"/>
+    /// appends them to <paramref name="sb"/>: the part of <see cref="Content"/> the version 9 tests share.
+    /// </summary>
+    internal static string PartsContent(Model model, StringBuilder sb, Action<PolygonMesh> mesh)
+    {
         foreach (var p in model.Parts)
         {
             sb.Append($"{p.Name}|{p.Parent}|{Floats(p.Translation.X, p.Translation.Y, p.Translation.Z)}|{Floats(p.Rotation.X, p.Rotation.Y, p.Rotation.Z, p.Rotation.W)}|");
             sb.Append($"{Floats(p.Scale.X, p.Scale.Y, p.Scale.Z)}|{(p.Envelope is { } e ? Floats(e.Min.X, e.Min.Y, e.Min.Z, e.Max.X, e.Max.Y, e.Max.Z) : "-")}|{p.InstanceOf}|{p.Moves}\n");
-            if (model.Find(p.Name) is { } live) Mesh(live);
+            if (model.Find(p.Name) is { } live) mesh(live);
             foreach (var level in p.Levels)
             {
                 sb.Append($"level {level.Number}\n");
-                Mesh(level.Mesh);
+                mesh(level.Mesh);
             }
         }
         return sb.ToString();

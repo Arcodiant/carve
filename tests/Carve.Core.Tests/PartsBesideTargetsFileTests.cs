@@ -14,15 +14,9 @@ namespace Carve.Core.Tests;
 [Trait("Tier", "unit")]
 public class PartsBesideTargetsFileTests
 {
-    private static Model Read(string text)
-    {
-        var read = CarveFile.Read(text);
-        Assert.True(read.Succeeded, string.Join("; ", read.Errors));
-        return read.Model!;
-    }
+    private static Model Read(string text) => PartTreeFileTests.Read(text);
 
-    private static string Floats(params float[] values) =>
-        string.Join(",", values.Select(v => BitConverter.SingleToInt32Bits(v).ToString("x8")));
+    private static string Floats(params float[] values) => PartTreeFileTests.Floats(values);
 
     /// <summary>Every part's record, and each mesh and kept level's vertices, faces and targets, to the bit.</summary>
     private static string Content(Model model)
@@ -39,18 +33,7 @@ public class PartsBesideTargetsFileTests
             }
             sb.Append('\n');
         }
-        foreach (var p in model.Parts)
-        {
-            sb.Append($"{p.Name}|{p.Parent}|{Floats(p.Translation.X, p.Translation.Y, p.Translation.Z)}|{Floats(p.Rotation.X, p.Rotation.Y, p.Rotation.Z, p.Rotation.W)}|");
-            sb.Append($"{Floats(p.Scale.X, p.Scale.Y, p.Scale.Z)}|{(p.Envelope is { } e ? Floats(e.Min.X, e.Min.Y, e.Min.Z, e.Max.X, e.Max.Y, e.Max.Z) : "-")}|{p.InstanceOf}|{p.Moves}\n");
-            if (model.Find(p.Name) is { } live) Mesh(live);
-            foreach (var level in p.Levels)
-            {
-                sb.Append($"level {level.Number}\n");
-                Mesh(level.Mesh);
-            }
-        }
-        return sb.ToString();
+        return PartTreeFileTests.PartsContent(model, sb, Mesh);
     }
 
     private static string VersionLine(int version) => $"{{\n  \"carve\": {version},\n";
