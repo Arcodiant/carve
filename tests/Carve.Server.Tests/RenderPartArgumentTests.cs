@@ -79,6 +79,43 @@ public class RenderPartArgumentTests
         Assert.Equal([0f, 0f, 0f], chassis.GetProperty("world").GetProperty("translation").EnumerateArray().Select(v => v.GetSingle()), new Near());
     }
 
+    /// <summary>RV-71: a crate under an empty scaled [2,1,1], turned by <paramref name="degrees"/> about Y.</summary>
+    private static async Task<JsonElement> CrateUnderScaleAsync(ToolHarness carve, float degrees)
+    {
+        await carve.CallToolAsync("define_mesh", PartToolsTests.MeshArguments("Crate", Carve.Rover.RoverSpec.Box(System.Numerics.Vector3.Zero, System.Numerics.Vector3.One)));
+        Ok(await carve.CallToolAsync("define_part", """{"part":"Base","scale":[2,1,1]}"""));
+        var turn = System.Numerics.Quaternion.CreateFromAxisAngle(System.Numerics.Vector3.UnitY, degrees * MathF.PI / 180);
+        Ok(await carve.CallToolAsync("define_part", JsonSerializer.Serialize(new { part = "Crate", parent = "Base", rotation = new[] { turn.X, turn.Y, turn.Z, turn.W } })));
+        return Ok(await carve.CallToolAsync("get_mesh", """{"mesh":"Crate"}"""));
+    }
+
+    private const string Shear = "world: the transform of part 'Crate' is not a translation, rotation and scale, since a non-uniform scale above a rotation makes a shear, "
+        + "so world only approximates where the part is drawn; give that ancestor a uniform scale, or turn the part so the scale's axes stay its own";
+
+    [Fact]
+    public async Task Get_mesh_warns_when_world_is_a_shear_that_no_translation_rotation_and_scale_holds()
+    {
+        await using var carve = new ToolHarness();
+        await carve.InitializeAsync();
+        var crate = await CrateUnderScaleAsync(carve, 30);
+        Assert.Contains(Shear, crate.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()));
+        Assert.True(crate.TryGetProperty("world", out _));
+    }
+
+    [Fact]
+    public async Task Get_mesh_gives_no_world_warning_when_the_transform_is_exact()
+    {
+        await using var carve = new ToolHarness();
+        await carve.InitializeAsync();
+        // A quarter turn keeps the scale's axes: the world is a translation, rotation and scale.
+        var crate = await CrateUnderScaleAsync(carve, 90);
+        Assert.DoesNotContain(crate.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.StartsWith("world:", StringComparison.Ordinal));
+        await using var rover = await RoverAsync();
+        foreach (var mesh in new[] { "Chassis", "Wheel_FL", "Cab" })
+            Assert.DoesNotContain(Ok(await rover.CallToolAsync("get_mesh", JsonSerializer.Serialize(new { mesh }))).GetProperty("warnings").EnumerateArray(),
+                w => w.GetString()!.StartsWith("world:", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Get_mesh_level_reads_the_newest_kept_level_at_or_below_it_and_names_both()
     {
