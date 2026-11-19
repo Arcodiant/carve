@@ -271,7 +271,7 @@ public class PartToolsTests
     [InlineData("""{"part":"Spare","instance_of":"Wheel_RL"}""", "instance_of: 'Wheel_RL' is itself an instance of 'Wheel_FL'; name 'Wheel_FL'")]
     [InlineData("""{"part":"Spare","instance_of":"Nope"}""", "instance_of: no part named 'Nope'")]
     [InlineData("""{"part":"Cab","instance_of":"Wheel_FL"}""", "instance_of: 'Cab' already exists with geometry of its own, and an existing part's instance_of does not change")]
-    [InlineData("""{"part":"Axle_R","instance_of":"Wheel_FL"}""", "instance_of: 'Axle_R' already exists as an empty part")]
+    [InlineData("""{"part":"Axle_R","instance_of":"Wheel_FL"}""", "instance_of: 'Axle_R' already exists as an empty part, and an existing part's instance_of does not change; give a new name to make an instance")]
     [InlineData("""{"part":"Wheel_RL","instance_of":"Cab"}""", "instance_of: 'Wheel_RL' is already an instance of 'Wheel_FL'")]
     [InlineData("""{"part":"Spare","instance_of":"Spare"}""", "instance_of: 'Spare' cannot be an instance of itself")]
     [InlineData("""{"part":"a:b"}""", "part: a part name must not contain ':'")]

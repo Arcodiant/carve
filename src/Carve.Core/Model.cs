@@ -405,13 +405,20 @@ public sealed class Model
     /// problems (<see cref="Part.Problems"/>), a parent that does not exist or would make the part its own ancestor, an
     /// <c>instance_of</c> on a part that owns geometry or naming a part that has none (or is itself an instance), levels on an
     /// instance or an empty, and a level whose faces use a material the model does not define. Empty when it can be placed.
+    /// An existing part's <c>instance_of</c> does not change (the person's ruling, T-93): a part of that name with another
+    /// <c>instance_of</c> is refused first, so an instance is not re-pointed or made an empty, and an owner or an empty is not made an instance.
     /// </summary>
     public IReadOnlyList<(string Field, string Problem)> PartProblems(Part part)
     {
         ArgumentNullException.ThrowIfNull(part);
         var own = Part.Problems(part);
         if (own.Any(p => p.Field == "name")) return own;
-        return [.. own, .. Placement(part, n => n == part.Name ? part : FindPart(n), n => Find(n) is not null,
+        IEnumerable<(string Field, string Problem)> changed = FindPart(part.Name) is { } existing && existing.InstanceOf != part.InstanceOf
+            ? [("instance_of", existing.InstanceOf is { } was
+                ? $"'{part.Name}' is already an instance of '{was}', and an existing part's instance_of does not change"
+                : $"'{part.Name}' already exists {(Find(part.Name) is null ? "as an empty part" : "with geometry of its own")}, and an existing part's instance_of does not change")]
+            : [];
+        return [.. changed, .. own, .. Placement(part, n => n == part.Name ? part : FindPart(n), n => Find(n) is not null,
             ListPartNames, n => FindMaterial(n) is not null)];
     }
 

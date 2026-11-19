@@ -73,6 +73,23 @@ public class PartTreeTests
     // ---- Refusals ---------------------------------------------------------------------------------------------------
 
     [Fact]
+    public void WithPart_refuses_a_change_to_an_existing_parts_instance_of()
+    {
+        var model = Tree().With("Other", TestMeshes.Cube());
+        var copy = model.FindPart("Wheel_R")!;
+        Assert.Equal("instance_of: 'Wheel_R' is already an instance of 'Wheel', and an existing part's instance_of does not change",
+            Refusal(model, copy with { InstanceOf = "Other" }));
+        Assert.Equal("instance_of: 'Wheel_R' is already an instance of 'Wheel', and an existing part's instance_of does not change",
+            Refusal(model, copy with { InstanceOf = null }));
+        Assert.Equal("instance_of: 'Axle' already exists as an empty part, and an existing part's instance_of does not change",
+            Refusal(model, model.FindPart("Axle")! with { InstanceOf = "Wheel" }));
+        Assert.Equal("instance_of: 'Other' already exists with geometry of its own, and an existing part's instance_of does not change",
+            Refusal(model, model.FindPart("Other")! with { InstanceOf = "Wheel" }));
+        // The same instance_of, with any other change, is placed.
+        Assert.NotNull(model.WithPart(copy with { Translation = new(0, 0, -3) }, out _));
+    }
+
+    [Fact]
     public void WithPart_refuses_each_bad_field_by_name()
     {
         var model = Tree();
@@ -88,7 +105,9 @@ public class PartTreeTests
             Refusal(model, new Part("X") { Envelope = new(new(0, 1, 0), new(1, 0, 1)) }));
         Assert.Equal("name: a part name must not be empty", Refusal(model, new Part("")));
         Assert.Equal("instance_of: 'Axle' has no geometry", Refusal(model, new Part("X") { InstanceOf = "Axle" }));
-        Assert.Equal("instance_of: an instance cannot also own geometry", Refusal(model, new Part("Body") { InstanceOf = "Wheel" }));
+        // An owner made an instance is refused first as a changed instance_of (RV-71); the file's check still says "cannot also own geometry".
+        Assert.Equal("instance_of: 'Body' already exists with geometry of its own, and an existing part's instance_of does not change",
+            Refusal(model, new Part("Body") { InstanceOf = "Wheel" }));
         Assert.Equal("instance_of: 'Wheel_R' is itself an instance of 'Wheel'; name 'Wheel', the part that owns the geometry",
             Refusal(model, new Part("X") { InstanceOf = "Wheel_R" }));
         Assert.Equal("instance_of: 'X' cannot be an instance of itself", Refusal(model, new Part("X") { InstanceOf = "X" }));
