@@ -85,8 +85,7 @@ public class ShadingFileTests
             for (var k = 0; k < rest[f].Length; k++)
                 Assert.True((Vector3.Transform(rest[f][k], quarter) - posed[f][k]).Length() < 1e-5f);
 
-        var model = Skinning.Posed(Model.Of("body", cube).WithSkeleton(skeleton), pose);
-        var drawn = Shading.CornersOf(model.Combined!);
+        var drawn = Shading.CornersOf(Skinning.PosedOf(Model.Of("body", cube).WithSkeleton(skeleton), pose, null, null)!);
         for (var f = 0; f < posed.Length; f++)
             for (var k = 0; k < posed[f].Length; k++) Assert.Equal(posed[f][k], drawn[f][k]);
     }
@@ -105,7 +104,7 @@ public class ShadingFileTests
         var pose = new Pose(new Dictionary<string, (Quaternion?, Vector3?)> { ["tip"] = (quarter, null) });
 
         var skinned = Skinning.CornerNormals(cube, skeleton, pose);
-        var combined = Skinning.Posed(Model.Of("body", cube).WithSkeleton(skeleton), pose).Combined!;
+        var combined = Skinning.PosedOf(Model.Of("body", cube).WithSkeleton(skeleton), pose, null, null)!;
         Assert.True(Shading.HasCornerNormals(combined), "a posed flat mesh carries no skinned corners: it is lit by its posed polygons");
         var drawn = Shading.CornersOf(combined);
         for (var f = 0; f < skinned.Length; f++)

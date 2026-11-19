@@ -148,39 +148,17 @@ public static class Skinning
     }
 
     /// <summary>
-    /// The model with every weighted mesh at its posed vertex positions, colours, materials and groups kept, weights dropped (the
-    /// result is a plain mesh to draw), and its rest corner normals skinned (<see cref="CornerNormals"/>), a flat mesh's as a
-    /// smooth one's: the export writes a flat mesh's face normal at each corner and a game skins those with the blended bone
-    /// matrices, so a posed flat face is lit by its skinned corners and not by its posed polygon's own normal (D-6).
-    /// A model with no skeleton comes back unchanged.
-    /// </summary>
-    public static Model Posed(Model model, Pose pose) => Posed(model, pose, null);
-
-    /// <summary>
-    /// As <see cref="Posed(Model, Pose)"/>, with every mesh first morphed to <paramref name="targets"/> (target name to weight,
-    /// <see cref="PolygonMesh.Morphed"/>): the morph comes <b>before</b> skinning, as glTF and Empyrean do it, and the rest
-    /// corner normals are the morphed mesh's. A mesh with targets comes back morphed, without targets, even with no skeleton.
-    /// Null <paramref name="targets"/> is <see cref="Posed(Model, Pose)"/>. Names no mesh has are ignored; the tools refuse them.
-    /// </summary>
-    public static Model Posed(Model model, Pose pose, IReadOnlyDictionary<string, float>? targets)
-    {
-        if (targets is not null) model = Morphed(model, targets);
-        if (model.Skeleton is not { } skeleton) return model;
-        var result = Model.Empty.WithMaterials(model.Materials);
-        foreach (var (name, mesh) in model.Meshes)
-        {
-            result = result.With(name, mesh.Weights is null ? mesh
-                : mesh.WithVertices(Positions(mesh, skeleton, pose), CornerNormals(mesh, skeleton, pose)));
-        }
-        return result.WithPartsFrom(model);
-    }
-
-    /// <summary>
     /// What render draws posed (RV-71): <see cref="Model.CombinedOf"/> of <paramref name="part"/> (the whole model when null),
     /// live, with every mesh first morphed to <paramref name="targets"/> when given, and each occurrence of a weighted mesh placed
     /// in the model's space before it is skinned, as the skinned export bakes it and the game draws it: the skeleton is in model
     /// space, so a placed part is skinned where it is drawn, and each instance at its own place. Unweighted occurrences are
     /// placed as <see cref="Model.CombinedOf"/> places them. A model with no skeleton is only morphed. Null when nothing is drawn.
+    /// A skinned occurrence keeps its colours, materials and groups and drops its weights (it is a plain mesh to draw), and its
+    /// rest corner normals are skinned (<see cref="CornerNormals"/>), a flat mesh's as a smooth one's: the export writes a flat
+    /// mesh's face normal at each corner and a game skins those with the blended bone matrices, so a posed flat face is lit by
+    /// its skinned corners and not by its posed polygon's own normal (D-6). The morph (<see cref="PolygonMesh.Morphed"/>, target
+    /// name to weight) comes <b>before</b> skinning, as glTF and Empyrean do it, and the rest corner normals are the morphed
+    /// mesh's; names no mesh has are ignored, the tools refuse them.
     /// </summary>
     public static PolygonMesh? PosedOf(Model model, Pose pose, IReadOnlyDictionary<string, float>? targets, string? part)
     {

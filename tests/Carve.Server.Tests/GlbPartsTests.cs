@@ -360,13 +360,16 @@ public class GlbPartsTests
     {
         var model = PlacedRig();
         // The game skins the baked file: each occurrence placed in model space, then skinned against the model-space bones.
-        var expected = Skinning.Posed(SkinnedExport.Baked(model), Bent).Combined!;
+        var expected = Skinning.PosedOf(SkinnedExport.Baked(model), Bent, null, null)!;
         var drawn = Skinning.PosedOf(model, Bent, null, null)!;
         Assert.Equal(expected.Vertices, drawn.Vertices);
-        Assert.Equal(Skinning.Posed(SkinnedExport.Baked(model), Bent).Find("Copy")!.Vertices,
+        Assert.Equal(Skinning.PosedOf(SkinnedExport.Baked(model), Bent, null, "Copy")!.Vertices,
             Skinning.PosedOf(model, Bent, null, "Copy")!.Vertices);
         // Skinning in part space and then placing, as before, is not what the game draws.
-        Assert.NotEqual(expected.Vertices, Skinning.Posed(model, Bent).Combined!.Vertices);
+        var box = model.Find("Box")!;
+        var partSpace = Model.Join([.. new[] { "Box", "Copy" }.Select(p =>
+            (box.WithVertices(Skinning.Positions(box, model.Skeleton!, Bent)), model.WorldTransform(p)!.Value))])!;
+        Assert.NotEqual(expected.Vertices, partSpace.Vertices);
     }
 
     [Fact]
@@ -378,7 +381,10 @@ public class GlbPartsTests
         {
             [model.Skeleton!.Bones[1].Name] = (Quaternion.CreateFromAxisAngle(Vector3.UnitX, 0.6f), null),
         });
-        var before = Skinning.Posed(model, pose).Combined!;
+        // As drawn before parts were placed: each mesh skinned on its own, then joined where it stands.
+        Assert.All(model.Parts, p => Assert.True(model.WorldTransform(p.Name)!.Value.IsIdentity, p.Name));
+        var before = Model.Join([.. model.Parts.Select(p => model.Find(p.Name)).OfType<PolygonMesh>().Select(m =>
+            (m.Weights is null ? m : m.WithVertices(Skinning.Positions(m, model.Skeleton!, pose)), System.Numerics.Matrix4x4.Identity))])!;
         var now = Skinning.PosedOf(model, pose, null, null)!;
         Assert.Equal(before.Vertices, now.Vertices);
         Assert.Equal(Shading.Corners(before), Shading.Corners(now));

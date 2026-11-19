@@ -64,10 +64,10 @@ public sealed class Model
         return new Model(_meshes, Skeleton, _clips, next, _parts);
     }
 
-    /// <summary>This model with <paramref name="source"/>'s part records, for a copy rebuilt mesh by mesh under the same names (<see cref="Skinning.Posed"/>), so it is placed as its source is.</summary>
+    /// <summary>This model with <paramref name="source"/>'s part records, for a copy rebuilt mesh by mesh under the same names (<see cref="Skinning.Morphed"/>), so it is placed as its source is.</summary>
     internal Model WithPartsFrom(Model source) => new(_meshes, Skeleton, _clips, _materials, source._parts);
 
-    /// <summary>The empty model's meshes with these materials, for a model rebuilt mesh by mesh (<see cref="Skinning.Posed"/>).</summary>
+    /// <summary>The empty model's meshes with these materials, for a model rebuilt mesh by mesh (<see cref="Skinning.Morphed"/>).</summary>
     internal Model WithMaterials(IReadOnlyList<Material> materials) => new(_meshes, Skeleton, _clips, [.. materials], _parts);
 
     /// <summary>The material names, quoted and comma-separated, in definition order.</summary>

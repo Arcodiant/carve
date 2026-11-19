@@ -73,7 +73,7 @@ public static class Shading
 
     /// <summary>
     /// Whether face <paramref name="face"/> shows corner normals in the normals look: a face of a smooth mesh. A flat mesh's faces
-    /// stay flat there, posed too (a posed flat mesh is lit by its skinned corners, <see cref="Skinning.Posed"/>, but the look
+    /// stay flat there, posed too (a posed flat mesh is lit by its skinned corners, <see cref="Skinning.PosedOf"/>, but the look
     /// shows its faces), and so do a flat mesh's faces in one combined mesh beside a smooth one (<see cref="Model.Combined"/>).
     /// </summary>
     public static bool FaceHasCornerNormals(PolygonMesh mesh, int face) =>

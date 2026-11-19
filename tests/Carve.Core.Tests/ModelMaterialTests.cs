@@ -172,9 +172,12 @@ public class ModelMaterialTests
     public void Posed_keeps_the_materials_and_the_assignment()
     {
         var skeleton = Skeleton.Create([new BoneSpec("root", null, Vector3.Zero, Quaternion.Identity)]).Skeleton!;
-        var posed = Skinning.Posed(WoodModel().WithSkeleton(skeleton), Pose.Rest);
-        Assert.Equal(["wood", "steel"], posed.Materials.Select(m => m.Name));
-        Assert.Equal("wood", posed.Find("box")!.Style!.MaterialOf(1));
+        // Render draws the posed mesh with the model's own materials (RenderPump), so the assignment must still name them.
+        var model = WoodModel().WithSkeleton(skeleton);
+        var posed = Skinning.PosedOf(model, Pose.Rest, null, null)!;
+        Assert.Equal(["wood", "steel"], model.Materials.Select(m => m.Name));
+        Assert.Equal("wood", posed.Style!.MaterialOf(1));
+        Assert.Equal("wood", Skinning.PosedOf(model, Pose.Rest, null, "box")!.Style!.MaterialOf(1));
     }
 
     [Fact]
