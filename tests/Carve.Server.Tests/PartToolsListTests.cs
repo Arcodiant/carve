@@ -91,6 +91,20 @@ public class PartToolsListTests
         }
     }
 
+    /// <summary>RV-71: T-94's paragraphs are taken out before the digest too; this pins render's and get_mesh's, once each.</summary>
+    [Fact]
+    public async Task Each_T94_paragraph_is_in_its_tools_description_once()
+    {
+        await using var carve = new ToolHarness();
+        await carve.InitializeAsync();
+        foreach (var tool in (await carve.ListToolsAsync()).EnumerateArray())
+        {
+            var (name, text) = (tool.GetProperty("name").GetString()!, tool.GetProperty("description").GetString()!);
+            Assert.True(Count(text, carve::Carve.Server.RenderPartTexts.Parts) == (name == "render" ? 1 : 0), $"{name}: render's part and level paragraph count");
+            Assert.True(Count(text, carve::Carve.Server.GetMeshTool.PlacementText) == (name == "get_mesh" ? 1 : 0), $"{name}: get_mesh's placement paragraph count");
+        }
+    }
+
     private static int Count(string text, string sentence)
     {
         var n = 0;
