@@ -12,7 +12,7 @@ description: >-
 
 **Previous:** —
 
-**Diff:** `0fc3fab856b627199a665f2b5c48b1ef57c6fbf2` against `631a596` (head `e835a72`)
+**Diff:** 0fc3fab856b627199a665f2b5c48b1ef57c6fbf2 against 631a596
 
 **Reviewer:** four reviewers, each claude-opus-5-5: Core and the Carve file; the part tools and render; the export, scenario, sample and acceptance; the whole diff
 
