@@ -158,6 +158,52 @@ A character is a model with a skeleton, bone weights and clips. `export` then wr
 
 `export` also warns when a model passes a game's limits on triangles, submeshes or height, read from the first `carve-limits.json` found in the `.glb`'s folder or a folder above it (or the one `limits` names). `write_limits: true` creates the file with starting numbers to edit. `samples/gardener.carve` is a rigged, animated character, and `samples/gardener-soft.carve` is the same character subdivided and smoothed.
 
+## patina: texture graphs
+
+`patina` is a second MCP server, beside carve, for texture graphs (D-7): an agent
+defines a graph of nodes (`noise`, `gradient`, `levels`, `blend`,
+`height_to_normal`, `colour`, `output`), edits it, reads it back, and saves it
+as a `.texgraph` file. Add it to the same `.mcp.json`, next to carve's entry:
+
+```json
+{
+  "mcpServers": {
+    "carve": {
+      "command": "dotnet",
+      "args": ["run", "--project", "C:/path/to/carve/src/Carve.Server", "--no-launch-profile"]
+    },
+    "patina": {
+      "command": "dotnet",
+      "args": ["run", "--project", "C:/path/to/carve/src/Patina.Server", "--no-launch-profile"]
+    }
+  }
+}
+```
+
+Its tools: `define_graph` (the whole graph, as a `.texgraph` body), `edit_graph`
+(a list of operations, all or nothing: `set_node`, `remove_node`, `connect`,
+`disconnect`, `set_params`, `set`), `get_graph`, `save`, `open`, and
+`push_snapshot` / `pop_snapshot` to try a change and go back. Every fault names
+its node and its port or parameter. A graph with faults can be opened and fixed
+with `edit_graph`, but not saved. `samples/graphs/planks.texgraph` is a whole
+material to open.
+
+`export` writes the open graph's outputs as `<folder>/<role>.png` at a size you
+name, a power of two from 32 to 8192 (default the graph's own), ready for a
+carve material's texture slots: `base_colour.png` for `base_colour_texture`,
+`normal.png` for `normal_texture`, `roughness.png` (a glTF metallic-roughness
+image) for `metallic_roughness_texture`, `occlusion.png` for `occlusion_texture`.
+At 8192 it works in bounded memory but takes minutes for four outputs.
+
+`swatch` shows the open graph: by default a sheet with a column per output (flat
+over tiled 3 x 3, to show seams) beside a sphere wearing all of them through the
+engine's PBR material lit as Carve's `render` lights a model (its ambient light,
+fixed sky and the directional light that keeps its place beside the camera, so a
+smooth material shows a highlight); or `view` `flat`, `tiled` or
+`sphere` alone, at a `size` from 32 to 2048, the sphere turned by `angle`.
+patina needs a Vulkan device to draw the sphere and the sheet; flat and tiled
+need none.
+
 ## License
 
 Carve is released under the [MIT license](LICENSE).

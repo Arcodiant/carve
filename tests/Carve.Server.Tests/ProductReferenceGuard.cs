@@ -14,6 +14,7 @@ internal static partial class ProductReferenceGuard
     {
         "Carve.Core",
         "Carve.Extensibility",
+        "Carve.Hosting", // The shared engine host (T-111), product code, itself checked by the guard's tests.
     };
 
     [GeneratedRegex(@"Carve\.Debug|Carve\.Scenario|Carve\.ModelViewer|(^|[\\/])(extensions|scenarios|spikes)[\\/]", RegexOptions.IgnoreCase)]

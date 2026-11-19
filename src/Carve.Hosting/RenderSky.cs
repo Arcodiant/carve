@@ -1,6 +1,6 @@
 using Empyrean;
 
-namespace Carve.Server;
+namespace Carve.Hosting;
 
 /// <summary>
 /// The fixed sky that lights a face with a material (T-78): the engine's <see cref="ProceduralSky.Default"/> unchanged, sun

@@ -4,7 +4,7 @@ description: >-
 ---
 # T-110 — Texture graph format and evaluator
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -13,6 +13,8 @@ description: >-
 **Batch:** — (standalone)
 
 **Depends on:** — (none)
+
+**Verify:** patina-unit
 
 ## Goal
 
@@ -106,3 +108,99 @@ server (T-113) and, from M-29, Carve both evaluate graphs through it, so what Ca
   CLAUDE.md. T-111 runs beside this task and edits `Carve.slnx` and CLAUDE.md too: a conflict there only adds, so
   keep both sides.
 - **Verify line:** at planning, `cairn lint` accepts only suites already in `tests.json`, so this file names none it will add. Once patina-unit is in `tests.json`, add it to this file's `**Verify:**` line (creating the line if there is none), with the task's other suites.
+
+### Plan (research pass, Opus 5.5)
+
+- **Namespaces.** `Patina.Graphs` holds the format (`TextureGraph`, `GraphNode`, `ParamValue`, `TexGraphFile`), the
+  faults (`GraphFault`, `GraphLoadError`) and validation; `Patina.Graphs.Nodes` the registration API (`NodeType`,
+  `InputPort`, `ParamSpec`, `NodeRegistry`) and the built-in types, one file each; `Patina.Graphs.Evaluation` the
+  banded evaluator; `Patina.Graphs.Imaging` the pixel side (`Band`, `PortKind`, `OutputEncoding`, `Png`), which
+  references nothing of graphs. That is D-7's boundary: imaging below, graphs above, so a split is mechanical.
+- **Format layout** exactly as the Scope's example. Keys written in a fixed order: `version`, `size`, `seed`,
+  `nodes`; in a node `type`, `inputs`, `params` (the last two left out when empty); nodes, inputs and params in
+  ordinal key order, so the bytes do not depend on which types are registered. One node per line, `\n` endings, a
+  final newline. Numbers written shortest round-trip (`"R"`, invariant). Shape errors (not JSON, an unknown or
+  missing top-level key, a container of the wrong JSON type, a duplicate key, `version` other than 1, a `size` that
+  is not a power of two in 32..8192, a `seed` outside uint32) are a `GraphLoadError` with line and column; every
+  thing about what the nodes say is a fault and the graph still loads.
+- **Values.** A parameter is a number, a string or an array of numbers (`ParamValue`); a `ParamSpec` says which and
+  checks it: `Int`, `Float`, `Enum`, `IntPair`, `Colour` (`#rrggbb`). A missing parameter takes its default.
+- **Registration.** `NodeType` is an abstract class: `Name`, `Inputs` (`InputPort`: name, `PortKind` Grey/Colour/Any,
+  required), `Outputs` (port names, default `["out"]`), `Parameters`, `Radius(parameters, size)` (texels, default 0),
+  `OutputKind(port, inputKinds, parameters)`, an optional `CheckInputKinds` for a rule a port kind cannot say (the
+  output node's role), and `Evaluate(NodeEvaluation)`. `NodeRegistry` is immutable: `NodeRegistry.BuiltIn` is made
+  from one list (one line per type; T-112 adds its five), and `registry.With(type)` gives a new registry with an
+  outside type, so M-29's mesh nodes need no package change and there is no global mutable state.
+- **Faults.** `GraphFault(string? Node, string? Port, string? Parameter, string Message)`, the message naming the
+  node and port or parameter itself, so the list can be returned as it stands. Only "no output at all" has no node,
+  having none to name.
+- **Evaluation.** Single-threaded, `float`, integer hashing, no `Math.Pow`/`Exp`, so the bytes are the same whatever
+  the machine. Colour channels hold sRGB-encoded values (as the `#rrggbb` they come from, and as T-77 multiplied
+  them), so no transfer function is needed. An output is made band by band: for each band the evaluator works, in
+  reverse topological order, each node's row range (the hull of every consumer's range widened by the consumer's
+  radius), then evaluates the nodes forwards into one `Band` each and drops them all before the next band. Rows are
+  logical and wrap modulo the size, columns wrap inside the node, so every texture tiles.
+- **Band size:** `BandTexels = 2^18`, band rows `max(1, 2^18 / size)`: sizes up to 512 are evaluated whole (the
+  threshold), 1024 in bands of 256 rows, 8192 in bands of 32. Bound: at any moment each node holds one band of at
+  most `bandRows + 2 * (sum of radii downstream)` rows of the full width, i.e. about 1 MB (grey) or 3 MB (colour)
+  per node at 8192 with no radius, plus the output's RGBA8 image the PNG encoder needs (256 MB at 8192).
+- **Output encoding:** `OutputEncoding.Encode(role, size, evaluator)` gives the RGBA8 image and the PNG bytes, packed
+  as the Scope says, rounding `MidpointRounding.AwayFromZero`.
+
+### As built (Opus 5.5)
+
+Built to the plan above; the file layout is the Scope's, unchanged. 42 `unit` tests in `tests/Patina.Graphs.Tests`,
+about 2.5 s, suite `patina-unit`.
+
+- **Registration API (for T-112 and M-29).** Subclass `Patina.Graphs.Nodes.NodeType`, one file per type:
+  `Name`; `Inputs` (`new InputPort("a", PortKind.Grey | Colour | Any, required: true)`); `Outputs` (default
+  `["out"]`; several make `"id.port"` sources required); `Parameters` (`ParamSpec.Int(name, min, max, default)`,
+  `Float`, `Enum(name, default, choices...)`, `IntPair(name, min, max, x, y)`, `Colour(name, "#rrggbb")`; a spec
+  checks values and writes the range into the fault); `Radius(parameters, size)` (texels, default 0);
+  `OutputKind(port, inputKinds, parameters)`; optionally `CheckInputKinds` for a rule a port's kind cannot say; and
+  `Evaluate(NodeEvaluation e)`, which fills logical rows `e.Y0 .. e.Y0 + e.Rows - 1`, every column, of
+  `e.Output(port)` from `e.Input(port)` (null when an optional input is absent), reading parameters through
+  `e.Parameters.Int/Float/Text/IntPair/Colour(name)` (the default where the file gives none). Image row is
+  `Band.Wrap(y, e.Size)`; neighbours across the left/right edge come through `Band.Grey/Colour(x, y)`, which wrap x;
+  `Band.Colour` spreads a greyscale band to grey. The graph's seed is `e.Seed`. Built-ins are the list in
+  `NodeRegistry.BuiltIn` (T-112: one line per type). From outside, `NodeRegistry.BuiltIn.With(new MyNode())` gives a
+  new registry; pass it to `TexGraphFile.Read`, `GraphValidator.Validate` and `new GraphEvaluator`. There is no
+  global mutable registry.
+- **Band size and memory bound (for T-115).** `GraphEvaluator.BandTexels = 2^18`; band rows
+  `BandRowsFor(size) = clamp(2^18 / size, 1, size)`: up to 512 the image is one band (the threshold), 1024 → 256
+  rows, 2048 → 128, 8192 → 32. For each band every node the output depends on holds one band of
+  `bandRows + 2R` rows, full width, R the sum of radii on its way to the output, all dropped before the next band: at
+  8192, 1 MB per greyscale node and 3 MB per colour node (+ 64 KB a row of radius). The only full-size buffer is the
+  caller's: `OutputImage.Make` keeps the RGBA8 image (256 MB at 8192) for the PNG encoder. `GraphEvaluator.LastRun`
+  (`EvaluationRun(BandRows, MostRows, PeakBytes)`) reports what an evaluation held, for T-115's test; the bound is in
+  `GraphEvaluator`'s doc comment.
+- **Fault shape (for T-113).** `GraphFault(string? Node, string? Port, string? Parameter, string Message)`; the
+  message names the node and the port or parameter itself (`node 'base' input 'mask': names 'grain_2', which is not
+  a node; the nodes are ...`), so it can be returned as it stands. `TexGraphFile.Read(text, registry)` gives
+  `TexGraphReadResult(Graph, Error, Faults)`: a `GraphLoadError(Line, Column, Message)` (1-based) for a file that is
+  not JSON, has not the shape, or has an unknown version, a bad size or seed; otherwise the graph with all its faults.
+  `GraphValidator.Validate(graph, registry)` re-checks a graph after an edit; `new GraphEvaluator` throws
+  `GraphFaultException` (with `.Faults`) on a faulty graph.
+- **Kind checks and no cascade (RV-68, person's ruling 2026-11-18).** Every input whose source is a node of a known type
+  is checked for kinds, even when another input of that node is at fault, so a greyscale/colour mismatch shows at the
+  edit that makes it. This holds for a node on a cycle too (RV-69): its inputs from sources off the cycle are
+  kind-checked (`GraphFaultTests.AnInputFromOffTheCycleIsKindCheckedOnANodeOnACycle`), and it gives its outputs no
+  kind. What cannot be checked stays unchecked: an input whose source is missing, of unknown type or on a
+  cycle, and what its kind would decide. `GraphValidator.Kinds` tries each such input as greyscale and as colour; a
+  node's output kind is known only when every try agrees (a blend with a colour `a` gives colour whatever `b` is), and
+  a node type's own input check is reported only when every try gives it. A graph may so report more faults at once
+  than before; T-117's plant (`grained`'s `mask` naming `grain_2`) still gives its one fault
+  (`PlanksGraphTests.T117sPlantInThePlanksGivesItsOneFault`), and no worked example or test of T-110's or T-113's changed.
+- **Encoding.** `OutputImage.Make(evaluator, role, size)` gives `Rgba` and `Png`; packing is
+  `Imaging.OutputPacking` (base_colour sRGB, normal `127.5 + 127.5 n`, roughness R 255 / G / B 0, occlusion grey),
+  rounding away from zero. Colour channels in the graph hold sRGB-encoded values (no transfer function, so no `Pow`).
+- **Namespaces (D-7's boundary).** `Patina.Graphs.Imaging` (bands, roles, packing, PNG) references nothing of graphs;
+  the format, validation, nodes and evaluator sit above it.
+- **Judgement calls, for the person to overrule.** "No output at all" is the one fault with `Node` null, having no
+  node to name (the Scope lists it; the stop on node-less faults is read as not covering it). A bad `size`/`seed`
+  is a load error rather than a fault, so that no other graph-level fault exists. An `output`'s `role` defaults to
+  `base_colour`; `colour`'s `colour` to `#808080`. `base_colour` takes greyscale too (spread to grey); `normal`
+  needs colour, `roughness` and `occlusion` greyscale. Unknown keys in a node, or a parameter of a JSON kind that is
+  not a number, string or array of numbers, are load errors (shape), not faults.
+- **Not checked here:** evaluation speed at 8192 (T-115). Texel access goes through bounds-checked `Band` methods;
+  a node that needs speed can work on `Band.Row(y)` spans directly.

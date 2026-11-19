@@ -4,7 +4,7 @@ description: >-
 ---
 # T-112 — The first texture nodes and the planks graph
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -13,6 +13,8 @@ description: >-
 **Batch:** — (standalone)
 
 **Depends on:** T-110
+
+**Verify:** patina-unit
 
 ## Goal
 
@@ -86,3 +88,24 @@ its four PNGs at 256.
 - Runs beside T-113, which touches no file here. T-113's descriptions name these node types and parameters as
   written above, so a rename here is a stop.
 - **Verify line:** at planning, `cairn lint` accepts only suites already in `tests.json`, so this file names none it will add. Once patina-unit (T-110 adds it) is in `tests.json`, add it to this file's `**Verify:**` line (creating the line if there is none), with the task's other suites.
+
+### As built (Sonnet 5.5)
+
+Five nodes in `src/Patina.Graphs/Nodes` (one file each, one line each in `NodeRegistry.BuiltIn`), `samples/graphs/planks.texgraph`
+with its four PNGs, and `tools/Patina.SampleGraphs` to remake them (`dotnet run --project tools/Patina.SampleGraphs`,
+`-- --canonical` first rewrites the graphs canonically). 82 `patina-unit` tests pass (40 new). The person approved the four
+PNGs through Waystone (round-1).
+
+- **Parameters as the Scope writes them**, with ranges: `noise` cells 1..4096, octaves 1..4, seed 0..1e6; `gradient` repeat 1..4096;
+  `levels` in 0..1, out 0..2 (above 1 so a tone can multiply a colour up), gamma 0.1..10 (applied as t^(1/gamma) by a
+  hand-made `DeterministicMath.Pow`, no `Math.Pow`); `blend` unclamped, the mask and opacity move `a` toward `mode(a, b)`;
+  `height_to_normal` strength 0..1000, slope = central difference per texel x size x strength, x = -slope, y = +slope down the rows.
+- **Planks numbers.** The gap is `levels(bevel, in 0.15..0.25, out 0.16..1)`, not in 0..0.2: the barrel's gap is dark but non-zero, and
+  this puts exactly three dark texels (red < 90) either side of each boundary (x % 32 in 0,1,2,29,30,31) with one bevel texel beyond.
+  Tone is `levels(out 0.86..1.12)`, grain `levels(out 0.95..1.05)`, so the stave colour is 0.817..1.176 of (170,112,64). The normal
+  strength is 0.01 (peak tilt about 0.6, as T-77). Seed 77.
+- **Tests.** `FirstNodesTests` (by-hand values, tiling, 256-vs-1024 size-invariance, a table of 14 broken copies each caught) and
+  `PlanksGraphTests` (PNGs equal the graph pixel for pixel and byte for byte, canonical text, boundaries, gap, colour range, flat
+  normal, ranges). T-110's `AnUnknownTypeListsTheTypes` now lists the new type names.
+- **Judgement calls:** gap `in_low` 0.15 (above); `levels` out range to 2. Wrap-around removal in `height_to_normal` and noise is
+  shown by broken copies of the neighbour lookup in the test, not by editing the node.

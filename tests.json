@@ -29,6 +29,41 @@
       "est-seconds": 30
     },
     {
+      "id": "patina-unit",
+      "tier": "unit",
+      "build": "solution",
+      "run": "dotnet test tests/Patina.Graphs.Tests/bin/Debug/net10.0/Patina.Graphs.Tests.dll tests/Patina.Server.Tests/bin/Debug/net10.0/Patina.Server.Tests.dll --filter Tier!=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Patina.Graphs.Tests/Patina.Graphs.Tests.csproj"
+        },
+        "samples/graphs/**",
+        {
+          "dotnet-closure": "tests/Patina.Server.Tests/Patina.Server.Tests.csproj"
+        },
+        "tests/Carve.Server.Tests/ProductReferenceGuard.cs",
+        "scenarios/Carve.Scenario.Patina/ExportMatch.cs"
+      ],
+      "resources": "cpu",
+      "est-seconds": 15
+    },
+    {
+      "id": "patina-regression",
+      "tier": "regression",
+      "build": "solution",
+      "run": "dotnet test tests/Patina.Server.Tests/Patina.Server.Tests.csproj -c Debug --no-build --filter Tier=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Patina.Server.Tests/Patina.Server.Tests.csproj"
+        },
+        "tests/Carve.Server.Tests/ProductReferenceGuard.cs",
+        "scenarios/Carve.Scenario.Patina/ExportMatch.cs",
+        "samples/graphs/**"
+      ],
+      "resources": "cpu",
+      "est-seconds": 200
+    },
+    {
       "id": "server-unit",
       "tier": "unit",
       "build": "solution",
@@ -381,6 +416,44 @@
       "est-seconds": 120
     },
     {
+      "id": "scenario-planks",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-planks-scenario.ps1 -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Planks/Carve.Scenario.Planks.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.PlanksLoad.Tests/Carve.PlanksLoad.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Materials/MaterialsSampler.cs",
+        "scenarios/Carve.Scenario.Materials/MaterialsChecks.cs",
+        "scenarios/Carve.Scenario.Uvs/UvsScene.cs",
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "tools/Carve.SampleTextures/TextureSet.cs",
+        "tools/Carve.SampleTextures/Png.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
+        "samples/barrel.carve",
+        "samples/barrel-planks.carve",
+        "samples/textures/*.png",
+        "samples/graphs/planks/*.png",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-planks-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 90
+    },
+    {
       "id": "scenario-cuts",
       "tier": "regression",
       "build": "solution",
@@ -498,6 +571,28 @@
         "vulkan"
       ],
       "est-seconds": 120
+    },
+    {
+      "id": "scenario-patina",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj"
+        },
+        {
+          "dotnet-closure": "src/Patina.Server/Patina.Server.csproj"
+        },
+        "samples/graphs/**",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
     }
   ],
   "todo": []

@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Carve.Server;
+namespace Carve.Hosting;
 
 /// <summary>
 /// Runs the engine on a dedicated <c>frame</c> thread. The engine's services are resolved there

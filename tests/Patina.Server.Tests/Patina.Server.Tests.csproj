@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- patina's tools in this process (PatinaHarness, unit) and the real patina over stdio (PatinaProcess, regression). -->
+  <PropertyGroup>
+    <RootNamespace>Patina.Server.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
+    <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+    <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Patina.Server/Patina.Server.csproj" />
+  </ItemGroup>
+
+  <!-- The product-reference guard is carve's own (tests/Carve.Server.Tests), compiled here so it covers patina too. -->
+  <ItemGroup>
+    <Compile Include="../Carve.Server.Tests/ProductReferenceGuard.cs" Link="ProductReferenceGuard.cs" />
+  </ItemGroup>
+
+  <!-- RV-68's matching-uv rule for an export at a larger size, shared with the Patina scenario's export stage (a file link, no project reference). -->
+  <ItemGroup>
+    <Compile Include="../../scenarios/Carve.Scenario.Patina/ExportMatch.cs" Link="ExportMatch.cs" />
+  </ItemGroup>
+
+</Project>

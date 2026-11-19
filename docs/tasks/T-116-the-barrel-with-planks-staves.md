@@ -4,7 +4,7 @@ description: >-
 ---
 # T-116 — The barrel with planks staves
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-112
 
-**Verify:** core-unit, scenario-materials
+**Verify:** core-unit, scenario-materials, scenario-planks
 
 ## Goal
 
@@ -61,3 +61,50 @@ left as it is.
 - Touches no patina file. It adds its suite to `tests.json` and a row to CLAUDE.md, and a conflict with the patina
   tasks there only adds.
 - **Verify line:** at planning, `cairn lint` accepts only suites already in `tests.json`, so this file names none it will add. Once scenario-planks is in `tests.json`, add it to this file's `**Verify:**` line (creating the line if there is none), with the task's other suites.
+
+### Research (Sonnet 5.5, before any frame)
+
+- **M-7's lit prediction holds with a roughness map; no new threshold, no skipped check.** `MaterialsChecks` asks of stave wood only
+  `Max >= T (80)` and `R >= G + 12 >= B + 24`; it never predicts a specular. The roughness map (G 146..199, so roughness 0.57..0.78
+  against M-7's scalar 1; B 0, so metallic 0 with the default factor) only changes the specular, which is added equally to all three
+  channels. Probed with `ColourRule.Lit` (its `Roughness` made a variable in a throwaway copy, not in the repo) over the planks'
+  darkest tone (0.817 of (170,112,64)), 72 azimuths, three tilts, the front, back, top and viewer cameras, at roughness 1, 0.78
+  and 0.57: the worst stave reads (112,81,60), so R-G >= 29, G-B >= 21 and max channel >= 110, against 12, 12 and 80, and the three
+  roughnesses give the same worst case. The planks' darkest mid texel is (142,94,53), no darker than that probe.
+- **Gaps are 3 texels each side, in every row** (the scenario checks it from the PNG before it opens anything: `PlankTexels.GapProblem`,
+  red < 90 as T-112 defines it; and no texel 6 or more from a boundary is dark). A P2 footprint (half-width 2, 5 texels) fits in the
+  6-wide gap only where a pixel spans 0.67 texel or less, so the gap is judged in a close-up (zoom 4, head on to the boundary), not
+  in the 512 px frames.
+- **Stave colours clear the lit threshold.** Mid-stave texels run (142..179, 94..118, 53..67), per-stave tones 0.82..1.18 of the base;
+  see the probe above for the lit values.
+- Not done, as the Scope says: M-7's `staves` (no roughness map) is untouched.
+
+### As built (Sonnet 5.5)
+
+`scenarios/Carve.Scenario.Planks` (suite `scenario-planks`, `gpu`; `scripts/run-planks-scenario.ps1`), `tests/Carve.PlanksLoad.Tests` (a project of its own, as
+the linking was cleaner; recorded in CLAUDE.md's Layout), `samples/barrel-planks.carve` (the scenario's own saved file, texture paths relative:
+`graphs/planks/*.png` and `textures/*.png`). M-7's scenario, barrel, generator, frames and `samples/textures/` are untouched; no patina file and nothing
+under `samples/graphs/` changed.
+
+- **Frames:** `planks-front`, `planks-back`, `planks-top`, `planks-gap` (head on to the boundary of two stave columns, zoom 4) and `planks-sheet`, each pixel
+  worked from `get_mesh` and the texels by M-7's `MaterialsSampler.cs` and `MaterialsChecks.cs` (linked). `check` is silent; save, reopen
+  (`planks-front` and `planks-gap` byte-identical) and export are clean.
+- **New checks (`PlanksChecks.cs`), no new threshold:** the gap texels (T-112's red < 90) of the close-up (5168 samples, brightest 34) all read darker
+  than every stave sample (darkest 128); staves differ in tone, each pair of faces predicted 12 (M-7's `M`) or more apart by `ColourRule.Lit` from the
+  planks' own texels must read apart the same way, with at least one such pair per frame; and the PNGs' gaps are checked 3 texels each side at start.
+- **Breaks (`CARVE_PLANKS_BREAK`), each fails:** `t77-base` (tone order, front), `roughness-base` (a rune-like orange pixel in back, the stave being
+  red-orange; the gap rule would also catch it, it is reached later), `mirror` (u mirrored on the side: the checks predict from 1 - u on the 32 cylindrical faces, the frames drawn as the tools made them; RV-68: it first moved the prediction's camera instead; caught by the rune check, front, "only 0 P2 samples of RuneOn": the mirrored u puts the rune's emissive texels off the rune faces' part of the texture). Run with `-NoBuild` by hand, not part of the suite.
+- **Tests:** the saved file equals the sample by content; the sample binds the planks' maps to `staves` and `rune-stave` and M-7's textures to the rest;
+  the exported `.glb` loads four materials, two of them with the planks' four maps.
+- **Not checked:** the frames themselves (a later agent looks at them); the viewer (M-7's step 2 is not repeated); the roughness map's specular is not predicted
+  (the lit rule is `ColourRule`'s roughness-1 model; only its inequalities are used, see Research).
+
+#### Frame review (Sonnet 5.5 build; reviewed by a frame-review agent on Sonnet 5.5; job J-20261118-084506-0372f8, commit cf020f0)
+
+- front: octagonal barrel, staves warm brown with visibly different tones, dark vertical gaps between them, orange rune clear on the front stave, blue-grey iron hoops with orange rust patches, end-grain rings on the top cap.
+- back: same staves and gaps, no rune; bottom cap rings and hoops as expected.
+- top: concentric rings on the cap, octagon edge clean.
+- gap close-up: two staves side by side, left lighter than right, gap clearly darker and several texels wide each side; wood faintly streaked, specular from the roughness map is subtle (soft sheen, no hot spots); hoop below.
+- sheet: four views consistent with the single frames.
+- Reopened frames were hash-checked by the scenario (byte-identical), not opened. Person approved all five frames in Waystone (round 1, copy at G:\My Drivertifacts\carve\M-27\T-116
+ound-1). No code change was needed.

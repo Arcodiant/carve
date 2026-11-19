@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The barrel with its staves from the planks graph (T-116): M-7's barrel, the planks' PNGs on its staves, seen in five frames, saved as samples/barrel-planks.carve, reopened and exported. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Planks</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StbImageWriteSharp" Version="$(StbImageWriteSharpVersion)" />
+    <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <!-- Linked, never copied: M-7's sampler and checks (and what they link), the Crate's colour rule, build and camera. -->
+  <ItemGroup>
+    <Compile Include="../Carve.Scenario.Materials/MaterialsSampler.cs" Link="MaterialsSampler.cs" />
+    <Compile Include="../Carve.Scenario.Materials/MaterialsChecks.cs" Link="MaterialsChecks.cs" />
+    <Compile Include="../Carve.Scenario.Uvs/UvsScene.cs" Link="UvsScene.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
+    <Compile Include="../../tools/Carve.SampleTextures/TextureSet.cs" Link="TextureSet.cs" />
+    <Compile Include="../../tools/Carve.SampleTextures/Png.cs" Link="Png.cs" />
+    <Content Include="../../samples/barrel.carve" Link="barrel.carve" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../samples/textures/*.png" Link="textures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../samples/graphs/planks/*.png" Link="graphs/planks/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

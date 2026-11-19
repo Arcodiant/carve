@@ -4,7 +4,7 @@ description: >-
 ---
 # T-114 — Swatch renders
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -13,6 +13,8 @@ description: >-
 **Batch:** — (standalone)
 
 **Depends on:** T-112, T-113
+
+**Verify:** patina-unit, patina-regression, scenario-patina
 
 ## Goal
 
@@ -80,3 +82,99 @@ all of them through `Material.Pbr` under Carve's fixed sky, or any one of those 
   beside it and adds to the same four: a conflict there only adds, so keep both sides.
 - There is no sound or motion, so there is no real-time pass. The person's look at the frames is the approval.
 - **Verify line:** at planning, `cairn lint` accepts only suites already in `tests.json`, so this file names none it will add. Once patina-unit and scenario-patina (T-113 adds them) are in `tests.json`, add them to this file's `**Verify:**` line (creating the line if there is none), with the task's other suites.
+
+### As built (Opus 5.5)
+
+Built by Claude Opus 5.5 (`claude-opus-5-5`), first agent, to the frame-review checkpoint.
+
+- **`swatch`** in `src/Patina.Server`: `SwatchTool.cs` (arguments, refusals, evaluation, captions), `SwatchImages.cs` (CPU:
+  nearest scaling at the pixel centre, flat, tiled, `SheetLayout`, `LabelAtlas`, `SwatchSheet.Compose`),
+  `SwatchRendering.cs` (`SwatchComposition`: a 512 sphere target and a 512 label atlas target through
+  `OffscreenTarget`; `SwatchSystem`: the scene, the sky entity, the camera, `PrimitiveMesh.Sphere` with a `Material.Pbr`
+  of `TextureUpload` textures, held by an `IAssetHolder` and released at the next request; `SwatchCamera`; `SwatchBreak`).
+  `Program.cs` adds the tool line, the queue in `AddTools`, and the pipeline and system in `AddServer`. Nothing in
+  `Carve.Hosting` or `Carve.Server` changed: T-111's API was enough.
+- **Sheet**: 4 x 258 + 512 = 1544 x 538 for the planks (2 px slate gutters; the sphere cell 1 px below the title strip).
+  Labels are the engine's font (`surface.Text`, as carve's labels), drawn white on black into a 512 atlas one row each
+  and composited on the CPU as coverage over carve's black 0.6 backing (`LabelLayout`'s colours, repeated, since patina
+  may not reference `Carve.Server`). Labels sit in each cell's top-left corner, so the cell checks leave out the top 22
+  rows (the label band).
+- **One surprise:** writing only `Transform3D` turned the sphere a frame late (the transform system had already run that
+  tick), so each sphere showed the previous request's angle. `SwatchSystem` writes `WorldTransform` too, as carve does
+  for its cameras.
+- **The sphere's UVs**, read from the engine (ilspy of `Empyrean.Geometry` 0.129.0, `PrimitiveMeshData.Sphere(32, 16)`):
+  u = sector / 32 from +x toward +z, v = stack / 16 from the top pole; `SwatchSphere.cs` restates that mesh and traces
+  each pixel to its triangle, so the prediction is the faceted mesh, not an ideal sphere.
+- **What the sphere check predicts**: for each pixel, the texel it shows (and so stave or gap) and how far mip filtering
+  can blur it; never a lit shade. The rules, named in `SwatchStage`'s remarks: *exact*, *seamless* (mean step across
+  tile boundaries at most 3 x the mean inside, + 1), *gap / stave texels* (base red < 90 / >= 120), *edge margin*
+  (every ray within 1.5 px hits, facing cosine >= 0.5, every texel within the footprint + 1 of one class), *dark* (luma <=
+  52), *in band* (luma 58..110), *silhouette* (all-miss pixels are slate within 1; at most 0.1 % of all-hit pixels slate),
+  *stave order* (between two angles, at the same pixels, the lighter-reading stave is the one with lighter texels,
+  for stave pairs whose texel tones differ by 3 % or more).
+- **The texels the checks predict from** (RV-68, the person's ruling of 2026-11-18): first the scenario evaluated the graph
+  itself through a reference to `Patina.Graphs`, outside CLAUDE.md's scenario rule. It no longer does: the reference is gone, and
+  the texels come from the approved PNGs in `samples/graphs/planks/` at 256 and from patina's own `export` of the open graph
+  into the run folder (`swatch-texels-64`, `swatch-texels-128`); evaluation correctness stays with `patina-unit`'s hand-worked tests.
+- **Probed on the planks** (`swatch-checks.tsv` of every run): gap pixels luma at most 31.7 / 36.7 / 39.6 (angles 200 /
+  0 / 90); stave pixels 70.2 .. 87.5; inside pixels reading slate 9, 6, 0 of about 139 600 (dark lower-limb gap pixels,
+  1 level off the slate, which is why that rule is a fraction). The thresholds 52 and 58..110 leave about 12 levels each
+  side. **To put to the person before landing** (the Scope's stop): those thresholds, the label band, and the
+  fraction rule for the silhouette.
+- **Breaks**, made on the scenario side since the person's ruling (below): patina carries no break switch, and nothing in
+  `src/` names one. `SwatchStage.BreaksAsync` makes each break after the positive checks, runs the same checks on a
+  `PatinaChecks` of its own and fails the run unless every check named for the break fails; it writes what each failed to
+  `swatch-breaks.txt` in the run folder and captures no frame, so the frame set is the approved one. All caught in job
+  `J-20261118-145644-0`:
+
+  | Break | How it is made now | Caught by |
+  |---|---|---|
+  | `role-order` (sheet columns reversed) | the four cells of each sheet read back swapped end for end, labels and all | sheet flat and tiled *exact*, all 16 cells at 256 and 64 |
+  | `u-flip` (textures mirrored) | the texels the checks predict from mirrored left to right (`Readback(mirrorU: true)`), against the spheres as drawn: the same mismatch the other way round | *stave order* 0 vs 200 (1 of 3 pairs) and 90 vs 200 (2 of 3) |
+  | `tiled-shift` (half a tile) | the 1:1 tiled frames rolled 64 px in x and y (exactly the break); the sheets' tiled cells drawn with every texel half a tile (size / 2) along, below the label band only (RV-68: they were rolled 43 px labels and all, so the moved label failed every cell) | tiled 128 *exact*, the sheets' base_colour and roughness tiled cells at 256 and 64, and the seam graph's *seamless* (the seam moved inside the tile); the normal and occlusion cells are blind to it (a bevel repeating 8 times across, constant down, is unchanged by half a tile), which `swatch-breaks.txt` says |
+  | `roughness-as-base` | through the tools: the planks with `base_out` fed from `roughness`, three spheres drawn by `swatch` and judged against the planks | *dark* and *in band* on all three spheres, and *stave order* 0 vs 200 |
+  | the seam graph (noise mixed 0.7 with a once-across ramp) | the graph itself, always run | *seamless* fails, as it must: the scenario asserts it does |
+
+  `SwatchImages.Tiled` and `SwatchSheet.Compose` lost their shift parameter and `SwatchImages.Mirrored` went, with
+  `SwatchBreak`. The 8 frames of `J-20261118-145644-0` are byte-identical by SHA-256 to the approved
+  `J-20261118-100559-862909`'s; none was opened again.
+- **Tests**: `SwatchTests` (11 + 11 refusal cases, harness with `EngineStatus.Faulted`, so flat and tiled are tested
+  with no GPU and the sphere and sheet are refused with the fault), the worked example, the tool lists in
+  `GraphToolTests`, `PatinaProcessTests` and `GraphStage`. `scenario-patina` is now `gpu` (and reads
+  `samples/graphs/**`); `patina-regression` stays `cpu`: its process test only lists tools, nothing renders.
+- **`CLAUDE.md`**: the `Patina.Server` Layout row now lists `swatch` (the person approved it in the round-1 review).
+- **Frame review** (Claude Opus 5.5, `claude-opus-5-5`, the frame-review agent), of job `J-20261118-100559-862909`
+  (hashes equal to the local run's `artifacts/scenarios/patina/5/frames/`). Every frame opened whole:
+  - `swatch-sheet-256` (1544 x 538): title strip `planks.texgraph   256 px   seed 77` (the graph's seed; the planning
+    sketch's "seed 7" was a placeholder). Columns in role order: base_colour, normal, roughness, occlusion, each label
+    in its cell's top-left on the dark backing; flat above, `<role> 3 x 3` below; 2 px slate gutters. The tiled cells
+    show 24 staves with even gaps and no seam at the thirds. Sphere cell on the right, labelled
+    `sphere, Pbr, fixed sky, angle 0`, on the slate.
+  - `swatch-sheet-64`: the same layout; the cells are 4 x nearest blocks of the 64 texels; the normal is fainter (the
+    bevel is about one texel at 64), the sphere softer. Nothing out of place.
+  - `swatch-flat-normal-256`: eight bevels; sampled, the texels left of a gap (x 28..30) read red 183..196 (+x tilt) and
+    those right of it (x 1..2) red 59 (-x), green 128 throughout: the bevel falls into the gap from both sides.
+  - `swatch-tiled-base-128` (384 x 384): 24 staves, gaps one width, no visible seam on either axis.
+  - `swatch-sphere-0`, `-90`, `-200` (512): the faceted 32-sector UV sphere, centred, whole, on the slate; staves brown
+    with darker gaps (a bluish sky rim along the gap bevels), lit evenly with a little darkening toward the limb and the
+    lower half; no highlight to speak of (the planks' roughness is high and narrow). 0 and 90 put the gaps at the same
+    pixels, as a quarter turn is two staves; they differ only in the staves' tones (55 357 pixels past 4 levels, at most
+    12), which is what *stave order* reads. 200 moves the gaps by 4 4/9 staves: two gaps either side of the centre
+    instead of one on it.
+  - `swatch-tiled-seam`: grey noise with a hard dark-to-light step at each tile column (x 128, 256) and none across the
+    rows: the visible seam the *seamless* check must fail on.
+- **The person's review** (round 1, `G:\My Drive\artifacts\carve\M-27\T-114\round-1`, Waystone, 2026-11-18):
+  **approved**, frames and the open point as put: *dark* luma <= 52, *in band* 58..110, the 22-row label band left out of
+  the exact check, the silhouette's 0.1 % of inside pixels as slate, and the `CLAUDE.md` row. Note on the whole: "Looks
+  fine, but the roughness isn't very apparent on the sphere renders" (not a change asked; the planks' roughness texels
+  sit in a narrow high band, so the sphere is matte all over).
+- **Rulings by the person** (via the orchestrator, 2026-11-18): `PATINA_SWATCH_BREAK` / `SwatchBreak` must move out of the
+  patina product to the scenario or test side (CLAUDE.md's no-debug-in-product rule); no engine need for the sphere's UV
+  mapping, `SwatchSphere.cs` stands.
+
+- **Finishing agent** (Claude Opus 5.5, `claude-opus-5-5`, third agent, after the first two, also Opus 5.5): moved the
+  breaks to the scenario side as above, added T-115's `export` to the `CLAUDE.md` `Patina.Server` row, rebased onto
+  `origin/milestone/M-27`, verify: VERIFY PASS (patina-unit, server-unit, core-unit, scenario-patina, patina-regression on
+  Mantorok). Earlier: after the first rebase onto T-115 the tool lists were made exact (the seven, then `export`, then
+  `swatch`). Not checked: no frame was opened by this agent (all hashes equal the approved set); the person noted the
+  roughness is not very apparent on the sphere (the planks' roughness is high and narrow), approved as is.

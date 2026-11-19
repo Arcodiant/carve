@@ -19,7 +19,7 @@ namespace Carve.Server.Tests;
 /// update and rendered and read back in the next, as <c>RenderPump</c> does (the light's transform is published a loop
 /// iteration later).
 /// </summary>
-internal static class EngineHost
+internal static class InProcessEngine
 {
     public sealed record Kit(IGraphicsResourceManager Resources, IModelLoader Models, ITextureLoader Textures, IAssetResidency Residency);
 
@@ -87,7 +87,7 @@ internal static class EngineHost
                 if (_shots is null)
                 {
                     scenes.CreateScene(Scene);
-                    _light = RenderLights.Add(scenes, entities, Scene);
+                    _light = RenderLights.Add(scenes, entities, Scene, ViewFraming.LightOrientation(RenderView.Front));
                     foreach (var size in RenderComposition.Sizes)
                     {
                         var camera = scenes.CreateEntity(Scene);
@@ -266,7 +266,7 @@ public sealed class PbrEqualityTests() : FileToolTests("carve-pbr-equality")
         Assert.All(colours, Assert.Null);
 
         Material[]? loaded = null, built = null;
-        var frames = EngineHost.Run(kit =>
+        var frames = InProcessEngine.Run(kit =>
         {
             loaded = kit.Models.LoadModel(glb, ModelFormat.Gltf, generateMipmaps: true).SubmeshMaterials!;
             var pbr = new PbrMaterials(kit.Resources, kit.Textures);

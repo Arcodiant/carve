@@ -15,6 +15,8 @@ internal static class Paths
 
     public static string CarveDll { get; } = Output("src/Carve.Server", "carve.dll");
 
+    public static string HostingDll { get; } = Output("src/Carve.Hosting", "Carve.Hosting.dll");
+
     public static string DebugExtensionDll { get; } = Output("extensions/Carve.Debug", "Carve.Debug.dll");
 
     public static string TinyScenarioDll { get; } = Output("tests/Carve.Scenario.Tiny", "Carve.Scenario.Tiny.dll");
@@ -128,7 +130,9 @@ internal sealed class CarveProcess : IToolCaller, IDisposable
     {
         var id = Interlocked.Increment(ref _lastId);
         await SendAsync($$"""{"jsonrpc":"2.0","id":{{id}},"method":"tools/list"}""");
-        return (await ReadResponseAsync(id)).GetProperty("result").GetProperty("tools");
+        var tools = (await ReadResponseAsync(id)).GetProperty("result").GetProperty("tools");
+        FrameLog.Tools(tools);
+        return tools;
     }
 
     /// <summary>The <c>result</c> of <c>tools/call</c>.</summary>
@@ -138,7 +142,9 @@ internal sealed class CarveProcess : IToolCaller, IDisposable
     {
         var id = Interlocked.Increment(ref _lastId);
         await SendAsync($$$"""{"jsonrpc":"2.0","id":{{{id}}},"method":"tools/call","params":{"name":"{{{name}}}","arguments":{{{arguments}}}}}""");
-        return (await ReadResponseAsync(id)).GetProperty("result");
+        var result = (await ReadResponseAsync(id)).GetProperty("result");
+        FrameLog.Call(name, arguments, result);
+        return result;
     }
 
     public void CloseStdin() => _process.StandardInput.Close();
