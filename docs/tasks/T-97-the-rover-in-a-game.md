@@ -4,7 +4,7 @@ description: >-
 ---
 # T-97 — The rover in a game
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
