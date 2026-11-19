@@ -4,7 +4,7 @@ description: >-
 ---
 # M-9 — Parts
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *A model is a named tree of parts with their own transforms, pivots and envelopes, instances, and the levels each was refined through*
 
