@@ -50,7 +50,7 @@ Sonnet 5.5, two agents (the first stopped on a question; this one finished), 202
 - `samples/rover.carve`: the version 7 file `parts/rover.carve` of the run (byte copy), equal by content to the saved file and to `RoverSpec.Build()`.
 - `scripts/run-parts-scenario.ps1` runs the scenario, then the viewer on `models/rover.glb` with `--sky` and views `viewer-front=1.2,0.5,2.2` and `viewer-angle=1.6,1.2,2.2`, then the checks. `tests.json`'s `scenario-parts` runs it.
 - `tests/Carve.PartsLoad.Tests` (in `Carve.slnx`), 10 checks: split load (names, pre-order, parents, composed transforms, sketch positions, one wheel mesh, triangle counts), merged and split bounds and 576 triangles, the five agreed colours, the sample by content, `view.json`, the viewer frames by hue and order (a mirrored view fails), and the material count below.
-- Break table, 9 breaks on copies of the run folder, each failing at least one check: `G:\My Drivertifacts\carve\M-9\T-97reak-table.tsv`.
+- Break table, 9 breaks on copies of the run folder, each failing at least one check: `G:\My Drive\artifacts\carve\M-9\T-97\break-table.tsv`.
 - `CLAUDE.md` rows for the scenario, tests project, script and sample.
 
 Rulings by the person, 2026-11-19:

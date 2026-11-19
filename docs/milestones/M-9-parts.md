@@ -197,7 +197,7 @@ In wave 2, `ModelStore.cs` is shared by T-92 and T-93, for adds only. `Program.c
     - the empty-part hint reads `define_mesh name=`.
   - T-92: `open mesh=` into an empty or an instance stays refused.
   - T-132: a kept level keeps its targets.
-  - T-95: four export rules, chosen through the review window:
+  - T-95: five export rules, chosen through the review window:
     - a sheared fold is refused;
     - nodes are written in pre-order;
     - limits count what is drawn;
