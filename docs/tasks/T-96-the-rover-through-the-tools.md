@@ -4,7 +4,7 @@ description: >-
 ---
 # T-96 — The rover through the tools
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
