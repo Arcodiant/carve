@@ -250,10 +250,24 @@ public class GlbPartsTests
     [Fact]
     public void Moving_parts_share_one_glTF_material_per_colour()
     {
-        var root = ModelRoot.ParseGLB(Export(Rover, "rover"));
-        Assert.Equal(root.LogicalMaterials.Count, root.LogicalMaterials.Select(m => m.Name).Distinct().Count());
-        Assert.Equal(3, root.LogicalMeshes.Count);
-        Assert.Equal(6, root.LogicalNodes.Count);
+        // Red on both meshes, blue on the lid's only: two materials for three primitives. SharpGLTF writes content-equal
+        // materials once by itself, so this can't see Write's shared dictionary (dropping it writes the same bytes); what it
+        // sees is the product naming and building each colour's material the same way in every mesh it's drawn in.
+        var body = TestMeshes.Cube().WithStyle(FaceStyle.None.WithColour([0, 1, 2, 3, 4, 5], "#C8503C"));
+        var lid = TestMeshes.Cube().WithStyle(FaceStyle.None.WithColour([0, 1, 2], "#C8503C").WithColour([3, 4, 5], "#3C50C8"));
+        var model = Of([new("Body", body), new("Lid", lid)],
+            new Part("Body"),
+            new Part("Lid") { Moves = true, Translation = new Vector3(0, 2, 0) });
+        var root = ModelRoot.ParseGLB(Export(model, "box"));
+        Assert.Equal(2, root.LogicalMeshes.Count);
+        Assert.Equal(3, root.LogicalMeshes.Sum(m => m.Primitives.Count));
+        Assert.Equal(GlbExport.MaterialNames(model.Combined!).Order(), root.LogicalMaterials.Select(m => m.Name).Order());
+        Assert.Equal(2, root.LogicalMaterials.Count);
+
+        var rover = ModelRoot.ParseGLB(Export(Rover, "rover"));
+        Assert.Equal(rover.LogicalMaterials.Count, rover.LogicalMaterials.Select(m => m.Name).Distinct().Count());
+        Assert.Equal(3, rover.LogicalMeshes.Count);
+        Assert.Equal(6, rover.LogicalNodes.Count);
     }
 
     [Fact]
