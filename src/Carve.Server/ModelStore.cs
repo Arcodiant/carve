@@ -89,21 +89,10 @@ public sealed class ModelStore
         }
     }
 
-    /// <summary>As <see cref="OpenMesh(Model, string, string, out string?)"/>, unless <paramref name="refuse"/> gives a reason for the current model, checked under the same lock.</summary>
-    public ModelSnapshot? OpenMesh(Model file, string name, string tool, Func<Model, string?> refuse, out string? problem)
-    {
-        lock (_write)
-        {
-            problem = refuse(_current.Model);
-            if (problem is not null) return null;
-            var next = _current.Model.WithMeshFrom(file, name, out problem);
-            return next is null ? null : PushLocked(next, tool);
-        }
-    }
-
     /// <summary>
-    /// As <see cref="OpenMesh(Model, string, string, Func{Model, string?}, out string?)"/> for a part tree (T-92): the part's own
-    /// geometry and kept levels, keeping the placement of the model's part of that name (<see cref="Model.WithPartPieceFrom"/>).
+    /// As <see cref="OpenMesh(Model, string, string, out string?)"/> for a part tree (T-92), unless <paramref name="refuse"/> gives a
+    /// reason for the current model, checked under the same lock: the part's own geometry and kept levels, keeping the placement
+    /// of the model's part of that name (<see cref="Model.WithPartPieceFrom"/>).
     /// </summary>
     public ModelSnapshot? OpenPiece(Model file, string name, string tool, Func<Model, string?> refuse, out string? problem)
     {
