@@ -169,13 +169,12 @@ public class ModelMaterialTests
     }
 
     [Fact]
-    public void Posed_keeps_the_materials_and_the_assignment()
+    public void Posed_keeps_the_material_assignment()
     {
         var skeleton = Skeleton.Create([new BoneSpec("root", null, Vector3.Zero, Quaternion.Identity)]).Skeleton!;
-        // Render draws the posed mesh with the model's own materials (RenderPump), so the assignment must still name them.
+        // Render looks each posed face's material up in the model's own list: RenderPumpTests.A_posed_draw_keeps_each_faces_material_from_the_models_materials.
         var model = WoodModel().WithSkeleton(skeleton);
         var posed = Skinning.PosedOf(model, Pose.Rest, null, null)!;
-        Assert.Equal(["wood", "steel"], model.Materials.Select(m => m.Name));
         Assert.Equal("wood", posed.Style!.MaterialOf(1));
         Assert.Equal("wood", Skinning.PosedOf(model, Pose.Rest, null, "box")!.Style!.MaterialOf(1));
     }
