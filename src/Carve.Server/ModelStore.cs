@@ -90,9 +90,10 @@ public sealed class ModelStore
     }
 
     /// <summary>
-    /// As <see cref="OpenMesh(Model, string, string, out string?)"/> for a part tree (T-92), unless <paramref name="refuse"/> gives a
-    /// reason for the current model, checked under the same lock: the part's own geometry and kept levels, keeping the placement
-    /// of the model's part of that name (<see cref="Model.WithPartPieceFrom"/>).
+    /// Takes the part <paramref name="name"/> from <paramref name="file"/> into the current model under the lock, as one step (T-92),
+    /// unless <paramref name="refuse"/> gives a reason for the current model, checked under the same lock: the part's own geometry
+    /// and kept levels, keeping the placement of the model's part of that name (<see cref="Model.WithPartPieceFrom"/>). Null,
+    /// pushing nothing, with <paramref name="problem"/> saying why.
     /// </summary>
     public ModelSnapshot? OpenPiece(Model file, string name, string tool, Func<Model, string?> refuse, out string? problem)
     {
@@ -101,20 +102,6 @@ public sealed class ModelStore
             problem = refuse(_current.Model);
             if (problem is not null) return null;
             var next = _current.Model.WithPartPieceFrom(file, name, out problem);
-            return next is null ? null : PushLocked(next, tool);
-        }
-    }
-
-    /// <summary>
-    /// Takes the mesh <paramref name="name"/> from <paramref name="file"/> into the current model under the lock, as one step
-    /// (<see cref="Model.WithMeshFrom"/>). Null, pushing nothing, with <paramref name="problem"/> saying why, when the file
-    /// has no such mesh or its weights name bones the current skeleton does not have.
-    /// </summary>
-    public ModelSnapshot? OpenMesh(Model file, string name, string tool, out string? problem)
-    {
-        lock (_write)
-        {
-            var next = _current.Model.WithMeshFrom(file, name, out problem);
             return next is null ? null : PushLocked(next, tool);
         }
     }

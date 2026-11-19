@@ -442,15 +442,15 @@ public class CarveFileV2Tests
     public void APieceWithWeightsCarriesTheSkeletonAndClipsAndOneWithoutDoesNot()
     {
         var model = Arm().With("hat", Cube());
-        var arm = model.Piece("arm")!;
+        var arm = model.PartPiece("arm", out _)!;
         Assert.Equal(["arm"], arm.Names);
         Assert.Same(model.Skeleton, arm.Skeleton);
         Assert.Equal(["wave"], arm.Clips.Select(c => c.Name));
-        var hat = model.Piece("hat")!;
+        var hat = model.PartPiece("hat", out _)!;
         Assert.Equal(["hat"], hat.Names);
         Assert.Null(hat.Skeleton);
         Assert.Empty(hat.Clips);
-        Assert.Null(model.Piece("boot"));
+        Assert.Null(model.PartPiece("boot", out _));
         AssertSameModel(arm, RoundTrip(arm));
     }
 
