@@ -4,7 +4,7 @@ description: >-
 ---
 # T-120 — Bake framework in the Core
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
