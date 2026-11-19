@@ -23,6 +23,7 @@ public sealed class LoopCutTool(ModelStore store)
         + "Bad input (a pair that is not an edge of the mesh, an edge with no quad on it, a ring that closes on itself reversed (a Mobius band), a cut across a quad that runs along or crosses one of its edges (a concave quad can make one), a bad at, an argument loop_cut does not take) is a tool error that lists every problem; select with kind edges lists the real edges. "
         + "The mesh is left unchanged and nothing is added to undo; one undo step undoes the whole cut. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to cut. "
+        + PartSpaceText
         + "Worked example on define_mesh's unit cube: one loop at 0.5 round the four sides, starting on the vertical edge 0-3, gives 12 vertices and 10 faces:\n"
         + ExampleMarker + """{"edge":[0,3],"at":[0.5]}""";
 

@@ -62,9 +62,13 @@ internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] F
         return Vector3.Normalize(n);
     }
 
+    // Each face's normal, worked once: FirstHit asks for every face's on every ray (T-96's rover has 300 faces and 16 000 rays a frame).
+    private Vector3[]? _normals;
+
     /// <summary>The face a ray meets first among those whose front is toward the ray, or -1.</summary>
     public int FirstHit(Vector3 origin, Vector3 direction)
     {
+        var normals = _normals ??= Enumerable.Range(0, Faces.Length).Select(f => IsDeleted(f) ? Vector3.Zero : Normal(f)).ToArray();
         var (best, nearest) = (-1, float.MaxValue);
         for (var f = 0; f < Faces.Length; f++)
         {
@@ -73,7 +77,7 @@ internal sealed record Solid(Vector3[] Vertices, (int[] Loop, int[][] Holes)[] F
                 continue;
             }
 
-            var n = Normal(f);
+            var n = normals[f];
             var facing = Vector3.Dot(n, direction);
             if (facing >= 0)
             {

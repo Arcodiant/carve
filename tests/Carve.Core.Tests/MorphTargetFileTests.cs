@@ -99,10 +99,10 @@ public sealed class MorphTargetFileTests
     [Fact]
     public void Save_of_one_mesh_carries_its_targets()
     {
-        var piece = WithTargets().Piece("box")!;
+        var piece = WithTargets().PartPiece("box", out _)!;
         var read = CarveFile.Read(CarveFile.Write(piece));
         Assert.Equal(["Bulk", "Lean", "Rest"], read.Model!.Meshes.Single().Mesh.Targets!.Names);
-        Assert.Equal(2, CarveFile.Read(CarveFile.Write(WithTargets().Piece("plain")!)).Version);
+        Assert.Equal(2, CarveFile.Read(CarveFile.Write(WithTargets().PartPiece("plain", out _)!)).Version);
     }
 
     [Theory]
@@ -164,14 +164,13 @@ public sealed class MorphTargetFileTests
     }
 
     [Fact]
-    public void Version_7_is_not_read_by_this_build()
+    public void Version_7_holds_no_targets()
     {
+        // Version 7 is the part tree (T-92), which has no targets key: version 9 holds both (T-132).
         var read = CarveFile.Read(Text().Replace("\"carve\": 8", "\"carve\": 7"));
-        var error = Assert.Single(read.Errors);
-        Assert.Equal("carve", error.Element);
-        Assert.Contains("version 7 is not one this build reads", error.Message);
+        Assert.Contains(read.Errors, e => e.Element == "meshes[0].targets" && e.Message.Contains("unknown key"));
+        Assert.Contains(7, CarveFile.ReadableVersions);
         Assert.Contains(8, CarveFile.ReadableVersions);
-        Assert.DoesNotContain(7, CarveFile.ReadableVersions);
     }
 
     /// <summary>

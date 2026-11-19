@@ -15,6 +15,7 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
 
     private const string OpenMeshText =
         "The one mesh to take from the file, by its name there (a version 1 file's single mesh is taken whatever the name, and placed under it, so long as it is a name define_mesh takes: not empty and with no ':'): it replaces the model's mesh of that name, or is added when the name is new, and the rest of the model stays. "
+        + "Of a part tree, the part's own geometry and kept levels: a part of that name keeps its place in the tree, and a new one is a top-level part at the origin; an instance or an empty, in the file or the model, is refused. "
         + "Left out, the whole model is replaced by the file's.";
 
     public const string Text =
@@ -38,6 +39,11 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         + "a file with no meshes and no skeleton, or anything the tools themselves would refuse (a bad vertex or face, colour, group, bone, weight or clip), each problem listed by where it is, e.g. meshes[0].faces[3][3]; "
         + "with mesh, a name that is empty or holds ':' (\"mesh: a mesh name must not contain ':' ...\"); a name a version 2 file has no mesh of (the file's meshes are listed, or it is said to have none), or weights on bones the model's skeleton lacks (they are listed); "
         + "an open that would replace a mesh that has morph targets (with mesh, the model's mesh of that name; without, any mesh of the model), naming the targets, unless drop_targets is true (undo brings them back either way). A file's morph targets come with its meshes, bit-exact. "
+        + "A version 7 file holds a part tree, and a version 9 file a part tree beside morph targets (save says how): open without mesh brings back every part, its parent, transform, envelope, instance_of, moves mark and kept levels, with every mesh's and level's targets in version 9, bit-exact. "
+        + "With mesh on a part tree, open takes that part's own geometry and kept levels as a piece and nothing of its place in the file: it replaces the geometry and levels of the model's part of that name, which keeps its parent, transform, envelope, children and moves mark, "
+        + "or adds it as a new top-level part at the origin. mesh naming an instance or an empty, in the file or in the model, is a tool error that says which it is and names the source part an instance shows. "
+        + "Part tree example: with the rover open, open {\"path\":\"wheel.carve\",\"mesh\":\"Wheel_FL\"} replaces Wheel_FL's polygons and levels with the file's; Wheel_FL stays at (0, 0, 0.72) under Axle_F, "
+        + "and its instances Wheel_FR, Wheel_RL and Wheel_RR show the new wheel; mesh Wheel_FR is refused, since it is an instance of Wheel_FL. "
         + "The whole sequence from an empty file to a game is the worked example in save's description.\n"
         + ExampleMarker + SaveTool.WorkedFile;
 
@@ -88,7 +94,7 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         {
             if ((opened = store.OpenModel(file, "open", refuse, out var problem)) is null) return Failed("open", [problem!]);
         }
-        else if ((opened = store.OpenMesh(file, name, "open", refuse, out var problem)) is null) return Failed("open", [problem!]);
+        else if ((opened = store.OpenPiece(file, name, "open", refuse, out var problem)) is null) return Failed("open", [problem!]);
 
         var model = opened.Model;
         var body = new Dictionary<string, object> { ["path"] = target.FullPath };

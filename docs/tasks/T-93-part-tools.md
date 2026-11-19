@@ -4,7 +4,7 @@ description: >-
 ---
 # T-93 — Part tools
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -40,3 +40,22 @@ An agent builds and reads a part tree through MCP: it places parts, marks what m
 - **Open rules: stop and ask.** No part removal or renaming in M-9: undo removes a part just made. If the work shows a need, it goes to the person. Also: whether `define_part` on an existing part may change `instance_of`, and anything the rulings leave open.
 - **Write down for dependents (As built):** the tool texts and the `get_parts` result shape, for T-94, T-96 and T-98.
 - **Carried:** `tools/list` unchanged for every existing tool apart from the agreed description sentences; each new check shown failing on a broken product, as a table; evidence at the absolute path the dispatch names; `finish` run inside the worktree, its output read whole and its `Merge task/T-93` line given; report a `verify` that waits more than a few minutes.
+
+### As built
+
+Opus 5.5, 2026-11-18 (two agents, both Opus 5.5). For T-94, T-96 and T-98.
+
+- **Files.** `src/Carve.Server/PartTools.cs` (new): `PartTexts` (the agreed sentences, public), `DefinePartTool`, `GetPartsTool`, `KeepLevelTool`. Registered in `CarveServer.AddTools`, after `define_mesh` (`Program.cs` has no tool list of its own; it calls `AddTools`). `ModelStore.Change(tool, model => (next, problem), out problem)`, added: one step under the write lock. `MeshToolSupport.PartSpaceText` is `PartTexts.PartSpace`.
+- **Texts.** Each tool's text is the `Text` constant of its class; the worked examples are `DefinePartTool.Example`, `KeepLevelTool.Example` (with its exact `Output:` line) and `GetPartsTool.ExampleEntry`, all checked against real calls on the rover in `PartToolsTests`.
+- **`define_part {part, parent?, translation?, rotation?, scale?, envelope?, instance_of?, moves?}`** returns `{created, part}`, `part` being the get_parts entry. Arguments are read raw, so `parent: null` (top-level) and `envelope: null` (clear) differ from leaving them out. `envelope` is `{min:[x,y,z], max:[x,y,z]}`. A new name with no `instance_of` is an empty. Core's field `name` is reported as `part`; every other field is the argument's own name. **The person's ruling (2026-11-18):** an existing part's `instance_of` may not change: giving a different one is refused (`instance_of: 'Cab' already exists with geometry of its own, and an existing part's instance_of does not change; ...`); giving the same one is accepted.
+- **`get_parts {}`** returns `{parts:[...]}` in pre-order, `[]` for an empty model. Entry, in this key order: `name, parent, translation, rotation [x,y,z,w], scale, envelope ({min,max} or null), instance_of, moves, geometry (owns geometry), vertices, faces (of the geometry shown: an instance's source's, 0 for an empty), levels (numbers shown, an instance's source's), local_bounds, world_bounds ({min,max} of the live vertices, null for an empty), warnings (that part's `EnvelopeWarning.Message`s)`. world_bounds are each live vertex through `Model.WorldTransform`, in float, so the example reads `0.29999998`.
+- **`keep_level {level, parts?}`** returns `{level, kept:[{part, levels}]}` in tree order. With `parts` left out it keeps every part that owns geometry; an empty model is the usual "there is no mesh yet". Core's `part:` refusals are re-prefixed `parts[i]:`; every refusal in one call is listed; the whole call is refused if any part is.
+- **`define_mesh`** gains `PartTexts.DefineMesh` and refuses an instance: `name: 'Wheel_FR' is an instance of 'Wheel_FL', with no geometry of its own; define_mesh name=Wheel_FL changes the geometry every instance shows`. An empty or a part with geometry already behaved as specified through T-91's `Model.With`.
+- **Edit tools and select** gain `PartTexts.PartSpace` after their "Needs a mesh" sentence: bridge, define_target, delete, extrude, knife, loop_cut, merge_faces, move, plane_cut, select, subdivide. Targeting was already T-91's `Model.Target`; meshes are stored part-local, so edits were already in part space.
+- **`check`** appends `Model.EnvelopeWarnings()` (the whole model's, whichever mesh is checked, since an empty such as `Axle_F` cannot be checked itself) after its own warnings, and `ok` is false when there are any. With no envelopes the output is as before.
+- **`tools/list`**: `PartToolsListTests` pins a SHA-256 of every pre-T-93 tool's entry with the three agreed sentences removed, taken on the code before this member: first on a2b8878, then re-taken on `origin/milestone/M-9` at 6e2626f without T-93, after T-92 changed save's and open's texts. It passes, so nothing else changed. Since the digest takes the agreed sentences out, `Each_agreed_sentence_is_in_its_tools_description_once` pins each one in its tool's text, once.
+- **Tests:** `PartToolsTests` (unit, on `ToolHarness`, `RoverSpec.cs` linked into `Carve.Server.Tests`) and `PartToolsListTests`.
+- **Core's empty-part refusal, the person's ruling (2026-11-18):** T-91's text now names define_mesh's real argument: `mesh: 'Axle_F' is an empty part with no geometry; define_mesh name=Axle_F gives it some` (was `mesh=`). define_mesh's schema is unchanged. Pinned in `PartTreeTests`, `PartTreeFileTests` and `PartPieceToolTests`.
+- **Rebase onto T-92:** one conflict, the test project's linked files (T-92's `PartTreeSample.cs`, T-93's `RoverSpec.cs`); both kept.
+- **Break table:** `G:\My Drive\artifacts\carve\M-9\T-93\break-table.tsv`, twelve breaks of the product, each made, tested with `PartTools|PartPiece` in `Carve.Server.Tests`, and reverted. Every break fails at least one check: world bounds left in part space, get_parts out of pre-order, define_part resetting an unnamed field, an instance_of change allowed, a refusal not naming its argument, keep_level taking instances and empties, kept parts out of tree order, check dropping envelope warnings, define_mesh accepting an instance, a missing part-space sentence, a changed existing text, and Core's refusal back to `mesh=` (that one fails `PartPieceToolTests` in the server tests, and Core's own tests besides).
+- **Not checked:** no real MCP client run; the checks are in-process through `ToolHarness`. `verify` is slow (over 10 minutes for server-unit).

@@ -19,6 +19,11 @@ public class RenderPumpTests
 
         public PolygonMesh? Shown { get; private set; }
 
+        /// <summary>The materials last given with a mesh, as RenderSystem keeps them to look each face's material up by name.</summary>
+        public IReadOnlyList<Material> Materials { get; private set; } = [];
+
+        public void ShowMaterials(IReadOnlyList<Material> materials) => Materials = materials;
+
         public Func<PolygonMesh, Exception?> OnShow { get; set; } = _ => null;
 
         public Func<RenderView, Exception?> OnView { get; set; } = _ => null;
@@ -147,6 +152,38 @@ public class RenderPumpTests
         // Vertex 2 is raised by half its delta (the morph) and carried by the whole bone's shift (the skin); the unmorphed vertex 0 only by the shift.
         Assert.Equal(rest.Vertices[2] + new Vector3(0, 0.5f, 0) + shift, _scene.Shown!.Vertices[2]);
         Assert.Equal(rest.Vertices[0] + shift, _scene.Shown.Vertices[0]);
+    }
+
+    /// <summary>
+    /// RV-72, by the person's ruling: a posed draw keeps each face's material, looked up by name in the materials render is
+    /// given for that draw, as RenderSystem looks it up. Two rigged meshes, the second placed, so a face's material coming from
+    /// the wrong mesh, or the materials or the assignment being dropped when posed, shows.
+    /// </summary>
+    [Fact]
+    public void A_posed_draw_keeps_each_faces_material_from_the_models_materials()
+    {
+        var pump = Started();
+        Material wood = new("wood", Roughness: 0.8f), steel = new("steel", Metallic: 1f, Roughness: 0.3f);
+        var skeleton = Skeleton.Create([new BoneSpec("Root", null, Vector3.Zero, Quaternion.Identity)]).Skeleton!;
+        var weights = VertexWeights.Of(Enumerable.Range(0, 8).Select(v => KeyValuePair.Create(v, new[] { new Influence(0, 1) })));
+        var a = Mesh().WithStyle(FaceStyle.None.WithMaterial([1], "wood").WithMaterial([3], "steel")).WithWeights(weights);
+        var b = Mesh().WithStyle(FaceStyle.None.WithMaterial([0, 5], "steel").WithMaterial([2], "wood")).WithWeights(weights);
+        var (model, errors) = Model.Create([new("A", a), new("B", b)], skeleton, [], [wood, steel],
+            [new Part("A"), new Part("B") { Translation = new Vector3(0, 0, 4), Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.5f) }]);
+        Assert.True(model is not null, string.Join("; ", errors));
+        _store.OpenModel(model!, "open");
+        var shift = new Vector3(3, 0, 0);
+        var pose = new Pose(new Dictionary<string, (Quaternion?, Vector3?)> { ["Root"] = (null, shift) });
+
+        _ = _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)) { Pose = pose });
+        for (var i = 0; i < 6; i++) pump.Step();
+
+        var shown = _scene.Shown!;
+        Assert.Equal(a.Vertices[0] + shift, shown.Vertices[0]);
+        Material? Drawn(int face) => shown.Style?.MaterialOf(face) is { } name ? _scene.Materials.Single(m => m.Name == name) : null;
+        Material?[] expected = [null, wood, null, steel, null, null, steel, null, wood, null, null, steel];
+        Assert.Equal(expected.Length, shown.Faces.Count);
+        for (var f = 0; f < expected.Length; f++) Assert.True(expected[f] == Drawn(f), $"face {f}: drawn with {Drawn(f)?.Name ?? "no material"}, expected {expected[f]?.Name ?? "none"}");
     }
 
     [Fact]

@@ -32,6 +32,13 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         + "a path naming a folder; any extension but .glb; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
         + "A model of several meshes and no skeleton is written as one mesh, every mesh merged in order, as above. "
+        + "Parts (define_part): the .glb keeps a node only where a part moves. With nothing marked moves, every part is merged into the one mesh at its place in the model (each part's transform folded into its vertices and normals, each instance copied), exactly as above. "
+        + "With parts marked moves, the root node (named after the file, the identity) holds every static part merged, its transform to the root folded in; each moving part is a child node named after the part, under its nearest moving ancestor or else the root, siblings in the tree's order, "
+        + "its transform its own composed with every static ancestor's up to that node, its mesh its own geometry plus its static descendants' folded in the same way; moving instances of one part share one glTF mesh of that part's own geometry (an instance with static descendants of its own gets its own mesh), and a moving empty is a node with no mesh. "
+        + "Worked example, the rover: root 'rover' holds the Chassis and the Cab merged (the static empties Axle_F and Axle_R draw nothing), with children 'Mast' (holding the Lamp, folded in) and 'Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR', the four wheels sharing one mesh, each axle's translation folded into its wheels' (Wheel_FL at 0.7, 0.4, 0.72); a game reads them back as parts with ModelParseOptions(SplitParts: true). "
+        + "A moving part under a static ancestor with a non-uniform scale, turned so the scale would shear it, is refused, writing nothing, since a glTF node cannot hold a shear: give the ancestor a uniform scale or mark it moves too. "
+        + "Game limits count the whole file as drawn (four shared wheels are four wheels' triangles). Morph targets with moving parts are written on each mesh that holds them, and export warns that a split load refuses a file with morph targets. "
+        + "A skinned model bakes its parts: each part's geometry at its place in the model and each instance a copy, written as below; moves has no effect there, and export warns, naming the moving parts. A piece (mode piece) is each named part's own geometry; naming an instance or an empty part is refused as save's mesh is, an instance's refusal naming its source. "
         + "With a skeleton (define_skeleton) the file is skinned, for a character: one glTF mesh named after the file holding every mesh of the model as primitives, "
         + "one per mesh and colour (meshes in order, colours by first face), each with its own material: '<mesh>' for uncoloured faces, '<mesh>:<group>' when a face group holds exactly that colour's faces, else '<mesh>:<rrggbb>' (also when the group's name is another colour's rrggbb in that mesh, so no two materials share a name); then the materials the mesh's faces use, one primitive each named for the material (a material two meshes use is one glTF material and one primitive, with both meshes' faces; a material named like a mesh renames that mesh's uncoloured material to '<mesh>:uncoloured' only when the names clash); "
         + "positions in the rest pose with JOINTS_0 and WEIGHTS_0 from set_weights; a node 'Armature' (identity, not a bone) with the bones under it in your order; skins[0] over every bone, "
@@ -43,7 +50,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         + "A limits file that is not a plain JSON object of those keys (a count a whole number of at least 1, a height a number above 0, min_height not above max_height), a limits argument naming no file without write_limits, or one no file could be written at (a file that is not .json, a folder, a character a path may not hold), is a tool error that writes nothing. "
         + "A mesh with warnings still exports, and the result repeats them (up to 10 not-planar faces named per mesh, the lowest ids first, the rest in one line \"and N more faces are not planar; select faces where non_planar names them\"); so do a skinned or clips export's clip warnings (see define_clip: a looping clip that does not close, a root that ends elsewhere on the ground plane). export changes nothing: not the mesh, its ids, or what undo steps back to. "
         + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve' (or each material, when there are several) (the colours' and each material's name), size <x> x <y> x <z> m, "
-        + "bounds (<min x, y, z>) to (<max x, y, z>), then where the limits came from (limits from <file>, or no game limits), then any warnings; a skinned export's line names its pieces, materials, bones and clips instead of the one material. "
+        + "bounds (<min x, y, z>) to (<max x, y, z>), with moving parts then \", <n> nodes: '<file>' and the moving part(s) '<part>', ...\", then where the limits came from (limits from <file>, or no game limits), then any warnings; a skinned export's line names its pieces, materials, bones and clips instead of the one material. "
         + "mode: 'model' (the default) writes all of the above; 'clips' writes the armature, skins[0] and the animations with no mesh, no node holding a mesh and no material, "
         + "which is one file of clips for every character that shares the skeleton: a game loads it with IModelGeometryLoader.LoadAnimationSet (the same bones in the same order and the same clips as the model file) and retargets it, "
         + "and the model loader refuses it as 'glTF contains no meshes.'. The skin stays in a clips file because without it the loader reorders bones and the tracks line up with the wrong ones. "
@@ -161,6 +168,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
     /// <summary>A model with no skeleton: every mesh merged into one, as T-30 writes it, warned on the game's limits.</summary>
     private static CallToolResult Static(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source)
     {
+        if (GlbParts.HasMoving(model)) return Tree(model, mesh, target, overwrite, source);
         var triangles = Shading.Triangles(mesh);
         var bytes = GlbExport.Write(mesh, triangles, target.Stem, model.Materials);
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
@@ -168,6 +176,22 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         var warnings = source.Limits.Warnings(model, triangles.Count, GlbExport.MaterialNames(mesh, model.Materials).Length);
         return Line(Summary(mesh, GlbExport.MaterialNames(mesh, model.Materials), target, replaced, triangles.Count, TargetsPart(model) + source.Describe(written: false), warnings,
             [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model)]));
+    }
+
+    /// <summary>T-95: a model with parts marked moves, a node per moving part (<see cref="GlbParts"/>), counted on the game's limits as drawn.</summary>
+    private static CallToolResult Tree(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source)
+    {
+        if (GlbParts.Plan(model, target.Stem, out var refusal) is not { } layout) return Error($"export: {refusal}. Nothing was written.");
+        var bytes = GlbParts.Write(model, layout);
+        if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
+
+        var triangles = Shading.Triangles(mesh).Count;
+        var names = GlbExport.MaterialNames(mesh, model.Materials);
+        var warnings = source.Limits.Warnings(model, triangles, names.Length);
+        List<string> more = [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model)];
+        if (model.TargetNames.Count > 0)
+            more.Add("the file has morph targets and moving parts: a split load (ModelParseOptions SplitParts) refuses a file with morph targets, so a game reads this one with the merged load");
+        return Line(Summary(mesh, names, target, replaced, triangles, GlbParts.Describe(layout) + TargetsPart(model) + source.Describe(written: false), warnings, more));
     }
 
     /// <summary>Clips mode: the armature, skin and animations with no mesh, or a refusal that writes nothing.</summary>
@@ -197,6 +221,9 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
     private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source, bool asPiece = false)
     {
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
+        // T-95: the parts baked into placed meshes, instances copied; moves has no effect, said in one warning.
+        var movesWarning = SkinnedExport.MovesWarning(model);
+        model = SkinnedExport.Baked(model);
         var unweighted = SkinnedExport.Unweighted(model);
         if (unweighted.Count > 0 && !allowUnweighted)
         {
@@ -229,6 +256,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         warnings.AddRange(GlbExport.UvWarnings(model));
         warnings.AddRange(GlbExport.MaterialUvWarnings(model));
         warnings.AddRange(ClipChecks.Check(model));
+        if (movesWarning is not null) warnings.Add(movesWarning);
         foreach (var piece in model.Meshes)
             warnings.AddRange(MeshWarningFold.Lines(MeshReport.Create(piece.Mesh).Warnings).Select(w => $"mesh '{piece.Name}': " + w.ReplaceLineEndings(" ")));
         return Line(line + WarningsSuffix(warnings));

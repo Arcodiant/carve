@@ -295,7 +295,7 @@ public sealed class TargetToolTests() : TempFolderTests("carve-targets")
         Assert.Contains("drop_targets", ToolList.Description(tools, "define_mesh"));
         Assert.Equal(["drop_targets", "faces", "name", "vertices"],
             ToolList.Tool(tools, "define_mesh").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray());
-        Assert.Equal(["mesh", "target"], ToolList.Tool(tools, "get_mesh").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray());
+        Assert.Equal(["level", "mesh", "target"], ToolList.Tool(tools, "get_mesh").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray());
         Assert.Contains("targets:[{name, vertices}]", ToolList.Description(tools, "get_mesh"));
     }
 }

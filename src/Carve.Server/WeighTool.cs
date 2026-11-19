@@ -18,6 +18,7 @@ public sealed class WeighTool(ModelStore store)
         + "By default only vertices with no weight yet are weighted: any weight already there, from set_weights or an earlier weigh, is left alone. replace: true weighs every vertex again. "
         + "bones (optional) limits it to those bone names: only the vertices whose nearest bone is one of them are weighted, and among those bones alone (e.g. bones [\"Shoulder_L\", \"Elbow_L\", \"Hand_L\"] with replace: true redoes the left arm). "
         + "Use set_weights afterwards to fix single vertices by hand. "
+        + PartTargetText
         + "Returns JSON {mesh, weighed: vertices weighted by this call, kept: vertices in scope left with their weights, unweighted: vertices of the mesh still without weights}. "
         + "Errors, each a tool error that changes nothing: no mesh yet, no skeleton yet, an unknown bone name, an empty bones list. "
         + "Worked example on a model with a skeleton:\n"

@@ -297,7 +297,7 @@ public class LookMeshesTests
             ["base"] = (Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.5f), null),
         });
 
-        foreach (var mesh in new[] { model.Combined!, Skinning.Posed(model, pose).Combined! })
+        foreach (var mesh in new[] { model.Combined!, Skinning.PosedOf(model, pose, null, null)! })
         {
             var space = SpaceOf(mesh);
             var ends = Ends(LookMeshes.Spikes(mesh, space));

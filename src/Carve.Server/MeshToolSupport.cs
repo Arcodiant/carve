@@ -88,6 +88,15 @@ internal static class MeshToolSupport
         "The name of the mesh to work on, as given to define_mesh. May be left out when the model has one mesh; "
         + "left out while it has several, the call is a tool error that lists the names.";
 
+    /// <summary>
+    /// The sentence every edit tool and select share (T-93): in a part tree, <c>mesh</c> names a part with geometry, and
+    /// coordinates are in that part's own space.
+    /// </summary>
+    public const string PartSpaceText = PartTexts.PartSpace;
+
+    /// <summary>The sentence of the tools that take <c>mesh</c> but no coordinates (RV-71): in a part tree, <c>mesh</c> names a part with geometry.</summary>
+    public const string PartTargetText = PartTexts.PartTarget;
+
     /// <summary>The schema of the <c>mesh</c> argument, added to <paramref name="properties"/>; returns the schema it was added to.</summary>
     public static JsonObject WithMesh(JsonObject? schema, string text = MeshText)
     {
@@ -121,15 +130,19 @@ internal static class MeshToolSupport
     public static PolygonMesh? Target(ModelStore store, string tool, string? name, out CallToolResult? error) =>
         Target(store.Current, tool, name, out error);
 
-    /// <summary>As <see cref="Target(ModelStore, string, string?, out CallToolResult?)"/>, in a snapshot already read.</summary>
-    public static PolygonMesh? Target(ModelSnapshot current, string tool, string? name, out CallToolResult? error)
+    /// <summary>As <see cref="Target(ModelStore, string, string?, out CallToolResult?)"/>, in a model already read.</summary>
+    public static PolygonMesh? Target(Model current, string tool, string? name, out CallToolResult? error)
     {
-        var target = current.Model.Target(name, out var problem);
+        var target = current.Target(name, out var problem);
         error = problem is not null ? Failed(tool, [problem])
             : target is null ? Error($"{tool}: " + NoMesh)
             : null;
         return target?.Mesh;
     }
+
+    /// <summary>As <see cref="Target(ModelStore, string, string?, out CallToolResult?)"/>, in a snapshot already read.</summary>
+    public static PolygonMesh? Target(ModelSnapshot current, string tool, string? name, out CallToolResult? error) =>
+        Target(current.Model, tool, name, out error);
 
     public static float[] Array(Vector3 v) => [v.X, v.Y, v.Z];
 

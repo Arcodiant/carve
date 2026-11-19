@@ -89,28 +89,19 @@ public sealed class ModelStore
         }
     }
 
-    /// <summary>As <see cref="OpenMesh(Model, string, string, out string?)"/>, unless <paramref name="refuse"/> gives a reason for the current model, checked under the same lock.</summary>
-    public ModelSnapshot? OpenMesh(Model file, string name, string tool, Func<Model, string?> refuse, out string? problem)
+    /// <summary>
+    /// Takes the part <paramref name="name"/> from <paramref name="file"/> into the current model under the lock, as one step (T-92),
+    /// unless <paramref name="refuse"/> gives a reason for the current model, checked under the same lock: the part's own geometry
+    /// and kept levels, keeping the placement of the model's part of that name (<see cref="Model.WithPartPieceFrom"/>). Null,
+    /// pushing nothing, with <paramref name="problem"/> saying why.
+    /// </summary>
+    public ModelSnapshot? OpenPiece(Model file, string name, string tool, Func<Model, string?> refuse, out string? problem)
     {
         lock (_write)
         {
             problem = refuse(_current.Model);
             if (problem is not null) return null;
-            var next = _current.Model.WithMeshFrom(file, name, out problem);
-            return next is null ? null : PushLocked(next, tool);
-        }
-    }
-
-    /// <summary>
-    /// Takes the mesh <paramref name="name"/> from <paramref name="file"/> into the current model under the lock, as one step
-    /// (<see cref="Model.WithMeshFrom"/>). Null, pushing nothing, with <paramref name="problem"/> saying why, when the file
-    /// has no such mesh or its weights name bones the current skeleton does not have.
-    /// </summary>
-    public ModelSnapshot? OpenMesh(Model file, string name, string tool, out string? problem)
-    {
-        lock (_write)
-        {
-            var next = _current.Model.WithMeshFrom(file, name, out problem);
+            var next = _current.Model.WithPartPieceFrom(file, name, out problem);
             return next is null ? null : PushLocked(next, tool);
         }
     }
@@ -370,9 +361,27 @@ public sealed class ModelStore
             }
             if (problems.Count > 0) return null;
 
-            var weights = AutoWeights.Weigh(target.Mesh, skeleton, indices, replace, out var outcome);
+            // The skeleton is in model space: a placed part is weighed where it is drawn, as the skinned export bakes it (RV-71).
+            var placed = model.WorldTransform(target.Name) is { IsIdentity: false } world
+                ? Model.Join([(target.Mesh, world)])!.WithWeights(target.Mesh.Weights)
+                : target.Mesh;
+            var weights = AutoWeights.Weigh(placed, skeleton, indices, replace, out var outcome);
             change = (target.Name, outcome);
             return PushLocked(model.With(target.Name, target.Mesh.WithWeights(weights)), tool);
+        }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="change"/> on the current model under the write lock and pushes the model it gives as one step of
+    /// <paramref name="tool"/> (the part tools, T-93). Null, pushing nothing, with <paramref name="problem"/> saying why, when
+    /// it gives no model.
+    /// </summary>
+    public ModelSnapshot? Change(string tool, Func<Model, (Model? Next, string? Problem)> change, out string? problem)
+    {
+        lock (_write)
+        {
+            (var next, problem) = change(_current.Model);
+            return next is null ? null : PushLocked(next, tool);
         }
     }
 

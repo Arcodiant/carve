@@ -169,12 +169,14 @@ public class ModelMaterialTests
     }
 
     [Fact]
-    public void Posed_keeps_the_materials_and_the_assignment()
+    public void Posed_keeps_the_material_assignment()
     {
         var skeleton = Skeleton.Create([new BoneSpec("root", null, Vector3.Zero, Quaternion.Identity)]).Skeleton!;
-        var posed = Skinning.Posed(WoodModel().WithSkeleton(skeleton), Pose.Rest);
-        Assert.Equal(["wood", "steel"], posed.Materials.Select(m => m.Name));
-        Assert.Equal("wood", posed.Find("box")!.Style!.MaterialOf(1));
+        // Render looks each posed face's material up in the model's own list: RenderPumpTests.A_posed_draw_keeps_each_faces_material_from_the_models_materials.
+        var model = WoodModel().WithSkeleton(skeleton);
+        var posed = Skinning.PosedOf(model, Pose.Rest, null, null)!;
+        Assert.Equal("wood", posed.Style!.MaterialOf(1));
+        Assert.Equal("wood", Skinning.PosedOf(model, Pose.Rest, null, "box")!.Style!.MaterialOf(1));
     }
 
     [Fact]
@@ -198,8 +200,8 @@ public class ModelMaterialTests
     {
         var model = Model.Empty.WithMaterial(Steel).WithMaterial(Wood).WithMaterial(new Material("glass"))
             .With("box", WoodCube()).With("plain", TestMeshes.Cube());
-        Assert.Equal(["wood"], model.Piece("box")!.Materials.Select(m => m.Name));
-        Assert.Empty(model.Piece("plain")!.Materials);
+        Assert.Equal(["wood"], model.PartPiece("box", out _)!.Materials.Select(m => m.Name));
+        Assert.Empty(model.PartPiece("plain", out _)!.Materials);
     }
 
     [Fact]

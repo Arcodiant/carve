@@ -70,6 +70,14 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         + "and clips [{name, duration, loop, channels {bone: {rotation, translation: {interpolation, keys [{time, value}]}}}}], as define_skeleton and define_clip take them. "
         + "The unit cube from define_mesh is saved as:\n"
         + CubeFile
+        + "A part tree is saved too, as a version 7 file: after meshes, parts [{name, parent, translation, rotation [x, y, z, w], scale, envelope {min, max}, instance_of, moves}], one per part in tree order, "
+        + "and in each mesh levels [{level, vertices, faces, ...}], every kept level as a whole mesh; an empty or an instance has no mesh, only its part. "
+        + "So every parent, transform, envelope, instance, moves mark and kept level comes back from open bit-exact; a model whose meshes are all top-level parts at the origin with no levels is written as it always was. "
+        + "With mesh on a part tree, save writes a piece: that part's own geometry and kept levels, as a top-level part at the origin, without its parent, transform, envelope, children or instances. "
+        + "mesh naming an instance or an empty is a tool error that says which it is (save the source part an instance shows). "
+        + "A model with both a part tree and morph targets is saved as a version 9 file: version 8's targets with version 7's parts and levels, each kept level keeping its own targets; with mesh, a piece of a part with targets keeps its targets and levels. "
+        + "Part tree example: with a rover whose Wheel_FL sits under Axle_F at (0, 0, 0.72) and is kept at levels 0 and 1, save {\"path\":\"rover.carve\"} keeps the whole tree, "
+        + "and save {\"path\":\"wheel.carve\",\"mesh\":\"Wheel_FL\"} writes Wheel_FL's polygons and its levels 0 and 1 at the origin, with no Axle_F and no instances; mesh Wheel_FR, an instance of Wheel_FL, is refused. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
         + "an existing file is replaced and the result says (replaced); the path must end in .carve, in any case. "
         + "Errors, each a tool error that writes nothing: no mesh and no skeleton yet (call define_mesh or open first); a mesh name the model does not have; an empty path; a path holding a character a file path may not; "
@@ -87,7 +95,7 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         + "5. export " + WorkedExport;
 
     public static McpServerTool Create() => MeshToolSupport.Create<SaveTool>("save", Text, WithMesh(PathSchema("The .carve file to write, absolute or relative to carve's working directory; replaced if it exists."),
-        "The one mesh to write, by name, with the skeleton and clips when it has weights. Left out, the whole model is written."));
+        "The one mesh to write, by name, with the skeleton and clips when it has weights; of a part tree, that part's own geometry and kept levels at the origin (not an instance or an empty). Left out, the whole model is written."));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null)
     {
@@ -98,8 +106,10 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         if (model.IsEmpty && model.Skeleton is null) return Error("save: " + NoMesh);
         if (name is not null)
         {
+            // An instance or an empty gets the piece refusal, as open mesh= and export mode=piece do (RV-71).
+            if (model.PieceProblem(name, "save") is { } notGeometry) return Failed("save", [$"mesh: {notGeometry}"]);
             if (Target(current, "save", name, out var error) is null) return error!;
-            model = model.Piece(name)!;
+            model = model.PartPiece(name, out _)!;
         }
 
         var target = ToolPaths.Resolve("save", text, Extension, out var pathError, toolFolder.Directory);

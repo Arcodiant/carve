@@ -1,2 +1,11 @@
 # Unreleased
 
+- T-91: A model is a named tree of parts with transforms, envelopes, instances and kept levels, placed in world space for drawing, with the sample rover worked in Core
+- T-92: The Carve file holds the part tree as version 7, written only when a model needs it, and save and open carry one part's geometry and levels as a piece
+- T-93: define_part, get_parts and keep_level build and read a part tree, the edit tools act on a named part, and check warns when a part leaves its envelope
+- T-132: A model with both a part tree and morph targets saves, as Carve file version 9, which holds both
+- T-95: export writes the part tree as glTF nodes, merging static parts into their nearest kept ancestor and sharing one mesh between instances, and a skinned model bakes its parts
+- T-94: render draws every part where it is placed, isolates a subtree with part and draws a kept level with level, and get_mesh gives a part's placement
+- T-96: scenario-parts builds the rover through the tools at two levels, turns its mast, edits an instance and shows each in frames worked from the geometry
+- T-97: The rover is saved as samples/rover.carve, exported, shown by the viewer and read back as a split part tree through Empyrean's loader
+- T-98: Fresh agents build a part-tree vehicle from the tool descriptions alone, find a planted envelope fault and export it

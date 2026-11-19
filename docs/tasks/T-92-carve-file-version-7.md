@@ -4,7 +4,7 @@ description: >-
 ---
 # T-92 — Carve file version 7
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -39,3 +39,58 @@ A part tree survives `save` and `open` bit-exact, and every file written before 
 - **Open question for the person at M-9's planning (RV-64, not decided here):** which version holds a model with both a part tree and morph targets. Version 7 has no `targets` and version 8 (T-101) has no `parts` or `levels`; T-101's As built names the two ways it saw (a version above both, or 8 growing the part keys).
 - **Write down for dependents (As built):** the version 7 layout as landed, with one short example.
 - **Carried:** every committed `.carve` byte-identical, by hash before and after; each new check shown failing on a broken product, as a table; evidence at the absolute path the dispatch names; `finish` run inside the worktree, its output read whole and its `Merge task/T-92` line given; report a `verify` that waits more than a few minutes.
+
+### As built
+
+Opus 5.5, 2026-11-18, one agent.
+
+- **The layout as landed.** Version 7 is version 6 with `parts` after `meshes` (before `skeleton`), and `levels` as the last key of a mesh (after `hard_edges`, or `uvs`/`seams` when there are any). Every other key, its order and every number are written exactly as version 6's writer writes them (floats by `"R"`, ids as integers, two-space indent, `
+`). `parts` holds every part's record, one per line in `Model.Parts` order (pre-order), so a read gives the same order back; each record is `name`, `parent` (a name or `null`), `translation`, `rotation` `[x, y, z, w]` and `scale`, always written, then `envelope` `{"min", "max"}`, `instance_of` and `"moves": true`, each left out when absent. A level is an object spanning lines, `"level": N` first and then the keys of a version 6 mesh but `name` (vertices, faces, colours, materials, groups, weights, shading, hard_edges, uvs, seams), the full keys as recommended. An empty or an instance has a record and no mesh. Short example (the cube bodies cut to one line each here):
+
+  ```
+  {
+    "carve": 7,
+    "meshes": [
+      {
+        "name": "Body",
+        "vertices": [ ... ],
+        "faces": [ ... ],
+        "colours": [],
+        "groups": [],
+        "weights": [],
+        "shading": "flat",
+        "hard_edges": [],
+        "levels": [
+          {
+            "level": 0,
+            "vertices": [ ... ],
+            ...
+            "hard_edges": []
+          }
+        ]
+      },
+      { "name": "Arm", ... }
+    ],
+    "parts": [
+      {"name": "Body", "parent": null, "translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1], "envelope": {"min": [-1, -1, -1], "max": [3, 3, 3]}},
+      {"name": "Arm", "parent": "Body", "translation": [0.5, 1.25, -0.1], "rotation": [0, 0.70710677, 0, 0.70710677], "scale": [1, 2, 0.5], "moves": true},
+      {"name": "Empty", "parent": "Body", "translation": [0, 2, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
+      {"name": "Copy", "parent": "Body", "translation": [0, 0, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1], "instance_of": "Arm"}
+    ],
+    "skeleton": null,
+    "clips": []
+  }
+  ```
+
+- **When it is written:** `CarveFile.HasPartTree(model)`, true when some part is not `IsPlain` (a parent, `HasTransform`, an envelope, `instance_of`, `moves` or a kept level). `HasTransform` compares exactly, so a part set back to the identity is plain again and the model writes version 6 or lower. `CarveFile.PartTreeVersion` is 7; `CarveFile.Version` stays 8 (the targets' version).
+- **A part tree beside morph targets is refused, not written.** RV-64 is open, so `CarveFile.VersionProblem(model)` names the meshes with targets and `Write` throws it; `save` returns it as a tool error and writes nothing. This is an interim refusal for the person to replace with their ruling, not a format decision. `open` of either kind of file is unaffected, so such a model can be built in memory but not saved.
+- **Reading** takes 1 to 8 (`ReadableVersions`). In version 7 `parts` is required (the writer always writes it). A mesh's levels join that part's record; a mesh with levels and no record would become a top-level part after the records. Level numbers are checked in the reader (`meshes[0].levels[1].level`: negative, or not ascending), and each level is read as a mesh is, so its problems are at `meshes[i].levels[j].<key>`. Everything else about a part (its own fields, a missing or cyclic parent, `instance_of` rules, a name twice) is `Model.Create`'s, at `parts[i].<field>`. `"moves": false` is accepted. `targets` is an unknown key in version 7 and `parts`/`levels` in versions 6 and 8.
+- **Pieces.** `Model.PartPiece(name, out problem)` (what `save mesh=` writes): the part's own live mesh and kept levels as `Part.Of(name) with { Levels }`, the materials the mesh and its levels use, and the skeleton and clips when it or a level has weights. It refuses as `Model.Target` does, so an instance or an empty is named as one. A piece with levels is version 7; one without is written exactly as a plain mesh is. `Model.WithPartPieceFrom(source, name, out problem)` (what `open mesh=` does, through the additive `ModelStore.OpenPiece`): each level and then the live mesh are brought in as `WithMeshFrom` brings a mesh (weights by bone name, materials added or matched), and the part keeps its record but its `Levels` are replaced by the file's (none when the piece has none). A new name is a new top-level part. An instance or an empty is refused **in the model or in the file**: the spec's "in either" read as both ends of `open`. `CarveFile.Read(text, folder, mesh)` on a version 7 file reduces the file to that part's mesh and levels with no placement, and the materials it reads include those its levels use. The old `Model.Piece` and `OpenMesh` are unchanged.
+- **Descriptions:** `save` and `open` each gained a paragraph on what a part tree keeps and what a piece carries, plus one worked example on the rover (`Wheel_FL` saved and opened back as a piece, `Wheel_FR` refused). The `mesh` argument text of both says the same in one clause. CLAUDE.md's Carve file line now names version 7.
+- **Tests (`unit`):** `PartTreeFileTests` (Core, 65 cases) and `PartPieceToolTests` (server, in-process, 9 cases). They cover the rover round trip by content (each part's record and each mesh and level, to the bit) with the same text twice; the small tree `PartTreeSample.Tree()` (linked into the server tests) with the exact `parts` and `levels` text; each trigger alone moving a file to 7; plain models staying at 2; every `samples/*.carve` and the v1 fixture reading below 7 and writing back to the same SHA-256; 33 version 7 refusals, one case each, by element; and pieces on a part, an instance, an empty and a placed part. Three existing tests changed: version 7 is now readable, so `AnotherVersionIsRefused` uses 9, the read-versions message says "6, 7 and 8", and `Version_7_holds_no_targets` replaces `Version_7_is_not_read_by_this_build`.
+- **Evidence** in `G:\My Drive\artifacts\carve\M-9\T-92\`: `carve-hashes-before.txt` and `carve-hashes-after.txt` (the 9 committed `.carve` files, identical), and `break-table.tsv`: 15 breaks of the product (always version 7, levels not a trigger, envelope not written, moves or levels not read, level order unchecked, rotation written w first, targets beside a tree allowed, open one part keeping its file place, a piece keeping placement or dropping levels, open dropping placement or allowing an empty, the old save and open paths), each failing at least one of the new tests, at unit tier.
+
+
+**The person's rulings after landing (2026-11-18):**
+- `open mesh=` into an existing empty or instance in the open model stays refused, as built.
+- The refusal of a part tree beside morph targets is temporary. Version 9 holds both, built in M-9 as T-132, which removes the refusal.

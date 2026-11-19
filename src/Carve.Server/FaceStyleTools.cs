@@ -34,6 +34,7 @@ public sealed class DefineGroupTool(ModelStore store)
         "Names a set of faces of a mesh, so set_colour can colour them together: define_group(name, faces). "
         + "A face may be in several groups. A group is kept with its mesh: faces keep their ids through every edit, and an extrude's walls join the groups of the face they came from. "
         + "Defining a name that exists replaces that group. A new define_mesh of the same name starts the mesh again with no groups and no colours. "
+        + PartTargetText
         + "Returns JSON {mesh, group, faces:[ids], groups:[{name, faces}]}. "
         + "Errors, each a tool error that changes nothing: no mesh yet, an empty name, no faces, a face id the mesh does not have. "
         + "Worked example on define_mesh's unit cube, naming the four sides:\n"
@@ -92,6 +93,7 @@ public sealed class SetColourTool(ModelStore store)
         + "Colours follow a face through extrude: the walls take the colour of the face they came from. "
         + "render shows the colours in the shaded look (the wireframe and normals looks are unlit and ignore them); export writes one opaque matte material per colour, metallic 0 and roughness 1, as baseColorFactor. "
         + "get_mesh reports the colours and groups. A new define_mesh of the same name starts again uncoloured. "
+        + PartTargetText
         + "Returns JSON {mesh, colour, faces:[ids coloured]}. "
         + "Errors, each a tool error that changes nothing: no mesh yet, a colour that is not #RRGGBB, both or neither of faces and group, an unknown group, a face id the mesh does not have. "
         + "Worked example on define_mesh's unit cube:\n"

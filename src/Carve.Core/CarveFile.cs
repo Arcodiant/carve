@@ -23,7 +23,7 @@ public sealed class CarveFileResult
     /// <summary>The model the file holds, every mesh, vertex, face, bone and clip in its place, or null when the file was refused.</summary>
     public Model? Model { get; }
 
-    /// <summary>The version the file was read as, 1 to 6 or 8, or 0 when the file was refused.</summary>
+    /// <summary>The version the file was read as, 1 to 9, or 0 when the file was refused.</summary>
     public int Version { get; }
 
     /// <summary>The model's only mesh, or null when the file was refused or holds several.</summary>
@@ -63,8 +63,18 @@ public sealed class CarveFileResult
 /// Version 8 (T-101) is version 6 with, after the last key of a mesh (<c>seams</c> when there are seams), <c>targets</c>: one
 /// object per line in definition order, <c>{"name": ..., "deltas": {"&lt;id&gt;": [dx, dy, dz], ...}}</c>, ids ascending, each
 /// delta written as positions are and read back bit-exact; a delta of (0, 0, 0) is never written. It is written only when some
-/// mesh has a target, so every other model is written as before, byte for byte. Version 7 is M-9's part tree (T-92), which
-/// this build neither writes nor reads.
+/// mesh has a target, so every other model is written as before, byte for byte. Version 7 (T-92) is version 6 with, after <c>meshes</c>,
+/// <c>parts</c>: every part's record (<see cref="Model.Parts"/>, pre-order), one per line, <c>{"name": ..., "parent": name or null,
+/// "translation": [x, y, z], "rotation": [x, y, z, w], "scale": [x, y, z]}</c> then <c>envelope</c>
+/// (<c>{"min": [...], "max": [...]}</c>), <c>instance_of</c> and <c>"moves": true</c>, each left out when absent; and, after the last
+/// key of a mesh, <c>levels</c>: <c>[{"level": N, "vertices": ..., ...}, ...]</c>, each kept level a whole mesh with the keys
+/// of a version 6 mesh but its name, ascending, left out when none is kept. An empty or an instance has no mesh. It is
+/// written only when some part has a parent, a transform, an envelope, <c>instance_of</c>, <c>moves</c> or a kept level, so
+/// every other model is written as before, byte for byte.
+/// Version 9 (T-132) is version 8 with version 7's additions: <c>parts</c> after <c>meshes</c>, and <c>levels</c> after the
+/// last key of a mesh (after <c>targets</c> when it has any), each kept level holding the keys of a version 8 mesh but its
+/// name, so a level keeps its targets (the person's ruling, 2026-11-18). It adds no key of its own, and is written only when
+/// the model has both a part tree (<see cref="HasPartTree"/>) and a morph target on a mesh or a kept level.
 /// Version 3 (T-42) added, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or <c>"smooth"</c>) and
 /// <c>hard_edges</c> (vertex-id pairs, lower id first, in order).
 /// Version 2: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
@@ -72,7 +82,7 @@ public sealed class CarveFileResult
 /// <c>weights</c>; two-space indent, one vertex, face, colour, group, weighted vertex, bone or clip key per line, <c>\n</c>
 /// line ends and a newline at the end. Each float is the shortest text that reads back to the same <see cref="float"/>,
 /// each weight the shortest that reads back to the same <see cref="double"/>.</para>
-/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2 to 6 and 8, keys in any order and
+/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2 to 9, keys in any order and
 /// any whitespace, and holds the file to exactly what the tools accept: geometry to <see cref="PolygonMesh.Create"/>, bones
 /// to <see cref="Skeleton.Create"/>, weights to <see cref="VertexWeights.Raw"/>, clips to <see cref="Clip.Create"/>, the
 /// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.
@@ -87,7 +97,16 @@ public static class CarveFile
     public const int Version = 8;
 
     /// <summary>The versions <see cref="Read(string)"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6, 8];
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+    /// <summary>The version that holds a part tree and kept levels (M-9, T-92).</summary>
+    public const int PartTreeVersion = 7;
+
+    /// <summary>The version that holds a part tree and kept levels beside morph targets (M-9, T-132).</summary>
+    public const int PartsAndTargetsVersion = 9;
+
+    /// <summary>Whether <paramref name="version"/> holds <c>parts</c> and <c>levels</c>: 7 and 9.</summary>
+    private static bool HoldsParts(int version) => version is PartTreeVersion or PartsAndTargetsVersion;
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
@@ -102,6 +121,17 @@ public static class CarveFile
     private static readonly string[] MeshKeysV6 = ["name", VerticesKey, FacesKey, "colours", MaterialsKey, "groups", "weights", "shading", "hard_edges", "uvs", "seams"];
     private const string TargetsKey = "targets";
     private static readonly string[] MeshKeysV8 = [.. MeshKeysV6, TargetsKey];
+    private const string PartsKey = "parts";
+    private const string LevelsKey = "levels";
+    // Version 7 (T-92): version 6 with "parts" after "meshes", and "levels" after the last key of a mesh.
+    private static readonly string[] FileKeysV7 = [VersionKey, MaterialsKey, "meshes", PartsKey, "skeleton", "clips"];
+    private static readonly string[] MeshKeysV7 = [.. MeshKeysV6, LevelsKey];
+    private static readonly string[] LevelKeys = ["level", .. MeshKeysV6.Skip(1)];
+    // Version 9 (T-132): version 8 with version 7's additions; "levels" after "targets", and a level holds targets as a mesh does.
+    private static readonly string[] MeshKeysV9 = [.. MeshKeysV8, LevelsKey];
+    private static readonly string[] LevelKeysV9 = ["level", .. MeshKeysV8.Skip(1)];
+    private static readonly string[] PartRecordKeys = ["name", "parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves"];
+    private static readonly string[] EnvelopeKeys = ["min", "max"];
     private static readonly string[] TargetKeys = ["name", "deltas"];
     private static readonly string[] MaterialUseKeys = ["material", "faces"];
     private static readonly string[] MaterialFactorKeys = ["base_colour", "metallic", "roughness", "emissive", "occlusion", "double_sided"];
@@ -127,7 +157,7 @@ public static class CarveFile
         return Write(Model.Of(Model.DefaultName, mesh));
     }
 
-    /// <summary>The file's text for a model, version 2 to 6 or 8 as the remarks say. The same model always gives the same text.</summary>
+    /// <summary>The file's text for a model, version 2 to 9 as the remarks say. The same model always gives the same text.</summary>
     /// <exception cref="ArgumentException">A material has a texture, whose path needs the file's folder: use <see cref="Write(Model, string)"/>.</exception>
     public static string Write(Model model)
     {
@@ -180,8 +210,13 @@ public static class CarveFile
         // tombstone (T-64), so a model a version 2 or 3 file can hold is still written as before, byte for byte (T-42's rule and its tests).
         // Version 5 only when a mesh has UVs or seams (T-53, the person's ruling 2026-11-13).
         // Version 6 only when the model has a material (T-74), so every model without one is written as before, byte for byte.
-        // Version 8 only when a mesh has a morph target (T-101); version 7 is M-9's part tree (T-92), not written by this build.
-        var version = model.Meshes.Any(m => m.Mesh.Targets is not null) ? Version
+        // Version 8 only when a mesh has a morph target (T-101). Version 7 only when some part is not a plain top-level mesh at the
+        // origin: a parent, a transform, an envelope, instance_of, moves or a kept level (T-92, the person's ruling 2026-11-17),
+        // or the parts are not the meshes in mesh order: an empty part, or plain parts in another order (RV-71).
+        // Version 9 only when the model needs both: a part tree and a morph target, on a mesh or a kept level (T-132).
+        var targeted = model.Meshes.Any(m => m.Mesh.Targets is not null) || model.Parts.Any(p => p.Levels.Any(l => l.Mesh.Targets is not null));
+        var version = HasPartTree(model) ? targeted ? PartsAndTargetsVersion : PartTreeVersion
+            : targeted ? Version
             : model.Materials.Count > 0 ? 6
             : model.Meshes.Any(m => m.Mesh.Uvs is not null) ? 5
             : model.Meshes.Any(m => m.Mesh.HasTombstones || m.Mesh.Faces.Any(f => f.HasHoles)) ? 4
@@ -192,10 +227,12 @@ public static class CarveFile
         w.Open(1, "\"meshes\": [", model.Meshes.Count == 0, ",");
         for (var i = 0; i < model.Meshes.Count; i++)
         {
-            WriteMesh(w, model.Meshes[i], model.Skeleton, version);
+            WriteMesh(w, model.Meshes[i], model.Skeleton, version, HoldsParts(version) ? model.FindPart(model.Meshes[i].Name)!.Levels : []);
             w.Line(2, i < model.Meshes.Count - 1 ? "}," : "}");
         }
         w.Close(1, "],", model.Meshes.Count == 0);
+        // Version 7 (T-92) and 9 (T-132): every part's record, one per line in pre-order, so the tree and its order come back as they were.
+        if (HoldsParts(version)) w.List(1, PartsKey, model.Parts.Count, i => PartText(model.Parts[i]), ",");
 
         if (model.Skeleton is not { } skeleton) w.Line(1, "\"skeleton\": null,");
         else
@@ -221,55 +258,96 @@ public static class CarveFile
         return w.ToString();
     }
 
-    private static void WriteMesh(Writer w, NamedMesh named, Skeleton? skeleton, int version)
+    private static void WriteMesh(Writer w, NamedMesh named, Skeleton? skeleton, int version, IReadOnlyList<PartLevel> levels)
     {
         var (name, mesh) = named;
         w.Line(2, "{");
         w.Line(3, $"\"name\": {Text(name)},");
-        w.Line(3, $"\"{VerticesKey}\": [");
-        w.Items(4, mesh.Vertices.Count, i => mesh.IsVertexDeleted(i) ? "null" : Vector(mesh.Vertices[i]));
-        w.Line(3, "],");
-        w.Line(3, $"\"{FacesKey}\": [");
-        w.Items(4, mesh.Faces.Count, i => FaceText(mesh.Faces[i]));
-        w.Line(3, "],");
+        WriteMeshKeys(w, 3, mesh, skeleton, version, levels.Count > 0 ? "," : "");
+        if (levels.Count == 0) return;
+        // Version 7 (T-92): "levels", after the mesh's last key, each kept level a whole mesh as version 6 writes one, but its name;
+        // in version 9 (T-132) as version 8 writes one, so a level's targets are its last key.
+        w.Line(3, $"\"{LevelsKey}\": [");
+        for (var i = 0; i < levels.Count; i++)
+        {
+            w.Line(4, "{");
+            w.Line(5, $"\"level\": {levels[i].Number.ToString(CultureInfo.InvariantCulture)},");
+            WriteMeshKeys(w, 5, levels[i].Mesh, skeleton, version, "");
+            w.Line(4, i < levels.Count - 1 ? "}," : "}");
+        }
+        w.Line(3, "]");
+    }
+
+    /// <summary>A mesh's keys after its name, at <paramref name="depth"/>, the last followed by <paramref name="after"/>.</summary>
+    private static void WriteMeshKeys(Writer w, int depth, PolygonMesh mesh, Skeleton? skeleton, int version, string after)
+    {
+        var d = depth;
+        w.Line(d, $"\"{VerticesKey}\": [");
+        w.Items(d + 1, mesh.Vertices.Count, i => mesh.IsVertexDeleted(i) ? "null" : Vector(mesh.Vertices[i]));
+        w.Line(d, "],");
+        w.Line(d, $"\"{FacesKey}\": [");
+        w.Items(d + 1, mesh.Faces.Count, i => FaceText(mesh.Faces[i]));
+        w.Line(d, "],");
 
         var style = mesh.Style ?? FaceStyle.None;
         var colours = style.Colours.GroupBy(c => c.Value, StringComparer.Ordinal)
             .Select(g => (Colour: g.Key, Faces: g.Select(c => c.Key).Order().ToArray()))
             .OrderBy(c => c.Faces[0]).ToArray();
-        w.List(3, "colours", colours.Length, i => $"{{\"colour\": {Text(colours[i].Colour)}, \"faces\": {Ids(colours[i].Faces)}}}", ",");
+        w.List(d, "colours", colours.Length, i => $"{{\"colour\": {Text(colours[i].Colour)}, \"faces\": {Ids(colours[i].Faces)}}}", ",");
         // Version 6 (T-74): "materials", left out when no face has one.
         var used = style.Materials.GroupBy(c => c.Value, StringComparer.Ordinal)
             .Select(g => (Material: g.Key, Faces: g.Select(c => c.Key).Order().ToArray()))
             .OrderBy(c => c.Faces[0]).ToArray();
         if (used.Length > 0)
-            w.List(3, MaterialsKey, used.Length, i => $"{{\"material\": {Text(used[i].Material)}, \"faces\": {Ids(used[i].Faces)}}}", ",");
+            w.List(d, MaterialsKey, used.Length, i => $"{{\"material\": {Text(used[i].Material)}, \"faces\": {Ids(used[i].Faces)}}}", ",");
         var groups = style.Groups;
-        w.List(3, "groups", groups.Count, i => $"{{\"name\": {Text(groups[i].Name)}, \"faces\": {Ids(groups[i].Faces)}}}", ",");
+        w.List(d, "groups", groups.Count, i => $"{{\"name\": {Text(groups[i].Name)}, \"faces\": {Ids(groups[i].Faces)}}}", ",");
 
         // A weighted mesh is only ever in a model with a skeleton (Model.Create, ModelStore.SetWeights).
         var weights = mesh.Weights ?? VertexWeights.None;
         var vertices = weights.Vertices.ToArray();
-        w.List(3, "weights", vertices.Length, i =>
+        w.List(d, "weights", vertices.Length, i =>
         {
             var bones = string.Join(", ", weights.Of(vertices[i]).Select(x => $"{Text(skeleton!.Bones[x.Bone].Name)}: {Weight(x.Weight)}"));
             return $"{{\"vertex\": {vertices[i].ToString(CultureInfo.InvariantCulture)}, \"bones\": {{{bones}}}}}";
-        }, version >= 3 ? "," : "");
+        }, version >= 3 ? "," : after);
         if (version < 3) return;
-        w.Line(3, $"\"shading\": {Text(mesh.ShadingMode == ShadingMode.Smooth ? "smooth" : "flat")},");
+        w.Line(d, $"\"shading\": {Text(mesh.ShadingMode == ShadingMode.Smooth ? "smooth" : "flat")},");
         var hard = mesh.HardEdges;
         var uvs = mesh.Uvs ?? MeshUvs.None;
         var mapped = uvs.MappedFaces;
         var seams = uvs.Seams;
         var targets = mesh.Targets;
-        w.List(3, "hard_edges", hard.Count, i => Ids([hard[i].Lo, hard[i].Hi]), mapped.Count > 0 || seams.Count > 0 || targets is not null ? "," : "");
+        w.List(d, "hard_edges", hard.Count, i => Ids([hard[i].Lo, hard[i].Hi]), mapped.Count > 0 || seams.Count > 0 || targets is not null ? "," : after);
         // Version 5 (T-53): "uvs" and "seams", each left out when empty.
         if (mapped.Count > 0)
-            w.List(3, "uvs", mapped.Count, i => $"{{\"face\": {mapped[i].ToString(CultureInfo.InvariantCulture)}, \"uv\": [{string.Join(", ", uvs.Of(mapped[i])!.Select(Uv))}]}}",
-                seams.Count > 0 || targets is not null ? "," : "");
-        if (seams.Count > 0) w.List(3, "seams", seams.Count, i => Ids([seams[i].Lo, seams[i].Hi]), targets is not null ? "," : "");
+            w.List(d, "uvs", mapped.Count, i => $"{{\"face\": {mapped[i].ToString(CultureInfo.InvariantCulture)}, \"uv\": [{string.Join(", ", uvs.Of(mapped[i])!.Select(Uv))}]}}",
+                seams.Count > 0 || targets is not null ? "," : after);
+        if (seams.Count > 0) w.List(d, "seams", seams.Count, i => Ids([seams[i].Lo, seams[i].Hi]), targets is not null ? "," : after);
         // Version 8 (T-101): "targets", one per line in definition order, left out when the mesh has none.
-        if (targets is not null) w.List(3, TargetsKey, targets.Count, i => TargetText(targets.All[i]), "");
+        if (targets is not null) w.List(d, TargetsKey, targets.Count, i => TargetText(targets.All[i]), after);
+    }
+
+    /// <summary>
+    /// Whether the model needs version 7 (T-92): some part has a parent, a transform, an envelope, <c>instance_of</c>,
+    /// <c>moves</c> or a kept level; or the parts are not the meshes one for one in mesh order, as when a part is an empty
+    /// with no mesh or plain parts were defined in another order than their meshes (RV-71), which only <c>parts</c> holds.
+    /// A model of plain top-level meshes at the origin, in mesh order, is written as before, byte for byte.
+    /// </summary>
+    public static bool HasPartTree(Model model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        return model.Parts.Any(p => !p.IsPlain) || !model.Parts.Select(p => p.Name).SequenceEqual(model.Names);
+    }
+
+    /// <summary>A part's record on one line: name, parent, translation, rotation, scale, then envelope, instance_of and moves when it has them.</summary>
+    private static string PartText(Part p)
+    {
+        var text = $"{{\"name\": {Text(p.Name)}, \"parent\": {(p.Parent is null ? "null" : Text(p.Parent))}, \"translation\": {Vector(p.Translation)}, \"rotation\": {Rotation(p.Rotation)}, \"scale\": {Vector(p.Scale)}";
+        if (p.Envelope is { } e) text += $", \"envelope\": {{\"min\": {Vector(e.Min)}, \"max\": {Vector(e.Max)}}}";
+        if (p.InstanceOf is { } source) text += $", \"instance_of\": {Text(source)}";
+        if (p.Moves) text += ", \"moves\": true";
+        return text + "}";
     }
 
     /// <summary>A morph target on one line: its name and its sparse deltas by vertex id, ids ascending, each float by its bits.</summary>
@@ -427,7 +505,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) is (2 or 3 or 4 or 5 or 6 or 8) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3 or 4 or 5 or 6 or 7 or 8 or 9) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
         }
     }
 
@@ -517,7 +595,7 @@ public static class CarveFile
     private static CarveFileResult ReadVersion2(JsonElement root, int version, string? folder, string? only)
     {
         var errors = new List<MeshError>();
-        var fields = Fields(root, "", Invariant($"a version {version} Carve file"), version >= 6 ? FileKeysV6 : FileKeys, errors)!;
+        var fields = Fields(root, "", Invariant($"a version {version} Carve file"), HoldsParts(version) ? FileKeysV7 : version >= 6 ? FileKeysV6 : FileKeys, errors)!;
         var used = only is null || version < 6 ? null : MaterialsUsedBy(fields, only);
 
         // The materials first, since faces name them (T-74); a name is known even when the rest of its material is not.
@@ -551,6 +629,7 @@ public static class CarveFile
         }
 
         var meshes = new List<NamedMesh>();
+        var levels = new Dictionary<string, PartLevel[]>(StringComparer.Ordinal);
         if (!fields.TryGetValue("meshes", out var m)) errors.Add(new MeshError("meshes", "missing: the file has no meshes array"));
         else if (m.ValueKind != JsonValueKind.Array) errors.Add(new MeshError("meshes", $"meshes is {Describe(m)}, not an array"));
         else if (m.GetArrayLength() == 0)
@@ -564,7 +643,7 @@ public static class CarveFile
             var i = 0;
             foreach (var item in m.EnumerateArray())
             {
-                if (ReadMesh(item, Invariant($"meshes[{i}]"), skeleton, skeletonGood, version, materialNames, errors) is { } mesh) meshes.Add(mesh);
+                if (ReadMesh(item, Invariant($"meshes[{i}]"), skeleton, skeletonGood, version, materialNames, errors, levels) is { } mesh) meshes.Add(mesh);
                 i++;
             }
         }
@@ -586,9 +665,30 @@ public static class CarveFile
             }
         }
 
+        // Version 7 (T-92) and 9 (T-132): every part's record, after the meshes and before the skeleton, as the file writes it.
+        var parts = new List<Part>();
+        if (HoldsParts(version) && Required(fields, "", PartsKey, Invariant($"a version {version} Carve file"), errors) is { } ps && List(ps, PartsKey, errors) is { } partList)
+        {
+            var i = 0;
+            foreach (var item in partList.EnumerateArray())
+                if (ReadPart(item, Invariant($"{PartsKey}[{i++}]"), errors) is { } part) parts.Add(part);
+        }
+
         if (errors.Count > 0) return Refused(errors);
-        if (used is not null && meshes.Count(x => x.Name == only) == 1) meshes = [meshes.Single(x => x.Name == only)];
-        var (model, problems) = Model.Create(meshes, skeleton, clips, materials);
+        if (used is not null && meshes.Count(x => x.Name == only) == 1)
+        {
+            // open mesh= takes one part's own geometry and levels: not its place in the file's tree (the person's ruling, M-9).
+            meshes = [meshes.Single(x => x.Name == only)];
+            parts = levels.TryGetValue(only!, out var own) ? [Part.Of(only!) with { Levels = own }] : [];
+        }
+        else
+        {
+            // A mesh's levels join its part's record; a mesh with levels and no record is a top-level part, after the records.
+            var recorded = parts.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+            parts = [.. parts.Select(p => levels.TryGetValue(p.Name, out var own) ? p with { Levels = own } : p),
+                .. meshes.Where(x => levels.ContainsKey(x.Name) && !recorded.Contains(x.Name)).Select(x => Part.Of(x.Name) with { Levels = levels[x.Name] })];
+        }
+        var (model, problems) = Model.Create(meshes, skeleton, clips, materials, parts);
         if (model is null) return Refused(problems);
         return new CarveFileResult(model, [], model.Meshes.SelectMany(x => MeshReport.Create(x.Mesh).Warnings).ToArray(), version);
     }
@@ -608,10 +708,17 @@ public static class CarveFile
         {
             if (NameOf(item) != mesh) continue;
             var used = new HashSet<string>(StringComparer.Ordinal);
-            if (item.TryGetProperty(MaterialsKey, out var uses) && uses.ValueKind == JsonValueKind.Array)
-                foreach (var use in uses.EnumerateArray())
-                    if (use.ValueKind == JsonValueKind.Object && use.TryGetProperty("material", out var m) && m.ValueKind == JsonValueKind.String)
-                        used.Add(m.GetString()!);
+            void Add(JsonElement holder)
+            {
+                if (holder.ValueKind == JsonValueKind.Object && holder.TryGetProperty(MaterialsKey, out var uses) && uses.ValueKind == JsonValueKind.Array)
+                    foreach (var use in uses.EnumerateArray())
+                        if (use.ValueKind == JsonValueKind.Object && use.TryGetProperty("material", out var m) && m.ValueKind == JsonValueKind.String)
+                            used.Add(m.GetString()!);
+            }
+            Add(item);
+            // Version 7 (T-92): a kept level's faces may use materials the live mesh no longer does.
+            if (item.TryGetProperty(LevelsKey, out var kept) && kept.ValueKind == JsonValueKind.Array)
+                foreach (var level in kept.EnumerateArray()) Add(level);
             return used;
         }
         return null;
@@ -684,11 +791,13 @@ public static class CarveFile
         return problems.Length > 0 ? null : material;
     }
 
-    private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, int version, List<string> materialNames, List<MeshError> errors)
+    private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, int version, List<string> materialNames, List<MeshError> errors,
+        Dictionary<string, PartLevel[]>? levels = null, bool level = false)
     {
         var before = errors.Count;
-        if (Fields(item, at, "a mesh", version >= 8 ? MeshKeysV8 : version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
-        var name = Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
+        if (Fields(item, at, level ? "a level" : "a mesh", level ? version == PartsAndTargetsVersion ? LevelKeysV9 : LevelKeys
+            : version == PartsAndTargetsVersion ? MeshKeysV9 : version == PartTreeVersion ? MeshKeysV7 : version >= 8 ? MeshKeysV8 : version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
+        var name = level ? "" : Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         f.TryGetValue(VerticesKey, out var vs);
         f.TryGetValue(FacesKey, out var fs);
         var deleted = new List<int>();
@@ -813,9 +922,93 @@ public static class CarveFile
         if (version >= 5) uvs = ReadUvs(f, at, mesh, errors);
         MorphTargets? targets = null;
         if (version >= 8) targets = ReadTargets(f, at, mesh, errors);
+        // Version 7 (T-92): the part's kept levels, each a whole mesh as a version 6 mesh holds it; in version 9 (T-132), as a
+        // version 8 mesh holds it, targets and all.
+        PartLevel[]? kept = null;
+        if (!level && HoldsParts(version) && f.TryGetValue(LevelsKey, out var ls))
+            kept = ReadLevels(ls, $"{at}.{LevelsKey}", skeleton, skeletonGood, version, materialNames, errors);
 
         if (errors.Count > before || name is null) return null;
+        if (kept is not null && levels is not null) levels.TryAdd(name, kept);
         return new NamedMesh(name, mesh.WithStyle(style).WithWeights(VertexWeights.Of(weights)).WithShade(shade).WithUvs(uvs).WithTargets(targets));
+    }
+
+    /// <summary>
+    /// Version 7's <c>levels</c> in a mesh (T-92): each <c>{"level": N, ...}</c> holding the keys of a version 6 mesh but its
+    /// name, read as a mesh is, every problem named where it is (<c>meshes[0].levels[1].faces[3]</c>); the numbers 0 or more
+    /// and ascending, each once, as <see cref="Part.Problems"/> holds them.
+    /// </summary>
+    private static PartLevel[]? ReadLevels(JsonElement element, string at, Skeleton? skeleton, bool skeletonGood, int version, List<string> materialNames, List<MeshError> errors)
+    {
+        if (List(element, at, errors) is not { } list) return null;
+        var before = errors.Count;
+        var levels = new List<PartLevel>();
+        int? previous = null;
+        var i = 0;
+        foreach (var item in list.EnumerateArray())
+        {
+            var e = Invariant($"{at}[{i++}]");
+            int? number = null;
+            if (item.ValueKind == JsonValueKind.Object)
+            {
+                if (!item.TryGetProperty("level", out var n)) errors.Add(new MeshError($"{e}.level", "missing: a level needs level"));
+                else if (Int(n, $"{e}.level", "level number", errors) is { } k)
+                {
+                    if (k < 0) errors.Add(new MeshError($"{e}.level", Invariant($"level {k} is negative; a level number is 0 or more")));
+                    else if (previous is { } p && k <= p)
+                        errors.Add(new MeshError($"{e}.level", Invariant($"level {k} comes after level {p}; levels are kept in ascending order, each number once")));
+                    else number = k;
+                    previous = k;
+                }
+            }
+            var mesh = ReadMesh(item, e, skeleton, skeletonGood, version, materialNames, errors, level: true);
+            if (mesh is not null && number is { } kept) levels.Add(new PartLevel(kept, mesh.Mesh));
+        }
+        return errors.Count > before ? null : [.. levels];
+    }
+
+    /// <summary>
+    /// One of version 7's <c>parts</c> (T-92): <c>name</c>, <c>parent</c> (a name or null), <c>translation</c>, <c>rotation</c>
+    /// <c>[x, y, z, w]</c> and <c>scale</c>, and the optional <c>envelope</c> (<c>{"min": [...], "max": [...]}</c>),
+    /// <c>instance_of</c> and <c>moves</c>. Its values are read as given; what <see cref="Model.Create"/> refuses is refused there.
+    /// </summary>
+    private static Part? ReadPart(JsonElement item, string at, List<MeshError> errors)
+    {
+        var before = errors.Count;
+        if (Fields(item, at, "a part", PartRecordKeys, errors) is not { } f) return null;
+        var name = Required(f, at, "name", "a part", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
+        string? parent = null;
+        if (Required(f, at, "parent", "a part", errors) is { } pe && pe.ValueKind != JsonValueKind.Null)
+            parent = Str(pe, $"{at}.parent", errors, "a part name or null");
+        var translation = Required(f, at, "translation", "a part", errors) is { } t ? Floats(t, $"{at}.translation", 3, "a translation is [x, y, z]", errors) : null;
+        var rotation = Required(f, at, "rotation", "a part", errors) is { } r ? Floats(r, $"{at}.rotation", 4, "a rotation is [x, y, z, w]", errors) : null;
+        var scale = Required(f, at, "scale", "a part", errors) is { } sc ? Floats(sc, $"{at}.scale", 3, "a scale is [x, y, z]", errors) : null;
+        PartEnvelope? envelope = null;
+        if (f.TryGetValue("envelope", out var env) && Fields(env, $"{at}.envelope", "an envelope", EnvelopeKeys, errors) is { } ef)
+        {
+            var min = Required(ef, $"{at}.envelope", "min", "an envelope", errors) is { } lo ? Floats(lo, $"{at}.envelope.min", 3, "min is [x, y, z]", errors) : null;
+            var max = Required(ef, $"{at}.envelope", "max", "an envelope", errors) is { } hi ? Floats(hi, $"{at}.envelope.max", 3, "max is [x, y, z]", errors) : null;
+            if (min is not null && max is not null) envelope = new PartEnvelope(new Vector3(min[0], min[1], min[2]), new Vector3(max[0], max[1], max[2]));
+        }
+        string? instanceOf = null;
+        if (f.TryGetValue("instance_of", out var io)) instanceOf = Str(io, $"{at}.instance_of", errors, "a part name");
+        var moves = false;
+        if (f.TryGetValue("moves", out var mv))
+        {
+            if (mv.ValueKind is JsonValueKind.True or JsonValueKind.False) moves = mv.GetBoolean();
+            else errors.Add(new MeshError($"{at}.moves", $"moves is {Describe(mv)}, not true or false"));
+        }
+        if (errors.Count > before || name is null) return null;
+        return new Part(name)
+        {
+            Parent = parent,
+            Translation = new Vector3(translation![0], translation[1], translation[2]),
+            Rotation = new Quaternion(rotation![0], rotation[1], rotation[2], rotation[3]),
+            Scale = new Vector3(scale![0], scale[1], scale[2]),
+            Envelope = envelope,
+            InstanceOf = instanceOf,
+            Moves = moves,
+        };
     }
 
     /// <summary>

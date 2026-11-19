@@ -58,6 +58,7 @@ public sealed class SelectTool(ModelStore store)
         + "at character 201: nested too deeply; 'not' and '(' go 200 levels deep at most\n"
         + "Character positions count from 1 and point at the thing at fault: the name, the axis letter, the operator, or where a token was expected (one past the end when the text stops short).\n"
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to search. Worked examples on define_mesh's unit cube.\n"
+        + PartSpaceText
         + "The top face:\n"
         + ExampleMarker + """{"kind":"faces","where":"normal.y > 0.9"}""" + "\n"
         + ResultMarker + """{"kind":"faces","faces":[3],"count":1,"of":6}""" + "\n"

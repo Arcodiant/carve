@@ -21,6 +21,7 @@ public sealed class DefineMeshTool(ModelStore store)
         "Defines one mesh of the model: a polygon mesh, given by vertex coordinates and faces that index them, under a name (name, default \"mesh\"). "
         + "A model holds named meshes in the order they were first defined. A call with a name the model already has REPLACES that mesh entirely; a new name ADDS a mesh. "
         + "Either is one step for undo, and a call that fails leaves the model unchanged. "
+        + PartTexts.DefineMesh
         + "Replacing a mesh that has morph targets (see define_target) is refused, naming them, because the new mesh would lose them; give drop_targets: true to replace it and drop them anyway. "
         + "The other tools take mesh, the name of the mesh to work on, which may be left out while the model has one mesh; render draws every mesh together. "
         + "Coordinates are in metres (1 unit = 1 m, as export writes them) and Y is up. "
@@ -181,7 +182,9 @@ public sealed class DefineMeshTool(ModelStore store)
         var mesh = result.Mesh!;
         // The refusal is made under the store's write lock, with the push, so a define_target landing between them is not dropped unasked.
         if (store.Define(meshName!, mesh, "define_mesh",
-                model => !dropTargets && model.Find(meshName!)?.Targets is { } targets
+                model => model.FindPart(meshName!) is { InstanceOf: { } source }
+                    ? $"name: '{meshName}' is an instance of '{source}', with no geometry of its own; define_mesh name={source} changes the geometry every instance shows"
+                    : !dropTargets && model.Find(meshName!)?.Targets is { } targets
                     ? $"name: the mesh '{meshName}' has the morph targets {targets.ListNames()}, which replacing it would drop; give drop_targets: true to replace it anyway, or a new name to add a mesh"
                     : null,
                 out var refusal) is null)

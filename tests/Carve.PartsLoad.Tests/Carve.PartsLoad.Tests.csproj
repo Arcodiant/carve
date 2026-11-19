@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The check step of suite scenario-parts: reads the rover's content folder as a game would, and what the viewer made of it. Run by scripts/run-parts-scenario.ps1. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.PartsLoad.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
+    <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+    <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
+    <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
+    <PackageReference Include="Arcodiant.Empyrean.Animation" Version="$(EmpyreanVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The run-folder and sample helpers of the character checks, and the frame reader of the viewer checks, linked and not copied. -->
+    <Compile Include="../Carve.CharacterLoad.Tests/RunContent.cs" Link="RunContent.cs" />
+    <Compile Include="../Carve.ModelViewer.Tests/FramePixels.cs" Link="FramePixels.cs" />
+    <!-- The rover's numbers and model, typed once in Core's tests. -->
+    <Compile Include="../Carve.Core.Tests/RoverSpec.cs" Link="RoverSpec.cs" />
+    <Compile Include="../Carve.Core.Tests/RoverSpec.Model.cs" Link="RoverSpec.Model.cs" />
+  </ItemGroup>
+
+</Project>

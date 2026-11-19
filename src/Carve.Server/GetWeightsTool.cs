@@ -16,6 +16,7 @@ public sealed class GetWeightsTool(ModelStore store)
         + "give neither to read every vertex of the mesh; both is a tool error. A vertex with no weight reads as an empty object. "
         + "The summary and warnings always cover the whole mesh, whatever was asked: warnings list the unweighted vertices by id with their count "
         + "(they stay where they are when posed, and export refuses them), and note each bone no vertex follows. "
+        + PartTargetText
         + "Returns JSON {mesh, vertices: [{vertex, weights: {bone: weight}}] (by vertex), or bone, followers: [{vertex, weight}] (by bone), "
         + "summary: {vertices, weighted, unweighted, unweightedVertices, boneVertices: {bone: how many vertices follow it}}, warnings: [text]}. "
         + "Errors, each a tool error: no mesh yet, no skeleton yet, both of vertices and bone, an unknown bone name, a vertex id the mesh does not have. "

@@ -44,6 +44,34 @@ public static class SkinnedExport
         "UpperLeg_L", "LowerLeg_L", "Ankle_L", "UpperLeg_R", "LowerLeg_R", "Ankle_R",
     ];
 
+    /// <summary>
+    /// T-95 (the person's ruling, M-9 planning): the model a skinned export writes. Each part with geometry becomes a mesh of
+    /// its name placed at its world transform (its weights kept), each instance a copy of its source under the instance's
+    /// name, in pre-order; empties write nothing. A model whose parts all draw their own mesh at the identity, in mesh order,
+    /// is returned as it is, so its bytes are today's.
+    /// </summary>
+    public static Model Baked(Model model)
+    {
+        var drawn = model.Parts.Where(p => model.Shown(p) is not null).ToList();
+        if (drawn.All(p => p.InstanceOf is null && model.WorldTransform(p.Name)!.Value.IsIdentity)
+            && drawn.Select(p => p.Name).SequenceEqual(model.Names))
+            return model;
+        var meshes = drawn.Select(p =>
+        {
+            var mesh = model.Shown(p)!;
+            var placed = Model.Join([(mesh, model.WorldTransform(p.Name)!.Value)])!;
+            return new NamedMesh(p.Name, ReferenceEquals(placed, mesh) ? mesh : placed.WithWeights(mesh.Weights));
+        }).ToList();
+        var (baked, errors) = Model.Create(meshes, model.Skeleton, model.Clips, model.Materials);
+        return baked ?? throw new InvalidOperationException(string.Join("; ", errors.Select(e => e.ToString())));
+    }
+
+    /// <summary>The warning a skinned export gives when parts are marked moves, naming them; null when none is.</summary>
+    public static string? MovesWarning(Model model) =>
+        model.Parts.Where(p => p.Moves).Select(p => p.Name).ToList() is { Count: > 0 } moving
+            ? $"moves has no effect on a skinned export, which bakes every part into the skinned mesh: {NameList.Quoted(moving)}"
+            : null;
+
     /// <summary>Every vertex with no weight, per mesh, in mesh order; empty when every vertex has one.</summary>
     public static IReadOnlyList<(string Mesh, IReadOnlyList<int> Vertices)> Unweighted(Model model) =>
         [.. model.Meshes

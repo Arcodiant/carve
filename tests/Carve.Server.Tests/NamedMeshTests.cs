@@ -234,6 +234,37 @@ public sealed class NamedMeshTests() : TempFolderTests("carve-named")
         Assert.False(DiffersNear(bare, marked, PixelOf(new Vector3(0.5f, 0.5f, 1))), "the cube's front face has a label");
     }
 
+    /// <summary>
+    /// RV-71: one mesh with an instance is drawn as two occurrences, the cube and, scaled to the tall box, its copy. Labels and
+    /// highlight on the whole model, with mesh named, and at a level with no mesh, name the cube's own ids on its own
+    /// occurrence only: the copy carries no label, and an id past the cube's (the copy's in the drawn whole) is refused.
+    /// </summary>
+    [Fact]
+    public async Task A_single_mesh_with_an_instance_is_labelled_and_highlighted_on_its_own_occurrence_only()
+    {
+        var cases = new[] { ("whole", """{"view":"front"}"""), ("mesh", """{"view":"front","mesh":"left"}"""), ("level", """{"view":"front","level":0}""") };
+        using var carve = new CarveProcess([]);
+        await carve.InitializeAsync();
+        Ok(await carve.CallToolAsync("define_mesh", Left));
+        Ok(await carve.CallToolAsync("define_part", """{"part":"right","instance_of":"left","translation":[2,0,0],"scale":[1,2,1]}"""));
+        Ok(await carve.CallToolAsync("keep_level", """{"level":0}"""));
+        foreach (var (name, view) in cases)
+        {
+            string With(string extra) => view[..^1] + "," + extra + "}";
+            var bare = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", view)), ColorComponents.RedGreenBlueAlpha);
+            var labelled = Png(await carve.CallToolAsync("render", With("\"labels\":\"faces\"")));
+            File.WriteAllBytes(Path.Combine(Frames, $"instance-labels-{name}.png"), labelled);
+            var marked = ImageResult.FromMemory(labelled, ColorComponents.RedGreenBlueAlpha);
+            Assert.True(DiffersNear(bare, marked, PixelOf(new Vector3(0.5f, 0.5f, 1))), $"{name}: the cube's front face has no label");
+            Assert.False(DiffersNear(bare, marked, PixelOf(new Vector3(2.5f, 1, 1))), $"{name}: the copy's front face has a label");
+
+            var lit = ImageResult.FromMemory(Png(await carve.CallToolAsync("render", With("\"highlight\":{\"faces\":[1]}"))), ColorComponents.RedGreenBlueAlpha);
+            Assert.True(IsOrange(lit, PixelOf(new Vector3(0.5f, 0.5f, 1))), $"{name}: the cube's front face is not orange");
+            Assert.False(IsOrange(lit, PixelOf(new Vector3(2.5f, 1.5f, 1))), $"{name}: the copy's front face is orange");
+            Assert.Contains("7", Refused(await carve.CallToolAsync("render", With("\"highlight\":{\"faces\":[7]}"))));
+        }
+    }
+
     /// <summary>Renders while the crate is defined again and again, so the frame is drawn on a later model than the call checked.</summary>
     private static async Task<JsonElement> RenderDuringCrateEditsAsync(CarveProcess carve, string crate, string arguments)
     {

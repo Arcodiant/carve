@@ -20,6 +20,7 @@ public sealed class SetWeightsTool(ModelStore store)
         + "Changing the skeleton once weights exist is a tool error unless the bone names and their order stay the same. "
         + "A vertex with no weight stays where it is when the model is posed. "
         + "render's pose argument draws the model posed. "
+        + PartTargetText
         + "Returns JSON {mesh, set: vertices set, capped: how many of them lost influences to the cap of four (0 if none), unweighted: vertices of the mesh still without weights, weights: {bone: normalised weight}}. "
         + "Errors, each a tool error that changes nothing: no mesh yet, no skeleton yet, both or neither of vertices and group, an unknown group, a vertex id the mesh does not have, an unknown bone name, a negative or non-numeric weight, no weight above 0. "
         + "Worked example on a model with bones Hips and Head (a box on the head):\n"

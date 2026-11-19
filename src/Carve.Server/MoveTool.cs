@@ -24,6 +24,7 @@ public sealed class MoveTool(ModelStore store)
         + "So is a move after which a face would cross itself (a bow-tie), which the call checks as a whole, not corner by corner: "
         + "when reshaping a face by its corners, move whole edges or sets of corners that keep their order around the face, rather than one corner at a time past its neighbour. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to move. "
+        + PartSpaceText
         + "Worked example on define_mesh's unit cube, raising the top face (face 3, y = 1) by half a unit:\n"
         + ExampleMarker + """{"faces":[3],"by":[0,0.5,0]}""";
 

@@ -68,10 +68,17 @@
     <Compile Include="../../src/Carve.Server/SkinnedExport.cs" Link="SkinnedExport.cs" />
     <Compile Include="../../src/Carve.Server/ClipsExport.cs" Link="ClipsExport.cs" />
     <Compile Include="../../src/Carve.Server/PieceExport.cs" Link="PieceExport.cs" />
+    <Compile Include="../../src/Carve.Server/GlbParts.cs" Link="GlbParts.cs" />
+    <Compile Include="../Carve.Core.Tests/RoverSpec.Model.cs" Link="RoverSpec.Model.cs" />
     <Compile Include="../../src/Carve.Server/GlbScene.cs" Link="GlbScene.cs" />
     <Compile Include="../../src/Carve.Server/SurfaceMaterial.cs" Link="SurfaceMaterial.cs" />
     <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
+    <Compile Include="../Carve.Core.Tests/PartTreeSample.cs" Link="PartTreeSample.cs" />
+    <Compile Include="../Carve.Core.Tests/RoverSpec.cs" Link="RoverSpec.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Shed/ShedGeometry.cs" Link="ShedGeometry.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Cuts/CutsGeometry.cs" Link="CutsGeometry.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Acceptance/Silhouette.cs" Link="Silhouette.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Orcward/GlbEdit.cs" Link="GlbEdit.cs" />
     <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
