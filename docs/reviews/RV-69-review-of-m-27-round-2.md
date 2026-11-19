@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-69 — Review of M-27, round 2
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-27
 
@@ -55,7 +55,9 @@ I read each fix commit's diff and the tree at `defc7c9` and checked that every n
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `GraphValidator.Kinds` now kind-checks a node on a cycle: an input from a source on the cycle is unknown (tried both ways), its inputs from known, off-cycle sources are checked, and its own outputs get no kind, so what the cycle would decide stays unchecked (1275cc6). Tests `GraphFaultTests.AnInputFromOffTheCycleIsKindCheckedOnANodeOnACycle` (the reviewer's graph: `base/b` on a cycle and `base/mask: takes greyscale, but 'c' gives colour`) and `GraphToolTests.A_kind_mismatch_on_a_node_on_a_cycle_is_refused_at_the_edit_that_makes_it` (`base/b` from `zzz` turned into the cycle plus a colour mask is refused with the one new mask fault; `connect base b from n` then gives no faults) both failed without the fix and pass with it. The planks' and T-117's `grain_2` plant keep their fault counts (`Patina.Graphs.Tests` 98 pass, `Patina.Server.Tests` `Tier!=regression` 101 pass). T-110's and T-113's As built state the rule for a node on a cycle.
 
 ### T-128's and T-111's As built name the refactor commits by hashes no ref holds
 
@@ -67,7 +69,9 @@ I read each fix commit's diff and the tree at `defc7c9` and checked that every n
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** T-128's and T-111's As built name `5ebd511`, `f601bdf` and `c73fae1`, the commits on the branch (each confirmed with `git log` and `git merge-base --is-ancestor`), and RV-68's Fix line for that finding does the same; every other commit hash in RV-68's Fix lines is on the branch (dd3fea1). A tracker change, so no test.
 
 ## Findings: RV-68's answers on the scenarios and the whole diff, and the changes since round 1 (claude-opus-5-5)
 
@@ -94,7 +98,9 @@ I read every cited fix commit, all on the branch, against the code: `ExportMatch
 
 **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `ExportStage` exports roughness alone at 1024 into the same folder, after the `outputs` check, and holds it to `ExportMatch`'s rule (4 levels) and its half-tile shift, u-mirror and flat map like base colour, so all four outputs are checked at 1024 in the real process (cddb1b2). No rule or tolerance changed. `scenario-patina` passes (J-20261119-005220-94f25d); its 10 frames are byte-identical by SHA-256 with J-20261119-000738-170574 (3b288a5), the one new file being `export-1024/roughness.png`.
 
 ### ExportMatch's summary cites a one-stave shift fault that `Faults` does not make
 
@@ -106,7 +112,9 @@ I read every cited fix commit, all on the branch, against the code: `ExportMatch
 
 **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `ExportMatch`'s class summary gives only the faults `Faults` makes (base colour: half-tile shift 31, u-mirror 26.5, flat map 109; occlusion's flat map 86), and `Faults`' summary no longer says a one-stave shift is caught (5ed77cb). A comment only, so no test.
 
 ## Summary
 
