@@ -222,13 +222,11 @@ public sealed class DefinePartTool(ModelStore store)
         {
             var existing = model.FindPart(name!);
             created = existing is null;
-            if (existing is not null && instanceOf is not null && instanceOf != existing.InstanceOf)
-                return (null, existing.InstanceOf is { } was
-                    ? $"instance_of: '{name}' is already an instance of '{was}', and an existing part's instance_of does not change"
-                    : $"instance_of: '{name}' already exists {(model.Find(name!) is null ? "as an empty part" : "with geometry of its own")}, and an existing part's instance_of does not change; give a new name to make an instance");
             var part = existing ?? new Part(name!) { InstanceOf = instanceOf };
             part = part with
             {
+                // Core refuses a changed instance_of on an existing part (Model.PartProblems); the tool says how to make one.
+                InstanceOf = instanceOf ?? part.InstanceOf,
                 Parent = setParent ? parent : part.Parent,
                 Translation = translation ?? part.Translation,
                 Rotation = rotation ?? part.Rotation,
@@ -237,7 +235,8 @@ public sealed class DefinePartTool(ModelStore store)
                 Moves = moves ?? part.Moves,
             };
             if (model.PartProblems(part) is [var (field, problem), ..])
-                return (null, $"{PartToolSupport.Argument(field)}: {problem}");
+                return (null, $"{PartToolSupport.Argument(field)}: {problem}"
+                    + (field == "instance_of" && existing is { InstanceOf: null } && instanceOf is not null ? "; give a new name to make an instance" : ""));
             return (model.WithPart(part), null);
         }, out var refusal);
         if (snapshot is null) return Failed(tool, [refusal!]);
