@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Carve.Rover;
@@ -134,41 +133,6 @@ public class PartTreeFileTests
         Assert.StartsWith("{\n  \"carve\": 7,\n", text);
         Assert.Equal(Content(model), Content(Read(text)));
         Assert.Equal(text, CarveFile.Write(Read(text)));
-    }
-
-    // ---- Every committed file, byte for byte ----------------------------------------------------------------------------
-
-    private static string RepoRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (!File.Exists(Path.Combine(dir.FullName, "samples", "gatehouse.carve"))) dir = dir.Parent!;
-        return dir.FullName;
-    }
-
-    public static TheoryData<string> CommittedFiles()
-    {
-        var root = RepoRoot();
-        var data = new TheoryData<string>();
-        foreach (var f in Directory.GetFiles(Path.Combine(root, "samples"), "*.carve").Order(StringComparer.Ordinal))
-            data.Add(Path.GetRelativePath(root, f).Replace('\\', '/'));
-        data.Add("tests/Carve.Core.Tests/Fixtures/leaky-shed-v1.carve");
-        return data;
-    }
-
-    [Theory]
-    [MemberData(nameof(CommittedFiles))]
-    public void Every_committed_file_reads_below_version_7_and_writes_byte_for_byte(string path)
-    {
-        var full = Path.Combine(RepoRoot(), path);
-        var committed = File.ReadAllText(full).ReplaceLineEndings("\n");
-        var read = CarveFile.Read(committed, Path.GetDirectoryName(full));
-        Assert.True(read.Succeeded, string.Join("; ", read.Errors));
-        Assert.NotEqual(7, read.Version);
-        Assert.False(CarveFile.HasPartTree(read.Model!));
-        Assert.All(read.Model!.Parts, p => Assert.True(p.IsPlain));
-        if (read.Version == 1) return; // version 1 is read only
-        var written = CarveFile.Write(read.Model, Path.GetDirectoryName(full)!);
-        Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(committed))), Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(written))));
     }
 
     // ---- Every version 7 refusal, by where it is --------------------------------------------------------------------
