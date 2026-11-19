@@ -278,6 +278,7 @@ public class GlbPartsTests
         var skeleton = Skeleton.Create([new BoneSpec("Root", null, Vector3.Zero, Quaternion.Identity)]).Skeleton!;
         var cube = TestMeshes.Cube();
         var (model, _) = Model.Create([new("Box", cube)], skeleton, [], [], [new Part("Box") { Translation = new Vector3(0, 1, 0) }]);
-        Assert.Equal(cube.Vertices, PieceExport.Select(model!, ["Box"]).Find("Box")!.Vertices);
+        // The piece is what the skinned export writes, after its bake: the part's own geometry, not placed.
+        Assert.Equal(cube.Vertices, SkinnedExport.Baked(PieceExport.Select(model!, ["Box"])).Find("Box")!.Vertices);
     }
 }
