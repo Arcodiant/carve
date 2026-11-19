@@ -105,4 +105,6 @@ Every mask on a layer is given by exact arguments with a checkable result: a `se
 - **Hosting.** Answered at M-27's planning: both servers host through a shared `Carve.Hosting` library extracted from
   `Carve.Server` (T-111), and patina loads the same extensions as carve.
 - **How quality is judged.** Value checks catch broken textures, not ugly ones. Whether swatch renders let an agent judge a texture well enough is for M-27's and M-28's acceptance runs to show.
-- **M-24's outputs as graph inputs.** M-24 is planned to write bakes as PNGs. M-29 needs them as mesh-input nodes; whether M-24 provides both, or M-29 wraps its PNGs, is for whichever is planned first.
+- ~~**M-24's outputs as graph inputs.**~~ Answered at M-24's planning (2026-11-18): M-24 gives an engine-free Core API,
+  `Carve.Core.Baking` (T-120: `BakeLayout`, `BakeImage`, `Bake`), and writes PNGs from it; M-29 wraps that API as
+  mesh-input nodes rather than reading M-24's PNGs.

@@ -42,6 +42,8 @@ Every plan, for a milestone or a task, keeps these:
   graphs evaluate the same on patina and in Carve (D-7), so evaluation is
   deterministic and banded. `PatinaGraphsIsEngineFreeTests` enforces it. Node
   types are registered in `NodeRegistry`, never switched on.
+- **Bakes are computed in `Carve.Core`** (`Carve.Core.Baking`, T-120), deterministically and at rest, and are never
+  stored in the Carve file.
 - **Stdout belongs to MCP.** On the stdio transport nothing but protocol goes to
   stdout; logs go to stderr or the temp folder.
 
