@@ -579,17 +579,7 @@ public sealed class Model
     /// Where the part named <paramref name="name"/>'s own occurrence starts in <see cref="Combined"/>: the vertices and faces
     /// of the occurrences before it. Null when there is no such part, or it is an empty and draws nothing.
     /// </summary>
-    public (int Vertices, int Faces)? OffsetOf(string name)
-    {
-        int vertices = 0, faces = 0;
-        foreach (var (part, mesh, _) in LazyInitializer.EnsureInitialized(ref _live, () => Occurrences(null)))
-        {
-            if (part.Name == name) return (vertices, faces);
-            vertices += mesh.Vertices.Count;
-            faces += mesh.Faces.Count;
-        }
-        return null;
-    }
+    public (int Vertices, int Faces)? OffsetOf(string name) => OffsetOf(name, null, null);
 
     /// <summary>
     /// Every drawn occurrence as one mesh placed in the model's space, for drawing them together and taking bounds over all

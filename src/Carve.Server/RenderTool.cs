@@ -479,7 +479,7 @@ internal static class RenderTool
             if (part is null && level is null ? current.Model.Meshes.Count > 1 : !ReferenceEquals(drawn, own))
             {
                 idsIn = own;
-                offset = (part is null && level is null ? current.Model.OffsetOf(named.Name) : current.Model.OffsetOf(named.Name, part, level))!.Value;
+                offset = current.Model.OffsetOf(named.Name, part, level)!.Value;
                 window = new ElementWindow(offset.Vertices, offset.Faces, own.Faces.Count);
                 // Only ids asked for are shifted; a render naming the mesh with none has nothing a later model could misplace.
                 shiftedFor = wantsIds ? named.Name : null;
