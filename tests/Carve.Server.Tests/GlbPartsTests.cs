@@ -70,6 +70,23 @@ public class GlbPartsTests
     }
 
     [Fact]
+    public void A_moving_part_under_a_turned_uniformly_scaled_static_parent_takes_the_parents_turn_and_scale()
+    {
+        // The rover's static ancestors are not turned, so this is the case where a static ancestor's rotation and uniform scale enter the node's.
+        var quarter = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2);
+        var tilt = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI / 6);
+        var model = Of([new("Base", TestMeshes.Cube()), new("Arm", TestMeshes.Cube())],
+            new Part("Base") { Rotation = quarter, Scale = new Vector3(2, 2, 2), Translation = new Vector3(1, 0, 0) },
+            new Part("Arm") { Parent = "Base", Moves = true, Rotation = tilt, Translation = new Vector3(0, 0, 1) });
+        var arm = Split(Export(model, "arm")).Parts!.Parts.Single(p => p.Name == "Arm");
+        Assert.True(Matrix4x4.Decompose(model.WorldTransform("Arm")!.Value, out var scale, out var rotation, out var translation));
+        Assert.True(Vector3.Distance(new Vector3(3, 0, 0), translation) < 1e-5f, $"{translation}");
+        Assert.True(Vector3.Distance(translation, arm.Translation) < 1e-5f, $"{arm.Translation} against {translation}");
+        Assert.True(MathF.Abs(Quaternion.Dot(rotation, arm.Rotation)) > 1 - 1e-6f, $"{arm.Rotation} against {rotation}");
+        Assert.True(Vector3.Distance(new Vector3(2, 2, 2), arm.Scale) < 1e-5f, $"{arm.Scale}");
+    }
+
+    [Fact]
     public void The_front_left_wheel_and_the_mast_sit_where_the_sketch_puts_them()
     {
         var parts = RoverSplit().Parts!.Parts;
@@ -130,6 +147,27 @@ public class GlbPartsTests
         var inverse = Vector3.Normalize(new Vector3(0.5f * MathF.Cos(MathF.PI / 4), MathF.Sin(MathF.PI / 4), 0));
         var direct = Vector3.Normalize(new Vector3(2 * MathF.Cos(MathF.PI / 4), MathF.Sin(MathF.PI / 4), 0));
         Assert.Contains(root.Vertices, v => Vector3.Distance(v.Normal, inverse) < 1e-5f);
+        Assert.DoesNotContain(root.Vertices, v => Vector3.Distance(v.Normal, direct) < 1e-3f);
+    }
+
+    [Fact]
+    public void A_smooth_parts_corner_normals_under_a_static_non_uniform_scale_are_moved_by_the_inverse_transpose()
+    {
+        // A flat face's normal is taken again from its moved corners, so only a smooth mesh's corner normals rest on the fold:
+        // the (+x, -y, +z) corner's (1, -1, 1)/sqrt 3, turned 45 degrees about z, then through the parent's (2, 1, 1).
+        var turned = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 4);
+        var smooth = TestMeshes.Cube().WithShade(MeshShade.Flat.WithMode(ShadingMode.Smooth));
+        var model = Of([new("Stretch", TestMeshes.Cube()), new("Box", smooth), new("Mover", TestMeshes.Cube())],
+            new Part("Stretch") { Scale = new Vector3(2, 1, 1) },
+            new Part("Box") { Parent = "Stretch", Rotation = turned, Translation = new Vector3(0, 3, 0) },
+            new Part("Mover") { Moves = true, Translation = new Vector3(10, 0, 0) });
+        var split = Split(Export(model, "stretch")).Parts!;
+        var root = split.Meshes[split.Parts[0].MeshIndex].MeshData;
+
+        var corner = Vector3.Transform(Vector3.Normalize(new Vector3(1, -1, 1)), turned);
+        var inverse = Vector3.Normalize(corner * new Vector3(0.5f, 1, 1));
+        var direct = Vector3.Normalize(corner * new Vector3(2, 1, 1));
+        Assert.Contains(root.Vertices, v => Vector3.Distance(v.Normal, inverse) < 1e-4f);
         Assert.DoesNotContain(root.Vertices, v => Vector3.Distance(v.Normal, direct) < 1e-3f);
     }
 
