@@ -69,7 +69,6 @@
     <Compile Include="../../src/Carve.Server/ClipsExport.cs" Link="ClipsExport.cs" />
     <Compile Include="../../src/Carve.Server/PieceExport.cs" Link="PieceExport.cs" />
     <Compile Include="../../src/Carve.Server/GlbParts.cs" Link="GlbParts.cs" />
-    <Compile Include="../Carve.Core.Tests/RoverSpec.cs" Link="RoverSpec.cs" />
     <Compile Include="../Carve.Core.Tests/RoverSpec.Model.cs" Link="RoverSpec.Model.cs" />
     <Compile Include="../../src/Carve.Server/GlbScene.cs" Link="GlbScene.cs" />
     <Compile Include="../../src/Carve.Server/SurfaceMaterial.cs" Link="SurfaceMaterial.cs" />
