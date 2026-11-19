@@ -8,7 +8,8 @@ namespace Carve.Scenario.Patina;
 /// T-115's stage, export end to end on the real patina: open samples/graphs/planks.texgraph, export it at its own size
 /// (256) into the run folder and compare each PNG with samples/graphs/planks/*.png byte for byte, name the slots, export
 /// at 1024 and check by ExportMatch's rule that it is the same picture at four times the resolution (and that the rule
-/// catches a half-tile shift, a u-mirror and a flat map made on it), then the error
+/// catches a half-tile shift, a u-mirror and a flat map made on it; the normal under its own rule, failing a u-mirror, a
+/// flat map and shifts in u of a quarter stave, one texel and half a texel), then the error
 /// paths: a size that is not a power of two, a role the graph has no output for, and a folder that is a file.
 /// </summary>
 internal sealed class ExportStage : IPatinaStage
@@ -33,17 +34,31 @@ internal sealed class ExportStage : IPatinaStage
         }
 
         // The same picture at four times the resolution under ExportMatch's rule: each 256 texel against the mean of the
-        // four 1024 texels at its centre, per RGB channel, within 4 levels; then a shift, a mirror and a flat map must fail.
+        // four 1024 texels at its centre, per RGB channel, within 4 levels (the normal: 4 where flat, 32 at a kink); then
+        // each of ExportMatch's faults must fail.
         var large = Path.Combine(driver.RunFolder, "export-1024");
-        var big = await checks.CallAsync("export", JsonSerializer.Serialize(new { folder = large, size = 1024, outputs = new[] { "base_colour", "occlusion" } }));
-        checks.Check(big.StartsWith($"export: wrote 2 files to {large} at size 1024\n", StringComparison.Ordinal), "export: the 1024 export said " + big);
-        checks.Check(!File.Exists(Path.Combine(large, "normal.png")), "export: outputs base_colour and occlusion wrote a normal.png as well");
-        foreach (var role in new[] { "base_colour", "occlusion" })
+        var big = await checks.CallAsync("export", JsonSerializer.Serialize(new { folder = large, size = 1024, outputs = new[] { "base_colour", "normal", "occlusion" } }));
+        checks.Check(big.StartsWith($"export: wrote 3 files to {large} at size 1024\n", StringComparison.Ordinal), "export: the 1024 export said " + big);
+        checks.Check(!File.Exists(Path.Combine(large, "roughness.png")), "export: outputs base_colour, normal and occlusion wrote a roughness.png as well");
+        foreach (var role in new[] { "base_colour", "normal", "occlusion" })
         {
             var a = Decode(Path.Combine(small, role + ".png"));
             var b = Decode(Path.Combine(large, role + ".png"));
             checks.Check(a.Width == 256 && b.Width == 1024 && b.Height == 1024, $"export: {role} sizes are {a.Width} and {b.Width}x{b.Height}, not 256 and 1024");
             if (b.Width != 1024 || b.Height != 1024 || a.Width != 256 || a.Height != 256) continue;
+            if (role == "normal")
+            {
+                // The normal's own rule (RV-68): flat texels (local step 4 or less) within 4, the planks' kinks within 32;
+                // a u-mirror, a flat map and shifts in u of a quarter stave, one texel and half a texel must fail it.
+                var good = ExportMatch.NormalDifferences(a.Data, 256, b.Data, 1024);
+                checks.Check(ExportMatch.NormalMatches(a.Data, 256, b.Data, 1024), $"export: normal at 1024 is not the 256 picture at matching uv (flat {good.Flat:0.0}, allowed {ExportMatch.NormalFlatTolerance}; kink {good.Kink:0.0}, allowed {ExportMatch.NormalKinkTolerance})");
+                foreach (var (fault, data) in ExportMatch.Faults(role, b.Data, 1024))
+                {
+                    var wrong = ExportMatch.NormalDifferences(a.Data, 256, data, 1024);
+                    checks.Check(!ExportMatch.NormalMatches(a.Data, 256, data, 1024), $"export: normal at 1024 with a {fault} passed the normal's rule (flat {wrong.Flat:0.0}, kink {wrong.Kink:0.0})");
+                }
+                continue;
+            }
             var largest = ExportMatch.LargestDifference(a.Data, 256, b.Data, 1024);
             checks.Check(largest <= ExportMatch.Tolerance, $"export: {role} at 1024 is not the 256 picture at matching uv (largest difference {largest:0.0}, allowed {ExportMatch.Tolerance})");
 

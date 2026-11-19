@@ -80,7 +80,33 @@ public class ExportToolTests
         Assert.True(largest <= ExportMatch.Tolerance, $"1024 is not the 256 picture at matching uv (largest difference {largest:0.0})");
     }
 
-    /// <summary>RV-68: the matching-uv rule passes the good 1024 export and fails a half-tile shift, a u-mirror and a flat map of it (occlusion: the flat map; normal is not under the rule, see ExportMatch).</summary>
+    /// <summary>
+    /// RV-68: the normal's rule (flat texels within 4, the planks' kinks within 32) passes the good 1024 export and fails a
+    /// u-mirror, a flat map and shifts in u of a quarter stave, one 256 texel and half a 256 texel.
+    /// </summary>
+    [Fact]
+    public async Task The_normal_s_rule_passes_the_good_export_and_fails_a_mirror_a_flat_map_and_each_shift()
+    {
+        using var folder = new TempFolder();
+        await using var patina = await OpenPlanks(folder.Path);
+        await patina.Ok("export", """{"folder":"a","size":256,"outputs":["normal"]}""");
+        await patina.Ok("export", """{"folder":"b","size":1024,"outputs":["normal"]}""");
+
+        var a = Decode(Path.Combine(folder.Path, "a", "normal.png"));
+        var b = Decode(Path.Combine(folder.Path, "b", "normal.png"));
+        var good = ExportMatch.NormalDifferences(a.Data, 256, b.Data, 1024);
+        Assert.True(ExportMatch.NormalMatches(a.Data, 256, b.Data, 1024), $"normal: the good 1024 export fails the rule (flat {good.Flat:0.0}, kink {good.Kink:0.0})");
+        Assert.InRange(good.FlatShare, 0.55, 0.70);
+        var faults = ExportMatch.Faults("normal", b.Data, 1024);
+        Assert.Equal(["u-mirror", "flat", "quarter-stave shift", "one-texel shift", "half-texel shift"], faults.Select(f => f.Name));
+        foreach (var (fault, data) in faults)
+        {
+            var wrong = ExportMatch.NormalDifferences(a.Data, 256, data, 1024);
+            Assert.False(ExportMatch.NormalMatches(a.Data, 256, data, 1024), $"normal: a {fault} passed the rule (flat {wrong.Flat:0.0}, kink {wrong.Kink:0.0})");
+        }
+    }
+
+    /// <summary>RV-68: the matching-uv rule passes the good 1024 export and fails a half-tile shift, a u-mirror and a flat map of it (occlusion: the flat map; the normal has its own rule, tested above).</summary>
     [Fact]
     public async Task The_matching_uv_rule_fails_a_shifted_a_mirrored_and_a_flat_picture()
     {
