@@ -44,6 +44,20 @@ public sealed class PieceExportToolTests() : TempFolderTests("carve-piece")
         Assert.False(File.Exists(Path.Combine(Root, "p.glb")));
     }
 
+    [Theory]
+    [InlineData("Copy", "export: mode piece: the model's part 'Copy' is an instance of 'upper', with no geometry of its own; export 'upper', and every instance shows it. Nothing was written.")]
+    [InlineData("Empty", "export: mode piece: the model's part 'Empty' is an empty part with no geometry; a piece is one part's own geometry, so name a part that has some. Nothing was written.")]
+    public async Task A_piece_of_an_instance_or_an_empty_is_refused_as_save_refuses_it(string name, string expected)
+    {
+        using var carve = await StartChainAsync(Root);
+        Ok(await carve.CallToolAsync("define_part", """{"part":"Copy","instance_of":"upper","translation":[2,0,0]}"""));
+        Ok(await carve.CallToolAsync("define_part", """{"part":"Empty"}"""));
+        var refused = await carve.CallToolAsync("export", $$"""{"path":"p.glb","mode":"piece","meshes":["lower","{{name}}"]}""");
+        Assert.True(IsError(refused), TextOf(refused));
+        Assert.Equal(expected, TextOf(refused));
+        Assert.False(File.Exists(Path.Combine(Root, "p.glb")));
+    }
+
     [Fact]
     public async Task A_piece_of_a_model_with_no_skeleton_is_refused()
     {

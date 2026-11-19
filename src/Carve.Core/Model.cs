@@ -737,11 +737,17 @@ public sealed class Model
     /// The piece <c>save mesh=</c> writes (T-92, the person's ruling at M-9's planning): the part <paramref name="name"/>'s own
     /// geometry and kept levels as a top-level part at the origin, without its parent, transform, envelope, children or
     /// instances; the materials its live mesh and its levels use, in the model's order (the person's ruling, 2026-11-16); and
-    /// the skeleton and clips that move it when it or a level has weights, with no weights the mesh alone. Null with <paramref name="problem"/> as <see cref="Target"/> gives it for a name that is
-    /// not a part with geometry (an instance or an empty is named as one).
+    /// the skeleton and clips that move it when it or a level has weights, with no weights the mesh alone. Null with
+    /// <paramref name="problem"/> for an instance or an empty as <see cref="PieceProblem"/> gives it (pointing an instance at
+    /// its source to save), or as <see cref="Target"/> gives it for a name that is not a part.
     /// </summary>
     public Model? PartPiece(string name, out string? problem)
     {
+        if (PieceProblem(name, "save") is { } notGeometry)
+        {
+            problem = $"mesh: {notGeometry}";
+            return null;
+        }
         if (Target(name, out problem) is not { } found)
         {
             problem ??= "mesh: the model has no meshes yet";
@@ -765,7 +771,8 @@ public sealed class Model
     public Model? WithPartPieceFrom(Model source, string name, out string? problem)
     {
         ArgumentNullException.ThrowIfNull(source);
-        problem = NotGeometry(this, "the model's", "open into", name) ?? NotGeometry(source, "the file's", "open", name);
+        problem = PieceProblem(this, "the model's", "open into", "every instance follows", name) ?? PieceProblem(source, "the file's", "open", "every instance follows", name);
+        if (problem is not null) problem = $"mesh: {problem}";
         if (problem is not null) return null;
         var levels = source.FindPart(name)?.Levels ?? [];
         var target = this;
@@ -783,9 +790,17 @@ public sealed class Model
         if (target.WithMeshFrom(source, name, out problem) is not { } placed) return null;
         return placed.WithPart(placed.FindPart(name)! with { Levels = kept });
 
-        static string? NotGeometry(Model model, string whose, string verb, string name) =>
-            model.FindPart(name) is not { } part || model.Find(name) is not null ? null
-            : part.InstanceOf is { } shown ? $"mesh: {whose} part '{name}' is an instance of '{shown}', with no geometry of its own; {verb} '{shown}', and every instance follows"
-            : $"mesh: {whose} part '{name}' is an empty part with no geometry; a piece is one part's own geometry, so name a part that has some";
     }
+
+    /// <summary>
+    /// Why a piece of the part <paramref name="name"/> cannot be taken (<c>save mesh=</c>, <c>export mode=piece</c>; <c>open mesh=</c>
+    /// says the same): it is an instance, which is pointed at its source to <paramref name="verb"/>, or an empty, with no geometry
+    /// of its own. No field prefix. Null when the name is no part, or a part that owns geometry.
+    /// </summary>
+    public string? PieceProblem(string name, string verb) => PieceProblem(this, "the model's", verb, "every instance shows it", name);
+
+    private static string? PieceProblem(Model model, string whose, string verb, string instances, string name) =>
+        model.FindPart(name) is not { } part || model.Find(name) is not null ? null
+        : part.InstanceOf is { } shown ? $"{whose} part '{name}' is an instance of '{shown}', with no geometry of its own; {verb} '{shown}', and {instances}"
+        : $"{whose} part '{name}' is an empty part with no geometry; a piece is one part's own geometry, so name a part that has some";
 }

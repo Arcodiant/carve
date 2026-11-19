@@ -17,6 +17,9 @@ public static class PieceExport
     {
         if (meshes.Count == 0)
             return $"meshes is empty, and a piece is the meshes it names; the model's meshes are {model.ListNames()}";
+        // An instance or an empty is refused as save mesh= refuses it, pointing an instance at its source (RV-71).
+        if (meshes.Select(m => model.PieceProblem(m, "export")).FirstOrDefault(p => p is not null) is { } notGeometry)
+            return notGeometry;
         var unknown = meshes.Where(m => model.Find(m) is null).Distinct().ToList();
         if (unknown.Count > 0)
             return $"no mesh named {NameList.Quoted(unknown)}; the model's meshes are {model.ListNames()}";

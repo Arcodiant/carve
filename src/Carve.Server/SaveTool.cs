@@ -106,6 +106,8 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         if (model.IsEmpty && model.Skeleton is null) return Error("save: " + NoMesh);
         if (name is not null)
         {
+            // An instance or an empty gets the piece refusal, as open mesh= and export mode=piece do (RV-71).
+            if (model.PieceProblem(name, "save") is { } notGeometry) return Failed("save", [$"mesh: {notGeometry}"]);
             if (Target(current, "save", name, out var error) is null) return error!;
             model = model.PartPiece(name, out _)!;
         }
