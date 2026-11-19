@@ -44,6 +44,12 @@ internal sealed record RenderSpec(
     /// <summary>The bone whose weights are drawn as heat (mode is then <see cref="Look.Weights"/>), or null.</summary>
     public string? Weights { get; init; }
 
+    /// <summary>The part whose subtree alone is drawn and framed on (T-94), or null for the whole model.</summary>
+    public string? Part { get; init; }
+
+    /// <summary>The kept level drawn (<see cref="Carve.Core.Model.CombinedAt"/>, T-94), or null for the live geometry.</summary>
+    public int? Level { get; init; }
+
     /// <summary>The skeleton drawn over the model, or null for none. Compared by reference: one per call.</summary>
     internal BoneDraw? Bones { get; init; }
 
