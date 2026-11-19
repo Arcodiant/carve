@@ -614,6 +614,56 @@ public sealed class Model
         return Joined([.. meshes.Select(m => new Occurrence(Part.Of(""), m.Mesh, m.Transform))], ref none);
     }
 
+    /// <summary>
+    /// The part <paramref name="name"/> and every part under it, in pre-order (<see cref="Parts"/>), itself first; empty when
+    /// there is no such part (T-94).
+    /// </summary>
+    public IReadOnlyList<string> SubtreeOf(string name)
+    {
+        if (FindPart(name) is null) return [];
+        bool Under(Part p)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var q = p; q is not null && seen.Add(q.Name); q = q.Parent is null ? null : FindPart(q.Parent))
+                if (q.Name == name) return true;
+            return false;
+        }
+        return [.. Parts.Where(Under).Select(p => p.Name)];
+    }
+
+    /// <summary>
+    /// What render draws (T-94): <see cref="Combined"/> when <paramref name="part"/> and <paramref name="level"/> are null,
+    /// <see cref="CombinedAt"/> for a level, and with a part only the occurrences of its subtree (<see cref="SubtreeOf"/>),
+    /// each at its world placement, live or at the level. Null when nothing is drawn.
+    /// </summary>
+    public PolygonMesh? CombinedOf(string? part, int? level)
+    {
+        if (part is null) return level is { } n ? CombinedAt(n) : Combined;
+        PolygonMesh? none = null;
+        return Joined(Drawn(part, level), ref none);
+    }
+
+    /// <summary>As <see cref="OffsetOf(string)"/> within <see cref="CombinedOf"/>: where the named part's own occurrence starts in what is drawn, or null when it is not drawn there.</summary>
+    public (int Vertices, int Faces)? OffsetOf(string name, string? part, int? level)
+    {
+        int vertices = 0, faces = 0;
+        foreach (var (p, mesh, _) in Drawn(part, level))
+        {
+            if (p.Name == name) return (vertices, faces);
+            vertices += mesh.Vertices.Count;
+            faces += mesh.Faces.Count;
+        }
+        return null;
+    }
+
+    private Occurrence[] Drawn(string? part, int? level)
+    {
+        var all = level is null ? LazyInitializer.EnsureInitialized(ref _live, () => Occurrences(null)) : Occurrences(level);
+        if (part is null) return all;
+        var under = SubtreeOf(part).ToHashSet(StringComparer.Ordinal);
+        return [.. all.Where(o => under.Contains(o.Part.Name))];
+    }
+
     private static PolygonMesh? Joined(Occurrence[] occurrences, ref PolygonMesh? cache) => occurrences switch
     {
         [] => null,

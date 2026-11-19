@@ -19,12 +19,18 @@ public sealed class GetMeshTool(ModelStore store)
         + "A deleted vertex or face (see delete) is null in its slot of vertices or faces: its id is never given out again, so every other id keeps its place. "
         + "Coordinates are in metres (1 unit = 1 m), Y up. The output is the whole mesh, never trimmed, so it grows with the mesh. "
         + "With no mesh yet it is a tool error saying to call define_mesh or open. "
+        + PlacementText
         + "Worked example on define_mesh's unit cube; the output is shown trimmed, where ... stands for more entries:\n"
         + ExampleMarker + "{}\n"
         + """Output: {"vertices":[{"id":0,"at":[0,0,0]}, ...],"faces":[{"id":3,"vertices":[3,7,6,2],"normal":[0,1,0],"centre":[0.5,1,0.5]}, ...],"edges":[{"vertices":[0,1],"faces":[0,2]}, ...],"closed":true,"bounds":{"min":[0,0,0],"max":[1,1,1]},"warnings":[]}""" + "\n"
         + "Worked example reading a target, after define_target's bulge on the same cube; the output is shown trimmed, where ... stands for the vertices, faces and edges as above:\n"
         + ExampleMarker + """{"target":"Bulge"}""" + "\n"
         + """With the target, the output also holds: {"targets":[{"name":"Bulge","vertices":4}],"target":{"name":"Bulge","positions":{"2":[1.1,1.3,-0.1],"3":[-0.1,1.3,-0.1],"6":[1.1,1.3,1.1],"7":[-0.1,1.3,1.1]}}}""";
+
+    /// <summary>T-94's sentences: the part's placement, and level.</summary>
+    public const string PlacementText =
+        "The coordinates are the part's own, in its local space, and two keys place it: parent (the part's parent's name, null at the top) and world:{translation:[x,y,z], rotation:[x,y,z,w], scale:[x,y,z]} (the part's space to the model's, its own transform after every ancestor's; a plain mesh's is the identity). "
+        + "level (0 or more) reads a kept level (keep_level) instead of the live geometry: the newest kept level at or below it, named by level:{given, shown}, e.g. level:{given:3, shown:1}; a part with none is a tool error listing its levels. ";
 
     public static McpServerTool Create() => MeshToolSupport.Create<GetMeshTool>("get_mesh", Text, WithMesh(new JsonObject
     {
@@ -36,21 +42,44 @@ public sealed class GetMeshTool(ModelStore store)
                 ["description"] = "The name of one of the mesh's morph targets: its absolute positions for the vertices it moves are returned as target.positions.",
                 ["type"] = "string",
             },
+            ["level"] = new JsonObject
+            {
+                ["description"] = "A kept level (keep_level), 0 or more: reads the part's newest kept level at or below it instead of its live geometry.",
+                ["type"] = "integer",
+            },
         },
     }));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? target = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? target = null, JsonElement? level = null)
     {
-        var errors = UnknownArguments("get_mesh", context, "mesh", "target");
+        var errors = UnknownArguments("get_mesh", context, "mesh", "target", "level");
+        int? levelAsked = null;
+        if (level is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } given)
+        {
+            if (given.ValueKind == JsonValueKind.Number && given.TryGetInt32(out var n) && n >= 0) levelAsked = n;
+            else errors.Add($"level: {given.GetRawText()} is not a level; a kept level is a whole number, 0 or more (keep_level)");
+        }
         var name = MeshName(mesh, errors);
         var targetName = TargetToolSupport.TargetName("target", target, errors);
         if (errors.Count > 0) return Failed("get_mesh", errors);
         if (Target(store, "get_mesh", name, out var error) is not { } mesh0) return error!;
+        var model = store.Current.Model;
+        var partName = model.Target(name, out _)!.Name;
+        PartLevel? shown = null;
+        if (levelAsked is { } asking)
+        {
+            var record = model.FindPart(partName)!;
+            if ((shown = record.LevelAt(asking)) is null)
+                return Failed("get_mesh", [record.Levels.Count == 0
+                    ? $"level: '{partName}' has no kept level; keep_level keeps one"
+                    : $"level: '{partName}' has no kept level at or below {asking}; its levels are {string.Join(", ", record.Levels.Select(l => l.Number))}"]);
+            mesh0 = shown.Mesh;
+        }
         MorphTarget? asked = null;
         if (targetName is not null && (asked = mesh0.Targets?.Find(targetName)) is null)
             return Failed("get_mesh", [TargetToolSupport.NoSuchTarget(targetName, mesh0)]);
 
-        var body = new Dictionary<string, object>
+        var body = new Dictionary<string, object?>
         {
             ["vertices"] = mesh0.Vertices.Select((v, i) => mesh0.IsVertexDeleted(i) ? null : (object)new { id = i, at = Array(v) }).ToArray(),
             ["faces"] = Enumerable.Range(0, mesh0.Faces.Count).Select(f => mesh0.IsFaceDeleted(f) ? null : (object)new
@@ -66,7 +95,6 @@ public sealed class GetMeshTool(ModelStore store)
             ["edges"] = mesh0.Topology.Edges.Select(e => new { vertices = new[] { e.Lo, e.Hi }, faces = e.Faces.Select(u => u.Face).ToArray() }).ToArray(),
         };
         var style = mesh0.Style;
-        var model = store.Current.Model;
         body["colours"] = (style?.Colours ?? new Dictionary<int, string>())
             .GroupBy(c => c.Value)
             .Select(g => new { colour = g.Key, faces = g.Select(c => c.Key).ToArray() }).ToArray();
@@ -91,6 +119,10 @@ public sealed class GetMeshTool(ModelStore store)
             if (k is "vertices" or "faces" or "edges") continue;
             body[k] = v;
         }
+        body["parent"] = model.FindPart(partName)!.Parent!;
+        System.Numerics.Matrix4x4.Decompose(model.WorldTransform(partName)!.Value, out var scale, out var rotation, out var translation);
+        body["world"] = new { translation = Array(translation), rotation = new[] { rotation.X, rotation.Y, rotation.Z, rotation.W }, scale = Array(scale) };
+        if (shown is not null) body["level"] = new { given = levelAsked, shown = shown.Number };
         return Ok(body);
     }
 }
