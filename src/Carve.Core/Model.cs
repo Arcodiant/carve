@@ -235,22 +235,6 @@ public sealed class Model
     }
 
     /// <summary>
-    /// The model a Carve file of the one mesh <paramref name="name"/> holds, so that it opens on its own: that mesh, and
-    /// when it has weights the skeleton they name and the clips that move it; with no weights, the mesh alone. It keeps only
-    /// the materials that mesh's faces use, in the model's order (the person's ruling, 2026-11-16). Null when there is no
-    /// mesh of that name.
-    /// </summary>
-    public Model? Piece(string name)
-    {
-        var found = System.Array.Find(_meshes, m => m.Name == name);
-        if (found is null) return null;
-        var used = MaterialsUsedBy(found.Mesh).ToHashSet(StringComparer.Ordinal);
-        var materials = System.Array.FindAll(_materials, m => used.Contains(m.Name));
-        Part[] part = [Part.Of(name)];
-        return found.Mesh.Weights is null ? new Model([found], null, [], materials, part) : new Model([found], Skeleton, _clips, materials, part);
-    }
-
-    /// <summary>
     /// This model with the mesh <paramref name="name"/> taken from <paramref name="source"/> (a model a file holds): it
     /// replaces the mesh of that name, or is added after the others. Its weights are moved onto this model's skeleton by
     /// bone name, every weight kept to the bit. The materials its faces use come with it: one this model lacks is added after
@@ -752,8 +736,8 @@ public sealed class Model
     /// <summary>
     /// The piece <c>save mesh=</c> writes (T-92, the person's ruling at M-9's planning): the part <paramref name="name"/>'s own
     /// geometry and kept levels as a top-level part at the origin, without its parent, transform, envelope, children or
-    /// instances; the materials its live mesh and its levels use; and, as <see cref="Piece"/>, the skeleton and clips when
-    /// it or a level has weights. Null with <paramref name="problem"/> as <see cref="Target"/> gives it for a name that is
+    /// instances; the materials its live mesh and its levels use, in the model's order (the person's ruling, 2026-11-16); and
+    /// the skeleton and clips that move it when it or a level has weights, with no weights the mesh alone. Null with <paramref name="problem"/> as <see cref="Target"/> gives it for a name that is
     /// not a part with geometry (an instance or an empty is named as one).
     /// </summary>
     public Model? PartPiece(string name, out string? problem)

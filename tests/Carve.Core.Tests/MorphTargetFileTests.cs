@@ -99,10 +99,10 @@ public sealed class MorphTargetFileTests
     [Fact]
     public void Save_of_one_mesh_carries_its_targets()
     {
-        var piece = WithTargets().Piece("box")!;
+        var piece = WithTargets().PartPiece("box", out _)!;
         var read = CarveFile.Read(CarveFile.Write(piece));
         Assert.Equal(["Bulk", "Lean", "Rest"], read.Model!.Meshes.Single().Mesh.Targets!.Names);
-        Assert.Equal(2, CarveFile.Read(CarveFile.Write(WithTargets().Piece("plain")!)).Version);
+        Assert.Equal(2, CarveFile.Read(CarveFile.Write(WithTargets().PartPiece("plain", out _)!)).Version);
     }
 
     [Theory]

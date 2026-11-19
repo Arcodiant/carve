@@ -198,8 +198,8 @@ public class ModelMaterialTests
     {
         var model = Model.Empty.WithMaterial(Steel).WithMaterial(Wood).WithMaterial(new Material("glass"))
             .With("box", WoodCube()).With("plain", TestMeshes.Cube());
-        Assert.Equal(["wood"], model.Piece("box")!.Materials.Select(m => m.Name));
-        Assert.Empty(model.Piece("plain")!.Materials);
+        Assert.Equal(["wood"], model.PartPiece("box", out _)!.Materials.Select(m => m.Name));
+        Assert.Empty(model.PartPiece("plain", out _)!.Materials);
     }
 
     [Fact]
