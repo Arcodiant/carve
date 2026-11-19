@@ -4,7 +4,7 @@ description: >-
 ---
 # T-98 — Parts acceptance run
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
