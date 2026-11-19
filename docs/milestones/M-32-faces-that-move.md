@@ -42,7 +42,8 @@ today is to export and then patch the `.glb`'s animations with a script, which s
 
 - Is `weights` a part inside `channels` (and so a reserved name no bone can take), or a separate argument?
 - Which Carve file version holds weight tracks? It follows the lowest-version rule (2026-11-11), and it must be
-  numbered after [M-9](M-9-parts.md)'s version 7 and [M-21](M-21-morph-targets.md)'s version 8.
+  numbered after [M-21](M-21-morph-targets.md)'s version 8 and [M-9](M-9-parts.md)'s versions 7 and 9 (T-132: parts
+  beside targets). A clip's weights are keyed by target name, so a model with parts and targets may need them too.
 - Which mesh's targets a clip keys when a model has more than one mesh with targets: a name per mesh, or a name that must
   be unique across the model?
 - How the sampler blends a weights-only clip with a bone clip. For example, does `Blink` layer over `Talk`, or does
