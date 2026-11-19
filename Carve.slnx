@@ -23,6 +23,7 @@
   <Project Path="tests/Carve.CharacterLoad.Tests/Carve.CharacterLoad.Tests.csproj" />
   <Project Path="tests/Carve.MaterialsLoad.Tests/Carve.MaterialsLoad.Tests.csproj" />
   <Project Path="tests/Carve.PartsLoad.Tests/Carve.PartsLoad.Tests.csproj" />
+  <Project Path="tests/Carve.PartsAcceptance.Tests/Carve.PartsAcceptance.Tests.csproj" />
   <Project Path="tests/Carve.PlanksLoad.Tests/Carve.PlanksLoad.Tests.csproj" />
   <Project Path="tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj" />
   <Project Path="tests/Carve.GatehouseLoad.Tests/Carve.GatehouseLoad.Tests.csproj" />
