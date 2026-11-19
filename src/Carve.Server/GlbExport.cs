@@ -191,30 +191,57 @@ public static class GlbExport
     public static byte[] Write(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name, IReadOnlyList<CarveMaterial> materials)
     {
         var uvs = HasUvs(mesh) || Textured(UsedBy(mesh is null ? [] : [mesh], materials));
+        var built = Build(mesh, triangles, name, materials, uvs, new Images(), null);
+        var scene = new SceneBuilder();
+        scene.AddRigidMesh(built.Mesh, Matrix4x4.Identity).WithName(name);
+        var root = scene.ToGltf2();
+        built.Targets?.Write(root, root.LogicalMeshes[0], built.Tags!);
+        return root.WriteGLB().ToArray();
+    }
+
+    /// <summary>One glTF mesh as it is built, with its morph targets' writer and each primitive's vertex tags when the mesh has targets.</summary>
+    internal sealed record Built(IMeshBuilder<MaterialBuilder> Mesh, GlbTargets? Targets, IReadOnlyList<IReadOnlyList<int>>? Tags);
+
+    /// <summary>
+    /// The glTF mesh of <paramref name="mesh"/>'s <paramref name="triangles"/>, named <paramref name="name"/>: a primitive per
+    /// colour and material, <c>TEXCOORD_0</c> when <paramref name="uvs"/>, the mesh's own morph targets tagged on its corners.
+    /// <paramref name="shared"/> (T-95), when given, holds the materials by primitive key across the meshes of one file, so a
+    /// colour or material used by several meshes is one glTF material.
+    /// </summary>
+    internal static Built Build(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name, IReadOnlyList<CarveMaterial> materials,
+        bool uvs, Images images, Dictionary<string, MaterialBuilder>? shared)
+    {
         if (mesh?.Targets is { } named && GlbTargets.For([.. named.Names]) is { } targets)
         {
             var piece = targets.Of(mesh);
             return uvs
-                ? Write<Tagged<VertexTexture1>>(mesh, triangles, name, materials,
-                    (m, i, v, n) => new(new VertexTexture1(UvAt(m!, i, v)), targets.Tag(piece, i, v, n)), true, targets)
-                : Write<Tagged<VertexEmpty>>(mesh, triangles, name, materials,
-                    (_, i, v, n) => new(default, targets.Tag(piece, i, v, n)), false, targets);
+                ? Build<Tagged<VertexTexture1>>(mesh, triangles, name, materials,
+                    (m, i, v, n) => new(new VertexTexture1(UvAt(m!, i, v)), targets.Tag(piece, i, v, n)), true, targets, images, shared)
+                : Build<Tagged<VertexEmpty>>(mesh, triangles, name, materials,
+                    (_, i, v, n) => new(default, targets.Tag(piece, i, v, n)), false, targets, images, shared);
         }
         return uvs
-            ? Write<VertexTexture1>(mesh, triangles, name, materials, (m, i, v, _) => new VertexTexture1(UvAt(m!, i, v)), true, null)
-            : Write<VertexEmpty>(mesh, triangles, name, materials, (_, _, _, _) => default, false, null);
+            ? Build<VertexTexture1>(mesh, triangles, name, materials, (m, i, v, _) => new VertexTexture1(UvAt(m!, i, v)), true, null, images, shared)
+            : Build<VertexEmpty>(mesh, triangles, name, materials, (_, _, _, _) => default, false, null, images, shared);
     }
 
-    private static byte[] Write<TvM>(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name, IReadOnlyList<CarveMaterial> materials,
-        Func<PolygonMesh?, int, int, Vector3, TvM> texture, bool uvs, GlbTargets? targets)
+    private static Built Build<TvM>(PolygonMesh? mesh, IReadOnlyList<ShadedTriangle> triangles, string name, IReadOnlyList<CarveMaterial> materials,
+        Func<PolygonMesh?, int, int, Vector3, TvM> texture, bool uvs, GlbTargets? targets, Images images, Dictionary<string, MaterialBuilder>? shared)
         where TvM : struct, IVertexMaterial
     {
         var mesh2 = new MeshBuilder<VertexPositionNormal, TvM, VertexEmpty>(name);
         var primitives = new Dictionary<string, PrimitiveBuilder<MaterialBuilder, VertexPositionNormal, TvM, VertexEmpty>>();
-        var images = new Images();
         foreach (var p in Primitives(mesh, triangles, materials))
-            primitives[p.Material is null ? "c" + (p.Colour ?? "") : "m" + p.Name] =
-                mesh2.UsePrimitive(p.Material is null ? Material(p.Name, p.Colour) : Material(p.Material, images));
+        {
+            var key = p.Material is null ? "c" + (p.Colour ?? "") : "m" + p.Name;
+            MaterialBuilder? material = null;
+            if (shared is null || !shared.TryGetValue(key, out material))
+            {
+                material = p.Material is null ? Material(p.Name, p.Colour) : Material(p.Material, images);
+                if (shared is not null) shared[key] = material;
+            }
+            primitives[key] = mesh2.UsePrimitive(material);
+        }
 
         // Shading.Triangles is in Triangulator order, so the ids of a triangle's vertices (and so its corners) are read from there.
         // A target's corners are tagged with their deltas, so they need the vertex ids too.
@@ -231,10 +258,6 @@ public static class GlbExport
                 new VertexBuilder<VertexPositionNormal, TvM, VertexEmpty>(new VertexPositionNormal(t.C, t.NormalC), cornered ? texture(mesh, t.Face, id.C, t.NormalC) : default));
         }
 
-        var scene = new SceneBuilder();
-        scene.AddRigidMesh(mesh2, Matrix4x4.Identity).WithName(name);
-        var root = scene.ToGltf2();
-        targets?.Write(root, root.LogicalMeshes[0], GlbTargets.TagsOf(mesh2.Primitives));
-        return root.WriteGLB().ToArray();
+        return new Built(mesh2, targets, targets is null ? null : GlbTargets.TagsOf(mesh2.Primitives));
     }
 }

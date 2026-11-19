@@ -11,12 +11,14 @@ namespace Carve.Server.Tests;
 /// The digest is of every other tool's whole entry (name, description, schema) with the agreed sentences taken out, taken
 /// on the code before T-93: origin/milestone/M-9 at 6e2626f (Merge task/T-92), whose save and open texts T-92 changed;
 /// taken again for T-132 (Opus 5.5), whose save and open texts name version 9 and drop T-92's refusal of a part tree beside targets.
+/// Taken again for T-95 (Opus 5.5), whose export text says how a part tree becomes nodes: on T-95 with ExportTool.cs as at 431c75c
+/// (the milestone tip), the digest was the one before (EBD17198...), and export's description was the only field of tools/list that changed.
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "EBD17198E644DBC221163DA4999E52FC07FD8B2FC0E92784BB18922BB197E453";
+    private const string Before = "DCE3D7BA5DD735B860C8E5D249B83FA1F2B178FA0227C1CDEB6ED5958A1E6EF7";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level"];
 

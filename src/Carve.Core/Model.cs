@@ -602,6 +602,18 @@ public sealed class Model
         return Joined(Occurrences(level), ref none);
     }
 
+    /// <summary>
+    /// T-95: the given meshes joined as <see cref="Combined"/> joins a model's occurrences, each at its transform (row vectors,
+    /// part space to the joined space), in the order given: for export, which merges static parts into the node they sit in.
+    /// One mesh at the identity gives that mesh itself; none gives null. Weights are not carried (place a single mesh and
+    /// put its weights back with <see cref="PolygonMesh.WithWeights"/>).
+    /// </summary>
+    public static PolygonMesh? Join(IReadOnlyList<(PolygonMesh Mesh, Matrix4x4 Transform)> meshes)
+    {
+        PolygonMesh? none = null;
+        return Joined([.. meshes.Select(m => new Occurrence(Part.Of(""), m.Mesh, m.Transform))], ref none);
+    }
+
     private static PolygonMesh? Joined(Occurrence[] occurrences, ref PolygonMesh? cache) => occurrences switch
     {
         [] => null,
