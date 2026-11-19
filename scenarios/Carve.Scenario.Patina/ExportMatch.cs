@@ -4,8 +4,9 @@ namespace Carve.Scenario.Patina;
 /// RV-68's rule that an export at a larger size is the same picture as the graph's own size (approved 2026-11-18): each
 /// small texel is compared, per RGB channel, with the mean of the 2 x 2 large texels at its centre (for 256 against 1024,
 /// rows and columns 4x+1..4x+2), and every texel of every output but the normal must be within <see cref="Tolerance"/> levels. On the
-/// planks the good export's largest difference is 2.0 (base colour) and 0.5 (occlusion); a half-tile shift gives 31, a
-/// one-stave shift 35, a u-mirror 26.5 and a flat map 109 and 86 (roughness: good 1.0, faults 27 or more). The normal has
+/// planks the good export's largest difference is 2.0 (base colour) and 0.5 (occlusion); the faults <see cref="Faults"/>
+/// makes give, on base colour, a half-tile shift 31, a u-mirror 26.5 and a flat map 109, and on occlusion a flat map 86
+/// (roughness: good 1.0, faults 27 or more). The normal has
 /// its own rule (<see cref="NormalMatches"/>), since a correct normal differs by up to 30 where it is sampled at the planks'
 /// kinks. Linked by tests/Patina.Server.Tests; RGBA8 data only.
 /// </summary>
@@ -105,7 +106,7 @@ internal static class ExportMatch
     /// flat map. The planks' occlusion is its own half-tile shift and its own u-mirror (largest difference 0.5 against the
     /// unchanged picture), so a shift or mirror leaves it the same picture and only the flat map is a fault there. The normal
     /// repeats every stave (an eighth of the tile) and does not vary down the image, so a half-tile or one-stave shift is
-    /// invisible in it under any rule (the base colour catches those); its faults are a u-mirror, a flat map and shifts in u
+    /// invisible in it under any rule (the half-tile shift is made and caught on base colour and roughness); its faults are a u-mirror, a flat map and shifts in u
     /// of a quarter stave, of one 256 texel and of half a 256 texel (an image of 1024 against 256).
     /// </summary>
     public static IReadOnlyList<(string Name, byte[] Data)> Faults(string role, byte[] image, int size) => role switch
