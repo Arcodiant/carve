@@ -7,3 +7,4 @@
 - T-95: export writes the part tree as glTF nodes, merging static parts into their nearest kept ancestor and sharing one mesh between instances, and a skinned model bakes its parts
 - T-94: render draws every part where it is placed, isolates a subtree with part and draws a kept level with level, and get_mesh gives a part's placement
 - T-96: scenario-parts builds the rover through the tools at two levels, turns its mast, edits an instance and shows each in frames worked from the geometry
+- T-97: The rover is saved as samples/rover.carve, exported, shown by the viewer and read back as a split part tree through Empyrean's loader
