@@ -481,7 +481,7 @@
       "id": "scenario-parts",
       "tier": "regression",
       "build": "solution",
-      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 parts -NoBuild -TimeoutSeconds 900",
+      "run": "pwsh -NoProfile -File scripts/run-parts-scenario.ps1 -NoBuild",
       "inputs": [
         {
           "dotnet-closure": "scenarios/Carve.Scenario.Parts/Carve.Scenario.Parts.csproj"
@@ -489,19 +489,31 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
+        {
+          "dotnet-closure": "spikes/Carve.ModelViewer/Carve.ModelViewer.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.PartsLoad.Tests/Carve.PartsLoad.Tests.csproj"
+        },
         "tests/Carve.Core.Tests/RoverSpec.cs",
+        "tests/Carve.Core.Tests/RoverSpec.Model.cs",
         "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
         "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
         "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
         "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
+        "tests/Carve.ModelViewer.Tests/FramePixels.cs",
+        "samples/rover.carve",
         "scripts/run-scenario.ps1",
-        "scripts/bounded-run.ps1"
+        "scripts/bounded-run.ps1",
+        "scripts/run-viewer.ps1",
+        "scripts/run-parts-scenario.ps1"
       ],
       "resources": "gpu",
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 200
+      "est-seconds": 240
     },
     {
       "id": "scenario-morph",
