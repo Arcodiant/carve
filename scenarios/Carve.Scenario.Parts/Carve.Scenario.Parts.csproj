@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The parts (M-9, T-96): the rover built through the tools at two levels, its mast turned, an instance edited, and each stage seen in frames worked from the geometry. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Parts</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <!-- Linked, never copied: the rover's numbers (T-91, typed once), the shed's checks and camera, the Cuts ray test and the Crate's colour rule. -->
+  <ItemGroup>
+    <Compile Include="../../tests/Carve.Core.Tests/RoverSpec.cs" Link="RoverSpec.cs" />
+    <Compile Include="../Carve.Scenario.Shed/ShedChecks.cs" Link="ShedChecks.cs" />
+    <Compile Include="../Carve.Scenario.Shed/ShedGeometry.cs" Link="ShedGeometry.cs" />
+    <Compile Include="../Carve.Scenario.Cuts/CutsGeometry.cs" Link="CutsGeometry.cs" />
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
+  </ItemGroup>
+
+</Project>

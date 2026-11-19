@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-96
 
-**Verify:** viewer-cube
+**Verify:** viewer-cube, scenario-parts
 
 **Perf:** skip: Carve declares no heavy suites
 
