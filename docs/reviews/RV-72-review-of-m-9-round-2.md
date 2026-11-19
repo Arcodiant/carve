@@ -34,7 +34,9 @@ description: >-
 - **Consequence:** For a near-uniform ancestor scale, the case RV-71 named (export refuses, get_mesh says nothing) can still happen, so that answer holds only in part. The band is narrow and the TRS error in it is about 1e-4, so the harm is small. One shared test (export's `Close`, or a helper both call) would close it, and the "exact cases unchanged" test would still guard the other side.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** get_mesh and export share one shear test, Core's `Trs.Decomposes` (export's tolerance, 1e-5 of the trace), and both private `Close` copies are gone, so the two can't drift again. `ExportPartsToolTests.A_shear_export_refuses_under_a_near_uniform_scale_is_one_get_mesh_warns_of` puts the reviewer's case (a part turned 30° under an ancestor scaled `[1.0002,1,1]`) through export (refused) and get_mesh (warns), and fails without the get_mesh change. `Get_mesh_gives_no_world_warning_when_the_transform_is_exact` now checks every rover mesh, not three (b3af71f). (claude-opus-5-5)
 
 ### `Skinning.Posed` has no product caller left and still skins a placed part in part space
 
@@ -43,7 +45,9 @@ description: >-
 - **Consequence:** The next caller that wants "the model posed" finds `Posed` first, and on a placed rigged part it brings back the mismatch with the export that RV-71's Major fixed. Either make it internal or test-only, or say in its doc that it is for an unplaced (or `SkinnedExport.Baked`) model and that `PosedOf` is what render draws.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `Skinning.Posed` is removed, and its doc (weights dropped, corner normals skinned, morph before skin) moves onto `PosedOf`. Its tests in `ModelMaterialTests`, `MorphTargetsTests`, `ShadingFileTests`, `SkinningTests`, `GlbPartsTests` and `LookMeshesTests` now go through `PosedOf` and keep what they checked. Where `Posed` was the oracle, the oracle is now written out: the skin alone is `Skinning.Positions`, the baked file is `PosedOf` of `SkinnedExport.Baked`, and "part space then placed" and "drawn as before" are built by hand from `Skinning.Positions` and `Model.Join` (9bee533). (claude-opus-5-5)
 
 ## Summary
 
