@@ -79,7 +79,8 @@ About **7 tasks**:
   (T-137), floor tiles (T-138), the bricks' grey variant (T-139), grime and the old wall (T-140), and planted fault graphs
   (T-141). Every sample is worked against check's rules before its PNGs are shown, and the person approves each look
   before its task lands.
-- **Acceptance** (T-143): fresh agents make a woven rug, and fix a planted draft from check's report.
+- **Acceptance** (T-143): fresh agents make three materials (a woven rug, rusted corrugated iron, and a mossy flagstone
+  path with a moss filter graph used as a node), and fix a planted draft from check's report.
 - **Eleven tasks in one milestone** (the estimate was 7), kept by the person over splitting the milestone or merging
   tasks.
 
@@ -158,6 +159,6 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-140](../tasks/T-140-graphs-as-nodes.md) — A graph node uses another .texgraph by path, its exposed parameters set by name and its input nodes as ports; grime and old-wall sample graphs
 - [ ] [T-141](../tasks/T-141-the-check-tool.md) — patina's check lists texture faults in the open graph's outputs or in PNG files: seams, base colour out of range, metallic not near 0 or 1, normals not of unit length, and an output of one value
 - [ ] [T-142](../tasks/T-142-the-node-library-in-scenario-patina.md) — scenario-patina's library stage opens, swatches, checks and exports every sample material and variant, with every pixel worked from its texels, and commits each sample's swatch sheet
-- [ ] [T-143](../tasks/T-143-node-library-acceptance-run.md) — Fresh agents make a woven rug on patina from the tool descriptions alone and fix what check reports on a planted graph
+- [ ] [T-143](../tasks/T-143-node-library-acceptance-run.md) — Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
 
 ## Retrospective
