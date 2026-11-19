@@ -155,6 +155,20 @@ public class PartsLoadTests
         Assert.Equal(["viewer-front", "viewer-angle"], view.GetProperty("views").EnumerateArray().Select(v => v.GetProperty("name").GetString()));
     }
 
+    /// <summary>
+    /// The viewer lists one material per submesh of its merged load, and a node instance contributes its mesh's primitives again:
+    /// 6 mesh instances (rover, Mast, 4 wheels sharing one mesh) of 2 primitives each are 12 entries for a file of 6 materials.
+    /// </summary>
+    [SkippableOrRun]
+    public void The_viewer_lists_a_material_per_submesh_so_the_four_wheel_instances_repeat_the_wheel_pair()
+    {
+        var listed = View.GetProperty("materials").EnumerateArray().Select(m => m.GetProperty("baseColor").ToString()).ToArray();
+        Assert.Equal(12, listed.Length);
+        Assert.Equal(6, listed.Distinct().Count());
+        var loaded = RunContent.Loader(RunFolder).Load(Glb).SubmeshMaterials!;
+        Assert.Equal(12, loaded.Length);
+    }
+
     private enum Look { None, Olive, Sand, Dark, Yellow }
 
     /// <summary>
