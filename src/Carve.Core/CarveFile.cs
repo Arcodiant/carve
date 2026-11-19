@@ -211,7 +211,8 @@ public static class CarveFile
         // Version 5 only when a mesh has UVs or seams (T-53, the person's ruling 2026-11-13).
         // Version 6 only when the model has a material (T-74), so every model without one is written as before, byte for byte.
         // Version 8 only when a mesh has a morph target (T-101). Version 7 only when some part is not a plain top-level mesh at the
-        // origin: a parent, a transform, an envelope, instance_of, moves or a kept level (T-92, the person's ruling 2026-11-17).
+        // origin: a parent, a transform, an envelope, instance_of, moves or a kept level (T-92, the person's ruling 2026-11-17),
+        // or the parts are not the meshes in mesh order: an empty part, or plain parts in another order (RV-71).
         // Version 9 only when the model needs both: a part tree and a morph target, on a mesh or a kept level (T-132).
         var targeted = model.Meshes.Any(m => m.Mesh.Targets is not null) || model.Parts.Any(p => p.Levels.Any(l => l.Mesh.Targets is not null));
         var version = HasPartTree(model) ? targeted ? PartsAndTargetsVersion : PartTreeVersion
@@ -329,12 +330,14 @@ public static class CarveFile
 
     /// <summary>
     /// Whether the model needs version 7 (T-92): some part has a parent, a transform, an envelope, <c>instance_of</c>,
-    /// <c>moves</c> or a kept level. A model of plain top-level meshes at the origin is written as before, byte for byte.
+    /// <c>moves</c> or a kept level; or the parts are not the meshes one for one in mesh order, as when a part is an empty
+    /// with no mesh or plain parts were defined in another order than their meshes (RV-71), which only <c>parts</c> holds.
+    /// A model of plain top-level meshes at the origin, in mesh order, is written as before, byte for byte.
     /// </summary>
     public static bool HasPartTree(Model model)
     {
         ArgumentNullException.ThrowIfNull(model);
-        return model.Parts.Any(p => !p.IsPlain);
+        return model.Parts.Any(p => !p.IsPlain) || !model.Parts.Select(p => p.Name).SequenceEqual(model.Names);
     }
 
     /// <summary>A part's record on one line: name, parent, translation, rotation, scale, then envelope, instance_of and moves when it has them.</summary>
