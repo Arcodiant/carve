@@ -378,6 +378,12 @@ public sealed class Model
     /// <summary>The part called <paramref name="name"/> (a named mesh, an empty or an instance), or null.</summary>
     public Part? FindPart(string name) => System.Array.Find(_parts, p => p.Name == name);
 
+    /// <summary>The parent of <paramref name="part"/>, or null for a top-level part (or a parent that does not exist).</summary>
+    public Part? ParentOf(Part part) => part.Parent is null ? null : FindPart(part.Parent);
+
+    /// <summary>The geometry <paramref name="part"/> shows: its own, its source's for an instance, or null for an empty.</summary>
+    public PolygonMesh? Shown(Part part) => Find(part.InstanceOf ?? part.Name);
+
     /// <summary>The part names, quoted and comma-separated, in definition order.</summary>
     public string ListPartNames() => NameList.Quoted(_parts.Select(p => p.Name));
 
@@ -498,7 +504,7 @@ public sealed class Model
         if (FindPart(name) is not { } part) return null;
         var world = part.LocalTransform;
         var seen = new HashSet<string>(StringComparer.Ordinal) { name };
-        for (var p = part.Parent is null ? null : FindPart(part.Parent); p is not null && seen.Add(p.Name); p = p.Parent is null ? null : FindPart(p.Parent))
+        for (var p = ParentOf(part); p is not null && seen.Add(p.Name); p = ParentOf(p))
             world *= p.LocalTransform;
         return world;
     }
@@ -519,7 +525,7 @@ public sealed class Model
         foreach (var part in Parts)
         {
             if (part.Envelope is not { } envelope) continue;
-            if (Find(part.InstanceOf ?? part.Name) is { } mesh)
+            if (Shown(part) is { } mesh)
             {
                 var live = Enumerable.Range(0, mesh.Vertices.Count).Where(v => !mesh.IsVertexDeleted(v)).Select(v => mesh.Vertices[v]).ToArray();
                 if (live.Length > 0) Leaves(part.Name, null, Bounds(live), envelope, warnings);
@@ -563,7 +569,7 @@ public sealed class Model
         var result = new List<Occurrence>();
         foreach (var part in Parts)
         {
-            var mesh = level is { } n ? LevelMesh(part.Name, n) : Find(part.InstanceOf ?? part.Name);
+            var mesh = level is { } n ? LevelMesh(part.Name, n) : Shown(part);
             if (mesh is not null) result.Add(new Occurrence(part, mesh, WorldTransform(part.Name)!.Value));
         }
         return [.. result];
@@ -624,7 +630,7 @@ public sealed class Model
         bool Under(Part p)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            for (var q = p; q is not null && seen.Add(q.Name); q = q.Parent is null ? null : FindPart(q.Parent))
+            for (var q = p; q is not null && seen.Add(q.Name); q = ParentOf(q))
                 if (q.Name == name) return true;
             return false;
         }

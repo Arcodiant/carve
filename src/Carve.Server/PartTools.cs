@@ -57,13 +57,10 @@ internal static class PartToolSupport
     public static Vector3? Vector(string name, JsonElement value, List<string> errors) =>
         Numbers(name, value, 3, "[x, y, z]", errors) is { } c ? new Vector3(c[0], c[1], c[2]) : null;
 
-    /// <summary>The geometry a part shows: its own, its source's for an instance, or null for an empty.</summary>
-    public static PolygonMesh? Shown(Model model, Part part) => model.Find(part.InstanceOf ?? part.Name);
-
     /// <summary>One part as get_parts reports it.</summary>
     public static object Entry(Model model, Part part, IReadOnlyList<EnvelopeWarning> warnings)
     {
-        var mesh = Shown(model, part);
+        var mesh = model.Shown(part);
         var report = mesh is null ? null : MeshReport.Create(mesh);
         var levels = model.FindPart(part.InstanceOf ?? part.Name)?.Levels.Select(l => l.Number).ToArray() ?? [];
         object? local = null, world = null;

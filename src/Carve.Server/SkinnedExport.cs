@@ -52,13 +52,13 @@ public static class SkinnedExport
     /// </summary>
     public static Model Baked(Model model)
     {
-        var drawn = model.Parts.Where(p => model.Find(p.InstanceOf ?? p.Name) is not null).ToList();
+        var drawn = model.Parts.Where(p => model.Shown(p) is not null).ToList();
         if (drawn.All(p => p.InstanceOf is null && model.WorldTransform(p.Name)!.Value.IsIdentity)
             && drawn.Select(p => p.Name).SequenceEqual(model.Names))
             return model;
         var meshes = drawn.Select(p =>
         {
-            var mesh = model.Find(p.InstanceOf ?? p.Name)!;
+            var mesh = model.Shown(p)!;
             var placed = Model.Join([(mesh, model.WorldTransform(p.Name)!.Value)])!;
             return new NamedMesh(p.Name, ReferenceEquals(placed, mesh) ? mesh : placed.WithWeights(mesh.Weights));
         }).ToList();

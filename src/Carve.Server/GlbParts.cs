@@ -39,7 +39,7 @@ internal static class GlbParts
     /// <summary>The nearest ancestor of <paramref name="part"/> marked <c>moves</c>, or null for the root.</summary>
     private static Part? NearestMoving(Model model, Part part)
     {
-        for (var p = part.Parent is null ? null : model.FindPart(part.Parent); p is not null; p = p.Parent is null ? null : model.FindPart(p.Parent))
+        for (var p = model.ParentOf(part); p is not null; p = model.ParentOf(p))
             if (p.Moves) return p;
         return null;
     }
@@ -48,7 +48,7 @@ internal static class GlbParts
     private static Matrix4x4 Relative(Model model, Part part, Part? owner)
     {
         var m = part.LocalTransform;
-        for (var p = part.Parent is null ? null : model.FindPart(part.Parent); p is not null && p != owner; p = p.Parent is null ? null : model.FindPart(p.Parent))
+        for (var p = model.ParentOf(part); p is not null && p != owner; p = model.ParentOf(p))
             m *= p.LocalTransform;
         return m;
     }
@@ -63,7 +63,7 @@ internal static class GlbParts
         var scale = part.Scale;
         var rotation = Quaternion.Normalize(part.Rotation);
         var translation = part.Translation;
-        for (var p = part.Parent is null ? null : model.FindPart(part.Parent); p is not null && p != owner; p = p.Parent is null ? null : model.FindPart(p.Parent))
+        for (var p = model.ParentOf(part); p is not null && p != owner; p = model.ParentOf(p))
         {
             var r = Quaternion.Normalize(p.Rotation);
             if (p.Scale.X == p.Scale.Y && p.Scale.Y == p.Scale.Z)
@@ -114,7 +114,7 @@ internal static class GlbParts
         var descendants = new HashSet<string>(StringComparer.Ordinal);
         foreach (var part in parts)
         {
-            var geometry = model.Find(part.InstanceOf ?? part.Name);
+            var geometry = model.Shown(part);
             if (part.Moves)
             {
                 if (geometry is not null) held[part.Name].Add((geometry, Matrix4x4.Identity));
