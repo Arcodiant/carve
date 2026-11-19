@@ -22,7 +22,7 @@ public sealed class PartsExtension : ICarveExtension
 
 /// <summary>
 /// M-9 through the real tools: the agreed rover (<see cref="RoverSpec"/>, typed once in Core's tests and linked here) built as a
-/// part tree, blockout first and then refined, and seen in eleven frames, each judged pixel by pixel against the geometry
+/// part tree, blockout first and then refined, and seen in 13 frames, each judged pixel by pixel against the geometry
 /// <c>get_mesh</c> gives placed by the spec's tree. The run folder holds <c>frames/</c>, <c>user-data/</c>, <c>run.json</c> and
 /// <c>parts/rover.carve</c>, the model as saved after the refinement (what <c>open</c> read back for <c>reopened-front</c>).
 /// </summary>

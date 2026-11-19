@@ -78,8 +78,17 @@
         {
           "dotnet-closure": "tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj"
         },
+        {
+          "dotnet-closure": "tests/Carve.PartsAcceptance.Tests/Carve.PartsAcceptance.Tests.csproj"
+        },
         "tests/Carve.Server.Tests/Fixtures/*.png",
         "tests/Carve.Core.Tests/TestMeshes.cs",
+        "tests/Carve.Core.Tests/RoverSpec.cs",
+        "tests/Carve.Core.Tests/RoverSpec.Model.cs",
+        "tests/Carve.Core.Tests/PartTreeSample.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
         "scenarios/Carve.Scenario.Acceptance/Silhouette.cs",
         "scenarios/Carve.Scenario.Orcward/GlbEdit.cs",
