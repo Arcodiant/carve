@@ -196,6 +196,7 @@ public sealed class SetMaterialTool(ModelStore store)
         + "Give exactly one of faces (face ids) or group (a name from define_group). A face has one material or one colour, never both: this clears the faces' colours, and set_colour clears a face's material. The last call wins. "
         + "Materials belong to the model, not to a mesh, so any mesh's faces may use any material. Faces keep their material through every edit (an extrude's walls take the material of the face they came from) and through undo, save and open. "
         + "A texture is drawn only on faces that have UVs, so give the faces UVs first with project_uvs, unwrap or set_uvs; the result warns of faces that have none, and check does too. "
+        + PartTargetText
         + "Returns JSON {mesh, material, faces:[ids given the material], warnings:[] (only when there are some)}. "
         + "Errors, each a tool error naming the argument, that changes nothing: no mesh yet, a material that is not defined (the defined names are listed), both or neither of faces and group, an unknown group, a face id the mesh does not have, an unknown mesh, an argument set_material does not take. "
         + "Worked example on define_mesh's unit cube: texture its top and front, faces 3 and 2, with the crate material. "

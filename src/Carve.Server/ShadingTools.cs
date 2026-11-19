@@ -15,6 +15,7 @@ public sealed class SetShadingTool(ModelStore store)
         + "Under smooth an edge is soft unless mark_edges made it hard; an open edge (one face) is a plain boundary with nothing to smooth across, and an edge shared by three or more faces is always hard. "
         + "Shading is per mesh, kept with it through move and extrude, saved in the Carve file (version 3, written only when a mesh is smooth or has hard edges), and render and export draw the same normals. "
         + "A new define_mesh of the same name starts flat again. "
+        + PartTargetText
         + "Returns JSON {mesh, shading, hard_edges:[[a,b]...]}. "
         + "Errors, each a tool error that changes nothing: no mesh yet, a shading that is not flat or smooth. "
         + "Worked example on define_mesh's unit cube:\n"
@@ -58,6 +59,7 @@ public sealed class MarkEdgesTool(ModelStore store)
         + "A seam is an edge where the UV layout is cut: unwrap cuts the mesh open along its seams (and its open edges) so it can lie flat, and the layout look draws them. A seam does not make an edge sharp, and a split in the UVs between two faces needs no seam to exist (set_uvs gives each face its own UVs at a shared vertex). UVs run as in glTF (origin top-left, v down; see set_uvs). "
         + "A hard edge changes shading, in renders and in the normals export writes; a seam changes neither: it only guides unwrap and is drawn in the uvs layout look. "
         + "Both marks are kept with the mesh through move, extrude, subdivide and the cuts (plane_cut, loop_cut and knife keep the mark on every piece of an edge they split; a mark on an edge an edit removes is dropped), and saved in the Carve file. "
+        + PartTargetText
         + "Returns JSON {mesh, shading, marked:[[a,b]...], hard_edges:[[a,b]...]} with every hard edge of the mesh, and, when seam was given, seams:[[a,b]...] with every seam of the mesh (get_mesh reads them back as seams). "
         + "Errors, each a tool error that changes nothing: no mesh yet, a pair that is not an edge of the mesh (named), an entry that is not a pair. "
         + "Worked example on define_mesh's unit cube, creasing the edge between vertices 0 and 1 and cutting a seam along the edge between 0 and 3 (the left edge of face 0's four corners [0,3,2,1]):\n"

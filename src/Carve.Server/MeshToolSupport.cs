@@ -94,6 +94,9 @@ internal static class MeshToolSupport
     /// </summary>
     public const string PartSpaceText = PartTexts.PartSpace;
 
+    /// <summary>The sentence of the tools that take <c>mesh</c> but no coordinates (RV-71): in a part tree, <c>mesh</c> names a part with geometry.</summary>
+    public const string PartTargetText = PartTexts.PartTarget;
+
     /// <summary>The schema of the <c>mesh</c> argument, added to <paramref name="properties"/>; returns the schema it was added to.</summary>
     public static JsonObject WithMesh(JsonObject? schema, string text = MeshText)
     {

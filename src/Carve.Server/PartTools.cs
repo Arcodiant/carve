@@ -13,7 +13,11 @@ public static class PartTexts
 {
     /// <summary>Every edit tool's and select's: what <c>mesh</c> names in a part tree, and the space its coordinates are in.</summary>
     public const string PartSpace =
-        "In a part tree (define_part, get_parts), mesh names a part with geometry, and every coordinate here is in that part's own local space, before its translation, rotation and scale place it; an instance or an empty part is refused, naming the part to use instead. ";
+        "In a part tree (define_part, get_parts), mesh names a part with geometry, and every coordinate here is in that part's own local space, before its translation, rotation and scale place it; an instance is refused, naming its source to use instead, and an empty part is refused as having no geometry. ";
+
+    /// <summary>The same for the tools that take mesh but no coordinates (RV-71): mesh names a part with geometry.</summary>
+    public const string PartTarget =
+        "In a part tree (define_part, get_parts), mesh names a part with geometry; an instance is refused, naming its source to use instead, and an empty part is refused as having no geometry. ";
 
     /// <summary>define_mesh's.</summary>
     public const string DefineMesh =
@@ -291,7 +295,7 @@ public sealed class KeepLevelTool(ModelStore store)
         + "level is a whole number, 0 or more. parts lists the parts to keep; left out, it is every part that owns geometry. "
         + "A level must be at least the part's newest kept level; the same number replaces that level with the live geometry, and a higher one adds a level. "
         + "Edits and define_mesh always change the live geometry, never a kept level. An instance shows its source's levels, and an empty part has none. "
-        + "Refused, as a tool error naming each problem, with the model unchanged: an unknown part, an instance or an empty part (by name, saying which part to keep instead), a part named twice, a level below a part's newest kept level, a negative or fractional level, and an argument keep_level does not take. One step for undo. "
+        + "Refused, as a tool error naming each problem, with the model unchanged: an unknown part, an instance or an empty part (by name, an instance's refusal naming its source to keep a level of instead), a part named twice, a level below a part's newest kept level, a negative or fractional level, and an argument keep_level does not take. One step for undo. "
         + "Returns JSON {level, kept:[{part, levels}]}, one entry per part kept, in part-tree order, with every level number it now holds, ascending. "
         + "Worked example on the rover's blockout, keeping every part with geometry as level 0:\n"
         + ExampleMarker + Example

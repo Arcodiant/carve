@@ -13,17 +13,20 @@ namespace Carve.Server.Tests;
 /// taken again for T-132 (Opus 5.5), whose save and open texts name version 9 and drop T-92's refusal of a part tree beside targets.
 /// Taken again for T-95 (Opus 5.5), whose export text says how a part tree becomes nodes: on T-95 with ExportTool.cs as at 431c75c
 /// (the milestone tip), the digest was the one before (EBD17198...), and export's description was the only field of tools/list that changed.
+/// Taken again for RV-71 (Opus 5.5), whose project_uvs text says planar sees the mesh's own axes and whose export text says a piece of an
+/// instance or an empty is refused as save's is: with those two changes stripped the digest was the one before (DCE3D7BA...).
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "DCE3D7BA5DD735B860C8E5D249B83FA1F2B178FA0227C1CDEB6ED5958A1E6EF7";
+    private const string Before = "1697322BAD754E9F549E58F829ACB3038B71EA812D27C0FEA8C1782F06D46820";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level"];
 
     /// <summary>The sentences T-93 adds to existing descriptions, each removed before the digest.</summary>
-    private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check];
+    private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check,
+        carve::Carve.Server.PartTexts.PartTarget];
 
     private static readonly string[] T94Added = [carve::Carve.Server.RenderPartTexts.Parts, carve::Carve.Server.GetMeshTool.PlacementText];
 
@@ -77,10 +80,12 @@ public class PartToolsListTests
         await carve.InitializeAsync();
         var texts = (await carve.ListToolsAsync()).EnumerateArray()
             .ToDictionary(t => t.GetProperty("name").GetString()!, t => t.GetProperty("description").GetString()!);
-        string[] partSpace = ["bridge", "define_target", "delete", "extrude", "knife", "loop_cut", "merge_faces", "move", "plane_cut", "select", "subdivide"];
+        string[] partSpace = ["bridge", "define_target", "delete", "extrude", "knife", "loop_cut", "merge_faces", "move", "plane_cut", "project_uvs", "select", "subdivide"];
+        string[] partTarget = ["define_group", "delete_target", "get_weights", "mark_edges", "set_colour", "set_material", "set_shading", "set_uvs", "set_weights", "unwrap", "weigh"];
         foreach (var (name, text) in texts)
         {
             Assert.True(Count(text, carve::Carve.Server.PartTexts.PartSpace) == (partSpace.Contains(name) ? 1 : 0), $"{name}: PartSpace sentence count");
+            Assert.True(Count(text, carve::Carve.Server.PartTexts.PartTarget) == (partTarget.Contains(name) ? 1 : 0), $"{name}: PartTarget sentence count");
             Assert.True(Count(text, carve::Carve.Server.PartTexts.DefineMesh) == (name == "define_mesh" ? 1 : 0), $"{name}: DefineMesh sentence count");
             Assert.True(Count(text, carve::Carve.Server.PartTexts.Check) == (name == "check" ? 1 : 0), $"{name}: Check sentence count");
         }
