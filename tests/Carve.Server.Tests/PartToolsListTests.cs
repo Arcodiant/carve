@@ -22,7 +22,7 @@ public class PartToolsListTests
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
     private const string Before = "1697322BAD754E9F549E58F829ACB3038B71EA812D27C0FEA8C1782F06D46820";
 
-    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level"];
+    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake"];
 
     /// <summary>The sentences T-93 adds to existing descriptions, each removed before the digest.</summary>
     private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check,
