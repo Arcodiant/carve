@@ -478,6 +478,32 @@
       "est-seconds": 30
     },
     {
+      "id": "scenario-parts",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 parts -NoBuild -TimeoutSeconds 900",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Parts/Carve.Scenario.Parts.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "tests/Carve.Core.Tests/RoverSpec.cs",
+        "scenarios/Carve.Scenario.Shed/ShedChecks.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 200
+    },
+    {
       "id": "scenario-morph",
       "tier": "regression",
       "build": "solution",

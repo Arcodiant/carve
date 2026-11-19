@@ -15,6 +15,7 @@
   <Project Path="scenarios/Carve.Scenario.Orcward/Carve.Scenario.Orcward.csproj" />
   <Project Path="scenarios/Carve.Scenario.Rig/Carve.Scenario.Rig.csproj" />
   <Project Path="scenarios/Carve.Scenario.Cuts/Carve.Scenario.Cuts.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Parts/Carve.Scenario.Parts.csproj" />
   <Project Path="scenarios/Carve.Scenario.Gatehouse/Carve.Scenario.Gatehouse.csproj" />
   <Project Path="scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj" />
   <Project Path="tools/Carve.SampleTextures/Carve.SampleTextures.csproj" />
