@@ -245,6 +245,29 @@ public class RenderGlbTests
         }
     }
 
+    /// <summary>
+    /// RV-71: a weighted mesh on a placed part is skinned in model space, where it is drawn, by render as by the skinned
+    /// export's bake, so a pose of it agrees with the exported file drawn back. Skinning the part's own coordinates and then
+    /// placing them moves the legs' and arms' vertices off what the game draws.
+    /// </summary>
+    [Fact]
+    public async Task Render_and_render_glb_agree_on_a_posed_placed_rigged_part()
+    {
+        using var carve = await StartAsync();
+        Assert.False(IsError(await carve.CallToolAsync("open", JsonSerializer.Serialize(new { path = Sample }))));
+        var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.3f);
+        Assert.False(IsError(await carve.CallToolAsync("define_part", JsonSerializer.Serialize(new
+        {
+            part = "Body", translation = new[] { 0f, 0.25f, 0f }, rotation = new[] { turn.X, turn.Y, turn.Z, turn.W },
+        }))));
+        Assert.False(IsError(await carve.CallToolAsync("export", """{"path":"agree-placed.glb"}""")));
+        var loaded = Image(await carve.CallToolAsync("render_glb", """{"path":"agree-placed.glb","clip":"Walk","time":0.5,"view":"+x"}"""), "agree-placed-walk-glb");
+        var preview = Image(await carve.CallToolAsync("render", """{"clip":"Walk","time":0.5,"view":"+x"}"""), "agree-placed-walk-render");
+        var (differing, ratio) = Agreement(loaded, preview);
+        var share = 100.0 * differing / (Size * Size);
+        Assert.True(share <= 0.5, $"{differing} pixels ({share:0.00} %) differ past 8/255; brightness on the model {ratio:0.000} of render's");
+    }
+
     /// <summary>The pixels that differ past 8/255 in R, G or B, and the glb's brightness on the pixels both draw the model on, over render's.</summary>
     private static (int Differing, double Ratio) Agreement(ImageResult glb, ImageResult render)
     {

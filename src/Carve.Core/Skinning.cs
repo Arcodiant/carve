@@ -175,6 +175,20 @@ public static class Skinning
         return result.WithPartsFrom(model);
     }
 
+    /// <summary>
+    /// What render draws posed (RV-71): <see cref="Model.CombinedOf"/> of <paramref name="part"/> (the whole model when null),
+    /// live, with every mesh first morphed to <paramref name="targets"/> when given, and each occurrence of a weighted mesh placed
+    /// in the model's space before it is skinned, as the skinned export bakes it and the game draws it: the skeleton is in model
+    /// space, so a placed part is skinned where it is drawn, and each instance at its own place. Unweighted occurrences are
+    /// placed as <see cref="Model.CombinedOf"/> places them. A model with no skeleton is only morphed. Null when nothing is drawn.
+    /// </summary>
+    public static PolygonMesh? PosedOf(Model model, Pose pose, IReadOnlyDictionary<string, float>? targets, string? part)
+    {
+        if (targets is not null) model = Morphed(model, targets);
+        if (model.Skeleton is not { } skeleton) return model.CombinedOf(part, null);
+        return model.CombinedSkinned(part, mesh => mesh.WithVertices(Positions(mesh, skeleton, pose), CornerNormals(mesh, skeleton, pose)));
+    }
+
     /// <summary>The model with every mesh that has targets morphed to <paramref name="targets"/>, its weights kept so that it can be skinned.</summary>
     public static Model Morphed(Model model, IReadOnlyDictionary<string, float> targets)
     {

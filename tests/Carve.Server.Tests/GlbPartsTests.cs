@@ -319,4 +319,70 @@ public class GlbPartsTests
         // The piece is what the skinned export writes, after its bake: the part's own geometry, not placed.
         Assert.Equal(cube.Vertices, SkinnedExport.Baked(PieceExport.Select(model!, ["Box"])).Find("Box")!.Vertices);
     }
+    /// <summary>A two-bone arm, a cube weighted wholly to its upper bone on a part turned and moved, and an instance of it elsewhere (RV-71).</summary>
+    private static Model PlacedRig()
+    {
+        var skeleton = Skeleton.Create([
+            new BoneSpec("Root", null, Vector3.Zero, Quaternion.Identity),
+            new BoneSpec("Arm", "Root", new Vector3(0, 1, 0), Quaternion.Identity),
+        ]).Skeleton!;
+        var cube = TestMeshes.Cube();
+        var weights = VertexWeights.None;
+        for (var v = 0; v < cube.Vertices.Count; v++) weights = weights.With([v], [new Influence(v % 2, 1)]);
+        var (model, errors) = Model.Create([new("Box", cube.WithWeights(weights))], skeleton, [], [],
+            [new Part("Box") { Translation = new Vector3(2, 1, 0), Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.7f) },
+             new Part("Copy") { InstanceOf = "Box", Translation = new Vector3(-3, 0, 1) }]);
+        Assert.True(model is not null, string.Join("; ", errors));
+        return model!;
+    }
+
+    private static readonly Pose Bent = new(new Dictionary<string, (Quaternion?, Vector3?)>
+    {
+        ["Arm"] = (Quaternion.CreateFromAxisAngle(Vector3.UnitZ, 0.8f), null),
+    });
+
+    [Fact]
+    public void A_posed_placed_rigged_part_is_drawn_as_the_skinned_export_bakes_it()
+    {
+        var model = PlacedRig();
+        // The game skins the baked file: each occurrence placed in model space, then skinned against the model-space bones.
+        var expected = Skinning.Posed(SkinnedExport.Baked(model), Bent).Combined!;
+        var drawn = Skinning.PosedOf(model, Bent, null, null)!;
+        Assert.Equal(expected.Vertices, drawn.Vertices);
+        Assert.Equal(Skinning.Posed(SkinnedExport.Baked(model), Bent).Find("Copy")!.Vertices,
+            Skinning.PosedOf(model, Bent, null, "Copy")!.Vertices);
+        // Skinning in part space and then placing, as before, is not what the game draws.
+        Assert.NotEqual(expected.Vertices, Skinning.Posed(model, Bent).Combined!.Vertices);
+    }
+
+    [Fact]
+    public void A_model_with_no_part_transforms_is_drawn_posed_as_before()
+    {
+        var path = Path.Combine(Paths.RepoRoot, "samples", "gardener-soft.carve");
+        var model = CarveFile.Read(File.ReadAllText(path), Path.GetDirectoryName(path)).Model!;
+        var pose = new Pose(new Dictionary<string, (Quaternion?, Vector3?)>
+        {
+            [model.Skeleton!.Bones[1].Name] = (Quaternion.CreateFromAxisAngle(Vector3.UnitX, 0.6f), null),
+        });
+        var before = Skinning.Posed(model, pose).Combined!;
+        var now = Skinning.PosedOf(model, pose, null, null)!;
+        Assert.Equal(before.Vertices, now.Vertices);
+        Assert.Equal(Shading.Corners(before), Shading.Corners(now));
+    }
+
+    [Fact]
+    public void Weigh_weighs_a_placed_part_where_it_is_drawn()
+    {
+        var model = PlacedRig();
+        var store = new ModelStore();
+        store.OpenModel(model, "open");
+        Assert.NotNull(store.Weigh("weigh", "Box", null, true, out _, out var problems));
+        Assert.Empty(problems);
+        var baked = SkinnedExport.Baked(model).Find("Box")!;
+        var expected = AutoWeights.Weigh(baked, model.Skeleton!, null, true, out _);
+        var weighed = store.Current.Model.Find("Box")!.Weights!;
+        foreach (var v in baked.LiveVertices)
+            Assert.Equal(expected.Of(v), weighed.Of(v));
+        Assert.NotEqual(AutoWeights.Weigh(model.Find("Box")!, model.Skeleton!, null, true, out _).Of(0), weighed.Of(0));
+    }
 }

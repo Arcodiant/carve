@@ -196,9 +196,10 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             {
                 // The morph comes before the skin. With no pose only the morph is applied, so the mesh is not skinned at rest.
                 var morphed = _shownTargets is { } weights ? weights.ByName : null;
+                // Each weighted occurrence is skinned where it is drawn, in model space, as the skinned export bakes it (RV-71).
                 var posed = (_shownPose is { } pose && snapshot.Model.Skeleton is not null
-                    ? Skinning.Posed(snapshot.Model, pose, morphed)
-                    : Skinning.Morphed(snapshot.Model, morphed!)).CombinedOf(_shownPart, null)!;
+                    ? Skinning.PosedOf(snapshot.Model, pose, morphed, _shownPart)
+                    : Skinning.Morphed(snapshot.Model, morphed!).CombinedOf(_shownPart, null))!;
                 if (heat is null) scene.ShowMesh(posed, drawn);
                 else scene.ShowMesh(posed, drawn, heat);
             }

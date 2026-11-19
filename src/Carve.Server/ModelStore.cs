@@ -361,7 +361,11 @@ public sealed class ModelStore
             }
             if (problems.Count > 0) return null;
 
-            var weights = AutoWeights.Weigh(target.Mesh, skeleton, indices, replace, out var outcome);
+            // The skeleton is in model space: a placed part is weighed where it is drawn, as the skinned export bakes it (RV-71).
+            var placed = model.WorldTransform(target.Name) is { IsIdentity: false } world
+                ? Model.Join([(target.Mesh, world)])!.WithWeights(target.Mesh.Weights)
+                : target.Mesh;
+            var weights = AutoWeights.Weigh(placed, skeleton, indices, replace, out var outcome);
             change = (target.Name, outcome);
             return PushLocked(model.With(target.Name, target.Mesh.WithWeights(weights)), tool);
         }

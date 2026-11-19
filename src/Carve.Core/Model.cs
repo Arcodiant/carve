@@ -643,6 +643,18 @@ public sealed class Model
         return null;
     }
 
+    /// <summary>
+    /// As <see cref="CombinedOf"/> live, with each occurrence of a weighted mesh first placed in the model's space, its weights
+    /// kept, and then given to <paramref name="skin"/> to be drawn where it lands: an instance is its own copy at its own place.
+    /// This is how the skinned export bakes parts (<c>SkinnedExport.Baked</c>), so a pose skins what the game skins.
+    /// </summary>
+    internal PolygonMesh? CombinedSkinned(string? part, Func<PolygonMesh, PolygonMesh> skin)
+    {
+        PolygonMesh? none = null;
+        return Joined([.. Drawn(part, null).Select(o => o.Mesh.Weights is not { } weights ? o
+            : new Occurrence(o.Part, skin(o.World.IsIdentity ? o.Mesh : Join([(o.Mesh, o.World)])!.WithWeights(weights)), Matrix4x4.Identity))], ref none);
+    }
+
     private Occurrence[] Drawn(string? part, int? level)
     {
         var all = level is null ? LazyInitializer.EnsureInitialized(ref _live, () => Occurrences(null)) : Occurrences(level);
