@@ -7,9 +7,11 @@ namespace Carve.Scenario.Patina;
 /// <summary>
 /// T-115's stage, export end to end on the real patina: open samples/graphs/planks.texgraph, export it at its own size
 /// (256) into the run folder and compare each PNG with samples/graphs/planks/*.png byte for byte, name the slots, export
-/// at 1024 and check by ExportMatch's rule that it is the same picture at four times the resolution (and that the rule
-/// catches a half-tile shift, a u-mirror and a flat map made on it; the normal under its own rule, failing a u-mirror, a
-/// flat map and shifts in u of a quarter stave, one texel and half a texel), then the error
+/// at 1024 (base colour, normal and occlusion through outputs, then roughness alone) and check by ExportMatch's rule that
+/// each is the same picture at four times the resolution (and that the rule catches the faults ExportMatch.Faults makes
+/// on it: a half-tile shift, a u-mirror and a flat map for base colour and roughness, a flat map for occlusion; the
+/// normal under its own rule, failing a u-mirror, a flat map and shifts in u of a quarter stave, one texel and half a
+/// texel), then the error
 /// paths: a size that is not a power of two, a role the graph has no output for, and a folder that is a file.
 /// </summary>
 internal sealed class ExportStage : IPatinaStage
@@ -40,7 +42,10 @@ internal sealed class ExportStage : IPatinaStage
         var big = await checks.CallAsync("export", JsonSerializer.Serialize(new { folder = large, size = 1024, outputs = new[] { "base_colour", "normal", "occlusion" } }));
         checks.Check(big.StartsWith($"export: wrote 3 files to {large} at size 1024\n", StringComparison.Ordinal), "export: the 1024 export said " + big);
         checks.Check(!File.Exists(Path.Combine(large, "roughness.png")), "export: outputs base_colour, normal and occlusion wrote a roughness.png as well");
-        foreach (var role in new[] { "base_colour", "normal", "occlusion" })
+        // Roughness too, alone into the same folder, so the rule and its faults hold for every output the ruling covers.
+        var rough = await checks.CallAsync("export", JsonSerializer.Serialize(new { folder = large, size = 1024, outputs = new[] { "roughness" } }));
+        checks.Check(rough.StartsWith($"export: wrote 1 file to {large} at size 1024\n", StringComparison.Ordinal), "export: the 1024 roughness export said " + rough);
+        foreach (var role in Roles)
         {
             var a = Decode(Path.Combine(small, role + ".png"));
             var b = Decode(Path.Combine(large, role + ".png"));
