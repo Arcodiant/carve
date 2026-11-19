@@ -1,0 +1,363 @@
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Carve.Core;
+using Carve.Core.Baking;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
+using StbImageWriteSharp;
+using static Carve.Server.MeshToolSupport;
+
+namespace Carve.Server;
+
+/// <summary>
+/// <c>bake</c> (M-24, T-122): writes a mesh's maps as PNGs for <c>define_material</c>. The Core does the work
+/// (<see cref="BakeLayout"/>, <see cref="Bake.Masks"/>, <see cref="Bake.Pad"/>); this is the tool surface, the files
+/// and the result. It changes no model state, so it adds no undo entry.
+/// </summary>
+public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
+{
+    public const string MasksMap = "masks";
+    public const string BaseColourMap = "base_colour";
+
+    /// <summary>The maps there are; T-124 to T-126 add theirs.</summary>
+    public static readonly string[] Maps = [MasksMap, BaseColourMap];
+
+    public const string DefaultFolder = "textures";
+    public const int DefaultSize = 1024;
+    public const int DefaultPadding = 8;
+
+    /// <summary>The example call in the description; a test runs it on <c>samples/wrench.carve</c>.</summary>
+    public const string Example = """{"mesh":"wrench","folder":"textures","size":1024,"maps":["masks","base_colour"],"surface":{"all":{"base_colour":"#80858A","roughness":0.4,"metallic":1},"rubber":{"base_colour":"#282A2E","roughness":0.88,"metallic":0},"red":{"base_colour":"#B02A22"}}}""";
+
+    public const string Text =
+        "Bakes the mesh's maps into PNG files that define_material takes as they come back: the model is not changed (no undo step, nothing to save). "
+        + "A bake is worked in the mesh's UV layout, one texel for each point of the square [0, 1] x [0, 1] with (0, 0) at the image's top-left, so the mesh needs UVs (unwrap, project_uvs or set_uvs) and no two faces may share a texel; the error says which faces do. "
+        + "Faces with no UVs are skipped, listed in skipped_faces and named in a warning. "
+        + "Arguments: mesh (the mesh to bake; required when the model has several, as render's is), folder (where the PNGs go, relative to carve's working folder like export's paths, or absolute; created when missing; default 'textures'), "
+        + "size (the image's side in texels, a power of two from 64 to 4096; default 1024), padding (texels of the island's edge colour spread past it so filtering and mip maps never reach the empty background, 0 to size/2; default 8), "
+        + "maps (which maps to bake, at least one of 'masks' and 'base_colour'; default both) and surface (below). "
+        + "The maps: 'masks' writes one single-channel grey PNG for each face group, <folder>/<mesh>.mask.<group>.png, and one for each material the mesh's faces use, <folder>/<mesh>.material.<name>.png (a group and a material with one name never collide): a texel is white (255) where its face is in the group or has the material and black (0) elsewhere, then padded; a group with no faces gives an all-black mask. "
+        + "'base_colour' writes <folder>/<mesh>.base_colour.png, an RGB PNG of sRGB bytes, so define_material's base_colour_texture reads it as it is: each texel takes its face's colour, which is, in this order, the base_colour of the last surface entry that names a group the face is in or its material; else the face's own colour (set_colour); else its material's base_colour; else white (#FFFFFF). "
+        + "surface is an object of entries, each keyed by a group or material name, applied in the order given, so a later entry wins a face that two of them name: put a group that holds every face first as a default and the specific groups after it. "
+        + "An entry is {base_colour: '#RRGGBB', roughness: 0 to 1, metallic: 0 to 1}, each optional and validated; an entry with no base_colour gives no colour to base_colour. roughness and metallic are for maps that read them and make no warning when no map in this call does. "
+        + "Returns JSON {files:[{map, name (a mask's group or material), path, size, replaced, coverage, min, max, mean}], skipped_faces:[face ids], warnings:[]}. "
+        + "path is relative to carve's working folder with '/' separators (absolute when folder is), the form define_material takes. replaced is true when a file of that name was there and was overwritten: bake always overwrites. "
+        + "coverage is the fraction of the image's texels the faces cover, before padding. min, max and mean are over those covered texels, from 0 to 1; for base_colour each is [r, g, b]. "
+        + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
+        + "a mesh, group or material name that a file name cannot hold. "
+        + "Worked example, from bake to a material on the faces, on the wrench (open samples/wrench.carve): bake with the arguments below writes textures/wrench.base_colour.png and a mask for each group; then define_material {name: 'wrench', base_colour_texture: 'textures/wrench.base_colour.png'} and set_material {material: 'wrench', group: 'all'} (the wrench's group of every face) show the baked colours on the model:\n"
+        + ExampleMarker + Example;
+
+    private static readonly string[] Known = ["mesh", "folder", "size", "padding", "maps", "surface"];
+
+    private static readonly string[] SurfaceKnown = ["base_colour", "roughness", "metallic"];
+
+    public static McpServerTool Create() => MeshToolSupport.Create<BakeTool>("bake", Text, new JsonObject
+    {
+        ["type"] = "object",
+        ["properties"] = new JsonObject
+        {
+            ["mesh"] = new JsonObject { ["description"] = "The mesh to bake; required when the model has several meshes.", ["type"] = "string" },
+            ["folder"] = new JsonObject { ["description"] = "The folder the PNGs are written to, relative to carve's working folder or absolute; created if missing. Default 'textures'.", ["type"] = "string" },
+            ["size"] = new JsonObject { ["description"] = "The image's side in texels: a power of two from 64 to 4096. Default 1024.", ["type"] = "integer", ["minimum"] = 64, ["maximum"] = 4096 },
+            ["padding"] = new JsonObject { ["description"] = "Texels of colour spread past each island's edge, 0 to size/2. Default 8.", ["type"] = "integer", ["minimum"] = 0 },
+            ["maps"] = new JsonObject
+            {
+                ["description"] = "The maps to bake, at least one of: masks (one grey PNG per group and per material), base_colour (an RGB PNG). Default both.",
+                ["type"] = "array",
+                ["items"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(Maps.Select(m => (JsonNode)m).ToArray()) },
+                ["minItems"] = 1,
+            },
+            ["surface"] = new JsonObject
+            {
+                ["description"] = "Per group or material name, applied in the order given (the later entry wins a face): {base_colour: '#RRGGBB', roughness: 0 to 1, metallic: 0 to 1}, each optional.",
+                ["type"] = "object",
+                ["additionalProperties"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["base_colour"] = new JsonObject { ["type"] = "string" },
+                        ["roughness"] = new JsonObject { ["type"] = "number", ["minimum"] = 0, ["maximum"] = 1 },
+                        ["metallic"] = new JsonObject { ["type"] = "number", ["minimum"] = 0, ["maximum"] = 1 },
+                    },
+                    ["additionalProperties"] = false,
+                },
+            },
+        },
+    });
+
+    /// <summary>One surface entry: the name it is keyed by and the fields it gave.</summary>
+    private sealed record SurfaceEntry(string Name, string? BaseColour, float? Roughness, float? Metallic);
+
+    private static string Quoted(IEnumerable<string> names)
+    {
+        var list = names.Select(n => $"'{n}'").ToList();
+        return list.Count == 0 ? "none" : string.Join(", ", list);
+    }
+
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? folder = null,
+        JsonElement? size = null, JsonElement? padding = null, JsonElement? maps = null, JsonElement? surface = null)
+    {
+        var errors = UnknownArguments("bake", context, Known);
+        var meshName = MeshName(mesh, errors);
+        var folderText = OptionalString("folder", folder, errors) ?? DefaultFolder;
+        if (!Absent(folder) && folderText.Trim().Length == 0) errors.Add("folder: is empty; give a folder, or leave it out for 'textures'");
+        var side = Whole("size", size, DefaultSize, errors);
+        var pad = Whole("padding", padding, DefaultPadding, errors);
+        if (side is { } s && BakeLayout.SizeProblem(s) is { } sizeProblem) { errors.Add(sizeProblem); side = null; }
+        if (pad is { } p && (p < 0 || (side is { } sz && p > sz / 2)))
+        {
+            errors.Add(side is { } sz2 ? $"padding: must be from 0 to {sz2 / 2} (half the size), not {p}" : $"padding: must be 0 or more, and at most half the size, not {p}");
+            pad = null;
+        }
+
+        var wanted = ReadMaps(maps, errors);
+
+        var model = store.Current.Model;
+        var named = model.Target(meshName, out var meshProblem);
+        if (meshProblem is not null) errors.Add(meshProblem);
+        else if (named is null) errors.Add(NoMesh);
+
+        var entries = ReadSurface(surface, errors);
+
+        // Names a file name cannot hold, and the surface's names against the mesh's.
+        if (named is not null)
+        {
+            var style = named.Mesh.Style ?? FaceStyle.None;
+            var groups = style.Groups.Select(g => g.Name).ToList();
+            var materials = Model.MaterialsUsedBy(named.Mesh).ToList();
+            var known = groups.Concat(model.Materials.Select(m => m.Name)).Concat(materials).Distinct().ToList();
+            foreach (var entry in entries.Where(e => !known.Contains(e.Name)))
+                errors.Add($"surface: '{entry.Name}' is not a group or a material; the names are {Quoted(known)}");
+            if (FileNameProblem(named.Name) is { } meshBad) errors.Add($"mesh: {meshBad}");
+            if (wanted.Contains(MasksMap))
+                foreach (var name in groups.Concat(materials).Distinct())
+                    if (FileNameProblem(name) is { } bad) errors.Add($"masks: the name {bad}, so its mask has no file name");
+        }
+
+        if (errors.Count > 0 && (named is null || side is null)) return Failed("bake", errors);
+
+        // The layout is worked even when an argument is wrong, so one call gives every problem, the overlap included.
+        var result = BakeLayout.Create(named!.Mesh, side!.Value);
+        if (result.Error is not null) errors.Add(result.Error);
+        if (errors.Count > 0) return Failed("bake", errors);
+        var layout = result.Layout!;
+        var mapped = named.Mesh;
+
+        var jobs = new List<(string Map, string? Name, string File, BakeImage Image, bool Colour)>();
+        if (wanted.Contains(MasksMap))
+        {
+            foreach (var mask in Bake.Masks(layout, mapped))
+            {
+                var infix = mask.Source == MaskSource.Group ? "mask" : "material";
+                jobs.Add((MasksMap, mask.Name, $"{named.Name}.{infix}.{mask.Name}.png", mask.Image, false));
+            }
+        }
+        if (wanted.Contains(BaseColourMap)) jobs.Add((BaseColourMap, null, $"{named.Name}.{BaseColourMap}.png", BaseColour(layout, model, mapped, entries), true));
+
+        var folderPath = folderText.Replace('\\', '/').TrimEnd('/');
+        var targets = new List<ToolPath>();
+        foreach (var job in jobs)
+        {
+            var target = ToolPaths.Resolve("bake", $"{folderPath}/{job.File}", ".png", out var pathError, toolFolder.Directory);
+            if (target is null) errors.Add(pathError!);
+            else targets.Add(target);
+        }
+        foreach (var clash in targets.GroupBy(t => t.FullPath, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+            errors.Add($"two maps would write the file {clash.Key}; rename a group or material so their names differ by more than case");
+        if (errors.Count > 0) return Failed("bake", errors);
+
+        var baseDirectory = toolFolder.Directory ?? Environment.CurrentDirectory;
+        var files = new List<Dictionary<string, object?>>();
+        for (var i = 0; i < jobs.Count; i++)
+        {
+            var job = jobs[i];
+            var (stats, png) = Encode(job.Image, layout, pad!.Value, job.Colour);
+            if (!ToolPaths.Write("bake", targets[i], png, out var replaced, out var writeError, overwrite: true))
+                return Error(writeError!);
+            var entry = new Dictionary<string, object?> { ["map"] = job.Map };
+            if (job.Name is not null) entry["name"] = job.Name;
+            entry["path"] = ReportedPath(baseDirectory, targets[i].FullPath);
+            entry["size"] = layout.Size;
+            entry["replaced"] = replaced;
+            entry["coverage"] = stats.Coverage;
+            entry["min"] = stats.Min;
+            entry["max"] = stats.Max;
+            entry["mean"] = stats.Mean;
+            files.Add(entry);
+        }
+
+        var warnings = new List<string>();
+        if (layout.Unmapped.Count > 0)
+            warnings.Add($"{named.Name}: {layout.Unmapped.Count} face(s) have no UVs and were skipped: {string.Join(", ", layout.Unmapped.Take(10))}{(layout.Unmapped.Count > 10 ? ", ..." : "")}");
+        return Ok(new { files, skipped_faces = layout.Unmapped, warnings });
+    }
+
+    /// <summary>A whole number argument, or its default; null with the problem added to <paramref name="errors"/>.</summary>
+    private static int? Whole(string name, JsonElement? value, int fallback, List<string> errors)
+    {
+        if (Absent(value)) return fallback;
+        if (value!.Value.ValueKind == JsonValueKind.Number && value.Value.TryGetInt32(out var n)) return n;
+        if (value.Value.ValueKind == JsonValueKind.Number && value.Value.TryGetDouble(out var d) && d == Math.Floor(d) && Math.Abs(d) < int.MaxValue) return (int)d;
+        errors.Add($"{name}: expected a whole number, got {Describe(value.Value)}");
+        return null;
+    }
+
+    private static List<string> ReadMaps(JsonElement? maps, List<string> errors)
+    {
+        if (Absent(maps)) return [.. Maps];
+        if (maps!.Value.ValueKind != JsonValueKind.Array)
+        {
+            errors.Add($"maps: expected an array of map names, got {Describe(maps.Value)}");
+            return [];
+        }
+        var chosen = new List<string>();
+        var index = 0;
+        foreach (var item in maps.Value.EnumerateArray())
+        {
+            var at = $"maps[{index++}]";
+            if (item.ValueKind != JsonValueKind.String) errors.Add($"{at}: expected a map name, got {Describe(item)}");
+            else if (!Maps.Contains(item.GetString())) errors.Add($"{at}: '{item.GetString()}' is not a map; the maps are {Quoted(Maps)}");
+            else if (!chosen.Contains(item.GetString()!)) chosen.Add(item.GetString()!);
+        }
+        if (index == 0) errors.Add($"maps: is empty; name at least one of {Quoted(Maps)}");
+        return chosen;
+    }
+
+    private static List<SurfaceEntry> ReadSurface(JsonElement? surface, List<string> errors)
+    {
+        var entries = new List<SurfaceEntry>();
+        if (Absent(surface)) return entries;
+        if (surface!.Value.ValueKind != JsonValueKind.Object)
+        {
+            errors.Add($"surface: expected an object keyed by group or material name, got {Describe(surface.Value)}");
+            return entries;
+        }
+        foreach (var property in surface.Value.EnumerateObject())
+        {
+            var at = $"surface['{property.Name}']";
+            if (property.Value.ValueKind != JsonValueKind.Object)
+            {
+                errors.Add($"{at}: expected {{base_colour, roughness, metallic}}, got {Describe(property.Value)}");
+                continue;
+            }
+            string? colour = null;
+            float? roughness = null, metallic = null;
+            foreach (var field in property.Value.EnumerateObject())
+            {
+                switch (field.Name)
+                {
+                    case "base_colour":
+                        if (field.Value.ValueKind != JsonValueKind.String) errors.Add($"{at}.base_colour: expected a colour string, got {Describe(field.Value)}");
+                        else if (FaceStyle.ColourProblem(field.Value.GetString()) is { } problem) errors.Add($"{at}.base_colour: {problem}");
+                        else colour = field.Value.GetString();
+                        break;
+                    case "roughness":
+                    case "metallic":
+                        var factor = Number($"{at}.{field.Name}", field.Value, errors);
+                        if (factor is { } f && (f < 0 || f > 1)) errors.Add($"{at}.{field.Name}: must be from 0 to 1, not {f.ToString(CultureInfo.InvariantCulture)}");
+                        else if (field.Name == "roughness") roughness = factor;
+                        else metallic = factor;
+                        break;
+                    default:
+                        errors.Add($"{at}: '{field.Name}' is not a surface field; the fields are {Quoted(SurfaceKnown)}");
+                        break;
+                }
+            }
+            entries.Add(new SurfaceEntry(property.Name, colour, roughness, metallic));
+        }
+        return entries;
+    }
+
+    /// <summary>Why <paramref name="name"/> cannot be in a file name, naming it, or null.</summary>
+    private static string? FileNameProblem(string name)
+    {
+        var bad = name.FirstOrDefault(c => System.Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0 || c is '/' or '\\');
+        if (bad != default) return $"'{name}' holds {(char.IsControl(bad) ? $"U+{(int)bad:X4}" : $"'{bad}'")}, which a file name may not";
+        if (name.EndsWith('.') || name.EndsWith(' ')) return $"'{name}' ends in a '{name[^1]}', which a file name may not";
+        return null;
+    }
+
+    private static string ReportedPath(string baseDirectory, string full)
+    {
+        var relative = Path.GetRelativePath(baseDirectory, full);
+        return (Path.IsPathRooted(relative) ? full : relative).Replace('\\', '/');
+    }
+
+    /// <summary>The base colour image, unpadded: each covered texel the sRGB bytes (as 0 to 1) of its face's colour.</summary>
+    private static BakeImage BaseColour(BakeLayout layout, Model model, PolygonMesh mesh, IReadOnlyList<SurfaceEntry> entries)
+    {
+        var style = mesh.Style ?? FaceStyle.None;
+        var colours = new string?[mesh.Faces.Count];
+        foreach (var entry in entries)
+        {
+            if (entry.BaseColour is null) continue;
+            if (style.FacesOf(entry.Name) is { } members)
+                foreach (var f in members) if ((uint)f < (uint)colours.Length) colours[f] = entry.BaseColour;
+            foreach (var f in mesh.LiveFaces) if (style.MaterialOf(f) == entry.Name) colours[f] = entry.BaseColour;
+        }
+
+        var image = layout.NewImage(3);
+        var rgb = new Dictionary<string, (float R, float G, float B)>(StringComparer.OrdinalIgnoreCase);
+        for (var y = 0; y < layout.Size; y++)
+        for (var x = 0; x < layout.Size; x++)
+        {
+            var f = layout.FaceAt(x, y);
+            if (f < 0) continue;
+            var hex = colours[f] ?? style.ColourOf(f) ?? (style.MaterialOf(f) is { } m ? model.FindMaterial(m)?.BaseColour : null) ?? Material.DefaultBaseColour;
+            if (!rgb.TryGetValue(hex, out var c))
+            {
+                byte At(int i) => byte.Parse(hex.AsSpan(1 + 2 * i, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                rgb[hex] = c = (At(0) / 255f, At(1) / 255f, At(2) / 255f);
+            }
+            image[x, y, 0] = c.R;
+            image[x, y, 1] = c.G;
+            image[x, y, 2] = c.B;
+        }
+        return image;
+    }
+
+    private sealed record Stats(double Coverage, object Min, object Max, object Mean);
+
+    /// <summary>The statistics of the unpadded image over the covered texels, then the padded image as PNG bytes.</summary>
+    private static (Stats Stats, byte[] Png) Encode(BakeImage image, BakeLayout layout, int padding, bool colour)
+    {
+        var channels = image.Channels;
+        var min = new double[channels];
+        var max = new double[channels];
+        var sum = new double[channels];
+        System.Array.Fill(min, 1.0);
+        long covered = 0;
+        for (var y = 0; y < layout.Size; y++)
+        for (var x = 0; x < layout.Size; x++)
+        {
+            if (!layout.IsCovered(x, y)) continue;
+            covered++;
+            for (var c = 0; c < channels; c++)
+            {
+                var v = (double)Quantised(image[x, y, c]) / 255;
+                min[c] = Math.Min(min[c], v);
+                max[c] = Math.Max(max[c], v);
+                sum[c] += v;
+            }
+        }
+        if (covered == 0) System.Array.Clear(min);
+
+        var padded = Bake.Pad(image, layout, padding);
+        var bytes = new byte[layout.Size * layout.Size * channels];
+        var values = padded.Values;
+        for (var i = 0; i < bytes.Length; i++) bytes[i] = Quantised(values[i]);
+        using var stream = new MemoryStream();
+        new ImageWriter().WritePng(bytes, layout.Size, layout.Size, colour ? ColorComponents.RedGreenBlue : ColorComponents.Grey, stream);
+
+        static object Shape(double[] v, bool colour) => colour ? v.Select(Round).ToArray() : Round(v[0]);
+        var mean = sum.Select(s => covered == 0 ? 0 : s / covered).ToArray();
+        return (new Stats((double)covered / ((double)layout.Size * layout.Size), Shape(min, colour), Shape(max, colour), Shape(mean, colour)), stream.ToArray());
+    }
+
+    private static double Round(double v) => Math.Round(v, 6);
+
+    private static byte Quantised(float v) => (byte)Math.Clamp((int)MathF.Round(v * 255f, MidpointRounding.AwayFromZero), 0, 255);
+}
