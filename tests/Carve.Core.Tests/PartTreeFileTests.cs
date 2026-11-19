@@ -119,7 +119,7 @@ public class PartTreeFileTests
         Assert.Equal(CarveFile.Write(plain), CarveFile.Write(same));
     }
 
-    public static TheoryData<string> Triggers => ["parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves", "level"];
+    public static TheoryData<string> Triggers => ["parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves", "level", "empty", "order"];
 
     [Theory]
     [MemberData(nameof(Triggers))]
@@ -136,12 +136,36 @@ public class PartTreeFileTests
             "envelope" => model.WithPart(b with { Envelope = new(Vector3.Zero, Vector3.One) }),
             "instance_of" => model.WithPart(new Part("c") { InstanceOf = "b" }),
             "moves" => model.WithPart(b with { Moves = true }),
-            _ => model.WithLevel("b", 0),
+            "level" => model.WithLevel("b", 0),
+            // A bare top-level empty: plain but for having no mesh, so only "parts" holds it (RV-71).
+            "empty" => model.WithPart(new Part("c")),
+            // Plain parts recorded in another order than their meshes: only "parts" holds the drawing order (RV-71).
+            _ => Model.Empty.WithPart(new Part("a")).WithPart(new Part("b")).With("b", TestMeshes.Cube()).With("a", TestMeshes.Cube()),
         };
         var text = CarveFile.Write(model);
         Assert.StartsWith("{\n  \"carve\": 7,\n", text);
         Assert.Equal(Content(model), Content(Read(text)));
         Assert.Equal(text, CarveFile.Write(Read(text)));
+    }
+
+    [Fact]
+    public void Plain_parts_in_another_order_than_their_meshes_draw_the_same_after_save_and_open()
+    {
+        var model = Model.Empty.WithPart(new Part("A")).WithPart(new Part("B"))
+            .With("B", TestMeshes.Cube()).With("A", TestMeshes.Crate());
+        var back = Read(CarveFile.Write(model));
+        Assert.Equal(["A", "B"], back.Parts.Select(p => p.Name));
+        Assert.Equal(model.OffsetOf("A"), back.OffsetOf("A"));
+        Assert.Equal(model.OffsetOf("B"), back.OffsetOf("B"));
+        Assert.Equal(model.Combined!.Vertices, back.Combined!.Vertices);
+    }
+
+    [Fact]
+    public void A_bare_empty_part_comes_back_from_save_and_open()
+    {
+        var back = Read(CarveFile.Write(Model.Of("A", TestMeshes.Cube()).WithPart(new Part("E"))));
+        Assert.NotNull(back.FindPart("E"));
+        Assert.Equal(["A", "E"], back.Parts.Select(p => p.Name));
     }
 
     // ---- Every version 7 refusal, by where it is --------------------------------------------------------------------
