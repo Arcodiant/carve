@@ -350,13 +350,13 @@ public class MorphTargetsTests
         Assert.Empty(errors);
         var bend = new Pose(new Dictionary<string, (Quaternion?, Vector3?)> { ["joint"] = (Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 3), null) });
 
-        var skinOnly = Skinning.Posed(model!, bend).Meshes[0].Mesh.Vertices;
+        var skinOnly = Skinning.Positions(mesh, skeleton, bend);
         // At weight 0 (or with no weights given) the pose is the skin alone, bit for bit.
-        Assert.Equal(skinOnly, Skinning.Posed(model!, bend, W(("Swell", 0))).Meshes[0].Mesh.Vertices);
-        Assert.Equal(skinOnly, Skinning.Posed(model!, bend, null).Meshes[0].Mesh.Vertices);
+        Assert.Equal(skinOnly, Skinning.PosedOf(model!, bend, W(("Swell", 0)), null)!.Vertices);
+        Assert.Equal(skinOnly, Skinning.PosedOf(model!, bend, null, null)!.Vertices);
 
         // At weight 1 it is the skin of the morphed mesh: the delta is rotated with its bone, not added after.
-        var posed = Skinning.Posed(model!, bend, W(("Swell", 1))).Meshes[0].Mesh;
+        var posed = Skinning.PosedOf(model!, bend, W(("Swell", 1)), null)!;
         var expected = Skinning.Positions(mesh.Morphed(W(("Swell", 1))).WithWeights(weights), skeleton, bend);
         Assert.Equal(expected, posed.Vertices);
         Assert.Null(posed.Targets);
@@ -370,9 +370,9 @@ public class MorphTargetsTests
     {
         var arm = Arm();
         var model = Model.Of("arm", With(arm, Bulk(arm)));
-        var posed = Skinning.Posed(model, Pose.Rest, W(("Bulk", 1)));
-        Assert.Equal(model.Meshes[0].Mesh.Morphed(W(("Bulk", 1))).Vertices, posed.Meshes[0].Mesh.Vertices);
-        Assert.Same(model, Skinning.Posed(model, Pose.Rest));
+        var posed = Skinning.PosedOf(model, Pose.Rest, W(("Bulk", 1)), null)!;
+        Assert.Equal(model.Meshes[0].Mesh.Morphed(W(("Bulk", 1))).Vertices, posed.Vertices);
+        Assert.Same(model.Meshes[0].Mesh, Skinning.PosedOf(model, Pose.Rest, null, null));
     }
 
     // --- Subdivide ---

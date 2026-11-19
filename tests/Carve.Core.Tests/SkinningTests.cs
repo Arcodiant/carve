@@ -177,10 +177,16 @@ public class SkinningTests
             .WithStyle(FaceStyle.None.WithColour([0], "#C8503C"));
         var plain = TestMeshes.Cube();
         var model = Model.Of("a", weighted).With("b", plain).WithSkeleton(Chain());
-        var posed = Skinning.Posed(model, Of(("joint", QuarterZ, null)));
-        Assert.Same(plain, posed.Find("b"));
-        Assert.Equal("#C8503C", posed.Find("a")!.Style!.ColourOf(0));
-        Assert.NotEqual(weighted.Vertices[0], posed.Find("a")!.Vertices[0]);
-        Assert.Null(posed.Find("a")!.Weights);
+        var pose = Of(("joint", QuarterZ, null));
+        Assert.Same(plain, Skinning.PosedOf(model, pose, null, "b"));
+        var a = Skinning.PosedOf(model, pose, null, "a")!;
+        Assert.Equal("#C8503C", a.Style!.ColourOf(0));
+        Assert.NotEqual(weighted.Vertices[0], a.Vertices[0]);
+        Assert.Null(a.Weights);
+        // The whole model: a posed, b as it is, after it.
+        var both = Skinning.PosedOf(model, pose, null, null)!;
+        Assert.Equal("#C8503C", both.Style!.ColourOf(0));
+        Assert.Equal(a.Vertices, both.Vertices.Take(a.Vertices.Count));
+        Assert.Equal(plain.Vertices, both.Vertices.Skip(a.Vertices.Count));
     }
 }
