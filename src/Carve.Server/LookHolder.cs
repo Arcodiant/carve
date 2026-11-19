@@ -37,6 +37,9 @@ internal sealed class LookHolder<TMesh>(LookHolder<TMesh>.IParts parts)
     /// <summary>The <c>uvs</c> look's face range; null for every other look.</summary>
     public ElementWindow? Faces { get; private set; }
 
+    /// <summary>What else the <c>uvs</c> look is drawn from, compared by value (T-121: its image); null for none.</summary>
+    public object? Variant { get; private set; }
+
     public PolygonMesh? Shown { get; private set; }
 
     /// <summary>Draws a new mesh in the look already asked for.</summary>
@@ -47,9 +50,9 @@ internal sealed class LookHolder<TMesh>(LookHolder<TMesh>.IParts parts)
     }
 
     /// <summary>Takes the look of a request; a camera change alone rebuilds nothing.</summary>
-    public void Apply(Look look, Highlight highlight, DrawnSpace space, ElementWindow? faces = null)
+    public void Apply(Look look, Highlight highlight, DrawnSpace space, ElementWindow? faces = null, object? variant = null)
     {
-        if (Shown is { } shown && (look != Look || highlight != Highlight || faces != Faces))
+        if (Shown is { } shown && (look != Look || highlight != Highlight || faces != Faces || !Equals(variant, Variant)))
         {
             Put(shown, space, look, highlight, faces);
         }
@@ -57,6 +60,7 @@ internal sealed class LookHolder<TMesh>(LookHolder<TMesh>.IParts parts)
         Look = look;
         Highlight = highlight;
         Faces = faces;
+        Variant = variant;
     }
 
     /// <summary>
