@@ -185,12 +185,12 @@ internal static class RenderTool
         + "Six more view names look head-on along an axis, as that direction would: '+x' shows the +X side, +Z on the left; '-x' the -X side, +Z on the right; "
         + "'+z' the +Z side, +X on the right; '-z' the -Z side, +X on the left; all four with +Y up. "
         + "'+y' looks down on the top, +X on the right; '-y' looks up at the underside, +X on the left; both with -Z up. "
-        + "Or give 'direction' instead of 'view': [x, y, z], pointing from the point looked at toward the eye, in the mesh's own axes, any length. "
+        + "Or give 'direction' instead of 'view': [x, y, z], pointing from the point looked at toward the eye, in model space's axes, any length. "
         + "Up on the image is +Y, or -Z when the direction is within 1 degree of straight up or down. "
         + "Examples: [1,0,0] looks from +X, [-1,0,0] from -X, [0,1,0] from above, down at the mesh, [0,-1,0] from below, [0,0,1] from +Z, [0,0,-1] from -Z. "
         + "A head-on axis view shows every face pointing one way as one flat shade, so a slight tilt such as [0.4, 2, 0.8] reads better from above. "
         + "'zoom' (1 to 8, default 1) narrows the view about 'target' without moving the camera; 'target' is the point [x, y, z] to look at and zoom on, "
-        + "in the mesh's own coordinates and inside its bounds (default: the centre of the bounds). "
+        + "in model space, every part where it is placed, and inside the bounds of what is drawn (default: the centre of the bounds). "
         + "The camera frames the whole mesh each time, so a render shows shape, not size; zoom in on a target to see a detail. "
         + "The caption then reads e.g. '512x512, direction (2, 1, 1), zoom 3, target (1.02, 0.4, 0.5), 72 vertices, 70 faces', "
         + "with zoom and target only when you set them. "
@@ -240,8 +240,24 @@ internal static class RenderTool
         + "'bones' draws the skeleton over the model, in the pose or clip of the frame: magenta lines, 3 pixels wide, over the model and not hidden by it. A bone with children is a line from its head to each child's head; a leaf bone is a line along its parent's direction for half its parent's length; every head has a dot; a lone bone with no parent and no child is a dot. 'bone_labels' (needs bones: true) writes each bone's name white on a dark backing, up and to the right of its head; names crowd on a dense skeleton, so use size 1024 or zoom. The caption says 'bones' or 'bones, bone labels' after the labels and highlight. Both are independent of labels, highlight, mode and mesh. Errors: bones or bone_labels with no skeleton, bone_labels without bones: true. "
         + "'weights' is a bone's name: the model is drawn unlit, each face corner coloured by that bone's weight at its vertex: dark blue at 0, through green at 0.5, to red at 1, so red is what the bone wholly moves and blue what it leaves alone. A vertex with no weight at all (not even to another bone) is magenta, and magenta means the vertex needs fixing: call set_weights or weigh, since export refuses it. It follows the frame's pose or clip, replaces mode (not with wireframe, normals or checker), and draws on the model's faces, so with bones: true the magenta bone lines are on top of the same magenta a bad vertex has: tell them apart by shape, the bone lines being thin lines with dots at the joints and an unweighted vertex a patch of a face. The caption says 'weights <bone>' where the mode would be. Errors: no skeleton, a bone the skeleton lacks (the bones are listed). "
         + "'clip' and 'time' draw the model as the clip of that name (define_clip) poses it at that time in seconds, interpolated as define_clip says; framed on the rest pose like pose. Errors: clip together with pose, clip without time or time without clip, no clip of that name, a time outside 0 to the clip's duration. "
+        + PartsText
         + "Calling render with no mesh (before define_mesh or open) is a tool error saying so. A machine with no working Vulkan device gives a tool error naming Vulkan; "
         + "define_mesh, open, save, export, move, extrude, get_mesh, undo, select, check, define_group, set_colour, define_skeleton, get_skeleton, set_weights, weigh, get_weights, define_clip and delete_clip still work there.";
+
+    /// <summary>T-94's paragraph of render's text: the placed model, part and level.</summary>
+    public const string PartsText =
+        "The model is drawn as the game places it: every part at its world placement (get_parts), each instance as a copy of its source. "
+        + "'part' names one part: only it and the parts under it are drawn, each where it is placed, and the camera frames their bounds; an instance draws its source's geometry. "
+        + "'level' draws a kept level (keep_level): each part at its newest kept level at or below it, a part with none not drawn; not with pose, clip, targets or weights, since a level is drawn as it was kept, at rest. "
+        + "With part, labels and highlight apply to 'mesh', which must be drawn with it, or with mesh left out to the one part under it with geometry of its own; the ids are that part's own (at a level, the level's), shown on its own occurrence and not on its instances. "
+        + "The caption names them before the counts: '512x512, view front, part Axle_F, level 0, 32 vertices, 20 faces'. "
+        + "Errors: a part the model lacks (the parts are listed), a level below 0, a part or level that draws nothing, and a mesh not drawn with the part or at the level. ";
+
+    /// <summary>The description of render's <c>part</c>.</summary>
+    public const string PartArgumentText = "A part's name (get_parts): draws only it and the parts under it, each where it is placed, framed on them. Default: the whole model.";
+
+    /// <summary>The description of render's <c>level</c>.</summary>
+    public const string LevelArgumentText = "A kept level (keep_level), 0 or more: each part at its newest kept level at or below it; a part with none is not drawn. Not with pose, clip, targets or weights.";
 
     /// <summary>The text of render's <c>mesh</c>: it aims labels and highlight, never what is drawn.</summary>
     private const string MeshArgumentText =
@@ -258,7 +274,7 @@ internal static class RenderTool
         [Description("Where to look from: the corner 'front' (the default when no direction is given) or 'back', or head-on along an axis: '+x', '-x', '+y', '-y', '+z', '-z'. Not with direction."), AllowedValues("front", "back", "+x", "-x", "+y", "-y", "+z", "-z")] string? view = null,
         [Description("[x, y, z]: from the point looked at toward the eye. Up is +Y, or -Z within 1 degree of vertical. Not with view.")] double[]? direction = null,
         [Description("1 to 8: how far to zoom in about the target. The default 1 frames the whole mesh.")] double zoom = 1,
-        [Description("[x, y, z] in the mesh's coordinates, inside its bounds: the point to look at. Default: the centre.")] double[]? target = null,
+        [Description("[x, y, z] in model space, inside the bounds of what is drawn: the point to look at. Default: the centre.")] double[]? target = null,
         [Description("'perspective' (the default), what a game shows, or 'orthographic': parallel edges stay parallel, true proportions."), AllowedValues("perspective", "orthographic")] string? projection = null,
         [Description("The image's width and height: 256, 512 (the default) or 1024."), AllowedValues(256, 512, 1024)] double size = RenderSpec.DefaultSize,
         [Description("The look: 'shaded' (the default), 'wireframe' (every visible edge over a flat fill) , 'normals' (faces coloured by facing, with spikes), 'checker' (lit, a hued checker at each face's UVs, white cell at uv (0,0), magenta where a face has none) or 'uvs' (one mesh's UV layout flat: u right, v down, bright where faces use the texture, dim where empty, white edges, yellow seams)."), AllowedValues("shaded", "wireframe", "normals", "checker", "uvs")] string? mode = null,
@@ -274,9 +290,11 @@ internal static class RenderTool
         [Description("true draws the skeleton over the model, in the frame's pose: a line from each bone's head to each child's head, a dot on every head, and a leaf bone as a line along its parent's direction for half its parent's length. Magenta, drawn over the model and not hidden by it.")] bool? bones = null,
         [Description("true writes each bone's name beside its head, white on a dark backing. Needs bones: true.")] bool? bone_labels = null,
         [Description("A bone's name: draws the model unlit with that bone's weight at each vertex, dark blue at 0 through green (0.5) to red at 1; a vertex with no weight at all is magenta and needs fixing (set_weights or weigh). Needs a skeleton; follows pose or clip; not with mode wireframe, normals or checker.")] string? weights = null,
+        [Description(PartArgumentText)] string? part = null,
+        [Description(LevelArgumentText)] int? level = null,
         CancellationToken cancellationToken = default)
     {
-        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "targets", "bones", "bone_labels", "weights") is { Count: > 0 } unknown)
+        if (UnknownArguments("render", context, "view", "direction", "zoom", "target", "projection", "size", "mode", "highlight", "labels", "views", "columns", "mesh", "pose", "clip", "time", "targets", "bones", "bone_labels", "weights", "part", "level") is { Count: > 0 } unknown)
         {
             return Failed("render", unknown);
         }
@@ -350,9 +368,22 @@ internal static class RenderTool
         var (clipName, clipTime) = ReadClip(clip, time, pose, problems);
         var morph = TargetWeightsArgument.Read(targets, store.Current.Model, problems);
         var listed = HighlightLists(highlight, problems);
+        if (level is < 0) problems.Add($"level: {level} is not a level; a kept level is 0 or more (keep_level)");
+        if (level is not null)
+        {
+            foreach (var (name, on) in new[] { ("pose", posed is not null), ("clip", clipName is not null), ("targets", morph is not null), ("weights", weights is not null) })
+                if (on) problems.Add($"level: not with {name}; a kept level is drawn as it was kept, at rest");
+        }
+
         if (problems.Count > 0)
         {
             return Failed("render", problems);
+        }
+
+        // The part is checked against the model of the call before the engine is waited on, so a wrong name needs no device.
+        if (part is not null && PartRefusal(store.Current.Model, part, meshName) is { } partRefused)
+        {
+            return Failed("render", [partRefused]);
         }
 
         var projected = projection == "orthographic" ? Projection.Orthographic : Projection.Perspective;
@@ -383,6 +414,23 @@ internal static class RenderTool
             posed = sampled.Sample(clipTime);
         }
 
+        if (part is not null && PartRefusal(current.Model, part, meshName) is { } partGone)
+        {
+            return Failed("render", [partGone]);
+        }
+
+        if (part is not null || level is not null)
+        {
+            if (current.Model.CombinedOf(part, level) is not { } selected)
+            {
+                return Failed("render", [level is { } none
+                    ? $"level: nothing is drawn at level {none}: no part{(part is null ? "" : $" under '{part}'")} has a kept level at or below {none}; keep_level keeps one"
+                    : $"part: '{part}' draws nothing: neither it nor any part under it has geometry"]);
+            }
+
+            drawn = selected;
+        }
+
         if (posed is not null)
         {
             if (current.Model.Skeleton is not { } rig) return Failed("render", ["pose: the model has no skeleton; call define_skeleton first"]);
@@ -411,18 +459,28 @@ internal static class RenderTool
         ElementWindow? window = null;
         string? shiftedFor = null;
         (int Vertices, int Faces) offset = (0, 0);
-        if (meshName is not null || (wantsIds && current.Model.Meshes.Count > 1))
+        // With part, labels and highlight left unaimed go to the one part under it with geometry of its own (T-94).
+        var aimName = meshName ?? (part is not null && wantsIds ? SoleOwner(current.Model, part) : null);
+        if (aimName is not null || (wantsIds && (part is not null || current.Model.Meshes.Count > 1)))
         {
-            if (current.Model.Target(meshName, out var aimed) is not { } named)
+            if (current.Model.Target(aimName, out var aimed) is not { } named)
             {
-                return Failed("render", [meshName is null ? aimed + "; labels and highlight name ids within one mesh" : aimed!]);
+                return Failed("render", [aimName is null ? aimed + "; labels and highlight name ids within one mesh" : aimed!]);
             }
 
-            if (current.Model.Meshes.Count > 1)
+            var own = level is { } at ? current.Model.LevelMesh(named.Name, at) : named.Mesh;
+            if (own is null || (part is not null && !current.Model.SubtreeOf(part).Contains(named.Name)))
             {
-                idsIn = named.Mesh;
-                offset = current.Model.OffsetOf(named.Name)!.Value;
-                window = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
+                return Failed("render", [own is null
+                    ? $"mesh: '{named.Name}' has no kept level at or below {level}, so it is not drawn at level {level}"
+                    : $"mesh: '{named.Name}' is not drawn with part '{part}'; the parts under it are {NameList.Quoted(current.Model.SubtreeOf(part!))}"]);
+            }
+
+            if (part is null && level is null ? current.Model.Meshes.Count > 1 : !ReferenceEquals(drawn, own))
+            {
+                idsIn = own;
+                offset = (part is null && level is null ? current.Model.OffsetOf(named.Name) : current.Model.OffsetOf(named.Name, part, level))!.Value;
+                window = new ElementWindow(offset.Vertices, offset.Faces, own.Faces.Count);
                 // Only ids asked for are shifted; a render naming the mesh with none has nothing a later model could misplace.
                 shiftedFor = wantsIds ? named.Name : null;
             }
@@ -451,7 +509,7 @@ internal static class RenderTool
         async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
             var rendering = Task.WhenAll(tiles
-                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Targets = morph, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton, Weights = weights })));
+                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Targets = morph, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton, Weights = weights, Part = part, Level = level })));
 
             // The frame thread drains the queue; once it has ended, nothing will.
             await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
@@ -485,7 +543,7 @@ internal static class RenderTool
                 Content =
                 [
                     ImageContentBlock.FromBytes(EncodePng(composed.Pixels, composed.Width, composed.Height), "image/png"),
-                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton, weights, noUvs) },
+                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton, weights, noUvs, part, level) },
                 ],
             };
         }
@@ -497,7 +555,7 @@ internal static class RenderTool
             Content =
             [
                 ImageContentBlock.FromBytes(EncodePng(image.Pixels, image.Width, image.Height), "image/png"),
-                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs) },
+                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs, part, level) },
             ],
         };
     }
@@ -519,6 +577,8 @@ internal static class RenderTool
         ("bones", "the layout draws no skeleton"),
         ("bone_labels", "the layout draws no skeleton"),
         ("weights", "the layout draws the checker, not weights"),
+        ("part", "the layout is one mesh's, named by mesh"),
+        ("level", "the layout is the live mesh's"),
     ];
 
     /// <summary>
@@ -807,7 +867,7 @@ internal static class RenderTool
     /// each thing asked for beyond the default, only where set: the projection, the mode, the labels, the
     /// highlight, zoom, target. The counts close it, so a part added here goes before them.
     /// </summary>
-    internal static string Caption(RenderedFrame frame, string? view, double[]? direction, Projection projection, Look look, LabelSet labels, Highlight highlight, double zoom, double[]? target, BoneDraw? bones = null, string? weights = null, bool noUvs = false)
+    internal static string Caption(RenderedFrame frame, string? view, double[]? direction, Projection projection, Look look, LabelSet labels, Highlight highlight, double zoom, double[]? target, BoneDraw? bones = null, string? weights = null, bool noUvs = false, string? part = null, int? level = null)
     {
         var parts = new List<string>
         {
@@ -817,6 +877,7 @@ internal static class RenderTool
 
         AddLookParts(parts, projection, look, labels, highlight, bones, weights, noUvs);
         AddZoomAndTarget(parts, zoom, target);
+        AddPartAndLevel(parts, part, level);
         return WithCounts(parts, frame);
     }
 
@@ -824,13 +885,37 @@ internal static class RenderTool
     /// <c>3x2 tiles of 256x256</c>, columns by rows; the parts every tile shares, as the single caption has them;
     /// then <c>views</c> and each tile's own caption, so a caption cut off at a tile's edge is whole here; the counts.
     /// </summary>
-    private static string SheetCaption(RenderedFrame frame, int columns, IReadOnlyList<Tile> tiles, Projection projection, Look look, LabelSet labels, Highlight highlight, BoneDraw? bones = null, string? weights = null, bool noUvs = false)
+    private static string SheetCaption(RenderedFrame frame, int columns, IReadOnlyList<Tile> tiles, Projection projection, Look look, LabelSet labels, Highlight highlight, BoneDraw? bones = null, string? weights = null, bool noUvs = false, string? part = null, int? level = null)
     {
         var parts = new List<string> { $"{columns}x{SheetComposer.Rows(tiles.Count, columns)} tiles of {frame.Pixels.Width}x{frame.Pixels.Height}" };
         AddLookParts(parts, projection, look, labels, highlight, bones, weights, noUvs);
         parts.Add($"views {string.Join(", ", tiles.Select(t => t.Caption))}");
+        AddPartAndLevel(parts, part, level);
         return WithCounts(parts, frame);
     }
+
+    /// <summary>What is drawn, when not the whole live model (T-94): <c>part Axle_F, level 0</c>, before the counts.</summary>
+    private static void AddPartAndLevel(List<string> parts, string? part, int? level)
+    {
+        if (part is not null) parts.Add($"part {part}");
+        if (level is not null) parts.Add($"level {level}");
+    }
+
+    /// <summary>Why <c>part</c> cannot be drawn on <paramref name="model"/>, with <c>mesh</c> as given, or null.</summary>
+    internal static string? PartRefusal(Model model, string part, string? mesh)
+    {
+        if (model.FindPart(part) is null)
+            return model.Parts.Count == 0
+                ? $"part: there is no part named '{part}'; the model has no parts yet (define_mesh or define_part makes one)"
+                : $"part: there is no part named '{part}'; the parts are {model.ListPartNames()}";
+        if (mesh is not null && model.FindPart(mesh) is not null && !model.SubtreeOf(part).Contains(mesh))
+            return $"mesh: '{mesh}' is not drawn with part '{part}'; the parts under it are {NameList.Quoted(model.SubtreeOf(part))}";
+        return null;
+    }
+
+    /// <summary>The one part in <paramref name="part"/>'s subtree with geometry of its own, or null when there are none or several.</summary>
+    private static string? SoleOwner(Model model, string part) =>
+        model.SubtreeOf(part).Where(n => model.FindPart(n)!.InstanceOf is null && model.Find(n) is not null).ToArray() is [var only] ? only : null;
 
     /// <summary>The caption's parts closed by the counts, joined.</summary>
     private static string WithCounts(List<string> parts, RenderedFrame frame)
@@ -921,4 +1006,10 @@ internal static class RenderTool
         new ImageWriter().WritePng(pixels, width, height, ColorComponents.RedGreenBlueAlpha, png);
         return png.ToArray();
     }
+}
+
+/// <summary>T-94: render's part paragraph, public for the tools/list guard (RenderTool itself is internal).</summary>
+public static class RenderPartTexts
+{
+    public const string Parts = RenderTool.PartsText;
 }

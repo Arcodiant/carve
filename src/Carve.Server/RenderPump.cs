@@ -52,6 +52,8 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     private Pose? _shownPose;
     private TargetWeights? _shownTargets;
     private string? _shownWeights;
+    private string? _shownPart;
+    private int? _shownLevel;
     private GlbScene? _shownGlb;
 
     public void Step()
@@ -155,6 +157,14 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
+            // And the part and level drawn (T-94): another puts that part of the model in, framed on it.
+            if (next.Spec.Part != _shownPart || next.Spec.Level != _shownLevel)
+            {
+                (_shownPart, _shownLevel) = (next.Spec.Part, next.Spec.Level);
+                ShowMesh(store.Current);
+                continue;
+            }
+
             if (next.Spec != _spec || !_viewApplied)
             {
                 ChangeView(next);
@@ -173,19 +183,22 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         _version = snapshot.Version;
         try
         {
-            var drawn = snapshot.Mesh!;
+            var whole = _shownPart is null && _shownLevel is null;
+            var drawn = whole ? snapshot.Mesh! : snapshot.Model.CombinedOf(_shownPart, _shownLevel)
+                ?? throw new InvalidOperationException(_shownPart is { } p && snapshot.Model.FindPart(p) is null
+                    ? $"part: there is no part named '{p}'" : "nothing is drawn: no part of it has geometry at that level");
             scene.ShowMaterials(snapshot.Model.Materials);
             // The bone of the last weights look may be gone from a newer model (an undo, open or renaming define_skeleton):
             // then the mesh is shown shaded, and only a weights request for that bone fails, at the head of the queue.
             var heat = _shownWeights is null || WeightHeat.Refusal(snapshot.Model, _shownWeights) is not null
-                ? null : WeightHeat.Of(snapshot.Model, _shownWeights);
+                ? null : Within(snapshot.Model, WeightHeat.Of(snapshot.Model, _shownWeights));
             if ((_shownPose is not null && snapshot.Model.Skeleton is not null) || _shownTargets is not null)
             {
                 // The morph comes before the skin. With no pose only the morph is applied, so the mesh is not skinned at rest.
                 var morphed = _shownTargets is { } weights ? weights.ByName : null;
                 var posed = (_shownPose is { } pose && snapshot.Model.Skeleton is not null
                     ? Skinning.Posed(snapshot.Model, pose, morphed)
-                    : Skinning.Morphed(snapshot.Model, morphed!)).Combined!;
+                    : Skinning.Morphed(snapshot.Model, morphed!)).CombinedOf(_shownPart, null)!;
                 if (heat is null) scene.ShowMesh(posed, drawn);
                 else scene.ShowMesh(posed, drawn, heat);
             }
@@ -193,9 +206,9 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 scene.ShowMesh(drawn, drawn, heat);
             else
                 scene.ShowMesh(drawn);
-            var report = MeshReport.Create(snapshot.Mesh!);
+            var report = MeshReport.Create(drawn);
             _shownBounds = (report.BoundsMin, report.BoundsMax);
-            _shown = snapshot.Mesh;
+            _shown = drawn;
             _shownModel = snapshot.Model;
             _meshFault = null;
         }
@@ -218,6 +231,22 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             _viewApplied = false;
             scene.Report(e, ViewFault(e));
         }
+    }
+
+    /// <summary>
+    /// The heat of the shown part's subtree (T-94): <see cref="WeightHeat.Of"/> is per vertex of <see cref="Model.Meshes"/> in
+    /// order, so each drawn occurrence takes its mesh's run (an instance its source's), in the order the subtree is drawn.
+    /// </summary>
+    private float[] Within(Model model, float[] whole)
+    {
+        if (_shownPart is null) return whole;
+        var runs = new Dictionary<string, (int Start, int Count)>(StringComparer.Ordinal);
+        var at = 0;
+        foreach (var (name, mesh) in model.Meshes) { runs[name] = (at, mesh.Vertices.Count); at += mesh.Vertices.Count; }
+        var heat = new List<float>();
+        foreach (var name in model.SubtreeOf(_shownPart))
+            if (runs.TryGetValue(model.FindPart(name)!.InstanceOf ?? name, out var run)) heat.AddRange(whole[run.Start..(run.Start + run.Count)]);
+        return [.. heat];
     }
 
     private void ShowGlb(RenderRequest next)

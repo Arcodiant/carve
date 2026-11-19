@@ -25,6 +25,15 @@ public class PartToolsListTests
     /// <summary>The sentences T-93 adds to existing descriptions, each removed before the digest.</summary>
     private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check];
 
+    private static readonly string[] T94Added = [carve::Carve.Server.RenderPartTexts.Parts, carve::Carve.Server.GetMeshTool.PlacementText];
+
+    private static readonly (string Now, string Was)[] T94Reworded =
+    [
+        ("in model space, every part where it is placed, and inside the bounds of what is drawn", "in the mesh's own coordinates and inside its bounds"),
+        ("in model space's axes, any length", "in the mesh's own axes, any length"),
+        ("[x, y, z] in model space, inside the bounds of what is drawn: the point to look at.", "[x, y, z] in the mesh's coordinates, inside its bounds: the point to look at."),
+    ];
+
     internal static string Digest(JsonElement tools)
     {
         var kept = new JsonArray();
@@ -34,7 +43,18 @@ public class PartToolsListTests
             var node = JsonNode.Parse(tool.GetRawText())!.AsObject();
             var text = node["description"]!.GetValue<string>();
             foreach (var sentence in Agreed) text = text.Replace(sentence, "", StringComparison.Ordinal);
+            // T-94's agreed changes to render and get_mesh, taken out again: its paragraphs, its new arguments, and the
+            // texts that said "the mesh's own coordinates" put back as they were.
+            foreach (var sentence in T94Added) text = text.Replace(sentence, "", StringComparison.Ordinal);
+            foreach (var (now, was) in T94Reworded) text = text.Replace(now, was, StringComparison.Ordinal);
             node["description"] = text;
+            if (node["inputSchema"]?["properties"] is JsonObject properties)
+            {
+                var name = tool.GetProperty("name").GetString();
+                foreach (var added in name == "render" ? ["part", "level"] : name == "get_mesh" ? new[] { "level" } : []) properties.Remove(added);
+                if (name == "render" && properties["target"] is JsonObject targetArgument)
+                    targetArgument["description"] = T94Reworded.Aggregate(targetArgument["description"]!.GetValue<string>(), (t, r) => t.Replace(r.Now, r.Was, StringComparison.Ordinal));
+            }
             kept.Add(node);
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(kept.ToJsonString())));
