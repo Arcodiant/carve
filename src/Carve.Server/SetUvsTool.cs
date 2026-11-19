@@ -17,6 +17,7 @@ public sealed class SetUvsTool(ModelStore store)
         + "UVs run as in glTF (origin top-left, v down): (0, 0) is the texture's top-left, u runs right and v runs down, so (1, 1) is the bottom-right. A value outside 0..1 is allowed and tiles the texture; any finite number is legal. "
         + "A face with no UVs is unmapped; an edit keeps a face's UVs (move keeps them, an extrude's cap keeps its own and its new walls are unmapped, subdivide interpolates them linearly, undo restores them), and the Carve file keeps them. "
         + "One call is one step for undo, and a call that fails changes nothing. "
+        + PartTargetText
         + "Returns JSON {mesh, set, cleared, unmapped}: how many faces were given UVs, how many were cleared, and how many faces of the mesh are still unmapped; get_mesh reads the UVs back as uvs. "
         + "Errors, each a tool error that changes nothing and names the element: no mesh yet, a face that is not a face of the mesh or is deleted, a pair count that is not the face's corner count (it says how many corners the face has), a value that is not a finite number, a face both set and cleared (or listed twice), an entry that is not {face, uv}, an unknown argument. "
         + "Worked example on define_mesh's unit cube: face 0 is [0,3,2,1], four corners, here mapped to the whole texture, corner 0 at the top-left and the others following round the loop:\n"

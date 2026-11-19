@@ -283,6 +283,7 @@ public sealed class DeleteTargetTool(ModelStore store)
     public const string Text =
         "Removes one morph target from a mesh. Arguments: name (required), the target's name as get_mesh lists it; and mesh, the mesh it is on, which may be left out while the model has one mesh. "
         + "The mesh's own shape and its other targets are unchanged. One step for undo. "
+        + PartTargetText
         + "Returns JSON {mesh, deleted:name, targets:[the names left, in order]}. "
         + "A name the mesh has no target of is a tool error that lists the targets it has, and changes nothing. "
         + "Worked example on define_target's bulge:\n"
