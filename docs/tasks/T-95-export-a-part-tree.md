@@ -4,7 +4,7 @@ description: >-
 ---
 # T-95 — Export a part tree
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
