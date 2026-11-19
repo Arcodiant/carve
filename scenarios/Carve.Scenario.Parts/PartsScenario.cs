@@ -114,6 +114,14 @@ public sealed class PartsScenario : IScenario
         var frame10 = await driver.CaptureAsync("reopened-front", new { });
         driver.AssertBytesEqual("reopened-front against front", frame3.Png, frame10.Png);
 
+        // The export (T-95's node layout) of the model as saved, into the content folder the viewer and the load checks read (T-97).
+        var content = Path.Combine(driver.RunFolder, "game", "Content", "models");
+        Directory.CreateDirectory(content);
+        var exported = await CallTextAsync(driver, "export", new { path = Path.Combine(content, "rover.glb") });
+        if (exported.Contains("warning", StringComparison.OrdinalIgnoreCase) || !exported.Contains("rover.glb") || !exported.Contains("6 nodes"))
+            driver.Fail($"export: expected a clean report of rover.glb in 6 nodes, got: {exported}");
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "export-result.txt"), exported);
+
         // Frame 11: one move on Wheel_FL's hub boss changes all four wheels; undo puts them back, byte for byte.
         await InstanceEditAsync(driver, world, live, frame5);
 
