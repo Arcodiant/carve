@@ -76,6 +76,9 @@
     <Compile Include="../Carve.Core.Tests/PartTreeSample.cs" Link="PartTreeSample.cs" />
     <Compile Include="../Carve.Core.Tests/RoverSpec.cs" Link="RoverSpec.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Shed/ShedGeometry.cs" Link="ShedGeometry.cs" />
+    <Compile Include="../../scenarios/Carve.Scenario.Cuts/CutsGeometry.cs" Link="CutsGeometry.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Acceptance/Silhouette.cs" Link="Silhouette.cs" />
     <Compile Include="../../scenarios/Carve.Scenario.Orcward/GlbEdit.cs" Link="GlbEdit.cs" />
     <PackageReference Include="Arcodiant.Empyrean.Graphics" Version="$(EmpyreanVersion)" />
