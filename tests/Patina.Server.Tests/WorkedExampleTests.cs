@@ -26,6 +26,15 @@ public class WorkedExampleTests
     }
 
     [Fact]
+    public async Task Define_graph_takes_the_tone_per_stone_from_worleys_random_output()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+
+        Assert.Equal(DefineGraphTool.WorkedResult, await patina.Ok("define_graph", DefineGraphTool.WorkedStones));
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedStones + "\nreturns: " + DefineGraphTool.WorkedResult, DefineGraphTool.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn));
+    }
+
+    [Fact]
     public async Task Get_graph_after_define_graph_returns_the_description_s_text()
     {
         await using var patina = await PatinaHarness.StartAsync();
