@@ -13,9 +13,10 @@ namespace Patina.Server;
 /// <summary>
 /// What the sphere wears and the sheet labels: <paramref name="Images"/> by role (base colour, normal, roughness as the
 /// packed metallic-roughness image, occlusion; a missing role takes the material's default), and <paramref name="Metallic"/>
-/// when the roughness image carries the graph's metallic in B (the material's metallic factor is then 1, else 0).
+/// when the roughness image carries the graph's metallic in B (the material's metallic factor is then 1, else 0), and
+/// <paramref name="Tiling"/>, the whole repeats of every map in u and v over the sphere (T-156; 1 draws the sphere as it always was).
 /// </summary>
-public sealed record SwatchSpec(IReadOnlyDictionary<OutputRole, byte[]> Images, int Size, float Angle, IReadOnlyList<string>? Labels, bool Metallic = false);
+public sealed record SwatchSpec(IReadOnlyDictionary<OutputRole, byte[]> Images, int Size, float Angle, IReadOnlyList<string>? Labels, bool Metallic = false, int Tiling = 1);
 
 /// <summary>The sphere view and, when labels were asked, the label atlas and each label's measured extent; RGBA, sRGB.</summary>
 public sealed record SwatchFrame(byte[] Sphere, byte[]? Atlas, IReadOnlyList<Vector2>? Extents);
@@ -226,6 +227,8 @@ internal sealed class SwatchSystem(
         _holder.Hold(material);
         ref var instance = ref entities.GetComponent<MeshInstance>(_sphere!.Value);
         instance.Material = material;
+        // Tiling n repeats every map n times in u and v: the instance's atlas rect widened to n x n, the sampler repeating. At 1 it is the whole texture.
+        instance.AtlasRect = new UvRect(0, 0, spec.Tiling, spec.Tiling);
         instance.RenderLayerMask = RenderLayerMask.All;
     }
 }
