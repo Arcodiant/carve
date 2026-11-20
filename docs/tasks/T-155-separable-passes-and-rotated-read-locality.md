@@ -63,6 +63,15 @@ byte-identical, so the speed checks T-137 and T-138 moved here can be met.
   agent's call.
 - **Stop and ask:** any committed output that changes; a parallel evaluator; a speed check above that cannot be met.
 - T-142's library stage and T-143's acceptance evaluate the samples at large sizes, so T-142 waits on this task.
+- **Decided (2026-11-20, by the person, on the third agent's stop):**
+  - **T-155 lands without the 10 s checks.** Blur's own share at 8192 (120.4 s) and distance at range 0.1 at 8192
+    (17.6 s less its mask) are recorded in As built as unmet and moved to **T-159** (strip passes for separable nodes,
+    off-milestone), which now owns the 10 s target. No strip passes are built here. The other Scope checks still
+    hold: byte identity, the 2 GB peaks, the rotation ratio, and the strong minify under 2 GB.
+  - **The cobblestones' normal: re-run, then decide.** The cobblestones' four outputs and the planks at 8192 in
+    Release, before (the milestone base) and after, three times each, back to back, compared by median. An after
+    median more than 10% slower than its before median is looked into before landing (the normal's tiles made also
+    rose, 133,783 to 148,877); if the cause cannot be fixed within this task, stop and report it with the figures.
 
 ### Research (Claude Opus 5.5, `claude-opus-5-5`, 2026-11-20)
 
@@ -298,3 +307,41 @@ reading either as settled. Not yet looked into: which node of the normal chain i
 **Left once the person rules:** the cobblestones' normal (above); run
 `TransformDistanceBoundedMemoryTests` in Debug and set its deadline from it; CLAUDE.md's `tests/Patina.Server.Tests`
 line; As built; `verify`, `cairn lint`, `finish`.
+
+### Hand-off (fourth agent, Claude Opus 5.5, `claude-opus-5-5`, at its call checkpoint)
+
+Rebased onto `origin/milestone/M-28` (T-159's file) cleanly. The person's two rulings are in the Notes. `verify` has
+not been run; the unit suites have not been run since the tile-array reuse below.
+
+**The samples, three runs each, interleaved** (`%TEMP%\t155\run-samples3.sh`, log `samples3.log`), medians before / after:
+cobblestones base_colour 122.0 / 103.8 s (-15%), normal 223.7 / 208.5 s (**-7%**, tiles still 133,783 / 148,877),
+roughness 99.9 / 71.6 s (-28%), occlusion 83.6 / 58.7 s (-30%); planks base_colour 16.9 / 16.7 s, normal 3.0 / 3.0 s,
+roughness 5.9 / 6.7 s (+14%), occlusion 0.5 / 0.6 s (+20%), the planks' tiles made the same. Looked into the planks:
+seven more interleaved runs of roughness and occlusion alone (`planks7.log`): roughness median 5.7 / 6.0 s (+5%, each
+side spreading 2.5 s), occlusion 0.7 / 0.7 s. Run-to-run noise (another repo's build was busy on the machine), so every
+median is within 10%. The full three-run tables and the reading are drafted in `%TEMP%\t155\asbuilt.md`.
+
+**The strong minify failed its 2 GB in the real export** (Debug `patina`): 2,208 MB. Two fixes, no byte changed:
+- `ExportTool`: a full collection after an output is evaluated and before it is encoded, so the evaluation's cache
+  (768 MiB for the minify) and the encoder never peak together: 2,146 MB.
+- `TileCache` keeps dropped tiles' arrays (at most `max(4 MiB, Bound / 16)`) and `Take` hands them, cleared, to the
+  next tiles made (`Finish`, through an internal `Tile(kind, rect, data)`): dropped 192 KB tiles were large objects
+  piling up as garbage. Minify 1,522 MB.
+
+**`TransformDistanceBoundedMemoryTests` in Debug, with both fixes** (all four pass, 17 m 13 s; the summaries in
+`%TEMP%\patina-t138-8192-*.txt`): turn 129.1 s, 781 MB; distance 146.9 s, 1,444 MB; blur 640.3 s, 1,226 MB; minify
+113.8 s, 1,522 MB. Before the array reuse: turn 123.7 s, 1,718 MB; distance 156.7 s, 1,099 MB; blur 645.1 s, 1,116 MB.
+The peaks move with the collector's timing.
+
+**Left, in order:**
+1. Set the deadlines from those times: `Deadline` is one 60-minute placeholder; make it per test (blur about 30 min,
+   the others about 10 min, roughly three to four times the times above).
+2. Run `patina-unit` (Patina.Graphs and Patina.Server unit tests): the array reuse touches every tile made.
+3. The array reuse changed the evaluator after the samples were measured: re-run `run-samples3.sh` in the background
+   (about 50 min) and check the medians again before landing; replace the tables in the draft if they move.
+4. Splice the draft As built in place of the four `### Hand-off` sections (fill `{DEBUG}` with the Debug figures and
+   say the export's collection and the array reuse there, with the minify's 2,208 MB before), the evaluator bullet
+   list gaining the array reuse; CLAUDE.md's `Patina.Graphs` line could name it too. CLAUDE.md's
+   `tests/Patina.Server.Tests` line is done.
+5. `cairn task T-155 verify` (patina-regression in the background, about 20 min of it these tests), commit,
+   `cairn lint`, `cairn task T-155 finish`.
