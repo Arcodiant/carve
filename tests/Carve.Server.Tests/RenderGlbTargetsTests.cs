@@ -192,7 +192,7 @@ public class RenderGlbTargetsTests
     /// D-6's frame rule (Orcward's): a pixel differs when its luma differs past 4 of 255; a frame fails past 0.5 % of its
     /// pixels differing or with an 8-connected patch of them past 50.
     /// </summary>
-    private static (int Differing, int Patch) Measure(ImageResult a, ImageResult b)
+    internal static (int Differing, int Patch) Measure(ImageResult a, ImageResult b)
     {
         Assert.Equal((a.Width, a.Height), (b.Width, b.Height));
         var w = a.Width;

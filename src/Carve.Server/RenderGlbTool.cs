@@ -52,6 +52,7 @@ internal static class RenderGlbTool
         + "Carve's preview of it. The scene, light, background and cameras are render's, and the frame is fitted to the file's rest pose as render fits a posed model, "
         + "so a render_glb frame and a render frame of the same model, view, size, clip and time line up. A clip can carry a limb past the rest pose's frame, as in render. "
         + "The model being edited is not changed. "
+        + RenderGlbTexts.Sampling
         + "Given targets (name to weight, 0 to 1), the file's morph targets are drawn at those weights by the engine's MorphWeights, before skinning, as a game does. "
         + "Errors: no file at the path; a target the file lacks (its targets are listed), or targets given for a file with no targets; a weight outside 0 to 1 or not a number, naming the target; a clip given for a file with no skin; a clip the file does not have (the clips it has are listed); a time outside the clip; time without clip. "
         + "The loader's own warnings (something it read differently from the file's intent) are repeated in the result.";
@@ -205,4 +206,12 @@ internal static class RenderGlbTool
         var text = $"{string.Join(", ", parts)}; {glb.Vertices} vertices, {glb.Triangles} triangles, as the engine loaded them";
         return text + glb.WarningsText;
     }
+}
+
+/// <summary>Sentences of render_glb's description that tests pin or take out (as <see cref="RenderPartTexts"/> for render).</summary>
+public static class RenderGlbTexts
+{
+    /// <summary>T-124's sentence on texture sampling (mip maps, as render's); <c>PartToolsListTests</c> takes it out before its digest.</summary>
+    public const string Sampling =
+        "The file's textures are sampled as render samples a material's: with mip maps and Linear filtering, so a fine texture is averaged as it shrinks and the two frames agree. ";
 }
