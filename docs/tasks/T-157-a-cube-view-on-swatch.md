@@ -4,7 +4,7 @@ description: >-
 ---
 # T-157 — A cube view on swatch
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
@@ -55,6 +55,7 @@ Built and verified on Sonnet 5.5 (`claude-sonnet-5-5`), over two sessions.
 - Tests: label, cube geometry, refusals, worked example. Scenario (`SwatchCubeCheck.cs`) predicts each visible face from
   geometry and exported texels at tiling 1, 3 and angle 20, 0.5 % wrong per face; five seeded breaks are all caught.
 - Frames: all 43 PNGs of the baseline job equal by SHA-256.
-- Review: floor-tiles on the sphere and the cube at tiling 3 and 1 (`G:\My Drivertifacts\carve\M-28\T-157ound-1`),
+- Review: floor-tiles on the sphere and the cube at tiling 3 and 1 (`G:\My Drivertifacts\carve\M-28\T-157
+ound-1`),
   approved by the person in round 1.
 - Verify passed after rebasing onto T-138 (patina-unit, scenario-patina).
