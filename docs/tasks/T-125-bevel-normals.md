@@ -84,73 +84,67 @@ Render shows a rounded edge the way the game will, because the map is written in
 
 ### Hand-off
 
-Agent 1, Claude Opus 5.5 (2026-11-19), handing off at the call checkpoint. Commits `efb8e31`, the render test, `90c8498`.
+Agent 2, Claude Opus 5.5 (2026-11-20), handing off at the T-124 gate and on a stop. Agent 1 was Claude Opus 5.5. Rebased onto
+`origin/milestone/M-24` with T-126 in (conflicts in `BakeTool.cs`, `BakesStages.cs` and the Bakes row of `CLAUDE.md` only
+added; both kept, built clean). **T-124 has not landed** (`origin/milestone/M-24` tip `52d3089`), so the final numbers and the
+frame review wait for it, as the brief says. Commits `bd1ec56`, `2b74618`.
 
 **Done**
 
-- `src/Carve.Core/Baking/BevelNormal.cs`: `Bake.BevelNormal(layout, width)` (3 channels, `ToTangentSpace / 255`, uncovered 0)
-  and `Bake.BevelWorldNormal(texel, edges, width)` as Scope says: in double, edges in `NearEdges`' order, smoothstep, a sum
-  that cancels gives N. `NearEdges`, the frame and the layout are unchanged. `BakeLayoutTests.Celled` went from private to
-  internal so the new tests could reuse it.
-- `tests/Carve.Core.Tests/BevelNormalTests.cs` (10, unit): the top edge's mean (0, 0.707, 0.707), N at or beyond the width,
-  a corner summing two edges, the L-block's concave edge, a mirrored island (red flips, green kept, the same world normal),
-  byte-identical bakes, each error.
-- `bake`: map `normal` (`<mesh>.normal.png`, RGB), block `bevel: {width}`, the description paragraph, the schema. `maps`
-  left out still means masks and base_colour (`DefaultMaps`), since `normal` has no default width. **Chosen here, and a
-  stop if it is wrong:** `bevel` without `normal` is refused, the way render refuses `image` with another mode.
-  `tests/Carve.Server.Tests/BakeNormalToolTests.cs` (11, unit).
-- `tests/Carve.Server.Tests/BevelRenderTests.cs` (regression): the reconciliation, with frames and `bevel-readings.tsv` in
-  `artifacts/bevel-tests/`. The other faces get a grey #808080 material with no map, so the top and +X shades are like
-  for like. Without it they render white.
-- `scenarios/Carve.Scenario.Bakes/BevelStage.cs` and its line in `BakesStages.cs`: the bake, the material, 14 frames, the
-  N check, the strip check, the glb comparison and both breaks wired (`bevel-thin`, `bevel-g`). The `CLAUDE.md` row clause.
-  `scenario-bakes` is on the Verify line. `tests.json` is unchanged: the stage is inside the suite's `dotnet-closure`.
+- **The person's rulings (2026-11-20), landed:** `TopGain` 4.7 and `SideLoss` 1.6 in `BevelRenderTests`, "leaning toward
+  +X's" dropped; a `bevel` block without `normal` in maps, and a `curvature` block without `curvature`, bake what was asked and
+  warn (`bevel: ignored, 'normal' is not in maps`), through one helper `UnusedBlock` in `BakeTool.cs` (T-124 may add
+  `occlusion` to it; keep both in the rebase). Two new cases in `BakeNormalToolTests`; the refusal case removed. A malformed
+  unused block is still an error.
+- **Strip sampling fixed.** Counted apart on edge (112, 113): 0 of 48 points failed `Geo.Inside`; all 48 failed line of sight,
+  hidden by the ring head's faces 48, 49 and 64 at t 0.97 to 0.99. The edge is the dark boss's underside (face 78, facing −z
+  at z 0.0135), 0.5 mm over the ring's top: buried from every direction. `JawEdge` now takes the longest convex jaw edge whose
+  sample points are all on their face, facing the eye and in sight from all three close directions: (124, 125), faces 66 and 79.
+  A face shallower than six widths reads its shade at half its depth (face 66 is 5.5 mm deep, so 4.8 mm sat in its far edge's
+  strip). `Samples` is shared by the choice and the reading.
+- **Seam check** as a Core `unit` test, `tests/Carve.Core.Tests/WrenchBevelSeamTests.cs`, as ruled: texels within a quarter
+  width of a hard seam edge and within width of no other break edge, decoded from bake's bytes through their own frame.
+- core-unit (1352) and server-unit (970) pass locally. `verify` not run: scenario-bakes fails on the stop below.
 
-**Probed** (on this machine; evidence in `G:\My Drive\artifacts\carve\M-24\T-125\probe`)
+**Probed** (local runs `artifacts/scenarios/bakes/4` good, `5` bevel-g, `6` bevel-thin; pre-T-124 renders)
 
-Render test, front view, mean Rec. 709 luma:
+Seam test: 212 seam edges read on both sides, largest 8.33° from the mean; at width 0.00001 every side's largest is at least
+32.4° (60.1° at most). `SeamAngle` is 9, provisional.
 
-| map | middle | top strip | +X strip | top face | +X face |
-|---|---|---|---|---|---|
-| flat | 117.54 | 117.52 | 117.49 | 127.76 | 116.53 |
-| baked | 117.54 | 125.74 (+8.20) | 113.22 (−4.33) | 127.76 | 116.53 |
-| G inverted | 117.47 | 107.15 (−10.33) | 113.12 | | |
-| R inverted | 117.67 | 125.75 | 119.61 (+1.94) | | |
+Close jaw frames, edge (124, 125), luma; `pm` the colour rule's mean-normal shade (`ColourRule.Lit`, `#36393E`):
 
-**Surprising: the +X strip overshoots +X's shade.** The mean normal reads darker than either face: 113.2 against 116.5
-and 117.5. T-120's probe already says so, since R+ is that normal and read 114.3. So "leaning toward +X's" fails as
-written. The test currently checks "darker by `SideLoss`" only.
+| view | faces measured | faces predicted | pm | rule | strips good | strips bevel-g | strips bevel-thin | plain |
+|---|---|---|---|---|---|---|---|---|
+| jaw-1 | 58.78, 59.52 | 58.59, 59.52 | 59.66 | outside | 60.40, 60.37 | 58.00, 59.38 | 58.78, 59.52 | 58.77, 59.52 |
+| jaw-2 | 59.39, 59.45 | 58.59, 58.52 | 59.66 | outside | 60.70, 59.66 | 58.32, 60.61 | 59.37, 59.45 | 59.37, 59.45 |
+| jaw-3 | 57.96, 60.45 | 57.59, 59.52 | 59.37 | between | 60.56, 59.66 | 58.23, 59.59 | 57.78, 60.45 | 57.77, 60.45 |
 
-Options for the person (each names the one check it applies to):
+Strip less `pm`: good 0.74, 0.72, 1.04, 0.00, 1.18, 0.28 (largest 1.18); bevel-g −1.66, −0.28, −1.34, 0.95, −1.14, 0.22
+(largest 1.66); bevel-thin largest 1.59.
+
+**Stop: the stage's strip check, as ruled, cannot tell the map from its break.** The jaw is #36393E steel and the faces' shades
+are within 3 luma of each other, so every reading is within 2 luma. (a) The good run fails: on jaw-3, where the rule puts the
+mean between, strip A reads 60.56, 0.11 above face B's 60.45. (b) Any tolerance against `pm` that passes the good run (1.18 or
+more) also passes bevel-g (1.66 at most) unless it is between 1.18 and 1.34, a 0.16 luma window. (c) The bevel-g run passes
+whole; bevel-thin fails only on jaw-3, by 0.18. Options for the person, each for the one check named:
 
 | check | option A | option B | option C |
 |---|---|---|---|
-| render test, top strip (`TopGain`, now 4.7 provisional) | half the probe's edge gain, 4.7 | 4 | another number |
-| render test, +X strip (`SideLoss`, now 1.6 provisional) | darker by ≥ 1.6 and drop "toward +X" (the probe puts the mean below both faces) | within 2 of the probe's R+ reading, 114.3 | another rule |
-| stage, strip between the faces (`BetweenSlack`, now 0) | 0, as written | a slack worked from the close frames once sampled | judge only edges where the colour rule puts the mean between |
-
-Stage, run 1 (`artifacts/scenarios/bakes/1`): N check 448 texels, all flat within 1 level. `render_glb` against `render` with
-the map: front 47 px differ (patch 13), three-quarter 15 px (patch 5). Both pass D-6's rule, against stage 1's 48 (15) and
-10 (3) without the map. So the map introduces no shading difference past the rule. The person should still see the
-three-quarter rise from 10 to 15.
+| seam test, `SeamAngle` | 9° (probe 8.33 rounded up) | 12° | 16° (half the break's least, 32.4) |
+| stage strip, tolerance against `pm` where the rule puts the mean outside | 2 (ColourRule's own, 2026-11-14), and add check D below so the break still fails | 1.25 (between good 1.18 and break 1.34) | another number |
+| stage strip, where the rule puts the mean between | slack 0.25 (good is 0.11 out) | judge it against `pm` like the others | drop the "between" reading on the jaw and rely on D |
+| stage, a new check D for the bevel-g break | with the map less without (the plain frame), per strip, has the sign the rule gives `pm` less the face's predicted shade (good: +1.63/+0.85, +1.33/+0.21, +2.79/−0.79 against predicted +1.07/+0.14, +1.07/+1.14, +1.78/−0.15; bevel-g: −0.77 on jaw-1 A) | move the strip check to a lighter face (the `steel` grip, #80858A) where shades spread wider | the render test's box (already checks the strips and fails on G and R) stands for it, and the stage's strip check records only |
 
 **Left**
 
-1. **The strip check samples nothing.** On jaw edge (112, 113), faces 66 and 78, only face 66's 3 × width point in view 2
-   got a reading (`bevel.tsv`); every other point fails `Geo.Inside` or `Geo.InSight`. Likely causes: the edge is short,
-   so the points at ±0.15 of its length sit near the face corners; or the ray test hits the neighbour face for a point
-   0.4 mm from the edge. Count the two failures apart, then fix the sampling. The frames `bevel-jaw-{1,2,3}[-plain].png`
-   are in `probe\frames` and have not been opened yet.
-2. **The PNG check across a seam (Scope's first check) is not written.** It needs the engine's frame at a texel, scenario
-   side: the angle-weighted smooth corner normals (`Shading`) and `Triangulator`'s triangles for T and B. `get_mesh` gives
-   neither normals nor hard edges; the stage reads the hard edges from `wrench.carve`. One option is to write the stage's
-   own restatement. Another is to put this check in `tests/Carve.Core.Tests` on the wrench (as `WrenchSampleTests` does),
-   with the layout's own frames, and ask the person whether that place will do. Its break is `bevel-thin`. The probed angle
-   then goes to the person.
-3. Run both breaks and record the failures they cause. Bring all the numbers above. Then the Waystone frame review
-   (`round-N` under the evidence folder), verify, As built, `cairn lint`, and `finish`.
+1. The person answers the table above; land it.
+2. After T-124 lands: `git rebase origin/milestone/M-24`, rerun the stage, re-probe `render_glb` against `render` with the map
+   (pre-T-124: front 47 px, patch 13; three-quarter 15 px, patch 5; the person should see the rise from 10 to 15).
+3. `bevel-thin` in the stage now has no check of its own to break (the seam check moved to Core with its break inside the test);
+   either drop it from the stage or keep it as the strip check's second break. Ask with the table if kept.
+4. Frame review round 1 (`G:\My Drivertifacts\carve\M-24\T-125ound-1`): the normal `uvs` frame, the zoom-8 jaw frames with
+   and without the map, the six sides, the render test's frames; put the numbers above in the request, one option set per check.
+5. `verify`, As built, `cairn lint`, `finish`.
 
-**Not checked:** no frame has been opened (0 of 12 images). No queued run has been made. `server-regression` has run
-only the new test, not the whole suite.
-
-Verify at `c72e478` (job `J-20261120-013321-9792c3`): core-unit, server-unit and server-regression (652 s) pass. scenario-bakes fails, and only on the three strip checks of item 1 ("faces or strips are not in sight").
+**Not checked:** no frame opened (0 of 12 images in either agent). No queued run. `server-regression` not rerun after the rebase.
+The new jaw edge's frames are unseen; the stage's frames all changed with the edge.
