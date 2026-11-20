@@ -20,6 +20,8 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
         + "(a default it leaves out is not written). Give that JSON back to define_graph as graph to start again from it. Takes nothing, and changes nothing. "
         + "A graph with exposed parameters (version 2, set with edit_graph's set_parameter) lists them between the two, a line each: its name, kind, value, range (the narrowest of the node parameters it drives) and what it drives; "
         + "and in the file each driven node parameter shows {\"driven_by\": \"<name>\"} where its own value would be, which save leaves out and define_graph reads back. "
+        + "A graph using others as graph nodes (T-140) lists each after those, a line each: the file its path resolved to (against the graph's own file's folder, or the tool folder for a graph never saved, which the head line says), "
+        + "the nested graph's parameters with the values set on the node and their ranges, its inputs (name and kind, and whether it has a default) and its outputs as the node's ports (wall.base_colour). "
         + "For samples/graphs/bricks.texgraph the lines are:\n" + WorkedBricksParameters + "\n"
         + "and its layout node reads \"gap\": { \"driven_by\": \"mortar\" }.\n"
         + "Worked example, after define_graph's worked example, get_graph {} returns:\n"
@@ -51,6 +53,23 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
         return $"parameters ({graph.Parameters.Count.ToString(CultureInfo.InvariantCulture)}):\n" + string.Join("\n", lines) + "\n";
     }
 
+    /// <summary>A line for each graph node (T-140): its resolved file, the nested graph's parameters, inputs and outputs; nothing for a graph without.</summary>
+    public static string UseLines(TextureGraph graph, NodeRegistry registry, bool neverSaved)
+    {
+        var uses = GraphValidator.Uses(graph, registry);
+        if (uses.Count == 0) return "";
+        var against = neverSaved ? $"the tool folder {graph.Folder} (the graph has never been saved)" : $"the graph's own folder {graph.Folder}";
+        var lines = uses.Select(u =>
+        {
+            var head = $"- {u.Node}: {u.File ?? "no file (see the faults)"}";
+            if (!u.Expanded) return head + "; at fault (see the faults)";
+            var parameters = u.Parameters.Count == 0 ? "none" : string.Join("; ", u.Parameters.Values.Select(e => $"{e.Name} {e.KindText}, {e.Value}, {Range(e)}"));
+            var inputs = u.Inputs.Count == 0 ? "none" : string.Join(", ", u.Inputs.Select(i => $"{i.Name} ({Patina.Graphs.Imaging.PortKinds.Name(i.Kind)}{(i.HasDefault ? ", has a default" : ", must be connected")})"));
+            return $"{head}; parameters: {parameters}; inputs: {inputs}; outputs: {string.Join(", ", u.Outputs.Select(o => u.Node + "." + o))}";
+        });
+        return $"graph nodes ({uses.Count.ToString(CultureInfo.InvariantCulture)}), paths resolved against {against}:\n" + string.Join("\n", lines) + "\n";
+    }
+
     private static string Range(ExposedParameter e) => e.Kind switch
     {
         ParamKind.Float or ParamKind.Int => $"from {TexGraphFile.FormatNumber(e.Range.Min)} to {TexGraphFile.FormatNumber(e.Range.Max)}",
@@ -66,7 +85,7 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
         {
             if (store.Graph is not { } graph) return Error("get_graph: " + NoGraph);
             var path = store.Path is { } p ? "path " + p : "no path (save gives it one)";
-            return Line($"get_graph: {Describe(graph)}; {path}; {Faults(GraphValidator.Validate(graph, registry))}\n{ParameterLines(graph, registry)}{TexGraphFile.WriteShowingDriven(graph).TrimEnd('\n')}");
+            return Line($"get_graph: {Describe(graph)}; {path}; {Faults(GraphValidator.Validate(graph, registry))}\n{ParameterLines(graph, registry)}{UseLines(graph, registry, store.Path is null)}{TexGraphFile.WriteShowingDriven(graph).TrimEnd('\n')}");
         }
     }
 }
@@ -82,7 +101,7 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
         "Writes the open graph to a .texgraph file, so the work outlives this session; open reads it back. Takes path: .texgraph is added when the path does not end in it; "
         + "a relative path resolves against patina's working directory, and the result gives the absolute path; missing folders are created; an existing file is replaced, and the result says (replaced). "
         + "The file is the graph as get_graph shows it: versioned JSON, keys in one order, one node a line, so the same graph always gives the same bytes and a diff shows what changed. "
-        + "The path becomes the graph's path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. "
+        + "The path becomes the graph's path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates, but for an input node with no default, which a graph using this one as a node gives. Only the open graph is written, never a file it uses as a graph node. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. "
         + "Also refused: no open graph, an empty path, one naming a folder or holding a character a path may not, and a write that fails (naming the path and the system's message; no partial file is left). "
         + "save changes nothing in the graph or the snapshot stack, which is never saved.\n"
         + "Worked example, after define_graph's and edit_graph's worked examples (put patina's working directory for <folder>):\n"
@@ -102,7 +121,8 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
             if (store.Graph is not { } graph) return Error("save: " + NoGraph);
             var target = Resolve("save", text, folder.Directory, out var pathError);
             if (target is null) return Error(pathError!);
-            var faults = GraphValidator.Validate(graph, registry);
+            // A fault that only stops the graph evaluating on its own (an input with no default, T-140) does not stop the save: a graph using it as a node gives the input.
+            var faults = GraphValidator.Validate(graph, registry).Where(f => !f.OnItsOwn).ToList();
             if (faults.Count > 0)
                 return Error($"save: refused: the graph has {Faults(faults)}\nA saved graph evaluates; fix them with edit_graph, then save again. Nothing was written.");
             if (!Write("save", target, TexGraphFile.Write(graph), out var replaced, out var writeError)) return Error(writeError!);
@@ -124,7 +144,7 @@ public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder
 
     public const string Text =
         "Replaces the open graph with the one in a .texgraph file (save writes them). Takes path: .texgraph is added when the path does not end in it, and a relative path resolves against patina's working directory. "
-        + "The file's path becomes the graph's path, and the snapshot stack is cleared. "
+        + "The file's path becomes the graph's path, and the snapshot stack is cleared. A graph node's path resolves against the file's own folder; the result names each nested file it read. "
         + "A graph whose references are wrong (an input naming no node, an unknown type or parameter, a value out of range, a cycle) still opens, and the result lists its faults one a line, "
         + "each naming its node and port or parameter, so edit_graph can fix them; save refuses it until they are fixed. "
         + "Refused, leaving the open graph as it was: a missing file (the error lists the .texgraph files in its folder, so a misspelt name shows the right one); "
@@ -156,7 +176,7 @@ public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder
             return Error($"open: could not read {target}: {e.Message}");
         }
 
-        var read = TexGraphFile.Read(content, registry);
+        var read = TexGraphFile.Read(content, registry, null, Path.GetDirectoryName(target));
         if (read.Graph is null)
             return Error($"open: {target} is not a graph patina reads: {read.Error}; the open graph is unchanged");
         lock (store.Gate)
@@ -165,7 +185,9 @@ public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder
             var faults = read.Faults.Count == 0
                 ? Faults(read.Faults)
                 : Faults(read.Faults) + "\nIt is open: fix them with edit_graph (save refuses it until then).";
-            return Line($"open: opened {Path.GetFileName(target)} from {target}: {Describe(read.Graph)}; {faults}");
+            var nested = GraphValidator.Uses(store.Graph!, registry).SelectMany(u => u.Files).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var files = nested.Count == 0 ? "" : $"\nread {nested.Count.ToString(CultureInfo.InvariantCulture)} nested file{(nested.Count == 1 ? "" : "s")} for its graph nodes: {string.Join(", ", nested)}";
+            return Line($"open: opened {Path.GetFileName(target)} from {target}: {Describe(read.Graph)}; {faults}{files}");
         }
     }
 

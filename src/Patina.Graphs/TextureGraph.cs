@@ -35,6 +35,12 @@ public sealed record TextureGraph(int Size, uint Seed, ImmutableSortedDictionary
 
     public TextureGraph WithoutParameter(string name) => this with { Parameters = Parameters.Remove(name) };
 
+    /// <summary>
+    /// The folder a <c>graph</c> node's <c>path</c> resolves against (T-140): the graph file's own folder once read from or
+    /// saved to one, the tool folder for a graph never saved, the working directory when null. Never written to the file.
+    /// </summary>
+    public string? Folder { get; init; }
+
     /// <summary>The exposed parameter driving <paramref name="node"/>'s <paramref name="param"/>, or null (the first in name order, should two claim it).</summary>
     public string? DriverOf(string node, string param) =>
         Parameters.FirstOrDefault(p => p.Value.Drives.Contains($"{node}.{param}")).Key;
@@ -66,6 +72,18 @@ public static partial class GraphNames
     public const string Pattern = "[a-z][a-z0-9_]*";
 
     public static bool IsValid(string name) => NameRegex().IsMatch(name);
+
+    /// <summary>An expanded node's id (T-140): names joined by <c>/</c>, <c>wall/layout</c>; a plain id is one too.</summary>
+    public static bool IsValidPath(string id) => id.Split('/').All(IsValid);
+
+    /// <summary>As <see cref="TryParseSource(string, out string, out string?)"/>, the node part an expanded id (<c>wall/layout.out</c>).</summary>
+    public static bool TryParsePathSource(string source, out string node, out string? port)
+    {
+        var dot = source.IndexOf('.');
+        node = dot < 0 ? source : source[..dot];
+        port = dot < 0 ? null : source[(dot + 1)..];
+        return IsValidPath(node) && (port is null || IsValid(port));
+    }
 
     /// <summary>Splits an input's source, <c>"id"</c> or <c>"id.port"</c>; false when it has neither shape.</summary>
     public static bool TryParseSource(string source, out string node, out string? port)

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Patina.Graphs.Imaging;
 using Patina.Graphs.Nodes;
 
@@ -21,19 +22,62 @@ namespace Patina.Graphs;
 /// </summary>
 public static class GraphValidator
 {
+    /// <summary>How deep graphs used as nodes may nest: a graph using one using one ... 8 files down.</summary>
+    public const int MaxDepth = 8;
+
     public static IReadOnlyList<GraphFault> Validate(TextureGraph graph, NodeRegistry? registry = null) =>
         Analyse(graph, registry ?? NodeRegistry.BuiltIn).Faults;
 
-    internal static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry)
+    /// <summary>
+    /// Each <c>graph</c> node (T-140) as validation resolved it, in id order: its file, the nested graph's exposed
+    /// parameters, inputs and outputs, and the nested files read for it, all levels down; get_graph and open show them.
+    /// </summary>
+    public static IReadOnlyList<NestedGraphUse> Uses(TextureGraph graph, NodeRegistry? registry = null) =>
+        [.. Analyse(graph, registry ?? NodeRegistry.BuiltIn).Uses.OrderBy(u => u.Key, StringComparer.Ordinal).Select(u => u.Value.Public)];
+
+    /// <summary>The absolute path a <c>graph</c> node's <paramref name="path"/> names: against <see cref="TextureGraph.Folder"/> (the working directory when null), <c>.texgraph</c> added when missing; null for a path that is not one.</summary>
+    public static string? ResolvePath(TextureGraph graph, string path)
+    {
+        if (path.Length == 0) return null;
+        var text = path.EndsWith(TexGraphFile.Extension, StringComparison.OrdinalIgnoreCase) ? path : path + TexGraphFile.Extension;
+        try
+        {
+            return Path.GetFullPath(Path.Combine(graph.Folder ?? Directory.GetCurrentDirectory(), text));
+        }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
+        }
+    }
+
+    internal static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry) => Analyse(graph, registry, [], 0);
+
+    private static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth)
     {
         var a = new GraphAnalysis();
         var ids = string.Join(", ", graph.Nodes.Keys);
         // The exposed parameters first: what they drive takes their value, and its own value in the node is not checked.
         var exposed = GraphParameters.Analyse(graph, registry);
 
+        // Each graph node expanded inline (T-140): the nodes analysed are the graph's own and, for each graph node, the
+        // nested graph's nodes renamed <node>/<id>. A graph node is never one of them; a source naming it resolves to the
+        // nested output's own source.
+        var nodes = new SortedDictionary<string, GraphNode>(StringComparer.Ordinal);
+        var useFaults = new Dictionary<string, List<GraphFault>>(StringComparer.Ordinal);
+        var wiredHere = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (id, node) in graph.Nodes)
         {
-            if (!GraphNames.IsValid(id))
+            if (registry.Find(node.Type) is not NestedGraphNode) { nodes[id] = node; continue; }
+            var faults = useFaults[id] = [];
+            a.Uses[id] = Expand(id, node, graph, registry, chain, depth, faults, nodes, a, wiredHere);
+        }
+
+        foreach (var id in nodes.Keys.Concat(useFaults.Keys).Order(StringComparer.Ordinal))
+        {
+            if (useFaults.TryGetValue(id, out var fromUse)) { a.Faults.AddRange(fromUse); continue; }
+            var node = nodes[id];
+            var isExpanded = a.Expanded.Contains(id);
+            if (!(isExpanded ? GraphNames.IsValidPath(id) : GraphNames.IsValid(id)))
                 a.Fault(id, null, null, $"node '{id}': an id is {GraphNames.Pattern} (lower case letters, digits and _, starting with a letter)");
             var type = registry.Find(node.Type);
             if (type is null)
@@ -57,7 +101,8 @@ public static class GraphValidator
                 else if (spec.Check(value) is { } wrong)
                     a.Fault(id, null, name, $"node '{id}' parameter '{name}' {wrong}");
             }
-            var resolved = new ResolvedNode(id, type, new NodeParameters(type, values));
+            var resolved = new ResolvedNode(id, type, new NodeParameters(type, values), values);
+            if (type is InputNode && !isExpanded) InputFaults(a, id, node, resolved.Parameters);
             resolved.Connected.UnionWith(node.Inputs.Keys);
             var faultsBefore = a.Faults.Count;
             var sourceOfUnknownType = false;
@@ -68,12 +113,37 @@ public static class GraphValidator
                     a.Fault(id, port, null, $"node '{id}' input '{port}': {type.Name} has no such input; its inputs are {List(type.Inputs.Select(p => p.Name))}");
                     continue;
                 }
-                if (!GraphNames.TryParseSource(source, out var from, out var fromPort))
+                // An expanded node's sources are expanded ids; a source a file gives (this graph's own nodes, and what a
+                // graph node's input was given) is a plain one.
+                var plain = !isExpanded || wiredHere.Contains(id);
+                string from;
+                string? fromPort;
+                if (!(plain ? GraphNames.TryParseSource(source, out from, out fromPort) : GraphNames.TryParsePathSource(source, out from, out fromPort)))
                 {
                     a.Fault(id, port, null, $"node '{id}' input '{port}': '{source}' is not a source; a source is \"<id>\" or \"<id>.<port>\"");
                     continue;
                 }
-                if (!graph.Nodes.TryGetValue(from, out var target))
+                if (plain && a.Uses.TryGetValue(from, out var use))
+                {
+                    if (use.Failed) { sourceOfUnknownType = true; continue; } // its own faults say why
+                    if (fromPort is null)
+                    {
+                        if (use.Outputs.Count == 1) fromPort = use.Outputs.Keys.Single();
+                        else
+                        {
+                            a.Fault(id, port, null, $"node '{id}' input '{port}': names '{from}', a graph node using {use.FileName}, which has several outputs, so name one: {List(use.Order.Select(o => from + "." + o))}");
+                            continue;
+                        }
+                    }
+                    if (!use.Outputs.TryGetValue(fromPort, out var inner))
+                    {
+                        a.Fault(id, port, null, $"node '{id}' input '{port}': names '{source}', but {use.FileName} has no output '{fromPort}'; its outputs are {List(use.Order.Select(o => from + "." + o))}");
+                        continue;
+                    }
+                    resolved.Sources[port] = inner;
+                    continue;
+                }
+                if (!nodes.TryGetValue(from, out var target) || (plain && a.Expanded.Contains(from)))
                 {
                     a.Fault(id, port, null, $"node '{id}' input '{port}': names '{from}', which is not a node; the nodes are {ids}");
                     continue;
@@ -108,9 +178,194 @@ public static class GraphValidator
 
         Cycles(a);
         Kinds(a);
-        Outputs(a, graph);
+        Outputs(a, nodes);
+        InputNames(a);
         a.Faults.AddRange(exposed.Faults);
+        // A fault on what a graph node's input was given is named on the graph node's input (wall's in), not on the
+        // nested input node's port.
+        for (var i = 0; i < a.Faults.Count; i++)
+            if (a.Faults[i] is { Node: { } n, Port: InputNode.ValuePort } f && a.PassThrough.TryGetValue(n, out var at))
+            {
+                var head = $"node '{n}' input '{InputNode.ValuePort}':";
+                var rest = f.Message.StartsWith(head, StringComparison.Ordinal) ? f.Message[head.Length..] : " " + f.Message;
+                a.Faults[i] = f with { Node = at.Node, Port = at.Input, Message = $"node '{at.Node}' input '{at.Input}':{rest} ({at.FileName}'s input '{at.Input}')" };
+            }
         return a;
+    }
+
+    /// <summary>An input node's own faults: no name, a default of the other kind, a file wiring its value port, and no default (which only stops the graph being evaluated on its own).</summary>
+    private static void InputFaults(GraphAnalysis a, string id, GraphNode node, NodeParameters parameters)
+    {
+        if (!node.Params.ContainsKey("name"))
+            a.Fault(id, null, "name", $"node '{id}' parameter 'name': an input needs a name, {GraphNames.Pattern}: the input port a graph node using this graph gives it");
+        if (InputNode.CheckDefault(parameters) is { } wrong)
+            a.Fault(id, null, "default", $"node '{id}' parameter 'default' {wrong}");
+        var port = InputNode.PortName(parameters) ?? id;
+        if (node.Inputs.ContainsKey(InputNode.ValuePort))
+            a.Fault(id, InputNode.ValuePort, null, $"node '{id}' input '{InputNode.ValuePort}': an input node takes nothing in its own file; a graph node using this graph gives it, as its input '{port}'");
+        else if (!node.Params.ContainsKey("default"))
+            a.Faults.Add(new(id, null, "default", $"node '{id}' parameter 'default': input '{port}' has no default, so the graph cannot be evaluated on its own; give it a default, or use the graph as a graph node that connects '{port}'") { OnItsOwn = true });
+    }
+
+    /// <summary>Two input nodes of one name.</summary>
+    private static void InputNames(GraphAnalysis a)
+    {
+        var byName = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var node in a.Nodes.Values.Where(n => n.Type is InputNode && !a.Expanded.Contains(n.Id)).OrderBy(n => n.Id, StringComparer.Ordinal))
+            if (InputNode.PortName(node.Parameters) is { } name && !byName.TryAdd(name, node.Id))
+                a.Fault(node.Id, null, "name", $"node '{node.Id}' parameter 'name': {name} is already the name of input '{byName[name]}'; a graph has one input per name");
+    }
+
+    /// <summary>
+    /// One graph node expanded: its file resolved and read, the values set on it checked against the nested graph's
+    /// parameters and set through <see cref="GraphParameters.WithOverrides"/>, the nested graph analysed with the chain of
+    /// files above it, and its nodes added to <paramref name="nodes"/> as <c>&lt;id&gt;/&lt;nested id&gt;</c> with their
+    /// sources resolved and driven parameters set. Faults go to <paramref name="faults"/>; a use with any is
+    /// <see cref="GraphUse.Failed"/>, and nothing of it is added.
+    /// </summary>
+    private static GraphUse Expand(string id, GraphNode node, TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth,
+        List<GraphFault> faults, SortedDictionary<string, GraphNode> nodes, GraphAnalysis a, HashSet<string> wiredHere)
+    {
+        var use = new GraphUse(id);
+        void Fault(string? port, string? parameter, string message) => faults.Add(new(id, port, parameter, message));
+        if (!GraphNames.IsValid(id))
+            Fault(null, null, $"node '{id}': an id is {GraphNames.Pattern} (lower case letters, digits and _, starting with a letter)");
+        if (!node.Params.TryGetValue("path", out var pathValue))
+        {
+            Fault(null, "path", $"node '{id}' parameter 'path': a graph node needs path, the .texgraph it uses, relative to this graph's file");
+            return use;
+        }
+        var spec = ParamSpec.FilePath("path");
+        var full = spec.Check(pathValue) is null ? ResolvePath(graph, pathValue.Text!) : null;
+        if (full is null)
+        {
+            Fault(null, "path", $"node '{id}' parameter 'path' {spec.Check(pathValue) ?? $"is {pathValue}, which is not a path"}");
+            return use;
+        }
+        use.File = full;
+        var fileName = use.FileName;
+        var at = chain.ToList().FindIndex(f => string.Equals(f, full, StringComparison.OrdinalIgnoreCase));
+        if (at >= 0)
+        {
+            Fault(null, "path", $"node '{id}' parameter 'path': uses {fileName}, a cycle through files: {string.Join(" -> ", chain.Skip(at).Append(full).Select(Path.GetFileName))} (each file uses the next as a node)");
+            return use;
+        }
+        if (depth >= MaxDepth)
+        {
+            Fault(null, "path", $"node '{id}' parameter 'path': uses {fileName}, nesting deeper than {MaxDepth} files ({string.Join(" -> ", chain.Append(full).Select(Path.GetFileName))})");
+            return use;
+        }
+        if (!File.Exists(full))
+        {
+            Fault(null, "path", $"node '{id}' parameter 'path': {Missing(full)}");
+            return use;
+        }
+        string text;
+        try
+        {
+            text = File.ReadAllText(full);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Fault(null, "path", $"node '{id}' parameter 'path': could not read {full}: {e.Message}");
+            return use;
+        }
+        a.Files.Add(full);
+        use.Files.Add(full);
+        var read = TexGraphFile.Parse(text, null, Path.GetDirectoryName(full));
+        if (read.Graph is not { } nested)
+        {
+            Fault(null, "path", $"node '{id}' parameter 'path': {full} is not a graph patina reads: {read.Error}");
+            return use;
+        }
+
+        // The values set on the node: the nested graph's exposed parameters by name, each checked alone so every one at fault is named.
+        var overrides = node.Params.Where(p => p.Key != "path").ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
+        foreach (var (name, value) in overrides.OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
+            var where = $"nodes['{id}'].params['{name}']";
+            if (!nested.Parameters.ContainsKey(name))
+            {
+                Fault(null, name, $"{where}: {fileName} has no such parameter; its parameters are {(nested.Parameters.Count == 0 ? "none" : string.Join(", ", nested.Parameters.Keys))}");
+                continue;
+            }
+            var one = GraphParameters.WithOverrides(nested, new Dictionary<string, ParamValue> { [name] = value }, registry);
+            if (one.Error is { } error)
+            {
+                var head = GraphParameters.Where(name) + ": ";
+                Fault(null, name, $"{where}: {(error.StartsWith(head, StringComparison.Ordinal) ? error[head.Length..] : error)} ({fileName}, parameter '{name}')");
+            }
+        }
+        if (faults.Count > 0) return use;
+        var set = GraphParameters.WithOverrides(nested, overrides, registry).Graph!;
+
+        var inner = Analyse(set, registry, [.. chain, full], depth + 1);
+        use.Files.AddRange(inner.Files);
+        a.Files.AddRange(inner.Files);
+        use.Parameters = GraphParameters.Of(set, registry);
+        foreach (var f in inner.Faults.Where(f => !f.OnItsOwn))
+        {
+            var path = f.Node is null ? id : $"{id}/{f.Node}";
+            var message = f.Node is not null && f.Message.StartsWith($"node '{f.Node}'", StringComparison.Ordinal)
+                ? $"node '{path}'" + f.Message[$"node '{f.Node}'".Length..]
+                : $"node '{id}' ({fileName}): {f.Message}";
+            faults.Add(f with { Node = path, Message = f.File is null ? $"{message} (in {fileName})" : message, File = f.File ?? full });
+        }
+
+        // The nested graph's ports: its own input nodes (not those of graphs it uses) and its outputs.
+        var inputs = inner.Nodes.Values.Where(n => n.Type is InputNode && !inner.Expanded.Contains(n.Id) && InputNode.PortName(n.Parameters) is not null)
+            .GroupBy(n => InputNode.PortName(n.Parameters)!, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        use.Inputs = [.. inputs.OrderBy(i => i.Key, StringComparer.Ordinal).Select(i => new NestedGraphInput(i.Key, InputNode.KindOf(i.Value.Parameters), i.Value.Parameters.Has("default")))];
+        use.Order = [.. OutputRoles.Order(inner.Outputs.Keys)];
+        if (faults.Count > 0) return use;
+        foreach (var (port, _) in node.Inputs.Where(p => !inputs.ContainsKey(p.Key)))
+            Fault(port, null, $"node '{id}' input '{port}': {fileName} has no such input; its inputs are {List(use.Inputs.Select(i => $"{i.Name} ({PortKinds.Name(i.Kind)})"))}");
+        foreach (var input in use.Inputs.Where(i => !i.HasDefault && !node.Inputs.ContainsKey(i.Name)))
+            Fault(input.Name, null, $"node '{id}' input '{input.Name}': {fileName}'s input '{input.Name}' has no default, so a graph node using it must connect it, and it is not");
+        if (faults.Count > 0) return use;
+
+        foreach (var (nestedId, flat) in inner.Flat())
+        {
+            var newId = $"{id}/{nestedId}";
+            var flatInputs = flat.Inputs.Select(p => KeyValuePair.Create(p.Key, $"{id}/{p.Value}")).ToList();
+            if (inner.Nodes[nestedId].Type is InputNode && !inner.Expanded.Contains(nestedId)
+                && InputNode.PortName(inner.Nodes[nestedId].Parameters) is { } name && node.Inputs.TryGetValue(name, out var given))
+            {
+                flatInputs.Add(KeyValuePair.Create(InputNode.ValuePort, given));
+                wiredHere.Add(newId);
+                a.PassThrough[newId] = (id, name, fileName);
+            }
+            nodes[newId] = flat with { Inputs = ImmutableSortedDictionary.CreateRange(StringComparer.Ordinal, flatInputs) };
+            a.Expanded.Add(newId);
+        }
+        foreach (var output in use.Order)
+        {
+            var (from, port) = inner.Nodes[inner.Outputs[output]].Sources["in"];
+            use.Outputs[output] = ($"{id}/{from}", port);
+        }
+        use.Failed = false;
+        return use;
+    }
+
+    /// <summary>A missing nested file, as open's missing file (and carve's missing texture, T-81) gives it: the path and the .texgraph files in its folder.</summary>
+    private static string Missing(string full)
+    {
+        const int limit = 20;
+        var where = Path.GetDirectoryName(full)!;
+        var head = $"no file at {full}; ";
+        if (!Directory.Exists(where)) return head + $"the folder {where} does not exist";
+        List<string> names;
+        try
+        {
+            names = [.. Directory.GetFiles(where, "*" + TexGraphFile.Extension).Select(f => Path.GetFileName(f)!).Order(StringComparer.Ordinal)];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return head + $"the folder {where} could not be listed: {e.Message}";
+        }
+        if (names.Count == 0) return head + $"there are no .texgraph files in {where}";
+        var shown = string.Join(", ", names.Take(limit)) + (names.Count > limit ? $" and {names.Count - limit} more" : "");
+        return head + $"the .texgraph files in {where} ({names.Count}) are: {shown}";
     }
 
     private static void Cycles(GraphAnalysis a)
@@ -241,7 +496,7 @@ public static class GraphValidator
         return ways;
     }
 
-    private static void Outputs(GraphAnalysis a, TextureGraph graph)
+    private static void Outputs(GraphAnalysis a, IReadOnlyDictionary<string, GraphNode> nodes)
     {
         // Each output's role's name or its own name, to the output's id.
         var byName = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -249,7 +504,7 @@ public static class GraphValidator
         {
             // A role or name already at fault is not counted against another output's: no cascade.
             if (a.Faults.Any(f => f.Node == node.Id && f.Parameter is "role" or "name")) continue;
-            var given = graph.Nodes[node.Id].Params;
+            var given = nodes[node.Id].Params;
             if (given.ContainsKey("role") && given.ContainsKey("name"))
             {
                 a.Fault(node.Id, null, "name", $"node '{node.Id}' parameter 'name': an output has a role or a name, not both; drop role to name an extra image, or name to give a role");
@@ -294,10 +549,52 @@ internal sealed class GraphAnalysis
     public Dictionary<string, string> Outputs { get; set; } = new(StringComparer.Ordinal);
 
     public void Fault(string? node, string? port, string? parameter, string message) => Faults.Add(new(node, port, parameter, message));
+
+    /// <summary>Each graph node by id (T-140), resolved or failed.</summary>
+    public Dictionary<string, GraphUse> Uses { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>The ids expansion made, <c>&lt;node&gt;/&lt;id&gt;</c>.</summary>
+    public HashSet<string> Expanded { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Each nested input node a graph node's input was wired to: the graph node, the input's name, the nested file's name.</summary>
+    public Dictionary<string, (string Node, string Input, string FileName)> PassThrough { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Every nested file read, all levels down, in the order read.</summary>
+    public List<string> Files { get; } = [];
+
+    /// <summary>
+    /// The graph as plain nodes for a graph using it to take in (T-140): every node but the outputs, its sources resolved
+    /// (<c>"id.port"</c>, graph nodes already expanded) and its driven parameters set to their values. Only for a graph with no faults.
+    /// </summary>
+    public IEnumerable<(string Id, GraphNode Node)> Flat() =>
+        Nodes.Values.Where(n => n.Type is not OutputNode).OrderBy(n => n.Id, StringComparer.Ordinal).Select(n => (n.Id, GraphNode.Of(n.Type.Name,
+            n.Sources.Select(s => KeyValuePair.Create(s.Key, $"{s.Value.Node}.{s.Value.Port}")),
+            n.Values)));
 }
 
-internal sealed class ResolvedNode(string id, NodeType type, NodeParameters parameters)
+/// <summary>A graph node as validation resolved it (T-140).</summary>
+internal sealed class GraphUse(string id)
 {
+    public string Id { get; } = id;
+    public string? File { get; set; }
+    public string FileName => File is null ? "the file" : Path.GetFileName(File);
+    public bool Failed { get; set; } = true;
+    public IReadOnlyDictionary<string, ExposedParameter> Parameters { get; set; } = new Dictionary<string, ExposedParameter>();
+    public IReadOnlyList<NestedGraphInput> Inputs { get; set; } = [];
+    /// <summary>The nested graph's outputs, in sheet order.</summary>
+    public IReadOnlyList<string> Order { get; set; } = [];
+    /// <summary>Each output to the expanded node and port it comes from; empty for a failed use.</summary>
+    public Dictionary<string, (string Node, string Port)> Outputs { get; } = new(StringComparer.Ordinal);
+    public List<string> Files { get; } = [];
+
+    public NestedGraphUse Public => new(Id, File, !Failed, Parameters, Inputs, Order, Files);
+}
+
+internal sealed class ResolvedNode(string id, NodeType type, NodeParameters parameters, IReadOnlyDictionary<string, ParamValue> values)
+{
+    /// <summary>The parameter values the node is evaluated with, driven ones set.</summary>
+    public IReadOnlyDictionary<string, ParamValue> Values { get; } = values;
+
     public string Id { get; } = id;
     public NodeType Type { get; } = type;
     public NodeParameters Parameters { get; } = parameters;
@@ -310,3 +607,14 @@ internal sealed class ResolvedNode(string id, NodeType type, NodeParameters para
     /// <summary>An input of this node is at fault (a bad port, source or a required one missing) or names a node of unknown type, so the node is not put in the evaluation order.</summary>
     public bool InputsAtFault { get; set; }
 }
+
+/// <summary>A nested graph's input port (T-140): its name, kind, and whether it has a default (one without must be connected).</summary>
+public sealed record NestedGraphInput(string Name, PortKind Kind, bool HasDefault);
+
+/// <summary>
+/// A <c>graph</c> node as validation resolved it (T-140), for get_graph: the file it names (null when its path is not one),
+/// whether it expanded (false: its faults say why), the nested graph's exposed parameters with the values set on the node,
+/// its inputs and its outputs (sheet order), and every nested file read for it, all levels down.
+/// </summary>
+public sealed record NestedGraphUse(string Node, string? File, bool Expanded, IReadOnlyDictionary<string, ExposedParameter> Parameters,
+    IReadOnlyList<NestedGraphInput> Inputs, IReadOnlyList<string> Outputs, IReadOnlyList<string> Files);
