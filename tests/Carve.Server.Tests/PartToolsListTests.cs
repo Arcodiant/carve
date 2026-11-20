@@ -15,6 +15,7 @@ namespace Carve.Server.Tests;
 /// (the milestone tip), the digest was the one before (EBD17198...), and export's description was the only field of tools/list that changed.
 /// Taken again for RV-71 (Opus 5.5), whose project_uvs text says planar sees the mesh's own axes and whose export text says a piece of an
 /// instance or an empty is refused as save's is: with those two changes stripped the digest was the one before (DCE3D7BA...).
+/// T-124 (Opus 5.5) adds render_glb's sentence on texture sampling (mip maps, as render's); it is taken out with T-94's additions.
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
@@ -22,13 +23,14 @@ public class PartToolsListTests
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
     private const string Before = "1697322BAD754E9F549E58F829ACB3038B71EA812D27C0FEA8C1782F06D46820";
 
-    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level"];
+    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake"];
 
     /// <summary>The sentences T-93 adds to existing descriptions, each removed before the digest.</summary>
     private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check,
         carve::Carve.Server.PartTexts.PartTarget];
 
-    private static readonly string[] T94Added = [carve::Carve.Server.RenderPartTexts.Parts, carve::Carve.Server.GetMeshTool.PlacementText];
+    private static readonly string[] T94Added = [carve::Carve.Server.RenderPartTexts.Parts, carve::Carve.Server.GetMeshTool.PlacementText, carve::Carve.Server.RenderPartTexts.Image,
+        carve::Carve.Server.RenderGlbTexts.Sampling];
 
     private static readonly (string Now, string Was)[] T94Reworded =
     [
@@ -54,7 +56,7 @@ public class PartToolsListTests
             if (node["inputSchema"]?["properties"] is JsonObject properties)
             {
                 var name = tool.GetProperty("name").GetString();
-                foreach (var added in name == "render" ? ["part", "level"] : name == "get_mesh" ? new[] { "level" } : []) properties.Remove(added);
+                foreach (var added in name == "render" ? ["part", "level", "image"] : name == "get_mesh" ? new[] { "level" } : []) properties.Remove(added);
                 if (name == "render" && properties["target"] is JsonObject targetArgument)
                     targetArgument["description"] = T94Reworded.Aggregate(targetArgument["description"]!.GetValue<string>(), (t, r) => t.Replace(r.Now, r.Was, StringComparison.Ordinal));
             }

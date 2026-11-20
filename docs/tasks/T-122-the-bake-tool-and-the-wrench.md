@@ -4,7 +4,7 @@ description: >-
 ---
 # T-122 — The bake tool and the wrench
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -110,3 +110,22 @@ maps are `masks` and `base_colour`. The fps-arms wrench joins the samples as the
   register the tool where the tools are registered then.
 - **Verify line:** `server-unit` covers `ToolHarness`. Name `server-regression` only if this task touches rendering or
   the stdio transport (CLAUDE.md).
+
+### As built
+
+Built by Claude Sonnet 5.5 (2026-11-19).
+
+- `src/Carve.Server/BakeTool.cs`: `bake`, registered last in `CarveServer.AddTools` (`Program.cs` is untouched). Arguments, file names and result are as agreed. Core is unchanged: no file was added under `src/Carve.Core/Baking/`. A mask's `map` is `masks` and its `name` the group or material; its file is `<mesh>.mask.<group>.png` or `<mesh>.material.<name>.png`. `base_colour` is `<mesh>.base_colour.png`. `maps` left out is both; `folder` left out is `textures`.
+- `samples/wrench.carve`: the bytes of `git show 1535e3e:carve/wrench.carve` in fps-arms. The working file there is the same text with CRLF line endings (a checkout with autocrlf; it differs only by `\r`), so the committed LF bytes are used. Nothing was written in fps-arms. The `CLAUDE.md` `samples/` row names it.
+- Tests: `tests/Carve.Core.Tests/WrenchSampleTests.cs` (3: opens clean with no warning, UVs check clean, groups and counts; lays out at 1024 with no overlap; masks at 256 sum to the layout's coverage and each group is within one texel of its UV edge length of its UV area) and `tests/Carve.Server.Tests/BakeToolTests.cs` (25 cases: the two-group box at 64 with every texel and the padding ring, the colour order, the later entry, separate mask files for a group and a material of one name, two bakes byte-identical and no new model version, `define_material` taking the PNG and `get_mesh` reading it, skipped faces, each error, and the description's example run on the wrench). `PartToolsListTests.NewTools` gained `bake`, which the old-tools digest skips.
+
+Readings landed:
+
+- **`coverage` is the whole layout's**, the same number in every file of one bake: the fraction of texels the faces cover, before padding. For a mask, `min`, `max` and `mean` are over all covered texels, so `mean` is the share of covered texels in the group or material. T-120's layout counts a clamp ring (texels whose centres lie within sqrt(0.5) of a face) as covered, so a 16 x 32 island covers 18 x 34.
+- **A surface entry with no `base_colour` gives no colour**: the face falls to an earlier entry, its own colour, its material, then white. `roughness` and `metallic` are validated only.
+- **A name that is both a group and a material** takes the entry for both sets. An unknown name lists the mesh's groups, the mesh's materials and the model's defined materials.
+- **Names**: a mesh, group or material holding a character a file name cannot hold is refused, naming it, but a group or material only when `masks` is asked for. Two files that differ only by case are refused.
+- `bake` always overwrites; `replaced` says so for each file. Uncovered texels beyond the padding are black (0 or RGB 0,0,0).
+- `set_material` takes `faces` or `group`, not neither, so the description's example uses `group: 'all'`.
+
+Not checked: timing of a 4096 bake, a real stdio run or a frame (no render code touched, so `server-regression` is not named).

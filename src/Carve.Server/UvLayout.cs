@@ -54,7 +54,18 @@ public sealed record UvScene(
     Rgba8[] Colours,
     MeshData<PositionVertex> Edges,
     MeshData<PositionVertex>? Seams,
-    UvWindow Window);
+    UvWindow Window)
+{
+    /// <summary>
+    /// With an image (T-121), the fill's index ranges, in this order, each present only when not empty: the ground (the checker),
+    /// the image at half brightness over the unit square, the faces (the image), the highlighted faces (the checker's white cell,
+    /// orange). Null with no image, when the fill is one range and one material.
+    /// </summary>
+    public IReadOnlyList<(UvGroup Group, Submesh Range)>? Groups { get; init; }
+}
+
+/// <summary>The parts of the <c>uvs</c> look's fill that an image gives their own material (T-121).</summary>
+public enum UvGroup { Ground, ImageDimmed, Faces, Highlighted }
 
 /// <summary>
 /// Pure CPU: the <c>uvs</c> look of one mesh (T-58), its faces <paramref name="faces"/> of the drawn mesh. The checker is
@@ -89,7 +100,10 @@ public static class UvLayout
 
     public static UvWindow Window(PolygonMesh mesh, ElementWindow faces) => UvWindow.Of(mesh, Mapped(mesh, faces));
 
-    public static UvScene Compose(PolygonMesh mesh, ElementWindow faces, Highlight highlight)
+    /// <summary>The image's dimmed copy sits just above the ground and below the faces.</summary>
+    public const float UnderZ = 0.005f;
+
+    public static UvScene Compose(PolygonMesh mesh, ElementWindow faces, Highlight highlight, bool imaged = false)
     {
         var mapped = Mapped(mesh, faces);
         var window = UvWindow.Of(mesh, mapped);
@@ -102,25 +116,52 @@ public static class UvLayout
         Add(window, vertices, colours, ground[0], ground[1], ground[2], GroundVertex, GroundZ, null);
         Add(window, vertices, colours, ground[0], ground[2], ground[3], GroundVertex, GroundZ, null);
 
-        foreach (var face in mapped)
+        var groups = imaged ? new List<(UvGroup, Submesh)>() : null;
+        void Close(UvGroup group, int from)
         {
-            var corners = mesh.Uvs!.Of(face)!;
-            var loop = mesh.Faces[face];
-            // A highlighted face is solid orange: every corner samples the white cell.
-            var picked = highlight.Faces.Contains(face);
-            foreach (var t in Triangulator.TriangulateFace(mesh, face))
+            // Vertices are added three to a triangle in order, so a group's indices are its vertices'.
+            if (groups is not null && vertices.Count > from) groups.Add((group, new Submesh(from, vertices.Count - from)));
+        }
+
+        if (imaged)
+        {
+            // The image's copy at half brightness over the unit square, uv (0, 0) to (1, 1): the padding's ground.
+            Close(UvGroup.Ground, 0);
+            var from = vertices.Count;
+            Vector2[] unit = [new(0, 0), new(1, 0), new(1, 1), new(0, 1)];
+            Add(window, vertices, colours, unit[0], unit[1], unit[2], Rgba8.White, UnderZ, null);
+            Add(window, vertices, colours, unit[0], unit[2], unit[3], Rgba8.White, UnderZ, null);
+            Close(UvGroup.ImageDimmed, from);
+        }
+
+        // With an image the highlighted faces are drawn last, in a group of their own, as the checker's white cell.
+        foreach (var pickedPass in imaged ? new[] { false, true } : new[] { false })
+        {
+            var from = vertices.Count;
+            foreach (var face in mapped)
             {
-                Add(window, vertices, colours, corners[loop.CornerOf(t.A)], corners[loop.CornerOf(t.B)], corners[loop.CornerOf(t.C)],
-                    picked ? OrangeVertex : Rgba8.White, FaceZ, picked ? CheckerTexture.WhiteCentre : null);
+                var corners = mesh.Uvs!.Of(face)!;
+                var loop = mesh.Faces[face];
+                // A highlighted face is solid orange: every corner samples the white cell.
+                var picked = highlight.Faces.Contains(face);
+                if (imaged && picked != pickedPass) continue;
+                foreach (var t in Triangulator.TriangulateFace(mesh, face))
+                {
+                    Add(window, vertices, colours, corners[loop.CornerOf(t.A)], corners[loop.CornerOf(t.B)], corners[loop.CornerOf(t.C)],
+                        picked ? OrangeVertex : Rgba8.White, FaceZ, picked ? CheckerTexture.WhiteCentre : null);
+                }
             }
+
+            Close(pickedPass ? UvGroup.Highlighted : UvGroup.Faces, from);
         }
 
         var indices = Enumerable.Range(0, vertices.Count).Select(i => (uint)i).ToArray();
         var fill = new MeshData<PositionUvNormalVertex>(vertices.ToArray(), indices);
+        if (groups is not null) fill = new MeshData<PositionUvNormalVertex>(fill.Vertices!, indices, groups.Select(g => g.Item2).ToArray());
         var (edges, seams) = Lines(mesh, mapped);
         var white = edges.Select(e => (e.A, e.B)).Concat(Border).SelectMany(e => new[] { window.World(e.A, EdgeZ), window.World(e.B, EdgeZ) });
         var yellow = seams.SelectMany(e => new[] { window.World(e.A, SeamZ), window.World(e.B, SeamZ) });
-        return new UvScene(fill, colours.ToArray(), LineList(white)!.Value, LineList(yellow), window);
+        return new UvScene(fill, colours.ToArray(), LineList(white)!.Value, LineList(yellow), window) { Groups = groups };
     }
 
     /// <summary>The unit square's four sides.</summary>

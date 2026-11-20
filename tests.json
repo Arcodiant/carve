@@ -640,6 +640,34 @@
         "vulkan"
       ],
       "est-seconds": 30
+    },
+    {
+      "id": "scenario-bakes",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 bakes -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Bakes/Carve.Scenario.Bakes.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "scenarios/Carve.Scenario.Uvs/UvsScene.cs",
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "tools/Carve.SampleTextures/Png.cs",
+        "scenarios/Carve.Scenario.Orcward/ComparisonPng.cs",
+        "samples/wrench.carve",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 90
     }
   ],
   "todo": []

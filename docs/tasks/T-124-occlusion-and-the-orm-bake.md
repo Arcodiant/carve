@@ -4,7 +4,7 @@ description: >-
 ---
 # T-124 — Occlusion and the ORM bake
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-123
 
-**Verify:** core-unit, server-unit
+**Verify:** core-unit, server-unit, server-regression, scenario-bakes, scenario-orcward, scenario-morph
 
 ## Goal
 
@@ -90,3 +90,65 @@ occlusion, roughness and metallic from bakes alone.
 - The person looks at the occlusion frames before this lands (a Waystone review). Treat "Commented" as unanswered.
 - **Verify line:** once scenario-bakes (T-123) is in `tests.json`, add it to this file's `**Verify:**` line, with the
   task's other suites.
+
+### As built
+
+Agent 1 Claude Opus 5.5 (BVH, occlusion, ORM, `bake`, stage, probe); research agent Claude Opus 5.5 (render against
+`render_glb`); agent 3 Claude Opus 5.5 (the fix, rulings, unused-block warning, before hashes); agent 4 Claude Opus 5.5
+(the corrected crevice check, after hashes, runs, review, landing). 2026-11-19.
+
+- **Core.** `RayCaster.cs`: a median-split BVH over the occluders' triangles at rest, closest hit within a distance, both
+  sides block. `BakeOcclusion.cs`: a Fibonacci-spiral cosine-weighted set, turned per texel by T-77's hash of
+  `y × size + x`; falloff `1 − (t / reach)²`; value 1 − mean; no curve; padded by `Pad`. The self-hit offset is
+  1e-5 × max(box diagonal, largest absolute coordinate) over the occluders and the baked mesh (about 2.5 µm on the
+  wrench; 0 self-hits at 256 × 8 rays). `Bake.Orm`: R occlusion, G roughness and B metallic by T-122's resolution, linear.
+- **`bake`.** Maps `occlusion` and `orm`; block `occlusion: {rays, reach, occluders}` (rays 1 to 1024, default 32; reach
+  required; occluders default every mesh); `ms` per file; the description paragraph and the example with `orm` in both
+  slots. An unused `occlusion` block warns through the shared `UnusedBlock` helper (T-125 adds `bevel` and `curvature`
+  to it). Default maps stay `masks` and `base_colour`, since `reach` has no default.
+- **The person's rulings (2026-11-20).**
+  - Crevice, **as corrected by the person**: every crevice texel reads at least 50 below every open texel, the open
+    texels' least minus the crevice texels' most (`CreviceMargin = 50`; measured 255 − 183 = 72). This replaced the
+    mean-to-mean comparison first coded. Break: reach 0.0001.
+  - Open texels far from other geometry read at least 250 (`OpenLeast`; measured 255).
+  - The wrench is a ratchet with no jaw opening: the drive crevice (socket top within 1.5 mm of the square drive's
+    footprint) stands in for the jaw's inside corner, and `wrench-orm-drive-close` for the inside-the-opening frame.
+  - `render_glb` loads with `GenerateMipmaps = true`, landed here; the untextured `render_glb` frames had to stay
+    byte-identical.
+  - An unused `occlusion` block warns.
+  - ORM G and B exact, as built.
+- **The fix.** `RenderSystem.cs` loaded the `.glb` with default `ModelLoadOptions`, so `render_glb` point-sampled its
+  textures with no mips while `render` used mips and Linear (T-78 ruling 1); the occlusion's per-texel noise exposed it.
+  It now loads with `GenerateMipmaps = true`, citing engine need 8. `render_glb`'s description says so
+  (`RenderGlbTexts.Sampling`, taken out of `PartToolsListTests`' digest as T-94's sentences are). `RenderGlbSamplingTests`
+  (regression) draws a 1024 texel-noise face with both tools under D-6's rule: without the flag 184846 px differ (limit
+  1310.72); with it the two frames are byte-identical.
+- **Before and after hashes** (`G:\My Drive\artifacts\carve\M-24\T-124\mipmap-fix`, `before.sha256`, `after.sha256`,
+  `compare.py`): scenario-orcward, scenario-morph and server-regression run `--fresh` without and with the fix (all
+  PASS). Of 287 PNGs, 286 byte-identical; the one change is `render-glb-sampling-tests/noise-render-glb.png`, which now
+  equals `noise-render.png`. No untextured `render_glb` frame changed.
+- **Comparison numbers** (scenario-bakes run 5, after the fix), differing px / largest patch:
+
+  | comparison | before the fix | after |
+  |---|---|---|
+  | `wrench-front` (T-123 stage 1) | 48 / 15 | 0 / 0 |
+  | `wrench-three-quarter` (T-123 stage 1) | 10 / 3 | 1 / 1 |
+  | `wrench-orm-front` | 315 / 39 | 0 / 0 |
+  | `wrench-orm-three-quarter` | 215 / 54 (failed) | 1 / 1 |
+  | control `three-quarter-glb-against-front` | 90204 (fails) | 90202 (fails) |
+  | control `orm-three-quarter-glb-against-front` | 78162 (fails) | 78198 / 76667 (fails) |
+
+- **Probe** (8-bit occlusion, unchanged by the fix): crevice n 818, 103 / 133.7 / 183; open (grip facet 5's middle) n
+  123, all 255; margin 72.
+- **Breaks:** `reach` fails "the crevice's most (255) is only 0 below the grip's middle's least (255), under 50";
+  `metal` fails "271418 of 497040 covered texels differ from the surface's roughness and metallic".
+- **Timing**, wrench at 1024 × 32 rays, Debug, this machine: occlusion 8788 ms (8268 in the probe), orm 605 ms. Under
+  10 s, with little room. A Release timing was not taken.
+- **The description's example bakes at 512**, not 1024: with `orm` it cast 32 rays per texel at 1024 and took 13 s
+  alone in `BakeToolTests`, and under `finish`'s load (server-regression on the same machine) it ran past the harness's
+  30 s answer window (server-unit failed once on a TaskCanceledException). At 512 it takes 3 s. No check changed; the
+  test's size assertion follows the example.
+- **Review:** Waystone round 1 (17 items: the occlusion `uvs` frame, the `wrench-orm-*` frames, the two compare
+  triptychs and the sampling test's two frames, `G:\My Drive\artifacts\carve\M-24\T-124\round-1`): **approved**, no notes.
+- **Not checked:** part transforms; occluders use each mesh's stored positions, so a multi-part model's part offsets are
+  not applied. T-125's normal-map comparison moves with the fix; it was not run here.

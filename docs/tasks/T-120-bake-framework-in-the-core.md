@@ -4,7 +4,7 @@ description: >-
 ---
 # T-120 — Bake framework in the Core
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -121,3 +121,64 @@ material, proves the kernel end to end.
 - T-71 (off-milestone, in progress) moves groups, colours and hard edges onto attribute layers, with their public
   behaviour unchanged. Read groups, materials and hard edges through `FaceStyle` and `MeshShade` as they stand, and
   rebase onto T-71 if it lands first.
+
+### As built
+
+Built by Claude Opus 5.5 (2026-11-19). `src/Carve.Core/Baking/`, namespace `Carve.Core.Baking`:
+
+- `BakeImage(width, height, channels)`: `float` values row-major, top row first (`Values`, `this[x, y, c]`, `Texel`,
+  `CentreUv`, `Clone`).
+- `BakeLayout.Create(mesh, size[, faces])` gives a `BakeLayoutResult` (`Layout`, `Error`, `Unmapped`). The layout has
+  `Mesh`, `Size`, `Triangles` (`Triangulator.Triangulate`'s list), `Faces`, `Unmapped`, `CoveredCount`,
+  `ClampedCount`, `CoverageAt`, `IsCovered`, `FaceAt`, `TryGetTexel`, `Texels()` (row-major), `NewImage` and
+  `NearEdges(texel, width)`. Its constants are `MinSize`, `MaxSize`, `ClampReach` (√0.5 texels) and `NamedOverlaps`
+  (8), and its messages `SizeProblem`, `OverlapMessage` and `NoUvsMessage`. A `BakeTexel` holds the face, the triangle
+  index, the barycentric weights for corners A, B and C, the `BakeCoverage` (`Centre` or `Clamp`), the uv, the rest
+  position, the unit shading normal (from `Shading.Corners`, never `PosedCorners`), the face normal and a
+  `TangentFrame`. The layout stores only the triangle, the weights and the clamp flag for each covered texel. The rest
+  is interpolated from the triangle each time a texel is read, the same way every time, so a 4096 layout stays small.
+- `TangentFrame(T, B, N)`: `Of(...)`, `Cotangent(...)` (the formula as written), `ToTangentSpace(world)` and
+  `FromTangentSpace(encoded)`, both in glTF's 0 to 255 encoding `127.5 + 127.5 * n`. Decoding is
+  `normalize(T x + B y + N z)` and encoding inverts it exactly (Cramer's rule in double), so T and B can be non-unit.
+- `Bake.Pad(image, layout, texels)` returns a padded copy. `Bake.Masks(layout, mesh)` returns `BakeMask(Source, Name,
+  Image)` in order: groups, then materials. `Bake` is a `static partial class`, so each later map adds one file.
+- `EdgeShape` (`Flat`, `Convex`, `Concave`) and `NearEdge(Lo, Hi, OtherFace, Distance, Closest, OtherNormal, Bend,
+  Shape)`. `Bend` is in radians. `BakeLayout.AreCoplanar(mesh, f, g)` is public.
+
+Readings landed:
+
+- **Green is the formula's second vector negated.** On `FrontUvs`, the cotangent formula as written gives B' along
+  world −y (along +v, down the image). The probe says +G leans toward world +y. So `TangentFrame.B = −B'` and T is as
+  written. `The_frame_matches_the_probe_...` holds both facts: it checks the raw `Cotangent` along −y and the frame's B
+  along +y. The mirrored island flips red and keeps green. The frame agrees with the probe. `Cotangent` is public so
+  the test can show the sign.
+- **Coplanarity uses `PolygonMesh.PlanarityTolerance`**, the planarity rule of the non-planar check. It is applied to
+  the pair: two faces are coplanar when their normals point the same way and every corner of each lies within
+  `PlanarityTolerance` × the bounding-box diagonal of both faces' corners of the other face's plane. Each plane is
+  taken through the mean of its outer loop, as `MeshReport` does. So two faces are coplanar exactly when the check
+  would pass them merged into one face. Carve has no tolerance of its own for comparing two faces. This is the one it
+  uses for "planar".
+- **On a smooth mesh, breaks are the edges `Shading` never smooths across:** marked hard edges, plus non-manifold
+  edges (three or more faces, or two wound the same way). That is "the edges render draws hard". An edge of 3 or more
+  faces is listed once for each other face. On a smooth mesh, a marked edge between coplanar faces is `Flat` with
+  bend 0.
+- **Convex or concave** is read from the side of the texel's face plane that the other face's outer-loop mean lies
+  on, measured from the edge's midpoint.
+- **Overlap** names every pair of faces whose triangles hold one centre. Pairs are sorted, the first eight are named
+  and the rest counted. A face whose own triangles overlap in UV is named as `faces[f] and faces[f]`.
+- **Top-left rule.** Coverage is worked in texel space with y down. A centre on a shared vertical edge goes to the
+  island on its right, and one on a horizontal edge goes to the island below it. The edge functions are exact in
+  double: float uv × a power of two gives 24-bit operands.
+- **Clamp ties** go to the lower face and then to the lower triangle. Distances are squared and compared against 0.5.
+- **Padding** is exact Euclidean, with the tie at the lowest row-major index. It uses a column pass (the upper of two
+  equidistant rows) and then a row scan bounded by the padding and the best found. Rows run in parallel, but each row
+  writes only its own texels.
+- **Masks** have one image for every stored group, so a group with no faces gives an all-zero mask, then one for each
+  material in order of its lowest live face id. The mesh argument supplies the style. It may be the layout's mesh
+  restyled, but its face count must match.
+- **`faces` that name no live face are an error** (`faces[n]: ...`). A mapped face with a zero-area uv triangle covers
+  nothing.
+
+Tests: `tests/Carve.Core.Tests/BakeLayoutTests.cs` (15, unit, about 1 s in total) covers every item in Scope's test
+list, and `samples/barrel.carve` lays out at 256 with no overlap. Not checked: timings at 4096. There is no frame or
+engine run, since this member is Core-only.

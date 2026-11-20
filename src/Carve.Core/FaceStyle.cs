@@ -71,7 +71,7 @@ public sealed class FaceStyle
     }
 
     /// <summary>A colour <c>#RRGGBB</c> as sRGB bytes. Throws on malformed text; check with <see cref="ColourProblem"/> first.</summary>
-    private static (byte R, byte G, byte B) ToBytes(string hex)
+    public static (byte R, byte G, byte B) ToBytes(string hex)
     {
         if (ColourProblem(hex) is { } problem) throw new ArgumentException(problem, nameof(hex));
         byte At(int i) => byte.Parse(hex.AsSpan(1 + 2 * i, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
