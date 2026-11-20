@@ -149,3 +149,69 @@ next agent can carry on; `verify` has not been run.
 **Before figures so far** (this branch before code, Release harness): default fbm through gradient_map at 8192
 12.4 s (14.1 s on a later run); blur smooth 0.05 at 2048 6.7 s, 960 tiles. **After so far:** blur at 2048 3.3 s,
 1,312 tiles, peak 64 MiB, working set 179 MB (with the seven-eighths budget).
+
+**The person's rulings since the first hand-off (2026-11-20):** the `EvaluationTests` cap-0 target of 18 tiles held
+and 2,004 made (against 35 and 2,240 before) is approved. The two round-1 rulings stand as recorded: blur's 10 s at
+8192 is blur's own share, the run less its source alone; the 64 MiB cap is kept, with as little recomputation as it
+allows.
+
+### Hand-off (second agent, Claude Opus 5.5, `claude-opus-5-5`, at its call checkpoint)
+
+Rebased onto `origin/milestone/M-28` (T-141 landed) cleanly, no conflicts. `verify` has not been run; the unit tests
+have not been run since this agent's changes either (nothing heavy ran while measuring).
+
+**Done this round (committed, built in Release through the harness only):**
+- `BandTiles` now takes off what a row tile pins while it is made (the whole entries of its inputs across the row's
+  reach, every port of a source such as `tiles`) before dividing by a column's row tiles.
+- `Distance_at_its_largest_range_holds_no_more_than_the_cap` now reads a one-port greyscale `fbm` mask
+  (`FbmDistance`), so the window held is distance's own: one pass pins 10 x 10 greyscale tiles of 64 (1.56 MiB) against
+  the 1 MiB cap. **Not run yet**; check it passes and how long it takes.
+- `A_30_degree_turn_makes_its_source_close_to_once` (new, 2048, tiles of 32, 4 MiB cap: 64 x 64 tiles as at 8192),
+  its bound `MostTurnRemakes = 1.25`, which is **a placeholder, not measured**: run it, write the ratio reached,
+  and set the bound just above it (a new target, so it is stated in As built, not loosened later).
+- CLAUDE.md Layout: `Patina.Graphs` (depth-first making, bands, separable passes; blur and distance separable) and
+  `tests/Patina.Graphs.Tests` (`SeparablePassesTests.cs`). The `tests/Patina.Server.Tests` line still needs the new
+  regression tests once they exist.
+- Harness: `%TEMP%\t155\measure` takes a seventh argument, the cap in KiB (`Measure <label> <size> <limit> <nodes>
+  <output> <tile> <capKiB>`). `%TEMP%\t155\measure-base` is the same harness on `origin/milestone/M-28`'s `src`
+  (extracted to `%TEMP%\t155\base`), for the before figures; `%TEMP%\t155\run-samples.sh` runs the cobblestones
+  and planks at 8192 before and after, interleaved. `%TEMP%\t155\run32.sh` is the 2048 proxy below.
+
+**Blur at 8192 still thrashes; the cause is found, not fixed.** With the three-quarters budget, blur smooth 0.05 at
+8192 stopped at 400 s with 268 of 4,096 output tiles (about 6,100 s in all). A proxy with the same tile geometry runs
+16 times faster: **2048 in tiles of 32 under a 4 MiB cap** (64 x 64 tiles, reach 9.6 tiles as at 8192); its source
+alone is 1.1 s, the blur about 360 to 400 s. Counting makes per node (temporary, taken out again) showed a band of 10
+columns and **21 row tiles made for every output tile, from the first band row to the last**: no row tile is ever
+reused. The band's row tiles fit the cap (10 x 22 x 12 KB plus the churn is about 3.1 MB of 4 MiB), so the budget is
+not the cause. The cause is the cold start: at a band's first row nothing is held, so each output tile makes its 21
+row tiles a column at a time, each reading 21 source tiles, about 630 source tiles (some 10 MB) for one output tile.
+That flushes the row tiles made for the tiles beside it, so the next band row misses again, and LRU never recovers
+(the seven-eighths and three-quarters runs failed the same way).
+**Suggested fix:** in the order loop, before a band's output row, make (`Ensure` and unpin) the separable output
+step's row tiles the row needs that are not held, a row of row tiles at a time across the band (and, at the band's
+start, the 2 x reach rows above as well, row by row), so a row tile's source row is read once for the whole band.
+Then the column tiles find every row tile held. For a separable step deeper in the graph than the output node, the
+same warm-up applies to the step whose column pass the output tile reaches; the general rule is to walk the row
+pass's tiles in raster order within the band. Check it on the proxy first (expect the blur at about 3 to 4 times
+its source), then at 8192.
+
+**Left, in order:**
+1. The warm-up above; the proxy, then `bash %TEMP%\t155\run-after.sh > %TEMP%\t155\after2.log` in the background
+   (blur 0.05 and 0.1, distance 0.1 and 0.25, the colour fbm source, rot30, tile16 at scale 0.25, all at 8192). Blur's
+   own share = the blur run less `src` (the default fbm through gradient_map, 12.4 to 14.1 s alone). If it is over 10 s,
+   stop and bring the figure and the options to the person.
+2. `bash %TEMP%\t155\run-samples.sh > %TEMP%\t155\samples.log` (before and after, cobblestones and planks at 8192;
+   T-153's after figures for the cobblestones: base_colour 75.5 s, normal 129.2 s, roughness 57.4 s, occlusion
+   54.9 s; T-153 has no planks figure at 8192 in Release, so the before run is the planks' baseline).
+3. Run `SeparablePassesTests` (the distance cap test and the rotation ratio) and the whole Patina.Graphs suite.
+4. `TransformDistanceBoundedMemoryTests`: distance raised to 8192, blur at 8192, the strong minify (tile 16 at scale
+   0.25) at 8192, each at 2 GB or less. **A question for the person:** the suite `patina-regression` runs a Debug
+   `patina` (`tests.json`), and the spec asks this test to assert distance's 10 s; Debug may well be past 10 s where
+   Release meets it. Measure Debug first and ask before asserting a time a Debug build cannot meet.
+5. CLAUDE.md's `tests/Patina.Server.Tests` line; As built (API, a worked opting-in node, every figure, the models);
+   `verify`, commit, `cairn lint`, `finish`.
+
+**Figures so far.** Before (this branch before code): default fbm through gradient_map at 8192 12.4 s, 14.1 s; blur
+smooth 0.05 at 2048 6.7 s, 960 tiles. After: blur at 2048 3.3 s, 1,312 tiles, peak 64 MiB, working set 179 MB
+(seven-eighths budget); blur at 8192 not finished (above). Proxy (2048, tiles of 32, 4 MiB): source 1.1 s, 8,192
+tiles; blur stopped at 300 s with 3,091 of 4,096 output tiles.
