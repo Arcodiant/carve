@@ -4,7 +4,7 @@ description: >-
 ---
 # T-137 — Blur and gradient map
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
@@ -86,4 +86,5 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`), one agent, which stopped at th
 
 **Speed (not met; moved to T-155 by the person's ruling).** Release build, one run each, `smooth` radius 0.05 on a colour input (an `fbm` through a `gradient_map`), the 64 MiB cap and tiles of 128: **2048: 10.5 s** (960 tiles evaluated). **8192: not finished**: stopped at 120 s with 131 of 4096 output tiles done, about 0.9 s a tile, so about an hour. Cause: each 128 output tile asks for 128 + 2 x 1229 = 2586 texels a side (6.7 M texels, 400 input tiles against a cache of about 340 colour tiles), 4096 times. No code change inside `blur` can reach 10 s with this API; it needs the node to see wider tiles or to be split in two passes (an **engine need**: a node that can ask the evaluator for whole-row or whole-column bands, or a larger tile size per node).
 
-**Not checked:** blur at 8192 against 10 s (T-155's). Round 2 (G:\My Drivertifacts\carve\M-28\T-137ound-2): the engine's swatch sheet and sphere of the sample, drawn through patina's `swatch` over MCP, approved by the person; there is no lit plane view, so the plane is the sheet's flat and tiled 3 x 3 rows. Rebased onto `origin/milestone/M-28` (T-134, T-135, T-136, T-153): one conflict, CLAUDE.md's Layout lines, both sides kept; `verify` passes unchanged.
+**Not checked:** blur at 8192 against 10 s (T-155's). Round 2 (G:\My Drivertifacts\carve\M-28\T-137
+ound-2): the engine's swatch sheet and sphere of the sample, drawn through patina's `swatch` over MCP, approved by the person; there is no lit plane view, so the plane is the sheet's flat and tiled 3 x 3 rows. Rebased onto `origin/milestone/M-28` (T-134, T-135, T-136, T-153): one conflict, CLAUDE.md's Layout lines, both sides kept; `verify` passes unchanged.
