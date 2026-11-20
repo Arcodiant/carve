@@ -180,7 +180,8 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             var style = named.Mesh.Style ?? FaceStyle.None;
             var groups = style.Groups.Select(g => g.Name).ToList();
             var materials = Model.MaterialsUsedBy(named.Mesh).ToList();
-            var known = groups.Concat(model.Materials.Select(m => m.Name)).Concat(materials).Distinct().ToList();
+            // Only the materials the mesh's faces use: a defined material no face has covers nothing, so naming it is refused.
+            var known = groups.Concat(materials).Distinct().ToList();
             foreach (var entry in entries.Where(e => !known.Contains(e.Name)))
                 errors.Add($"surface: '{entry.Name}' is not a group or a material; the names are {Quoted(known)}");
             if (FileNameProblem(named.Name) is { } meshBad) errors.Add($"mesh: {meshBad}");

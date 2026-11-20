@@ -225,6 +225,18 @@ public class BakeToolTests : FileToolTests
     }
 
     [Fact]
+    public async Task A_surface_entry_naming_a_material_no_face_uses_is_refused_with_the_meshs_names()
+    {
+        var (carve, _) = await StartStripAsync();
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_group", """{"name":"g","faces":[0]}"""));
+        Ok(await carve.CallToolAsync("define_material", """{"name":"unused"}"""));
+        var text = Refused(await carve.CallToolAsync("bake", """{"size":64,"maps":["base_colour"],"surface":{"unused":{"base_colour":"#000000"}}}"""));
+        Assert.Contains("'unused' is not a group or a material; the names are 'g'", text);
+        Assert.False(Directory.Exists(Path.Combine(Root, "textures")));
+    }
+
+    [Fact]
     public async Task Every_problem_is_listed_at_once()
     {
         var (carve, _) = await StartStripAsync();
