@@ -55,6 +55,9 @@ library without running anything.
   branch (M-27).
 - **Stop and ask:** a sample that check flags, a threshold to loosen, or a frame rule that cannot hold. Each sample
   task's look was approved before it landed, so a look that changes here is a stop too.
+- **Decided after landing (2026-11-20, by the person):** the sphere's correlation bars stand, `CorrelationMin` 0.6 and
+  painted metal's `MetalMin` 0.62 (measured 0.661, 0.571 without metallic). Capturing each sample on the cube (T-157)
+  is filed off-milestone as T-169.
 
 ### As built
 
