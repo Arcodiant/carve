@@ -210,6 +210,9 @@ public sealed class MaterialsScenario : IScenario
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "export-result.txt"), exported);
         WriteViewerSamples(driver, faces, min, max, materials);
         File.WriteAllLines(Path.Combine(driver.RunFolder, "pixel-samples.txt"), Pool.Log);
+
+        // 9. T-121: the barrel's layout with staves-base.png under it, after every earlier frame.
+        await UvImageFrame.CheckAsync(driver, textures, barrel);
     }
 
     /// <summary>The break table's "uploaded v-flipped": these textures are rewritten with their rows reversed.</summary>
