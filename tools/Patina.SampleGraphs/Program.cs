@@ -22,11 +22,12 @@ foreach (var path in Directory.GetFiles(folder, "*" + TexGraphFile.Extension).Or
     var evaluator = new GraphEvaluator(graph);
     var outFolder = Path.Combine(folder, Path.GetFileNameWithoutExtension(path));
     Directory.CreateDirectory(outFolder);
-    foreach (var role in evaluator.Roles)
+    // Each output's file: metallic is packed into roughness.png, so it has none of its own.
+    foreach (var output in evaluator.Outputs.Where(o => o != OutputRoles.Name(OutputRole.Metallic)))
     {
-        var image = OutputImage.Make(evaluator, role, graph.Size);
-        File.WriteAllBytes(Path.Combine(outFolder, OutputRoles.Name(role) + ".png"), image.Png);
-        Console.Error.WriteLine($"{Path.GetFileName(outFolder)}/{OutputRoles.Name(role)}.png: {image.Png.Length} bytes");
+        var image = OutputImage.Make(evaluator, output, graph.Size);
+        File.WriteAllBytes(Path.Combine(outFolder, OutputRoles.FileOf(output)), image.Png);
+        Console.Error.WriteLine($"{Path.GetFileName(outFolder)}/{OutputRoles.FileOf(output)}: {image.Png.Length} bytes");
     }
 }
 return 0;

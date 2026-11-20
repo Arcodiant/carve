@@ -230,7 +230,7 @@ public class GraphToolTests
 
     [Theory]
     [InlineData("{\n  \"version\": 1,\n  \"size\": 64\n  \"seed\": 5\n}\n", "line 4, column 3: not JSON")]
-    [InlineData("{\n  \"version\": 2,\n  \"size\": 64,\n  \"seed\": 5,\n  \"nodes\": {}\n}\n", "line 2, column 14: version 2 is not known")]
+    [InlineData("{\n  \"version\": 3,\n  \"size\": 64,\n  \"seed\": 5,\n  \"nodes\": {}\n}\n", "line 2, column 14: version 3 is not known")]
     [InlineData("{\n  \"version\": 1,\n  \"size\": 64,\n  \"seed\": 5,\n  \"nodes\": { \"a\": { \"kind\": \"colour\" } }\n}\n", "line 5, column 21: node 'a': unknown key 'kind'")]
     public async Task Open_refuses_a_file_that_does_not_parse_with_its_position(string file, string expected)
     {

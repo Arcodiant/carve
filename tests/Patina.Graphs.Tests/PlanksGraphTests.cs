@@ -44,6 +44,9 @@ public class PlanksGraphTests
         Assert.Contains(", grain2, ", fault.Message);
     }
 
+    /// <summary>The planks' four roles: no metallic or height, so their sheet and PNGs are as before T-134.</summary>
+    public static readonly IReadOnlyList<OutputRole> PlanksRoles = [OutputRole.BaseColour, OutputRole.Normal, OutputRole.Roughness, OutputRole.Occlusion];
+
     private static byte[] Committed(OutputRole role)
     {
         var path = Path.Combine(Root(), "samples", "graphs", "planks", OutputRoles.Name(role) + ".png");
@@ -100,7 +103,7 @@ public class PlanksGraphTests
     {
         var g = Planks();
         Assert.Equal(Size, g.Size);
-        Assert.Equal(OutputRoles.All, new GraphEvaluator(g).Roles);
+        Assert.Equal(PlanksRoles, new GraphEvaluator(g).Roles);
     }
 
     [Fact]
@@ -126,7 +129,7 @@ public class PlanksGraphTests
     public void TheEncodedPngBytesAreAlsoTheCommittedBytes()
     {
         var evaluator = new GraphEvaluator(Planks());
-        foreach (var role in OutputRoles.All)
+        foreach (var role in PlanksRoles)
         {
             var path = Path.Combine(Root(), "samples", "graphs", "planks", OutputRoles.Name(role) + ".png");
             Assert.Equal(File.ReadAllBytes(path), OutputImage.Make(evaluator, role, Size).Png);

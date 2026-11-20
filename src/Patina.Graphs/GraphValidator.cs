@@ -8,8 +8,9 @@ namespace Patina.Graphs;
 /// a bad id, an unknown type (listing the types), an unknown parameter (listing the type's) or a wrong value (giving
 /// the range), an input port the type has not (listing its inputs), a source that is not a node (listing the ids) or
 /// names a port that node has not, a required input missing; then each cycle (naming the nodes on it), each input
-/// given the wrong kind (greyscale where colour is wanted, or the other way), two outputs with one role, and no output
-/// at all. Every input whose source is a node of a known type is checked for kinds, even when another input of its node
+/// given the wrong kind (greyscale where colour is wanted, or the other way), an output given both a role and a name, a
+/// name that is a role's, two outputs with one role or one name, a metallic output with no roughness to be packed with,
+/// and no output at all. Every input whose source is a node of a known type is checked for kinds, even when another input of its node
 /// is at fault or its node is on a cycle; a fault does not cascade: an input whose source is missing, of unknown type or on a cycle is not kind-checked,
 /// nor is anything its kind would decide (a port whose kind it could change, and what that port feeds).
 /// </summary>
@@ -92,7 +93,7 @@ public static class GraphValidator
 
         Cycles(a);
         Kinds(a);
-        Outputs(a);
+        Outputs(a, graph);
         return a;
     }
 
@@ -224,21 +225,39 @@ public static class GraphValidator
         return ways;
     }
 
-    private static void Outputs(GraphAnalysis a)
+    private static void Outputs(GraphAnalysis a, TextureGraph graph)
     {
-        var byRole = new Dictionary<OutputRole, string>();
+        // Each output's role's name or its own name, to the output's id.
+        var byName = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var node in a.Nodes.Values.Where(n => n.Type is OutputNode).OrderBy(n => n.Id, StringComparer.Ordinal))
         {
-            // A role already at fault reads as the default, so it is not counted against another output's: no cascade.
-            if (a.Faults.Any(f => f.Node == node.Id && f.Parameter == "role")) continue;
-            var role = OutputNode.Role(node.Parameters);
-            if (byRole.TryGetValue(role, out var first))
-                a.Fault(node.Id, null, "role", $"node '{node.Id}' parameter 'role': {OutputRoles.Name(role)} is already the role of output '{first}'; a graph has one output per role");
-            else byRole[role] = node.Id;
+            // A role or name already at fault is not counted against another output's: no cascade.
+            if (a.Faults.Any(f => f.Node == node.Id && f.Parameter is "role" or "name")) continue;
+            var given = graph.Nodes[node.Id].Params;
+            if (given.ContainsKey("role") && given.ContainsKey("name"))
+            {
+                a.Fault(node.Id, null, "name", $"node '{node.Id}' parameter 'name': an output has a role or a name, not both; drop role to name an extra image, or name to give a role");
+                continue;
+            }
+            if (OutputNode.GivenName(node.Parameters) is { } name)
+            {
+                if (OutputRoles.TryParse(name, out _))
+                    a.Fault(node.Id, null, "name", $"node '{node.Id}' parameter 'name': {name} is a role; give it as role, or name the output something else");
+                else if (byName.TryGetValue(name, out var other))
+                    a.Fault(node.Id, null, "name", $"node '{node.Id}' parameter 'name': {name} is already the name of output '{other}'; a graph has one output per name");
+                else byName[name] = node.Id;
+                continue;
+            }
+            var role = OutputRoles.Name(OutputNode.Role(node.Parameters));
+            if (byName.TryGetValue(role, out var first))
+                a.Fault(node.Id, null, "role", $"node '{node.Id}' parameter 'role': {role} is already the role of output '{first}'; a graph has one output per role");
+            else byName[role] = node.Id;
         }
+        if (byName.TryGetValue(OutputRoles.Name(OutputRole.Metallic), out var metallic) && !byName.ContainsKey(OutputRoles.Name(OutputRole.Roughness)))
+            a.Fault(metallic, null, "role", $"node '{metallic}' parameter 'role': metallic is packed with roughness, so the graph needs a roughness output too (glTF's metallic-roughness image, roughness.png: R 255, G roughness, B metallic)");
         if (!a.Nodes.Values.Any(n => n.Type is OutputNode))
             a.Fault(null, null, null, $"the graph has no output: add an output node with a role ({string.Join(", ", OutputRoles.Names)})");
-        a.Outputs = byRole;
+        a.Outputs = byName;
     }
 
     private static string List(IEnumerable<string> names)
@@ -255,7 +274,8 @@ internal sealed class GraphAnalysis
     public Dictionary<string, ResolvedNode> Nodes { get; } = new(StringComparer.Ordinal);
     public HashSet<string> Cyclic { get; } = new(StringComparer.Ordinal);
     public List<string> Order { get; } = [];
-    public Dictionary<OutputRole, string> Outputs { get; set; } = [];
+    /// <summary>Each output by its role's name or its own name, to its node's id.</summary>
+    public Dictionary<string, string> Outputs { get; set; } = new(StringComparer.Ordinal);
 
     public void Fault(string? node, string? port, string? parameter, string message) => Faults.Add(new(node, port, parameter, message));
 }

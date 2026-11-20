@@ -66,21 +66,22 @@ public static partial class GraphNames
     }
 }
 
-/// <summary>What a parameter holds in the file: a number, a string or an array of numbers.</summary>
-public enum ParamValueKind { Number, Text, Numbers }
+/// <summary>What a parameter holds in the file: a number, a string, an array of numbers or an array of strings (an empty array is <see cref="Numbers"/>).</summary>
+public enum ParamValueKind { Number, Text, Numbers, Texts }
 
 /// <summary>A parameter's value as written, before its type's <c>ParamSpec</c> reads it.</summary>
 public sealed class ParamValue : IEquatable<ParamValue>
 {
-    private ParamValue(ParamValueKind kind, double number, string? text, ImmutableArray<double> numbers)
+    private ParamValue(ParamValueKind kind, double number, string? text, ImmutableArray<double> numbers, ImmutableArray<string> texts = default)
     {
-        Kind = kind; Number = number; Text = text; Numbers = numbers;
+        Kind = kind; Number = number; Text = text; Numbers = numbers; Texts = texts.IsDefault ? [] : texts;
     }
 
     public ParamValueKind Kind { get; }
     public double Number { get; }
     public string? Text { get; }
     public ImmutableArray<double> Numbers { get; }
+    public ImmutableArray<string> Texts { get; }
 
     public static ParamValue Of(double number) =>
         double.IsFinite(number) ? new(ParamValueKind.Number, number, null, []) : throw new ArgumentOutOfRangeException(nameof(number), "a parameter is a finite number");
@@ -90,8 +91,13 @@ public sealed class ParamValue : IEquatable<ParamValue>
     public static ParamValue Of(params double[] numbers) =>
         numbers.All(double.IsFinite) ? new(ParamValueKind.Numbers, 0, null, [.. numbers]) : throw new ArgumentOutOfRangeException(nameof(numbers), "a parameter is a finite number");
 
+    /// <summary>An array of strings, at least one (an empty array is <see cref="Of(double[])"/> of none).</summary>
+    public static ParamValue OfTexts(params string[] texts) =>
+        texts.Length > 0 ? new(ParamValueKind.Texts, 0, null, [], [.. texts]) : throw new ArgumentException("an empty array is a list of numbers", nameof(texts));
+
     public bool Equals(ParamValue? other) =>
-        other is not null && Kind == other.Kind && Number.Equals(other.Number) && Text == other.Text && Numbers.SequenceEqual(other.Numbers);
+        other is not null && Kind == other.Kind && Number.Equals(other.Number) && Text == other.Text && Numbers.SequenceEqual(other.Numbers)
+        && Texts.SequenceEqual(other.Texts, StringComparer.Ordinal);
 
     public override bool Equals(object? obj) => Equals(obj as ParamValue);
 
@@ -101,6 +107,7 @@ public sealed class ParamValue : IEquatable<ParamValue>
     {
         ParamValueKind.Number => TexGraphFile.FormatNumber(Number),
         ParamValueKind.Text => $"\"{Text}\"",
+        ParamValueKind.Texts => "[" + string.Join(", ", Texts.Select(t => $"\"{t}\"")) + "]",
         _ => "[" + string.Join(", ", Numbers.Select(TexGraphFile.FormatNumber)) + "]",
     };
 }

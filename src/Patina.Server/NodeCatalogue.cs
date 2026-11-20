@@ -25,7 +25,7 @@ public static class NodeCatalogue
         ["worley"] = "Worley cells: one feature point in each of cells [x, y] cells (wrapping, so it tiles), placed by hash, jitter 0 (cell centre) to 1 (anywhere in the cell); distances are in cell widths by metric; f1 is the distance to the nearest point, edge is f2 - f1 (0 on the boundary between cells), random is one value 0..1 for each cell; seed is added to the graph's seed",
         ["fbm"] = "fractal noise in 0..1: octaves of value or gradient (Perlin-style) basis on cells [x, y], the cells doubling each octave, each octave gain times the weight of the one before, normalised; style plain, ridged (1 - |2n - 1|) or billow (|2n - 1|); seed is added to the graph's seed",
         ["warp"] = "bends in by by: a colour by gives the u and v offsets in its R and G about 0.5, a greyscale by the offset along angle degrees (0 is u, 90 is v, down); amount is the largest offset as a fraction of the image, in 0..0.25; read bilinear and wrapping",
-        ["output"] = "one of the material's images, at most one per role: base_colour takes colour or grey, normal colour, roughness and occlusion grey",
+        ["output"] = "one of the material's images, at most one per role or name: base_colour takes colour or grey, normal colour, roughness, metallic, occlusion and height grey; with a name in place of a role, an extra image <name>.png, colour or grey",
     };
 
     public static string Text(NodeRegistry registry)
@@ -40,7 +40,7 @@ public static class NodeCatalogue
             s.Append(type.Inputs.Count == 0 ? "none" : string.Join(", ", type.Inputs.Select(i => i.Name + (i.Required ? "" : " (optional)"))));
             if (type.Outputs.Count > 1) s.Append(". Outputs: ").Append(string.Join(", ", type.Outputs));
             s.Append(". Params: ");
-            s.Append(type.Parameters.Count == 0 ? "none" : string.Join("; ", type.Parameters.Select(p => $"{p.Name}: {p.Describe()}, default {p.Default}")));
+            s.Append(type.Parameters.Count == 0 ? "none" : string.Join("; ", type.Parameters.Select(p => $"{p.Name}: {p.Describe()}, " + (p.Optional ? "optional, no default" : $"default {p.Default}"))));
             s.Append(".\n");
         }
         return s.ToString();

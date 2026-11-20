@@ -44,7 +44,23 @@ public sealed class GraphEvaluator
     public TextureGraph Graph { get; }
 
     /// <summary>The roles the graph has an output for, in role order.</summary>
-    public IReadOnlyList<OutputRole> Roles => [.. OutputRoles.All.Where(_analysis.Outputs.ContainsKey)];
+    public IReadOnlyList<OutputRole> Roles => [.. OutputRoles.All.Where(r => _analysis.Outputs.ContainsKey(OutputRoles.Name(r)))];
+
+    /// <summary>Every output the graph has, by its role's name or its own, in sheet order: the roles in role order, then the named outputs a to z.</summary>
+    public IReadOnlyList<string> Outputs => OutputRoles.Order(_analysis.Outputs.Keys);
+
+    /// <summary>The graph's named outputs (those with a <c>name</c>, not a role), a to z.</summary>
+    public IReadOnlyList<string> Named => [.. Outputs.Where(o => !OutputRoles.TryParse(o, out _))];
+
+    /// <summary>True when the graph has an output of this role's name or this name.</summary>
+    public bool Has(string output) => _analysis.Outputs.ContainsKey(output);
+
+    /// <summary>What reaches the output's <c>in</c>: greyscale or colour.</summary>
+    public PortKind KindOf(string output)
+    {
+        var (node, port) = _analysis.Nodes[_analysis.Outputs[output]].Sources["in"];
+        return _analysis.Nodes[node].OutputKinds[port];
+    }
 
     /// <summary>What the last <see cref="Evaluate"/> held: its tile size, the most tiles and bytes held at once, the cap, and how many node tiles it made.</summary>
     public EvaluationRun? LastRun { get; private set; }
@@ -60,12 +76,16 @@ public sealed class GraphEvaluator
     /// power of two) and <paramref name="cacheBytes"/> override <see cref="DefaultTileSize"/> and
     /// <see cref="DefaultCacheBytes"/>; neither changes a byte of the output.
     /// </summary>
-    public void Evaluate(OutputRole role, int size, Action<Tile> onTile, int? tileSize = null, long? cacheBytes = null)
+    public void Evaluate(OutputRole role, int size, Action<Tile> onTile, int? tileSize = null, long? cacheBytes = null) =>
+        Evaluate(OutputRoles.Name(role), size, onTile, tileSize, cacheBytes);
+
+    /// <summary>As <see cref="Evaluate(OutputRole, int, Action{Tile}, int?, long?)"/>, for the output of a role's name or a named output's name.</summary>
+    public void Evaluate(string output, int size, Action<Tile> onTile, int? tileSize = null, long? cacheBytes = null)
     {
         if (!TextureGraph.IsValidSize(size))
             throw new ArgumentOutOfRangeException(nameof(size), size, "size is " + TextureGraph.SizesText);
-        if (!_analysis.Outputs.TryGetValue(role, out var outputId))
-            throw new ArgumentException($"the graph has no {OutputRoles.Name(role)} output; it has {string.Join(", ", Roles.Select(OutputRoles.Name))}", nameof(role));
+        if (!_analysis.Outputs.TryGetValue(output, out var outputId))
+            throw new ArgumentException($"the graph has no {output} output; it has {string.Join(", ", Outputs)}", nameof(output));
         var side = tileSize ?? DefaultTileSize;
         if (side < 1 || (side & (side - 1)) != 0)
             throw new ArgumentOutOfRangeException(nameof(tileSize), side, "a tile's side is a power of two");

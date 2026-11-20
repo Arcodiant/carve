@@ -119,7 +119,7 @@ public class WorkedExampleTests
         {
             var type = registry.Find(name)!;
             Assert.Contains($"- {name}", text);
-            foreach (var p in type.Parameters) Assert.Contains($"{p.Name}: {p.Describe()}, default {p.Default}", text);
+            foreach (var p in type.Parameters) Assert.Contains($"{p.Name}: {p.Describe()}, " + (p.Optional ? "optional, no default" : $"default {p.Default}"), text);
         }
     }
 }
