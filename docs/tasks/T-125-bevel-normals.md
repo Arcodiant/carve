@@ -130,8 +130,7 @@ strip check only):
    sides in `BakesStages.cs` and the Bakes row), rebuild, rerun good and bevel-g, re-read the table above and `render_glb`
    against `render` with the map (pre-T-124: front 47 px, patch 13; three-quarter 15 px, patch 5).
 2. Review round 1 via `mcp__waystone__review`: the option set above plus the `render_glb` numbers, and frames under
-   `G:\My Drive\artifacts\carve\M-24\T-125
-ound-1`: `wrench-uvs-normal`, `bevel-grip-1..3` with and without the map, the six
+   `G:\My Drive\artifacts\carve\M-24\T-125ound-1`: `wrench-uvs-normal`, `bevel-grip-1..3` with and without the map, the six
    sides, `BevelRenderTests`' frames. Land the tolerance as answered.
 3. `verify`, As built (rulings with the person's earlier ones, numbers, break counts, the review, agents 1 to 3 Opus 5.5),
    `cairn lint`, `finish`.
