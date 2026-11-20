@@ -142,7 +142,7 @@ whole; bevel-thin fails only on jaw-3, by 0.18. Options for the person, each for
    (pre-T-124: front 47 px, patch 13; three-quarter 15 px, patch 5; the person should see the rise from 10 to 15).
 3. `bevel-thin` in the stage now has no check of its own to break (the seam check moved to Core with its break inside the test);
    either drop it from the stage or keep it as the strip check's second break. Ask with the table if kept.
-4. Frame review round 1 (`G:\My Drivertifacts\carve\M-24\T-125ound-1`): the normal `uvs` frame, the zoom-8 jaw frames with
+4. Frame review round 1 (`G:\My Drive\artifacts\carve\M-24\T-125\round-1`): the normal `uvs` frame, the zoom-8 jaw frames with
    and without the map, the six sides, the render test's frames; put the numbers above in the request, one option set per check.
 5. `verify`, As built, `cairn lint`, `finish`.
 
