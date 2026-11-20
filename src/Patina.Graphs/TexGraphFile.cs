@@ -16,8 +16,10 @@ namespace Patina.Graphs;
 /// <para><b>Versions.</b> A file is written in the lowest version that holds the graph, as the Carve file is: version 1
 /// unless the graph uses something a later version adds, which a <see cref="TexGraphFormat"/> lists (a top-level
 /// <see cref="TexGraphField"/>, written after <c>seed</c> in the format's order, or a node type). Version 2 is reserved for
-/// T-139's <c>parameters</c> and T-140's <c>graph</c> and <c>input</c> nodes; <see cref="TexGraphFormat.Current"/> holds
-/// none yet. Both versions are read; a file that uses what its version does not hold is a <see cref="GraphLoadError"/>.</para>
+/// T-139's <c>parameters</c> (<see cref="ParametersField"/>) and T-140's <c>graph</c> and <c>input</c> nodes;
+/// <see cref="TexGraphFormat.Current"/> holds <c>parameters</c>. A node parameter an exposed parameter drives is not
+/// written (its own value is ignored); <see cref="WriteShowingDriven"/> writes it as <c>{"driven_by": "name"}</c>, which
+/// is read back too. Both versions are read; a file that uses what its version does not hold is a <see cref="GraphLoadError"/>.</para>
 /// <para>A file that is not JSON, has not this shape (an unknown or missing key, a value of the wrong JSON kind, a
 /// duplicate key), has a version other than 1 or 2, a size that is not a power of two from 32 to 8192 or a seed outside
 /// 0..4294967295 is a <see cref="GraphLoadError"/> with its line and column. Everything else wrong is a
@@ -30,9 +32,23 @@ public static class TexGraphFile
     /// <summary>The versions this build reads: 1 to <see cref="LatestVersion"/>.</summary>
     public const int LatestVersion = 2;
 
-    public static string Write(TextureGraph graph, TexGraphFormat? format = null)
+    public static string Write(TextureGraph graph, TexGraphFormat? format = null) => Write(graph, format, showDriven: false);
+
+    /// <summary>
+    /// The graph as <see cref="Write(TextureGraph, TexGraphFormat?)"/> gives it, but with each node parameter an exposed
+    /// parameter drives shown in its node as <c>{"driven_by": "&lt;name&gt;"}</c> (get_graph's form). Read takes it back,
+    /// giving the same graph.
+    /// </summary>
+    public static string WriteShowingDriven(TextureGraph graph, TexGraphFormat? format = null) => Write(graph, format, showDriven: true);
+
+    private static string Write(TextureGraph graph, TexGraphFormat? format, bool showDriven)
     {
         format ??= TexGraphFormat.Current;
+        // A driven parameter's own value is ignored, so it is not written; get_graph's form names its driver instead.
+        var driven = new Dictionary<(string, string), string>();
+        foreach (var (name, p) in graph.Parameters.OrderBy(p => p.Key, StringComparer.Ordinal))
+            foreach (var drive in p.Drives)
+                if (GraphParameter.TryParseDrive(drive, out var n, out var q)) driven.TryAdd((n, q), name);
         var s = new StringBuilder();
         s.Append("{\n");
         s.Append("  \"version\": ").Append(format.VersionOf(graph).ToString(CultureInfo.InvariantCulture)).Append(",\n");
@@ -52,8 +68,14 @@ public static class TexGraphFile
             s.Append("    ").Append(Quote(id)).Append(": { \"type\": ").Append(Quote(node.Type));
             if (node.Inputs.Count > 0)
                 s.Append(", \"inputs\": { ").Append(string.Join(", ", node.Inputs.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => Quote(p.Key) + ": " + Quote(p.Value)))).Append(" }");
-            if (node.Params.Count > 0)
-                s.Append(", \"params\": { ").Append(string.Join(", ", node.Params.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => Quote(p.Key) + ": " + Value(p.Value)))).Append(" }");
+            var shown = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            foreach (var (name, value) in node.Params)
+                if (!driven.ContainsKey((id, name))) shown[name] = Value(value);
+            if (showDriven)
+                foreach (var ((n, q), by) in driven)
+                    if (n == id) shown[q] = "{ \"driven_by\": " + Quote(by) + " }";
+            if (shown.Count > 0)
+                s.Append(", \"params\": { ").Append(string.Join(", ", shown.Select(p => Quote(p.Key) + ": " + p.Value))).Append(" }");
             s.Append(" }").Append(++i < graph.Nodes.Count ? ",\n" : "\n");
         }
         s.Append("  }\n}\n");
@@ -91,7 +113,7 @@ public static class TexGraphFile
     /// <summary>A number as the file writes it: shortest round-trip, invariant culture.</summary>
     public static string FormatNumber(double value) => value.ToString("R", CultureInfo.InvariantCulture);
 
-    private static string Value(ParamValue value) => value.Kind switch
+    internal static string Value(ParamValue value) => value.Kind switch
     {
         ParamValueKind.Number => FormatNumber(value.Number),
         ParamValueKind.Text => Quote(value.Text!),
@@ -99,7 +121,7 @@ public static class TexGraphFile
         _ => "[" + string.Join(", ", value.Numbers.Select(FormatNumber)) + "]",
     };
 
-    private static string Quote(string text) => "\"" + JsonEncodedText.Encode(text, JavaScriptEncoder.UnsafeRelaxedJsonEscaping) + "\"";
+    internal static string Quote(string text) => "\"" + JsonEncodedText.Encode(text, JavaScriptEncoder.UnsafeRelaxedJsonEscaping) + "\"";
 
     private static (int Line, int Column) Position(byte[] bytes, long offset)
     {
@@ -136,6 +158,8 @@ public static class TexGraphFile
         private readonly TexGraphFormat _format;
         // What the file uses that a later version adds, and where: checked against its version once the whole file is read.
         private readonly List<(string What, int Version, long At)> _uses = [];
+        // Each node parameter given as {"driven_by": name} (get_graph's form), checked against the parameters once read.
+        private readonly List<(string Node, string Param, string By, long At)> _drivenBy = [];
 
         public Parser(byte[] bytes, TexGraphFormat format)
         {
@@ -203,7 +227,11 @@ public static class TexGraphFile
             if (_reader.Read()) throw new ShapeException(_reader.TokenStartIndex, "nothing may follow the graph's object");
             foreach (var (what, needs, at) in _uses.Where(u => u.Version > version))
                 throw new ShapeException(at, $"{what} needs version {needs}, but the file is version {version}");
-            return fields.Aggregate(new TextureGraph(size.Value, seed.Value, nodes), (graph, apply) => apply(graph));
+            var read = fields.Aggregate(new TextureGraph(size.Value, seed.Value, nodes), (graph, apply) => apply(graph));
+            foreach (var (node, param, by, at) in _drivenBy)
+                if (!read.Parameters.TryGetValue(by, out var p) || !p.Drives.Contains($"{node}.{param}"))
+                    throw new ShapeException(at, $"node '{node}' parameter '{param}': is driven_by '{by}', but no parameter '{by}' drives {node}.{param}");
+            return read;
         }
 
         private ImmutableSortedDictionary<string, GraphNode> Nodes()
@@ -258,7 +286,8 @@ public static class TexGraphFile
                         {
                             var name = Key(names, $"node '{id}' params: ");
                             Next();
-                            parameters[name] = Param(id, name);
+                            if (_reader.TokenType == JsonTokenType.StartObject) DrivenBy(id, name);
+                            else parameters[name] = Param(id, name);
                         }
                         break;
                     default:
@@ -267,6 +296,19 @@ public static class TexGraphFile
             }
             if (type is null) throw new ShapeException(start, $"node '{id}' has no type");
             return new GraphNode(type, inputs.ToImmutable(), parameters.ToImmutable());
+        }
+
+        /// <summary>Reads <c>{"driven_by": "&lt;name&gt;"}</c>, get_graph's form of a driven parameter: the parameter has no value of its own.</summary>
+        private void DrivenBy(string id, string name)
+        {
+            var at = _reader.TokenStartIndex;
+            var what = $"node '{id}' parameter '{name}': an object here is {{\"driven_by\": \"<parameter>\"}}, get_graph's form of a driven parameter";
+            if (Next() != JsonTokenType.PropertyName || _reader.GetString() != "driven_by") throw new ShapeException(_reader.TokenStartIndex, what);
+            Next();
+            Expect(JsonTokenType.String, what);
+            var by = _reader.GetString()!;
+            if (Next() != JsonTokenType.EndObject) throw new ShapeException(_reader.TokenStartIndex, what);
+            _drivenBy.Add((id, name, by, at));
         }
 
         private ParamValue Param(string id, string name)
@@ -362,8 +404,11 @@ public sealed class TexGraphFormat
         Fields = fields; NodeTypes = nodeTypes;
     }
 
-    /// <summary>The format this build uses: version 2 adds nothing yet.</summary>
-    public static TexGraphFormat Current { get; } = new([], ImmutableSortedDictionary.Create<string, int>(StringComparer.Ordinal));
+    /// <summary>The format with nothing a later version adds: every graph is version 1.</summary>
+    public static TexGraphFormat Version1 { get; } = new([], ImmutableSortedDictionary.Create<string, int>(StringComparer.Ordinal));
+
+    /// <summary>The format this build uses: version 2 adds <c>parameters</c> (T-139).</summary>
+    public static TexGraphFormat Current { get; } = Version1.With(ParametersField.Instance);
 
     public ImmutableArray<TexGraphField> Fields { get; }
 

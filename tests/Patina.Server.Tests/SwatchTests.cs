@@ -96,7 +96,7 @@ public class SwatchTests
     [InlineData("""{"view":"sphere","angle":1e300}""", "swatch: angle 1e300 is out of range; angle is a number of degrees")]
     [InlineData("""{"view":"flat","output":"emissive"}""", "swatch: the graph has no emissive output; its outputs are base_colour, normal, roughness, occlusion")]
     [InlineData("""{"view":"flat","output":"Edge!"}""", "swatch: output is 'Edge!'; give a role (base_colour, normal, roughness, metallic, occlusion, height) or a named output's name")]
-    [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle")]
+    [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle, parameters")]
     [InlineData("""{"view":"sphere"}""", "swatch: " + PatinaHarness.NoEngine)]
     [InlineData("""{}""", "swatch: " + PatinaHarness.NoEngine)]
     public async Task Refusals_say_what_to_do(string arguments, string said)

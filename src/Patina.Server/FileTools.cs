@@ -17,7 +17,11 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
     public const string Text =
         "Reads back the open graph: a line with its nodes, size, seed, path (the file save last wrote or open read, or no path) and faults, one a line, each naming its node and port or parameter; "
         + "then the graph exactly as save would write it, a .texgraph file: version, size, seed, then one node a line in id order, inputs and params in name order, the parameters the graph gives "
-        + "(a default it leaves out is not written). Give that JSON back to define_graph as graph to start again from it. Takes nothing, and changes nothing.\n"
+        + "(a default it leaves out is not written). Give that JSON back to define_graph as graph to start again from it. Takes nothing, and changes nothing. "
+        + "A graph with exposed parameters (version 2, set with edit_graph's set_parameter) lists them between the two, a line each: its name, kind, value, range (the narrowest of the node parameters it drives) and what it drives; "
+        + "and in the file each driven node parameter shows {\"driven_by\": \"<name>\"} where its own value would be, which save leaves out and define_graph reads back. "
+        + "For samples/graphs/bricks.texgraph the lines are:\n" + WorkedBricksParameters + "\n"
+        + "and its layout node reads \"gap\": { \"driven_by\": \"mortar\" }.\n"
         + "Worked example, after define_graph's worked example, get_graph {} returns:\n"
         + WorkedHead + "\n"
         + "{\n  \"version\": 1,\n  \"size\": 256,\n  \"seed\": 0,\n  \"nodes\": {\n"
@@ -29,6 +33,32 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
 
     public static McpServerTool Create() => Create<GetGraphTool>("get_graph", Text, new JsonObject());
 
+    /// <summary>What get_graph lists for the bricks' parameters (samples/graphs/bricks.texgraph) after its head line, before the file.</summary>
+    public const string WorkedBricksParameters =
+        "parameters (3):\n"
+        + "- jitter: a number, 0.25, from 0 to 1; drives layout.jitter\n"
+        + "- mortar: a number, 0.1, from 0 to 0.45; drives layout.gap\n"
+        + "- tint: a colour, \"#a8452f\", any colour \"#rrggbb\"; drives clay.colour";
+
+    /// <summary>A line for each exposed parameter, its kind, value, range and drives, under a count line; nothing for a graph without. A parameter at fault says so.</summary>
+    public static string ParameterLines(TextureGraph graph, NodeRegistry registry)
+    {
+        if (graph.Parameters.Count == 0) return "";
+        var exposed = GraphParameters.Of(graph, registry);
+        var lines = graph.Parameters.Select(p => exposed.TryGetValue(p.Key, out var e)
+            ? $"- {p.Key}: {e.KindText}, {e.Value}, {Range(e)}; drives {string.Join(", ", e.Drives)}"
+            : $"- {p.Key}: at fault (see the faults), {p.Value.Value}; drives {(p.Value.Drives.Length == 0 ? "nothing" : string.Join(", ", p.Value.Drives))}");
+        return $"parameters ({graph.Parameters.Count.ToString(CultureInfo.InvariantCulture)}):\n" + string.Join("\n", lines) + "\n";
+    }
+
+    private static string Range(ExposedParameter e) => e.Kind switch
+    {
+        ParamKind.Float or ParamKind.Int => $"from {TexGraphFile.FormatNumber(e.Range.Min)} to {TexGraphFile.FormatNumber(e.Range.Max)}",
+        ParamKind.IntPair => $"each from {TexGraphFile.FormatNumber(e.Range.Min)} to {TexGraphFile.FormatNumber(e.Range.Max)}",
+        ParamKind.Enum => "one of " + string.Join(", ", e.Range.Choices),
+        _ => "any colour \"#rrggbb\"",
+    };
+
     public CallToolResult Run(RequestContext<CallToolRequestParams> context)
     {
         if (Unknown("get_graph", context) is { } unknown) return unknown;
@@ -36,7 +66,7 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
         {
             if (store.Graph is not { } graph) return Error("get_graph: " + NoGraph);
             var path = store.Path is { } p ? "path " + p : "no path (save gives it one)";
-            return Line($"get_graph: {Describe(graph)}; {path}; {Faults(GraphValidator.Validate(graph, registry))}\n{TexGraphFile.Write(graph).TrimEnd('\n')}");
+            return Line($"get_graph: {Describe(graph)}; {path}; {Faults(GraphValidator.Validate(graph, registry))}\n{ParameterLines(graph, registry)}{TexGraphFile.WriteShowingDriven(graph).TrimEnd('\n')}");
         }
     }
 }
