@@ -13,7 +13,7 @@
     <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
   </ItemGroup>
 
-  <!-- Linked, never copied: the Uvs scenario's mesh reading, the Crate's call helpers and camera, the PNG writer, and Orcward's frame rule (D-6). -->
+  <!-- Linked, never copied: the Uvs scenario's mesh reading, the Crate's call helpers, camera and colour rule, the PNG writer, and Orcward's frame rule (D-6). -->
   <ItemGroup>
     <Compile Include="../Carve.Scenario.Uvs/UvsScene.cs" Link="UvsScene.cs" />
     <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />

@@ -656,6 +656,7 @@
         "scenarios/Carve.Scenario.Uvs/UvsScene.cs",
         "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
         "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "tools/Carve.SampleTextures/Png.cs",
         "scenarios/Carve.Scenario.Orcward/ComparisonPng.cs",
         "samples/wrench.carve",
