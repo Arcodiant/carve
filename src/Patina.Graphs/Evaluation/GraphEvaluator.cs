@@ -133,6 +133,8 @@ public sealed class GraphEvaluator
 
         var cache = new TileCache(n, cap);
         var evaluated = 0;
+        var cold = false; // a row pass is being made, so what is unpinned is cold (TileCache)
+        int bandStart = 0, bandEnd = 0; // the band of output tile columns being walked
         // Separable steps (T-155): their row pass's tiles are cached under node number steps.Length + i.
         var passes = steps.Select(s => s.Type.Separable(s.Parameters, size)).ToArray();
         for (var i = 0; i < steps.Length; i++)
@@ -174,6 +176,7 @@ public sealed class GraphEvaluator
             return node < steps.Length ? MakeTile(node, x, y) : MakeRows(node - steps.Length, x, y);
         }
 
+        // Fills and caches a tile, then unpins its inputs: cold while a row pass is being made (TileCache).
         TileCache.Entry Finish(long key, Step step, TexelRect rect, Action<Dictionary<string, Tile>> fill, List<TileCache.Entry> pins)
         {
             long incoming = 0;
@@ -184,7 +187,7 @@ public sealed class GraphEvaluator
             for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect);
             fill(named);
             var entry = cache.AddPinned(key, outputs);
-            foreach (var pin in pins) cache.Unpin(pin);
+            foreach (var pin in pins) cache.Unpin(pin, cold);
             cache.Trim();
             evaluated++;
             return entry;
@@ -198,9 +201,18 @@ public sealed class GraphEvaluator
             var inputs = new Dictionary<string, TileRead>(StringComparer.Ordinal);
             if (passes[i] is { } separable)
             {
-                inputs[NodeType.RowsPort] = Gather(steps.Length + i, 0, step.Kinds[0], [rect.Inflate(0, separable.ColumnReach)], pins);
-                return Finish(cache.Key(i, x, y), step, rect,
-                    named => step.Type.EvaluateColumns(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+                // A column tile's row tiles are read again by the column tiles below, so they are unpinned warm even
+                // when this tile is made for an outer row pass.
+                var was = cold;
+                cold = false;
+                try
+                {
+                    WarmRows(i, x, rect.Inflate(0, separable.ColumnReach));
+                    inputs[NodeType.RowsPort] = Gather(steps.Length + i, 0, step.Kinds[0], [rect.Inflate(0, separable.ColumnReach)], pins);
+                    return Finish(cache.Key(i, x, y), step, rect,
+                        named => step.Type.EvaluateColumns(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+                }
+                finally { cold = was; }
             }
             foreach (var source in step.Sources)
                 if (!source.Dependent) inputs[source.Port] = GatherSource(source, [step.Type.InputRect(source.Port, rect, step.Parameters, size)], pins);
@@ -218,21 +230,49 @@ public sealed class GraphEvaluator
                 named => step.Type.Evaluate(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
         }
 
+        // Before a column tile reads its row tiles, each row of them not held is made across the rest of the band
+        // (from x to the band's right edge), left to right, and unpinned: a row tile's source row is then read once
+        // for the band, not once for each output tile beside it. Without it a band's first row makes its row tiles a
+        // column at a time, each column reading a tall square of source tiles, which flushes the row tiles beside it,
+        // and LRU never recovers (T-155: blur at 8192 made 21 row tiles for every output tile). A column tile outside
+        // the band (a deeper step read away from its output tile) makes only its own.
+        void WarmRows(int i, int x, TexelRect column)
+        {
+            var cover = TileRead.Cover(TileRead.Clamp(column, size), size, t);
+            var last = x >= bandStart && x < bandEnd ? bandEnd : x + 1;
+            for (var r = 0; r < cover.Height; r++)
+            {
+                var y = Tile.Wrap(cover.Y + r, n);
+                if (cache.Find(cache.Key(steps.Length + i, x, y)) is not null) continue;
+                for (var c = x; c < last; c++)
+                    if (cache.Find(cache.Key(steps.Length + i, c, y)) is null) cache.Unpin(MakeRows(i, c, y));
+            }
+        }
+
         // The row pass's tile (x, y) of separable step i, from its inputs widened in x.
+        // Everything made and unpinned under it is cold: read along this tile row only.
         TileCache.Entry MakeRows(int i, int x, int y)
         {
             var step = steps[i];
             var rect = TileRect(x, y);
             var pins = new List<TileCache.Entry>();
             var inputs = new Dictionary<string, TileRead>(StringComparer.Ordinal);
-            foreach (var source in step.Sources)
-                inputs[source.Port] = GatherSource(source, [rect.Inflate(passes[i]!.RowReach, 0)], pins);
-            return Finish(cache.Key(steps.Length + i, x, y), step, rect,
-                named => step.Type.EvaluateRows(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+            var was = cold;
+            cold = true;
+            try
+            {
+                foreach (var source in step.Sources)
+                    inputs[source.Port] = GatherSource(source, [rect.Inflate(passes[i]!.RowReach, 0)], pins);
+                return Finish(cache.Key(steps.Length + i, x, y), step, rect,
+                    named => step.Type.EvaluateRows(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+            }
+            finally { cold = was; }
         }
 
-        foreach (var (tx, ty) in Order(n, BandTiles(steps, passes, n, t, cap)))
+        var band = BandTiles(steps, passes, n, t, cap);
+        foreach (var (tx, ty) in Order(n, band))
         {
+            if (tx >= bandEnd || tx < bandStart) (bandStart, bandEnd) = (tx, Math.Min(n, tx + band));
             var entry = Ensure(outNode, tx, ty);
             onTile(entry.Tiles[outPort]);
             cache.Unpin(entry);

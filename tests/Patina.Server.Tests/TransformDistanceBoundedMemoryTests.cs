@@ -5,10 +5,12 @@ using Carve.Server.Tests;
 namespace Patina.Server.Tests;
 
 /// <summary>
-/// T-138: the real patina exports a colour fbm turned 30 degrees by transform, at 8192, and a tiles mask measured by
-/// distance at range 0.1, at 2048, each in a process whose peak working set stays at 2 GB or less (<see cref="ExportBoundedMemoryTests.BoundBytes"/>).
-/// The time and the peak are written to <c>patina-t138-*.txt</c> in the temp folder and to the test's output; the
-/// time is a figure for the task's notes, not a pass mark.
+/// T-138 and T-155: the real patina exports, at 8192, a colour fbm turned 30 degrees by transform, a tiles mask measured
+/// by distance at range 0.1, the colour fbm blurred smooth at radius 0.05, and the colour fbm tiled 16 x 16 at scale
+/// 0.25 (a strong minify), each in a process whose peak working set stays at 2 GB or less
+/// (<see cref="ExportBoundedMemoryTests.BoundBytes"/>). The time and the peak are written to <c>patina-t138-*.txt</c> in
+/// the temp folder and to the test's output; the time is a figure, not a pass mark: the person ruled (2026-11-20) that
+/// this suite, a Debug patina, asserts the peak only, and the 10 s checks are measured in Release (T-155's As built).
 /// </summary>
 [Trait("Tier", "regression")]
 public class TransformDistanceBoundedMemoryTests
@@ -16,20 +18,29 @@ public class TransformDistanceBoundedMemoryTests
     /// <summary>A colour fbm (8 x 8 cells, 4 octaves, toned by a colour) turned 30 degrees.</summary>
     public const string Turned = """{"version":1,"size":256,"seed":7,"nodes":{"f":{"type":"fbm","params":{"cells":[8,8],"octaves":4}},"tint":{"type":"colour","params":{"colour":"#c08040"}},"c":{"type":"blend","inputs":{"a":"tint","b":"f"},"params":{"mode":"multiply"}},"turned":{"type":"transform","inputs":{"in":"c"},"params":{"rotation":30}},"out":{"type":"output","inputs":{"in":"turned"},"params":{"role":"base_colour"}}}}""";
 
+    /// <summary>The same colour fbm blurred smooth at radius 0.05, blur's largest (T-155).</summary>
+    public const string Blurred = """{"version":1,"size":256,"seed":7,"nodes":{"f":{"type":"fbm","params":{"cells":[8,8],"octaves":4}},"tint":{"type":"colour","params":{"colour":"#c08040"}},"c":{"type":"blend","inputs":{"a":"tint","b":"f"},"params":{"mode":"multiply"}},"b":{"type":"blur","inputs":{"in":"c"},"params":{"radius":0.05,"quality":"smooth"}},"out":{"type":"output","inputs":{"in":"b"},"params":{"role":"base_colour"}}}}""";
+
+    /// <summary>The same colour fbm tiled 16 x 16 at scale 0.25: each output tile reads its whole input (T-155).</summary>
+    public const string Minified = """{"version":1,"size":256,"seed":7,"nodes":{"f":{"type":"fbm","params":{"cells":[8,8],"octaves":4}},"tint":{"type":"colour","params":{"colour":"#c08040"}},"c":{"type":"blend","inputs":{"a":"tint","b":"f"},"params":{"mode":"multiply"}},"m":{"type":"transform","inputs":{"in":"c"},"params":{"tile":[16,16],"scale":0.25}},"out":{"type":"output","inputs":{"in":"m"},"params":{"role":"base_colour"}}}}""";
+
     /// <summary>The floor's 4 x 4 tiles' mask, measured inside at range 0.1.</summary>
     public const string Measured = """{"version":1,"size":256,"seed":7,"nodes":{"t":{"type":"tiles","params":{"count":[4,4],"gap":0.06,"bevel":0}},"d":{"type":"distance","inputs":{"in":"t.mask"},"params":{"range":0.1}},"out":{"type":"output","inputs":{"in":"d"},"params":{"role":"height"}}}}""";
 
-    /// <summary>
-    /// How long the export may take before the test gives up. The person ruled (2026-11-20) that distance runs at
-    /// 2048 until T-155, which raises it to 8192 and asserts the 10 s; at 8192 it took about an hour in a debug patina.
-    /// </summary>
-    private static readonly TimeSpan Deadline = TimeSpan.FromMinutes(10);
+    /// <summary>How long the export may take, in a Debug patina, before the test gives up.</summary>
+    private static readonly TimeSpan Deadline = TimeSpan.FromMinutes(60);
 
     [Fact]
     public Task A_30_degree_turn_of_a_colour_fbm_at_8192_peaks_at_2_GB_or_less() => ExportAsync("turn", Turned, "base_colour", 8192);
 
     [Fact]
-    public Task Distance_at_range_0_1_at_2048_peaks_at_2_GB_or_less() => ExportAsync("distance", Measured, "height", 2048);
+    public Task Distance_at_range_0_1_at_8192_peaks_at_2_GB_or_less() => ExportAsync("distance", Measured, "height", 8192);
+
+    [Fact]
+    public Task A_smooth_blur_at_radius_0_05_at_8192_peaks_at_2_GB_or_less() => ExportAsync("blur", Blurred, "base_colour", 8192);
+
+    [Fact]
+    public Task A_strong_minify_at_8192_peaks_at_2_GB_or_less() => ExportAsync("minify", Minified, "base_colour", 8192);
 
     private static async Task ExportAsync(string label, string graph, string role, int size)
     {

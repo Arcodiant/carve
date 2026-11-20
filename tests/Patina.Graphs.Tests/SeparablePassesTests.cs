@@ -115,8 +115,8 @@ public class SeparablePassesTests
         Assert.True(one.PeakBytes > cap, $"one pass held {one.PeakBytes} bytes");
     }
 
-    /// <summary>The most times over a 30-degree turn may make its source (T-155; T-138 measured 2.4 at 8192 in raster order).</summary>
-    public const double MostTurnRemakes = 1.25;
+    /// <summary>The most times over a 30-degree turn may make its source (T-155: measured 1.16 here, 14,196 tiles against 12,288, and 1.15 at 8192 in tiles of 128; T-138 measured 2.4 at 8192 in raster order).</summary>
+    public const double MostTurnRemakes = 1.2;
 
     [Fact]
     public void A_30_degree_turn_makes_its_source_close_to_once()
@@ -135,9 +135,9 @@ public class SeparablePassesTests
             "t": { "type": "transform", "inputs": { "in": "c" }, "params": { "rotation": 30 } },
             "o": { "type": "output", "inputs": { "in": "t" }, "params": { "role": "base_colour" } }
             """), OutputRole.BaseColour, size, tile, cap);
-        // Each run makes n x n output tiles, and the turn n x n transform tiles besides; the rest is the source.
-        var once = alone.TilesEvaluated - n * n;
-        var made = turned.TilesEvaluated - 2 * n * n;
+        // The output node makes no tile of its own: alone is the source's tiles; the turn adds n x n transform tiles.
+        var once = alone.TilesEvaluated;
+        var made = turned.TilesEvaluated - n * n;
         var remakes = (double)made / once;
         TestContext.Current.SendDiagnosticMessage($"30-degree turn at {size} in tiles of {tile}: source made {made} tiles against {once} alone, {remakes:0.00} times; {turned.TilesEvaluated} tiles in all against {alone.TilesEvaluated}");
         Assert.True(remakes <= MostTurnRemakes, $"the source was made {remakes:0.00} times over ({made} tiles against {once})");
