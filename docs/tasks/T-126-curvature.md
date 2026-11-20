@@ -90,7 +90,7 @@ By Claude Sonnet 5.5 (claude-sonnet-5-5): agent 1 Sonnet 5.5, agent 2 (this one)
   unchanged.
 - Handle's flat middle: exactly 128.
 
-**Breaks** (`CARVE_BAKES_BREAK=curvature`, each value read as 255 minus it, which is `s` inverted): fails 122 checks (120 convex, the
+**Breaks** (`CARVE_BAKES_BREAK=curvature`, each value read as 255 minus it, which is `s` inverted): fails 123 checks (120 convex, the
 flat middle 127, both L-block texels 251 and 241 against at most 64). Clean run passes. Probe note: box islands abut with no gap, so the
 concave texel is half a texel inside the face, not the one on the UV edge (which landed in a neighbouring island's convex rim).
 
