@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-123
 
-**Verify:** core-unit, server-unit, server-regression
+**Verify:** core-unit, server-unit, server-regression, scenario-bakes
 
 ## Goal
 
