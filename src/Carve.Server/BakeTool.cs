@@ -19,9 +19,13 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
 {
     public const string MasksMap = "masks";
     public const string BaseColourMap = "base_colour";
+    public const string CurvatureMap = "curvature";
 
     /// <summary>The maps there are; T-124 to T-126 add theirs.</summary>
-    public static readonly string[] Maps = [MasksMap, BaseColourMap];
+    public static readonly string[] Maps = [MasksMap, BaseColourMap, CurvatureMap];
+
+    /// <summary>The maps a call with no <c>maps</c> bakes: the ones that need no block.</summary>
+    public static readonly string[] DefaultMaps = [MasksMap, BaseColourMap];
 
     public const string DefaultFolder = "textures";
     public const int DefaultSize = 1024;
@@ -35,21 +39,24 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "A bake is worked in the mesh's UV layout, one texel for each point of the square [0, 1] x [0, 1] with (0, 0) at the image's top-left, so the mesh needs UVs (unwrap, project_uvs or set_uvs) and no two faces may share a texel; the error says which faces do. "
         + "Faces with no UVs are skipped, listed in skipped_faces and named in a warning. "
         + "Arguments: mesh (the mesh to bake; required when the model has several, as render's is), folder (where the PNGs go, relative to carve's working folder like export's paths, or absolute; created when missing; default 'textures'), "
-        + "size (the image's side in texels, a power of two from 64 to 4096; default 1024), padding (texels of the island's edge colour spread past it so filtering and mip maps never reach the empty background, 0 to size/2; default 8), "
-        + "maps (which maps to bake, at least one of 'masks' and 'base_colour'; default both) and surface (below). "
+        + "size (the image's side in texels, a power of two from 64 to 4096; default 1024), curvature (below), padding (texels of the island's edge colour spread past it so filtering and mip maps never reach the empty background, 0 to size/2; default 8), "
+        + "maps (which maps to bake, at least one of 'masks', 'base_colour' and 'curvature'; default masks and base_colour) and surface (below). "
         + "The maps: 'masks' writes one single-channel grey PNG for each face group, <folder>/<mesh>.mask.<group>.png, and one for each material the mesh's faces use, <folder>/<mesh>.material.<name>.png (a group and a material with one name never collide): a texel is white (255) where its face is in the group or has the material and black (0) elsewhere, then padded; a group with no faces gives an all-black mask. "
         + "'base_colour' writes <folder>/<mesh>.base_colour.png, an RGB PNG of sRGB bytes, so define_material's base_colour_texture reads it as it is: each texel takes its face's colour, which is, in this order, the base_colour of the last surface entry that names a group the face is in or its material; else the face's own colour (set_colour); else its material's base_colour; else white (#FFFFFF). "
         + "surface is an object of entries, each keyed by a group or material name, applied in the order given, so a later entry wins a face that two of them name: put a group that holds every face first as a default and the specific groups after it. "
         + "An entry is {base_colour: '#RRGGBB', roughness: 0 to 1, metallic: 0 to 1}, each optional and validated; an entry with no base_colour gives no colour to base_colour. roughness and metallic are for maps that read them and make no warning when no map in this call does. "
+        + "'curvature' writes <folder>/<mesh>.curvature.png, a single-channel grey PNG for wear: 128 (0.5) on flat ground, lighter toward a convex edge and darker toward a concave one, over the width given in the curvature block {width} (metres, greater than 0, required when 'curvature' is a map). "
+        + "Each break edge (an edge the render draws hard: a marked hard edge on a smooth mesh, any edge between two faces that are not coplanar on a flat one) within width of a texel on its face adds half of its dihedral bend over a right angle (capped at 1), signed by convex (+) or concave (-), faded from full on the edge to nothing at width; the sum is clamped, so a right-angle convex edge reads 255 and a right-angle crease 0. "
+        + "A material does not take the curvature map directly (it is not a colour, roughness or normal); it is for wear masks in a texture graph, or a tool of your own. "
         + "Returns JSON {files:[{map, name (a mask's group or material), path, size, replaced, coverage, min, max, mean}], skipped_faces:[face ids], warnings:[]}. "
         + "path is relative to carve's working folder with '/' separators (absolute when folder is), the form define_material takes. replaced is true when a file of that name was there and was overwritten: bake always overwrites. "
         + "coverage is the fraction of the image's texels the faces cover, before padding. min, max and mean are over those covered texels, from 0 to 1; for base_colour each is [r, g, b]. "
-        + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
+        + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a curvature map with no curvature width, or a width that is not above 0; a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
         + "a mesh, group or material name that a file name cannot hold. "
         + "Worked example, from bake to a material on the faces, on the wrench (open samples/wrench.carve): bake with the arguments below writes textures/wrench.base_colour.png and a mask for each group; then define_material {name: 'wrench', base_colour_texture: 'textures/wrench.base_colour.png'} and set_material {material: 'wrench', group: 'all'} (the wrench's group of every face) show the baked colours on the model:\n"
         + ExampleMarker + Example;
 
-    private static readonly string[] Known = ["mesh", "folder", "size", "padding", "maps", "surface"];
+    private static readonly string[] Known = ["mesh", "folder", "size", "padding", "maps", "surface", "curvature"];
 
     private static readonly string[] SurfaceKnown = ["base_colour", "roughness", "metallic"];
 
@@ -64,10 +71,17 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             ["padding"] = new JsonObject { ["description"] = "Texels of colour spread past each island's edge, 0 to size/2. Default 8.", ["type"] = "integer", ["minimum"] = 0 },
             ["maps"] = new JsonObject
             {
-                ["description"] = "The maps to bake, at least one of: masks (one grey PNG per group and per material), base_colour (an RGB PNG). Default both.",
+                ["description"] = "The maps to bake, at least one of: masks (one grey PNG per group and per material), base_colour (an RGB PNG), curvature (a grey PNG, needs the curvature block). Default masks and base_colour.",
                 ["type"] = "array",
                 ["items"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(Maps.Select(m => (JsonNode)m).ToArray()) },
                 ["minItems"] = 1,
+            },
+            ["curvature"] = new JsonObject
+            {
+                ["description"] = "For the curvature map: {width}, in metres, greater than 0, over which an edge shows; required when maps has curvature.",
+                ["type"] = "object",
+                ["properties"] = new JsonObject { ["width"] = new JsonObject { ["type"] = "number", ["exclusiveMinimum"] = 0 } },
+                ["additionalProperties"] = false,
             },
             ["surface"] = new JsonObject
             {
@@ -98,7 +112,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
     }
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? folder = null,
-        JsonElement? size = null, JsonElement? padding = null, JsonElement? maps = null, JsonElement? surface = null)
+        JsonElement? size = null, JsonElement? padding = null, JsonElement? maps = null, JsonElement? surface = null, JsonElement? curvature = null)
     {
         var errors = UnknownArguments("bake", context, Known);
         var meshName = MeshName(mesh, errors);
@@ -121,6 +135,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         else if (named is null) errors.Add(NoMesh);
 
         var entries = ReadSurface(surface, errors);
+        var curvatureWidth = ReadCurvature(curvature, wanted.Contains(CurvatureMap), errors);
 
         // Names a file name cannot hold, and the surface's names against the mesh's.
         if (named is not null)
@@ -156,6 +171,8 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             }
         }
         if (wanted.Contains(BaseColourMap)) jobs.Add((BaseColourMap, null, $"{named.Name}.{BaseColourMap}.png", BaseColour(layout, model, mapped, entries), true));
+        if (wanted.Contains(CurvatureMap) && curvatureWidth is { } width)
+            jobs.Add((CurvatureMap, null, $"{named.Name}.{CurvatureMap}.png", Bake.Curvature(layout, width), false));
 
         var folderPath = folderText.Replace('\\', '/').TrimEnd('/');
         var targets = new List<ToolPath>();
@@ -207,7 +224,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
 
     private static List<string> ReadMaps(JsonElement? maps, List<string> errors)
     {
-        if (Absent(maps)) return [.. Maps];
+        if (Absent(maps)) return [.. DefaultMaps];
         if (maps!.Value.ValueKind != JsonValueKind.Array)
         {
             errors.Add($"maps: expected an array of map names, got {Describe(maps.Value)}");
@@ -224,6 +241,32 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         }
         if (index == 0) errors.Add($"maps: is empty; name at least one of {Quoted(Maps)}");
         return chosen;
+    }
+
+    /// <summary>The curvature block's width in metres, or null (with the problems added) when it is missing and needed, or wrong.</summary>
+    private static double? ReadCurvature(JsonElement? block, bool needed, List<string> errors)
+    {
+        if (Absent(block))
+        {
+            if (needed) errors.Add("curvature: the curvature map needs a curvature block {width}, in metres, greater than 0");
+            return null;
+        }
+        if (block!.Value.ValueKind != JsonValueKind.Object)
+        {
+            errors.Add($"curvature: expected {{width}}, got {Describe(block.Value)}");
+            return null;
+        }
+        double? width = null;
+        var bad = false;
+        foreach (var field in block.Value.EnumerateObject())
+        {
+            if (field.Name != "width") { errors.Add($"curvature: '{field.Name}' is not a curvature field; the field is 'width'"); bad = true; continue; }
+            if (field.Value.ValueKind != JsonValueKind.Number || !field.Value.TryGetDouble(out var w) || !double.IsFinite(w)) { errors.Add($"curvature.width: expected a number of metres, got {Describe(field.Value)}"); bad = true; }
+            else if (!(w > 0)) { errors.Add($"curvature.width: must be greater than 0, not {w.ToString(CultureInfo.InvariantCulture)}"); bad = true; }
+            else width = w;
+        }
+        if (width is null && !bad) errors.Add("curvature.width: required but missing");
+        return bad ? null : width;
     }
 
     private static List<SurfaceEntry> ReadSurface(JsonElement? surface, List<string> errors)
