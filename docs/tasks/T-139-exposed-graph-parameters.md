@@ -4,7 +4,7 @@ description: >-
 ---
 # T-139 — Exposed graph parameters
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
