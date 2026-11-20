@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "size": 256,
+  "seed": 21,
+  "nodes": {
+    "ao": { "type": "levels", "inputs": { "in": "layout.height" }, "params": { "in_high": 0.6, "out_low": 0.45 } },
+    "ao_out": { "type": "output", "inputs": { "in": "ao" }, "params": { "role": "occlusion" } },
+    "base": { "type": "blend", "inputs": { "a": "mortar", "b": "brick", "mask": "layout.mask" }, "params": { "mode": "mix" } },
+    "base_out": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "base_colour" } },
+    "brick": { "type": "blend", "inputs": { "a": "toned", "b": "fleck" }, "params": { "mode": "multiply" } },
+    "clay": { "type": "colour", "params": { "colour": "#a8452f" } },
+    "fleck": { "type": "levels", "inputs": { "in": "fleck_raw" }, "params": { "out_high": 1.08, "out_low": 0.88 } },
+    "fleck_raw": { "type": "noise", "params": { "cells": [48, 48], "interpolation": "smooth", "octaves": 3, "seed": 5 } },
+    "layout": { "type": "tiles", "params": { "bevel": 0.1, "count": [4, 8], "gap": 0.1, "jitter": 0.25, "stagger": 0.5 } },
+    "mortar": { "type": "blend", "inputs": { "a": "mortar_raw", "b": "fleck" }, "params": { "mode": "multiply" } },
+    "mortar_raw": { "type": "colour", "params": { "colour": "#b8b0a0" } },
+    "normal": { "type": "height_to_normal", "inputs": { "height": "layout.height" }, "params": { "strength": 0.015 } },
+    "normal_out": { "type": "output", "inputs": { "in": "normal" }, "params": { "role": "normal" } },
+    "rough_base": { "type": "levels", "inputs": { "in": "layout.mask" }, "params": { "out_high": 0.72, "out_low": 0.95 } },
+    "roughness": { "type": "blend", "inputs": { "a": "rough_base", "b": "fleck" }, "params": { "mode": "multiply" } },
+    "roughness_out": { "type": "output", "inputs": { "in": "roughness" }, "params": { "role": "roughness" } },
+    "tone": { "type": "levels", "inputs": { "in": "layout.random" }, "params": { "out_high": 1.1, "out_low": 0.7 } },
+    "toned": { "type": "blend", "inputs": { "a": "clay", "b": "tone" }, "params": { "mode": "multiply" } }
+  }
+}

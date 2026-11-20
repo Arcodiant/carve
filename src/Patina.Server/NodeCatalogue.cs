@@ -19,6 +19,9 @@ public static class NodeCatalogue
         ["levels"] = "remaps in_low..in_high to out_low..out_high with gamma, clamped; out_low above out_high inverts; greyscale or colour in, the same out",
         ["blend"] = "combines a and b by mode at opacity; colour if either input is (grey spread to grey); in mix the mask takes a where it is 0 and b where it is 1",
         ["height_to_normal"] = "a tangent-space normal (glTF: green up) from a greyscale height, strength the slope per image width at height 1, wrapping at the edges",
+        ["tiles"] = "a layout of tiles or bricks across the image, every size relative: count [x, y] tiles; stagger shifts every second row by that many tiles (0.5 is running bond); gap and bevel are parts of a tile's width (gap 0 to 0.45; the bevel is the ramp inside each edge); jitter moves each tile's size and place by the hash, inside its slot; orientation rows or columns. Outputs: mask (1 on a tile, 0 in the gap), height (0 in the gap, rising over the bevel to 1), random (one value per tile), uv (colour: each texel's place in its tile, red and green 0..1, for a pattern laid inside each tile)",
+        ["stripes"] = "greyscale stripes, 1 on a stripe: count whole stripes across the image, axis u (upright stripes), v (lying stripes) or diagonal (count along each axis), width a part of a period, softness the edge ramp as a part of a period; a stripe is centred on each multiple of 1/count",
+        ["shape"] = "greyscale, one shape per cell of count [x, y] cells, 1 inside: kind circle, square, ring, diamond or polygon (sides 3 to 12), size the part of the cell's shorter side it spans, softness 0..1 the ramp inward from the edge, rotation in degrees inside the cell",
         ["output"] = "one of the material's images, at most one per role: base_colour takes colour or grey, normal colour, roughness and occlusion grey",
     };
 

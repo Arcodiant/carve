@@ -17,6 +17,9 @@ public sealed class NodeRegistry
         new LevelsNode(),
         new BlendNode(),
         new HeightToNormalNode(),
+        new TilesNode(),
+        new StripesNode(),
+        new ShapeNode(),
     ]);
 
     private readonly IReadOnlyDictionary<string, NodeType> _types;

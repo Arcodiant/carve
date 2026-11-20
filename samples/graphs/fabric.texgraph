@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "size": 256,
+  "seed": 33,
+  "nodes": {
+    "ao": { "type": "levels", "inputs": { "in": "height" }, "params": { "out_low": 0.45 } },
+    "ao_out": { "type": "output", "inputs": { "in": "ao" }, "params": { "role": "occlusion" } },
+    "base": { "type": "blend", "inputs": { "a": "shaded", "b": "fibre" }, "params": { "mode": "multiply" } },
+    "base_out": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "base_colour" } },
+    "fibre": { "type": "levels", "inputs": { "in": "fibre_raw" }, "params": { "out_high": 1.08, "out_low": 0.9 } },
+    "fibre_raw": { "type": "noise", "params": { "cells": [128, 128], "interpolation": "smooth", "octaves": 2, "seed": 3 } },
+    "height": { "type": "blend", "inputs": { "a": "weft", "b": "warp", "mask": "over" }, "params": { "mode": "mix" } },
+    "normal": { "type": "height_to_normal", "inputs": { "height": "height" }, "params": { "strength": 0.012 } },
+    "normal_out": { "type": "output", "inputs": { "in": "normal" }, "params": { "role": "normal" } },
+    "over": { "type": "blend", "inputs": { "a": "warp_even", "b": "warp_odd", "mask": "weft_even" }, "params": { "mode": "mix" } },
+    "roughness": { "type": "levels", "inputs": { "in": "fibre_raw" }, "params": { "out_high": 0.95, "out_low": 0.78 } },
+    "roughness_out": { "type": "output", "inputs": { "in": "roughness" }, "params": { "role": "roughness" } },
+    "shade": { "type": "levels", "inputs": { "in": "height" }, "params": { "out_high": 1.04, "out_low": 0.4 } },
+    "shaded": { "type": "blend", "inputs": { "a": "thread", "b": "shade" }, "params": { "mode": "multiply" } },
+    "thread": { "type": "blend", "inputs": { "a": "weft_colour", "b": "warp_colour", "mask": "over" }, "params": { "mode": "mix" } },
+    "warp": { "type": "stripes", "params": { "axis": "u", "count": 16, "softness": 0.35, "width": 0.9 } },
+    "warp_colour": { "type": "colour", "params": { "colour": "#2c4f86" } },
+    "warp_even": { "type": "stripes", "params": { "axis": "u", "count": 8, "softness": 0.06, "width": 0.5 } },
+    "warp_odd": { "type": "levels", "inputs": { "in": "warp_even" }, "params": { "out_high": 0, "out_low": 1 } },
+    "weft": { "type": "stripes", "params": { "axis": "v", "count": 16, "softness": 0.35, "width": 0.9 } },
+    "weft_colour": { "type": "colour", "params": { "colour": "#cdbf9c" } },
+    "weft_even": { "type": "stripes", "params": { "axis": "v", "count": 8, "softness": 0.06, "width": 0.5 } }
+  }
+}

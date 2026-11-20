@@ -23,6 +23,12 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
     public const string WorkedFaultyResult =
         "define_graph: the open graph is now 4 nodes, size 256, seed 0; 1 fault:\n- node 'out' input 'in': names 'bsae', which is not a node; the nodes are base, out, tone, wood";
 
+    /// <summary>A second worked example: a running-bond layout of bricks, its height as the base colour (a node with several outputs is named "id.port").</summary>
+    public const string WorkedTiles =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"layout":{"type":"tiles","params":{"count":[4,8],"stagger":0.5,"gap":0.1,"bevel":0.1}},"out":{"type":"output","inputs":{"in":"layout.height"},"params":{"role":"base_colour"}}}}}""";
+
+    public const string WorkedTilesResult = "define_graph: the open graph is now 2 nodes, size 256, seed 0; no faults: it evaluates";
+
     public static string Text(NodeRegistry registry) =>
         "Replaces the open texture graph with a whole new one, given as graph: the body of a .texgraph file, as JSON. "
         + "patina holds one graph per session. define_graph clears the snapshot stack (push_snapshot) and the graph's path (save gives it one), "
@@ -43,6 +49,9 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         + "define_graph " + Worked + "\n"
         + "returns: " + WorkedResult + "\n"
         + "The same with out's input misspelt as \"bsae\" is taken, and returns:\n" + WorkedFaultyResult + "\n"
+        + "Brick layout, tiles (4 bricks across, 8 rows, every second row shifted half a brick) with its height output as the base colour:\n"
+        + "define_graph " + WorkedTiles + "\n"
+        + "returns: " + WorkedTilesResult + "\n"
         + "Next: edit_graph to change it, get_graph to read it back, save to keep it.";
 
     public static McpServerTool Create(NodeRegistry registry) => Create<DefineGraphTool>("define_graph", Text(registry), new JsonObject
