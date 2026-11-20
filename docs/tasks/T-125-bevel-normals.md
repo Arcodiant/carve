@@ -4,7 +4,7 @@ description: >-
 ---
 # T-125 — Bevel normals
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
