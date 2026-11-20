@@ -19,8 +19,8 @@ public class EvaluationTests
 
     private static readonly TextureGraph Blurred = Graph("""
         "h": { "type": "hash", "params": { "offset": 5 } },
-        "b1": { "type": "blur", "inputs": { "in": "h" } },
-        "b2": { "type": "blur", "inputs": { "in": "b1" } },
+        "b1": { "type": "box5", "inputs": { "in": "h" } },
+        "b2": { "type": "box5", "inputs": { "in": "b1" } },
         "o": { "type": "output", "inputs": { "in": "b2" }, "params": { "role": "occlusion" } },
         "r": { "type": "output", "inputs": { "in": "b1" }, "params": { "role": "roughness" } }
         """);
@@ -163,7 +163,7 @@ public class EvaluationTests
         "c": { "type": "colour", "params": { "colour": "#aa7040" } },
         "l": { "type": "levels", "inputs": { "in": "n" }, "params": { "gamma": 2 } },
         "m": { "type": "blend", "inputs": { "a": "c", "b": "gr", "mask": "l" }, "params": { "mode": "multiply", "opacity": 0.8 } },
-        "hb": { "type": "blur", "inputs": { "in": "l" } },
+        "hb": { "type": "box5", "inputs": { "in": "l" } },
         "rt": { "type": "rotate", "inputs": { "in": "hb" }, "params": { "degrees": 30 } },
         "t": { "type": "height_to_normal", "inputs": { "height": "rt" }, "params": { "strength": 2 } },
         "s": { "type": "split", "inputs": { "in": "m" } },

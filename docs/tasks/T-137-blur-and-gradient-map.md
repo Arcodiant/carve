@@ -61,3 +61,25 @@ colour stops. They come with a painted metal plate whose paint has worn through 
   rules.
 - Runs beside T-138, T-139: its own node files, registry lines, sample and tests. A conflict that only adds is settled by
   keeping both sides.
+
+### As built
+
+Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`), one agent, which stopped at the speed rule below.
+
+**Nodes** (`src/Patina.Graphs/Nodes/BlurNode.cs`, `GradientMapNode.cs`, one line each in `NodeRegistry.BuiltIn`):
+- `blur`: input `in` (grey or colour, the same out); `radius` 0..0.1 (0.01), made whole texels `r = floor(radius * size + 0.5)`; `quality` `box` (one pass of the `2r + 1` texels centred on each) | `smooth` (three). Horizontal passes then vertical, running sums, wrapping; `InputRect` is the output inflated by `r` (`3r` for smooth). **Arithmetic, as the research asked:** each running sum is an integer, the texels in 2^32 fixed point, divided once in `double` and rounded once to `float`, so a texel is the same in every tile and the sum has no drift (a float or double running sum starts from a different texel in each tile). Tests show the tile size changes not one bit.
+- `gradient_map`: input `in` (grey), output colour; `positions` 2..8 numbers 0..1 (0, 1), `colours` the same count (`#000000`, `#ffffff`). Linear in sRGB, clamped beyond the ends. A count mismatch or positions out of order is a fault on the node's `in` (through `CheckInputKinds`, as `GraphValidator` is T-139's), naming the node, `positions` and `colours`. **Equal neighbouring positions are allowed** (a hard step, the later colour at the value itself): the spec said "ascending" without settling this; say if it should be strict.
+- `define_graph` names both and has a worked example (`DefineGraphTool.WorkedMap`, run by `WorkedExampleTests`); `NodeCatalogue` has their lines.
+- The test node `blur` (5 x 5 box) in `TestNodes.cs` is renamed `box5`, since the real `blur` took the name; `GraphFaultTests`' type list has `blur`, `box5`, `gradient_map`.
+
+**Tests:** `BlurGradientMapTests` (23: impulse sum and width for box and smooth, the step across the wrap, radius 0, 256 vs 1024, tile sizes 8/32/128 equal to the bit, colour, the input rectangle, the running sums equal a slow blur written beside them; a table of broken copies, each caught: wrap dropped by the wrap step, window off by one by the box impulse, one pass for three by the smooth impulse, a rectangle one texel short by a throwing read; gradient map at each stop, between, beyond, in a graph, both faults, and broken copies: stops from the wrong end, not clamped, stops held not mixed) and `PaintedMetalTests`.
+
+**Painted metal** (`samples/graphs/painted-metal.texgraph`, 256, seed 137; PNGs in `painted-metal/`, kept equal by the test): paint is a `gradient_map` (3 stops, green-grey) of a gradient `fbm`; steel a `gradient_map` of a value `fbm`; `wear` is a step (`levels` with in_low = in_high 0.42, hard) of a smooth `blur` (0.012) of a gradient `fbm` minus 0.4 of `worley` chips (9 x 9, only cells whose `random` is above 0.65). Metallic is `wear` itself, so exactly 0 or 1. Roughness paint 0.6..0.85, steel 0.22..0.42. Height is a smooth `blur` (0.006) of the paint mask into `height_to_normal` (0.02); occlusion from the same. Named output `wear`. Check's rules, measured on the committed files: metal texels 12632 of 65536 (19.3%), their brightest channel from 158 (rule 120); non-metal brightest channel 74..120, none outside 20..245; metallic between 0.1 and 0.9 in 0 texels (rule 5%); normals worst length error 0.0060; every output has more than one value; seam steps at the wrap at most the interior's.
+
+**Speed (STOP, per the Notes).** Release build, one run each, `smooth` radius 0.05 on a colour input (an `fbm` through a `gradient_map`), the 64 MiB cap and tiles of 128: **2048: 10.5 s** (960 tiles evaluated). **8192: not finished**: stopped at 120 s with 131 of 4096 output tiles done, about 0.9 s a tile, so about an hour. Cause: each 128 output tile asks for 128 + 2 x 1229 = 2586 texels a side (6.7 M texels, 400 input tiles against a cache of about 340 colour tiles), 4096 times. No code change inside `blur` can reach 10 s with this API; it needs the node to see wider tiles or to be split in two passes (an **engine need**: a node that can ask the evaluator for whole-row or whole-column bands, or a larger tile size per node).
+
+**Not checked:** the engine-drawn swatch sheet and sphere (the harness has no engine; the sphere cell was not seen). The person approved the look in Waystone round-1 (G:\My Drive\artifacts\carve\M-28\T-137\round-1, flat PNGs, a sheet without the sphere, a 3 x 3 tiling) and asked for the complete texture on a sphere and a plane: not done.
+
+### Hand-off
+
+HANDOFF at the speed stop; the code is done. Left: the person's decision on blur at 8192 (accept as slow with the cost recorded in `NodeCatalogue`, which already says a large radius on a large image is slow, or an engine change); a sphere and plane view of the sample from a session that has the engine; then `cairn lint` and `cairn task T-137 finish`. Rebase onto the siblings has not been tried.

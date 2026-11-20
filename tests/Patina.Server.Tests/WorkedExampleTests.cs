@@ -35,6 +35,15 @@ public class WorkedExampleTests
     }
 
     [Fact]
+    public async Task Define_graph_takes_the_blur_and_gradient_map_example_as_written()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+
+        Assert.Equal(DefineGraphTool.WorkedMapResult, await patina.Ok("define_graph", DefineGraphTool.WorkedMap));
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedMap + "\nreturns: " + DefineGraphTool.WorkedMapResult, DefineGraphTool.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn));
+    }
+
+    [Fact]
     public async Task Get_graph_after_define_graph_returns_the_description_s_text()
     {
         await using var patina = await PatinaHarness.StartAsync();

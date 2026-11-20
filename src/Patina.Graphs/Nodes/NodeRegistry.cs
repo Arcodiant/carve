@@ -23,6 +23,8 @@ public sealed class NodeRegistry
         new WorleyNode(),
         new FbmNode(),
         new WarpNode(),
+        new BlurNode(),
+        new GradientMapNode(),
     ]);
 
     private readonly IReadOnlyDictionary<string, NodeType> _types;

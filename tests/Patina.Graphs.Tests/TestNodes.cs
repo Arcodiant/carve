@@ -7,7 +7,7 @@ namespace Patina.Graphs.Tests;
 /// <summary>Node types made outside the package, registered as M-29's mesh nodes will be.</summary>
 public static class TestNodes
 {
-    public static readonly NodeRegistry Registry = NodeRegistry.BuiltIn.With(new HashNode(), new BlurNode(), new SplitNode());
+    public static readonly NodeRegistry Registry = NodeRegistry.BuiltIn.With(new HashNode(), new Box5Node(), new SplitNode());
 
     /// <summary><see cref="Registry"/> and the nodes that read away from their texels, <c>rotate</c> and <c>peek</c>, kept apart so the type lists other tests hold stay as they are.</summary>
     public static readonly NodeRegistry Reaching = Registry.With(new RotateNode(), new PeekNode());
@@ -55,11 +55,11 @@ public sealed class HashNode : NodeType
     }
 }
 
-/// <summary><c>blur</c>: a 5 x 5 box mean, radius 2, wrapping; greyscale or colour in, the same out.</summary>
-public sealed class BlurNode : NodeType
+/// <summary><c>box5</c>: a 5 x 5 box mean, radius 2, wrapping; greyscale or colour in, the same out.</summary>
+public sealed class Box5Node : NodeType
 {
     public const int R = 2;
-    public override string Name => "blur";
+    public override string Name => "box5";
     public override IReadOnlyList<InputPort> Inputs { get; } = [new("in", PortKind.Any)];
     public override IReadOnlyList<ParamSpec> Parameters { get; } = [];
     public override TexelRect InputRect(string port, TexelRect output, NodeParameters parameters, int size) => output.Inflate(R);
