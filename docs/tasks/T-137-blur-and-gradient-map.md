@@ -4,7 +4,7 @@ description: >-
 ---
 # T-137 — Blur and gradient map
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
