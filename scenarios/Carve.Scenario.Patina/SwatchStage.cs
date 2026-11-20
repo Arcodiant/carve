@@ -48,6 +48,8 @@ internal sealed class SwatchStage : IPatinaStage
     public const double BandHigh = 128;
     public const double ToneStep = 0.03;
     public const double HighlightStep = 40;
+    /// <summary>Not yet measured: 0 until the person sets it from the run's swatch-checks.tsv (T-134).</summary>
+    public const double MetallicStep = 0;
     /// <summary>Carve's slate, (0.03, 0.035, 0.04) linear, through half floats and sRGB, as a frame shows it.</summary>
     private static readonly byte[] Slate = [.. new[] { 0.03f, 0.035f, 0.04f }.Select(v =>
     {
@@ -132,6 +134,8 @@ internal sealed class SwatchStage : IPatinaStage
             + string.Create(CultureInfo.InvariantCulture, $"\nhighlight\tpeak_luma_roughness_0\tpeak_luma_roughness_1\tstep\n\t{peaks[0]:0.0}\t{peaks[1]:0.0}\t{peaks[0] - peaks[1]:0.0}\n"));
         checks.Check(peaks[0] - peaks[1] >= HighlightStep,
             $"swatch: the roughness-0 sphere's peak luma {peaks[0]:0.0} is not {HighlightStep} above the roughness-1 sphere's {peaks[1]:0.0}: no highlight");
+
+        await MetalPlateAsync(driver, checks, read);
 
         await BreaksAsync(driver, checks, sample, read, spheres, sheet, small, tiled, seam);
     }
@@ -299,7 +303,7 @@ internal sealed class SwatchStage : IPatinaStage
             return new Readback(images);
         }
 
-        private static byte[] Decode(string path, int size)
+        public static byte[] Decode(string path, int size)
         {
             var image = File.Exists(path) ? ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha) : null;
             return image is not null && image.Width == size && image.Height == size ? image.Data
@@ -326,6 +330,86 @@ internal sealed class SwatchStage : IPatinaStage
     }
 
     private static byte[] Image(Readback read, string role, int size) => read.Image(role, size);
+
+    /// <summary>
+    /// The metal plate (T-134, define_graph's worked example): its sheet, a column per output in role order then by name
+    /// (base_colour, roughness, metallic, edge), each cell from the exported texels (roughness alone is roughness.png with B
+    /// 0, metallic alone is its B spread grey, edge is edge.png); its sphere, the silhouette the camera puts and the sheet's
+    /// sphere cell; then the metallic highlight: a grey-200 sphere at metallic 1 shows a highlight tinted by the base colour,
+    /// so its peak luma is at least <see cref="MetallicStep"/> below the same sphere at metallic 0, whose highlight is white.
+    /// </summary>
+    private async Task MetalPlateAsync(ScenarioDriver driver, PatinaChecks checks, Readback planks)
+    {
+        await checks.CallAsync("define_graph", MetalPlate);
+        var folder = Path.Combine(driver.RunFolder, "swatch-plate-texels");
+        await checks.CallAsync("export", JsonSerializer.Serialize(new { folder, size = 64 }));
+        checks.Check(!File.Exists(Path.Combine(folder, "metallic.png")), "swatch: export wrote metallic.png; metallic is packed into roughness.png");
+        var files = new[] { "base_colour", "roughness", "edge" }.ToDictionary(f => f, f => Readback.Decode(Path.Combine(folder, f + ".png"), 64));
+        var columns = new (string Name, Func<int, int, byte[]> Texel)[]
+        {
+            ("base_colour", (x, y) => files["base_colour"].AsSpan((y * 64 + x) * 4, 4).ToArray()),
+            ("roughness", (x, y) => { var t = files["roughness"].AsSpan((y * 64 + x) * 4, 4).ToArray(); t[2] = 0; return t; }),
+            ("metallic", (x, y) => { var b = files["roughness"][(y * 64 + x) * 4 + 2]; return [b, b, b, 255]; }),
+            ("edge", (x, y) => files["edge"].AsSpan((y * 64 + x) * 4, 4).ToArray()),
+        };
+        var sphere = await driver.CaptureToolAsync("swatch", "swatch-plate-sphere", new { view = "sphere" });
+        var judged = Judge(planks, 256, 0);
+        var silhouette = 0;
+        for (var at = 0; at < judged.Length; at++)
+        {
+            var (x, y) = (at % SwatchSphere.Size, at / SwatchSphere.Size);
+            if (judged[at].Outside && !IsSlate(sphere, x, y)) silhouette++;
+        }
+        checks.Check(silhouette == 0, $"swatch: the plate's sphere: {silhouette} pixel(s) outside the silhouette are not the slate");
+
+        var sheet = await driver.CaptureToolAsync("swatch", "swatch-plate-sheet", new { });
+        var width = columns.Length * 258 + 512;
+        if (sheet.Width != width || sheet.Height != 538)
+        {
+            checks.Check(false, $"swatch: the plate's sheet is {sheet.Width} x {sheet.Height}, not {width} x 538");
+        }
+        else
+        {
+            for (var column = 0; column < columns.Length; column++)
+            {
+                var (name, texel) = columns[column];
+                var left = column * 258;
+                CheckRegion(checks, $"plate sheet {name} flat", sheet, left, 24, 256, 256, LabelBand, (x, y) => texel(Under(x, 256, 64), Under(y, 256, 64)));
+                CheckRegion(checks, $"plate sheet {name} tiled", sheet, left, 282, 256, 256, LabelBand, (x, y) => texel(Under(x, 256, 192) % 64, Under(y, 256, 192) % 64));
+                checks.Check(Bright(sheet, left, 24, 256, LabelBand) && Bright(sheet, left, 282, 256, LabelBand), $"swatch: plate sheet column {name} has no label text");
+            }
+            CheckRegion(checks, "plate sheet sphere cell against the sphere view", sheet, columns.Length * 258, 25, 512, 512, LabelBand,
+                (x, y) => sphere.Pixels.AsSpan((y * 512 + x) * 4, 4));
+        }
+
+        var peaks = new Dictionary<int, double>();
+        foreach (var metallic in new[] { 0, 1 })
+        {
+            await checks.CallAsync("define_graph", MetallicSphere.Replace("METALLIC", metallic.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
+            peaks[metallic] = PeakLuma(await driver.CaptureToolAsync("swatch", $"swatch-sphere-metallic-{metallic}", new { view = "sphere" }));
+        }
+        File.AppendAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), string.Create(CultureInfo.InvariantCulture,
+            $"\nmetallic\tpeak_luma_metallic_0\tpeak_luma_metallic_1\tstep\n\t{peaks[0]:0.0}\t{peaks[1]:0.0}\t{peaks[0] - peaks[1]:0.0}\n"));
+        checks.Check(peaks[0] - peaks[1] >= MetallicStep,
+            $"swatch: the metallic-1 grey-200 sphere's peak luma {peaks[1]:0.0} is not {MetallicStep} below the metallic-0 sphere's {peaks[0]:0.0}: its highlight is not tinted");
+    }
+
+    /// <summary>define_graph's worked metal plate: base colour grey 200, roughness and metallic from a u ramp, a named edge output.</summary>
+    private const string MetalPlate = """
+        {"graph":{"version":1,"size":64,"seed":0,"nodes":{"plate":{"type":"colour","params":{"colour":"#c8c8c8"}},"ramp":{"type":"gradient"},"rough":{"type":"levels","inputs":{"in":"ramp"},"params":{"out_low":0.7,"out_high":0.3}},"band":{"type":"gradient","params":{"axis":"v","shape":"triangle"}},"out_base":{"type":"output","inputs":{"in":"plate"}},"out_rough":{"type":"output","inputs":{"in":"rough"},"params":{"role":"roughness"}},"out_metal":{"type":"output","inputs":{"in":"ramp"},"params":{"role":"metallic"}},"out_edge":{"type":"output","inputs":{"in":"band"},"params":{"name":"edge"}}}}}
+        """;
+
+    /// <summary>A grey-200 sphere at roughness 0.2 and metallic METALLIC, both constant.</summary>
+    private const string MetallicSphere = """
+        {"graph":{"version":1,"size":64,"seed":1,"nodes":{
+          "grey":{"type":"colour","params":{"colour":"#c8c8c8"}},
+          "ramp":{"type":"gradient","params":{"axis":"u","repeat":1}},
+          "flat":{"type":"levels","inputs":{"in":"ramp"},"params":{"out_low":0.2,"out_high":0.2}},
+          "metal":{"type":"levels","inputs":{"in":"ramp"},"params":{"out_low":METALLIC,"out_high":METALLIC}},
+          "base":{"type":"output","inputs":{"in":"grey"},"params":{"role":"base_colour"}},
+          "rough":{"type":"output","inputs":{"in":"flat"},"params":{"role":"roughness"}},
+          "metallic":{"type":"output","inputs":{"in":"metal"},"params":{"role":"metallic"}}}}}
+        """;
 
     private static ReadOnlySpan<byte> Texel(Readback read, string role, int size, int x, int y) =>
         Image(read, role, size).AsSpan((y * size + x) * 4, 4);
