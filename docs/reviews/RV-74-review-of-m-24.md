@@ -83,7 +83,9 @@ description: >-
 - **Consequence:** this breaks T-122's "Errors, all at once" and the description's "Errors, all listed at once". An agent fixes one problem, calls again and meets the next. On the wrench's default maps (six masks and base colour), one bad character becomes seven near-identical lines about file paths, where the problem is the `folder` argument.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 85eb530; `BakeToolTests.A_bad_folder_is_one_folder_problem_listed_with_the_others` and `BakeToolTests.Two_masks_that_differ_only_by_case_are_refused_with_the_other_problems` fail without it. The folder is judged once (`ToolPaths.FolderProblem`) with the argument errors, as `folder: "a*b" holds the character '*', which a folder path may not`, in `ToolPaths`' words for a file; the masks' case clash is worked from the group and material names, before the layout, so it is listed with the rest too. No test or digest pinned the old words (`bake` is outside the tools/list digest).
 
 ### A surface entry naming a model material the mesh does not use is accepted silently
 - **Where:** src/Carve.Server/BakeTool.cs:183-185 (rubric 1)
@@ -101,7 +103,9 @@ description: >-
 - **Consequence:** after a failed `bake` the folder holds a mix of new and old maps (say a new base colour with last call's ORM), and the agent cannot tell which.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 85eb530; `BakeToolTests.A_write_that_fails_part_way_names_the_files_written_before_it_and_those_not_written` fails without it. The error now ends `The bake stopped there; written before it, replacing any file of that name: ...; not written: ...`, and the description says a failed write stops the bake and names both. Staging every file and moving them all at the end was not done: each file already goes through its own temp file and move, and a run of moves can fail part way just the same.
 
 ### The description says `path` is absolute when the folder is, but an absolute folder comes back relative
 - **Where:** src/Carve.Server/BakeTool.cs:59 and :512-516 (rubric 1)
@@ -109,7 +113,9 @@ description: >-
 - **Consequence:** `define_material` still resolves the returned path to the same file, so nothing breaks. But the agent is told one form and gets another, including `..` paths it did not write.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 85eb530; a description fix, no test. The code is right (`define_material` resolves the path either way), so the text now says what it does: path is relative to the working folder, an absolute folder too, with `..` for one outside it, and absolute only on another drive. `bake` is one of the tools `PartToolsListTests` leaves out of its digest, so no digest moved.
 
 ### `image` with a non-`uvs` mode returns alone, before the call's other problems
 - **Where:** src/Carve.Server/RenderTool.cs:317-320 (rubric 1)
@@ -117,7 +123,9 @@ description: >-
 - **Consequence:** a second round trip for a mistyped call. This is minor, since the image refusal is the likely root mistake.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 8c1a528; `UvImageArgumentTests.Image_with_another_mode_is_reported_with_the_calls_other_problems` (view, projection, level) fails without it. With a mode other than `uvs`, the image's refusal, in its own words, goes ahead of whichever argument problem follows it (`render failed with 2 problem(s)`), and still comes back alone, as before, when it is the only one.
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -137,7 +145,11 @@ description: >-
 - **Consequence:** the occlusion map changes value from texel to texel, which is the case that exposed `render_glb`'s missing mips. If the look sampled or dimmed it wrongly, or drew a normal map's RGB wrongly, no check would catch it. One stage keeps a rule that two other stages drop, and the tracker says the opposite.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 7aac4e6, with the retrospective's line in the commit that answers this review; a scenario break each, no unit test. `CARVE_BAKES_BREAK=dark` reads the occlusion inverted (a reach cannot do it: with reach 1 m the grip's middle still reads 255, nothing standing over it): 2 failures, the grip's middle reading 0 against 250 and the crevice margin. `bevel-wide` bakes the normal map 20 times as wide: 380 of the 448 flat texels fail, and 2 strip checks. Both breaks are in the scenario only. The retrospective now says those two were shown failing only here.
+
+**Open:** (claude-opus-5-5) both frames fail T-121's strict rule, so a check on either needs a tolerance, which is the person's. Probed on 7aac4e6's code, with 22558 inside and 28344 outside pixels placed in each frame: `wrench-orm-uvs-occlusion` breaks it at 96 inside pixels (every one `inside-png`, up to 8 levels off, e.g. the frame 216 where the texel is 208, on the gradients of faces 64 and 65; none outside), and passes with `blend: 1` (and 2). `wrench-uvs-normal` breaks it at 3 inside pixels (faces 79, 12, 27: one channel 3 levels off N, e.g. (131, 130, 255) for (128, 128, 255)), and `blend` 1 or 2 does not clear them, since `Blended` reads grey. Options: (a) occlusion with `blend: 1` and the normal map with a per-channel slack of 3 (or a blend that reads each channel); (b) occlusion with `blend: 1` and the normal frame left unchecked; (c) both left as captures only, the retrospective's ruling line saying so. No check was added; the frames are as they were.
 
 ### Two scenario checks were never shown failing, against "every new check was shown failing on a break"
 - **Where:** scenarios/Carve.Scenario.Bakes/OcclusionStage.cs:168 (`OpenLeast`); scenarios/Carve.Scenario.Bakes/BevelStage.cs:118-144 (`CheckFlat`); docs/milestones/M-24-baked-maps.md:175; docs/tasks/T-124-occlusion-and-the-orm-bake.md:57-60; docs/tasks/T-125-bevel-normals.md:50-53 (rubric 2, 7)
@@ -145,7 +157,9 @@ description: >-
 - **Consequence:** nobody has shown that either check can catch the fault it names. The tracker claims coverage it does not have.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 7aac4e6; a scenario check, no unit test. BevelStage keeps its own rows in `bevel.tsv` and adds the control from `RenderExportAsync`'s frames, as `BakesChecks.CompareExportAsync` does: the three-quarter `render_glb` against the front `render`, noted if it passes. On the plain run it differs in 88205 of 1048576 pixels (patch 86985) and fails, as it must; the two good pairs still pass (0 and 1 pixels).
 
 ### The bevel stage's render_glb comparison drops the control the other two stages keep
 - **Where:** scenarios/Carve.Scenario.Bakes/BevelStage.cs:287-296 against BakesChecks.cs:321-333 (rubric 2)
@@ -153,7 +167,9 @@ description: >-
 - **Consequence:** if the comparison stops telling frames apart (for example, a `render_glb` that ignores the map's file, or a measure that always passes), the bevel stage's "render_glb agrees with render with the map" passes with nothing to show it could fail. The rule is kept by one stage and broken by another.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 7aac4e6; a scenario change, no unit test. The hard edges come from `set_shading`'s answer: the wrench is set to the smooth shading it already has (the mesh is unchanged), and the answer's `hard_edges` are the server's. `wrench.carve` is no longer read for them. The checks see the same edges as before: 448 flat texels and the same strip rows in `bevel.tsv`, and every bake and frame was byte-identical.
 
 ### The bevel stage reads hard edges by parsing the sample file on disk, not from the model through the tools
 - **Where:** scenarios/Carve.Scenario.Bakes/BevelStage.cs:96-102 (rubric 5, CLAUDE.md "never special-case the product or reach into its internals")
@@ -215,18 +231,17 @@ Three reviewers on Opus 5.5 read the diff in parallel, sized to its spread (abou
 
 ## Hand-off
 
-The answer (claude-opus-5-5) stopped at its checkpoint (about 60 tool calls) with 11 of 19 findings answered and **Status** left
-Open. Tip 82127f6.
+The answer (claude-opus-5-5, two agents) has 18 of 19 findings answered and **Status** left Open: the block rule on the
+occlusion and normal-map `uvs` frames waits on the person (its **Open:** line has the numbers and the options). Tip after
+this commit.
 
-- **Answered:** the five Core findings (NearEdges, the Clamp label, the clamp tie test and Pad fixed; WrenchBevelSeamTests
-  skipped), the unused material, ColourRule.cs, T-121's Verify, the evidence paths, the break table, and the duplicated
-  helpers (in part: the block rule's two copies are left, as its outcome says).
-- **Left, each still `—`:** the bad `folder` reported late and per file; the failed write part way; `path` relative for an
-  absolute `folder`; render's `image` error alone; the block rule on the occlusion and normal-map `uvs` frames (may need a
-  stop if either frame needs a blend); the two checks never shown failing (a break each); BevelStage's `render_glb` control;
-  BevelStage's hard edges through `set_shading`'s answer.
-- **Checked:** `scenario-bakes` run three times (before any fix, after NearEdges, after everything here): every PNG
-  (76 frames and textures) byte-identical; the text files differ only in the run folder's path and the `ms` timings. All
-  1389 Core tests and the 57 server bake tests pass.
-- **Surprising:** a backslash written through the shell becomes a line break in transit, as the evidence paths show; compose
-  Windows paths with `chr(92)`.
+- **Answered by the second agent:** the bad `folder` and the case clash, listed once with the other problems; the failed
+  write naming the files; `path`'s description; render's `image` refusal listed with the other problems; a break each for
+  the two unbroken checks (`dark`, `bevel-wide`); BevelStage's `render_glb` control; hard edges through `set_shading`.
+- **Left:** the block-rule finding. Once ruled: add the `CheckUvImage` calls (their places in OcclusionStage and BevelStage
+  carry an RV-74 comment), run `scenario-bakes`, fill the outcome, remove this section and set **Status:** Answered.
+- **Checked:** `scenario-bakes` plain on the final code (run 12): passed, all 66 PNGs byte-identical with run 3, the
+  first agent's last; the text files differ only by the run folder in paths, the `ms` timings and `bevel.tsv`'s new
+  control row. 994 server unit tests pass.
+- **Surprising:** a reach does not darken the grip's middle at all (nothing stands over it), so its break reads the map
+  inverted, as `curvature`'s does.

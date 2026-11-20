@@ -172,10 +172,13 @@ milestone and wraps T-120's API as mesh-input nodes.
 - **The tangent frame matches the probe.** On `FrontUvs` the planning formula's second vector points down the image, so
   T-120 negates it. A unit test holds the raw formula's sign and the frame's, and T-125's render test shows +G brightening
   toward the top face, with G or R inverted failing.
-- **Every new check was shown failing on a break,** with the counts in each member's As built: the steel/red swap (448),
+- **Every new check was shown failing on a break, two of them only in RV-74's answer,** with the counts in each member's As built: the steel/red swap (448),
   a faint steel and red (53), a mirrored camera (57), inverted curvature (123), reach 0.0001 (the crevice 0 below the
   open texels), metallic 0 (271418 of 497040 texels), the G-inverted normal map (6 of 6 strip checks), the thin-width
-  seam break (32.4° against 9°).
+  seam break (32.4° against 9°). The open texels at least 250 and the flat texels holding N had no break until RV-74
+  (claude-opus-5-5) added `dark` (the occlusion read inverted: 2 failures, the grip's middle reading 0) and `bevel-wide`
+  (the map baked 20 times as wide: 380 of 448 flat texels, and 2 strips); RV-74 also gave the bevel export the control
+  that must fail (88205 of 1048576 pixels, failing).
 - **The person approved every frame set, each in round 1 with no notes:** T-121's four, T-123's 17, T-124's 17,
   T-125's 19 and T-126's four.
 - **`cairn milestone M-24 verify` (2026-11-20, at 6887cfe, before this retrospective)** passed every check but `review`,
