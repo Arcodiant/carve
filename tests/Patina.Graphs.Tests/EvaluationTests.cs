@@ -24,8 +24,8 @@ public class EvaluationTests
         "r": { "type": "output", "inputs": { "in": "b1" }, "params": { "role": "roughness" } }
         """);
 
-    private static byte[] Rgba(TextureGraph g, OutputRole role, int size, int? bandRows = null) =>
-        OutputImage.Rgba8(new GraphEvaluator(g, TestNodes.Registry), role, size, bandRows);
+    private static byte[] Rgba(TextureGraph g, OutputRole role, int size, int? tileSize = null, long? cacheBytes = null) =>
+        OutputImage.Rgba8(new GraphEvaluator(g, TestNodes.Registry), role, size, tileSize, cacheBytes);
 
     [Fact]
     public void AColourToBaseColourGivesExactlyThatColour()
@@ -44,10 +44,10 @@ public class EvaluationTests
     {
         byte[] Pack(OutputRole role, PortKind kind, params float[] texel)
         {
-            var band = new Band(kind, 1, 0, 1);
-            texel.CopyTo(band.Data, 0);
+            var tile = new Tile(kind, new TexelRect(0, 0, 1, 1));
+            texel.CopyTo(tile.Data, 0);
             var rgba = new byte[4];
-            OutputPacking.PackRow(role, band, 0, rgba);
+            OutputPacking.PackRow(role, tile, 0, rgba);
             return rgba;
         }
 
@@ -62,26 +62,25 @@ public class EvaluationTests
     }
 
     [Fact]
-    public void TheSameGraphGivesTheSameBytesTwiceAndAtAnyBandHeight()
+    public void TheSameGraphGivesTheSameBytesTwiceAndAtAnyTileSizeAndCap()
     {
         var once = Rgba(Blurred, OutputRole.Occlusion, 64);
         Assert.Equal(once, Rgba(Blurred, OutputRole.Occlusion, 64));
-        Assert.Equal(once, Rgba(Blurred, OutputRole.Occlusion, 64, bandRows: 7));
-        Assert.Equal(once, Rgba(Blurred, OutputRole.Occlusion, 64, bandRows: 16));
+        Assert.Equal(once, Rgba(Blurred, OutputRole.Occlusion, 64, tileSize: 8));
+        Assert.Equal(once, Rgba(Blurred, OutputRole.Occlusion, 64, tileSize: 16, cacheBytes: 0));
         var png = OutputImage.Make(new GraphEvaluator(Blurred, TestNodes.Registry), OutputRole.Roughness, 64).Png;
-        Assert.Equal(png, OutputImage.Make(new GraphEvaluator(Blurred, TestNodes.Registry), OutputRole.Roughness, 64, bandRows: 3).Png);
+        Assert.Equal(png, OutputImage.Make(new GraphEvaluator(Blurred, TestNodes.Registry), OutputRole.Roughness, 64, tileSize: 4).Png);
     }
 
     [Theory]
-    [InlineData(1)]
-    [InlineData(3)]
-    [InlineData(5)]
+    [InlineData(16)]
+    [InlineData(32)]
     [InlineData(64)]
-    public void ARadiusTwoNodeWrapsAtBandEdgesAsTheWholeImageDoes(int bandRows)
+    public void ARadiusTwoNodeWrapsAtTileEdgesAsTheWholeImageDoes(int tileSize)
     {
         // Worked here directly, with wrap-around, from the hash's texels: one blur (roughness) and two (occlusion).
         const int n = 64;
-        float H(int x, int y) => TestNodes.HashValue(Band.Wrap(x, n), Band.Wrap(y, n), 7, 5);
+        float H(int x, int y) => TestNodes.HashValue(Tile.Wrap(x, n), Tile.Wrap(y, n), 7, 5);
         float Box(Func<int, int, float> f, int x, int y)
         {
             float s = 0;
@@ -90,8 +89,8 @@ public class EvaluationTests
         }
         float B1(int x, int y) => Box(H, x, y);
 
-        var roughness = Rgba(Blurred, OutputRole.Roughness, n, bandRows);
-        var occlusion = Rgba(Blurred, OutputRole.Occlusion, n, bandRows);
+        var roughness = Rgba(Blurred, OutputRole.Roughness, n, tileSize);
+        var occlusion = Rgba(Blurred, OutputRole.Occlusion, n, tileSize, cacheBytes: 0);
         for (var y = 0; y < n; y++)
             for (var x = 0; x < n; x++)
             {
@@ -122,32 +121,38 @@ public class EvaluationTests
     }
 
     [Fact]
-    public void BandsAreBoundedAndOnlySmallSizesAreWhole()
+    public void TilesAreBoundedAndTheCacheStaysUnderItsCap()
     {
-        Assert.Equal(512, GraphEvaluator.BandRowsFor(512));
-        Assert.Equal(256, GraphEvaluator.BandRowsFor(1024));
-        Assert.Equal(128, GraphEvaluator.BandRowsFor(2048));
-        Assert.Equal(32, GraphEvaluator.BandRowsFor(8192));
+        Assert.Equal(128, GraphEvaluator.DefaultTileSize);
+        Assert.Equal(64L << 20, GraphEvaluator.DefaultCacheBytes);
 
-        // At 2048 a pointwise graph is made in 16 bands of 128 rows, none holding more.
+        // At 2048 a pointwise graph is made in 16 x 16 canonical tiles of 128, top row first, left to right. Nothing is
+        // read twice, but 256 greyscale tiles (16 MiB) fit under the default cap, so all are held to the end.
         var flat = new GraphEvaluator(Graph("""
             "h": { "type": "hash" },
             "o": { "type": "output", "inputs": { "in": "h" }, "params": { "role": "occlusion" } }
             """), TestNodes.Registry);
-        var bands = 0;
-        flat.Evaluate(OutputRole.Occlusion, 2048, (band, y0, rows) =>
-        {
-            bands++;
-            Assert.Equal(128, rows);
-            Assert.True(band.HoldsRow(y0) && band.HoldsRow(y0 + rows - 1));
-        });
-        Assert.Equal(16, bands);
-        Assert.Equal(new EvaluationRun(128, 128, 128 * 2048L * 4), flat.LastRun);
+        var seen = new List<TexelRect>();
+        flat.Evaluate(OutputRole.Occlusion, 2048, tile => seen.Add(tile.Rect));
+        Assert.Equal([.. Enumerable.Range(0, 256).Select(i => new TexelRect(i % 16 * 128, i / 16 * 128, 128, 128))], seen);
+        const long grey128 = 128 * 128 * 4;
+        Assert.Equal(new EvaluationRun(128, 256, 256 * grey128, 64L << 20, 256), flat.LastRun);
+        // With no cache, one tile is held at a time.
+        flat.Evaluate(OutputRole.Occlusion, 2048, _ => { }, cacheBytes: 0);
+        Assert.Equal(new EvaluationRun(128, 1, grey128, 0, 256), flat.LastRun);
+        // A tile size past the image is the image.
+        flat.Evaluate(OutputRole.Occlusion, 32, _ => { }, tileSize: 256);
+        Assert.Equal(new EvaluationRun(32, 1, 32 * 32 * 4, 64L << 20, 1), flat.LastRun);
 
-        // h feeds b1 (radius 2), which feeds b2 (radius 2): in bands of 32, h's holds 32 + 2 * 4 rows, the most any node holds.
+        // h feeds b1 (radius 2), which feeds b2 (radius 2). At 256 in tiles of 32 (8 x 8), one output tile needs b2's
+        // tile, b1's 3 x 3 around it and h's 5 x 5. Under the default cap each of the 3 x 64 node tiles is made once and
+        // all are held; with no cache each output tile makes its 35 again.
+        const long grey32 = 32 * 32 * 4;
         var blurred = new GraphEvaluator(Blurred, TestNodes.Registry);
-        blurred.Evaluate(OutputRole.Occlusion, 256, (_, _, _) => { }, bandRows: 32);
-        Assert.Equal(new EvaluationRun(32, 40, (40 + 36 + 32) * 256L * 4), blurred.LastRun);
+        blurred.Evaluate(OutputRole.Occlusion, 256, _ => { }, tileSize: 32);
+        Assert.Equal(new EvaluationRun(32, 192, 192 * grey32, 64L << 20, 192), blurred.LastRun);
+        blurred.Evaluate(OutputRole.Occlusion, 256, _ => { }, tileSize: 32, cacheBytes: 0);
+        Assert.Equal(new EvaluationRun(32, 35, 35 * grey32, 0, 64 * 35), blurred.LastRun);
     }
 
     [Fact]

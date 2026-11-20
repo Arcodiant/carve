@@ -69,7 +69,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         }
         // The graph is a value, so it is evaluated outside the store's lock and the other tools answer while an export
         // runs (minutes at 8192). Exports take turns, as two could write the same files. A cancelled call
-        // (notifications/cancelled) stops between bands, writing nothing more, and gives up its turn.
+        // (notifications/cancelled) stops between tiles, writing nothing more, and gives up its turn.
         Exports.Wait(cancellationToken);
         try
         {
@@ -132,10 +132,10 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                 long length;
                 try
                 {
-                    evaluator.Evaluate(role, pixels, (band, y0, rows) =>
+                    evaluator.Evaluate(role, pixels, tile =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        for (var y = y0; y < y0 + rows; y++) OutputPacking.PackRow(role, band, y, rgba.AsSpan(y * pixels * 4, pixels * 4));
+                        OutputPacking.PackTile(role, tile, rgba, pixels);
                     });
                     cancellationToken.ThrowIfCancellationRequested();
                     using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))

@@ -43,32 +43,41 @@ public static class OutputPacking
 {
     public static byte Byte(float v) => (byte)Math.Clamp(MathF.Round(v, MidpointRounding.AwayFromZero), 0f, 255f);
 
-    /// <summary>Packs logical row <paramref name="y"/> of <paramref name="band"/> into <paramref name="rgba"/>, four bytes a texel.</summary>
-    public static void PackRow(OutputRole role, Band band, int y, Span<byte> rgba)
+    /// <summary>Packs <paramref name="tile"/> into its place in <paramref name="rgba"/>, the whole image of side <paramref name="size"/>, row by row.</summary>
+    public static void PackTile(OutputRole role, Tile tile, byte[] rgba, int size)
     {
-        if (rgba.Length != band.Width * 4) throw new ArgumentException("one row is four bytes a texel", nameof(rgba));
-        for (var x = 0; x < band.Width; x++)
+        if (rgba.LongLength != (long)size * size * 4) throw new ArgumentException("an RGBA8 image is four bytes a texel", nameof(rgba));
+        for (var y = tile.Rect.Y; y < tile.Rect.Bottom; y++)
+            PackRow(role, tile, y, rgba.AsSpan((int)(((long)y * size + tile.Rect.X) * 4), tile.Rect.Width * 4));
+    }
+
+    /// <summary>Packs row <paramref name="y"/> of <paramref name="tile"/>, its columns <c>Rect.X</c> on, into <paramref name="rgba"/>, four bytes a texel.</summary>
+    public static void PackRow(OutputRole role, Tile tile, int y, Span<byte> rgba)
+    {
+        if (rgba.Length != tile.Rect.Width * 4) throw new ArgumentException("one row is four bytes a texel", nameof(rgba));
+        for (var i = 0; i < tile.Rect.Width; i++)
         {
-            var o = x * 4;
+            var x = tile.Rect.X + i;
+            var o = i * 4;
             switch (role)
             {
                 case OutputRole.BaseColour:
                 {
-                    var (r, g, b) = band.Colour(x, y);
+                    var (r, g, b) = tile.Colour(x, y);
                     rgba[o] = Byte(255f * r); rgba[o + 1] = Byte(255f * g); rgba[o + 2] = Byte(255f * b);
                     break;
                 }
                 case OutputRole.Normal:
                 {
-                    var (r, g, b) = band.Colour(x, y);
+                    var (r, g, b) = tile.Colour(x, y);
                     rgba[o] = Byte(127.5f + 127.5f * r); rgba[o + 1] = Byte(127.5f + 127.5f * g); rgba[o + 2] = Byte(127.5f + 127.5f * b);
                     break;
                 }
                 case OutputRole.Roughness:
-                    rgba[o] = 255; rgba[o + 1] = Byte(255f * band.Grey(x, y)); rgba[o + 2] = 0;
+                    rgba[o] = 255; rgba[o + 1] = Byte(255f * tile.Grey(x, y)); rgba[o + 2] = 0;
                     break;
                 case OutputRole.Occlusion:
-                    var a = Byte(255f * band.Grey(x, y));
+                    var a = Byte(255f * tile.Grey(x, y));
                     rgba[o] = a; rgba[o + 1] = a; rgba[o + 2] = a;
                     break;
             }

@@ -21,7 +21,7 @@ public sealed class ColourNode : NodeType
         var (r, g, b) = evaluation.Parameters.Colour("colour");
         float fr = r / 255f, fg = g / 255f, fb = b / 255f;
         var output = evaluation.Output();
-        for (var y = evaluation.Y0; y < evaluation.Y0 + evaluation.Rows; y++)
+        for (var y = evaluation.Rect.Y; y < evaluation.Rect.Bottom; y++)
         {
             var row = output.Row(y);
             for (var i = 0; i < row.Length; i += 3)
