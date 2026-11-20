@@ -72,6 +72,9 @@ byte-identical, so the speed checks T-137 and T-138 moved here can be met.
     Release, before (the milestone base) and after, three times each, back to back, compared by median. An after
     median more than 10% slower than its before median is looked into before landing (the normal's tiles made also
     rose, 133,783 to 148,877); if the cause cannot be fixed within this task, stop and report it with the figures.
+- **Decided (2026-11-20, by the person, on the first and second hand-offs):** `EvaluationTests.TilesAreBoundedAndTheCacheStaysUnderItsCap`'s
+  cap-0 target goes from 35 tiles held and 2,240 made to 18 and 2,004. `patina-regression` runs a Debug build, so
+  its 8192 regression tests assert the 2 GB peak only; the 10 s checks are Release figures, written in As built.
 
 ### Research (Claude Opus 5.5, `claude-opus-5-5`, 2026-11-20)
 
@@ -106,242 +109,175 @@ node so the source is made once.
 **The person's rulings (round-1, 2026-11-20):** Q1 (a): the blur's 10 s is its own share, the run less its source
 alone. Q2 (A): keep the 64 MiB cap and recompute as little as it allows ("let's try for A").
 
-### Hand-off
+### As built
 
-From the first agent (Claude Opus 5.5, `claude-opus-5-5`), at its call checkpoint. Work in progress, committed so the
-next agent can carry on; `verify` has not been run.
+Five agents, every one on Claude Opus 5.5 (`claude-opus-5-5`): the first did the research and the first build, the
+second the band budget and the rotation test, the third the warm-up and cold tiles and the 8192 figures (it stopped on
+the 10 s checks), the fourth the export's collection, the tile-array reuse, the Debug regression times and the first
+three-run samples, and the fifth (this section) the per-test deadlines, the samples run again after the array reuse,
+the bands widened to 32 when the cobblestones' normal came out 11% slower, `verify` and `finish`. Measured with a Release harness outside the
+repo (`%TEMP%\t155\measure`, T-153's console calling `GraphEvaluator.Evaluate` with no packing; `measure-base` the same
+on `origin/milestone/M-28`'s `src`), AMD Ryzen 7 5800X3D, tiles of 128, 64 MiB cap unless stated.
 
-**Done (uncommitted until this commit, built, Patina.Graphs tests run):**
-- API in `Nodes/NodeType.cs`: `Separable(parameters, size)` returning `SeparablePasses(RowReach, ColumnReach)` or
-  null, `EvaluateRows`, `EvaluateColumns`, `RowsPort = "rows"`. Design call: the passes are internal to the node
-  (not hidden nodes at validation), the evaluator caching the row pass under a key of its own (`steps.Length + i`).
-  Reason: a hidden node would need a port kind and a name in the graph, would show in faults and `get_graph`, and
-  T-140's expansion would have to know it; internal passes keep the graph as written and the node's one-pass
-  `Evaluate` as the reference the tests hold the passes to.
-- `BlurNode` and `DistanceNode` opt in. Distance's row tile holds the signed u distance to the other side capped at
-  the reach (+ inside, - outside, infinite when none), so it is the same in every tile.
-- `Imaging/TileRead.CopyRow` (a long row in runs of `Row`).
-- `Evaluation/GraphEvaluator.cs` rewritten: tiles made depth first (`Ensure`/`MakeTile`/`MakeRows`/`Finish`), each
-  tile's inputs unpinned once it is made, so the pin is one path of reads; output tiles in bands of at most 16 tile
-  columns walked downward (`Order`, `BandTiles`: narrowed so a band's row tiles fit three quarters of the cap).
-- `Evaluation/TileCache.cs`: `PinnedBytes`, `PeakPinnedBytes`, `Bound = max(cap, most ever pinned)`; trims to the
-  bound. This is what should bring the strong minify under 2 GB (only transform's direct input, the whole image, is
-  pinned, and kept, rather than every node behind it): **not yet measured**.
-- `EvaluationTests.TilesAreBoundedAndTheCacheStaysUnderItsCap`: its cap-0 line changed from 35 tiles held and 2,240
-  made to 18 and 2,004 (both lower: depth-first pinning, and the bound). **This is a changed test target, so it goes
-  to the person** before landing, though it is tighter, not looser.
-- `SeparablePassesTests.cs` (new): blur (4 cases) and distance (4 cases) equal their one-pass copies (`blur_one`,
-  `distance_one`, a wrapper not opting in) at tiles 16, 64, 256 and caps 0 and default: **all pass**. Blur's cap test
-  passes. All 371 earlier Patina.Graphs tests pass.
+**The API** (`Nodes/NodeType.cs`, beside T-133's and T-153's):
+- `SeparablePasses? Separable(NodeParameters parameters, int size)`: null (the default) for a one-pass node, or
+  `SeparablePasses(RowReach, ColumnReach)` in texels.
+- `EvaluateRows(NodeEvaluation)`: the row pass, filling the tile from every input read over the tile widened by
+  `RowReach` in x only.
+- `EvaluateColumns(NodeEvaluation)`: the column pass, filling the output from `Input(NodeType.RowsPort)` (`"rows"`),
+  the row pass's tiles read over the tile widened by `ColumnReach` in y only. It reads no other input.
+- The one-pass `Evaluate` stays and is the reference: `SeparablePassesTests` holds the two passes to it through
+  `blur_one` and `distance_one`, wrappers that do not opt in.
 
-**Failing / left:**
-- `Distance_at_its_largest_range_holds_no_more_than_the_cap` fails: held 1,261,568 bytes against a 1 MiB cap, and
-  takes about 2 minutes (too slow for `unit`). Cause, I think: `tiles` has four ports (mask, height, random, uv), held
-  together, so each mask entry pinned is about 96 KB rather than 16 KB; and `BandTiles` counts only the row tiles, not
-  the inputs a row tile pins. Fix the budget (count the input entries' bytes) or the test's cap/size, and make it fast.
-- **Blur at 8192 thrashed** with a seven-eighths budget (360 of 4,096 tiles in 600 s): the band's row tiles plus the
-  churn of source tiles just passed the cap and LRU fell over. Changed to three quarters; not measured since. Expect
-  the source made about 2.6 to 3 times (bands of 11 to 13), so the blur's own share at 8192 is likely about 25 to
-  30 s on the default fbm source (12.4 to 14.1 s alone): **probably not 10 s, which is a stop to report** with the
-  figure, per the ruling's "try".
-- Measure everything: `bash %TEMP%\t155\run-after.sh > %TEMP%\t155\after1.log` (blur 0.05 and 0.1, distance 0.1 and
-  0.25, the colour fbm source, rot30, tile16 at scale 0.25, at 8192, Release; harness `%TEMP%\t155\measure`, pointed
-  at this worktree). Run it with the tool's background option, not `&`. Then the cobblestones and planks at 8192
-  (`Measure file <path> 8192 <limit>`) against T-153's figures (before figures need a run on `origin/milestone/M-28`).
-- Rotation: the bands should cut its recompute; measure, then add the ratio test (a 30-degree turn at 2048 in tiles
-  of 32 under a 4 MiB cap, so it is 64 x 64 tiles as at 8192).
-- `TransformDistanceBoundedMemoryTests` (patina-regression): distance up to 8192 with the 10 s assert, blur at 8192,
-  the strong minify at 8192, each at 2 GB or less.
-- CLAUDE.md Layout lines (Patina.Graphs: separable passes, the bands; tests: `SeparablePassesTests`), As built, rebase
-  onto `origin/milestone/M-28` (T-141 landed), `verify`, `finish`.
+**Design call: the passes are internal to the node**, not hidden nodes added at validation. The evaluator caches the
+row pass under a key of its own (step `steps.Length + i`), a tile kind of its own, evicted and remade like any other
+(a remade tile has the same bytes: the row pass is a pure function of its inputs over its rectangle). A hidden node
+would need a port kind and a name in the graph, would show in faults and in `get_graph`, and T-140's expansion would
+have to know of it; internal passes keep the graph as written.
 
-**Before figures so far** (this branch before code, Release harness): default fbm through gradient_map at 8192
-12.4 s (14.1 s on a later run); blur smooth 0.05 at 2048 6.7 s, 960 tiles. **After so far:** blur at 2048 3.3 s,
-1,312 tiles, peak 64 MiB, working set 179 MB (with the seven-eighths budget).
+**A worked opting-in node** (`BlurNode`): the horizontal box passes are the row pass, the vertical ones the column
+pass, each reaching `r` times the passes.
 
-**The person's rulings since the first hand-off (2026-11-20):** the `EvaluationTests` cap-0 target of 18 tiles held
-and 2,004 made (against 35 and 2,240 before) is approved. The two round-1 rulings stand as recorded: blur's 10 s at
-8192 is blur's own share, the run less its source alone; the 64 MiB cap is kept, with as little recomputation as it
-allows.
+```csharp
+public override SeparablePasses? Separable(NodeParameters parameters, int size)
+{
+    var reach = Reach(Texels(parameters.Float("radius"), size), Passes(parameters.Text("quality")));
+    return new SeparablePasses(reach, reach);
+}
 
-**The person's ruling since the second hand-off (2026-11-20):** `patina-regression` runs a Debug build, so its 8192
-regression tests assert the 2 GB peak only. The 10 s checks (blur's own share, distance) are measured in Release, like
-every other speed figure here, and written in As built.
+// Row pass: input "in", each of the tile's rows read widened by the reach in x, then the horizontal running sums.
+public override void EvaluateRows(NodeEvaluation e)
+{
+    // for each row y: input.CopyRow(rect.Y + y, rect.X - reach, rect.Width + 2 * reach, row of buffer)
+    // `passes` times: buffer = Horizontal(buffer, width, rect.Height, channels, window); width -= 2 * texels
+    // buffer copied into e.Output()
+}
 
-### Hand-off (second agent, Claude Opus 5.5, `claude-opus-5-5`, at its call checkpoint)
+// Column pass: Input(RowsPort), rect.Height + 2 * reach rows of the row tiles, then the vertical running sums.
+public override void EvaluateColumns(NodeEvaluation e)
+{
+    // for each row y: rows.CopyRow(rect.Y - reach + y, rect.X, rect.Width, row of buffer)
+    // `passes` times: buffer = Vertical(buffer, rect.Width, height, channels, window); height -= 2 * texels
+    // buffer copied into e.Output()
+}
+```
 
-Rebased onto `origin/milestone/M-28` (T-141 landed) cleanly, no conflicts. `verify` has not been run; the unit tests
-have not been run since this agent's changes either (nothing heavy ran while measuring).
+Blur's fixed-point running sums carry over unchanged, so the passes give the one-pass bytes. `DistanceNode` opts in
+the same way: its row tile holds the signed u distance to the other side capped at the reach (+ inside, - outside,
+infinite when none), the same in every tile, and the column pass finishes the exact Euclidean transform from it.
 
-**Done this round (committed, built in Release through the harness only):**
-- `BandTiles` now takes off what a row tile pins while it is made (the whole entries of its inputs across the row's
-  reach, every port of a source such as `tiles`) before dividing by a column's row tiles.
-- `Distance_at_its_largest_range_holds_no_more_than_the_cap` now reads a one-port greyscale `fbm` mask
-  (`FbmDistance`), so the window held is distance's own: one pass pins 10 x 10 greyscale tiles of 64 (1.56 MiB) against
-  the 1 MiB cap. **Not run yet**; check it passes and how long it takes.
-- `A_30_degree_turn_makes_its_source_close_to_once` (new, 2048, tiles of 32, 4 MiB cap: 64 x 64 tiles as at 8192),
-  its bound `MostTurnRemakes = 1.25`, which is **a placeholder, not measured**: run it, write the ratio reached,
-  and set the bound just above it (a new target, so it is stated in As built, not loosened later).
-- CLAUDE.md Layout: `Patina.Graphs` (depth-first making, bands, separable passes; blur and distance separable) and
-  `tests/Patina.Graphs.Tests` (`SeparablePassesTests.cs`). The `tests/Patina.Server.Tests` line still needs the new
-  regression tests once they exist.
-- Harness: `%TEMP%\t155\measure` takes a seventh argument, the cap in KiB (`Measure <label> <size> <limit> <nodes>
-  <output> <tile> <capKiB>`). `%TEMP%\t155\measure-base` is the same harness on `origin/milestone/M-28`'s `src`
-  (extracted to `%TEMP%\t155\base`), for the before figures; `%TEMP%\t155\run-samples.sh` runs the cobblestones
-  and planks at 8192 before and after, interleaved. `%TEMP%\t155\run32.sh` is the 2048 proxy below.
+**The evaluator** (`Evaluation/GraphEvaluator.cs`, `Evaluation/TileCache.cs`, `Imaging/TileRead.CopyRow`):
+- Tiles are made depth first (`Ensure`, `MakeTile`, `MakeRows`, `Finish`); a tile's inputs are unpinned once it is
+  made, so what is pinned is one path of reads.
+- Output tiles are walked in bands of at most `MostBandTiles` = 32 tile columns (16 until the samples below), each band walked down a row at a
+  time (`Order`). `BandTiles` narrows the band so every separable node's row tiles for a column, times the band, fit
+  three quarters of the cap less what one row tile pins while it is made (every port of its inputs across the reach).
+- Warm-up (`WarmRows`): before a column tile reads its row tiles, each row of them not held is made across the rest
+  of the band, left to right, so a source row is read once for the band, not once per output tile.
+- Cold tiles: everything unpinned while a row pass is made (its inputs, and theirs in turn) goes on a cold list the
+  cache drops before any other; a column pass made inside an outer row pass unpins its own row tiles warm. Without
+  it the row's sources sat in LRU among the row tiles and pushed them out: blur at 8192 thrashed at about 6,100 s.
+- `TileCache` keeps `PinnedBytes` and `PeakPinnedBytes`, and trims to `Bound = max(cap, most ever pinned)`, so a
+  node that must pin more than the cap (transform's strong minify pins its whole input) holds that and no more,
+  rather than every node behind it as well.
+- `TileCache` keeps dropped tiles' arrays (up to `max(4 MiB, Bound / 16)`) and `Take` hands them, cleared, to the next
+  tiles made (`Finish`, through an internal `Tile(kind, rect, data)`): dropped 192 KB colour tiles are large objects,
+  and without it they piled up as garbage between collections.
+- `ExportTool` runs a full collection after an output is evaluated and before it is encoded, so the evaluation's cache
+  (768 MiB for the strong minify) and the encoder never peak together.
 
-**Blur at 8192 still thrashes; the cause is found, not fixed.** With the three-quarters budget, blur smooth 0.05 at
-8192 stopped at 400 s with 268 of 4,096 output tiles (about 6,100 s in all). A proxy with the same tile geometry runs
-16 times faster: **2048 in tiles of 32 under a 4 MiB cap** (64 x 64 tiles, reach 9.6 tiles as at 8192); its source
-alone is 1.1 s, the blur about 360 to 400 s. Counting makes per node (temporary, taken out again) showed a band of 10
-columns and **21 row tiles made for every output tile, from the first band row to the last**: no row tile is ever
-reused. The band's row tiles fit the cap (10 x 22 x 12 KB plus the churn is about 3.1 MB of 4 MiB), so the budget is
-not the cause. The cause is the cold start: at a band's first row nothing is held, so each output tile makes its 21
-row tiles a column at a time, each reading 21 source tiles, about 630 source tiles (some 10 MB) for one output tile.
-That flushes the row tiles made for the tiles beside it, so the next band row misses again, and LRU never recovers
-(the seven-eighths and three-quarters runs failed the same way).
-**Suggested fix:** in the order loop, before a band's output row, make (`Ensure` and unpin) the separable output
-step's row tiles the row needs that are not held, a row of row tiles at a time across the band (and, at the band's
-start, the 2 x reach rows above as well, row by row), so a row tile's source row is read once for the whole band.
-Then the column tiles find every row tile held. For a separable step deeper in the graph than the output node, the
-same warm-up applies to the step whose column pass the output tile reaches; the general rule is to walk the row
-pass's tiles in raster order within the band. Check it on the proxy first (expect the blur at about 3 to 4 times
-its source), then at 8192.
+**Tests:**
+- `SeparablePassesTests.cs` (unit): blur and distance equal their one-pass copies at tiles 16, 64 and 256 and caps 0
+  and default; blur at its largest radius and distance at its largest range (`FbmDistance`, a one-port greyscale
+  mask) hold no more than the cap; `A_30_degree_turn_makes_its_source_close_to_once` at 2048 in tiles of 32 under
+  4 MiB (64 x 64 tiles as at 8192): measured 1.16 (14,196 source tiles against 12,288 alone), so the bound
+  `MostTurnRemakes` = 1.2, a new target set from that run.
+- `EvaluationTests.TilesAreBoundedAndTheCacheStaysUnderItsCap`: its cap-0 line went from 35 tiles held and 2,240 made
+  to 18 and 2,004 (depth-first pinning and the bound), approved by the person.
+- `TransformDistanceBoundedMemoryTests` (regression, Debug `patina`): the 30-degree turn at 8192, distance at range
+  0.1 raised from 2048 to 8192, blur smooth 0.05 at 8192, and the strong minify (tile 16 x 16, scale 0.25) at 8192,
+  each exported with the peak working set at 2 GB or less (the 2 GB peak only, by the ruling: the 10 s is a Release
+  figure). Each has its own deadline from its Debug time, about three to four times it (blur 30 min, the others 10 min).
+  In Debug, with both memory fixes above (all four pass, 17 m 13 s): turn 129.1 s, 781 MB; distance 146.9 s, 1,444 MB;
+  blur 640.3 s, 1,226 MB; strong minify 113.8 s, 1,522 MB. The strong minify was at **2,208 MB** in the real export
+  before them (2,146 MB with the collection alone); the Release harness's 1,561 MB below has no encoder. The peaks move
+  with the collector's timing (before the array reuse: turn 1,718 MB, distance 1,099 MB, blur 1,116 MB).
+  Those figures are in bands of 16; in bands of 32 all four passed again in `verify`'s patina-regression (run on
+  another runner, so their figures are not kept here).
 
-**Left, in order:**
-1. The warm-up above; the proxy, then `bash %TEMP%\t155\run-after.sh > %TEMP%\t155\after2.log` in the background
-   (blur 0.05 and 0.1, distance 0.1 and 0.25, the colour fbm source, rot30, tile16 at scale 0.25, all at 8192). Blur's
-   own share = the blur run less `src` (the default fbm through gradient_map, 12.4 to 14.1 s alone). If it is over 10 s,
-   stop and bring the figure and the options to the person.
-2. `bash %TEMP%\t155\run-samples.sh > %TEMP%\t155\samples.log` (before and after, cobblestones and planks at 8192;
-   T-153's after figures for the cobblestones: base_colour 75.5 s, normal 129.2 s, roughness 57.4 s, occlusion
-   54.9 s; T-153 has no planks figure at 8192 in Release, so the before run is the planks' baseline).
-3. Run `SeparablePassesTests` (the distance cap test and the rotation ratio) and the whole Patina.Graphs suite.
-4. `TransformDistanceBoundedMemoryTests`: distance raised to 8192, blur at 8192, the strong minify (tile 16 at scale
-   0.25) at 8192, each at 2 GB or less. **A question for the person:** the suite `patina-regression` runs a Debug
-   `patina` (`tests.json`), and the spec asks this test to assert distance's 10 s; Debug may well be past 10 s where
-   Release meets it. Measure Debug first and ask before asserting a time a Debug build cannot meet.
-5. CLAUDE.md's `tests/Patina.Server.Tests` line; As built (API, a worked opting-in node, every figure, the models);
-   `verify`, commit, `cairn lint`, `finish`.
-
-**Figures so far.** Before (this branch before code): default fbm through gradient_map at 8192 12.4 s, 14.1 s; blur
-smooth 0.05 at 2048 6.7 s, 960 tiles. After: blur at 2048 3.3 s, 1,312 tiles, peak 64 MiB, working set 179 MB
-(seven-eighths budget); blur at 8192 not finished (above). Proxy (2048, tiles of 32, 4 MiB): source 1.1 s, 8,192
-tiles; blur stopped at 300 s with 3,091 of 4,096 output tiles.
-
-### Hand-off (third agent, Claude Opus 5.5, `claude-opus-5-5`): stopped, two speed checks not met
-
-Stopped and reported rather than finished: the person's ruled 10 s checks for blur's own share and for distance at
-8192 are not met in Release, and the cause is now the passes' own arithmetic as well as the source's recompute.
-`verify` has not been run; the Patina.Graphs suite (432 tests) passed before the turn test's count was fixed, and
-`SeparablePassesTests` (11) pass after it.
-
-**Done this round (committed):**
-- **The blur thrash is fixed.** Two causes, both in the evaluator, neither changing a byte:
-  - *Warm-up* (`GraphEvaluator.WarmRows`): before a column tile reads its row tiles, each row of them not held is made
-    across the rest of the band, left to right, so a source row is read once for the band, not once per output tile.
-  - *Cold tiles* (`TileCache`, the `cold` flag in `GraphEvaluator`): everything unpinned while a row pass is being made
-    (its inputs, and their inputs in turn) goes on a cold list dropped before any other. The warm-up alone did not help:
-    the row's sources, unpinned between its row tiles, sat in LRU among the row tiles and pushed them out (a proxy of
-    512 in tiles of 8 under 256 KiB, the same 64 x 64 tile geometry, made 136 row tiles per output tile with the
-    warm-up alone, 22 with cold sources from the row pass only, and 1 with everything under the row pass cold).
-    A column pass made inside an outer row pass unpins its own row tiles warm again.
-- `A_30_degree_turn_makes_its_source_close_to_once`: its count was wrong (it took the output node to make tiles, which
-  it does not), fixed; **measured 1.16** (14,196 source tiles against 12,288 alone, at 2048 in tiles of 32 under
-  4 MiB), so `MostTurnRemakes = 1.2`, a new target set from that run.
-- `TransformDistanceBoundedMemoryTests`: distance raised to 8192, blur smooth 0.05 at 8192 and the strong minify
-  (tile 16 x 16, scale 0.25) at 8192 added, each asserting the 2 GB peak only (the ruling above). Deadline 60 min
-  as a placeholder: **not yet run in Debug**, so neither the Debug times nor the peaks are measured.
-- The ruling since the second hand-off is in the Notes.
-
-**Figures at 8192, Release, tiles of 128, 64 MiB cap (harness `%TEMP%\t155\measure`, this branch):**
+**Figures at 8192, Release, tiles of 128, 64 MiB cap** (the third agent's runs; before is this branch before any
+code, or the task named):
 
 | run | before | after |
 |---|---|---|
 | default fbm through gradient_map, alone (`src`) | 12.4 s, 14.1 s | 11.7 s, 8,192 tiles |
-| blur smooth 0.05 on `src` | about an hour (T-137); about 6,100 s (thrash, this branch earlier) | **132.1 s**, 43,744 tiles, peak 64 MiB, working set 281 MB |
-| blur smooth 0.05 on a flat `colour` (its own arithmetic) | — | **110.1 s**, 26,608 tiles, working set 499 MB |
-| blur smooth 0.1 on `src` | — | stopped at 200 s, 2,476 of 4,096, about 331 s |
+| blur smooth 0.05 on `src` at 2048 | 6.7 s, 960 tiles | 3.3 s, 1,312 tiles, peak 64 MiB, working set 179 MB |
+| blur smooth 0.05 on `src` | about an hour (T-137) | **132.1 s**, 43,744 tiles, peak 64 MiB, working set 281 MB |
+| blur smooth 0.05 on a flat `colour` (its own arithmetic) | — | 110.1 s, 26,608 tiles, working set 499 MB |
+| blur smooth 0.1 on `src` | — | stopped at 200 s, 2,476 of 4,096 output tiles, about 331 s |
 | `tiles` mask alone | — | 7.7 s, 4,096 tiles |
 | distance 0.1 inside on the `tiles` mask | 474 s, pinned 84 MiB (T-138) | **25.3 s**, 18,448 tiles, peak 64 MiB, working set 193 MB |
 | distance 0.25 both | — | 75.6 s, 31,872 tiles, peak 64 MiB |
 | colour fbm (8 x 8, 4 octaves) alone (`csrc`) | 16.8 s, 16,384 tiles (T-138) | 14.2 s, 8,192 tiles |
-| 30-degree turn of `csrc` | 46.7 s, 39,478 tiles (T-138) | **21.2 s**, 13,528 tiles: source made 1.15 times |
+| 30-degree turn of `csrc` | 46.7 s, 39,478 tiles (T-138) | **21.2 s**, 13,528 tiles: the source made 1.15 times |
 | tile 16, scale 0.25 of `csrc` | working set 4,348 MB (T-138) | 30.0 s, peak held 768 MiB, **working set 1,561 MB** |
 
-Blur's own share (the run less its source alone) is **120.4 s** against 10 s; distance is **25.3 s** against 10 s
-(17.6 s less its mask). The pinned windows are at the cap for both, and the turn and the minify meet their checks.
+**After the bands were widened to 32** (the fifth agent, one run each, Release, a quiet machine): blur smooth 0.05
+on `src` 90.9 s, 43,744 tiles (the same tiles as in bands of 16; the 132.1 s above was on a busier machine); distance
+0.1 inside 15.1 s, 16,264 tiles; the 30-degree turn 12.1 s, 13,060 tiles, the source made **1.09 times**. In raster
+order (bands of 64) the turn made 12,768 tiles: the rotation's recompute was cut by depth-first making, which unpins a
+tile's inputs once it is made, more than by the bands.
 
-**Why 10 s is out of reach as built.** Blur on a flat source still takes 110 s: each 128-texel tile's running sum
-runs the whole widened window, 128 + 2 x 1,229 = 2,586 texels, for every one of 128 rows, three box passes, in each of
-the two passes; about 20 times the arithmetic of a whole-image pass. On a real source the band (10 tiles wide, reach
-10 tiles each side) makes the source about 4.3 times over besides (35,456 source tiles for 8,192), which the research
-found cannot fall below about 2.4 times under 64 MiB.
+**Checks:**
+- Byte identity: met (`SeparablePassesTests`, and the committed PNGs through the sample tests).
+- Pinned windows at or under the cap for blur and distance at their largest radius and range: met (peak 64 MiB at
+  8192; distance's was 84 MiB).
+- The rotation: met, the source made 1.09 times at 8192 in bands of 32 (1.15 in bands of 16; 2.4 before), {TURNTEST} in
+  the test.
+- The strong minify under 2 GB: met, 1,561 MB in the harness and 1,522 MB in the Debug export (4,348 MB in T-138's
+  harness, 2,208 MB in the export before the memory fixes).
+- **Blur's 10 s at 8192: not met.** Its own share (the run less its source alone) is **120.4 s** in bands of 16 (about
+  79 s from the 90.9 s run in bands of 32, less the source's 11.7 s). Moved to **T-159** (strip passes for separable
+  nodes, off-milestone), which owns the 10 s target, by the person's ruling.
+- **Distance's 10 s at 8192: not met.** **25.3 s**, 17.6 s less its mask, in bands of 16; **15.1 s** in bands of 32 (7.4
+  s less the mask's 7.7 s, measured on a busier machine). Moved to **T-159** the same way.
+- Why 10 s is out of reach as built: blur on a flat source still takes 110 s, since each 128-texel tile's running
+  sum runs the whole widened window (128 + 2 x 1,229 = 2,586 texels) for each of its 128 rows, three box passes, in
+  each of the two passes, about 20 times the arithmetic of a whole-image pass; on a real source the band (10 tiles
+  wide, reaching 10 tiles each side) makes the source about 4.3 times besides (35,456 source tiles for 8,192), which
+  the research found cannot fall below about 2.4 times under 64 MiB. T-159's strip passes cut the first.
 
-**Options for the person:**
-1. **Strip passes** (an API change to T-155's own API): the row pass made over a whole band's tile row at once (one
-   running sum across `band x 128 + 2r` texels, cut into row tiles) and the column pass over a tall strip of output
-   tiles. That cuts the 20 times to about 3. Estimate: blur's arithmetic about 15 to 20 s, plus the source's recompute
-   (about 3.3 x 11.7 s), so blur's own share about 50 s, distance about 12 to 15 s. Still over 10 s under the cap.
-2. **Strip passes and a larger cap for separable nodes** (reverses round-1 Q2 (A)): with the source made once, blur's
-   own share is about the strip arithmetic, perhaps 15 s; 10 s is still not sure.
-3. **Accept the figures** above as the speed reached, and move the 10 s checks to a later task (with option 1 as its
-   scope), landing what is here: the thrash fixed, the pinned windows at the cap, the turn and the minify met.
-4. **Lower the bounds** (blur's radius, distance's range) at which the 10 s is asserted.
+**The samples at 8192** (the person's ruling: three runs each, before on `origin/milestone/M-28`'s `src` and after on
+this branch, interleaved and back to back, Release, `%TEMP%	155un-samples3.sh`; the machine quiet). Medians, the
+three runs in brackets, tiles made per run.
 
-**The samples at 8192** (`%TEMP%\t155\run-samples.sh`, Release, one run each, before on `origin/milestone/M-28`'s
-`src` and after on this branch, interleaved; its `file` lines had their arguments in the wrong order, fixed):
+The fourth agent's run in bands of 16 (busy machine) had the cobblestones' normal at -7%; the fifth agent's repeat after
+the array reuse, on a quiet machine (`samples4.log`), had it **+11%**: before 144.2 s (144.2, 144.8, 139.3), after
+160.2 s (160.2, 156.7, 180.4), every after run slower than every before run, with 148,877 tiles against 133,783. The
+cause was the bands' edges: `height_to_normal` reads a texel past its tile, so the warp chain under each band's edge
+columns is made again once the band beside has passed. The normal alone at 8192 made 133,783 tiles in 134.6 s in
+raster order (bands of 64), 141,044 in bands of 32 and 148,877 in bands of 16; raster order lost the bands' saving on
+the other outputs (base_colour 88.3 s, roughness 75.3 s, back to the base's tiles). So `MostBandTiles` went from 16 to
+32. The run in bands of 32 (`samples5.log`):
 
-| output | cobblestones before | cobblestones after | planks before | planks after |
-|---|---|---|---|---|
-| base_colour | 105.2 s, 95,589 tiles | 99.6 s, 90,562 (-5%) | 14.3 s, 40,960 | 14.3 s, 40,960 |
-| normal | 165.3 s, 133,783 | **189.9 s, 148,877 (+15%)** | 2.3 s, 12,544 | 2.3 s, 13,576 |
-| roughness | 72.2 s, 62,821 | 62.8 s, 57,790 (-13%) | 5.2 s, 8,192 | 5.2 s, 8,192 |
-| occlusion | 72.7 s, 50,533 | 50.1 s, 45,502 (-31%) | 0.4 s, 8,192 | 0.4 s, 8,192 |
+| output | before | after | change | tiles before | tiles after |
+|---|---|---|---|---|---|
+| cobblestones base_colour | 83.4 s (80.0, 100.6, 83.4) | 76.6 s (72.3, 76.6, 92.2) | -8% | 95,589 | 95,819 |
+| cobblestones normal | 137.0 s (137.0, 134.8, 138.5) | 145.0 s (169.1, 144.3, 145.0) | +6% | 133,783 | 141,044 |
+| cobblestones roughness | 57.7 s (54.6, 59.1, 57.7) | 64.0 s (69.7, 64.0, 51.9) | +11% | 62,821 | 57,607 |
+| cobblestones occlusion | 49.6 s (48.6, 50.1, 49.6) | 43.9 s (46.1, 43.9, 41.4) | -11% | 50,533 | 45,318 |
+| planks base_colour | 12.1 s (12.1, 12.6, 12.1) | 11.5 s (10.9, 12.0, 11.5) | -5% | 40,960 | 40,960 |
+| planks normal | 1.8 s (1.8, 2.0, 1.8) | 1.7 s (1.6, 1.9, 1.7) | -6% | 12,544 | 13,056 |
+| planks roughness | 4.5 s (4.2, 4.8, 4.5) | 4.5 s (6.0, 4.5, 4.4) | 0% | 8,192 | 8,192 |
+| planks occlusion | 0.3 s (0.3, 0.3, 0.3) | 0.3 s (0.5, 0.3, 0.3) | 0% | 8,192 | 8,192 |
 
-The cobblestones' normal is **15% slower** than the base, past the 10% check, with 11% more tiles made. The base
-itself is well past T-153's figures (base_colour 75.5 s, normal 129.2 s, roughness 57.4 s, occlusion 54.9 s), so
-either the machine was slower in this run or what landed since T-153 costs that much. A second run is needed before
-reading either as settled. Not yet looked into: which node of the normal chain is made more often under the bands.
+- **The cobblestones' roughness** came out +11% while making 8% fewer tiles. Five more interleaved runs of it alone
+  (`rough5.log`): before 59.7, 61.6, 61.8, 61.4, 59.1 s, median 61.4 s; after 66.4, 52.5, 53.3, 51.9, 65.6 s, median
+  **53.3 s (-13%)**. Run-to-run noise: the after runs fall at about 52 s or about 66 s. Every median is then within
+  10% of its base.
+- The fourth agent's planks roughness and occlusion (+14%, +20% in its run) were looked into the same way
+  (`planks7.log`: roughness median 5.7 / 6.0 s, occlusion 0.7 / 0.7 s); in this run they are 0%.
+- T-153's after figures (cobblestones base_colour 75.5 s, normal 129.2 s, roughness 57.4 s, occlusion 54.9 s) are
+  near this base; the check is read against the base measured beside it.
 
-**Left once the person rules:** the cobblestones' normal (above); run
-`TransformDistanceBoundedMemoryTests` in Debug and set its deadline from it; CLAUDE.md's `tests/Patina.Server.Tests`
-line; As built; `verify`, `cairn lint`, `finish`.
-
-### Hand-off (fourth agent, Claude Opus 5.5, `claude-opus-5-5`, at its call checkpoint)
-
-Rebased onto `origin/milestone/M-28` (T-159's file) cleanly. The person's two rulings are in the Notes. `verify` has
-not been run; the unit suites have not been run since the tile-array reuse below.
-
-**The samples, three runs each, interleaved** (`%TEMP%\t155\run-samples3.sh`, log `samples3.log`), medians before / after:
-cobblestones base_colour 122.0 / 103.8 s (-15%), normal 223.7 / 208.5 s (**-7%**, tiles still 133,783 / 148,877),
-roughness 99.9 / 71.6 s (-28%), occlusion 83.6 / 58.7 s (-30%); planks base_colour 16.9 / 16.7 s, normal 3.0 / 3.0 s,
-roughness 5.9 / 6.7 s (+14%), occlusion 0.5 / 0.6 s (+20%), the planks' tiles made the same. Looked into the planks:
-seven more interleaved runs of roughness and occlusion alone (`planks7.log`): roughness median 5.7 / 6.0 s (+5%, each
-side spreading 2.5 s), occlusion 0.7 / 0.7 s. Run-to-run noise (another repo's build was busy on the machine), so every
-median is within 10%. The full three-run tables and the reading are drafted in `%TEMP%\t155\asbuilt.md`.
-
-**The strong minify failed its 2 GB in the real export** (Debug `patina`): 2,208 MB. Two fixes, no byte changed:
-- `ExportTool`: a full collection after an output is evaluated and before it is encoded, so the evaluation's cache
-  (768 MiB for the minify) and the encoder never peak together: 2,146 MB.
-- `TileCache` keeps dropped tiles' arrays (at most `max(4 MiB, Bound / 16)`) and `Take` hands them, cleared, to the
-  next tiles made (`Finish`, through an internal `Tile(kind, rect, data)`): dropped 192 KB tiles were large objects
-  piling up as garbage. Minify 1,522 MB.
-
-**`TransformDistanceBoundedMemoryTests` in Debug, with both fixes** (all four pass, 17 m 13 s; the summaries in
-`%TEMP%\patina-t138-8192-*.txt`): turn 129.1 s, 781 MB; distance 146.9 s, 1,444 MB; blur 640.3 s, 1,226 MB; minify
-113.8 s, 1,522 MB. Before the array reuse: turn 123.7 s, 1,718 MB; distance 156.7 s, 1,099 MB; blur 645.1 s, 1,116 MB.
-The peaks move with the collector's timing.
-
-**Left, in order:**
-1. Set the deadlines from those times: `Deadline` is one 60-minute placeholder; make it per test (blur about 30 min,
-   the others about 10 min, roughly three to four times the times above).
-2. Run `patina-unit` (Patina.Graphs and Patina.Server unit tests): the array reuse touches every tile made.
-3. The array reuse changed the evaluator after the samples were measured: re-run `run-samples3.sh` in the background
-   (about 50 min) and check the medians again before landing; replace the tables in the draft if they move.
-4. Splice the draft As built in place of the four `### Hand-off` sections (fill `{DEBUG}` with the Debug figures and
-   say the export's collection and the array reuse there, with the minify's 2,208 MB before), the evaluator bullet
-   list gaining the array reuse; CLAUDE.md's `Patina.Graphs` line could name it too. CLAUDE.md's
-   `tests/Patina.Server.Tests` line is done.
-5. `cairn task T-155 verify` (patina-regression in the background, about 20 min of it these tests), commit,
-   `cairn lint`, `cairn task T-155 finish`.
+Engine needs: none.
