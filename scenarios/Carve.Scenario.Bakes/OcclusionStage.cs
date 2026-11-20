@@ -14,7 +14,7 @@ namespace Carve.Scenario.Bakes;
 /// occlusion 1. Seen in the <c>uvs</c> look with the occlusion under it, on the wrench from six sides, the three-quarter view and stage 1's
 /// close frames, and close on the square drive, the wrench's one crevice. Checked: the crevice darker than the grip's middle, the grip's
 /// middle open, the ORM's G and B exactly the surface's on every covered texel, and render against <c>render_glb</c> with the full material.
-/// <c>CARVE_BAKES_BREAK</c> <c>reach</c> bakes with reach 0.0001 and <c>metal</c> with <c>steel</c> metallic 0.
+/// <c>CARVE_BAKES_BREAK</c> <c>reach</c> bakes with reach 0.0001, <c>dark</c> reads the occlusion inverted and <c>metal</c> with <c>steel</c> metallic 0.
 /// </summary>
 internal sealed class OcclusionStage : IBakesStage
 {
@@ -35,7 +35,7 @@ internal sealed class OcclusionStage : IBakesStage
     /// </summary>
     private const int CreviceMargin = 50;
 
-    /// <summary>Ruled by the person (2026-11-20): open texels far from other geometry (the grip's middle) read at least this.</summary>
+    /// <summary>Ruled by the person (2026-11-20): open texels far from other geometry (the grip's middle) read at least this. Break: <c>dark</c>.</summary>
     private const int OpenLeast = 250;
 
     // Faces of samples/wrench.carve. The wrench is separate solids stacked: the steel square drive (faces 100 to 105) stands between
@@ -81,6 +81,8 @@ internal sealed class OcclusionStage : IBakesStage
         CheckOcclusion(regions);
         WriteProbe(driver, files, regions);
 
+        // RV-74: no block-rule check yet. Strict, 96 of 22558 inside pixels break it (up to 8 levels, the look minified on the
+        // occlusion's gradients); with blend 1 none do. A blend is a threshold, so it waits on the person.
         await driver.CaptureAsync("wrench-orm-uvs-occlusion", new { mode = "uvs", image = occlusionPath, size = Size });
         var jaw = Mean(mesh, groups["dark"]);
         var grip = Mean(mesh, groups["rubber"]);
@@ -142,7 +144,10 @@ internal sealed class OcclusionStage : IBakesStage
         var centre = mesh.Centre(GripFacet);
 
         Region Of(string name, IEnumerable<int> faces, Func<Vector3, bool> keep) => new(name,
-            faces.SelectMany(f => TexelsOf(mesh, f, occlusion.Width)).Where(t => keep(t.World)).Select(t => occlusion.At(t.X, t.Y).R).ToArray());
+            faces.SelectMany(f => TexelsOf(mesh, f, occlusion.Width)).Where(t => keep(t.World)).Select(t => Read(occlusion.At(t.X, t.Y).R)).ToArray());
+        // dark: the occlusion read inverted, so the open grip reads closed; OpenLeast's break (no reach darkens the grip's middle:
+        // nothing stands over it, and with a reach of 1 m it still reads 255).
+        static int Read(int r) => Break == "dark" ? 255 - r : r;
 
         return
         [

@@ -17,8 +17,8 @@ namespace Carve.Scenario.Bakes;
 /// directions, each without and then with the map (the person's ruling, 2026-11-20: the lighter steel spreads the shades wider than
 /// the dark jaw, where the map and its break read within 2 luma of each other); the wrench from the six sides and the three-quarter
 /// view. Checks: texels farther than the width from every break edge of their face hold N itself, (128, 128, 255) or a level from it; in the close frames each strip by the edge
-/// reads within 2 luma of the colour rule's shade for the mean normal (the person's ruling, 2026-11-20); <c>render_glb</c> of the export with the map agrees with <c>render</c> under D-6's rule.
-/// <c>CARVE_BAKES_BREAK</c>: <c>bevel-g</c> puts the map on with G inverted. The thin-width break is the Core seam test's
+/// reads within 2 luma of the colour rule's shade for the mean normal (the person's ruling, 2026-11-20); <c>render_glb</c> of the export with the map agrees with <c>render</c> under D-6's rule, with the control that must fail it.
+/// <c>CARVE_BAKES_BREAK</c>: <c>bevel-g</c> puts the map on with G inverted; <c>bevel-wide</c> bakes it 20 times as wide, which the flat-texel check catches. The thin-width break is the Core seam test's
 /// (<c>WrenchBevelSeamTests</c>), so the stage has none (the person's ruling, 2026-11-20).
 /// </summary>
 internal sealed class BevelStage : IBakesStage
@@ -43,14 +43,15 @@ internal sealed class BevelStage : IBakesStage
 
     public async Task RunAsync(ScenarioDriver driver)
     {
-        var here = Path.GetDirectoryName(typeof(BevelStage).Assembly.Location)!;
-        var hard = HardEdges(Path.Combine(here, "wrench.carve"));
+        var hard = await HardEdgesAsync(driver);
         var scene = await Scene.ReadAsync(driver, "wrench");
         var mesh = scene["wrench"];
         var groups = GroupsOf(mesh.Raw);
 
         var textures = Path.Combine(driver.RunFolder, "textures");
-        var bake = await CallJsonAsync(driver, "bake", new { mesh = "wrench", folder = textures, size = Size, padding = 8, maps = new[] { "normal" }, bevel = new { width = Width } });
+        // bevel-wide: the map baked 20 times as wide, so it rounds texels the checks hold flat; CheckFlat's break.
+        var width = Break == "bevel-wide" ? 20 * Width : Width;
+        var bake = await CallJsonAsync(driver, "bake", new { mesh = "wrench", folder = textures, size = Size, padding = 8, maps = new[] { "normal" }, bevel = new { width } });
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "bevel-bake.json"), bake.ToString());
         if (bake.GetProperty("skipped_faces").GetArrayLength() != 0 || bake.GetProperty("warnings").GetArrayLength() != 0) Note($"bevel bake: expected no skipped faces and no warnings, got {bake}");
         var normal = bake.GetProperty("files")[0].GetProperty("path").GetString()!;
@@ -77,6 +78,8 @@ internal sealed class BevelStage : IBakesStage
             CheckStrip(view, "normal", frame, scene, mesh, edge, tsv, judge: true);
         }
 
+        // RV-74: no block-rule check yet. Strict, 3 of 22558 inside pixels break it (one channel 3 levels off N); a blend does not
+        // clear them. A tolerance is a threshold, so it waits on the person.
         await driver.CaptureAsync("wrench-uvs-normal", new { mode = "uvs", image = normal, size = Size });
 
         var sides = new View[]
@@ -92,11 +95,14 @@ internal sealed class BevelStage : IBakesStage
         await File.WriteAllLinesAsync(Path.Combine(driver.RunFolder, "bevel.tsv"), tsv);
     }
 
-    /// <summary>The marked hard edges of <c>samples/wrench.carve</c>, which get_mesh does not report: on a smooth mesh these are the breaks.</summary>
-    private static HashSet<(int, int)> HardEdges(string path)
+    /// <summary>
+    /// The wrench's marked hard edges, as the server holds them: on a smooth mesh these are the breaks. get_mesh does not report
+    /// them, and set_shading answers with them, so the wrench is set to the smooth shading it already has (the mesh is unchanged).
+    /// </summary>
+    private static async Task<HashSet<(int, int)>> HardEdgesAsync(ScenarioDriver driver)
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(path));
-        return doc.RootElement.GetProperty("meshes")[0].GetProperty("hard_edges").EnumerateArray()
+        var answer = await CallJsonAsync(driver, "set_shading", new { mesh = "wrench", shading = "smooth" });
+        return answer.GetProperty("hard_edges").EnumerateArray()
             .Select(e => (Math.Min(e[0].GetInt32(), e[1].GetInt32()), Math.Max(e[0].GetInt32(), e[1].GetInt32()))).ToHashSet();
     }
 
@@ -282,15 +288,22 @@ internal sealed class BevelStage : IBakesStage
         return path;
     }
 
-    /// <summary>The wrench with the map exported, and <c>render_glb</c> against <c>render</c> front and three-quarter under D-6's rule.</summary>
+    /// <summary>
+    /// The wrench with the map exported, and <c>render_glb</c> against <c>render</c> front and three-quarter under D-6's rule, with the
+    /// control that must fail it, as <see cref="BakesChecks.CompareExportAsync"/> has: the three-quarter <c>render_glb</c> against the front.
+    /// </summary>
     private static async Task CompareExportAsync(ScenarioDriver driver, Dictionary<string, ScenarioFrame> frames, View[] views, List<string> tsv)
     {
-        var (_, rows) = await RenderExportAsync(driver, frames, views, "wrench-bevel.glb", "export-bevel-result.txt", ["wrench-bevel-front", "wrench-bevel-three-quarter"]);
+        var (glbFrames, rows) = await RenderExportAsync(driver, frames, views, "wrench-bevel.glb", "export-bevel-result.txt", ["wrench-bevel-front", "wrench-bevel-three-quarter"]);
         foreach (var row in rows)
         {
             var name = row.Name;
             tsv.Add($"glb\t{name}\t{row.Differing}\tof {row.Total}, patch {row.LargestPatch}, fails {row.Fails}");
             if (row.Fails) Note($"bevel: {name}: render_glb differs from render with the map, {row.Differing} pixels, patch {row.LargestPatch}");
         }
+
+        var control = Carve.Scenario.Orcward.Comparison.Measure("bevel-three-quarter-glb-against-front", "control", frames["wrench-bevel-front"], glbFrames["wrench-bevel-three-quarter"]);
+        tsv.Add($"glb-control\t{control.Name}\t{control.Differing}\tof {control.Total}, patch {control.LargestPatch}, fails {control.Fails}");
+        if (!control.Fails) Note($"the control {control.Name} passes the frame rule, so the rule cannot tell two views apart");
     }
 }
