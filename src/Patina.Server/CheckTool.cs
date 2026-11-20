@@ -1,0 +1,228 @@
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
+using Patina.Graphs;
+using Patina.Graphs.Checks;
+using Patina.Graphs.Evaluation;
+using Patina.Graphs.Imaging;
+using Patina.Graphs.Nodes;
+using StbImageSharp;
+using static Patina.Server.ToolSupport;
+
+namespace Patina.Server;
+
+/// <summary>
+/// <c>check</c> (T-141): measures the open graph's outputs, or PNG files given with their roles, against
+/// <see cref="CheckRules"/> and lists what is wrong with the fix in words, as carve's <c>check</c> lists mesh faults. It
+/// reports and never refuses a graph that evaluates, and changes nothing.
+/// </summary>
+public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolder toolFolder)
+{
+    /// <summary>The largest size check evaluates a graph at.</summary>
+    public const int MaxSize = 2048;
+
+    /// <summary>The first worked example: the bricks, clean.</summary>
+    public const string Worked = """{"size":64}""";
+
+    /// <summary>What it returns for the bricks open (samples/graphs/bricks.texgraph).</summary>
+    public const string WorkedResult = "<set by the measured run>";
+
+    /// <summary>The second: samples/graphs/faults/chrome-in-paint.texgraph open, paint with a metallic of about 0.5.</summary>
+    public const string WorkedFault = """{}""";
+
+    public const string WorkedFaultResult = "<set by the measured run>";
+
+    /// <summary>The third: PNG files, read with their roles.</summary>
+    public const string WorkedFiles = """{"files":[{"path":"samples/graphs/bricks/base_colour.png","role":"base_colour"},{"path":"samples/graphs/bricks/normal.png","role":"normal"}]}""";
+
+    public const string WorkedFilesResult = "<set by the measured run>";
+
+    public const string Text =
+        "Measures what the open graph's outputs came to, as numbers, rather than judging by a render: lists what is wrong with each output, with the fix in words, as carve's check lists a mesh's faults. "
+        + "Changes nothing, and never refuses a graph that evaluates: a fault is a problem in the list, not an error. "
+        + "Takes size (a power of two from 32 to 2048; default the graph's own, at most 2048), parameters (the graph's exposed parameters to set for this call only, as swatch and export take them) "
+        + "and files (a list of {path, role} for PNGs, the path relative to patina's working directory or absolute, the role one of base_colour, normal, roughness, metallic, occlusion, height, or a named output's name; with files only those are checked, no graph is needed, and size and parameters are not used). "
+        + "A roughness file is read as the glTF metallic-roughness image export writes: G is the roughness and B the metallic, which judges the base colour's metal texels. "
+        + "The rules, each with its thresholds and what it means for a game:\n"
+        + "- base-colour-range: base colour's brightest channel, in sRGB levels 0 to 255, should be 20 to 245 for a non-metal texel (metallic below 0.5, or no metallic) and 120 or more for a metal texel (metallic 0.5 or more); "
+        + "near black is a hole under game lighting, near white blows out, and dark metal, which takes its colour from reflection, shows almost nothing. A fault when over 1% of texels are out. "
+        + "Fix: pull the darks up and the lights in with a levels or gradient_map node.\n"
+        + "- metallic-not-binary: metallic should be 0 or 1, with a sharp edge between (a half-metal is not a real surface and renders as dull chrome). A fault when over 5% of texels are from 0.1 to 0.9. "
+        + "Fix: push the mask to 0 and 1 (a levels node with in_low equal to in_high is a step), or set a constant.\n"
+        + "- normal-not-unit: a normal is a unit vector (a longer or shorter one lights too strongly or too weakly). A fault when over 0.1% of texels' length differs from 1 by more than 0.02 (0.03 for a PNG, for the 8-bit rounding). "
+        + "Fix: make it with height_to_normal, which normalises, and do not mix a normal's components as colours.\n"
+        + "- one-value: a greyscale output (roughness, metallic, occlusion, height, a greyscale named output) whose texels all pack to one byte; a mask of one value masks nothing. "
+        + "Fix: widen its levels, or drive it from a noise or pattern, or drop the output.\n"
+        + "- does-not-tile: across the wrap in u or v, the mean step between the last and first column (or row) is more than twice the mean step between neighbours plus 2 levels, so the texture shows a seam when it repeats. "
+        + "Fix: whole-number frequencies and counts and quarter turns; swatch's tiled view shows where.\n"
+        + "Result: {ok, problems:[{check, output, message}], notes, stats}. ok is true when there are no problems; each message gives the share, the worst texel and the fix; "
+        + "notes say how the texels were read (the share of metal texels, a metallic read from a roughness file); stats gives each output's min, max and mean per channel, in packed levels 0 to 255 "
+        + "(a normal's too: 127.5 is zero), at stats.size. "
+        + "Errors, writing nothing: no open graph (when no files are given), a graph with a fault (the error lists them; fix them with edit_graph), a size that is not allowed, a parameter that is refused, and a file that is missing or not a PNG.\n"
+        + "Worked example, with samples/graphs/bricks.texgraph open: check " + Worked + " returns, clean:\n" + WorkedResult + "\n"
+        + "Worked example, with samples/graphs/faults/chrome-in-paint.texgraph open (a paint whose metallic is about 0.5 everywhere): check " + WorkedFault + " returns:\n" + WorkedFaultResult + "\n"
+        + "Worked example, PNG files: check " + WorkedFiles + " returns:\n" + WorkedFilesResult;
+
+    public static McpServerTool Create() => Create<CheckTool>("check", Text, new JsonObject
+    {
+        ["size"] = new JsonObject { ["type"] = "integer", ["description"] = "A power of two from 32 to 2048; default the graph's own size (at most 2048)." },
+        ["parameters"] = new JsonObject { ["type"] = "object", ["description"] = ParameterOverrides.Description },
+        ["files"] = new JsonObject
+        {
+            ["type"] = "array",
+            ["description"] = "PNG files to check instead of the open graph, each {path, role}: the role is base_colour, normal, roughness (a metallic-roughness image), metallic, occlusion, height, or a named output's name.",
+            ["items"] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject { ["path"] = new JsonObject { ["type"] = "string" }, ["role"] = new JsonObject { ["type"] = "string" } },
+                ["required"] = new JsonArray("path", "role"),
+            },
+        },
+    });
+
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? size = null, JsonElement? parameters = null, JsonElement? files = null)
+    {
+        if (Unknown("check", context, "size", "parameters", "files") is { } unknown) return unknown;
+        var haveFiles = files is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) };
+        CheckSet set;
+        int pixels;
+        if (haveFiles)
+        {
+            if (!TryFiles(files!.Value, out set, out var fileError)) return Error(fileError!);
+            pixels = set.Outputs.Count == 0 ? 0 : set.Outputs[0].Width;
+            var ignored = new List<string>();
+            if (size is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) }) ignored.Add("size");
+            if (parameters is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) }) ignored.Add("parameters");
+            if (ignored.Count > 0)
+                set = new(set.Source, set.Outputs, [.. set.Notes, $"{string.Join(" and ", ignored)} {(ignored.Count == 1 ? "was" : "were")} not used: with files only the files are checked"]);
+        }
+        else
+        {
+            TextureGraph graph;
+            lock (store.Gate)
+            {
+                if (store.Graph is not { } open) return Error("check: " + NoGraph);
+                graph = open;
+            }
+            var faults = GraphValidator.Validate(graph, registry);
+            if (faults.Count > 0)
+                return Error($"check: the graph has {Faults(faults)}\nA check needs a graph that evaluates; fix them with edit_graph, then check again.");
+            if (!ParameterOverrides.TryApply("check", graph, parameters, registry, out graph, out _, out var overrideError))
+                return Error(overrideError!);
+            pixels = Math.Min(graph.Size, MaxSize);
+            if (size is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } given)
+            {
+                if (!(given.ValueKind == JsonValueKind.Number && given.TryGetInt32(out pixels) && TextureGraph.IsValidSize(pixels) && pixels <= MaxSize))
+                    return Error($"check: size {given.GetRawText()} is not allowed; size is a power of two from 32 to {MaxSize} (32, 64, 128, 256, 512, 1024 or 2048)");
+            }
+            set = CheckSet.OfGraph(new GraphEvaluator(graph, registry), pixels);
+        }
+        return Line(Report(set, pixels).ToJsonString());
+    }
+
+    /// <summary>The report for <paramref name="set"/>: <c>{ok, problems, notes, stats}</c>.</summary>
+    public static JsonObject Report(CheckSet set, int size)
+    {
+        var problems = CheckRules.Run(set);
+        var notes = new List<string>(set.Notes);
+        foreach (var o in set.Outputs.Where(o => o.IsRole(OutputRole.BaseColour) && set.MetallicFor(o) is null && set.Find("metallic") is not null))
+            notes.Add("base_colour and metallic are different sizes, so every base colour texel is judged as a non-metal");
+        if (set.Find(OutputRoles.Name(OutputRole.Metallic)) is { IsGrey: true } metallic)
+        {
+            long metal = metallic.Data.LongCount(v => v >= BaseColourRangeRule.MetallicIsMetal);
+            notes.Insert(0, $"metal texels (metallic>=0.5): {CheckRules.Percent(metal, metallic.Texels)}");
+        }
+        var outputs = new JsonObject();
+        foreach (var o in set.Outputs) outputs[o.Name] = Stats(o);
+        return new JsonObject
+        {
+            ["ok"] = problems.Count == 0,
+            ["problems"] = new JsonArray([.. problems.Select(p => (JsonNode)new JsonObject { ["check"] = p.Check, ["output"] = p.Output, ["message"] = p.Message })]),
+            ["notes"] = new JsonArray([.. notes.Select(n => (JsonNode)n)]),
+            ["stats"] = new JsonObject { ["size"] = size, ["outputs"] = outputs },
+        };
+    }
+
+    /// <summary>An output's min, max and mean per channel, in packed levels, the mean to a tenth.</summary>
+    private static JsonObject Stats(CheckOutput o)
+    {
+        var channels = o.Channels;
+        var min = new int[channels]; var max = new int[channels]; var sum = new double[channels];
+        Array.Fill(min, 255);
+        for (long i = 0; i < o.Texels; i++)
+            for (var c = 0; c < channels; c++)
+            {
+                int level = o.Level(o.Data[i * channels + c]);
+                if (level < min[c]) min[c] = level;
+                if (level > max[c]) max[c] = level;
+                sum[c] += level;
+            }
+        return new JsonObject
+        {
+            ["min"] = new JsonArray([.. min.Select(v => (JsonNode)v)]),
+            ["max"] = new JsonArray([.. max.Select(v => (JsonNode)v)]),
+            ["mean"] = new JsonArray([.. sum.Select(s => (JsonNode)Math.Round(s / o.Texels, 1))]),
+        };
+    }
+
+    private bool TryFiles(JsonElement files, out CheckSet set, out string? error)
+    {
+        set = null!;
+        error = null;
+        if (files.ValueKind != JsonValueKind.Array || files.GetArrayLength() == 0)
+        {
+            error = "check: files is a list of {path, role}, such as [{\"path\":\"textures/planks/base_colour.png\",\"role\":\"base_colour\"}]";
+            return false;
+        }
+        var decoded = new List<(string Role, int Width, int Height, byte[] Rgba)>();
+        var notes = new List<string>();
+        foreach (var item in files.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object
+                || !item.TryGetProperty("path", out var p) || p.ValueKind != JsonValueKind.String
+                || !item.TryGetProperty("role", out var r) || r.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(p.GetString()) || !GraphNames.IsValid(r.GetString()!))
+            {
+                error = $"check: files holds {item.GetRawText()}, which is not {{path, role}}: a path, and a role (base_colour, normal, roughness, metallic, occlusion, height) or a named output's name";
+                return false;
+            }
+            var role = r.GetString()!;
+            if (decoded.Any(d => d.Role == role))
+            {
+                error = $"check: files names the role {role} twice; give each output one file";
+                return false;
+            }
+            string full;
+            try
+            {
+                full = Path.GetFullPath(p.GetString()!, toolFolder.Directory ?? Environment.CurrentDirectory);
+            }
+            catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                error = $"check: could not read {JsonSerializer.Serialize(p.GetString())}: {e.Message}";
+                return false;
+            }
+            if (!File.Exists(full))
+            {
+                error = $"check: the file {full} does not exist";
+                return false;
+            }
+            try
+            {
+                var image = ImageResult.FromMemory(File.ReadAllBytes(full), ColorComponents.RedGreenBlueAlpha);
+                decoded.Add((role, image.Width, image.Height, image.Data));
+            }
+            catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException)
+            {
+                error = $"check: could not read {full} as a PNG: {e.Message}";
+                return false;
+            }
+            notes.Add($"{role}: {Path.GetFileName(full)}, {decoded[^1].Width}x{decoded[^1].Height}");
+        }
+        var read = CheckSet.OfPngs(decoded);
+        set = new(read.Source, read.Outputs, [.. notes, .. read.Notes]);
+        return true;
+    }
+}

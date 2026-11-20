@@ -86,3 +86,42 @@ output, as carve's `check` lists mesh faults, with the fix in words, and never r
 - Runs beside T-140, which owns the format, validator and `FileTools.cs`. This task adds its own files and one line in
   `Program.Tools`. A conflict that only adds is settled by keeping both sides.
 - **Stop and ask:** a threshold that a committed sample fails, or any change to a rule's number.
+
+### Hand-off
+
+Written by Claude Sonnet 5.5 (`claude-sonnet-5-5`), stopped at about 22 tool calls on the planning stop-rule: a committed
+sample fails a rule.
+
+**STOP, for the person: `samples/graphs/planks.texgraph` fails `does-not-tile` on its `normal` output.** Every other
+top-level sample (painted-metal, grime, fabric, bricks, old-wall, floor-tiles, cobblestones) and the bricks grey variant
+check clean at their own sizes. The planks' normal: u wrap step 25.7 levels (mean over three channels) against an interior
+mean of 3.5, over the threshold of 2 x 3.5 + 2 = 9. Cause measured: the normal's R channel has a stave edge at every 32nd
+column pair (steps of 77, 35, 30 around columns 31, 63, ..., 255), and u = 0 is itself a stave edge, so the wrap step is
+77 in every row, exactly what each interior edge has. The planks tile (they were looked at tiled in M-27); the rule, which
+compares one wrap step with the *mean* interior step, reads any hard edge that falls on the wrap as a seam. The rule is
+not changed here. Choices for the person: compare the wrap step against the interior steps' own distribution (for
+example a high percentile or the largest edge step) instead of the mean; or accept the normal's edge on the wrap and
+exempt it; or move the stave edge off the wrap in the sample.
+
+**Done (uncommitted-to-finish; the branch is not finished):** the five rules as classes in `src/Patina.Graphs/Checks/`
+(`CheckSet.cs`, `CheckRules.cs` with the one list `CheckRules.All`, and one file a rule), `src/Patina.Server/CheckTool.cs`
+(arguments size, parameters, files; result `{ok, problems, notes, stats}` as agreed; StbImageSharp added to Patina.Server
+to decode PNGs), one line in `Program.Tools` and the two tool-list tests, the two planted graphs in
+`samples/graphs/faults/` (each raises only its one problem: chrome-in-paint a metallic of 0.45..0.55 over a base colour of
+130..200, flat-mask a named `wear` clipped to one value), and `tests/Patina.Graphs.Tests/CheckSamplesTests.cs` (the sample
+sweep, the bricks variant, the fault graphs, and the M-7 PNGs written to the test output).
+
+**Left:** the person's ruling on does-not-tile above; the description's worked examples (`CheckTool.Worked*Result` are
+placeholders to fill from a real run, with a test that runs each as written); the per-rule just-inside/just-outside tests
+for a graph and a PNG and the broken-copy table (threshold side, metal judged as non-metal, wrap not compared); a tool
+test over the harness; CLAUDE.md's Layout line; `As built`; `cairn lint`, `verify`, `finish`.
+
+**M-7 PNGs, checked with their roles (to report, not fix):** end-grain-base + end-grain-normal: normal-not-unit 0.62%
+(worst 0.033), does-not-tile base_colour (u) and normal (u and v). iron-base + iron-mr: metallic-not-binary 8.71%,
+does-not-tile on base_colour (u 44.6 against 2.8, v 33.6 against 10.7), roughness and more (output cut off).
+rune-emissive (as a named colour output): clean. staves-base + normal + occlusion: does-not-tile base_colour (v, 3.6
+against 0.0 inside) and normal (u, 51.0 against 3.5), which is the planks' case again (an edge on the wrap) and a
+flat-interior case: an interior step of 0 makes any wrap step over 2 levels a fault.
+
+**Surprising:** the same rule would be flagged by anything whose edge falls on the wrap, which the staves-base case shows
+is not rare.
