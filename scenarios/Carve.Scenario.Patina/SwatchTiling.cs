@@ -44,9 +44,9 @@ internal static class SwatchTiling
     }
 
     /// <summary>Per pixel: +1 predicted white, -1 predicted black, 0 not judged, from the 64 px red channel at tiling (tu, tv).</summary>
-    public static sbyte[] Predict(byte[] texels, float angle, int tu, int tv)
+    public static sbyte[] Predict(byte[] texels, float angle, int tu, int tv, SwatchSphere.Hit?[,]? given = null, float facing = Facing)
     {
-        var hits = HitsAt(angle);
+        var hits = given ?? HitsAt(angle);
         bool White(int x, int y) => texels[((((y % Size) + Size) % Size) * Size + (((x % Size) + Size) % Size)) * 4] >= 128;
         static float Wrapped(float d) => MathF.Abs(d - MathF.Round(d));
         var judged = new sbyte[N * N];
@@ -54,7 +54,7 @@ internal static class SwatchTiling
         {
             for (var x = 0; x < N; x++)
             {
-                if (hits[x, y] is not { } hit || hit.Facing < Facing || hits[x + 1, y] is not { } right || hits[x, y + 1] is not { } below) continue;
+                if (hits[x, y] is not { } hit || hit.Facing < facing || hits[x + 1, y] is not { } right || hits[x, y + 1] is not { } below) continue;
                 var footprint = MathF.Max(
                     MathF.Max(Wrapped((right.U - hit.U) * tu), Wrapped((below.U - hit.U) * tu)),
                     MathF.Max(Wrapped((right.V - hit.V) * tv), Wrapped((below.V - hit.V) * tv))) * Size;
@@ -75,14 +75,14 @@ internal static class SwatchTiling
     private static double Luma(byte[] p, int at) => 0.2126 * p[at * 4] + 0.7152 * p[at * 4 + 1] + 0.0722 * p[at * 4 + 2];
 
     /// <summary>Judges a sphere frame against the prediction; the numbers are appended to <paramref name="measured"/>.</summary>
-    public static void Check(PatinaChecks checks, string label, ScenarioFrame frame, byte[] texels, float angle, int tu, int tv, StringBuilder? measured = null)
+    public static void Check(PatinaChecks checks, string label, ScenarioFrame frame, byte[] texels, float angle, int tu, int tv, StringBuilder? measured = null, SwatchSphere.Hit?[,]? given = null, float facing = Facing)
     {
         if (frame.Width != N || frame.Height != N)
         {
             checks.Check(false, $"swatch: tiling {label}: the sphere is {frame.Width} x {frame.Height}, not {N} x {N}");
             return;
         }
-        var predicted = Predict(texels, angle, tu, tv);
+        var predicted = Predict(texels, angle, tu, tv, given, facing);
         int white = 0, black = 0, wrongWhite = 0, wrongBlack = 0;
         double whiteLow = 255, blackHigh = 0;
         for (var at = 0; at < predicted.Length; at++)
@@ -151,6 +151,7 @@ internal static class SwatchTiling
         Caught("tiling-2-for-3", probe => Check(probe, "2 for 3", three, texels, 0, 2, 2));
         Caught("tiling-3-for-1", probe => Check(probe, "3 for 1", frames[(0f, 3)], texels, 0, 1, 1));
         Caught("axes-swapped", probe => Check(probe, "swapped", three, SwapAxes(texels), 0, 3, 3));
+        await SwatchCubeCheck.RunAsync(driver, checks, measured, log);
         File.WriteAllText(Path.Combine(driver.RunFolder, "swatch-tiling-checks.tsv"), measured + "\n" + log);
     }
 
