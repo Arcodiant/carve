@@ -158,6 +158,29 @@ public class ExposedParametersTests
         Assert.Equal("parameters['p']: drives 'name_out.name', a name, which a graph parameter cannot drive; it drives a whole number, a number, a choice, two whole numbers or a colour", Faults(g));
     }
 
+    /// <summary>A node carrying both list kinds, for the person's ruling (2026-11-20): a list stays a fault when driven.</summary>
+    private sealed class ListsNode : NodeType
+    {
+        public override string Name => "lists";
+        public override IReadOnlyList<InputPort> Inputs { get; } = [];
+        public override IReadOnlyList<ParamSpec> Parameters { get; } =
+            [ParamSpec.Floats("stops", 2, 8, 0, 1, 0, 1), ParamSpec.Colours("colours", 0, 4, "#000000", "#ffffff")];
+        public override PortKind OutputKind(string port, IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters) => PortKind.Grey;
+        public override void Evaluate(NodeEvaluation e) => throw new NotSupportedException();
+    }
+
+    [Theory]
+    [InlineData("l.stops", "a list of numbers")]
+    [InlineData("l.colours", "a list of colours")]
+    public void A_floats_or_colours_parameter_cannot_be_driven(string drive, string kind)
+    {
+        var registry = NodeRegistry.BuiltIn.With(new ListsNode());
+        var value = drive == "l.stops" ? ParamValue.Of([0.0, 1.0]) : ParamValue.OfTexts(["#000000", "#ffffff"]);
+        var g = TextureGraph.Empty(64).WithNode("l", GraphNode.Of("lists")).WithParameter("p", GraphParameter.Of(value, drive));
+        var faults = string.Join(Environment.NewLine, GraphValidator.Validate(g, registry).Select(f => f.Message));
+        Assert.Contains($"parameters['p']: drives '{drive}', {kind}, which a graph parameter cannot drive;", faults);
+    }
+
     [Fact]
     public void The_narrowest_range_is_the_intersection_worked_by_hand()
     {

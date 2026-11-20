@@ -111,7 +111,8 @@ parameters' ranges (an enum's common choices), narrowed by `min` and `max`; the 
 `ExposedParametersTests.FaultCases`: an unknown node or parameter (listing what there is), a drive not `"<node>.<param>"`,
 an empty `drives`, two kinds (`drives 'layout.gap', a number, and 'paint.colour', a colour; ...`), an empty range, a value
 out of range, a node parameter driven by two parameters or named twice, `min`/`max` on a kind without order, a bad name,
-and a list or `Name` driven. A driven node parameter takes the parameter's value and its own value in the node is not
+and a list or `Name` driven. The rulings are tested: `A_floats_or_colours_parameter_cannot_be_driven`,
+`A_list_parameter_cannot_be_driven` (a `Name`), and an `IntPair` driven with min 1.5 and max 8.5 read as 2 to 8. A driven node parameter takes the parameter's value and its own value in the node is not
 checked.
 
 **Tools:** edit_graph `set_parameter`, `remove_parameter` (the driven parameters keep the value as their own) and
