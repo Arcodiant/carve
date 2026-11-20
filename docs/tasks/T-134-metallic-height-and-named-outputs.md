@@ -169,6 +169,11 @@ So the planks' sheet and every committed PNG keep their bytes. `ListParamsAndVer
 metallic rule, from `G:\My Drive\artifacts\carve\M-28\T-134\round-1`. The scenario frames were opened only as
 scaled copies.
 
+**Rebased onto T-135 and T-136.** Three conflicts touched only lines that add, and both sides were kept:
+define_graph's worked examples, `NodeCatalogue`'s node lines (with the `output` line as T-134 has it), and CLAUDE.md's
+Patina lines. One fix went in a commit of its own. T-135's `CobblestonesGraphTests` took `OutputRoles.All` to mean the
+cobblestones' four roles, but `All` now holds six, so the test names those four (`FourRoles`), as the planks' tests do.
+
 **What T-137, T-138 and T-139 build on.**
 - *List parameters*: `ParamSpec.Floats(name, minCount, maxCount, min, max, default...)` and `ParamSpec.Colours(name,
   minCount, maxCount, default...)`, read through `NodeParameters.Floats`/`Colours`. In the file they are a JSON array of
