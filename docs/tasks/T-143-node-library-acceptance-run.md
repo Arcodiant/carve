@@ -67,3 +67,11 @@ check let an agent judge a texture well enough is D-7's open question, and this 
   between a fix here and a filed task.
 - **Stop and ask:** before round 1 (the prompts and plants); before any change to run conditions; and before a second
   round.
+
+### Pre-round-1 numbers (Claude Sonnet 5.5, `claude-sonnet-5-5`, orchestrating; inner sessions on the default model, expected Opus 5.5)
+
+Awaiting the person's approval (stop 1); no session has run.
+
+- **Run:** a Release publish of `src/Patina.Server` at `%TEMP%\carve-m28-t143\patina\`; four folders under `C:\Users\andre\artifacts\carve\M-28\T-143\round-1\` (`s1-rug`, `s2-iron`, `s3-path`, `s4-fix`), each with `prompt.txt` and an `.mcp.json` naming that patina; `run-session.ps1` there runs `claude -p --allowedTools "mcp__patina__*" --tools "" --mcp-config .mcp.json --strict-mcp-config --output-format stream-json --verbose` with the prompt on stdin and no `--model`, in the session's folder (patina inherits it as its working folder).
+- **Plant** (`s4-fix/rug-draft.texgraph`, 14 nodes, size 256, neutral ids): `open` reports no fault; `check` gives ok false with exactly three problems: `base-colour-range` 1.68% of texels outside 20..245 (worst #0b0706; gradient_map `base`, first stop `#050505`, positions 0, 0.7, 1; at positions 0.45 it was under 1% and did not fire); `one-value` on the named output `wear` (every texel 1.000, levels `in_high` 0.02); `does-not-tile` on `roughness` (a seam in v, wrap step 36.6 levels against a 99th percentile of 13.2; `transform` `sheen` rotation 30). A clean fix keeping all 14 ids exists (`#3a1510`, `in_high` 0.8, rotation 90, checked clean). Note: define_graph's worked example already describes the 30-degree seam.
+- **Prompt numbers:** size 512 is a power of two in export's 32..8192; paths are relative to patina's working folder, the session folder; role names match export's roles; metallic has no file of its own (it is the B of `roughness.png`) and no prompt claims one; no node type or sample is named; file names given (`rug`, `iron`, `moss`, `flagstones`, `rug-draft`, `rug-fixed`) are the names the unit test reads; variants export to `textures/rug_variant/`, `iron_rusty/`, `flagstones_mossy/`.
