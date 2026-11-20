@@ -84,67 +84,60 @@ Render shows a rounded edge the way the game will, because the map is written in
 
 ### Hand-off
 
-Agent 2, Claude Opus 5.5 (2026-11-20), handing off at the T-124 gate and on a stop. Agent 1 was Claude Opus 5.5. Rebased onto
-`origin/milestone/M-24` with T-126 in (conflicts in `BakeTool.cs`, `BakesStages.cs` and the Bakes row of `CLAUDE.md` only
-added; both kept, built clean). **T-124 has not landed** (`origin/milestone/M-24` tip `52d3089`), so the final numbers and the
-frame review wait for it, as the brief says. Commits `bd1ec56`, `2b74618`.
+Agent 3, Claude Opus 5.5 (2026-11-20), handing off at the T-124 gate: **T-124 has not landed** (`origin/milestone/M-24` tip
+`52d3089`, fetched twice), and the brief puts the `render_glb` re-probe and the frame review (one request with the strip
+tolerance question) after it. Agents 1 and 2 were Claude Opus 5.5.
 
-**Done**
+**Done, from earlier agents** (commits `bd1ec56`, `2b74618`): the person's rulings `TopGain` 4.7 and `SideLoss` 1.6 in
+`BevelRenderTests`; unused `bevel`/`curvature` blocks warn through `UnusedBlock` in `BakeTool.cs` (T-124's `occlusion` joins it
+in the rebase: keep all three); the seam check as the Core `unit` test `WrenchBevelSeamTests`; the close-edge rule (longest
+convex hard edge of the group whose sample points are on their face, facing the eye, in sight from all three close directions).
 
-- **The person's rulings (2026-11-20), landed:** `TopGain` 4.7 and `SideLoss` 1.6 in `BevelRenderTests`, "leaning toward
-  +X's" dropped; a `bevel` block without `normal` in maps, and a `curvature` block without `curvature`, bake what was asked and
-  warn (`bevel: ignored, 'normal' is not in maps`), through one helper `UnusedBlock` in `BakeTool.cs` (T-124 may add
-  `occlusion` to it; keep both in the rebase). Two new cases in `BakeNormalToolTests`; the refusal case removed. A malformed
-  unused block is still an error.
-- **Strip sampling fixed.** Counted apart on edge (112, 113): 0 of 48 points failed `Geo.Inside`; all 48 failed line of sight,
-  hidden by the ring head's faces 48, 49 and 64 at t 0.97 to 0.99. The edge is the dark boss's underside (face 78, facing −z
-  at z 0.0135), 0.5 mm over the ring's top: buried from every direction. `JawEdge` now takes the longest convex jaw edge whose
-  sample points are all on their face, facing the eye and in sight from all three close directions: (124, 125), faces 66 and 79.
-  A face shallower than six widths reads its shade at half its depth (face 66 is 5.5 mm deep, so 4.8 mm sat in its far edge's
-  strip). `Samples` is shared by the choice and the reading.
-- **Seam check** as a Core `unit` test, `tests/Carve.Core.Tests/WrenchBevelSeamTests.cs`, as ruled: texels within a quarter
-  width of a hard seam edge and within width of no other break edge, decoded from bake's bytes through their own frame.
-- core-unit (1352) and server-unit (970) pass locally. `verify` not run: scenario-bakes fails on the stop below.
+**Done, agent 3: the person's rulings of 2026-11-20 on agent 2's option table, landed**
 
-**Probed** (local runs `artifacts/scenarios/bakes/4` good, `5` bevel-g, `6` bevel-thin; pre-T-124 renders)
+- **Seam check:** `SeamAngle` 9 degrees, as ruled (probed largest 8.33; the thin-width break's least 32.4).
+- **Stage strip check moved to the steel grip.** `JawEdge` is now `CloseEdge(group)`, the same rule, given the faces that are
+  `steel` and in no later group of SurfaceStage's table (dark, red, black); predicted shades use `#80858A`. Chosen edge
+  **(72, 74), faces 42 and 46**. Close frames `bevel-grip-1..3`, each `-plain` and with the map. **The jaw close frames are
+  gone** (their readings are in agent 2's probe, kept in the table below).
+- **`bevel-thin` dropped from the stage** and from CLAUDE.md's break list; the Core seam test's thin-width break covers it.
 
-Seam test: 212 seam edges read on both sides, largest 8.33° from the mean; at width 0.00001 every side's largest is at least
-32.4° (60.1° at most). `SeamAngle` is 9, provisional.
+**Probed, grip edge (72, 74)** (local runs `artifacts/scenarios/bakes/7` good, `8` bevel-g; pre-T-124 renders), luma; `pm` the
+colour rule's mean-normal shade:
 
-Close jaw frames, edge (124, 125), luma; `pm` the colour rule's mean-normal shade (`ColourRule.Lit`, `#36393E`):
-
-| view | faces measured | faces predicted | pm | rule | strips good | strips bevel-g | strips bevel-thin | plain |
+| view | faces measured | faces predicted | pm | rule | strips good | less pm | strips bevel-g | less pm |
 |---|---|---|---|---|---|---|---|---|
-| jaw-1 | 58.78, 59.52 | 58.59, 59.52 | 59.66 | outside | 60.40, 60.37 | 58.00, 59.38 | 58.78, 59.52 | 58.77, 59.52 |
-| jaw-2 | 59.39, 59.45 | 58.59, 58.52 | 59.66 | outside | 60.70, 59.66 | 58.32, 60.61 | 59.37, 59.45 | 59.37, 59.45 |
-| jaw-3 | 57.96, 60.45 | 57.59, 59.52 | 59.37 | between | 60.56, 59.66 | 58.23, 59.59 | 57.78, 60.45 | 57.77, 60.45 |
+| grip-1 | 121.96, 123.98 | 121.74, 123.96 | 126.96 | outside | 126.19, 127.03 | -0.77, +0.07 | 115.07, 118.82 | -11.89, -8.14 |
+| grip-2 | 125.67, 121.74 | 124.96, 121.03 | 126.96 | outside | 127.14, 127.21 | +0.18, +0.25 | 118.74, 116.82 | -8.21, -10.14 |
+| grip-3 | 119.03, 126.96 | 118.82, 126.96 | 126.96 | between (pm on face B's shade) | 125.96, 127.96 | -1.00, +1.00 | 114.82, 121.74 | -12.14, -5.21 |
 
-Strip less `pm`: good 0.74, 0.72, 1.04, 0.00, 1.18, 0.28 (largest 1.18); bevel-g −1.66, −0.28, −1.34, 0.95, −1.14, 0.22
-(largest 1.66); bevel-thin largest 1.59.
+Good: largest |strip - pm| 1.00. bevel-g: least 5.21. So **a tolerance of 2 against `pm`** (`PredictedSlack`, ColourRule's own
+of 2026-11-14) passes the good run with 1.00 to spare and fails every bevel-g strip by at least 3.21. **The "between" rule fails
+the good run** on grip-3: strip B 127.96 is 1.00 above face B's 126.96, because the rule puts `pm` exactly on face B's shade;
+bevel-g's grip-3 strip A (114.82) is 4.21 below face A, strip B (121.74) lies between.
 
-**Stop: the stage's strip check, as ruled, cannot tell the map from its break.** The jaw is #36393E steel and the faces' shades
-are within 3 luma of each other, so every reading is within 2 luma. (a) The good run fails: on jaw-3, where the rule puts the
-mean between, strip A reads 60.56, 0.11 above face B's 60.45. (b) Any tolerance against `pm` that passes the good run (1.18 or
-more) also passes bevel-g (1.66 at most) unless it is between 1.18 and 1.34, a 0.16 luma window. (c) The bevel-g run passes
-whole; bevel-thin fails only on jaw-3, by 0.18. Options for the person, each for the one check named:
+As the code stands, the good run fails that one check (`bevel-grip-3: strip B reads 127.96, not between 119.03 and 126.96`) and
+bevel-g fails five; nothing is landed for the tolerance. **Proposed for the review request** (one option set, for the grip
+strip check only):
 
-| check | option A | option B | option C |
-|---|---|---|---|
-| seam test, `SeamAngle` | 9° (probe 8.33 rounded up) | 12° | 16° (half the break's least, 32.4) |
-| stage strip, tolerance against `pm` where the rule puts the mean outside | 2 (ColourRule's own, 2026-11-14), and add check D below so the break still fails | 1.25 (between good 1.18 and break 1.34) | another number |
-| stage strip, where the rule puts the mean between | slack 0.25 (good is 0.11 out) | judge it against `pm` like the others | drop the "between" reading on the jaw and rely on D |
-| stage, a new check D for the bevel-g break | with the map less without (the plain frame), per strip, has the sign the rule gives `pm` less the face's predicted shade (good: +1.63/+0.85, +1.33/+0.21, +2.79/−0.79 against predicted +1.07/+0.14, +1.07/+1.14, +1.78/−0.15; bevel-g: −0.77 on jaw-1 A) | move the strip check to a lighter face (the `steel` grip, #80858A) where shades spread wider | the render test's box (already checks the strips and fails on G and R) stands for it, and the stage's strip check records only |
+- A (proposed): every view held to `pm` within 2, the "between" reading dropped (pm sits on a face's shade where it is "between").
+- B: `pm` within 2 where the rule puts the mean outside; "between" with a slack of 1.25 luma where it puts it between.
+- C: another number.
 
 **Left**
 
-1. The person answers the table above; land it.
-2. After T-124 lands: `git rebase origin/milestone/M-24`, rerun the stage, re-probe `render_glb` against `render` with the map
-   (pre-T-124: front 47 px, patch 13; three-quarter 15 px, patch 5; the person should see the rise from 10 to 15).
-3. `bevel-thin` in the stage now has no check of its own to break (the seam check moved to Core with its break inside the test);
-   either drop it from the stage or keep it as the strip check's second break. Ask with the table if kept.
-4. Frame review round 1 (`G:\My Drive\artifacts\carve\M-24\T-125\round-1`): the normal `uvs` frame, the zoom-8 jaw frames with
-   and without the map, the six sides, the render test's frames; put the numbers above in the request, one option set per check.
-5. `verify`, As built, `cairn lint`, `finish`.
+1. When T-124 lands: `git rebase origin/milestone/M-24` (keep `occlusion`, `bevel`, `curvature` in `UnusedBlock`; keep both
+   sides in `BakesStages.cs` and the Bakes row), rebuild, rerun good and bevel-g, re-read the table above and `render_glb`
+   against `render` with the map (pre-T-124: front 47 px, patch 13; three-quarter 15 px, patch 5).
+2. Review round 1 via `mcp__waystone__review`: the option set above plus the `render_glb` numbers, and frames under
+   `G:\My Drivertifacts\carve\M-24\T-125ound-1`: `wrench-uvs-normal`, `bevel-grip-1..3` with and without the map, the six
+   sides, `BevelRenderTests`' frames. Land the tolerance as answered.
+3. `verify`, As built (rulings with the person's earlier ones, numbers, break counts, the review, agents 1 to 3 Opus 5.5),
+   `cairn lint`, `finish`.
 
-**Not checked:** no frame opened (0 of 12 images in either agent). No queued run. `server-regression` not rerun after the rebase.
-The new jaw edge's frames are unseen; the stage's frames all changed with the edge.
+**Agent 2's jaw probe, for the record** (edge (124, 125), faces 66 and 79, `#36393E`): strips less `pm` good largest 1.18,
+bevel-g largest 1.66, bevel-thin largest 1.59; on jaw-3 the good strip read 0.11 outside "between". That is why the check moved.
+
+**Not checked:** no frame opened (0 of 12 images in this agent). No queued run. core-unit and server-unit not rerun (agent 3
+changed a comment in Core's test and the stage only; the scenario built and ran). `verify` not run (the good run fails the
+pending check by design).

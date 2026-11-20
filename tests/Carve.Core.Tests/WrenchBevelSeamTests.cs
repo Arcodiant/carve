@@ -19,8 +19,8 @@ public class WrenchBevelSeamTests(ITestOutputHelper output)
     private const double Width = 0.0016, ThinWidth = 0.00001;
 
     /// <summary>
-    /// The largest angle, in degrees, between a decoded texel beside a seam edge and the edge's mean normal. PENDING THE PERSON'S
-    /// RULING (T-125's hand-off): probed (Opus 5.5, 2026-11-20) on 212 seam edges read on both sides, largest 8.33 degrees; 9
+    /// The largest angle, in degrees, between a decoded texel beside a seam edge and the edge's mean normal, as the person ruled
+    /// (2026-11-20): probed (Opus 5.5, 2026-11-20) on 212 seam edges read on both sides, largest 8.33 degrees; 9
     /// is that rounded up. The break's least, over every side, is 32.4 degrees.
     /// </summary>
     internal const double SeamAngle = 9;
