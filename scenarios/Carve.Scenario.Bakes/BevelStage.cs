@@ -17,8 +17,8 @@ namespace Carve.Scenario.Bakes;
 /// <c>normal_texture</c>). Frames: the <c>uvs</c> look with the map under it; zoom 8 on a convex grip (<c>steel</c>) edge from three
 /// directions, each without and then with the map (the person's ruling, 2026-11-20: the lighter steel spreads the shades wider than
 /// the dark jaw, where the map and its break read within 2 luma of each other); the wrench from the six sides and the three-quarter
-/// view. Checks: texels farther than the width from every break edge of their face hold N itself, (128, 128, 255) or a level from it; in the close frames the strip by the edge lies
-/// between the two faces' shades; <c>render_glb</c> of the export with the map agrees with <c>render</c> under D-6's rule.
+/// view. Checks: texels farther than the width from every break edge of their face hold N itself, (128, 128, 255) or a level from it; in the close frames each strip by the edge
+/// reads within 2 luma of the colour rule's shade for the mean normal (the person's ruling, 2026-11-20); <c>render_glb</c> of the export with the map agrees with <c>render</c> under D-6's rule.
 /// <c>CARVE_BAKES_BREAK</c>: <c>bevel-g</c> puts the map on with G inverted. The thin-width break is the Core seam test's
 /// (<c>WrenchBevelSeamTests</c>), so the stage has none (the person's ruling, 2026-11-20).
 /// </summary>
@@ -33,8 +33,9 @@ internal sealed class BevelStage : IBakesStage
     private const int FlatLevels = 1;
 
     /// <summary>
-    /// How far, in luma, a strip may lie from the mean normal's shade as the colour rule predicts it, on an edge whose predicted
-    /// mean is not between its faces' shades. PENDING THE PERSON'S RULING: probed in <c>bevel.tsv</c>'s <c>predicted</c> rows.
+    /// How far, in luma, a strip may lie from the mean normal's shade as the colour rule predicts it, in every close view: the
+    /// person's ruling (2026-11-20), ColourRule's own slack. Probed in <c>bevel.tsv</c>'s <c>predicted</c> rows: the good map at
+    /// most 1.00 off, <c>bevel-g</c> at least 5.21 off.
     /// </summary>
     private const double PredictedSlack = 2;
 
@@ -224,7 +225,8 @@ internal sealed class BevelStage : IBakesStage
 
     /// <summary>
     /// In a close frame: the mean luma of each face at three widths from the edge (its shade) and of the strip on each side at a
-    /// quarter width, over the middle of the edge, each point in sight. With the map, each strip lies between the faces' shades.
+    /// quarter width, over the middle of the edge, each point in sight. With the map, each strip reads within PredictedSlack of the
+    /// mean normal's predicted shade.
     /// </summary>
     private static void CheckStrip(View view, string map, ScenarioFrame frame, Scene scene, SceneMesh mesh, Edge e, List<string> tsv, bool judge)
     {
@@ -256,25 +258,21 @@ internal sealed class BevelStage : IBakesStage
             Note($"bevel: {view.Name}: the edge ({e.Lo}, {e.Hi})'s faces or strips are not in sight");
             return;
         }
-        // The person's ruling (2026-11-20): judge "between the faces' shades" only where the colour rule puts the mean normal's
-        // shade between the two faces'; elsewhere hold each strip to that predicted shade, within PredictedSlack.
+        // The person's ruling (2026-11-20): every strip in every view is held to the colour rule's shade for the mean normal,
+        // within PredictedSlack; the "between the two faces' shades" reading is dropped (it failed the good map on grip-3, where
+        // the rule puts the mean exactly on face B's shade).
         double Predicted(Vector3 n)
         {
             var lit = ColourRule.Lit(Steel, n, view.Direction);
             return Luma((ColourRule.Encode(lit[0]), ColourRule.Encode(lit[1]), ColourRule.Encode(lit[2])));
         }
         var (pa, pb, pm) = (Predicted(e.NormalA), Predicted(e.NormalB), Predicted(Vector3.Normalize(e.NormalA + e.NormalB)));
-        var between = pm >= Math.Min(pa, pb) && pm <= Math.Max(pa, pb);
         tsv.Add(string.Create(CultureInfo.InvariantCulture,
-            $"predicted	{view.Name}	{pm:F2}	faces {pa:F2} {pb:F2} (measured {a:F2} {b:F2}); mean {(between ? "between" : "outside")}; strips less predicted {sa - pm:F2} {sb - pm:F2}"));
+            $"predicted	{view.Name}	{pm:F2}	faces {pa:F2} {pb:F2} (measured {a:F2} {b:F2}); strips less predicted {sa - pm:F2} {sb - pm:F2}"));
         foreach (var (side, s) in new[] { ("A", sa), ("B", sb) })
         {
-            if (between)
-            {
-                if (s < Math.Min(a, b) || s > Math.Max(a, b)) Note(string.Create(CultureInfo.InvariantCulture, $"bevel: {view.Name}: strip {side} reads {s:F2}, not between the faces' shades {a:F2} and {b:F2}"));
-            }
-            else if (Math.Abs(s - pm) > PredictedSlack)
-                Note(string.Create(CultureInfo.InvariantCulture, $"bevel: {view.Name}: strip {side} reads {s:F2}, not within {PredictedSlack} of the mean normal's predicted shade {pm:F2} (the faces' predicted {pa:F2} and {pb:F2} do not hold it between)"));
+            if (Math.Abs(s - pm) > PredictedSlack)
+                Note(string.Create(CultureInfo.InvariantCulture, $"bevel: {view.Name}: strip {side} reads {s:F2}, not within {PredictedSlack} of the mean normal's predicted shade {pm:F2} (faces predicted {pa:F2} and {pb:F2})"));
         }
     }
 
