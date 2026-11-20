@@ -4,7 +4,7 @@ description: >-
 ---
 # T-123 — The bakes scenario
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-121, T-122
 
-**Verify:** core-unit, server-unit
+**Verify:** core-unit, server-unit, scenario-bakes
 
 ## Goal
 
@@ -74,3 +74,44 @@ T-124 to T-126 each add theirs.
 - **Verify line:** at planning, `cairn lint` accepts only suites already in `tests.json`, so this file names none it
   will add. Once scenario-bakes is in `tests.json`, add it to this file's `**Verify:**` line, with the task's other
   suites.
+
+### As built
+
+By Claude Opus 5.5 in two agents: agent 1 (Opus 5.5) built, ran and probed the scenario; agent 2 (Opus 5.5) landed the
+person's rulings, showed each failing and ran the frame review.
+
+- **`scenarios/Carve.Scenario.Bakes`** (`BakesScenario.cs`, `BakesStages.cs`, `SurfaceStage.cs`, `BakesChecks.cs`), in
+  `Carve.slnx`; suite `scenario-bakes` in `tests.json` (every linked file and `samples/wrench.carve` as inputs), its
+  `CLAUDE.md` row, and the suite on the `**Verify:**` line. A new stage is one file and one line in `BakesStages.cs`.
+- **Stage 1** bakes all six masks and the base colour at 1024, padding 8 (coverage 0.4856), checks the file list, no
+  skipped faces and no warnings, writes `bakes.tsv`, `samples.tsv`, `mirrors.tsv`, `probe.tsv` and `differences.tsv`,
+  and captures 14 frames plus the 4x crop `wrench-uvs-steel-padding-4x.png`.
+- **Checks.** `uvs` frames by T-121's block rule (nearest texel, tolerance 2, a pixel a quarter to three quarters into
+  its texel and 4 px from every face edge and the square's border), the islands also held to the colour worked from the
+  groups. Render frames sampled on faces turned to the eye (cosine ≥ 0.5, `BakesChecks.Facing`), at the centre and 0.7
+  of the way to each corner, kept only when the rays through the pixel and 1.5 px around it all meet that face. M-2: the
+  x-mirror of each red-box centre (views not along x) must not lead red. Export: `render_glb` against `render` under
+  D-6's rule, front 48 px differ (patch 15), three-quarter 10 px (patch 3); the control (glb three-quarter against render
+  front) fails it, as it must.
+- **The person's rulings (2026-11-20)**, landed as written:
+  - *Steel:* in each view, the darkest `steel` sample is at least 30 luma (Rec. 709) above the lightest `rubber`,
+    `dark` or `black` sample of that view (`SurfaceStage.SteelMargin`). No fixed split. Least margin seen: 45.4 (left).
+  - *Red:* `red` samples lead max(G, B) by 50 or more (`RedLeadMin`); every other group's lead is at most 0. Seen: red
+    ≥ 105, the rest ≤ −6.
+  - *Sample placement:* accepted as built (cos 0.5, centre plus 0.7 toward each corner, the 1.5 px solid test).
+- **Breaks** (`CARVE_BAKES_BREAK`, scenario side only), each run on this machine after the rulings landed; the clean
+  run passes:
+  - `swap` (steel and red swapped in the bake): 448 failures: red lead under 50 ×38, another group leading ×392, steel
+    margin ×7 (10.5 to 23.9), the mirror ×2, the `uvs` frames ×9.
+  - `faint` (new: steel baked #5C6064, red #8C6460, so steel stays grey and red still leads): 53 failures: red lead
+    under 50 ×38 (leads 16 to 35, which the old lead-above-0 rule passed), steel margin ×6 (16.5 to 27.9), `uvs` ×9.
+  - `mirror` (camera mirrored left to right): 57 failures, the mirror check ×2 among them.
+- **Frame review:** Waystone round 1, the 14 frames, the crop and both compare triptychs from job
+  `J-20261120-005533-8f1553` (06f0844; byte-identical to job `J-20261120-004722-5c8b13`), in
+  `G:\My Drive\artifacts\carve\M-24\T-123\round-1`. The person **approved**, no notes. Agent 2 looked at the frames
+ound-1`. The person **approved**, no notes. Agent 2 looked at the frames
+  itself, scaled, before sending. Break logs in `...\T-123\breaks`, the probe in `...\T-123\probe`.
+- **Not checked:** `samples/wrench.carve`'s stats against fps-arms.
+- **Surprising.** The first run failed on the `uvs` square's border line and on mirror checks in the views along x (a
+  point and its mirror share a line of sight); both are excluded by rule, not by tolerance. Two dark corners next to the
+  red box read red-dominant until the solid-pixel ray test was added.
