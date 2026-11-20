@@ -35,6 +35,7 @@ public partial class Program
         PopSnapshotTool.Create(),
         ExportTool.Create(),
         SwatchTool.Create(),
+        CheckTool.Create(),
     ];
 
     /// <summary>
