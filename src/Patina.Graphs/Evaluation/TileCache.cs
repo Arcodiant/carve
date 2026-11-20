@@ -5,8 +5,9 @@ namespace Patina.Graphs.Evaluation;
 /// <summary>
 /// The tiles one <see cref="GraphEvaluator.Evaluate"/> holds, keyed by node and tile position, every output port of a
 /// node at one position held together. Tiles the current step needs are pinned and never dropped; past
-/// <see cref="Cap"/> bytes the unpinned ones are dropped least recently used first, so what is held stays at most the
-/// cap or what is pinned, whichever is more. No clock: "recent" is the order tiles were last unpinned.
+/// <see cref="Bound"/> bytes (the cap, or the most ever pinned at once if that is more, T-155) the unpinned ones are
+/// dropped least recently used first, so what is held stays at most the cap or the most one step pinned, whichever is
+/// more. No clock: "recent" is the order tiles were last unpinned.
 /// </summary>
 internal sealed class TileCache(int tilesAcross, long cap)
 {
@@ -28,22 +29,43 @@ internal sealed class TileCache(int tilesAcross, long cap)
     public int MostTiles { get; private set; }
     public long PeakBytes { get; private set; }
 
+    /// <summary>The bytes of the tiles pinned now, and the most there have been.</summary>
+    public long PinnedBytes { get; private set; }
+    public long PeakPinnedBytes { get; private set; }
+
+    /// <summary>
+    /// What the cache trims to: the cap, or the most ever pinned at once if that is more. A step that pinned more than
+    /// the cap (a strong minify reads its whole input for every tile) has shown it needs that much; keeping it lets the
+    /// next step find those tiles rather than make them all again, and holds no more than was held already.
+    /// </summary>
+    public long Bound => Math.Max(Cap, PeakPinnedBytes);
+
     public long Key(int node, int tx, int ty) => ((long)node * tilesAcross + ty) * tilesAcross + tx;
 
     public Entry? Find(long key) => _entries.GetValueOrDefault(key);
 
     public void Pin(Entry entry)
     {
-        if (entry.Pins++ == 0 && entry.Unpinned is { } node)
+        if (entry.Pins++ != 0) return;
+        if (entry.Unpinned is { } node)
         {
             _unpinned.Remove(node);
             entry.Unpinned = null;
         }
+        AddPinnedBytes(entry.Bytes);
     }
 
     public void Unpin(Entry entry)
     {
-        if (--entry.Pins == 0) entry.Unpinned = _unpinned.AddLast(entry);
+        if (--entry.Pins != 0) return;
+        entry.Unpinned = _unpinned.AddLast(entry);
+        PinnedBytes -= entry.Bytes;
+    }
+
+    private void AddPinnedBytes(long bytes)
+    {
+        PinnedBytes += bytes;
+        PeakPinnedBytes = Math.Max(PeakPinnedBytes, PinnedBytes);
     }
 
     /// <summary>Adds a node's tiles at one position, pinned once, then drops unpinned tiles past the cap.</summary>
@@ -55,18 +77,19 @@ internal sealed class TileCache(int tilesAcross, long cap)
         Tiles += tiles.Length;
         MostTiles = Math.Max(MostTiles, Tiles);
         PeakBytes = Math.Max(PeakBytes, Bytes);
+        AddPinnedBytes(entry.Bytes);
         Trim();
         return entry;
     }
 
     /// <summary>
     /// Drops unpinned tiles, least recently used first, until <paramref name="incoming"/> more bytes fit under the cap
-    /// or none is left: called before a node's tiles are allocated, so the cache never holds the cap and a tile more.
+    /// or none is left: called before a node's tiles are allocated, so the cache never holds the bound and a tile more.
     /// </summary>
-    public void MakeRoom(long incoming) => Trim(Cap - incoming);
+    public void MakeRoom(long incoming) => Trim(Bound - incoming);
 
-    /// <summary>Drops unpinned tiles, least recently used first, until no more than the cap is held or none is left.</summary>
-    public void Trim() => Trim(Cap);
+    /// <summary>Drops unpinned tiles, least recently used first, until no more than the bound is held or none is left.</summary>
+    public void Trim() => Trim(Bound);
 
     private void Trim(long limit)
     {

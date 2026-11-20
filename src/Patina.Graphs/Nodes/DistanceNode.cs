@@ -47,6 +47,90 @@ public sealed class DistanceNode : NodeType
     /// <summary>A row distance beyond the reach: no texel of that side within the window.</summary>
     private const int None = int.MaxValue;
 
+    /// <summary>
+    /// T-155: pass 1 is the row pass and pass 2 the column pass, each reaching the window's reach. The row pass's tile
+    /// holds, for each texel, the u distance to the nearest texel of the other side within the reach, positive for an
+    /// inside texel and negative for an outside one (infinite, with that sign, when there is none). Capped at the
+    /// reach, it is the same in every tile; every distance under the range is still found, so the bytes are
+    /// <see cref="Evaluate"/>'s.
+    /// </summary>
+    public override SeparablePasses? Separable(NodeParameters parameters, int size)
+    {
+        var reach = Reach(parameters.Float("range"), size);
+        return new SeparablePasses(reach, reach);
+    }
+
+    public override void EvaluateRows(NodeEvaluation e)
+    {
+        var input = e.Input("in")!;
+        var output = e.Output();
+        var rect = e.Rect;
+        var reach = Reach(e.Parameters.Float("range"), e.Size);
+        var width = rect.Width + 2 * reach;
+        var row = new float[width];
+        var left = new int[width];
+        for (var y = rect.Y; y < rect.Bottom; y++)
+        {
+            input.CopyRow(y, rect.X - reach, width, row);
+            // the last window index at or before each of the other side, for the tile's columns: from the left, then the right
+            int lastIn = int.MinValue / 2, lastOut = int.MinValue / 2;
+            for (var i = 0; i < reach + rect.Width; i++)
+            {
+                if (row[i] >= 0.5f) lastIn = i; else lastOut = i;
+                if (i >= reach) left[i] = row[i] >= 0.5f ? i - lastOut : i - lastIn;
+            }
+            int nextIn = int.MaxValue / 2, nextOut = int.MaxValue / 2;
+            var to = output.Row(y);
+            for (var i = width - 1; i >= reach; i--)
+            {
+                var inside = row[i] >= 0.5f;
+                if (inside) nextIn = i; else nextOut = i;
+                if (i >= reach + rect.Width) continue;
+                var d = Math.Min(left[i], inside ? nextOut - i : nextIn - i);
+                var v = d > reach ? float.PositiveInfinity : d;
+                to[i - reach] = inside ? v : -v;
+            }
+        }
+    }
+
+    public override void EvaluateColumns(NodeEvaluation e)
+    {
+        var rowsRead = e.Input(RowsPort)!;
+        var output = e.Output();
+        var rect = e.Rect;
+        var side = e.Parameters.Text("side");
+        var reach = Reach(e.Parameters.Float("range"), e.Size);
+        var rangeTexels = RangeTexels(e.Parameters.Float("range"), e.Size);
+        bool wantInside = side != "outside", wantOutside = side != "inside";
+        var rows = rect.Height + 2 * reach;
+        var buffer = new float[rows * rect.Width];
+        for (var r = 0; r < rows; r++) rowsRead.CopyRow(rect.Y - reach + r, rect.X, rect.Width, buffer.AsSpan(r * rect.Width, rect.Width));
+        var toOut = new int[rows];
+        var toIn = new int[rows];
+        var f = new double[rows];
+        var outOf = new double[rect.Height];
+        var inOf = new double[rect.Height];
+        var envelope = new Envelope(rows);
+        for (var c = 0; c < rect.Width; c++)
+        {
+            for (var q = 0; q < rows; q++)
+            {
+                var v = buffer[q * rect.Width + c];
+                var d = float.IsInfinity(v) ? None : (int)Math.Abs(v);
+                toOut[q] = v > 0 ? d : 0;
+                toIn[q] = v > 0 ? 0 : d;
+            }
+            if (wantInside) envelope.Column(toOut, 0, 1, rows, reach, f, outOf);
+            if (wantOutside) envelope.Column(toIn, 0, 1, rows, reach, f, inOf);
+            for (var y = 0; y < rect.Height; y++)
+            {
+                var self = buffer[(reach + y) * rect.Width + c] > 0;
+                double d2 = self ? (wantInside ? outOf[y] : -1) : (wantOutside ? inOf[y] : -1);
+                output.Row(rect.Y + y)[c] = d2 < 0 ? 0f : Value(d2, rangeTexels);
+            }
+        }
+    }
+
     public override void Evaluate(NodeEvaluation e)
     {
         var range = e.Parameters.Float("range");

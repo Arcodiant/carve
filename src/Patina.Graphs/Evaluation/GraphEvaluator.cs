@@ -7,22 +7,27 @@ namespace Patina.Graphs.Evaluation;
 /// Evaluates a graph with no faults, one output at a time, in square tiles.
 /// <para><b>Tiles.</b> An output is made in canonical tiles of side <c>T = min(tileSize, size)</c>
 /// (<see cref="DefaultTileSize"/>, 128, unless a caller names another power of two), tile <c>(tx, ty)</c> holding
-/// columns <c>tx * T</c> to <c>tx * T + T - 1</c> and the same rows, always inside the image. Output tiles are made top
-/// row first, left to right. For each, the evaluator works back through the graph which tiles of each node it needs
-/// (each node names, by <see cref="NodeType.InputRect"/>, the rectangle of each input it reads for a tile; the tiles
-/// covering that rectangle, wrapping around the image, are needed), pins them, makes those not already held, inputs
-/// first, hands the output tile to the caller, then unpins them.</para>
+/// columns <c>tx * T</c> to <c>tx * T + T - 1</c> and the same rows, always inside the image. Output tiles are made in
+/// bands of at most <see cref="MostBandTiles"/> tile columns (T-155), each band walked down a row at a time, left to
+/// right in the row: up to 16 tiles across that is the image's raster order. A tile is made depth first: each tile of
+/// each input it reads (each node names, by <see cref="NodeType.InputRect"/>, the rectangle of each input it reads for
+/// a tile; the tiles covering that rectangle, wrapping around the image, are read) is found or made and pinned, the
+/// tile is filled, and its inputs are unpinned. So what is pinned at once is one path of reads through the graph.</para>
 /// <para><b>Dependent inputs</b> (T-153). An input whose rectangles depend on another input's values
-/// (<see cref="NodeType.DependsOn"/>) is not worked back with the rest: when the node's tile is about to be made, the
-/// inputs it depends on are made already (with their static rectangles), the node's <see cref="NodeType.InputRects"/>
-/// names from reads of them the rectangles it needs, and those tiles and what they need are made then, the same way,
-/// and pinned with the rest until the output tile is handed over. A read outside every rectangle asked for throws.</para>
+/// (<see cref="NodeType.DependsOn"/>) is read after the others: the node's <see cref="NodeType.InputRects"/> names from
+/// reads of them the rectangles it needs, and those tiles are found or made the same way. A read outside every
+/// rectangle asked for throws.</para>
+/// <para><b>Separable passes</b> (T-155). A node whose <see cref="NodeType.Separable"/> is not null is made in two
+/// passes: its tile is <see cref="NodeType.EvaluateColumns"/> over its row pass's tiles widened in y, and each row
+/// pass tile is <see cref="NodeType.EvaluateRows"/> over its inputs widened in x, cached under a key of its own like
+/// any node's tile. The band is narrowed so that a band's row tiles, as tall as the column pass reaches, fit in three
+/// quarters of the cap.</para>
 /// <para><b>Memory bound.</b> Tiles are kept between output tiles in a cache of at most <see cref="DefaultCacheBytes"/>
-/// (64 MiB) unless a caller names another cap, dropped least recently used first, never while a step needs them; so
-/// held bytes stay at most the cap or one step's pinned tiles, whichever is more (one tile a node in a pointwise
-/// chain; a few for a node reading around or away from its texels), plus the caller's own result
-/// (<see cref="OutputImage"/> keeps the RGBA8 image, 256 MB at 8192, which the PNG encoder needs whole). The cache is
-/// dropped at the end of the call. <see cref="LastRun"/> reports what one output held.</para>
+/// (64 MiB) unless a caller names another cap, dropped least recently used first, never while pinned; so held bytes
+/// stay at most the cap or the most ever pinned at once, whichever is more (one tile a node in a pointwise chain; a
+/// few for a node reading around or away from its texels; a strong minify's whole input), plus the caller's own
+/// result (<see cref="OutputImage"/> keeps the RGBA8 image, 256 MB at 8192, which the PNG encoder needs whole). The
+/// cache is dropped at the end of the call. <see cref="LastRun"/> reports what one output held.</para>
 /// <para><b>Determinism.</b> A tile's texels are worked from their image coordinates, from inputs holding exactly the
 /// values a whole-image evaluation would, so an output's bytes depend on neither the tile size nor the cap: a dropped
 /// tile asked for again comes out the same. Evaluation is single-threaded, in a fixed order, in <c>float</c> with
@@ -77,8 +82,8 @@ public sealed class GraphEvaluator
 
     /// <summary>
     /// Evaluates the output with <paramref name="role"/> at <paramref name="size"/>, tile by tile, calling
-    /// <paramref name="onTile"/> with the tile reaching the output node for each canonical tile, top row first, left to
-    /// right. The tile is the evaluator's: read it during the call and do not keep it. <paramref name="tileSize"/> (a
+    /// <paramref name="onTile"/> with the tile reaching the output node for each canonical tile, in the bands the
+    /// class describes (the image's raster order up to 16 tiles across). The tile is the evaluator's: read it during the call and do not keep it. <paramref name="tileSize"/> (a
     /// power of two) and <paramref name="cacheBytes"/> override <see cref="DefaultTileSize"/> and
     /// <see cref="DefaultCacheBytes"/>; neither changes a byte of the output.
     /// </summary>
@@ -127,14 +132,17 @@ public sealed class GraphEvaluator
         int outNode = index[inNode], outPort = PortIndex(inNode, inPort);
 
         var cache = new TileCache(n, cap);
-        var pinned = new List<TileCache.Entry>();
         var evaluated = 0;
-        // The tiles each node needs, one set a depth: depth 0 for an output tile, one deeper for each dependent input
-        // made inside a node's step.
-        var pools = new List<(List<(int Tx, int Ty)>[] Needs, HashSet<int>[] Seen)>();
+        // Separable steps (T-155): their row pass's tiles are cached under node number steps.Length + i.
+        var passes = steps.Select(s => s.Type.Separable(s.Parameters, size)).ToArray();
+        for (var i = 0; i < steps.Length; i++)
+            if (passes[i] is not null && (steps[i].Ports.Length != 1 || steps[i].Sources.Any(s => s.Dependent)))
+                throw new InvalidOperationException($"node type {steps[i].Type.Name} runs as separable passes, so it has one output and no dependent input");
         TexelRect TileRect(int tx, int ty) => new(tx * t, ty * t, t, t);
 
-        TileRead Read(Source source, IReadOnlyList<TexelRect> wanted)
+        // The read of node `node`'s port `port` over `wanted`, each covering tile made if it is not held and pinned
+        // into `pins` for the caller to unpin once it has made its own tile.
+        TileRead Gather(int node, int port, PortKind kind, IReadOnlyList<TexelRect> wanted, List<TileCache.Entry> pins)
         {
             var parts = new (TexelRect Asked, Tile[] Tiles)[wanted.Count];
             for (var w = 0; w < wanted.Count; w++)
@@ -144,61 +152,58 @@ public sealed class GraphEvaluator
                 var tiles = new Tile[cover.Width * cover.Height];
                 for (var r = 0; r < cover.Height; r++)
                     for (var c = 0; c < cover.Width; c++)
-                        tiles[r * cover.Width + c] = cache.Find(cache.Key(source.Node, Tile.Wrap(cover.X + c, n), Tile.Wrap(cover.Y + r, n)))!.Tiles[source.OutPort];
+                    {
+                        var entry = Ensure(node, Tile.Wrap(cover.X + c, n), Tile.Wrap(cover.Y + r, n));
+                        pins.Add(entry);
+                        tiles[r * cover.Width + c] = entry.Tiles[port];
+                    }
                 parts[w] = (want, tiles);
             }
-            var kind = steps[source.Node].Kinds[source.OutPort];
             return parts.Length == 1 ? new TileRead(kind, size, t, parts[0].Asked, parts[0].Tiles) : new TileRead(kind, size, t, parts);
         }
 
-        // Makes the seed tiles (of nodes 0 to top) and every tile they need, inputs first, each pinned until the output
-        // tile is handed over. A dependent input's tiles are not worked back here: they are known only once the node's
-        // other inputs are made, so MakeTile makes them, one depth deeper.
-        void Make(int depth, int top, IEnumerable<(int Node, int Tx, int Ty)> seeds)
+        TileRead GatherSource(Source source, IReadOnlyList<TexelRect> wanted, List<TileCache.Entry> pins) =>
+            Gather(source.Node, source.OutPort, steps[source.Node].Kinds[source.OutPort], wanted, pins);
+
+        // Node `node`'s tile (x, y), held or made, pinned once for the caller. A tile is made depth first: its inputs'
+        // tiles are made and pinned, it is filled, and they are unpinned, so what is pinned at once is one path of
+        // reads through the graph, not every tile a step needs.
+        TileCache.Entry Ensure(int node, int x, int y)
         {
-            while (pools.Count <= depth)
-                pools.Add(([.. steps.Select(_ => new List<(int, int)>())], [.. steps.Select(_ => new HashSet<int>())]));
-            var (needs, seen) = pools[depth];
-            for (var i = 0; i <= top; i++) { needs[i].Clear(); seen[i].Clear(); }
-            void Add(int node, int tx, int ty)
-            {
-                if (seen[node].Add(ty * n + tx)) needs[node].Add((tx, ty));
-            }
-            foreach (var (node, x, y) in seeds) Add(node, x, y);
-
-            // Which tiles of each node the seeds need, worked back.
-            for (var i = top; i >= 0; i--)
-            {
-                var step = steps[i];
-                foreach (var (x, y) in needs[i])
-                    foreach (var source in step.Sources)
-                    {
-                        if (source.Dependent) continue;
-                        var cover = TileRead.Cover(step.Type.InputRect(source.Port, TileRect(x, y), step.Parameters, size), size, t);
-                        for (var r = cover.Y; r < cover.Bottom; r++)
-                            for (var c = cover.X; c < cover.Right; c++)
-                                Add(source.Node, Tile.Wrap(c, n), Tile.Wrap(r, n));
-                    }
-            }
-
-            // Pin what is held already, so nothing this step needs is dropped while it runs.
-            for (var i = 0; i <= top; i++)
-                foreach (var (x, y) in needs[i])
-                    if (cache.Find(cache.Key(i, x, y)) is { } held) { cache.Pin(held); pinned.Add(held); }
-
-            // Make the rest, inputs first.
-            for (var i = 0; i <= top; i++)
-                foreach (var (x, y) in needs[i])
-                    if (cache.Find(cache.Key(i, x, y)) is null) MakeTile(depth, i, x, y);
+            if (cache.Find(cache.Key(node, x, y)) is { } held) { cache.Pin(held); return held; }
+            return node < steps.Length ? MakeTile(node, x, y) : MakeRows(node - steps.Length, x, y);
         }
 
-        void MakeTile(int depth, int i, int x, int y)
+        TileCache.Entry Finish(long key, Step step, TexelRect rect, Action<Dictionary<string, Tile>> fill, List<TileCache.Entry> pins)
+        {
+            long incoming = 0;
+            foreach (var kind in step.Kinds) incoming += (long)rect.Width * rect.Height * PortKinds.Channels(kind) * sizeof(float);
+            cache.MakeRoom(incoming);
+            var outputs = new Tile[step.Ports.Length];
+            var named = new Dictionary<string, Tile>(StringComparer.Ordinal);
+            for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect);
+            fill(named);
+            var entry = cache.AddPinned(key, outputs);
+            foreach (var pin in pins) cache.Unpin(pin);
+            cache.Trim();
+            evaluated++;
+            return entry;
+        }
+
+        TileCache.Entry MakeTile(int i, int x, int y)
         {
             var step = steps[i];
             var rect = TileRect(x, y);
+            var pins = new List<TileCache.Entry>();
             var inputs = new Dictionary<string, TileRead>(StringComparer.Ordinal);
+            if (passes[i] is { } separable)
+            {
+                inputs[NodeType.RowsPort] = Gather(steps.Length + i, 0, step.Kinds[0], [rect.Inflate(0, separable.ColumnReach)], pins);
+                return Finish(cache.Key(i, x, y), step, rect,
+                    named => step.Type.EvaluateColumns(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+            }
             foreach (var source in step.Sources)
-                if (!source.Dependent) inputs[source.Port] = Read(source, [step.Type.InputRect(source.Port, rect, step.Parameters, size)]);
+                if (!source.Dependent) inputs[source.Port] = GatherSource(source, [step.Type.InputRect(source.Port, rect, step.Parameters, size)], pins);
             foreach (var source in step.Sources)
             {
                 if (!source.Dependent) continue;
@@ -207,38 +212,63 @@ public sealed class GraphEvaluator
                 var wanted = step.Type.InputRects(source.Port, request);
                 if (wanted.Count == 0)
                     throw new InvalidOperationException($"node type {step.Type.Name} asked for no rectangle of its input {source.Port}");
-                var seeds = new List<(int, int, int)>();
-                foreach (var want in wanted)
-                {
-                    var cover = TileRead.Cover(want, size, t);
-                    for (var r = cover.Y; r < cover.Bottom; r++)
-                        for (var c = cover.X; c < cover.Right; c++)
-                            seeds.Add((source.Node, Tile.Wrap(c, n), Tile.Wrap(r, n)));
-                }
-                Make(depth + 1, source.Node, seeds);
-                inputs[source.Port] = Read(source, wanted);
+                inputs[source.Port] = GatherSource(source, wanted, pins);
             }
-            long incoming = 0;
-            foreach (var kind in step.Kinds) incoming += (long)rect.Width * rect.Height * PortKinds.Channels(kind) * sizeof(float);
-            cache.MakeRoom(incoming);
-            var outputs = new Tile[step.Ports.Length];
-            var named = new Dictionary<string, Tile>(StringComparer.Ordinal);
-            for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect);
-            step.Type.Evaluate(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named));
-            pinned.Add(cache.AddPinned(cache.Key(i, x, y), outputs));
-            evaluated++;
+            return Finish(cache.Key(i, x, y), step, rect,
+                named => step.Type.Evaluate(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
         }
 
-        for (var ty = 0; ty < n; ty++)
-            for (var tx = 0; tx < n; tx++)
-            {
-                pinned.Clear();
-                Make(0, outNode, [(outNode, tx, ty)]);
-                onTile(cache.Find(cache.Key(outNode, tx, ty))!.Tiles[outPort]);
-                foreach (var entry in pinned) cache.Unpin(entry);
-                cache.Trim();
-            }
+        // The row pass's tile (x, y) of separable step i, from its inputs widened in x.
+        TileCache.Entry MakeRows(int i, int x, int y)
+        {
+            var step = steps[i];
+            var rect = TileRect(x, y);
+            var pins = new List<TileCache.Entry>();
+            var inputs = new Dictionary<string, TileRead>(StringComparer.Ordinal);
+            foreach (var source in step.Sources)
+                inputs[source.Port] = GatherSource(source, [rect.Inflate(passes[i]!.RowReach, 0)], pins);
+            return Finish(cache.Key(steps.Length + i, x, y), step, rect,
+                named => step.Type.EvaluateRows(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+        }
+
+        foreach (var (tx, ty) in Order(n, BandTiles(steps, passes, n, t, cap)))
+        {
+            var entry = Ensure(outNode, tx, ty);
+            onTile(entry.Tiles[outPort]);
+            cache.Unpin(entry);
+            cache.Trim();
+        }
         LastRun = new EvaluationRun(t, cache.MostTiles, cache.PeakBytes, cap, evaluated);
+    }
+
+    /// <summary>The widest band of tile columns walked: 16, or narrower when a separable node's row tiles for one column must all stay held.</summary>
+    public const int MostBandTiles = 16;
+
+    // Bands of `band` tile columns, each walked down a row at a time, left to right in the row (T-155): a tile's later
+    // reads by the rows below come while it is still held, where a row of the whole image between them would have
+    // pushed it out of the cache.
+    private static IEnumerable<(int Tx, int Ty)> Order(int n, int band)
+    {
+        for (var b = 0; b < n; b += band)
+            for (var ty = 0; ty < n; ty++)
+                for (var tx = b; tx < Math.Min(n, b + band); tx++)
+                    yield return (tx, ty);
+    }
+
+    // So many tile columns that every separable node's row tiles for the band (a column of them as tall as its column
+    // pass reaches, times the band) fit in three quarters of the cap, leaving room for the tiles a row tile reads (LRU fails all at once
+    // when a cycle of reads only just passes what it holds).
+    private static int BandTiles(Step[] steps, SeparablePasses?[] passes, int n, int t, long cap)
+    {
+        var band = Math.Min(n, MostBandTiles);
+        for (var i = 0; i < steps.Length; i++)
+        {
+            if (passes[i] is not { } p) continue;
+            var tall = Math.Min(n, (t + 2 * p.ColumnReach + t - 1) / t + 1);
+            var column = (long)tall * t * t * PortKinds.Channels(steps[i].Kinds[0]) * sizeof(float);
+            band = Math.Min(band, (int)Math.Max(1, cap / 4 * 3 / column));
+        }
+        return band;
     }
 
     // The inputs a port's rectangles depend on, checked: other inputs of the type, each with a static rectangle.
@@ -259,7 +289,7 @@ public sealed class GraphEvaluator
 /// <summary>
 /// What one output's evaluation held: the tile size; the most tiles (one port of one node at one position each) and
 /// the most bytes held at once; the cache's cap; and how many node tiles were made (a node's ports at one position
-/// count once; a tile dropped and asked for again counts again).
+/// count once; a separable node's row pass tile counts as one too; a tile dropped and asked for again counts again).
 /// </summary>
 public sealed record EvaluationRun(int TileSize, int MostTiles, long PeakBytes, long CapBytes, int TilesEvaluated);
 
