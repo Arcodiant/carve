@@ -46,40 +46,64 @@ public static partial class Bake
             }
         });
 
-        // Along each row, the covered texel nearest in 2D: each row's answer depends on nothing another row writes.
+        // Along each row, the covered texel nearest in 2D, as the lower envelope of one parabola per column that has a
+        // nearest row: column c offers (x - c)^2 + dy(c)^2 at index row(c) * size + c, and a texel takes the least
+        // (distance, index) pair. Two columns' offers cross once along the row, so the envelope is built left to right in
+        // one pass with integer switch points, exact and linear in the row (Felzenszwalb and Huttenlocher's transform with
+        // the tie rule folded into where one column takes over from the last). Each row's answer depends on nothing
+        // another row writes.
         var limit = (long)texels * texels;
         var channels = image.Channels;
         var source = image.Values.ToArray();
         System.Threading.Tasks.Parallel.For(0, size, y =>
         {
-            var values = new float[channels];
+            var hull = new int[size];
+            var from = new long[size];
+            var count = 0;
+            for (var c = 0; c < size; c++)
+            {
+                if (near[y * size + c] < 0) continue;
+                var start = long.MinValue;
+                while (count > 0)
+                {
+                    start = TakesOver(near, size, y, hull[count - 1], c);
+                    // The last column wins nowhere once the new one takes over no later than the last took over.
+                    if (count > 1 && start <= from[count - 1]) { count--; continue; }
+                    break;
+                }
+                hull[count] = c;
+                from[count] = start;
+                count++;
+            }
+            if (count == 0) return;
+            var k = 0;
             for (var x = 0; x < size; x++)
             {
+                while (k + 1 < count && from[k + 1] <= x) k++;
                 if (layout.IsCovered(x, y)) continue;
-                var best = long.MaxValue;
-                var bestIndex = -1;
-                for (var dx = 0; dx <= texels; dx++)
-                {
-                    var dx2 = (long)dx * dx;
-                    if (dx2 > best || dx2 > limit) break;
-                    for (var side = dx == 0 ? 1 : 0; side < 2; side++)
-                    {
-                        var sx = side == 0 ? x - dx : x + dx;
-                        if ((uint)sx >= (uint)size) continue;
-                        var row = near[y * size + sx];
-                        if (row < 0) continue;
-                        var dy = row - y;
-                        var d2 = dx2 + (long)dy * dy;
-                        if (d2 > limit) continue;
-                        var index = row * size + sx;
-                        if (d2 < best || (d2 == best && index < bestIndex)) { best = d2; bestIndex = index; }
-                    }
-                }
-                if (bestIndex < 0) continue;
-                source.AsSpan(bestIndex * channels, channels).CopyTo(values);
-                values.CopyTo(result.Texel(x, y));
+                var sx = hull[k];
+                var row = near[y * size + sx];
+                long dx = x - sx, dy = row - y;
+                if (dx * dx + dy * dy > limit) continue;
+                source.AsSpan((row * size + sx) * channels, channels).CopyTo(result.Texel(x, y));
             }
         });
         return result;
+    }
+
+    /// <summary>
+    /// The first column x along row <paramref name="y"/> at which column <paramref name="q"/>'s nearest covered texel beats
+    /// column <paramref name="p"/>'s (p &lt; q): nearer, or as near with the lower row-major index.
+    /// </summary>
+    private static long TakesOver(int[] near, int size, int y, int p, int q)
+    {
+        long rp = near[y * size + p], rq = near[y * size + q];
+        long gp = (rp - y) * (rp - y), gq = (rq - y) * (rq - y);
+        // p's offer less q's is d * x - n, rising with x: q is nearer once d * x > n, as near at d * x == n.
+        var n = (long)q * q + gq - (long)p * p - gp;
+        var d = 2L * (q - p);
+        var floor = n >= 0 ? n / d : -((-n + d - 1) / d);
+        var tieToQ = rq * size + q < rp * size + p;
+        return floor * d == n && tieToQ ? floor : floor + 1;
     }
 }
