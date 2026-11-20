@@ -63,3 +63,33 @@ byte-identical, so the speed checks T-137 and T-138 moved here can be met.
   agent's call.
 - **Stop and ask:** any committed output that changes; a parallel evaluator; a speed check above that cannot be met.
 - T-142's library stage and T-143's acceptance evaluate the samples at large sizes, so T-142 waits on this task.
+
+### Research (Claude Opus 5.5, `claude-opus-5-5`, 2026-11-20)
+
+Measured with a Release harness outside the repo (`%TEMP%\t155\measure`, T-153's console calling
+`GraphEvaluator.Evaluate` with no packing; AMD Ryzen 7 5800X3D, tiles of 128, 64 MiB cap), on this branch before any
+change, and a cache simulation (`%TEMP%\t155\sim.py`: the evaluator's LRU and pinning, tile counts only).
+
+- **The source alone is past 10 s.** A default `fbm` through a two-stop `gradient_map` (colour) at 8192: **12.4 s**,
+  8,192 tiles. T-138's colour fbm source took 16.8 s. So `blur` at 8192 on such an input cannot be 10 s in all; only
+  the blur's own share (the run less its source alone) can. The same graph's blur, smooth 0.05, at 2048: 6.7 s (T-137
+  had 10.5 s on its own input).
+- **Under the 64 MiB cap the source of a wide colour blur must be made more than once.** A smooth blur at 0.05 and
+  8192 reaches 1,229 texels each way, 10 tiles. Every output tile depends on a 21 x 21 square of source tiles, so
+  whatever the order, a source band 21 tile rows high (or wide) is live at once: as the row pass's colour tiles that
+  is 21 x 64 x 192 KB = 252 MB, four times the cap. No schedule computes the source once under 64 MiB; any that keeps
+  the cap trades the shortfall for recomputation. Simulated with two passes cached as separate tiles: raster order
+  makes the source 441 times over (1,806,336 fbm tiles for 4,096), column order 27.6 times. The best I found under
+  the cap is bands of 14 tile columns walked downward, the row pass's tiles kept for the band: the source about 2.4
+  times, about 30 s with this source.
+- **Distance fits.** Its mask and its row pass are greyscale; at range 0.1 and 8192 a band is 15 x 64 x 64 KB =
+  60 MiB. The pinned window drops from 196 tiles to about 30 once the row pass is its own tile, so the peak is under
+  the cap at every range (range 0.25 recomputes the row pass, cheaply).
+- **The rotation.** The turn's source is used by two or three consecutive output rows, and in raster order a whole
+  row of output tiles (a slanted band of about 200 source positions, four node tiles each) passes between those uses,
+  more than the cap holds, so it is evicted and made again: the 2.4 times. A locality-preserving order of output tiles
+  (bands a few tiles wide walked downward, or a Hilbert curve) keeps a tile's later uses close to its first. The
+  callers of `Evaluate` (`OutputImage`, `ExportTool`) place tiles by position, so the order may change.
+
+**Decision asked of the person** (round-1): what the blur's 10 s means, and whether the cap may grow for a separable
+node so the source is made once.
