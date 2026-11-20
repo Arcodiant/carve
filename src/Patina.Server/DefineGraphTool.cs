@@ -28,6 +28,9 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"layout":{"type":"tiles","params":{"count":[4,8],"stagger":0.5,"gap":0.1,"bevel":0.1}},"out":{"type":"output","inputs":{"in":"layout.height"},"params":{"role":"base_colour"}}}}}""";
 
     public const string WorkedTilesResult = "define_graph: the open graph is now 2 nodes, size 256, seed 0; no faults: it evaluates";
+    /// <summary>A second worked example: a tone per stone, from worley's random on a stone colour. Tests run it as written.</summary>
+    public const string WorkedStones =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"stones":{"type":"worley","params":{"cells":[6,6],"jitter":0.85}},"stone":{"type":"colour","params":{"colour":"#8c857a"}},"base":{"type":"blend","inputs":{"a":"stone","b":"stones.random"},"params":{"mode":"multiply"}},"out":{"type":"output","inputs":{"in":"base"},"params":{"role":"base_colour"}}}}}""";
 
     public static string Text(NodeRegistry registry) =>
         "Replaces the open texture graph with a whole new one, given as graph: the body of a .texgraph file, as JSON. "
@@ -52,6 +55,9 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         + "Brick layout, tiles (4 bricks across, 8 rows, every second row shifted half a brick) with its height output as the base colour:\n"
         + "define_graph " + WorkedTiles + "\n"
         + "returns: " + WorkedTilesResult + "\n"
+        + "Worked example, a tone per stone (worley's random output, one grey for each of 6 x 6 cells; a type with several outputs is named \"id.port\") on a stone colour:\n"
+        + "define_graph " + WorkedStones + "\n"
+        + "returns: " + WorkedResult + "\n"
         + "Next: edit_graph to change it, get_graph to read it back, save to keep it.";
 
     public static McpServerTool Create(NodeRegistry registry) => Create<DefineGraphTool>("define_graph", Text(registry), new JsonObject

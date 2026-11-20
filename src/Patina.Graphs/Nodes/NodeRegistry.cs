@@ -20,6 +20,9 @@ public sealed class NodeRegistry
         new TilesNode(),
         new StripesNode(),
         new ShapeNode(),
+        new WorleyNode(),
+        new FbmNode(),
+        new WarpNode(),
     ]);
 
     private readonly IReadOnlyDictionary<string, NodeType> _types;
