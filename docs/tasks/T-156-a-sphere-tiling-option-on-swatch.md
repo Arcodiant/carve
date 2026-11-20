@@ -4,7 +4,7 @@ description: >-
 ---
 # T-156 — A sphere tiling option on swatch
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
