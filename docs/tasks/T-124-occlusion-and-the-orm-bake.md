@@ -139,7 +139,9 @@ fails. Nothing is ruled yet.
   the margin to 0, so any option above catches it.
 - **Failing: render against `render_glb` with the full material.** Three-quarter: 215 px differ, largest patch 54. D-6's
   rule allows a patch of 50. Front: 315 px, patch 39, a pass. With reach 0.0001 (occlusion about 1) the comparison
-  passes, and stage 1's comparison still passes (48 and 10 px). So the occlusion texture is what `render` and
+  passes, and stage 1's comparison still passes (48 and 10 px). Queued verify job `J-20261120-013502-764402`
+  (commit after 6071a57) gives the same 215 px and patch 54, so the result is deterministic. core-unit and server-unit
+  pass there. So the occlusion texture is what `render` and
   `render_glb` disagree on. This is not investigated yet. It could be how `render` builds the material's occlusion
   against the loader's, or filtering. Loosening the rule is the person's call, not ours.
 - **Left:**
