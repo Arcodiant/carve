@@ -89,13 +89,12 @@ node's output ports.
   - the other two stand as built: grime's `height` is wired from `wall.occlusion`, and a cycle back to the top file is
     found one level down.
 
-### Hand-off
+### As built
 
-Written by Claude Opus 5.5 (`claude-opus-5-5`), the second agent, at its call checkpoint (about 60 calls), code
-committed and `cairn task T-140 verify` passing (patina-unit and scenario-patina; WARN uncovered for CLAUDE.md and
-`tools/Patina.SampleGraphs/Program.cs`, which no suite takes as input). The first agent's hand-off is folded in below.
+Built by Claude Opus 5.5 (`claude-opus-5-5`) over three agents: the first two built and tested it, the third rebased onto
+T-156, checked the frames and took the review.
 
-**Done by the first agent (committed):** the `input` and `graph` nodes (`Nodes/InputNode.cs`, `NestedGraphNode.cs`);
+**First agent:** the `input` and `graph` nodes (`Nodes/InputNode.cs`, `NestedGraphNode.cs`);
 `TextureGraph.Folder`, set by `TexGraphFile.ReadFile` and by `GraphStore` (the file's folder once saved or opened, else
 the tool folder), `GraphValidator.ResolvePath`; the expansion in `GraphValidator.Analyse`/`Expand` (nodes renamed
 `<node>/<id>`, a source `wall.base_colour` resolving to the nested output's own source, no cascade from a use at fault);
@@ -107,7 +106,7 @@ ignoring `OnItsOwn`; `grime.texgraph` and `old-wall.texgraph` with PNGs; `Nested
 20..245, normals worst |len-1| 0.0050, old-wall mean level 94.1 vs 107.5 clean, chroma 70.9 vs 83.0). Every other
 committed PNG unchanged (sha256 compared by the first agent).
 
-**Done by this agent (committed):**
+**Second agent:**
 - *Ruling 1*: `GraphValidator.NestedMessage` rewrites a nested fault as `nodes['wall/layout'].params['gap']: ...`,
   `nodes['wall/x'].inputs['in']: ...` or `nodes['wall/x']: ...`, prefixing again at each level up, with ` (<file>)`
   for the innermost file. Tests updated: the nested fault, and the three-file cycle, now
@@ -133,15 +132,27 @@ committed PNG unchanged (sha256 compared by the first agent).
 - *Docs*: D-7's rule under "A graph is its own file"; CLAUDE.md's Layout lines for `Patina.Graphs`, `Patina.Server`,
   `tools/Patina.SampleGraphs`, both test projects and `samples/`.
 
-**Left:**
-- The review. Fetch the scenario-patina frames from this branch's verify job by job id (not `cairn test artifacts`,
-  which returns the newest job from any branch), check their hashes, and put `samples/graphs/grime/base_colour.png`,
-  `samples/graphs/old-wall/*.png` and the two sheets under `G:/My Drive/artifacts/carve/M-28/T-140/round-1`, then ask
-  the person with `mcp__waystone__review`. Or draw the sheets through patina's `swatch` with the script T-137's As built
-  names (`t138-swatch.py` in the user's Temp folder; read it first). No image has been opened by either agent.
-- Fold this section into `### As built`, with what T-141, T-142 and T-143 need and the models (both agents Opus 5.5).
-- Commit, `cairn lint`, `cairn task T-140 finish`.
+**Review and frames (third agent):** rebased onto `milestone/M-28` after T-156 (one conflict, CLAUDE.md's Layout lines
+for `Patina.Graphs` and `Patina.Server`; both kept, T-156's `tiling` clause with T-140's additions). This branch's
+`scenario-patina` job J-20261120-085227-39ade3: all 43 frames and exports it shares with T-139's job
+J-20261120-070631-363baf equal by SHA-256; 13 new (T-156's 7, this member's 6); the old-wall exports equal the committed
+samples byte for byte. The only committed PNGs changed are the five added samples. The person approved grime and the old
+wall (round 1: the sample PNGs, both scenario sheets and both sheets at `tiling` 3, drawn with `t140-swatch.py` in Temp).
+
+**For T-141, T-142, T-143 and M-29:**
+- *Naming*: a nested graph's nodes become `<graph node>/<id>`, again at each level (`wall/layout`, `u/u/u/u`); a source
+  `wall.base_colour` resolves to the nested output's own source, so no node `wall` survives expansion. A fault inside is
+  `nodes['wall/layout'].params['gap']: ... (bricks.texgraph)`, the file the innermost one.
+- *Paths*: a `graph` node's `path` resolves through `GraphValidator.ResolvePath` (`src/Patina.Graphs/GraphValidator.cs`)
+  against `TextureGraph.Folder`, which `TexGraphFile.ReadFile` sets to the file's folder and `GraphStore` sets to the
+  saved or opened file's folder, else the tool folder. A Carve material naming a graph (M-29) should read it with
+  `TexGraphFile.ReadFile` so `Folder` is set, and nested files then resolve there with no other change.
+- *Checks (T-141)*: validation hands on the expanded graph, so a check that evaluates sees no `graph` node; check's
+  rules on the two samples are measured in `NestedSamplesTests`.
+- *Pass-through*: `GraphParameters.Analyse` takes the chain of files and reads a nested range through
+  `GraphValidator.NestedParameters`; bricks' `mortar` is 0 to 0.45.
 
 **Surprising:** backslash escapes written through the Bash tool were consumed several times (a C# `\n` became a
 newline); use `chr(92)` or the Edit tool. The verify checkout gives samples CRLF, so a text comparison with a sample
-must ignore line endings.
+must ignore line endings. In the swatch sheet the sphere's label does not name the tiling (`sphere, Pbr, carve lights,
+angle 0` at tiling 3), though the title does; T-156's, not this member's.
