@@ -1,3 +1,4 @@
+using Patina.Graphs.Nodes;
 using Patina.Graphs.Evaluation;
 using Patina.Graphs.Imaging;
 using StbImageSharp;
@@ -8,9 +9,9 @@ namespace Patina.Graphs.Tests;
 [Trait("Tier", "unit")]
 public class EvaluationTests
 {
-    private static TextureGraph Graph(string nodes, int size = 64, uint seed = 7)
+    private static TextureGraph Graph(string nodes, int size = 64, uint seed = 7, NodeRegistry? registry = null)
     {
-        var read = TexGraphFile.Read($$"""{ "version": 1, "size": {{size}}, "seed": {{seed}}, "nodes": { {{nodes}} } }""", TestNodes.Registry);
+        var read = TexGraphFile.Read($$"""{ "version": 1, "size": {{size}}, "seed": {{seed}}, "nodes": { {{nodes}} } }""", registry ?? TestNodes.Registry);
         Assert.True(read.Loaded, read.Error?.ToString());
         Assert.Empty(read.Faults);
         return read.Graph!;
@@ -153,6 +154,84 @@ public class EvaluationTests
         Assert.Equal(new EvaluationRun(32, 192, 192 * grey32, 64L << 20, 192), blurred.LastRun);
         blurred.Evaluate(OutputRole.Occlusion, 256, _ => { }, tileSize: 32, cacheBytes: 0);
         Assert.Equal(new EvaluationRun(32, 35, 35 * grey32, 0, 64 * 35), blurred.LastRun);
+    }
+
+    // Every node type, the seven built in and the four from outside, in one graph feeding all four roles.
+    private static readonly TextureGraph EveryType = Graph("""
+        "n": { "type": "noise", "params": { "cells": [4, 4], "octaves": 2 } },
+        "gr": { "type": "gradient", "params": { "axis": "v", "repeat": 3, "shape": "triangle" } },
+        "c": { "type": "colour", "params": { "colour": "#aa7040" } },
+        "l": { "type": "levels", "inputs": { "in": "n" }, "params": { "gamma": 2 } },
+        "m": { "type": "blend", "inputs": { "a": "c", "b": "gr", "mask": "l" }, "params": { "mode": "multiply", "opacity": 0.8 } },
+        "hb": { "type": "blur", "inputs": { "in": "l" } },
+        "rt": { "type": "rotate", "inputs": { "in": "hb" }, "params": { "degrees": 30 } },
+        "t": { "type": "height_to_normal", "inputs": { "height": "rt" }, "params": { "strength": 2 } },
+        "s": { "type": "split", "inputs": { "in": "m" } },
+        "h": { "type": "hash", "params": { "offset": 3 } },
+        "x": { "type": "blend", "inputs": { "a": "h", "b": "s.r" }, "params": { "mode": "add", "opacity": 0.5 } },
+        "bc": { "type": "output", "inputs": { "in": "m" }, "params": { "role": "base_colour" } },
+        "nm": { "type": "output", "inputs": { "in": "t" }, "params": { "role": "normal" } },
+        "ro": { "type": "output", "inputs": { "in": "s.g" }, "params": { "role": "roughness" } },
+        "oc": { "type": "output", "inputs": { "in": "x" }, "params": { "role": "occlusion" } }
+        """, 256, registry: TestNodes.Reaching);
+
+    [Theory]
+    [InlineData(OutputRole.BaseColour)]
+    [InlineData(OutputRole.Normal)]
+    [InlineData(OutputRole.Roughness)]
+    [InlineData(OutputRole.Occlusion)]
+    public void EveryNodeTypeGivesTheSameBytesAtEveryTileSizeAndCap(OutputRole role)
+    {
+        var evaluator = new GraphEvaluator(EveryType, TestNodes.Reaching);
+        var whole = OutputImage.Rgba8(evaluator, role, 256, tileSize: 256);
+        var channel = role == OutputRole.Roughness ? 1 : 0;
+        Assert.Contains(whole.Where((_, i) => i % 4 == channel), v => v != whole[channel]); // not a flat image
+        foreach (var side in new[] { 16, 64, 256 })
+            foreach (var cap in new[] { 0, GraphEvaluator.DefaultCacheBytes })
+                Assert.True(whole.AsSpan().SequenceEqual(OutputImage.Rgba8(evaluator, role, 256, side, cap)), $"{OutputRoles.Name(role)} in tiles of {side} under a cap of {cap} differs from one tile");
+    }
+
+    [Fact]
+    public void AFarReadingNodeStaysUnderTheCap()
+    {
+        // rotate turns the hash by 30 degrees about the centre and moves it by half the image: each output tile reads
+        // a turned square of the hash a long way off. Worked directly from the hash, nearest texel, wrapping.
+        const int n = 2048;
+        const long cap = 8L << 20;
+        var g = Graph("""
+            "h": { "type": "hash", "params": { "offset": 5 } },
+            "r": { "type": "rotate", "inputs": { "in": "h" }, "params": { "degrees": 30 } },
+            "o": { "type": "output", "inputs": { "in": "r" }, "params": { "role": "occlusion" } }
+            """, n, registry: TestNodes.Reaching);
+        var evaluator = new GraphEvaluator(g, TestNodes.Reaching);
+        var rgba = OutputImage.Rgba8(evaluator, OutputRole.Occlusion, n, cacheBytes: cap);
+        var run = evaluator.LastRun!;
+        Assert.Equal(cap, run.CapBytes);
+        Assert.True(run.PeakBytes <= run.CapBytes, $"held {run.PeakBytes} bytes, past the cap of {run.CapBytes}");
+
+        var turn = RotateNode.Turn(30);
+        for (var y = 0; y < n; y++)
+            for (var x = 0; x < n; x++)
+            {
+                var (sx, sy) = RotateNode.Source(x + 0.5f, y + 0.5f, turn, n);
+                var want = OutputPacking.Byte(255f * TestNodes.HashValue(Tile.Wrap((int)MathF.Floor(sx), n), Tile.Wrap((int)MathF.Floor(sy), n), 7, 5));
+                if (rgba[(y * n + x) * 4] != want) Assert.Fail($"texel ({x}, {y}) is {rgba[(y * n + x) * 4]}, not {want}");
+            }
+        foreach (var side in new[] { 64, 256 })
+            Assert.True(rgba.AsSpan().SequenceEqual(OutputImage.Rgba8(evaluator, OutputRole.Occlusion, n, side, cap)), $"in tiles of {side} it differs");
+    }
+
+    [Fact]
+    public void AnUnderDeclaringNodeThrows()
+    {
+        // peek asks for its own tile but reads the texel to its right: the read past the tile's last column throws.
+        var g = Graph("""
+            "h": { "type": "hash" },
+            "p": { "type": "peek", "inputs": { "in": "h" } },
+            "o": { "type": "output", "inputs": { "in": "p" }, "params": { "role": "occlusion" } }
+            """, registry: TestNodes.Reaching);
+        var e = Assert.Throws<ArgumentOutOfRangeException>(() => OutputImage.Rgba8(new GraphEvaluator(g, TestNodes.Reaching), OutputRole.Occlusion, 64, tileSize: 32));
+        Assert.Contains("(32, 0) is not in the rectangle asked for (columns 0 to 31, rows 0 to 31", e.Message);
     }
 
     [Fact]

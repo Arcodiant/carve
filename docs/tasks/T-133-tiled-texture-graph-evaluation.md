@@ -296,20 +296,112 @@ outlier (the agent was only editing this file at the time, so something else on 
 it the runs spread by +-6 %, so the after time must be five runs too, compared by median: one run cannot tell a 10 %
 slowdown from noise. Runs 1 to 3 overlapped the agent's file reads and edits; runs 4 and 5 overlapped nothing.
 
+### As built
+
+Built by Claude Opus 5.5 (`claude-opus-5-5`), following the research's plan.
+
+**Rulings since the research (2026-11-19, by the person):**
+- *Accepted:* the evaluator fills only canonical tiles inside the image; only a node's reads wrap, and the rectangles a
+  node asks of its inputs may still run past the image. This narrows the Scope's "an output rectangle which may run
+  past the image and wrap".
+- The cost of a large warp or a strong minify at 8192 (heavy recomputation under one bounding box per input and the
+  64 MiB cap) is left to T-135 and T-138 to measure and raise. T-133 adds no data-dependent request.
+
+**What was built.** `Imaging/TexelRect.cs`, `Tile.cs`, `TileRead.cs` and `PortKind.cs` (moved out of the deleted
+`Band.cs`); `Evaluation/TileCache.cs` (internal) and the tiled `GraphEvaluator`; `NodeType.InputRect` for `Radius`;
+`OutputPacking.PackRow` over a `Tile` and `PackTile`; `OutputImage.Make`/`Rgba8(…, tileSize, cacheBytes)`;
+`ExportTool` packs tile by tile and checks for cancellation once a tile. The research's commits 1 and 2 went in as one
+(the types and the switch), since `PortKind` moved out of `Band.cs`; the new tests are a commit of their own. Every
+committed `samples/graphs/*/*.png` is unchanged. Test start lines moved: `FirstNodesTests.Run`'s callback and its
+`CheckSeam` line (`Band.Wrap` is `Tile.Wrap`), `EvaluationTests.Rgba` and its packing helper, `PlanksGraphTests`' tiled
+test. The test nodes `rotate` and `peek` are in a registry of their own, `TestNodes.Reaching`, so the type list
+`GraphFaultTests` holds is unchanged.
+
+**The node API** (for every node task in M-28 and M-29's mesh nodes):
+
+```csharp
+public abstract class NodeType
+{
+    // The rectangle of input `port` that filling `output` reads, in logical texels; it may run past the image on any
+    // side. Default: `output` itself (a pointwise node).
+    public virtual TexelRect InputRect(string port, TexelRect output, NodeParameters parameters, int size) => output;
+    // Fills every texel of e.Rect in every output port.
+    public abstract void Evaluate(NodeEvaluation e);
+}
+// e.NodeId, e.Size, e.Seed, e.Parameters; e.Rect (the tile to fill, inside the image);
+// e.Input(port): TileRead? (null for an optional input left unconnected); e.Output(port = "out"): Tile.
+```
+
+- *Pointwise* (`levels`): no `InputRect`.
+  ```csharp
+  for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
+  {
+      var from = input.Row(y, e.Rect.X, e.Rect.Width);   // a pointwise read always lies in one tile
+      var to = output.Row(y);
+      for (var i = 0; i < to.Length; i++) to[i] = Map(from[i], lo, hi, olo, ohi, gamma);
+  }
+  ```
+  `colour`, `noise`, `gradient`, `blend`, `hash` and `split` loop `x` over `e.Rect.X` to `e.Rect.Right - 1` (an output
+  row's index is `x - e.Rect.X`) and `y` over `e.Rect.Y` to `e.Rect.Bottom - 1`.
+- *Widened* (`height_to_normal`, radius 1; `TestNodes.BlurNode`, radius 2):
+  ```csharp
+  public override TexelRect InputRect(string port, TexelRect output, NodeParameters parameters, int size) => output.Inflate(1);
+  // in Evaluate, for each x, y of e.Rect:
+  var n = Normal(h.Grey(x - 1, y), h.Grey(x + 1, y), h.Grey(x, y - 1), h.Grey(x, y + 1), e.Size, strength);
+  output.SetColour(x, y, n.X, n.Y, n.Z);
+  ```
+- *Transformed* (`TestNodes.RotateNode`, `rotate`: its input turned by `degrees` about the centre and moved by half the
+  image, nearest texel). `InputRect` maps the output rectangle's four corners through the same inverse map `Evaluate`
+  uses and returns `TexelRect.Bounding(minX, minY, maxX, maxY, margin: 2)`; `Evaluate` maps each texel centre
+  `(x + 0.5f, y + 0.5f)`, floors it and reads `input.Grey(sx, sy)`. The margin covers `float` rounding between corners
+  and centres; were it short, the read would throw rather than give a wrong value.
+
+**Reading a wrapped texel.** Read at the logical coordinate meant: `x - 1` at `x = 0`, an `sx` past the right edge, a
+negative one. `TileRead` wraps it by the image's size and finds the tile. A texel is readable when, wrapped, it lies in
+the rectangle asked for (`Wrap(x - Asked.X, size) < Asked.Width`, the same for y); any other read throws an
+`ArgumentOutOfRangeException` naming the texel and the rectangle. An axis asked the image's size or more across is the
+whole axis. Never wrap into a tile by hand and never index an input's `Data`; `TileRead.Row(y, x, count)` is for a run
+inside one tile (it throws across two).
+
+**Tile size and cap.** `GraphEvaluator.DefaultTileSize = 128` (a greyscale tile 64 KB, a colour one 192 KB; 4096 tiles
+at 8192; one tile at sizes to 128) and `DefaultCacheBytes = 64 MiB`, per `Evaluate` call. Tiles a step needs are pinned;
+past the cap, unpinned tiles are dropped least recently unpinned first. `EvaluationRun(TileSize, MostTiles, PeakBytes,
+CapBytes, TilesEvaluated)` is in `LastRun`. Neither the tile size nor the cap changes a byte: tests hold it at tile
+sizes 16, 64 and 256 under caps 0 and the default, for the planks and for a graph with every node type.
+
+**What a node must not assume:** the order tiles arrive in (raster today, not promised); that it is called once a tile
+(a dropped tile is asked for again and must come out the same); any state between calls (a `NodeType` is one shared
+instance); the tile's size (16 to 256 in the tests, the whole image below the tile size: never `Rect.Width == Size`);
+that an output tile starts zeroed (write every texel of every port); any texel outside the rectangle it asked for. A
+node works texels from image coordinates and `e.Size`, never from its place inside the tile.
+
+**Time at 8192** (the planks, all four outputs, Debug, `ExportBoundedMemoryTests` five runs one after another, AMD Ryzen
+7 5800X3D, Windows 10 Pro): before (bands) 196.0 s median; after (tiles) 187.6 s, 181.1 s, 195.0 s, 188.8 s, 167.8 s (measured on commit `ab42c20`, before the new tests); **median 187.6 s** (4 % faster than before), peak
+working set 1566 to 1567 MB in every run, as before. The runs overlapped only this agent's light file edits.
+
+**Frames.** scenario-patina's and scenario-planks' frames compared by hash with `main`'s: not yet compared (see the Hand-off).
+
 ### Hand-off
 
-Research done (Claude Opus 5.5); no product code changed, and nothing written outside this worktree except logs in
-`%TEMP%` (`t133-build.log`, `t133-test.log`, `t133-before.txt`, and the test's own `patina-export-8192.txt`).
-The implementer should:
-1. Read "Decisions proposed" and "Types and signatures" above, then do commit 1 (`TexelRect`, `Tile`, `TileRead` with
-   their tests), then commit 2 (the switch). Right after commit 2, run patina-unit, then take the 8192 time five times
-   as described and compare medians against 196.0 s. More than 10 % slower is the person's call, not the implementer's.
-2. Keep to canonical output tiles (decision 1). It is what makes `noise` and `gradient` byte-identical with no change
-   to their `x` arithmetic.
+Written by Claude Opus 5.5 (`claude-opus-5-5`) at the call checkpoint. "As built" above is a draft: correct it as the
+rest lands.
 
-Surprising:
-- The planks at 8192 already peak at about 1.57 GB of the 2 GB bound, almost all of it the RGBA image and the PNG
-  encode, not the evaluation. That is why the cap is 64 MiB and not larger.
-- `export`'s description says "about 2.5 minutes"; it measured 196 s (median) here.
-- Warp (T-135) at large amounts and minifying transforms (T-138) fit the memory bound, but at 8192 they will be slow
-  under a bounding-box request and a 64 MiB cap. See Risks; that is for those tasks, or the person, to settle.
+Done: the switch (commit `ab42c20`: types, evaluator, cache, the seven nodes and the test nodes ported; patina-unit
+passed on it, every committed PNG unchanged); the 8192 time (above: median 187.6 s against 196.0 s, no stop); the new
+tests and the docs (CLAUDE.md's rule and its two Layout rows, `ExportBoundedMemoryTests`' summary), in the commit after.
+
+Left, in order:
+1. `AFarReadingNodeStaysUnderTheCap` fails: `held 8454144 bytes, past the cap of 8388608`, one 64 KB tile over.
+   `TileCache.AddPinned` takes `PeakBytes` after adding the new tile and before `Trim`, and the tile is allocated
+   before anything is dropped, so the cache really does hold cap + one tile for a moment. Fix it in the evaluator, not
+   the test: before allocating a node's output tiles, drop unpinned tiles until `Bytes + incoming <= Cap` (a
+   `TileCache.MakeRoom(long incoming)`), then add. `TilesAreBoundedAndTheCacheStaysUnderItsCap`'s worked runs should
+   still hold (check the cap-0 cases: held is then exactly the pinned tiles). Every other patina-unit test passed.
+2. `export`'s description (`src/Patina.Server/ExportTool.cs` line 39): "in bands" to "in tiles", and "about 2.5
+   minutes" to the measured time (about 3 minutes, 187.6 s here). Check whether a test quotes that text.
+3. scenario-patina's and scenario-planks' frames by hash against `main`'s, fetched by job id.
+4. `cairn task T-133 verify`, then fold this Hand-off into As built, commit, `cairn lint`, `cairn task T-133 finish`.
+
+Not done: the research's commit 1 was not split from commit 2 (`PortKind` moved out of `Band.cs`; As built says so).
+Surprising: a stray empty folder `D:\Users\andre\AppData\Local\Temp` was made on D: by a mistyped path (the
+script in it was moved to `%TEMP%`); a safety check refused its removal, so it is left for the person to delete.
