@@ -52,16 +52,21 @@ public sealed class WarpNode : NodeType
         var byColour = by.Kind == PortKind.Colour;
         var o = request.Output;
         int x0 = int.MaxValue, y0 = int.MaxValue, x1 = int.MinValue, y1 = int.MinValue;
+        var step = byColour ? 3 : 1;
         for (var y = o.Y; y < o.Bottom; y++)
+        {
+            // by is read pointwise, so a row of the tile lies in one of its tiles; a grey by's R and G are its value
+            var row = by.Row(y, o.X, o.Width);
             for (var x = o.X; x < o.Right; x++)
             {
-                var (r, g, _) = by.Colour(x, y);
-                var (ix, iy, _, _) = Source(x, y, r, g, byColour, amount, cos, sin, request.Size);
+                var j = (x - o.X) * step;
+                var (ix, iy, _, _) = Source(x, y, row[j], byColour ? row[j + 1] : row[j], byColour, amount, cos, sin, request.Size);
                 if (ix < x0) x0 = ix;
                 if (ix > x1) x1 = ix;
                 if (iy < y0) y0 = iy;
                 if (iy > y1) y1 = iy;
             }
+        }
         return [new TexelRect(x0, y0, x1 - x0 + 2, y1 - y0 + 2)];
     }
 
@@ -106,15 +111,17 @@ public sealed class WarpNode : NodeType
         var input = e.Input("in")!;
         var by = e.Input("by")!;
         var byColour = by.Kind == PortKind.Colour;
+        var step = byColour ? 3 : 1;
         var output = e.Output();
         var channels = output.Channels;
         for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
         {
             var row = output.Row(y);
+            var offsets = by.Row(y, e.Rect.X, e.Rect.Width);
             for (var x = e.Rect.X; x < e.Rect.Right; x++)
             {
-                var (r, g, _) = by.Colour(x, y);
-                var (ix, iy, tx, ty) = Source(x, y, r, g, byColour, amount, cos, sin, e.Size);
+                var j = (x - e.Rect.X) * step;
+                var (ix, iy, tx, ty) = Source(x, y, offsets[j], byColour ? offsets[j + 1] : offsets[j], byColour, amount, cos, sin, e.Size);
                 var (r0, g0, b0) = input.Colour(ix, iy);
                 var (r1, g1, b1) = input.Colour(ix + 1, iy);
                 var (r2, g2, b2) = input.Colour(ix, iy + 1);
