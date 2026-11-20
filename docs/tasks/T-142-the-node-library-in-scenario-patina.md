@@ -93,5 +93,5 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`) in one agent.
   answer said only "Approved", so it is not added. Adding it is one `view: cube` capture per sample judged by `SwatchCubeCheck`.
 - **For T-143:** the stage writes `library-*-texels/`, `library-checks.tsv`, `library-breaks.txt` and frames `library-<name>-sheet`,
   `-sphere-0`, `-sphere-90`, `library-floor-tiles-turned-tiled` into the run folder. The stage takes about 3 minutes of the
-  scenario (`est-seconds` set to 230; the verify run took 217 s). Frames were not hash-compared with another branch: every library frame is new, and the
+  scenario (`est-seconds` set to 300; two verify runs took 217 s and 303 s). Frames were not hash-compared with another branch: every library frame is new, and the
   existing stages were not changed.
