@@ -74,6 +74,18 @@ A graph is saved as its own text file, which a Carve material names by path and 
 **Alternatives:** graphs embedded in the `.carve` file, which keeps a model in one file.
 **Would change if:** keeping a model and its graphs in step across two files proves a recurring fault in acceptance runs.
 
+A graph may use another as one node (T-140, version 2): a `graph` node names a `.texgraph` by a path relative to the
+using graph's file, sets the nested graph's exposed parameters by name, and takes its `input` nodes as its input ports
+and its outputs as its output ports (`wall.base_colour`). **Nested graphs are expanded inline at validation**, their
+nodes renamed `<node>/<id>` (`wall/layout`), so the evaluator, its tiles and its memory bound are unchanged, and the
+outer graph's size and seed rule. **A fault inside a nested graph is named by its path from the top and its file**
+(`nodes['wall/layout'].params['gap']: ... (bricks.texgraph)`). **A graph's `input` nodes are a nested graph's ports**:
+one lacking a default stops the graph being evaluated on its own, never its being saved or used. An exposed parameter
+of the using graph may drive a value on a graph node (`"wall.mortar"`), in the nested graph's range.
+
+**Alternatives:** evaluating a nested graph separately, as an image fed to the outer one (declined at M-28's planning:
+a second evaluator and memory bound).
+
 ### Graphs are baked to PNG on export
 
 **Certainty:** Leaning · **Strictness:** Rule
