@@ -95,7 +95,9 @@ and the tests up to its call checkpoint; the second rebased onto T-153, took the
 the regression class and `verify`, and at `finish` rebased by hand onto T-137, T-139 and T-156, keeping both sides of
 the registry, catalogue, `DefineGraphTool`, `GraphFaultTests` and CLAUDE.md Layout lines; the third rebased onto the
 milestone again (T-157 planned), made the person's second rulings, moved the distance memory test to 2048, ran
-`verify` and finished. Both hand-offs are folded in here. **Status: done, without the spec's 10 s for either node,
+`verify`, and at `finish` rebased by hand onto T-140, keeping both sides in the same places (`graph` and `input` beside
+`transform` and `distance`, `WorkedNested` beside `WorkedTurn`) and merging CLAUDE.md's Layout lines word by word, then
+finished. Both hand-offs are folded in here. **Status: done, without the spec's 10 s for either node,
 which the person moved to T-155 (see the Notes).**
 
 **Nodes:**
