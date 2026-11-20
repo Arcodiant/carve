@@ -65,3 +65,52 @@ shapes repeated across the image. They come with two materials, bricks and fabri
 - **Stop and ask:** a parameter beyond those above, or a sample that cannot meet check's rules.
 - Runs beside T-134 and T-135: node files, registry lines, its two samples and its tests only. A conflict that only adds
   (`NodeRegistry.cs`, `NodeCatalogue` text, CLAUDE.md's Layout) is settled by keeping both sides.
+
+### As built
+
+Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`), one agent. The person approved the bricks' and the fabric's looks in a
+Waystone review (round-1: base colour, normal, roughness, occlusion and a 3 x 3 tiling of each).
+
+**Nodes** (`src/Patina.Graphs/Nodes/TilesNode.cs`, `StripesNode.cs`, `ShapeNode.cs`; all worked from the texel alone at its
+centre, in `double`, so any tile size gives the same bytes):
+- `tiles`: `count` [x, y] 1..256 (4, 4); `stagger` 0..1 (0); `gap` 0..0.45 (0.1) and `bevel` 0..0.5 (0.1), both parts of a tile's
+  width as the image's width over `count` x, in either orientation; `jitter` 0..1 (0); `orientation` `rows` | `columns`.
+  Outputs `mask`, `height`, `random` (grey), `uv` (colour, R and G the place in the tile, clamped in the gap). Odd rows (odd
+  columns for `columns`) shift by `stagger` tiles. A gap is held to 90% of a tile's extent on either axis. Jitter shrinks a tile
+  by up to 60% on each axis and places it anywhere inside its inset slot, so a tile never reaches a neighbour's gap. An odd count
+  of rows lets the first and last row meet unshifted at the wrap (still tiles).
+- `stripes`: `count` 1..4096 (8); `axis` `u` | `v` | `diagonal` (the spec said "angle in whole steps (`axis` ...)"; I named the
+  parameter `axis`, as `gradient` does); `width` 0..1 (0.5); `softness` 0..0.5 (0), the smoothstep centred on each edge, as a part
+  of a period. A stripe is centred on each multiple of 1/count (the first at the image edge), so a set of half the count at width
+  0.5 covers every second stripe of the full set (the fabric's over-under uses this). A diagonal's texel centres land on a stripe
+  edge, so its hard coverage is 17/32 rather than 16/32.
+- `shape`: `count` [x, y] 1..256 (4, 4); `kind` circle | square | ring | diamond | polygon (circle); `sides` 3..12 (6); `size` 0..1
+  (0.6) of the cell's shorter side; `softness` 0..1 (0), the ramp inward over softness of the shape's depth; `rotation` -360..360
+  degrees (0). Rotation uses a Taylor-series sine and cosine (no `Math.Sin`).
+- `define_graph` names the three, and has a second worked example laying out `tiles` (`DefineGraphTool.WorkedTiles`, run by
+  `WorkedExampleTests`).
+
+**Bricks** (`samples/graphs/bricks.texgraph`, 256, seed 21), ids: `layout` (tiles 4 x 8, stagger 0.5, gap 0.1, bevel 0.1,
+jitter 0.25); `tone` (levels of `layout.random`, 0.7..1.1) and `clay` (#a8452f) multiply into `toned`; `fleck_raw`/`fleck` (noise
+cells 48, 3 octaves, 0.88..1.08) multiply into `brick`; `mortar_raw` (#b8b0a0) times `fleck` is `mortar`; `base` = blend mix
+`mortar` to `brick` by `layout.mask`; `normal` = `height_to_normal` of `layout.height` (strength 0.015); `rough_base` (levels of
+the mask, 0.95 in the gap, 0.72 on a brick) times `fleck` is `roughness`; `ao` (levels of `layout.height`, in_high 0.6, out_low
+0.45). Outputs `base_out`, `normal_out`, `roughness_out`, `ao_out`. **For T-139 to expose:** `layout.gap` (mortar width),
+`layout.jitter`, `mortar_raw.colour` (mortar), `clay.colour` and `tone`'s `out_low`/`out_high` (tint and variation per brick).
+T-140 uses the graph as a node through those same ids.
+
+**Fabric** (`fabric.texgraph`, 256, seed 33): `warp`/`weft` (stripes count 16, width 0.9, softness 0.35), `warp_even`/`weft_even`
+(count 8, width 0.5, softness 0.06), `warp_odd` (inverted `warp_even`), `over` (XOR by a mix with `weft_even` as the mask), `height`
+(mix `weft` to `warp` by `over`), `thread` (mix `weft_colour` #cdbf9c to `warp_colour` #2c4f86 by `over`), `shade`, `fibre`
+(noise cells 128), `base`; normal strength 0.012; roughness 0.78..0.95 from the fibre noise; occlusion from the height.
+
+**Check's rules, measured** (`PatternSamplesTests`, figures printed): base colour brightest channel 107..196 (bricks) and 90..226
+(fabric), none outside 20..245; normals worst |length - 1| 0.0052 and 0.0047 (PNG, limit 0.03); no output of one value; metallic
+none; the seam across the wrap at most 1.2 against interior steps of 3 to 10 in every output. The committed PNGs equal the graphs.
+
+**Tests**: `PatternNodesTests` (hand-worked texels, tile-size invariance, wrap, 256 vs 1024, gap and bevel in texels, jitter in its
+slot, columns as rows transposed, and tables of broken copies for the three nodes) and `PatternSamplesTests`. `GraphFaultTests`'s
+type list now includes shape, stripes and tiles.
+
+**Not checked:** scenario-patina frames (no scenario stage added; the swatch sheet is T-134's, so the review used my own
+PNGs and 3 x 3 tilings), 8192 timing.
