@@ -4,7 +4,7 @@ description: >-
 ---
 # T-136 — Tiles, bricks, stripes and shapes
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
