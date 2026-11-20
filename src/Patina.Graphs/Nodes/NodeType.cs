@@ -34,6 +34,25 @@ public abstract class NodeType
     /// </summary>
     public virtual TexelRect InputRect(string port, TexelRect output, NodeParameters parameters, int size) => output;
 
+    /// <summary>
+    /// The inputs whose values decide which rectangles of input <paramref name="port"/> a tile reads (T-153). Empty by
+    /// default: the port's rectangle is <see cref="InputRect"/>'s, known before anything is evaluated. A node that names
+    /// inputs here for a port is asked <see cref="InputRects"/> for it instead, once those inputs' tiles are made. A
+    /// named input must itself have a static rectangle (no chains), and must not be the port itself.
+    /// </summary>
+    public virtual IReadOnlyList<string> DependsOn(string port, NodeParameters parameters) => [];
+
+    /// <summary>
+    /// For a port with <see cref="DependsOn"/>: the rectangles of input <paramref name="port"/> that filling
+    /// <see cref="InputRequest.Output"/> reads, worked from <see cref="InputRequest.Input"/>'s reads of the inputs it
+    /// depends on (each holding that input's <see cref="InputRect"/>). One rectangle or a few; each may run past the
+    /// image, and a texel in any of them is readable. Reading outside them all throws, as for a static rectangle. It is
+    /// called for every tile the node makes, a dropped tile again, so it must give the same answer from the same values.
+    /// By default <see cref="InputRect"/>'s rectangle alone.
+    /// </summary>
+    public virtual IReadOnlyList<TexelRect> InputRects(string port, InputRequest request) =>
+        [InputRect(port, request.Output, request.Parameters, request.Size)];
+
     /// <summary>What an output port carries, given what each connected input carries (an absent optional input is not in <paramref name="inputs"/>).</summary>
     public abstract PortKind OutputKind(string port, IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters);
 
