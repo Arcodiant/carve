@@ -152,3 +152,71 @@ fails. Nothing is ruled yet.
   - `### As built`, `cairn lint` and `finish`.
 - **Not checked:** a Release-build timing, and part transforms. Occluders use each mesh's stored positions, as Scope
   says; a multi-part model's part offsets are not applied.
+
+**Research (render vs render_glb occlusion)**
+
+Research agent, Claude Opus 5.5 (2026-11-19). Nothing product-side is committed; only this section.
+
+- **Cause: `render_glb` loads the `.glb` without mipmaps, so its textures are sampled nearest with no mip chain, while
+  `render` samples them trilinear with mips.** `RenderSystem.cs:306` loads with
+  `models.LoadModel(glb.Bytes, ModelFormat.Gltf, new ModelLoadOptions())`, written by T-47 (17c7e0e, 2026-11-11) before
+  T-78's ruling 1. `ModelLoadOptions`' default has `GenerateMipmaps` false, and the engine docs say what that gives
+  (Graphics 0.129.0, `api/IModelLoader.md`): "every model texture gets that loader's default sampler: without mipmaps
+  `PixelArt` (Nearest, `Repeat`, anisotropy 1); with mipmaps Linear on all three filters". `render` follows ruling 1
+  (T-78, `docs/tasks/T-78-materials-in-render.md:91`). `PbrMaterials.cs:16-18,83` uploads through `TextureUpload.Create`:
+  Linear/Linear/Linear, `Repeat`, `generateMipmaps: true` (`TextureUpload.cs:13-20`). D-1's engine need 8 (line 222)
+  already records the interim: "Carve's render, the model viewer and the tests load with `generateMipmaps: true`".
+  `render_glb` was missed. `PbrEqualityTests.cs:271` loads with `generateMipmaps: true` itself, so it never exercised
+  `render_glb`'s own call.
+- **Why only the ORM shows it.** The occlusion is noisy from one texel to the next, because of the per-texel hash
+  rotation of the ray set. Measured on the probe's `wrench.orm.png`, over occluded texels: the mean |R difference| between
+  horizontal neighbours is 1.58 levels and the 95th percentile is 8. G and B are flat per face, with 6 and 2 distinct
+  values. A 1024 texture minified onto the frame is averaged by the mips in `render` but point-sampled in `render_glb`,
+  so the noise survives only in `render_glb`. The base colour (T-123) and T-125's normal map are smooth or flat, so the
+  same sampler difference stays under D-6's limits. Break `reach` makes R a constant 255, which leaves nothing to alias.
+  So it is the occlusion's content that exposes the difference, not the occlusion path. Read and ruled out:
+  - the strength: both paths pass `Occlusion` with the map, 1 here (`GlbExport.cs:103-107`, `PbrMaterials.cs:101`);
+  - the channel: R, per the engine's `Material.md`;
+  - the colour space: linear in both. `render` keys its texture by (hash, srgb=false) and shares it between the
+    metallic-roughness and occlusion slots. The loader sets data maps to linear on its own (changelog 0.16-0.44:
+    "data maps linear (automatic)");
+  - the UV set: `TEXCOORD_0` only (`GlbExport.HasUvs`);
+  - the metallic-roughness from the same texture: G and B are piecewise constant, so a change of filter barely moves
+    them.
+- **Measured.** I made a throwaway one-line change, `new ModelLoadOptions { GenerateMipmaps = true }` at
+  `RenderSystem.cs:306`, then ran `cairn test run --fresh scenario-bakes` (PASS, 32 s; run folder
+  `artifacts/scenarios/bakes/4`). Then I reverted it. Differing px / largest patch, before → after:
+
+  | comparison | before (probe) | with the fix |
+  |---|---|---|
+  | `wrench-orm-front` | 315 / 39 | 0 / 0 |
+  | `wrench-orm-three-quarter` | 215 / **54** (fails) | 1 / 1 |
+  | `wrench-front` (T-123, base colour) | 48 / 15 | 0 / 0 |
+  | `wrench-three-quarter` (T-123) | 10 / 3 | 1 / 1 |
+  | control `orm-three-quarter-glb-against-front` | 78162 / 76688 (fails) | 78198 / 76667 (fails) |
+  | control `three-quarter-glb-against-front` | 90204 / 90204 (fails) | 90202 / 90202 (fails) |
+
+  So with the fix, `render` and `render_glb` agree to within a pixel. The leftover differences under D-6's rule were
+  the sampler all along. The rule needs no change and no check is loosened.
+- **Proposed fix.**
+  - `src/Carve.Server/RenderSystem.cs:306`: load with `new ModelLoadOptions { GenerateMipmaps = true }`, and cite engine
+    need 8 at the site (`// Interim until engine need 8: ...`).
+  - `RenderGlbTool.cs`: add a clause to the description saying textures are sampled as `render` samples them
+    (trilinear, mips, engine need 8).
+  - A regression test in `tests/Carve.Server.Tests` (beside `RenderGlbTests`). It should draw a model whose texture is
+    texel noise with `render` and with `render_glb` and hold them to D-6's rule, or assert that the loaded model's
+    textures have more than one mip level. That catches a return to the default.
+  - No new engine need: number 8 already covers it.
+- **Reach on existing outputs.**
+  - Exported files: unchanged byte for byte. Only the load in `render_glb` changes.
+  - `render` frames: unchanged.
+  - `render_glb` frames of untextured models: these are Orcward, Morph's arm and the Acceptance files. No textures are
+    referenced in those scenarios, their samples or the `RenderGlb*`/`RenderPump` tests. Their materials sample no map,
+    so their frames should stay byte-identical. That is reasoned, not run: those suites were not run here.
+  - `render_glb` frames of textured files: these change, toward `render`. That means Bakes stage 1 (measured above) and
+    T-125's normal-map comparison, which runs beside this task and will move too.
+  - No `render_glb` frame is committed as a golden, so no committed file changes.
+- **Scope and ruling.** This is a one-line product fix that brings `render_glb` into line with ruling 1 and engine need
+  8's interim. It changes no rule or threshold. It sits outside T-124's bake work, though: it changes how a tool every
+  milestone uses samples textures, and it moves the sibling T-125's numbers. I propose it lands in T-124 (it is what
+  makes T-124's check pass) after the person rules on it, and T-125 is told before it does.
