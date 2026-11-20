@@ -135,9 +135,10 @@ check {}          (open graph, its own size; optional size<=2048,
 | 3 | T-139 exposed parameters + bricks variant | Opus | T-134, T-136 | `TexGraphFile.cs`, `GraphValidator.cs`, `EditGraphTool.cs`, `FileTools.cs`, swatch and export overrides |
 | 2b | T-153 data-dependent input requests (added 2026-11-20) | Opus | T-135 | `Evaluation/`, `NodeType.cs`, `WarpNode` |
 | 3b | T-155 separable passes, rotated-read locality (added 2026-11-20) | Opus | T-137, T-138 | `Evaluation/`, `NodeType.cs`, `BlurNode`, `DistanceNode` |
+| 3c | T-156 sphere tiling option on swatch (added 2026-11-20) | Sonnet | T-139 | `SwatchTool.cs`, `SwatchSphere.cs` |
 | 4 | T-140 graphs as nodes + grime, old wall | Opus (two agents) | T-139, T-135, T-153 | `TexGraphFile.cs`, `GraphValidator.cs`, `FileTools.cs`, `tools/Patina.SampleGraphs` |
 | 4 | T-141 check | Sonnet | T-134, T-137, T-138, T-139 | `CheckTool.cs`, `Patina.Graphs/Checks/` |
-| 5 | T-142 library stage in scenario-patina | Sonnet (+ frame review) | T-140, T-141, T-155 | `LibraryStage.cs`, `samples/graphs/*/swatch.png` |
+| 5 | T-142 library stage in scenario-patina | Sonnet (+ frame review) | T-140, T-141, T-155, T-156 | `LibraryStage.cs`, `samples/graphs/*/swatch.png` |
 | 6 | T-143 acceptance | Sonnet (inner sessions on the default, Opus) | T-142 | its round folders and checks |
 
 Dependencies on a sibling's feature: T-137's gradient map needs T-134's list parameters, and its sample T-134's
@@ -164,5 +165,6 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-143](../tasks/T-143-node-library-acceptance-run.md) — Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
 - [ ] [T-153](../tasks/T-153-data-dependent-input-requests-for-warp.md) — A node can ask for an input's rectangle after reading another input, so warp at a large amount reads the few tiles its offsets reach
 - [ ] [T-155](../tasks/T-155-separable-passes-and-rotated-read-locality.md) — A wide neighbourhood node runs as a cached row pass and a column pass, so blur and distance at 8192 meet 10 s within the cap, and a free rotation stops recomputing its source
+- [ ] [T-156](../tasks/T-156-a-sphere-tiling-option-on-swatch.md) — swatch takes a sphere tiling, default 1, so a material can be judged on the sphere at a texel density nearer a game's; the samples' sheets use 3
 
 ## Retrospective
