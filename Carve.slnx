@@ -18,6 +18,7 @@
   <Project Path="scenarios/Carve.Scenario.Parts/Carve.Scenario.Parts.csproj" />
   <Project Path="scenarios/Carve.Scenario.Gatehouse/Carve.Scenario.Gatehouse.csproj" />
   <Project Path="scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Bakes/Carve.Scenario.Bakes.csproj" />
   <Project Path="tools/Carve.SampleTextures/Carve.SampleTextures.csproj" />
   <Project Path="tools/Patina.SampleGraphs/Patina.SampleGraphs.csproj" />
   <Project Path="tests/Carve.CharacterLoad.Tests/Carve.CharacterLoad.Tests.csproj" />

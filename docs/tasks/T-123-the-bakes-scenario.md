@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-121, T-122
 
-**Verify:** core-unit, server-unit
+**Verify:** core-unit, server-unit, scenario-bakes
 
 ## Goal
 
