@@ -18,7 +18,8 @@ namespace Patina.Graphs.Nodes;
 /// the few source tiles under it; a strong minify (tile 16 at scale 0.25) reads the whole input for every tile.
 /// </para>
 /// <para>
-/// The result tiles when the rotation is a whole number of quarter turns and the scale is 1 or 1 / n (0.5, 1/3, 0.25);
+/// The result tiles when the rotation is a whole number of quarter turns and the scale is 1 or 1 / n (0.5, 1/3, 0.25:
+/// n repeats). A whole-number scale above 1 zooms in and does not tile (the person's ruling, 2026-11-20), and
 /// any other rotation or scale generally does not tile, which is the agent's choice and check's seam rule reports. A
 /// quarter turn's sine and cosine are exact, so a quarter turn moves texels without blending them; any other angle's
 /// are worked by <see cref="ShapeNode.SinCos"/>'s series, so the result is the same on every machine.
