@@ -8,3 +8,4 @@
 - T-137: blur and gradient_map nodes, and samples/graphs/painted-metal.texgraph with its PNGs
 - T-139: A graph declares named parameters that drive its node parameters, and swatch and export take overrides, so one graph gives variants; the bricks sample exposes mortar, tint and jitter
 - T-156: swatch takes a sphere tiling (whole repeats, default 1), so a material can be judged on the sphere at a texel density nearer a game's; the samples' committed sheets use 3
+- T-140: A graph node uses another .texgraph by path, its exposed parameters set by name and its input nodes as ports; grime and old-wall sample graphs

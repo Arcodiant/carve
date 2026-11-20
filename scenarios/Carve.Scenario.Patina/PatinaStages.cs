@@ -16,5 +16,6 @@ internal static class PatinaStages
         new GraphStage(),
         new ExportStage(),
         new SwatchStage(),
+        new NestedGraphStage(),
     ];
 }
