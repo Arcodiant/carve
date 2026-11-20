@@ -46,9 +46,6 @@ public sealed class BakeImage
     /// <summary>The <see cref="Channels"/> values of texel (<paramref name="x"/>, <paramref name="y"/>).</summary>
     public Span<float> Texel(int x, int y) => _values.AsSpan(Index(x, y, 0), Channels);
 
-    /// <summary>The uv of texel (<paramref name="x"/>, <paramref name="y"/>)'s centre.</summary>
-    public Vector2 CentreUv(int x, int y) => new((x + 0.5f) / Width, (y + 0.5f) / Height);
-
     /// <summary>A copy, value for value.</summary>
     public BakeImage Clone()
     {

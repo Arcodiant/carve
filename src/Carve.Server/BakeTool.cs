@@ -340,7 +340,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             if (field.Name != "width") { errors.Add($"bevel.{field.Name}: not a field of bevel; its one field is width"); continue; }
             given = true;
             if (field.Value.ValueKind != JsonValueKind.Number || !field.Value.TryGetDouble(out var w) || !double.IsFinite(w)) errors.Add($"bevel.width: expected a number of metres, got {Describe(field.Value)}");
-            else if (!(w > 0)) errors.Add($"bevel.width: must be more than 0 metres, not {w.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            else if (!(w > 0)) errors.Add($"bevel.width: must be more than 0 metres, not {w.ToString(CultureInfo.InvariantCulture)}");
             else width = w;
         }
         if (!given) errors.Add("bevel.width: required: how far from each hard edge the rounding reaches, in metres, more than 0");
@@ -396,10 +396,6 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
     private sealed record OcclusionArgs(int Rays, float Reach, List<NamedMesh> Meshes);
 
     /// <summary>
-    /// The <c>occlusion</c> block, validated whether or not a map reads it; null when it is absent or wrong. <c>reach</c> is
-    /// required when <c>occlusion</c> or <c>orm</c> is asked for.
-    /// </summary>
-    /// <summary>
     /// A block given when no map in this call reads it: the call bakes what was asked, and a warning says the block was ignored.
     /// The block is still read, so a wrong one is still an error. For bevel and curvature this is the person's ruling (2026-11-20).
     /// </summary>
@@ -410,6 +406,10 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         warnings.Add($"{block}: ignored, {named} in maps");
     }
 
+    /// <summary>
+    /// The <c>occlusion</c> block, validated whether or not a map reads it; null when it is absent or wrong. <c>reach</c> is
+    /// required when <c>occlusion</c> or <c>orm</c> is asked for.
+    /// </summary>
     private static OcclusionArgs? ReadOcclusion(JsonElement? block, List<string> wanted, Model model, List<string> errors)
     {
         var needed = wanted.Contains(OcclusionMap) || wanted.Contains(OrmMap);
@@ -479,10 +479,8 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         var metallic = new float?[mesh.Faces.Count];
         foreach (var entry in entries)
         {
-            var faces = (style.FacesOf(entry.Name) ?? []).Concat(mesh.LiveFaces.Where(f => style.MaterialOf(f) == entry.Name));
-            foreach (var f in faces)
+            foreach (var f in FacesNamed(mesh, style, entry.Name))
             {
-                if ((uint)f >= (uint)roughness.Length) continue;
                 if (entry.Roughness is { } r) roughness[f] = r;
                 if (entry.Metallic is { } m) metallic[f] = m;
             }
@@ -497,6 +495,10 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         }
         return (outR, outM);
     }
+
+    /// <summary>The faces a surface entry's name covers: the group's members on the mesh, then the live faces with that material.</summary>
+    private static IEnumerable<int> FacesNamed(PolygonMesh mesh, FaceStyle style, string name) =>
+        (style.FacesOf(name) ?? []).Where(f => (uint)f < (uint)mesh.Faces.Count).Concat(mesh.LiveFaces.Where(f => style.MaterialOf(f) == name));
 
     /// <summary>Why <paramref name="name"/> cannot be in a file name, naming it, or null.</summary>
     private static string? FileNameProblem(string name)
@@ -521,9 +523,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         foreach (var entry in entries)
         {
             if (entry.BaseColour is null) continue;
-            if (style.FacesOf(entry.Name) is { } members)
-                foreach (var f in members) if ((uint)f < (uint)colours.Length) colours[f] = entry.BaseColour;
-            foreach (var f in mesh.LiveFaces) if (style.MaterialOf(f) == entry.Name) colours[f] = entry.BaseColour;
+            foreach (var f in FacesNamed(mesh, style, entry.Name)) colours[f] = entry.BaseColour;
         }
 
         var image = layout.NewImage(3);
@@ -536,8 +536,8 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             var hex = colours[f] ?? style.ColourOf(f) ?? (style.MaterialOf(f) is { } m ? model.FindMaterial(m)?.BaseColour : null) ?? Material.DefaultBaseColour;
             if (!rgb.TryGetValue(hex, out var c))
             {
-                byte At(int i) => byte.Parse(hex.AsSpan(1 + 2 * i, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-                rgb[hex] = c = (At(0) / 255f, At(1) / 255f, At(2) / 255f);
+                var (r, g, b) = FaceStyle.ToBytes(hex);
+                rgb[hex] = c = (r / 255f, g / 255f, b / 255f);
             }
             image[x, y, 0] = c.R;
             image[x, y, 1] = c.G;
