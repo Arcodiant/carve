@@ -29,10 +29,16 @@ internal sealed class SurfaceStage : IBakesStage
     ];
 
     /// <summary>
-    /// The split between <c>steel</c> and the dark groups (<c>rubber</c>, <c>dark</c>, <c>black</c>) in Rec. 709 luma, or null while
-    /// the person has not ruled it: then the numbers are written to <c>probe.tsv</c> and no steel check is made.
+    /// The person's ruling (2026-11-20): in each view the darkest <c>steel</c> sample is at least this much Rec. 709 luma above the
+    /// lightest <c>rubber</c>, <c>dark</c> or <c>black</c> sample of that view. Probed on the wrench's own frames: least 45.4 (left).
     /// </summary>
-    private static readonly double? SteelSplit = null;
+    private const double SteelMargin = 30;
+
+    /// <summary>
+    /// The person's ruling (2026-11-20): a <c>red</c> sample's R leads max(G, B) by at least this; no other group's leads at all
+    /// (lead at most 0). Probed: red at least 105, the rest at most −6.
+    /// </summary>
+    private const int RedLeadMin = 50;
 
     private static readonly Vector3 ThreeQuarter = new(1, 0.6f, 1.5f);
 
@@ -55,8 +61,17 @@ internal sealed class SurfaceStage : IBakesStage
 
         if (colourOf.Count != mesh.Faces.Length) Note($"surface: {colourOf.Count} of {mesh.Faces.Length} faces have a colour");
 
-        // The bake. The swap break bakes steel and red swapped; every check still expects them as above.
-        string Baked(string group, string colour) => Break == "swap" && group == "steel" ? "#BE3C32" : Break == "swap" && group == "red" ? "#80858A" : colour;
+        // The bake. The swap break bakes steel and red swapped; the faint break bakes steel a dimmer grey and red a duller red, so
+        // the steel margin and the red lead each fall under the ruled numbers while red still leads and steel is still grey. Every
+        // check still expects the colours above.
+        string Baked(string group, string colour) => (Break, group) switch
+        {
+            ("swap", "steel") => "#BE3C32",
+            ("swap", "red") => "#80858A",
+            ("faint", "steel") => "#5C6064",
+            ("faint", "red") => "#8C6460",
+            _ => colour,
+        };
         var surface = Surface.ToDictionary(e => e.Group, e => (object)new { base_colour = Baked(e.Group, e.Colour) });
         var textures = Path.Combine(driver.RunFolder, "textures");
         var bake = await CallJsonAsync(driver, "bake", new { mesh = "wrench", folder = textures, size = Size, padding = 8, maps = new[] { "masks", "base_colour" }, surface });
@@ -102,6 +117,7 @@ internal sealed class SurfaceStage : IBakesStage
             samples.AddRange(seen);
             if (seen.Count < 10) Note($"{view.Name}: only {seen.Count} points of the faces could be sampled");
             foreach (var s in seen) CheckClass(s);
+            CheckSteelMargin(view.Name, seen);
 
             // M-2: the red box is off the wrench's middle, so its mirror in x must not show red.
             foreach (var s in seen.Where(s => view.Mirror && s.Group == "red" && s.Point == "centre"))
@@ -133,18 +149,29 @@ internal sealed class SurfaceStage : IBakesStage
         await CompareExportAsync(driver, frames, views);
     }
 
-    /// <summary>
-    /// A sample's class against its group's: <c>red</c> is red-dominant and nothing else is; with <see cref="SteelSplit"/> ruled,
-    /// <c>steel</c> is lighter than it and the dark groups darker.
-    /// </summary>
+    /// <summary>A sample's class against its group's: <c>red</c> leads by <see cref="RedLeadMin"/> or more, and nothing else leads.</summary>
     private static void CheckClass(Sample s)
     {
         var at = $"{s.View}: face {s.Face} ({s.Group}) at its {s.Point}, pixel ({s.X}, {s.Y}), shows {s.Shown}";
-        if (s.Group == "red" && s.RedLead <= 0) Note($"{at}, not red-dominant");
-        if (s.Group != "red" && s.RedLead > 0) Note($"{at}, red-dominant");
-        if (SteelSplit is not { } split || s.Group == "red") return;
-        if (s.Group == "steel" && s.Luma <= split) Note($"{at}, luma {s.Luma:F1}, not lighter than the split {split}");
-        if (s.Group != "steel" && s.Luma >= split) Note($"{at}, luma {s.Luma:F1}, not darker than the split {split}");
+        if (s.Group == "red" && s.RedLead < RedLeadMin) Note($"{at}, red lead {s.RedLead}, under {RedLeadMin}");
+        if (s.Group != "red" && s.RedLead > 0) Note($"{at}, red lead {s.RedLead}, red-dominant");
+    }
+
+    /// <summary>
+    /// In one view, the darkest <c>steel</c> sample against the lightest <c>rubber</c>, <c>dark</c> or <c>black</c> one: at least
+    /// <see cref="SteelMargin"/> of luma apart. A view with no sample of either side has nothing to compare (every group's presence is
+    /// checked across the views).
+    /// </summary>
+    private static void CheckSteelMargin(string view, List<Sample> seen)
+    {
+        var steel = seen.Where(s => s.Group == "steel").ToList();
+        var darks = seen.Where(s => s.Group is "rubber" or "dark" or "black").ToList();
+        if (steel.Count == 0 || darks.Count == 0) return;
+        var (least, most) = (steel.MinBy(s => s.Luma)!, darks.MaxBy(s => s.Luma)!);
+        if (least.Luma - most.Luma < SteelMargin)
+        {
+            Note(string.Create(CultureInfo.InvariantCulture, $"{view}: steel margin {least.Luma - most.Luma:F1} under {SteelMargin} (steel face {least.Face} at its {least.Point}, luma {least.Luma:F1}; {most.Group} face {most.Face} at its {most.Point}, luma {most.Luma:F1})"));
+        }
     }
 
     /// <summary>
