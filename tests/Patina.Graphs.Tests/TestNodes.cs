@@ -12,6 +12,13 @@ public static class TestNodes
     /// <summary><see cref="Registry"/> and the nodes that read away from their texels, <c>rotate</c> and <c>peek</c>, kept apart so the type lists other tests hold stay as they are.</summary>
     public static readonly NodeRegistry Reaching = Registry.With(new RotateNode(), new PeekNode());
 
+    /// <summary>
+    /// <see cref="Reaching"/> and the nodes whose rectangles depend on an input's values (T-153): <c>pair</c>, which
+    /// asks for one or two rectangles; <c>pair_short</c>, which reads as <c>pair</c> but asks for the first alone; and
+    /// <c>warp_static</c>, the built-in warp with its static rectangle, as it was before T-153.
+    /// </summary>
+    public static readonly NodeRegistry Dependent = Reaching.With(new PairNode(), new PairNode(asksForBoth: false), new StaticWarpNode());
+
     public static uint Hash(int x, int y, uint seed)
     {
         var h = (uint)x * 0x9E3779B1u ^ (uint)y * 0x85EBCA6Bu ^ seed * 0xC2B2AE35u;
@@ -167,4 +174,54 @@ public sealed class PeekNode : NodeType
         for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
             for (var x = e.Rect.X; x < e.Rect.Right; x++) output.SetGrey(x, y, input.Grey(x + 1, y));
     }
+}
+
+/// <summary>
+/// <c>pair</c>: where <c>gate</c> is above 0.5 its own texel of <c>in</c>, elsewhere the texel half the image to the
+/// right. Its <c>in</c> rectangles depend on <c>gate</c>: the tile, and the tile half the image to the right only when
+/// some texel of the gate needs it, so it asks for one rectangle or two. <c>pair_short</c> asks for the tile alone
+/// whatever the gate, so a read half the image away throws.
+/// </summary>
+public sealed class PairNode(bool asksForBoth = true) : NodeType
+{
+    public override string Name => asksForBoth ? "pair" : "pair_short";
+    public override IReadOnlyList<InputPort> Inputs { get; } = [new("in", PortKind.Grey), new("gate", PortKind.Grey)];
+    public override IReadOnlyList<ParamSpec> Parameters { get; } = [];
+
+    public override PortKind OutputKind(string port, IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters) => PortKind.Grey;
+
+    public override IReadOnlyList<string> DependsOn(string port, NodeParameters parameters) => port == "in" ? ["gate"] : [];
+
+    public override IReadOnlyList<TexelRect> InputRects(string port, InputRequest request)
+    {
+        var o = request.Output;
+        if (port != "in" || !asksForBoth) return [o];
+        var gate = request.Input("gate")!;
+        for (var y = o.Y; y < o.Bottom; y++)
+            for (var x = o.X; x < o.Right; x++)
+                if (gate.Grey(x, y) <= 0.5f) return [o, new TexelRect(o.X + request.Size / 2, o.Y, o.Width, o.Height)];
+        return [o];
+    }
+
+    public override void Evaluate(NodeEvaluation e)
+    {
+        var input = e.Input("in")!;
+        var gate = e.Input("gate")!;
+        var output = e.Output();
+        for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
+            for (var x = e.Rect.X; x < e.Rect.Right; x++)
+                output.SetGrey(x, y, gate.Grey(x, y) > 0.5f ? input.Grey(x, y) : input.Grey(x + e.Size / 2, y));
+    }
+}
+
+/// <summary><c>warp_static</c>: the built-in <c>warp</c> with its static rectangle, the output widened by the whole amount, as before T-153.</summary>
+public sealed class StaticWarpNode : NodeType
+{
+    private readonly WarpNode _warp = new();
+    public override string Name => "warp_static";
+    public override IReadOnlyList<InputPort> Inputs => _warp.Inputs;
+    public override IReadOnlyList<ParamSpec> Parameters => _warp.Parameters;
+    public override PortKind OutputKind(string port, IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters) => _warp.OutputKind(port, inputs, parameters);
+    public override TexelRect InputRect(string port, TexelRect output, NodeParameters parameters, int size) => _warp.InputRect(port, output, parameters, size);
+    public override void Evaluate(NodeEvaluation e) => _warp.Evaluate(e);
 }
