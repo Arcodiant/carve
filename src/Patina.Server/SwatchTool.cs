@@ -23,23 +23,30 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
     /// <summary>The worked example: the planks' tiled base colour at 128.</summary>
     public const string Worked = """{"view":"tiled","output":"base_colour","size":128}""";
 
+    /// <summary>The metal plate's named output, flat.</summary>
+    public const string WorkedEdge = """{"view":"flat","output":"edge"}""";
+
+    public const string WorkedEdgeResult = "swatch flat: edge of the open graph, 64 x 64 px, exact texels";
+
     /// <summary>What it returns for the planks, beside the image.</summary>
     public const string WorkedResult = "swatch tiled: base_colour of planks.texgraph, 3 x 3 of 128 px, 384 x 384 px, exact texels";
 
     public const string Text =
-        "Shows the open graph's outputs as images. view: sheet (default) is one image: a column per output in role order (base_colour, normal, roughness, occlusion; a role the graph lacks has no column), "
-        + "each output flat on top and tiled 3 x 3 below in 256 px cells, beside a 512 px sphere wearing all of them, under a title strip with the file, size and seed. "
+        "Shows the open graph's outputs as images. view: sheet (default) is one image: a column per output, the roles in role order (base_colour, normal, roughness, metallic, occlusion, height; a role the graph lacks has no column) and then the named outputs a to z, "
+        + "each output flat on top and tiled 3 x 3 below in 256 px cells, beside a 512 px sphere wearing base colour, normal, roughness with metallic, and occlusion (height and named outputs are shown, not worn), under a title strip with the file, size and seed. "
         + "flat is one output's texels exactly, size px a side; tiled is its 3 x 3 repeat (3 x size, scaled down to at most 1536 px), to show seams; "
-        + "sphere is the engine's UV sphere (u once around, v from the top pole) drawn with a PBR material made of the outputs (base colour sRGB, roughness as metallic-roughness with metallic 0, normal and occlusion linear, mipmaps on; a missing role uses the material's default), "
+        + "sphere is the engine's UV sphere (u once around, v from the top pole) drawn with a PBR material made of the outputs (base colour sRGB, roughness as the metallic-roughness image with the graph's metallic in B and the material's metallic factor 1, or metallic 0 when the graph has none, normal and occlusion linear, mipmaps on; a missing role uses the material's default), "
         + "lit as Carve's render lights a model (its ambient light, fixed sky and directional light, placed relative to the camera as Carve places it) on Carve's dark slate, from a fixed camera, 512 px. "
-        + "output: a role, for flat and tiled (default the first role the graph has). size: the evaluation size, a power of two from 32 to 2048 (default the graph's size, at most 2048; for larger PNGs use export). "
+        + "metallic, height and greyscale named outputs are drawn grey; roughness's column is roughness alone. "
+        + "output: a role or a named output's name, for flat and tiled (default the first role the graph has). size: the evaluation size, a power of two from 32 to 2048 (default the graph's size, at most 2048; for larger PNGs use export). "
         + "angle: the sphere's turn about y in degrees, for sheet and sphere (default 0; counter-clockwise seen from above). Refused while the graph has a fault. Changes nothing.\n"
-        + "Worked example, with the planks open (samples/graphs/planks.texgraph): swatch " + Worked + " returns an image and:\n" + WorkedResult;
+        + "Worked example, with the planks open (samples/graphs/planks.texgraph): swatch " + Worked + " returns an image and:\n" + WorkedResult + "\n"
+        + "Worked example, after define_graph's metal plate: swatch " + WorkedEdge + " returns an image and:\n" + WorkedEdgeResult;
 
     public static McpServerTool Create() => Create<SwatchTool>("swatch", Text, new JsonObject
     {
         ["view"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray([.. Views.Select(v => (JsonNode)v)]) },
-        ["output"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray([.. OutputRoles.Names.Select(v => (JsonNode)v)]) },
+        ["output"] = new JsonObject { ["type"] = "string", ["description"] = "A role (" + string.Join(", ", OutputRoles.Names) + ") or a named output's name, for flat and tiled." },
         ["size"] = new JsonObject { ["type"] = "integer" },
         ["angle"] = new JsonObject { ["type"] = "number" },
     });
@@ -96,7 +103,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         }
 
         var evaluator = new GraphEvaluator(graph, registry);
-        var roles = evaluator.Roles;
+        var roles = evaluator.Outputs;
         var name = path is null ? "the open graph" : System.IO.Path.GetFileName(path);
 
         if (view is "flat" or "tiled")
@@ -104,30 +111,37 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
             var role = roles[0];
             if (outputName is not null)
             {
-                if (!OutputRoles.TryParse(outputName, out role))
-                    return Error($"swatch: output is '{outputName}'; give base_colour, normal, roughness or occlusion");
-                if (!roles.Contains(role))
-                    return Error($"swatch: the graph has no {outputName} output; its outputs are {string.Join(", ", roles.Select(OutputRoles.Name))}");
+                if (!GraphNames.IsValid(outputName))
+                    return Error($"swatch: output is '{outputName}'; give a role ({string.Join(", ", OutputRoles.Names)}) or a named output's name");
+                if (!roles.Contains(outputName))
+                    return Error($"swatch: the graph has no {outputName} output; its outputs are {string.Join(", ", roles)}");
+                role = outputName;
             }
             var texels = OutputImage.Rgba8(evaluator, role, size);
             if (view == "flat")
             {
-                return Image(texels, size, size, $"swatch flat: {OutputRoles.Name(role)} of {name}, {size} x {size} px, exact texels");
+                return Image(texels, size, size, $"swatch flat: {role} of {name}, {size} x {size} px, exact texels");
             }
             var side = SwatchImages.TiledSide(size);
             var tiled = SwatchImages.Tiled(texels, size, side);
             var scaled = side == 3 * size ? "exact texels" : $"nearest-scaled from {3 * size} px";
-            return Image(tiled, side, side, $"swatch tiled: {OutputRoles.Name(role)} of {name}, 3 x 3 of {size} px, {side} x {side} px, {scaled}");
+            return Image(tiled, side, side, $"swatch tiled: {role} of {name}, 3 x 3 of {size} px, {side} x {side} px, {scaled}");
         }
 
-        var images = roles.ToDictionary(r => r, r => OutputImage.Rgba8(evaluator, r, size));
+        // Each column as the sheet shows it (roughness with B 0, metallic, height and greyscale named outputs grey); the
+        // sphere wears base colour, normal, the packed metallic-roughness image and occlusion.
+        var images = roles.ToDictionary(r => r, r => OutputImage.Rgba8(evaluator, r, size), StringComparer.Ordinal);
+        var metallic = evaluator.Has(OutputRoles.Name(OutputRole.Metallic));
+        var worn = new Dictionary<OutputRole, byte[]>();
+        foreach (var r in new[] { OutputRole.BaseColour, OutputRole.Normal, OutputRole.Roughness, OutputRole.Occlusion }.Where(r => evaluator.Has(OutputRoles.Name(r))))
+            worn[r] = r == OutputRole.Roughness && metallic ? OutputImage.FileRgba8(evaluator, OutputRoles.Name(r), size) : images[OutputRoles.Name(r)];
         var title = $"{(path is null ? "unsaved graph" : name)}   {size} px   seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}";
         var columns = roles.ToList();
         var labels = view == "sheet" ? SwatchSheet.Labels(title, columns, angle) : null;
 
         await status.WhenSettled.WaitAsync(cancellationToken);
         if (status.FaultMessage is { } fault) return Error("swatch: " + fault);
-        var request = new SwatchRequest(new SwatchSpec(images, size, angle, labels));
+        var request = new SwatchRequest(new SwatchSpec(worn, size, angle, labels, metallic));
         queue.Enqueue(request);
         await Task.WhenAny(request.Result, status.WhenStopped).WaitAsync(cancellationToken);
         if (!request.Result.IsCompleted) return Error("swatch: " + (status.FaultMessage ?? "the engine has stopped, so nothing can be drawn"));
@@ -142,7 +156,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         }
         var (sheet, layout) = SwatchSheet.Compose([.. columns.Select(r => images[r])], size, frame.Sphere, frame.Atlas!, frame.Extents!);
         return Image(sheet, layout.Width, layout.Height,
-            $"swatch sheet: {name}, {size} px, seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}; columns {string.Join(", ", columns.Select(OutputRoles.Name))}, flat over tiled 3 x 3; sphere at angle {angleText}; {layout.Width} x {layout.Height} px");
+            $"swatch sheet: {name}, {size} px, seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}; columns {string.Join(", ", columns)}, flat over tiled 3 x 3; sphere at angle {angleText}; {layout.Width} x {layout.Height} px");
     }
 
     private static CallToolResult Image(byte[] rgba, int width, int height, string caption) => new()

@@ -116,7 +116,7 @@ public class GraphFaultTests
         var fault = Assert.Single(read.Faults);
         Assert.Null(fault.Node);
         Assert.Contains("no output", fault.Message);
-        Assert.Contains("base_colour, normal, roughness, occlusion", fault.Message);
+        Assert.Contains("base_colour, normal, roughness, metallic, occlusion, height", fault.Message);
     }
 
     [Fact]

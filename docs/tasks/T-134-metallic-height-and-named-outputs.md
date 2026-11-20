@@ -94,3 +94,56 @@ and a version 2 that a file is written in only when it needs it.
   exist.
 - **Stop and ask:** any committed PNG or frame that changes; a sphere threshold; metallic packed anywhere else.
 - Breaks for the frame checks are made on the scenario side, never by a switch in the product (M-27's ruling on T-114).
+
+### Hand-off
+
+Written by Claude Opus 5.5 (`claude-opus-5-5`), first agent, at its call checkpoint (about 58 tool calls). Not verified
+yet: `cairn task T-134 verify` has not been run; the patina-unit tests were run by hand (below).
+
+**Done (committed):**
+- *Roles* (`Imaging/OutputPacking.cs`): `OutputRole` is `BaseColour, Normal, Roughness, Metallic, Occlusion, Height`
+  (role order); `OutputRoles.Order` (roles in role order, then named a to z), `FileOf` (`metallic` -> `roughness.png`),
+  `PackedAs` (a named output packs as `base_colour`: grey spread, colour sRGB); `PackTile` packs metallic and height grey;
+  `PackMetallicTile` writes B only. Packing table in the class comment.
+- *Named outputs* (`Nodes/OutputNode.cs`, `GraphValidator.cs`): parameter `name` (`ParamSpec.Identifier`, optional, no
+  default); `OutputNode.GivenName`. Faults: role and name both (on `name`), a name that is a role's, two outputs one
+  name, metallic with no roughness (on the metallic output's `role`, message as the spec). `GraphAnalysis.Outputs` is
+  keyed by output name (role's name or own name).
+- *Evaluator*: `Outputs` (sheet order), `Named`, `Has`, `KindOf`, `Evaluate(string output, ...)`; `Evaluate(OutputRole)` kept.
+- *`OutputImage`*: keyed by output name; `Rgba8` is the output alone (roughness B 0, metallic grey: the sheet's cells);
+  `FileRgba8`/`Make` are the file (roughness with metallic in B; metallic throws).
+- *List parameters*: `ParamKind.Floats`/`Colours` (`ParamSpec.Floats(name, minCount, maxCount, min, max, default...)`,
+  `ParamSpec.Colours(name, minCount, maxCount, default...)`), `ParamValueKind.Texts` (`ParamValue.OfTexts`), an empty
+  `[]` reads as numbers and either kind takes it; `NodeParameters.Floats/Colours/Has`. A mixed array is a load error
+  ("an array is all numbers or all strings"). Describe: "a list of 2 to 8 numbers [a, b, ...], each from 0 to 1", "a
+  list of 0 to 4 colours [\"#rrggbb\", ...]". Files with them stay version 1.
+- *Version 2's machinery* (`TexGraphFile.cs`): `TexGraphFile.LatestVersion = 2`; versions 1 and 2 read; `TexGraphField`
+  (abstract: `Name`, `Version`, `IsIn`, `Write`, `Read(ref Utf8JsonReader)` returning a graph transform) and
+  `TexGraphFormat` (`Current` is empty; `With(field)`, `WithNodeType(type, version)`, `VersionOf(graph)`); `Write`/`Read`
+  take an optional format. Fields are written after `seed`, before `nodes`. A file of a lower version using a later
+  field or node type is a load error at it. T-139 adds its `parameters` field to `TexGraphFormat.Current` (and a slot on
+  `TextureGraph` for its value); T-140 calls `WithNodeType("graph", 2)` and `("input", 2)` there.
+- *Tools*: export (`outputs` takes names; metallic alone refused; metallic packed into roughness.png; lines for height
+  and named outputs say "no Carve slot"), swatch (`output` takes names; columns = `evaluator.Outputs`; the sphere wears
+  the packed roughness and sets the material's metallic factor 1 when the graph has metallic, `SwatchSpec.Metallic`),
+  define_graph's text and `NodeCatalogue` (an optional parameter is listed "optional, no default"); the metal plate
+  worked example (`DefineGraphTool.WorkedMetal`, `ExportTool.WorkedMetal`, `SwatchTool.WorkedEdge`).
+  `tools/Patina.SampleGraphs` writes each output's file (no metallic file).
+- *Tests*: `RolesAndNamedOutputsTests`, `ListParamsAndVersionTests` (stand-in field and node type held there; every
+  committed `.texgraph` rewritten byte for byte), `MetalPlateTests` (server); existing tests' targets moved only where
+  the spec moves them (version 3 is now the unknown one; the six roles in the no-output message; "shiny" is now a
+  valid name, so the export refusal names the missing output; the planks' four roles named in the tests).
+  Patina.Graphs.Tests: 140 pass. Patina.Server.Tests unit: 104 pass, 1 fails (below).
+
+**Surprising, and left:** the sheet's label atlas (`LabelAtlas`, 512 px, 32 px pitch) holds 16 labels, a title, two a
+column and the sphere's, so 7 columns at most. A graph with every role and two named outputs (8 columns, the spec's
+unit test) throws `IndexOutOfRangeException` in `SwatchSheet.Compose`
+(`MetalPlateTests.The_sheet_has_a_column_per_output_...`). Fix in the atlas (taller, or two labels a row) without
+moving the planks' label pixels, and check the planks' sheet hash is unchanged; `SwatchRendering` draws the atlas.
+
+**Left:** the atlas fix; scenario-patina's swatch stage (metal plate sheet and sphere worked from texels as
+`SwatchStage.cs` does; the metallic-1 vs metallic-0 grey-200 highlight check, threshold measured and put to the
+person); `cairn task T-134 verify`; compare the planks' sheet and committed PNGs and scenario frames by hash (fetch by
+job id); the person's approval of the new sheet look (frames under `G:\My Drive\artifacts\carve\M-28\T-134\round-1`);
+CLAUDE.md's Layout lines (Patina.Graphs: roles, list params, format versions); `### As built`; lint and finish.
+No images have been opened.

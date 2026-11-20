@@ -68,7 +68,7 @@ public class TexGraphFileTests
 
     [Theory]
     [InlineData("{ \"version\": 1, \"size\": 256, \"seed\": 7, \"nodes\": { ", 1, "not JSON")]
-    [InlineData("{\n  \"version\": 2,\n  \"size\": 256, \"seed\": 7, \"nodes\": {} }", 2, "version 2 is not known")]
+    [InlineData("{\n  \"version\": 3,\n  \"size\": 256, \"seed\": 7, \"nodes\": {} }", 2, "version 3 is not known: this build reads versions 1 to 2")]
     [InlineData("{\n  \"version\": 1,\n  \"size\": 300, \"seed\": 7, \"nodes\": {} }", 3, "power of two from 32 to 8192")]
     [InlineData("{ \"version\": 1, \"size\": 16384, \"seed\": 7, \"nodes\": {} }", 1, "power of two")]
     [InlineData("{ \"version\": 1, \"size\": 256, \"seed\": -1, \"nodes\": {} }", 1, "seed is a whole number from 0 to 4294967295")]
