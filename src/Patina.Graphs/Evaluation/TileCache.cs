@@ -28,6 +28,8 @@ internal sealed class TileCache(int tilesAcross, long cap)
     private readonly Dictionary<long, Entry> _entries = [];
     private readonly LinkedList<Entry> _unpinned = new();
     private readonly LinkedList<Entry> _cold = new();
+    private readonly Dictionary<long, Stack<float[]>> _free = [];
+    private long _freeBytes;
 
     public long Cap { get; } = cap;
     public long Bytes { get; private set; }
@@ -108,6 +110,30 @@ internal sealed class TileCache(int tilesAcross, long cap)
             _entries.Remove(entry.Key);
             Bytes -= entry.Bytes;
             Tiles -= entry.Tiles.Length;
+            foreach (var tile in entry.Tiles) Free(tile.Data);
         }
+    }
+
+    // Dropped tiles' arrays, kept for the next tiles made (T-155). A tile is a large object, collected only in the
+    // runtime's rare full collections; made and dropped by the thousand, they piled up as garbage past the cap (the
+    // strong minify at 8192 peaked over 2 GB with 768 MiB held). At most FreeLimit bytes wait here.
+    private long FreeLimit => Math.Max(4L << 20, Bound / 16);
+
+    private void Free(float[] data)
+    {
+        var bytes = data.LongLength * sizeof(float);
+        if (_freeBytes + bytes > FreeLimit) return;
+        if (!_free.TryGetValue(data.LongLength, out var stack)) _free[data.LongLength] = stack = new Stack<float[]>();
+        stack.Push(data);
+        _freeBytes += bytes;
+    }
+
+    /// <summary>An array of <paramref name="length"/> zeros for a new tile: a dropped tile's, cleared, or a new one.</summary>
+    public float[] Take(long length)
+    {
+        if (!_free.TryGetValue(length, out var stack) || !stack.TryPop(out var data)) return new float[length];
+        _freeBytes -= length * sizeof(float);
+        Array.Clear(data);
+        return data;
     }
 }
