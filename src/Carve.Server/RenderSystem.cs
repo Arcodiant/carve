@@ -303,7 +303,10 @@ internal sealed class RenderSystem(
         // last file is kept here: the frames of one file at several times and views load it once.
         if (_loaded is not { } last || !last.Bytes.AsSpan().SequenceEqual(glb.Bytes))
         {
-            _loaded = (glb.Bytes, models.LoadModel(glb.Bytes, ModelFormat.Gltf, new ModelLoadOptions()));
+            // Interim until engine need 8: the loader's default (no mipmaps) gives every texture PixelArt (Nearest, no mip
+            // chain), while render samples through mips and Linear filters (ruling 1, T-78); with mipmaps the loader samples
+            // Linear on all three filters, so render_glb samples a texture as render does (T-124).
+            _loaded = (glb.Bytes, models.LoadModel(glb.Bytes, ModelFormat.Gltf, new ModelLoadOptions { GenerateMipmaps = true }));
         }
 
         var model = _loaded.Value.Model;

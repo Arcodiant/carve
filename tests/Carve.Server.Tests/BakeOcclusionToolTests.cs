@@ -124,12 +124,18 @@ public class BakeOcclusionToolTests : FileToolTests
     }
 
     [Fact]
-    public async Task The_occlusion_block_is_taken_without_a_map_that_reads_it_and_the_default_maps_are_unchanged()
+    public async Task The_occlusion_block_without_a_map_that_reads_it_bakes_what_was_asked_and_warns()
     {
         await using var carve = await StartStripAsync();
         var result = Body(Ok(await carve.CallToolAsync("bake", """{"size":64,"occlusion":{"reach":1}}""")));
         Assert.DoesNotContain(result.GetProperty("files").EnumerateArray(), f => f.GetProperty("map").GetString() is "occlusion" or "orm");
         Assert.Contains(result.GetProperty("files").EnumerateArray(), f => f.GetProperty("map").GetString() == "base_colour");
+        Assert.Contains("occlusion: ignored, neither 'occlusion' nor 'orm' is in maps",
+            result.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()));
+
+        // With a map that reads it, no such warning.
+        var read = Body(Ok(await carve.CallToolAsync("bake", """{"size":64,"maps":["orm"],"occlusion":{"reach":1}}""")));
+        Assert.DoesNotContain(read.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.StartsWith("occlusion:"));
     }
 
     [Fact]

@@ -31,13 +31,13 @@ internal sealed class OcclusionStage : IBakesStage
     ];
 
     /// <summary>
-    /// Not yet ruled: the least amount, in 8-bit occlusion, the grip's middle must read above the crevice. Null until the person rules
-    /// it; the stage then only probes (<c>occlusion-probe.tsv</c>).
+    /// Ruled by the person (2026-11-20): the crevice texels' mean (socket top by the drive) is at least this far below the open
+    /// texels' mean (the grip's middle), in 8-bit occlusion. Break: <c>reach</c>.
     /// </summary>
-    private static readonly int? CreviceMargin = null;
+    private const int CreviceMargin = 50;
 
-    /// <summary>Not yet ruled: the least 8-bit occlusion of the grip's middle, an open texel. Null until ruled; probe only.</summary>
-    private static readonly int? OpenLeast = null;
+    /// <summary>Ruled by the person (2026-11-20): open texels far from other geometry (the grip's middle) read at least this.</summary>
+    private const int OpenLeast = 250;
 
     // Faces of samples/wrench.carve. The wrench is separate solids stacked: the steel square drive (faces 100 to 105) stands between
     // the dark ring under the head (face 99, facing -z) and the dark socket's top (face 118, facing +z), the one crevice it has; the
@@ -159,15 +159,16 @@ internal sealed class OcclusionStage : IBakesStage
         ];
     }
 
-    /// <summary>The crevice against the grip's middle, and the grip's middle open, each once its number is ruled.</summary>
+    /// <summary>The crevice against the grip's middle, and the grip's middle open, by the person's numbers.</summary>
     private static void CheckOcclusion(List<Region> regions)
     {
         var corner = regions.Single(r => r.Name == "socket-top-by-drive");
         var open = regions.Single(r => r.Name == "grip-facet-5-middle");
         if (corner.Values.Length < 20 || open.Values.Length < 20) Note($"occlusion: too few texels probed ({corner.Name} {corner.Values.Length}, {open.Name} {open.Values.Length})");
-        if (CreviceMargin is { } margin && open.Min - corner.Max < margin)
-            Note($"occlusion: the grip's middle (least {open.Min}) is only {open.Min - corner.Max} above the crevice (most {corner.Max}), under {margin}");
-        if (OpenLeast is { } least && open.Min < least) Note($"occlusion: the grip's middle reads {open.Min}, under {least}");
+        var below = open.Values.Average() - corner.Values.Average();
+        if (below < CreviceMargin)
+            Note($"occlusion: the crevice's mean ({corner.Values.Average():0.0}) is only {below:0.0} below the grip's middle's ({open.Values.Average():0.0}), under {CreviceMargin}");
+        if (open.Min < OpenLeast) Note($"occlusion: the grip's middle reads {open.Min}, under {OpenLeast}");
     }
 
     /// <summary><c>occlusion-probe.tsv</c>: each region's count, least, mean and most, and each file's time; the numbers a threshold is chosen from.</summary>
