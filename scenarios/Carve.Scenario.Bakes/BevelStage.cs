@@ -33,10 +33,13 @@ internal sealed class BevelStage : IBakesStage
     private const int FlatLevels = 1;
 
     /// <summary>
-    /// How far, in luma, a strip may lie outside the two faces' shades. PENDING THE PERSON'S RULING (T-125's hand-off): 0 is the
-    /// spec's "between" as written; the probe's numbers are in <c>bevel.tsv</c>.
+    /// How far, in luma, a strip may lie from the mean normal's shade as the colour rule predicts it, on an edge whose predicted
+    /// mean is not between its faces' shades. PENDING THE PERSON'S RULING: probed in <c>bevel.tsv</c>'s <c>predicted</c> rows.
     /// </summary>
-    private const double BetweenSlack = 0;
+    private const double PredictedSlack = 2;
+
+    /// <summary>The jaw's (<c>dark</c>) colour, from <see cref="SurfaceStage"/>'s table.</summary>
+    private const string Dark = "#36393E";
 
     private static readonly Vector3 ThreeQuarter = new(1, 0.6f, 1.5f);
 
@@ -62,7 +65,7 @@ internal sealed class BevelStage : IBakesStage
         CheckFlat(mesh, hard, png, tsv);
 
         // Close on a convex jaw edge, from three directions, without the map (stage 1's material) and then with it.
-        var edge = JawEdge(mesh, hard, groups["dark"].ToHashSet());
+        var edge = JawEdge(scene, mesh, hard, groups["dark"].ToHashSet());
         var close = Directions(edge).Select((d, k) => new View($"bevel-jaw-{k + 1}", d, Size, 8, edge.Mid, Mirror: false)).ToArray();
         var plain = new Dictionary<string, ScenarioFrame>();
         foreach (var view in close) plain[view.Name] = await driver.CaptureAsync(view.Name + "-plain", view.Args);
@@ -143,13 +146,18 @@ internal sealed class BevelStage : IBakesStage
 
     internal sealed record Edge(int Lo, int Hi, int FaceA, int FaceB, Vector3 Mid, Vector3 Axis, Vector3 NormalA, Vector3 NormalB, float Length);
 
-    /// <summary>The longest convex hard edge between two jaw (<c>dark</c>) faces bending at least 60 degrees, the lower ids on a tie.</summary>
-    private static Edge JawEdge(SceneMesh mesh, HashSet<(int, int)> hard, HashSet<int> jaw)
+    /// <summary>
+    /// The longest convex hard edge between two jaw (<c>dark</c>) faces bending at least 60 degrees, the lower ids on a tie, whose
+    /// sample points (<see cref="Samples"/>) are all on their face, facing the eye and in sight from each of the three close
+    /// directions. The longest edge alone, (112, 113), is the underside of the dark boss where it sits 0.5 mm over the ring: the
+    /// ring hides every point of it from every direction.
+    /// </summary>
+    private static Edge JawEdge(Scene scene, SceneMesh mesh, HashSet<(int, int)> hard, HashSet<int> jaw)
     {
+        var candidates = new List<Edge>();
         var faces = new Dictionary<(int, int), List<int>>();
         for (var f = 0; f < mesh.Faces.Length; f++)
             foreach (var e in Loop(mesh.Faces[f])) (faces.TryGetValue(e, out var l) ? l : faces[e] = []).Add(f);
-        Edge? best = null;
         foreach (var ((lo, hi), around) in faces.OrderBy(k => k.Key))
         {
             if (around.Count != 2 || !hard.Contains((lo, hi)) || !jaw.Contains(around[0]) || !jaw.Contains(around[1])) continue;
@@ -158,10 +166,52 @@ internal sealed class BevelStage : IBakesStage
             var mid = (mesh.Vertices[lo] + mesh.Vertices[hi]) / 2;
             if (Vector3.Dot(na, nb) > 0.5f || Vector3.Dot(na, mesh.Centre(b) - mid) >= 0) continue;
             var length = Vector3.Distance(mesh.Vertices[lo], mesh.Vertices[hi]);
-            if (best is null || length > best.Length + 1e-7f)
-                best = new Edge(lo, hi, a, b, mid, Vector3.Normalize(mesh.Vertices[hi] - mesh.Vertices[lo]), na, nb, length);
+            candidates.Add(new Edge(lo, hi, a, b, mid, Vector3.Normalize(mesh.Vertices[hi] - mesh.Vertices[lo]), na, nb, length));
         }
-        return best ?? throw new InvalidOperationException("the wrench's jaw has no convex hard edge");
+        // A stable sort: longest first, the lower ids (the dictionary's order) on a tie.
+        foreach (var edge in candidates.OrderByDescending(c => MathF.Round(c.Length, 6)))
+        {
+            var seen = Directions(edge).All(d =>
+            {
+                var eye = CameraPixels.Eye(scene.Min, scene.Max, d, edge.Mid);
+                return Samples(mesh, edge).All(q => Geo.Inside(mesh.Vertices, mesh.Faces[q.Face], mesh.Normal(q.Face), q.P)
+                    && Vector3.Dot(mesh.Normal(q.Face), eye - q.P) > 0 && Geo.InSight(scene, mesh, q.Face, eye, q.P));
+            });
+            if (seen) return edge;
+        }
+        throw new InvalidOperationException($"none of the wrench's {candidates.Count} convex jaw hard edges is in sight from all three close directions");
+    }
+
+    /// <summary>
+    /// The points a close frame reads, at -0.15, -0.05, 0.05 and 0.15 of the edge's length from its middle: on each face at a
+    /// quarter width from the edge (its strip) and at its shade distance (<see cref="ShadeDistance"/>).
+    /// </summary>
+    private static IEnumerable<(int Face, bool Strip, Vector3 P)> Samples(SceneMesh mesh, Edge e)
+    {
+        foreach (var (face, normal) in new[] { (e.FaceA, e.NormalA), (e.FaceB, e.NormalB) })
+        {
+            var into = Into(mesh, e, face, normal);
+            foreach (var strip in new[] { false, true })
+                foreach (var t in new[] { -0.15f, -0.05f, 0.05f, 0.15f })
+                    yield return (face, strip, e.Mid + e.Axis * (t * e.Length) + into * (float)(strip ? 0.25 * Width : ShadeDistance(mesh, e, face, normal)));
+        }
+    }
+
+    private static Vector3 Into(SceneMesh mesh, Edge e, int face, Vector3 normal)
+    {
+        var into = Vector3.Normalize(Vector3.Cross(normal, e.Axis));
+        return Vector3.Dot(into, mesh.Centre(face) - e.Mid) < 0 ? -into : into;
+    }
+
+    /// <summary>
+    /// Where a face's own shade is read: three widths from the edge, or half the face's depth from it when the face is shallower
+    /// than six widths, so the point is not in the strip of the face's far edge (the chamfer, face 66, is 5.5 mm deep).
+    /// </summary>
+    private static double ShadeDistance(SceneMesh mesh, Edge e, int face, Vector3 normal)
+    {
+        var into = Into(mesh, e, face, normal);
+        var depth = mesh.Faces[face].Max(v => Vector3.Dot(mesh.Vertices[v] - e.Mid, into));
+        return Math.Min(3 * Width, depth / 2);
     }
 
     /// <summary>The edge seen from its mean normal and leaning toward each face, all a little along the edge so it is not seen end-on or flat.</summary>
@@ -179,39 +229,53 @@ internal sealed class BevelStage : IBakesStage
     private static void CheckStrip(View view, string map, ScenarioFrame frame, Scene scene, SceneMesh mesh, Edge e, List<string> tsv, bool judge)
     {
         var project = CameraPixels.Perspective(scene.Min, scene.Max, view.Direction, view.Size, view.Zoom, view.Target);
-        var eye = CameraPixels.Eye(scene.Min, scene.Max, view.Direction, view.Target);
-        double? Shade(int face, Vector3 normal, float s)
+        var misses = new List<string>();
+        double? Shade(int face, bool strip)
         {
-            var into = Vector3.Normalize(Vector3.Cross(normal, e.Axis));
-            if (Vector3.Dot(into, mesh.Centre(face) - e.Mid) < 0) into = -into;
             var lumas = new List<double>();
-            foreach (var t in new[] { -0.15f, -0.05f, 0.05f, 0.15f })
+            foreach (var (_, _, p) in Samples(mesh, e).Where(q => q.Face == face && q.Strip == strip))
             {
-                var p = e.Mid + e.Axis * (t * e.Length) + into * s;
-                if (!Geo.Inside(mesh.Vertices, mesh.Faces[face], mesh.Normal(face), p) || !Geo.InSight(scene, mesh, face, eye, p)) continue;
                 var (x, y) = CameraPixels.Holding(project(p));
-                if (x < 0 || y < 0 || x >= frame.Width || y >= frame.Height) continue;
+                if (x < 0 || y < 0 || x >= frame.Width || y >= frame.Height) { misses.Add($"{face} off frame"); continue; }
                 var c = frame.Pixel(x, y);
                 lumas.Add(Luma((c.R, c.G, c.B)));
             }
             return lumas.Count > 0 ? lumas.Average() : null;
         }
 
-        var faceA = Shade(e.FaceA, e.NormalA, (float)(3 * Width));
-        var faceB = Shade(e.FaceB, e.NormalB, (float)(3 * Width));
-        var stripA = Shade(e.FaceA, e.NormalA, (float)(0.25 * Width));
-        var stripB = Shade(e.FaceB, e.NormalB, (float)(0.25 * Width));
+        // JawEdge chose the edge so every point is on its face and in sight from this direction.
+        var faceA = Shade(e.FaceA, strip: false);
+        var faceB = Shade(e.FaceB, strip: false);
+        var stripA = Shade(e.FaceA, strip: true);
+        var stripB = Shade(e.FaceB, strip: true);
         string F(double? v) => v is { } d ? d.ToString("F2", CultureInfo.InvariantCulture) : "-";
-        tsv.Add($"strip\t{view.Name} {map}\t{F(stripA)} {F(stripB)}\tfaces {e.FaceA} {F(faceA)}, {e.FaceB} {F(faceB)}; edge ({e.Lo}, {e.Hi})");
+        tsv.Add($"strip\t{view.Name} {map}\t{F(stripA)} {F(stripB)}\tfaces {e.FaceA} {F(faceA)}, {e.FaceB} {F(faceB)}; edge ({e.Lo}, {e.Hi}){(misses.Count > 0 ? "; missed " + string.Join(", ", misses) : "")}");
         if (!judge) return;
         if (faceA is not { } a || faceB is not { } b || stripA is not { } sa || stripB is not { } sb)
         {
             Note($"bevel: {view.Name}: the edge ({e.Lo}, {e.Hi})'s faces or strips are not in sight");
             return;
         }
-        var (lo, hi) = (Math.Min(a, b) - BetweenSlack, Math.Max(a, b) + BetweenSlack);
+        // The person's ruling (2026-11-20): judge "between the faces' shades" only where the colour rule puts the mean normal's
+        // shade between the two faces'; elsewhere hold each strip to that predicted shade, within PredictedSlack.
+        double Predicted(Vector3 n)
+        {
+            var lit = ColourRule.Lit(Dark, n, view.Direction);
+            return Luma((ColourRule.Encode(lit[0]), ColourRule.Encode(lit[1]), ColourRule.Encode(lit[2])));
+        }
+        var (pa, pb, pm) = (Predicted(e.NormalA), Predicted(e.NormalB), Predicted(Vector3.Normalize(e.NormalA + e.NormalB)));
+        var between = pm >= Math.Min(pa, pb) && pm <= Math.Max(pa, pb);
+        tsv.Add(string.Create(CultureInfo.InvariantCulture,
+            $"predicted	{view.Name}	{pm:F2}	faces {pa:F2} {pb:F2} (measured {a:F2} {b:F2}); mean {(between ? "between" : "outside")}; strips less predicted {sa - pm:F2} {sb - pm:F2}"));
         foreach (var (side, s) in new[] { ("A", sa), ("B", sb) })
-            if (s < lo || s > hi) Note(string.Create(CultureInfo.InvariantCulture, $"bevel: {view.Name}: strip {side} reads {s:F2}, not between the faces' shades {a:F2} and {b:F2}"));
+        {
+            if (between)
+            {
+                if (s < Math.Min(a, b) || s > Math.Max(a, b)) Note(string.Create(CultureInfo.InvariantCulture, $"bevel: {view.Name}: strip {side} reads {s:F2}, not between the faces' shades {a:F2} and {b:F2}"));
+            }
+            else if (Math.Abs(s - pm) > PredictedSlack)
+                Note(string.Create(CultureInfo.InvariantCulture, $"bevel: {view.Name}: strip {side} reads {s:F2}, not within {PredictedSlack} of the mean normal's predicted shade {pm:F2} (the faces' predicted {pa:F2} and {pb:F2} do not hold it between)"));
+        }
     }
 
     /// <summary>The bevel break's map: the PNG with its green inverted, written beside it.</summary>

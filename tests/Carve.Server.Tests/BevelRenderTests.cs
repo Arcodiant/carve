@@ -12,15 +12,16 @@ namespace Carve.Server.Tests;
 /// whose +Z face is laid as <see cref="MaterialRenderTests.FrontUvs"/> lays it, put it on that face as <c>normal_texture</c> over
 /// #808080, and render from the front. There (T-120's probe) the top face is the brightest and +X is darker than +Z, so the strip of
 /// +Z within 0.05 of its top edge reads brighter than the face's middle, leaning toward the top face's shade, and the strip by its +X
-/// edge darker, leaning toward +X's. The same map with G inverted, and then with R inverted, each fails.
+/// edge darker. Not "leaning toward +X's": the edge's mean normal reads darker than both faces in this view, so the person dropped it
+/// (2026-11-20). The same map with G inverted, and then with R inverted, each fails.
 /// </summary>
 [Trait("Tier", "regression")]
 public sealed class BevelRenderTests() : FileToolTests("carve-bevel-render")
 {
     /// <summary>
-    /// The luma the top strip must gain over the middle, and the +X strip lose. PENDING THE PERSON'S RULING (T-125's hand-off):
-    /// T-120's probe puts the edge's own normal (the mean, (0, 0.707, 0.707)) at about +9.5 luma over flat for the top and the
-    /// +x lean at about −3.2, the R− lean at +1.9; these are half of each.
+    /// The luma the top strip must gain over the middle, and the +X strip lose: the person's rulings (2026-11-20), at least 4.7
+    /// brighter and at least 1.6 darker. T-120's probe puts the edge's own normal (the mean, (0, 0.707, 0.707)) at about +9.5 luma
+    /// over flat for the top and the +x lean at about −3.2; these are half of each. Probed here: +8.20 and −4.33.
     /// </summary>
     internal const double TopGain = 4.7, SideLoss = 1.6;
 
@@ -33,8 +34,8 @@ public sealed class BevelRenderTests() : FileToolTests("carve-bevel-render")
     internal sealed record Reading(string Map, double Middle, double TopStrip, double SideStrip, double TopFace, double SideFace)
     {
         public bool TopBrighter => TopStrip - Middle >= TopGain && Math.Abs(TopStrip - TopFace) < Math.Abs(Middle - TopFace);
-        // Not "toward +X's shade": the edge's mean normal reads darker than both faces in this view (T-120's probe: R+, which is that
-        // normal, 114.3 luma; the +X face 116.5; flat 117.5), so the strip overshoots +X's shade. PENDING THE PERSON'S RULING.
+        // Not "toward +X's shade", by the person's ruling (2026-11-20): the edge's mean normal reads darker than both faces in this
+        // view (T-120's probe: R+, which is that normal, 114.3 luma; the +X face 116.5; flat 117.5), so the strip overshoots +X's shade.
         public bool SideDarker => Middle - SideStrip >= SideLoss;
         public string Row => string.Join('\t', new object[] { Map, Middle, TopStrip, SideStrip, TopFace, SideFace, TopStrip - Middle, SideStrip - Middle, TopBrighter, SideDarker }
             .Select(v => v is double d ? d.ToString("F2", CultureInfo.InvariantCulture) : v.ToString()));
@@ -118,7 +119,7 @@ public sealed class BevelRenderTests() : FileToolTests("carve-bevel-render")
 
         var baked = readings[1];
         Assert.True(baked.TopBrighter, $"the top strip must read brighter than the middle, toward the top face:\n{all}");
-        Assert.True(baked.SideDarker, $"the +X strip must read darker than the middle, toward +X:\n{all}");
+        Assert.True(baked.SideDarker, $"the +X strip must read darker than the middle by SideLoss:\n{all}");
         Assert.False(readings[0].TopBrighter || readings[0].SideDarker, $"a flat map rounds nothing, so it must fail both:\n{all}");
         Assert.False(readings[2].TopBrighter, $"G inverted must fail the top strip:\n{all}");
         Assert.False(readings[3].SideDarker, $"R inverted must fail the +X strip:\n{all}");

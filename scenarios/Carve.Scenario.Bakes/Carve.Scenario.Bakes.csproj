@@ -18,6 +18,7 @@
     <Compile Include="../Carve.Scenario.Uvs/UvsScene.cs" Link="UvsScene.cs" />
     <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
     <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
     <Compile Include="../../tools/Carve.SampleTextures/Png.cs" Link="Png.cs" />
     <Compile Include="../Carve.Scenario.Orcward/ComparisonPng.cs" Link="ComparisonPng.cs" />
     <Content Include="../../samples/wrench.carve" Link="wrench.carve" CopyToOutputDirectory="PreserveNewest" />

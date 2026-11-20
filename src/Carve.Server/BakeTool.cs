@@ -49,7 +49,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "'occlusion' writes <folder>/<mesh>.occlusion.png, a single-channel grey PNG of ambient occlusion, linear with no curve: each texel casts rays over the hemisphere about its face's normal against the meshes at rest (their own positions, never a pose; both sides of a face block), a ray meeting geometry at distance t under reach occludes by 1 - (t / reach)^2, so distant geometry only tints, and the texel is 1 - the mean (white 255 open, black 0 closed); the rays are a fixed set, so two bakes are byte-identical. "
         + "'orm' writes <folder>/<mesh>.orm.png, the RGB texture glTF reads for both occlusion_texture (R) and metallic_roughness_texture (G roughness, B metallic), linear: R is the occlusion above, G and B each face's roughness and metallic from surface, resolved as base_colour is (the last entry naming the face's group or material that gives it; else its material's; else roughness 1 and metallic 0). "
         + "occlusion is {rays: 1 to 1024, default 32; reach: metres, required for 'occlusion' and 'orm' and with no default, the distance within which geometry darkens a texel; occluders: the mesh names that occlude, every mesh of the model by default}. "
-        + "'normal' writes <folder>/<mesh>.normal.png, an RGB tangent-space normal map that rounds the mesh's hard edges over bevel.width metres, as a modelled bevel would, with no extra geometry: the shading breaks render draws hard (a smooth mesh's marked hard edges, every edge between faces that are not coplanar on a flat one). On a break edge the normal is the mean of the two faces' normals, easing by smoothstep to the shading normal at width from the edge, measured in 3D, so it runs on across a UV seam; elsewhere it is the shading normal itself, (128, 128, 255). It is glTF's normal map, green up, in the engine's own tangent frame (no tangents are exported), so give it to define_material as normal_texture and render shows the rounded edge as the game will. bevel is {width: metres, more than 0}, required with 'normal' (there is no default; a few texels' worth is typical, e.g. 0.0016 on a 0.3 m tool at 1024) and refused without it. "
+        + "'normal' writes <folder>/<mesh>.normal.png, an RGB tangent-space normal map that rounds the mesh's hard edges over bevel.width metres, as a modelled bevel would, with no extra geometry: the shading breaks render draws hard (a smooth mesh's marked hard edges, every edge between faces that are not coplanar on a flat one). On a break edge the normal is the mean of the two faces' normals, easing by smoothstep to the shading normal at width from the edge, measured in 3D, so it runs on across a UV seam; elsewhere it is the shading normal itself, (128, 128, 255). It is glTF's normal map, green up, in the engine's own tangent frame (no tangents are exported), so give it to define_material as normal_texture and render shows the rounded edge as the game will. bevel is {width: metres, more than 0}, required with 'normal' (there is no default; a few texels' worth is typical, e.g. 0.0016 on a 0.3 m tool at 1024); given without 'normal' in maps it is ignored with a warning, as the curvature block is without 'curvature'. "
         + "surface is an object of entries, each keyed by a group or material name, applied in the order given, so a later entry wins a face that two of them name: put a group that holds every face first as a default and the specific groups after it. "
         + "An entry is {base_colour: '#RRGGBB', roughness: 0 to 1, metallic: 0 to 1}, each optional and validated; an entry with no base_colour gives no colour to base_colour. roughness and metallic are for maps that read them and make no warning when no map in this call does. A block no asked map reads (occlusion with neither 'occlusion' nor 'orm' in maps) is ignored with a warning. "
         + "'curvature' writes <folder>/<mesh>.curvature.png, a single-channel grey PNG for wear: 128 (0.5) on flat ground, lighter toward a convex edge and darker toward a concave one, over the width given in the curvature block {width} (metres, greater than 0, required when 'curvature' is a map). "
@@ -59,7 +59,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "path is relative to carve's working folder with '/' separators (absolute when folder is), the form define_material takes. replaced is true when a file of that name was there and was overwritten: bake always overwrites. "
         + "ms is the time the file took to bake and write, in milliseconds; work two files share (the masks, the occlusion the orm reads) is counted in the first of them. "
         + "coverage is the fraction of the image's texels the faces cover, before padding. min, max and mean are over those covered texels, from 0 to 1; for base_colour each is [r, g, b]. "
-        + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a curvature map with no curvature width, or a width that is not above 0; occlusion or orm with no occlusion.reach, a reach not over 0, rays outside 1 to 1024, an unknown or empty occluders (the error lists the meshes); 'normal' without bevel, bevel without 'normal', or a bevel width that is not a number more than 0; a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
+        + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a curvature map with no curvature width, or a width that is not above 0; occlusion or orm with no occlusion.reach, a reach not over 0, rays outside 1 to 1024, an unknown or empty occluders (the error lists the meshes); 'normal' without bevel, or a bevel width that is not a number more than 0; a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
         + "a mesh, group or material name that a file name cannot hold. "
         + "Worked example, from bake to a material on the faces, on the wrench (open samples/wrench.carve): bake with the arguments below writes textures/wrench.base_colour.png, textures/wrench.orm.png and a mask for each group; then define_material {name: 'wrench', base_colour_texture: 'textures/wrench.base_colour.png', metallic_roughness_texture: 'textures/wrench.orm.png', occlusion_texture: 'textures/wrench.orm.png'} (one ORM file in both slots) and set_material {material: 'wrench', group: 'all'} (the wrench's group of every face) show the baked colours on the model:\n"
         + ExampleMarker + Example;
@@ -159,6 +159,10 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         }
 
         var wanted = ReadMaps(maps, errors);
+        var warnings = new List<string>();
+        UnusedBlock("occlusion", occlusion, [OcclusionMap, OrmMap], wanted, warnings);
+        UnusedBlock("bevel", bevel, [NormalMap], wanted, warnings);
+        UnusedBlock("curvature", curvature, [CurvatureMap], wanted, warnings);
         var bevelWidth = ReadBevel(bevel, wanted.Contains(NormalMap), errors);
 
         var model = store.Current.Model;
@@ -254,8 +258,6 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             files.Add(entry);
         }
 
-        var warnings = new List<string>();
-        UnusedBlock("occlusion", occlusion, [OcclusionMap, OrmMap], wanted, warnings);
         if (layout.Unmapped.Count > 0)
             warnings.Add($"{named.Name}: {layout.Unmapped.Count} face(s) have no UVs and were skipped: {string.Join(", ", layout.Unmapped.Take(10))}{(layout.Unmapped.Count > 10 ? ", ..." : "")}");
         return Ok(new { files, skipped_faces = layout.Unmapped, warnings });
@@ -342,8 +344,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             else width = w;
         }
         if (!given) errors.Add("bevel.width: required: how far from each hard edge the rounding reaches, in metres, more than 0");
-        if (!normal) { errors.Add("bevel: only with map 'normal'; add 'normal' to maps or leave bevel out"); return null; }
-        return width;
+        return normal ? width : null;
     }
 
     private static List<SurfaceEntry> ReadSurface(JsonElement? surface, List<string> errors)
@@ -398,11 +399,14 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
     /// The <c>occlusion</c> block, validated whether or not a map reads it; null when it is absent or wrong. <c>reach</c> is
     /// required when <c>occlusion</c> or <c>orm</c> is asked for.
     /// </summary>
-    /// <summary>A block given when no map in this call reads it: the call bakes what was asked, and a warning says the block was ignored.</summary>
+    /// <summary>
+    /// A block given when no map in this call reads it: the call bakes what was asked, and a warning says the block was ignored.
+    /// The block is still read, so a wrong one is still an error. For bevel and curvature this is the person's ruling (2026-11-20).
+    /// </summary>
     private static void UnusedBlock(string block, JsonElement? value, string[] readers, List<string> wanted, List<string> warnings)
     {
         if (Absent(value) || readers.Any(wanted.Contains)) return;
-        var named = readers.Length == 1 ? $"'{readers[0]}' is" : "neither " + string.Join(" nor ", readers.Select(r => $"'{r}'")) + " is";
+        var named = readers.Length == 1 ? $"'{readers[0]}' is not" : "neither " + string.Join(" nor ", readers.Select(r => $"'{r}'")) + " is";
         warnings.Add($"{block}: ignored, {named} in maps");
     }
 
