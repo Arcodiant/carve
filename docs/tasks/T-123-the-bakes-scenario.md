@@ -4,7 +4,7 @@ description: >-
 ---
 # T-123 — The bakes scenario
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
