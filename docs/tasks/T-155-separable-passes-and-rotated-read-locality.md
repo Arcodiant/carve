@@ -4,7 +4,7 @@ description: >-
 ---
 # T-155 — Separable passes and rotated-read locality
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
@@ -248,7 +248,8 @@ tile's inputs once it is made, more than by the bands.
   the research found cannot fall below about 2.4 times under 64 MiB. T-159's strip passes cut the first.
 
 **The samples at 8192** (the person's ruling: three runs each, before on `origin/milestone/M-28`'s `src` and after on
-this branch, interleaved and back to back, Release, `%TEMP%	155un-samples3.sh`; the machine quiet). Medians, the
+this branch, interleaved and back to back, Release, `%TEMP%	155
+un-samples3.sh`; the machine quiet). Medians, the
 three runs in brackets, tiles made per run.
 
 The fourth agent's run in bands of 16 (busy machine) had the cobblestones' normal at -7%; the fifth agent's repeat after
