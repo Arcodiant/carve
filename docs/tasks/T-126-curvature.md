@@ -86,8 +86,9 @@ By Claude Sonnet 5.5 (claude-sonnet-5-5): agent 1 Sonnet 5.5, agent 2 (this one)
   later stages see the model as before. The wrench has no concave edge (its least value is exactly 128).
 - Concave margin, the person's answer in the Waystone review (picked from 90, 64, 110): 64, so the texel reads at most 64. Probed
   reads 4 and 14 (49 at the third texel).
-- Blend: only the curvature `uvs` frames (the wrench's and the L-block's) pass `blend: 2` to `CheckUvImage`; every other frame's check is
-  unchanged.
+- Blend: only the curvature `uvs` frames (the wrench's and the L-block's) pass `blend: 2` to `CheckUvImage`; every other frame's check was
+  unchanged when T-126 landed. Since RV-74 (the person, 2026-11-20) the occlusion and normal-map `uvs` frames are checked too, with
+  `blend: 1` read per channel; see RV-74's answers.
 - Handle's flat middle: exactly 128.
 
 **Breaks** (`CARVE_BAKES_BREAK=curvature`, each value read as 255 minus it, which is `s` inverted): fails 123 checks (120 convex, the

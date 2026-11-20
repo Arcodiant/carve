@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-75 — Review of M-24, round 2
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-24
 
@@ -34,7 +34,7 @@ description: >-
 - **Consequence:** A reader of the outcomes sees the review's first-named defect as closed. The first half needs `skipped: <reason>`, or a follow-up filed off the milestone. The drift is the risk the finding named: a later change to the rule lands in one scenario and not the other.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** skipped: filed as T-158, off-milestone (the person, 2026-11-20: this Nit survived two rounds, so file it and close). The block rule is coded once in each scenario until then; every frame and check is as RV-74 left it.
 
 ### The retrospective says rulings and break counts are in each member's As built, but RV-74's ruling and its two breaks are in none
 
@@ -43,7 +43,9 @@ description: >-
 - **Consequence:** The record the retrospective points to does not hold the ruling, and T-126's line reads as if the two frames still have no rule. Either record both in the As built of T-124, T-125 or T-126, or change the two retrospective sentences to say they live in RV-74.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** a tracker fix, no test. The retrospective's rulings line now says the rulings given in answer to RV-74 are recorded in RV-74's answers and in the retrospective, not a member's As built, and T-126's As built says its "unchanged" held when T-126 landed and points at RV-74 for the occlusion and normal-map frames' `blend: 1`. (claude-opus-5-5)
 
 ### The partial-write error names the failed file by its absolute path and the others relative, with the inner `bake:` prefix
 
@@ -52,7 +54,7 @@ description: >-
 - **Consequence:** An agent matching the failed file against the others, or against `path` in a normal answer, sees one file in two forms. The description says paths come back relative. It is cosmetic, and the message is otherwise right and tested.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** skipped: filed as T-158, off-milestone (the person, 2026-11-20). The error names every file; only the path forms differ.
 
 ### A new test was inserted between the padding test's summary and its method, so the summary now describes the clamp tie test
 
@@ -61,7 +63,7 @@ description: >-
 - **Consequence:** The clamp tie test is documented as a padding test, and the padding test has no summary. Move the line back above line 215.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** skipped: filed as T-158, off-milestone (the person, 2026-11-20). A test comment; no test's behaviour changes.
 
 ## Summary
 

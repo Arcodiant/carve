@@ -237,7 +237,7 @@ milestone and wraps T-120's API as mesh-input nodes.
 - **Every member left its task folder on disk.** `finish` could not remove `branches/task/T-120` to `T-126` while a shell
   sat in them; each is unregistered from git and safe to delete.
 
-**Rulings the person gave during the milestone** (each recorded in the As built of the member named):
+**Rulings the person gave during the milestone** (each recorded in the As built of the member named, except those given in answer to RV-74, which are recorded in RV-74's answers and here):
 
 - **T-120:** flat-mesh coplanarity is `PolygonMesh.PlanarityTolerance` applied to the pair, as landed (asked after it
   landed, since the spec named it a stop).
@@ -266,6 +266,7 @@ milestone and wraps T-120's API as mesh-input nodes.
 
 **Known and left.**
 
+- **The review, after the person's go (2026-11-20).** A Sonnet 5.5 agent rebased the milestone onto `origin/main` with no conflict, and an Opus 5.5 agent's refactor pass removed the stages' and tests' copied helpers with every frame, bake and `.glb` byte-identical. RV-74 (three Opus 5.5 reviewers: the Core kernel, the server and rendering, the whole diff) found 19: two Major (`NearEdges` called a convex edge concave across a non-convex face; `ColourRule.cs` missing from `scenario-bakes`' inputs), ten Minor and seven Nit. Two Opus 5.5 agents and a Sonnet 5.5 agent answered them: 18 fixed, one skipped (the seam test's 4 s in `unit`), with every approved bake and frame byte-identical and `Pad` 287 ms at 4096. RV-75 (one Opus 5.5 reviewer) found that 18 answers hold and four Nits; the person chose to fix the docs slip and file the other three as **T-158**, off-milestone, one of them (the `uvs` block rule coded twice) having survived both rounds.
 - **T-154**, filed from the test report: `cairn test report --since 2d` counted one flaky pass of `scenario-bakes` in
   18 runs and one run that could not start. The report held no more than the counts, so T-154 finds the run's log and
   names the cause. Nothing else in the report called for filing: no other suite flaked, and the costliest,
