@@ -249,7 +249,9 @@ milestone and wraps T-120's API as mesh-input nodes.
   luma of the predicted shade; the seam check as a Core test on the wrench within 9°; `bevel-thin` dropped from the
   stage.
 - **T-126:** convex jaw edges at least 218; the L-block's inner edge at most 64; `blend: 2` on the curvature `uvs`
-  frames only, every other frame keeping T-121's strict block rule.
+  frames; the occlusion (`wrench-orm-uvs-occlusion`) and normal-map (`wrench-uvs-normal`) `uvs` frames have T-121's block
+  rule with `blend: 1` (the person, 2026-11-20, RV-74: strictly 96 and 3 inside pixels fail; with `blend` reading each channel
+  none does), every other frame keeping the strict rule.
 - **`bake`, all three blocks:** an `occlusion`, `bevel` or `curvature` block whose map is not asked for bakes what was
   asked and warns, e.g. `bevel: ignored, 'normal' is not in maps`, rather than refusing. It is one helper, `UnusedBlock`.
 

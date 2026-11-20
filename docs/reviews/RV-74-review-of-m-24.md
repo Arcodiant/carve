@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-74 — Review of M-24
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-24
 
@@ -145,11 +145,9 @@ description: >-
 - **Consequence:** the occlusion map changes value from texel to texel, which is the case that exposed `render_glb`'s missing mips. If the look sampled or dimmed it wrongly, or drew a normal map's RGB wrongly, no check would catch it. One stage keeps a rule that two other stages drop, and the tracker says the opposite.
 - **Severity:** Minor
 
-**Outcome:** fixed
+**Outcome:** fixed (claude-sonnet-5-5)
 
-**Fix:** (claude-opus-5-5) 7aac4e6, with the retrospective's line in the commit that answers this review; a scenario break each, no unit test. `CARVE_BAKES_BREAK=dark` reads the occlusion inverted (a reach cannot do it: with reach 1 m the grip's middle still reads 255, nothing standing over it): 2 failures, the grip's middle reading 0 against 250 and the crevice margin. `bevel-wide` bakes the normal map 20 times as wide: 380 of the 448 flat texels fail, and 2 strip checks. Both breaks are in the scenario only. The retrospective now says those two were shown failing only here.
-
-**Open:** (claude-opus-5-5) both frames fail T-121's strict rule, so a check on either needs a tolerance, which is the person's. Probed on 7aac4e6's code, with 22558 inside and 28344 outside pixels placed in each frame: `wrench-orm-uvs-occlusion` breaks it at 96 inside pixels (every one `inside-png`, up to 8 levels off, e.g. the frame 216 where the texel is 208, on the gradients of faces 64 and 65; none outside), and passes with `blend: 1` (and 2). `wrench-uvs-normal` breaks it at 3 inside pixels (faces 79, 12, 27: one channel 3 levels off N, e.g. (131, 130, 255) for (128, 128, 255)), and `blend` 1 or 2 does not clear them, since `Blended` reads grey. Options: (a) occlusion with `blend: 1` and the normal map with a per-channel slack of 3 (or a blend that reads each channel); (b) occlusion with `blend: 1` and the normal frame left unchecked; (c) both left as captures only, the retrospective's ruling line saying so. No check was added; the frames are as they were.
+**Fix:** (claude-sonnet-5-5) 9b23429, with the retrospective's rulings in the commit that answers this review; the person ruled `blend: 1` for both frames (2026-11-20). `Blended` now reads each channel against its own range (a grey image has three equal ranges, so curvature's `blend: 2` and the strict rule are unchanged). OcclusionStage checks `wrench-orm-uvs-occlusion` and BevelStage `wrench-uvs-normal` with `CheckUvImage(..., blend: 1)`: 22558 inside and 28344 outside pixels placed in each, none failing (strictly 96 and 3 did). All 66 PNGs of `scenario-bakes` are byte-identical to run 12. No existing break reaches these checks (a break changes the bake and so the PNG the frame is checked against), so each was shown failing by a temporary, uncommitted edit that checks the frame against another bake's PNG: occlusion against the ORM, normal against the base colour, each 27293 pixels failing (4735 outside, 22558 inside-png). The existing breaks `dark` (2 failures) and `bevel-g` (6) still fail as before.
 
 ### Two scenario checks were never shown failing, against "every new check was shown failing on a break"
 - **Where:** scenarios/Carve.Scenario.Bakes/OcclusionStage.cs:168 (`OpenLeast`); scenarios/Carve.Scenario.Bakes/BevelStage.cs:118-144 (`CheckFlat`); docs/milestones/M-24-baked-maps.md:175; docs/tasks/T-124-occlusion-and-the-orm-bake.md:57-60; docs/tasks/T-125-bevel-normals.md:50-53 (rubric 2, 7)
@@ -159,7 +157,7 @@ description: >-
 
 **Outcome:** fixed
 
-**Fix:** (claude-opus-5-5) 7aac4e6; a scenario check, no unit test. BevelStage keeps its own rows in `bevel.tsv` and adds the control from `RenderExportAsync`'s frames, as `BakesChecks.CompareExportAsync` does: the three-quarter `render_glb` against the front `render`, noted if it passes. On the plain run it differs in 88205 of 1048576 pixels (patch 86985) and fails, as it must; the two good pairs still pass (0 and 1 pixels).
+**Fix:** (claude-opus-5-5) 7aac4e6, with the retrospective's line in the commit that answers this review; a scenario break each, no unit test. `CARVE_BAKES_BREAK=dark` reads the occlusion inverted (a reach cannot do it: with reach 1 m the grip's middle still reads 255, nothing standing over it): 2 failures, the grip's middle reading 0 against 250 and the crevice margin. `bevel-wide` bakes the normal map 20 times as wide: 380 of the 448 flat texels fail, and 2 strip checks. Both breaks are in the scenario only. The retrospective now says those two were shown failing only here.
 
 ### The bevel stage's render_glb comparison drops the control the other two stages keep
 - **Where:** scenarios/Carve.Scenario.Bakes/BevelStage.cs:287-296 against BakesChecks.cs:321-333 (rubric 2)
@@ -169,7 +167,7 @@ description: >-
 
 **Outcome:** fixed
 
-**Fix:** (claude-opus-5-5) 7aac4e6; a scenario change, no unit test. The hard edges come from `set_shading`'s answer: the wrench is set to the smooth shading it already has (the mesh is unchanged), and the answer's `hard_edges` are the server's. `wrench.carve` is no longer read for them. The checks see the same edges as before: 448 flat texels and the same strip rows in `bevel.tsv`, and every bake and frame was byte-identical.
+**Fix:** (claude-opus-5-5) 7aac4e6; a scenario check, no unit test. BevelStage keeps its own rows in `bevel.tsv` and adds the control from `RenderExportAsync`'s frames, as `BakesChecks.CompareExportAsync` does: the three-quarter `render_glb` against the front `render`, noted if it passes. On the plain run it differs in 88205 of 1048576 pixels (patch 86985) and fails, as it must; the two good pairs still pass (0 and 1 pixels).
 
 ### The bevel stage reads hard edges by parsing the sample file on disk, not from the model through the tools
 - **Where:** scenarios/Carve.Scenario.Bakes/BevelStage.cs:96-102 (rubric 5, CLAUDE.md "never special-case the product or reach into its internals")
@@ -177,7 +175,9 @@ description: >-
 - **Consequence:** if a tool call between `open` and the bake changed hard edges (or T-71's move of hard edges onto attribute layers changed the file's shape), the checks would test the wrong edges with no error. It also sets the precedent of a scenario reading product storage directly.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 7aac4e6; a scenario change, no unit test. The hard edges come from `set_shading`'s answer: the wrench is set to the smooth shading it already has (the mesh is unchanged), and the answer's `hard_edges` are the server's. `wrench.carve` is no longer read for them. The checks see the same edges as before: 448 flat texels and the same strip rows in `bevel.tsv`, and every bake and frame was byte-identical.
 
 ### T-121's Verify line leaves out the two suites whose `uvs` look frames it changed
 - **Where:** docs/tasks/T-121-an-image-under-the-uv-layout-look.md:17 (rubric 4)
@@ -228,20 +228,3 @@ Three reviewers on Opus 5.5 read the diff in parallel, sized to its spread (abou
 **Summary (server):** Read `BakeTool.cs` whole. Read the diffs of `RenderTool.cs`, `RenderSystem.cs` (the `uvs` image draw, its release in `Make`/`Install`, the `GenerateMipmaps` load and its engine need 8 comment), `UvLayout.cs`, `LookHolder.cs`, `MaterialTools.cs`, `RenderGlbTool.cs` and `RenderQueue.cs`, plus `ToolPaths`. Read T-121's and T-122's Scope and the milestone with its rulings, and the bake and `uvs`-image tests (the regression tests read, not run). Ran the 59 unit tests of `BakeToolTests`, `BakeNormalToolTests`, `BakeOcclusionToolTests` and `UvImageArgumentTests` (all pass), and one throwaway probe class for findings 1, 2 and 4 (deleted; no repo file changed by me). The texture lifetime (rebuilt on a different image by `MaterialTexture`'s byte equality, released on `Install` or on the next `Make`), the sRGB round trip and the mipmap change agree with the code and the retrospective. Not read: T-124/T-125/T-126 in full, the Core kernel, `BevelRenderTests` and `RenderGlbSamplingTests` beyond their names. An untracked `tests/Carve.Core.Tests/ZzReviewProbeTests.cs` in the worktree is not mine; it is presumably another reviewer's probe.
 
 **Summary (whole):** I read the whole Bakes scenario (every stage, `BakesChecks.cs`, the csproj and the break switch), `UvImageFrame.cs` and its call, the `tests.json` entry against every linked file, `Carve.slnx`, the CLAUDE.md, D-7 and changelog diffs, T-123 to T-125's Scope and As built, T-154, the milestone retrospective's rulings (every threshold in code matches them) and the two refactor-pass commits. I also checked the product diff for break switches, environment reads and InternalsVisibleTo (none) and the bakes for nondeterminism (none found). `cairn lint` is clean, and the Bakes project builds with 0 warnings. I read T-120, T-122 and T-126's tracker text only for their Verify lines, did not run the unit tests or any scenario, opened no images, and could not check `samples/wrench.carve` against fps-arms (private repo; git holds it as LF text).
-
-## Hand-off
-
-The answer (claude-opus-5-5, two agents) has 18 of 19 findings answered and **Status** left Open: the block rule on the
-occlusion and normal-map `uvs` frames waits on the person (its **Open:** line has the numbers and the options). Tip after
-this commit.
-
-- **Answered by the second agent:** the bad `folder` and the case clash, listed once with the other problems; the failed
-  write naming the files; `path`'s description; render's `image` refusal listed with the other problems; a break each for
-  the two unbroken checks (`dark`, `bevel-wide`); BevelStage's `render_glb` control; hard edges through `set_shading`.
-- **Left:** the block-rule finding. Once ruled: add the `CheckUvImage` calls (their places in OcclusionStage and BevelStage
-  carry an RV-74 comment), run `scenario-bakes`, fill the outcome, remove this section and set **Status:** Answered.
-- **Checked:** `scenario-bakes` plain on the final code (run 12): passed, all 66 PNGs byte-identical with run 3, the
-  first agent's last; the text files differ only by the run folder in paths, the `ms` timings and `bevel.tsv`'s new
-  control row. 994 server unit tests pass.
-- **Surprising:** a reach does not darken the grip's middle at all (nothing stands over it), so its break reads the map
-  inverted, as `curvature`'s does.
