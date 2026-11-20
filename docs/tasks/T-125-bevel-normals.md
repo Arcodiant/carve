@@ -81,3 +81,74 @@ Render shows a rounded edge the way the game will, because the map is written in
 - The person looks at the close frames before this lands (a Waystone review). Treat "Commented" as unanswered.
 - **Verify line:** `server-regression` is named because the reconciliation test renders. Once scenario-bakes is in
   `tests.json`, add it to this file's `**Verify:**` line.
+
+### Hand-off
+
+Agent 1, Claude Opus 5.5 (2026-11-19), handing off at the call checkpoint. Commits `efb8e31`, the render test, `90c8498`.
+
+**Done**
+
+- `src/Carve.Core/Baking/BevelNormal.cs`: `Bake.BevelNormal(layout, width)` (3 channels, `ToTangentSpace / 255`, uncovered 0)
+  and `Bake.BevelWorldNormal(texel, edges, width)` as Scope says: in double, edges in `NearEdges`' order, smoothstep, a sum
+  that cancels gives N. `NearEdges`, the frame and the layout are unchanged. `BakeLayoutTests.Celled` went from private to
+  internal so the new tests could reuse it.
+- `tests/Carve.Core.Tests/BevelNormalTests.cs` (10, unit): the top edge's mean (0, 0.707, 0.707), N at or beyond the width,
+  a corner summing two edges, the L-block's concave edge, a mirrored island (red flips, green kept, the same world normal),
+  byte-identical bakes, each error.
+- `bake`: map `normal` (`<mesh>.normal.png`, RGB), block `bevel: {width}`, the description paragraph, the schema. `maps`
+  left out still means masks and base_colour (`DefaultMaps`), since `normal` has no default width. **Chosen here, and a
+  stop if it is wrong:** `bevel` without `normal` is refused, the way render refuses `image` with another mode.
+  `tests/Carve.Server.Tests/BakeNormalToolTests.cs` (11, unit).
+- `tests/Carve.Server.Tests/BevelRenderTests.cs` (regression): the reconciliation, with frames and `bevel-readings.tsv` in
+  `artifacts/bevel-tests/`. The other faces get a grey #808080 material with no map, so the top and +X shades are like
+  for like. Without it they render white.
+- `scenarios/Carve.Scenario.Bakes/BevelStage.cs` and its line in `BakesStages.cs`: the bake, the material, 14 frames, the
+  N check, the strip check, the glb comparison and both breaks wired (`bevel-thin`, `bevel-g`). The `CLAUDE.md` row clause.
+  `scenario-bakes` is on the Verify line. `tests.json` is unchanged: the stage is inside the suite's `dotnet-closure`.
+
+**Probed** (on this machine; evidence in `G:\My Drive\artifacts\carve\M-24\T-125\probe`)
+
+Render test, front view, mean Rec. 709 luma:
+
+| map | middle | top strip | +X strip | top face | +X face |
+|---|---|---|---|---|---|
+| flat | 117.54 | 117.52 | 117.49 | 127.76 | 116.53 |
+| baked | 117.54 | 125.74 (+8.20) | 113.22 (−4.33) | 127.76 | 116.53 |
+| G inverted | 117.47 | 107.15 (−10.33) | 113.12 | | |
+| R inverted | 117.67 | 125.75 | 119.61 (+1.94) | | |
+
+**Surprising: the +X strip overshoots +X's shade.** The mean normal reads darker than either face: 113.2 against 116.5
+and 117.5. T-120's probe already says so, since R+ is that normal and read 114.3. So "leaning toward +X's" fails as
+written. The test currently checks "darker by `SideLoss`" only.
+
+Options for the person (each names the one check it applies to):
+
+| check | option A | option B | option C |
+|---|---|---|---|
+| render test, top strip (`TopGain`, now 4.7 provisional) | half the probe's edge gain, 4.7 | 4 | another number |
+| render test, +X strip (`SideLoss`, now 1.6 provisional) | darker by ≥ 1.6 and drop "toward +X" (the probe puts the mean below both faces) | within 2 of the probe's R+ reading, 114.3 | another rule |
+| stage, strip between the faces (`BetweenSlack`, now 0) | 0, as written | a slack worked from the close frames once sampled | judge only edges where the colour rule puts the mean between |
+
+Stage, run 1 (`artifacts/scenarios/bakes/1`): N check 448 texels, all flat within 1 level. `render_glb` against `render` with
+the map: front 47 px differ (patch 13), three-quarter 15 px (patch 5). Both pass D-6's rule, against stage 1's 48 (15) and
+10 (3) without the map. So the map introduces no shading difference past the rule. The person should still see the
+three-quarter rise from 10 to 15.
+
+**Left**
+
+1. **The strip check samples nothing.** On jaw edge (112, 113), faces 66 and 78, only face 66's 3 × width point in view 2
+   got a reading (`bevel.tsv`); every other point fails `Geo.Inside` or `Geo.InSight`. Likely causes: the edge is short,
+   so the points at ±0.15 of its length sit near the face corners; or the ray test hits the neighbour face for a point
+   0.4 mm from the edge. Count the two failures apart, then fix the sampling. The frames `bevel-jaw-{1,2,3}[-plain].png`
+   are in `probe\frames` and have not been opened yet.
+2. **The PNG check across a seam (Scope's first check) is not written.** It needs the engine's frame at a texel, scenario
+   side: the angle-weighted smooth corner normals (`Shading`) and `Triangulator`'s triangles for T and B. `get_mesh` gives
+   neither normals nor hard edges; the stage reads the hard edges from `wrench.carve`. One option is to write the stage's
+   own restatement. Another is to put this check in `tests/Carve.Core.Tests` on the wrench (as `WrenchSampleTests` does),
+   with the layout's own frames, and ask the person whether that place will do. Its break is `bevel-thin`. The probed angle
+   then goes to the person.
+3. Run both breaks and record the failures they cause. Bring all the numbers above. Then the Waystone frame review
+   (`round-N` under the evidence folder), verify, As built, `cairn lint`, and `finish`.
+
+**Not checked:** no frame has been opened (0 of 12 images). No queued run has been made. `server-regression` has run
+only the new test, not the whole suite.
