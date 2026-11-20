@@ -33,7 +33,9 @@ description: >-
 - **Consequence:** The curvature map (and any M-29 node built on `NearEdge.Shape`) inverts wear on convex edges next to non-convex faces. Such faces are common in Carve after extrusion. The wrench escapes only because every face next to its hard edges happens to put its mean on the right side. Fix: classify from the edge direction in this face's winding and the two normals (for example the sign of `dot(cross(n1, n2), edgeDir)`), and add an asymmetric L to the test.
 - **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 3bd5c2f; `BakeLayoutTests.On_a_long_armed_l_block_only_the_inner_edge_is_concave` (the profile (0,0) (3,0) (3,1) (1,1) (1,2) (0,2): only (3, 9) is concave and the wall x = 1's cap edges are convex) fails without it. The side test now takes the direction into the other face across the edge (its normal crossed with the edge as its own winding runs it), not the other face's corner mean, so it holds for a non-convex face and does not rest on the two faces being wound alike. Every bake and frame `scenario-bakes` writes was hashed before and after (runs 1 and 2 under `artifacts/scenarios/bakes`): all 76 PNGs and every `.tsv` but the run-path and `ms` columns are byte-identical, the L-block stage and the person's approved wrench frames included, so no ruling was needed.
 
 ### A texel centre on an island's bottom or right boundary is recorded as Clamp, not Centre
 - **Where:** src/Carve.Core/Baking/BakeRaster.cs:41,66-70 (rubric 1)
@@ -41,7 +43,9 @@ description: >-
 - **Consequence:** `ClampedCount` and `BakeCoverage` overstate the clamp on layouts with edges on centre lines. Nothing baked changes today, but M-29 or a stat that reads coverage would see it.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 1de2a41; `BakeLayoutTests.A_centre_on_an_islands_right_boundary_counts_as_a_centre` fails without it. A clamped texel at distance 0 (its centre on a triangle's edge that the top-left rule gives to no one) is labelled `Centre`; its weights are the clamp's as before. No baked value reads the label, and the scenario's bakes and frames are byte-identical.
 
 ### The clamp's "nearer face wins, tie to the lower face" rule has no test
 - **Where:** tests/Carve.Core.Tests/BakeLayoutTests.cs:73-117 (rubric 2)
@@ -49,7 +53,9 @@ description: >-
 - **Consequence:** A Scope rule that T-120's Notes name as a stop is unguarded against regression.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 1de2a41; `BakeLayoutTests.A_clamped_texel_as_near_two_faces_takes_the_lower_face` fails with `<=` in pass 2's comparison (tried). Faces 5 and 1 a quarter texel either side of column 10's centres; every texel of column 10 is `Clamp` on face 1.
 
 ### Pad's cost is size² × padding, so padding near size/2 at 4096 runs for about a minute per map
 - **Where:** src/Carve.Core/Baking/BakePadding.cs:56-77 (rubric 1)
@@ -57,7 +63,9 @@ description: >-
 - **Consequence:** A legal `bake` call at 4096 with large padding (not verified, per the retrospective) runs for minutes, far past the tool's answer window. That crosses into the server reviewer's part. Either a two-pass exact distance transform (linear in size² per pass), or a lower cap on padding, would remove it.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) a7f65de; `BakePadReferenceTests.Pad_matches_the_row_scan_it_replaced_bit_for_bit` (the speed itself has no test). The row pass is now the lower envelope of one parabola per column (Felzenszwalb and Huttenlocher), with the nearest-texel and lowest-index tie rule folded into exact integer switch points; the column pass is unchanged. With one small island, padding size/2 took 27 ms at 1024, 92 ms at 2048 and 287 ms at 4096 (Debug, a throwaway timing test, deleted). Byte identity: `BakePadReferenceTests` keeps T-120's row scan verbatim and holds the new `Pad` to it bit for bit on 12 layouts (celled cube, L-block, a one-face and a two-face subset, and eight seeded layouts of quads on whole and half texels, so many texels are as near two islands) at paddings 1, 2, 3, 5, 8, 13, size/4, size/2 - 1 and size/2; turning the tie round fails it and the existing padding test. The scenario's padded maps are byte-identical.
 
 ### WrenchBevelSeamTests is tagged unit but takes about 4 s
 - **Where:** tests/Carve.Core.Tests/WrenchBevelSeamTests.cs:14-17 (rubric 6)
@@ -65,7 +73,7 @@ description: >-
 - **Consequence:** `core-unit` is slower than its tier promises. It is the largest single cost among the 51 bake tests (7 s in total).
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** skipped: (claude-opus-5-5) making it fast means baking less than the ruled map (a smaller size or width, or a face subset, which can change which texels the clamp gives each face and so the ruled 9° readings), and moving it means a new Core `regression` suite that the tier rule does not fit (it starts no `carve` and needs no device). A Nit; left for the person to place if it matters.
 
 ## Findings: the server and rendering (claude-opus-5-5)
 
@@ -83,7 +91,9 @@ description: >-
 - **Consequence:** an agent that defines a material and bakes before `set_material` gets a white base colour and no hint why. The tool's description says this case is refused.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 82127f6; `BakeToolTests.A_surface_entry_naming_a_material_no_face_uses_is_refused_with_the_meshs_names` fails without it. The surface's names are checked against the mesh's groups and the materials its faces use; the error (same words) lists those names.
 
 ### A failed write part way through leaves earlier files written, and the error does not say so
 - **Where:** src/Carve.Server/BakeTool.cs:241-247 (rubric 1)
@@ -117,7 +127,9 @@ description: >-
 - **Consequence:** a change to `ColourRule.cs`, which about ten suites share, does not change scenario-bakes' fingerprint. `verify` then carries an old pass of the bevel strip check, whose whole prediction rests on that file. This is the gap the brief names, which M-5, M-19 and M-20 each found.
 - **Severity:** Major
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) a1aee7d; a tracker fix, no test. Added to `tests.json`'s inputs, the CLAUDE.md Bakes row and the csproj comment. Every other linked file of the project (`UvsScene.cs`, `CrateBuild.cs`, `CameraPixels.cs`, `Png.cs`, `ComparisonPng.cs`, `wrench.carve`) was already an input.
 
 ### The occlusion and normal-map `uvs` frames have no block-rule check, though the retrospective says every frame but curvature keeps it
 - **Where:** scenarios/Carve.Scenario.Bakes/OcclusionStage.cs:85; scenarios/Carve.Scenario.Bakes/BevelStage.cs:81; docs/milestones/M-24-baked-maps.md:247-248 (rubric 7, 2)
@@ -157,7 +169,9 @@ description: >-
 - **Consequence:** the member's own `verify` does not re-run the two suites that capture the changed look. Only the milestone-wide run covered them.
 - **Severity:** Minor
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 28ae5ba; a doc fix, no test. T-121's `**Verify:**` now names `scenario-crate` and `scenario-uvs`.
 
 ### Two As built sections still carry an evidence path broken by a lost backslash, and the retrospective names only T-126's
 - **Where:** docs/tasks/T-123-the-bakes-scenario.md:112; docs/tasks/T-124-occlusion-and-the-orm-bake.md:152-153; docs/milestones/M-24-baked-maps.md:231 (rubric 7)
@@ -165,7 +179,9 @@ description: >-
 - **Consequence:** the evidence folder for T-124's approval is not a usable path, and the retrospective understates what still needs repair.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 28ae5ba; a doc fix, no test. T-124's path rejoined with its `\round-1`, T-123's stray line removed, and the retrospective's line on T-126 says T-123's and T-124's had the same fault and were repaired here.
 
 ### The break table is documented incompletely in two places
 - **Where:** CLAUDE.md:91 (`CARVE_BAKES_BREAK` (`swap`, `mirror`, `curvature`, `reach`, `metal`, `bevel-g`)); scenarios/Carve.Scenario.Bakes/BakesChecks.cs:37-41 (rubric 7)
@@ -173,7 +189,9 @@ description: >-
 - **Consequence:** anyone running the breaks from the docs misses one, or reads a weaker concave bound than the code holds.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 28ae5ba; a doc fix, no test. The CLAUDE.md row lists `faint` and says the L-block reads 64 or less; `BakesChecks.Break`'s summary lists every stage's break.
 
 ### T-121's block rule is written twice, and stage helpers the refactor left are duplicated
 - **Where:** scenarios/Carve.Scenario.Materials/UvImageFrame.cs:13-19, 98-162 against scenarios/Carve.Scenario.Bakes/BakesChecks.cs:66-164; BevelStage.cs:42 (`Steel = "#80858A"`, "from SurfaceStage's table"); the `groups` parse at SurfaceStage.cs:47, CurvatureStage.cs:37, OcclusionStage.cs:57, BevelStage.cs:50 (rubric 3)
@@ -181,7 +199,9 @@ description: >-
 - **Consequence:** a change to the look's rule, or to the steel colour, has to be made twice or the checks drift apart without anyone noticing.
 - **Severity:** Nit
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** (claude-opus-5-5) 28ae5ba; a refactor, no new test. In part: the four `groups` lookups are one `BakesChecks.GroupsOf`, `BevelStage` takes `SurfaceStage.SteelColour`, and `UvImageFrame`'s summary says what the check does (samples inside the islands and in the `(c + 1) / 2` padding, ten or more of each). The block rule itself is still coded once in the Materials frame and once in the Bakes checks: sharing it means linking one scenario's checks into the other's suite, left for a later pass. Every Bakes frame and file was byte-identical after the change.
 
 ## Summary
 
@@ -192,3 +212,21 @@ Three reviewers on Opus 5.5 read the diff in parallel, sized to its spread (abou
 **Summary (server):** Read `BakeTool.cs` whole. Read the diffs of `RenderTool.cs`, `RenderSystem.cs` (the `uvs` image draw, its release in `Make`/`Install`, the `GenerateMipmaps` load and its engine need 8 comment), `UvLayout.cs`, `LookHolder.cs`, `MaterialTools.cs`, `RenderGlbTool.cs` and `RenderQueue.cs`, plus `ToolPaths`. Read T-121's and T-122's Scope and the milestone with its rulings, and the bake and `uvs`-image tests (the regression tests read, not run). Ran the 59 unit tests of `BakeToolTests`, `BakeNormalToolTests`, `BakeOcclusionToolTests` and `UvImageArgumentTests` (all pass), and one throwaway probe class for findings 1, 2 and 4 (deleted; no repo file changed by me). The texture lifetime (rebuilt on a different image by `MaterialTexture`'s byte equality, released on `Install` or on the next `Make`), the sRGB round trip and the mipmap change agree with the code and the retrospective. Not read: T-124/T-125/T-126 in full, the Core kernel, `BevelRenderTests` and `RenderGlbSamplingTests` beyond their names. An untracked `tests/Carve.Core.Tests/ZzReviewProbeTests.cs` in the worktree is not mine; it is presumably another reviewer's probe.
 
 **Summary (whole):** I read the whole Bakes scenario (every stage, `BakesChecks.cs`, the csproj and the break switch), `UvImageFrame.cs` and its call, the `tests.json` entry against every linked file, `Carve.slnx`, the CLAUDE.md, D-7 and changelog diffs, T-123 to T-125's Scope and As built, T-154, the milestone retrospective's rulings (every threshold in code matches them) and the two refactor-pass commits. I also checked the product diff for break switches, environment reads and InternalsVisibleTo (none) and the bakes for nondeterminism (none found). `cairn lint` is clean, and the Bakes project builds with 0 warnings. I read T-120, T-122 and T-126's tracker text only for their Verify lines, did not run the unit tests or any scenario, opened no images, and could not check `samples/wrench.carve` against fps-arms (private repo; git holds it as LF text).
+
+## Hand-off
+
+The answer (claude-opus-5-5) stopped at its checkpoint (about 60 tool calls) with 11 of 19 findings answered and **Status** left
+Open. Tip 82127f6.
+
+- **Answered:** the five Core findings (NearEdges, the Clamp label, the clamp tie test and Pad fixed; WrenchBevelSeamTests
+  skipped), the unused material, ColourRule.cs, T-121's Verify, the evidence paths, the break table, and the duplicated
+  helpers (in part: the block rule's two copies are left, as its outcome says).
+- **Left, each still `—`:** the bad `folder` reported late and per file; the failed write part way; `path` relative for an
+  absolute `folder`; render's `image` error alone; the block rule on the occlusion and normal-map `uvs` frames (may need a
+  stop if either frame needs a blend); the two checks never shown failing (a break each); BevelStage's `render_glb` control;
+  BevelStage's hard edges through `set_shading`'s answer.
+- **Checked:** `scenario-bakes` run three times (before any fix, after NearEdges, after everything here): every PNG
+  (76 frames and textures) byte-identical; the text files differ only in the run folder's path and the `ms` timings. All
+  1389 Core tests and the 57 server bake tests pass.
+- **Surprising:** a backslash written through the shell becomes a line break in transit, as the evidence paths show; compose
+  Windows paths with `chr(92)`.
