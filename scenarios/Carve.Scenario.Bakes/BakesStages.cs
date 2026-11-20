@@ -14,5 +14,6 @@ internal static class BakesStages
     public static readonly IReadOnlyList<IBakesStage> All =
     [
         new SurfaceStage(),
+        new CurvatureStage(),
     ];
 }

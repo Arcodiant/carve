@@ -4,7 +4,7 @@ description: >-
 ---
 # T-126 — Curvature
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-123
 
-**Verify:** core-unit, server-unit
+**Verify:** core-unit, server-unit, scenario-bakes
 
 ## Goal
 
@@ -68,3 +68,34 @@ creases. M-29 layers wear and grime under it. In M-24 it is seen on the wrench's
 - The person looks at the curvature frames before this lands (a Waystone review). Treat "Commented" as unanswered.
 - **Verify line:** once scenario-bakes (T-123) is in `tests.json`, add it to this file's `**Verify:**` line, with the
   task's other suites.
+
+### As built
+
+By Claude Sonnet 5.5 (claude-sonnet-5-5): agent 1 Sonnet 5.5, agent 2 (this one) Sonnet 5.5.
+
+`Curvature.cs` (`Bake.Curvature`), the `bake` map `curvature` and block `curvature: {width}` with its errors and description paragraph,
+`CurvatureStage.cs` (wrench at 1024, width 0.003; the `uvs` frame with the map under it and its 4x jaw crop), unit tests in
+`BakeCurvatureTests` and `BakeToolTests`, and `scenario-bakes` on the Verify line.
+
+**The person's rulings (2026-11-20), landed:**
+- Convex jaw edge: a texel reads 218 or more (above 128 by at least 90), on all 120 convex jaw edges, the 71 degree ones included
+  (probed least 227, 254 on the rest).
+- Concave: the stage builds a small L-block (0.1 m arms, extruded 0.1 m) through `define_mesh` and `project_uvs` box (an `unwrap`
+  needs seams on a closed block), bakes `curvature`, takes its own `uvs` frame and a 4x crop at the inner edge, and checks a texel
+  just inside each of the two inner faces (4 and 5) reads below 128. The block is undone afterwards (two `undo`s, asserted gone), so
+  later stages see the model as before. The wrench has no concave edge (its least value is exactly 128).
+- Concave margin, the person's answer in the Waystone review (picked from 90, 64, 110): 64, so the texel reads at most 64. Probed
+  reads 4 and 14 (49 at the third texel).
+- Blend: only the curvature `uvs` frames (the wrench's and the L-block's) pass `blend: 2` to `CheckUvImage`; every other frame's check is
+  unchanged.
+- Handle's flat middle: exactly 128.
+
+**Breaks** (`CARVE_BAKES_BREAK=curvature`, each value read as 255 minus it, which is `s` inverted): fails 123 checks (120 convex, the
+flat middle 127, both L-block texels 251 and 241 against at most 64). Clean run passes. Probe note: box islands abut with no gap, so the
+concave texel is half a texel inside the face, not the one on the UV edge (which landed in a neighbouring island's convex rim).
+
+**Frames:** Waystone round 1 (wrench `uvs`, jaw 4x, L-block `uvs`, L-block inner 4x): approved, no notes. The L-block changed no wrench
+frame or bake (hash compared with a run without it). Evidence: `G:\My Drivertifacts\carve\M-24\T-126
+ound-1`.
+
+**Not checked:** the margin's slack on other block sizes or widths; the L-block frame by eye beyond a scaled look.

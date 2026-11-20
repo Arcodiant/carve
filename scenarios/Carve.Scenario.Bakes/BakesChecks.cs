@@ -69,10 +69,10 @@ internal static class BakesChecks
     /// each axis and 4 pixels or more from every face edge, whose lines are drawn over the image (T-121's placement).
     /// <para>
     /// Inside an island the frame is also held to <paramref name="worked"/>, the face's colour worked from its groups, so a bake of
-    /// the wrong colours fails even though the frame shows the PNG faithfully. Returns the counts (inside, outside).
+    /// the wrong colours fails even though the frame shows the PNG faithfully. With <paramref name="blend"/> above 0 an inside pixel may also show a blend of the texels around its own (for a grey ramp steeper than a pixel). Returns the counts (inside, outside).
     /// </para>
     /// </summary>
-    public static (int Inside, int Outside) CheckUvImage(string what, ScenarioFrame frame, SceneMesh mesh, Texels png, Func<int, (int R, int G, int B)> worked)
+    public static (int Inside, int Outside) CheckUvImage(string what, ScenarioFrame frame, SceneMesh mesh, Texels png, Func<int, (int R, int G, int B)>? worked = null, int blend = 0)
     {
         var size = frame.Width;
         double origin = size / 16.0, side = size * 7 / 8.0;
@@ -108,9 +108,8 @@ internal static class BakesChecks
                 if (face >= 0)
                 {
                     inside++;
-                    var want = worked(face);
-                    if (!Near(got, texel, 2)) (problem, kind) = ($"inside face {face}, the frame shows {got} but the PNG's texel is {texel}", "inside-png");
-                    else if (!Near(got, want, 2)) (problem, kind) = ($"inside face {face}, the frame shows {got} but the face's colour, worked from its groups, is {want}", "inside-worked");
+                    if (!Near(got, texel, 2) && !(blend > 0 && Blended(got, png, (int)Math.Floor(u * png.Width), (int)Math.Floor(v * png.Height), blend))) (problem, kind) = ($"inside face {face}, the frame shows {got} but the PNG's texel is {texel}", "inside-png");
+                    else if (worked is not null && !Near(got, worked(face), 2)) (problem, kind) = ($"inside face {face}, the frame shows {got} but the face's colour, worked from its groups, is {worked(face)}", "inside-worked");
                 }
                 else
                 {
@@ -128,6 +127,15 @@ internal static class BakesChecks
         if (wrong > 8) Note($"{what}: {wrong} pixels in all break the block rule ({string.Join(", ", kinds.Select(k => $"{k.Value} {k.Key}"))})");
         if (inside < 2000 || outside < 500) Note($"{what}: only {inside} pixels inside islands and {outside} outside could be placed");
         return (inside, outside);
+    }
+
+    /// <summary>Whether a grey frame value lies, within 2, between the least and the most of the PNG's texels within <paramref name="blend"/> texels of the sampled one: the look is minified there (a texel is under a pixel), so a steep ramp shows a blend of neighbours.</summary>
+    private static bool Blended((int R, int G, int B) got, Texels png, int x, int y, int blend)
+    {
+        int lo = 255, hi = 0;
+        for (var j = Math.Max(0, y - blend); j <= Math.Min(png.Height - 1, y + blend); j++)
+        for (var i = Math.Max(0, x - blend); i <= Math.Min(png.Width - 1, x + blend); i++) { var r = png.At(i, j).R; lo = Math.Min(lo, r); hi = Math.Max(hi, r); }
+        return got.R >= lo - 2 && got.R <= hi + 2 && got.G >= lo - 2 && got.G <= hi + 2 && got.B >= lo - 2 && got.B <= hi + 2;
     }
 
     private static bool Clear(Vector2 p, (Vector2 A, Vector2 B)[] segments, float clear)

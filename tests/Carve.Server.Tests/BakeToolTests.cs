@@ -295,4 +295,41 @@ public class BakeToolTests : FileToolTests
         Ok(await carve.CallToolAsync("define_material", """{"name":"wrench","base_colour_texture":"textures/wrench.base_colour.png"}"""));
         Ok(await carve.CallToolAsync("set_material", """{"material":"wrench","group":"all"}"""));
     }
+
+    [Fact]
+    public async Task Curvature_writes_a_grey_png_flat_ground_at_128_and_two_bakes_are_byte_identical()
+    {
+        var (carve, _) = await StartStripAsync();
+        using var scope = carve;
+        var args = """{"size":64,"maps":["curvature"],"folder":"out","curvature":{"width":0.5}}""";
+        var result = Body(Ok(await carve.CallToolAsync("bake", args)));
+        var entry = Assert.Single(result.GetProperty("files").EnumerateArray());
+        Assert.Equal("out/strip.curvature.png", entry.GetProperty("path").GetString());
+        Assert.False(entry.TryGetProperty("name", out _));
+        // A flat strip has no break edge: every covered texel is 0.5, which is 128.
+        Assert.Equal(128 / 255.0, entry.GetProperty("min").GetDouble(), 6);
+        Assert.Equal(128 / 255.0, entry.GetProperty("max").GetDouble(), 6);
+        var first = Read("out/strip.curvature.png");
+        var image = Image("out/strip.curvature.png", ColorComponents.Grey);
+        Assert.Equal(128, image.Data[32 * 64 + 6]);
+        Ok(await carve.CallToolAsync("bake", args));
+        Assert.Equal(first, Read("out/strip.curvature.png"));
+    }
+
+    [Fact]
+    public async Task Curvature_needs_a_width_above_0_and_names_each_problem()
+    {
+        var (carve, _) = await StartStripAsync();
+        using var scope = carve;
+        Assert.Contains("needs a curvature block", Refused(await carve.CallToolAsync("bake", """{"size":64,"maps":["curvature"]}""")));
+        Assert.Contains("must be greater than 0", Refused(await carve.CallToolAsync("bake", """{"size":64,"maps":["curvature"],"curvature":{"width":0}}""")));
+        Assert.Contains("must be greater than 0", Refused(await carve.CallToolAsync("bake", """{"size":64,"maps":["curvature"],"curvature":{"width":-0.1}}""")));
+        Assert.Contains("expected a number", Refused(await carve.CallToolAsync("bake", """{"size":64,"maps":["curvature"],"curvature":{"width":"wide"}}""")));
+        Assert.Contains("required but missing", Refused(await carve.CallToolAsync("bake", """{"size":64,"maps":["curvature"],"curvature":{}}""")));
+        Assert.Contains("'depth' is not a curvature field", Refused(await carve.CallToolAsync("bake", """{"size":64,"maps":["curvature"],"curvature":{"width":1,"depth":2}}""")));
+        Assert.Contains("expected {width}", Refused(await carve.CallToolAsync("bake", """{"size":64,"maps":["curvature"],"curvature":3}""")));
+        // Not asked for, a good block is harmless and the default maps still need none.
+        Ok(await carve.CallToolAsync("bake", """{"size":64,"maps":["masks"],"curvature":{"width":1}}"""));
+        Ok(await carve.CallToolAsync("bake", """{"size":64}"""));
+    }
 }
