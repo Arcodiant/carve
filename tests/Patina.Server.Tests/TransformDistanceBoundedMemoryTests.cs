@@ -19,6 +19,13 @@ public class TransformDistanceBoundedMemoryTests
     /// <summary>The floor's 4 x 4 tiles' mask, measured inside at range 0.1.</summary>
     public const string Measured = """{"version":1,"size":256,"seed":7,"nodes":{"t":{"type":"tiles","params":{"count":[4,4],"gap":0.06,"bevel":0}},"d":{"type":"distance","inputs":{"in":"t.mask"},"params":{"range":0.1}},"out":{"type":"output","inputs":{"in":"d"},"params":{"role":"height"}}}}""";
 
+    /// <summary>
+    /// How long the export may take before the test gives up: a hang guard, not a time mark. The person ruled
+    /// (2026-11-20) that T-138 records its 8192 times and T-155 asserts the 10 s; distance at range 0.1 in a debug
+    /// patina takes well over the 10 minutes this once allowed, so the bound on the peak needs the run to finish.
+    /// </summary>
+    private static readonly TimeSpan Deadline = TimeSpan.FromMinutes(120);
+
     [Fact]
     public Task A_30_degree_turn_of_a_colour_fbm_at_8192_peaks_at_2_GB_or_less() => ExportAsync("turn", Turned, "base_colour");
 
@@ -67,7 +74,7 @@ public class TransformDistanceBoundedMemoryTests
                 Assert.True(said.EndsWith("no faults: it evaluates", StringComparison.Ordinal), said);
 
             var clock = Stopwatch.StartNew();
-            var result = await Send(3, "tools/call", JsonSerializer.Serialize(new { name = "export", arguments = new { folder = "big", size = 8192, outputs = new[] { role } } }), TimeSpan.FromMinutes(10));
+            var result = await Send(3, "tools/call", JsonSerializer.Serialize(new { name = "export", arguments = new { folder = "big", size = 8192, outputs = new[] { role } } }), Deadline);
             clock.Stop();
             process.Refresh();
             var peak = process.PeakWorkingSet64;
