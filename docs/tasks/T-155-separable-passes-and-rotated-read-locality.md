@@ -4,7 +4,7 @@ description: >-
 ---
 # T-155 — Separable passes and rotated-read locality
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
