@@ -34,7 +34,8 @@ internal static class BakesChecks
 
     /// <summary>
     /// <c>CARVE_BAKES_BREAK</c>: <c>swap</c> bakes the base colour with <c>steel</c> and <c>red</c> swapped (the checks still expect
-    /// the right colours); <c>mirror</c> works every render sample through a camera mirrored left to right.
+    /// the right colours); <c>faint</c> bakes <c>steel</c> a dimmer grey and <c>red</c> a duller red, under the ruled steel margin
+    /// and red lead but still grey and still red-leading; <c>mirror</c> works every render sample through a camera mirrored left to right.
     /// </summary>
     public static string? Break { get; } = Environment.GetEnvironmentVariable("CARVE_BAKES_BREAK");
 
