@@ -105,7 +105,7 @@ fails. Nothing is ruled yet.
   - `bake` gains maps `occlusion` and `orm`, the `occlusion` block (`rays`, `reach`, `occluders`) and `ms` per file. The
     default maps stay `masks` and `base_colour`, since `reach` has no default. The description has a new paragraph and the
     example uses `orm` in both slots.
-  - Tests: `OcclusionTests` (14, unit) and `BakeOcclusionToolTests` (18, unit). T-122's example test now expects the ORM.
+  - Tests: `OcclusionTests` (13, unit) and `BakeOcclusionToolTests` (17 cases, unit). T-122's example test now expects the ORM.
   - `OcclusionStage.cs` and its line in `BakesStages.cs`. The `CLAUDE.md` Bakes row has a clause for it, and
     `scenario-bakes` is on the Verify line.
 - **The wrench has no jaw opening.** It is a ratchet: separate solids stacked, with no concave edge. Its one crevice is
