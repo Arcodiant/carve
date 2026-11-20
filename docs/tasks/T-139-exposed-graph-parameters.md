@@ -4,7 +4,7 @@ description: >-
 ---
 # T-139 — Exposed graph parameters
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -75,3 +75,71 @@ with `export` without editing the graph.
   `SwatchTool.cs` and `ExportTool.cs` in wave 3. T-137 and T-138 run beside it and touch none of them.
 - **Stop and ask:** a rule the spec does not settle (an exposed parameter driving a list kind, say), or a committed
   PNG that changes.
+- **Ruled (2026-11-20, by the person)**, the three the spec left open:
+  - a graph parameter that drives a list (`Floats`, `Colours`) or a `Name` stays a fault;
+  - an `IntPair` may be driven, with one range for both components;
+  - a whole-number range narrowed by a non-whole `min` or `max` rounds inward.
+
+### As built
+
+Built by Claude Opus 5.5 (`claude-opus-5-5`), in two agents: the first wrote the format, faults, tools and content and
+handed off at its call checkpoint; the second rebased onto M-28 (T-134's and T-153's Layout lines kept beside this one),
+wrote the scenario stage, fixed the sheet title, and took the review.
+
+**For T-140 and T-141: the one function.** `GraphParameters.WithOverrides(graph, overrides, registry)` (`src/Patina.Graphs/GraphParameters.cs`)
+takes a `TextureGraph` and overrides by name (`IReadOnlyDictionary<string, ParamValue>`) and returns
+`OverrideResult(Graph, Error)`: the graph with each override set as the parameter's value, or an error naming the
+parameter and its range (`parameters['mortar']: is 0.5, but must be a number from 0 to 0.2`; an unknown name lists the
+parameters). It does not change the graph given. `GraphParameters.Of(graph, registry)` gives each parameter not at fault
+as `ExposedParameter(Name, Kind, Range, Value, Drives)`; `Range` is a `ParamSpec` named after the parameter, so its
+`Check` and `Describe` give the words. A `graph` node (T-140) should read its settings by name and call `WithOverrides`
+on the inner graph; `check` (T-141) should take its `parameters` argument through
+`ParameterOverrides.TryApply(tool, graph, JsonElement?, registry, out graph, out overrides, out error)`
+(`src/Patina.Server/ParameterOverrides.cs`), as `swatch` and `export` do, and name the overrides with
+`GraphParameters.Describe(overrides)` (`mortar 0.08, tint "#7a7a70"`).
+
+**Format** (version 2 through T-134's `TexGraphFormat`: `Current = Version1.With(ParametersField.Instance)`): `parameters`
+is written after `seed` and before `nodes`, one parameter a line in name order, keys in the order `value`, `drives`,
+`min`, `max`, the last two left out when absent; `drives` in the order given. A driven node parameter is left out of its
+node by the writer; `TexGraphFile.WriteShowingDriven` is get_graph's form (`"gap": { "driven_by": "mortar" }`), and `Read`
+takes it back (a `driven_by` naming a parameter that does not drive it is a load error). A graph without parameters is
+written as version 1, byte for byte as before. The exposed parameter's range is the intersection of the driven
+parameters' ranges (an enum's common choices), narrowed by `min` and `max`; the person's three rulings are in Notes.
+
+**Faults** (`GraphParameters.Analyse`, appended by `GraphValidator` after the node faults; `GraphFault` gained a fifth field,
+`GraphParameter`, with `Node` null). Each starts `parameters['<name>']: `; the full table is
+`ExposedParametersTests.FaultCases`: an unknown node or parameter (listing what there is), a drive not `"<node>.<param>"`,
+an empty `drives`, two kinds (`drives 'layout.gap', a number, and 'paint.colour', a colour; ...`), an empty range, a value
+out of range, a node parameter driven by two parameters or named twice, `min`/`max` on a kind without order, a bad name,
+and a list or `Name` driven. The rulings are tested: `A_floats_or_colours_parameter_cannot_be_driven`,
+`A_list_parameter_cannot_be_driven` (a `Name`), and an `IntPair` driven with min 1.5 and max 8.5 read as 2 to 8. A driven node parameter takes the parameter's value and its own value in the node is not
+checked.
+
+**Tools:** edit_graph `set_parameter`, `remove_parameter` (the driven parameters keep the value as their own) and
+`set_parameters`, all or nothing; get_graph lists each parameter's kind, range, value and drives, and shows driven node
+parameters as `driven_by`; swatch and export take `parameters` overrides (the sheet's title and caption, the sphere's
+caption and export's first line name them). Each description's worked example is run as written by
+`ExposedParameterToolTests`.
+
+**Sheet title** (found at review): a title naming overrides ran past the 512 px a cell's label takes and was cut there.
+`LabelAtlas.TitleWidth` lets the title row draw to the atlas's width; a title that fits draws the same pixels (all 22
+existing frames and PNGs equal by hash). Unit test: `ExposedParameterToolTests.LongTitleIsNotCutAtACellLabelsWidth`.
+
+**Content:** `samples/graphs/bricks.texgraph` is version 2 exposing `jitter`, `mortar` and `tint` at their old values; every
+committed PNG kept its SHA-256. `tools/Patina.SampleGraphs` has a variant list and writes
+`samples/graphs/bricks/variants/grey/` (mortar 0.08, tint `#7a7a70`); a unit test holds it equal. D-7's open question is
+added as answered; CLAUDE.md's Patina Layout line names `GraphParameters`.
+
+**Scenario** (`SwatchStage.BricksAsync`): the bricks opened, exported at 256 with and without the grey overrides, each equal
+byte for byte to the committed PNGs; frames `swatch-bricks-sheet` and `swatch-bricks-grey-sheet` (1544 x 538), every flat
+and tiled cell checked against the exported texels; the grey caption names the overrides and the plain one does not; the
+grey title has text past x 560. The break, made in the scenario: the grey sheet judged against the plain bricks' texels
+must fail its base colour flat and tiled cells (logged to `swatch-checks.tsv`).
+
+**Checked:** patina-unit and scenario-patina pass through `cairn task T-139 verify`. The frames, compared by hash against
+job `J-20261120-063443-d8a47b` (scenario-patina on M-28's tip, Mantorok) and this branch's job
+`J-20261120-064049-481cfd` (Xellotath): the 22 existing frames and PNGs are equal on both machines; the only frames
+added are the two bricks sheets. **The person approved the grey variant's look** (Waystone, round 1, 2026-11-20).
+
+**Surprising:** `ExportToolTests.Other_tools_answer_while_an_export_runs` timed out once on Xellotath (a call cancelled
+at 39 s) and passed when run again on the same runner. It is a timing test, and nothing in this member touches it.

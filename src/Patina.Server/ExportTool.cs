@@ -52,6 +52,9 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         + "Worked example, after open of samples/graphs/planks.texgraph (<folder> is the absolute path of textures/planks under patina's working directory):\n"
         + "export " + Worked + "\nreturns, a line for each file:\n"
         + WorkedHead + "\n- base_colour.png: 1024x1024, <bytes> bytes, slot base_colour_texture\n- normal.png: 1024x1024, <bytes> bytes, slot normal_texture\n"
+        + "parameters: the graph's exposed parameters to set for this export only, by name (get_graph lists them and their ranges); the graph is not changed, the first line names them, and a value out of range is refused naming the parameter and its range, writing nothing. "
+        + "The files equal those of the same values set in the graph with edit_graph's set_parameters, byte for byte.\n"
+        + "Worked example, after open of samples/graphs/bricks.texgraph: export " + WorkedParameters + " writes its four outputs as grey stone bricks (equal to samples/graphs/bricks/variants/grey/) and its first line is:\n" + WorkedParametersHead + "\n"
         + "Worked example, after define_graph's metal plate (<folder> is the absolute path of textures/plate):\n"
         + "export " + WorkedMetal + "\nreturns:\n" + WorkedMetalResult;
 
@@ -65,11 +68,17 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
             ["items"] = new JsonObject { ["type"] = "string" },
             ["description"] = "The outputs to write, each a role (base_colour, normal, roughness, occlusion, height; metallic is written in roughness.png) or a named output's name; default every output the graph has.",
         },
+        ["parameters"] = new JsonObject { ["type"] = "object", ["description"] = ParameterOverrides.Description },
     }, "folder");
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? folder = null, JsonElement? size = null, JsonElement? outputs = null, CancellationToken cancellationToken = default)
+    /// <summary>The overrides' worked example (T-139), on the bricks: grey stone bricks written without editing the graph.</summary>
+    public const string WorkedParameters = """{"folder":"textures/bricks_grey","parameters":{"mortar":0.08,"tint":"#7a7a70"}}""";
+
+    public const string WorkedParametersHead = "export: wrote 4 files to <folder> at size 256, parameters mortar 0.08, tint \"#7a7a70\"";
+
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? folder = null, JsonElement? size = null, JsonElement? outputs = null, JsonElement? parameters = null, CancellationToken cancellationToken = default)
     {
-        if (Unknown("export", context, "folder", "size", "outputs") is { } unknown) return unknown;
+        if (Unknown("export", context, "folder", "size", "outputs", "parameters") is { } unknown) return unknown;
         if (!TryText("export", "folder", folder, out var folderText, out var bad)) return bad!;
         if (string.IsNullOrWhiteSpace(folderText)) return Error("export: folder is missing; give the folder to write the PNGs into, such as textures/planks");
         TextureGraph graph;
@@ -87,6 +96,8 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
             var faults = GraphValidator.Validate(graph, registry);
             if (faults.Count > 0)
                 return Error($"export: refused: the graph has {Faults(faults)}\nAn export needs a graph that evaluates; fix them with edit_graph, then export again. Nothing was written.");
+            if (!ParameterOverrides.TryApply("export", graph, parameters, registry, out graph, out var overrides, out var overrideError))
+                return Error(overrideError! + ". Nothing was written.");
 
             var pixels = graph.Size;
             if (size is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } given)
@@ -182,7 +193,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                     : "no Carve slot (a named output)";
                 lines.Add($"- {OutputRoles.FileOf(role)}: {pixels}x{pixels}, {length.ToString(CultureInfo.InvariantCulture)} bytes{(replaced ? " (replaced)" : "")}, {slot}");
             }
-            return Line($"export: wrote {Count(lines.Count, "file")} to {target} at size {pixels}\n" + string.Join("\n", lines));
+            return Line($"export: wrote {Count(lines.Count, "file")} to {target} at size {pixels}{(overrides.Count == 0 ? "" : ", parameters " + GraphParameters.Describe(overrides))}\n" + string.Join("\n", lines));
         }
         finally
         {

@@ -6,3 +6,4 @@
 - T-134: Texture graphs gain metallic (packed into the glTF metallic-roughness image), height and named outputs, list parameters and format version 2's machinery, with export and the swatch sheet showing them
 - T-153: A node can ask for an input's rectangle after reading another input, so warp at a large amount reads the few tiles its offsets reach rather than a box widened by the whole amount
 - T-137: blur and gradient_map nodes, and samples/graphs/painted-metal.texgraph with its PNGs
+- T-139: A graph declares named parameters that drive its node parameters, and swatch and export take overrides, so one graph gives variants; the bricks sample exposes mortar, tint and jitter

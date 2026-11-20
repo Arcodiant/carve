@@ -138,6 +138,7 @@ internal sealed class SwatchStage : IPatinaStage
             $"swatch: the roughness-0 sphere's peak luma {peaks[0]:0.0} is not {HighlightStep} above the roughness-1 sphere's {peaks[1]:0.0}: no highlight");
 
         await MetalPlateAsync(driver, checks, read);
+        await BricksAsync(driver, checks);
 
         await BreaksAsync(driver, checks, sample, read, spheres, sheet, small, tiled, seam);
     }
@@ -396,6 +397,78 @@ internal sealed class SwatchStage : IPatinaStage
             $"swatch: the metallic-1 grey-200 sphere (median luma {lit[1].Median:0.0}, {lit[1].Clipped} px at 255) does not read metallic against metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px): the rule is a median {MetallicStep} lower and more px at 255");
         // The break, made here: metallic 0 judged against itself must fail the rule.
         checks.Check(!MetallicReads(lit[0], lit[0]), "swatch: the metallic rule passes metallic 0 against itself");
+    }
+
+    /// <summary>
+    /// The bricks and their grey variant (T-139): <c>samples/graphs/bricks.texgraph</c> opened, exported at 256 without and with
+    /// the overrides <see cref="GreyOverrides"/>, each export equal byte for byte to the committed PNGs (the bricks' own, and
+    /// <c>bricks/variants/grey/</c>); then each drawn as a sheet, a column per output in role order, every flat and tiled cell
+    /// judged against its export's texels, and the grey sheet's caption naming the overrides. The break, made here: the grey
+    /// sheet judged against the plain bricks' texels must fail its base colour cells, so the overrides reach the picture.
+    /// </summary>
+    private static async Task BricksAsync(ScenarioDriver driver, PatinaChecks checks)
+    {
+        var samples = Path.Combine(RepoRoot(), "samples", "graphs");
+        await checks.CallAsync("open", JsonSerializer.Serialize(new { path = Path.Combine(samples, "bricks.texgraph") }));
+        var variants = new (string Name, string Committed, object? Overrides)[]
+        {
+            ("bricks", Path.Combine(samples, "bricks"), null),
+            ("bricks-grey", Path.Combine(samples, "bricks", "variants", "grey"), JsonNode.Parse(GreyOverrides)),
+        };
+        var texels = new Dictionary<string, Dictionary<string, byte[]>>();
+        var sheets = new Dictionary<string, ScenarioFrame>();
+        foreach (var (name, committed, overrides) in variants)
+        {
+            var folder = Path.Combine(driver.RunFolder, $"swatch-{name}-texels");
+            await checks.CallAsync("export", overrides is null
+                ? JsonSerializer.Serialize(new { folder, size = 256 })
+                : JsonSerializer.Serialize(new { folder, size = 256, parameters = overrides }));
+            foreach (var role in Roles)
+            {
+                var (made, kept) = (Path.Combine(folder, role + ".png"), Path.Combine(committed, role + ".png"));
+                checks.Check(File.Exists(made) && File.Exists(kept) && File.ReadAllBytes(made).AsSpan().SequenceEqual(File.ReadAllBytes(kept)),
+                    $"swatch: {name}'s exported {role}.png is not {kept} byte for byte");
+            }
+            texels[name] = Roles.ToDictionary(r => r, r => Readback.Decode(Path.Combine(folder, r + ".png"), 256));
+            var sheet = await driver.CaptureToolAsync("swatch", $"swatch-{name}-sheet", overrides is null ? (object)new { size = 256 } : new { size = 256, parameters = overrides });
+            sheets[name] = sheet;
+            CheckBricksSheet(checks, name, sheet, texels[name]);
+        }
+        var caption = sheets["bricks-grey"].Caption ?? "";
+        checks.Check(caption.Contains("parameters mortar 0.08, tint \"#7a7a70\"", StringComparison.Ordinal), "swatch: the grey bricks sheet's caption does not name the overrides: " + caption);
+        checks.Check(!(sheets["bricks"].Caption ?? "").Contains("parameters", StringComparison.Ordinal), "swatch: the plain bricks sheet's caption names parameters: " + sheets["bricks"].Caption);
+        // The title naming the overrides runs past the 512 px a cell's label may take; it must be drawn, not cut there.
+        checks.Check(Bright(sheets["bricks-grey"], 560, 0, 200, SheetTop - 2), "swatch: the grey bricks sheet's title has no text past x 560: the overrides are cut from it");
+
+        var probe = new PatinaChecks(driver);
+        CheckBricksSheet(probe, "bricks-grey", sheets["bricks-grey"], texels["bricks"]);
+        File.AppendAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), "\nbreak overrides-not-applied (the grey sheet against the plain bricks' texels):\n" + string.Join("\n", probe.Failures.Select(f => "  " + f)) + "\n");
+        foreach (var cell in new[] { "flat", "tiled" })
+            checks.Check(probe.Failures.Any(f => f.StartsWith($"swatch: bricks-grey sheet base_colour {cell}:", StringComparison.Ordinal)),
+                $"swatch: the break overrides-not-applied was not caught by the grey sheet's base_colour {cell} cell");
+    }
+
+    /// <summary>The grey variant's overrides (T-139): wider mortar and a grey stone tint, as <c>tools/Patina.SampleGraphs</c> writes it.</summary>
+    private const string GreyOverrides = """{"mortar":0.08,"tint":"#7a7a70"}""";
+
+    /// <summary>A bricks sheet at 256: four columns in role order, each flat cell 1:1 and each tiled cell 3 x 3 scaled into 256, then the sphere cell.</summary>
+    private static void CheckBricksSheet(PatinaChecks checks, string name, ScenarioFrame sheet, Dictionary<string, byte[]> texels)
+    {
+        var width = Roles.Length * 258 + 512;
+        if (sheet.Width != width || sheet.Height != 538)
+        {
+            checks.Check(false, $"swatch: the {name} sheet is {sheet.Width} x {sheet.Height}, not {width} x 538");
+            return;
+        }
+        for (var column = 0; column < Roles.Length; column++)
+        {
+            var image = texels[Roles[column]];
+            var left = column * 258;
+            CheckRegion(checks, $"{name} sheet {Roles[column]} flat", sheet, left, 24, 256, 256, LabelBand, (x, y) => image.AsSpan((y * 256 + x) * 4, 4));
+            CheckRegion(checks, $"{name} sheet {Roles[column]} tiled", sheet, left, 282, 256, 256, LabelBand,
+                (x, y) => image.AsSpan((Under(y, 256, 768) % 256 * 256 + Under(x, 256, 768) % 256) * 4, 4));
+            checks.Check(Bright(sheet, left, 24, 256, LabelBand) && Bright(sheet, left, 282, 256, LabelBand), $"swatch: {name} sheet column {Roles[column]} has no label text");
+        }
     }
 
     /// <summary>The metallic rule (T-134, approved by the person): the diffuse light goes, so the median inside luma drops by <see cref="MetallicStep"/> or more, and the highlight, the sky reflected, clips over more pixels.</summary>

@@ -10,7 +10,12 @@ namespace Patina.Graphs;
 /// names a port that node has not, a required input missing; then each cycle (naming the nodes on it), each input
 /// given the wrong kind (greyscale where colour is wanted, or the other way), an output given both a role and a name, a
 /// name that is a role's, two outputs with one role or one name, a metallic output with no roughness to be packed with,
-/// and no output at all. Every input whose source is a node of a known type is checked for kinds, even when another input of its node
+/// and no output at all; then each exposed parameter's faults (T-139), in name order, each naming it
+/// (<c>parameters['mortar']: ...</c>, <see cref="GraphFault.GraphParameter"/>): a bad name, no drives, a drive that is not
+/// <c>"node.param"</c> or names no node or no parameter, a node parameter driven twice, a kind that cannot be driven (a
+/// list or a name), two kinds in one parameter, min or max on a kind that is not a number, no range in common, and a
+/// value out of the range. A node parameter a parameter drives takes its value, and its own value in the node is not
+/// checked. Every input whose source is a node of a known type is checked for kinds, even when another input of its node
 /// is at fault or its node is on a cycle; a fault does not cascade: an input whose source is missing, of unknown type or on a cycle is not kind-checked,
 /// nor is anything its kind would decide (a port whose kind it could change, and what that port feeds).
 /// </summary>
@@ -23,6 +28,8 @@ public static class GraphValidator
     {
         var a = new GraphAnalysis();
         var ids = string.Join(", ", graph.Nodes.Keys);
+        // The exposed parameters first: what they drive takes their value, and its own value in the node is not checked.
+        var exposed = GraphParameters.Analyse(graph, registry);
 
         foreach (var (id, node) in graph.Nodes)
         {
@@ -34,15 +41,23 @@ public static class GraphValidator
                 a.Fault(id, null, null, $"node '{id}': unknown type '{node.Type}'; the types are {string.Join(", ", registry.Names)}");
                 continue;
             }
+            var values = new Dictionary<string, ParamValue>(node.Params, StringComparer.Ordinal);
+            foreach (var spec in type.Parameters)
+                if (exposed.DrivenBy.ContainsKey((id, spec.Name)))
+                {
+                    values.Remove(spec.Name);
+                    if (exposed.Values.TryGetValue((id, spec.Name), out var drivenValue)) values[spec.Name] = drivenValue;
+                }
             foreach (var (name, value) in node.Params)
             {
+                if (exposed.DrivenBy.ContainsKey((id, name))) continue;
                 var spec = type.Parameter(name);
                 if (spec is null)
                     a.Fault(id, null, name, $"node '{id}' parameter '{name}': {type.Name} has no such parameter; its parameters are {List(type.Parameters.Select(p => p.Name))}");
                 else if (spec.Check(value) is { } wrong)
                     a.Fault(id, null, name, $"node '{id}' parameter '{name}' {wrong}");
             }
-            var resolved = new ResolvedNode(id, type, new NodeParameters(type, node.Params));
+            var resolved = new ResolvedNode(id, type, new NodeParameters(type, values));
             resolved.Connected.UnionWith(node.Inputs.Keys);
             var faultsBefore = a.Faults.Count;
             var sourceOfUnknownType = false;
@@ -94,6 +109,7 @@ public static class GraphValidator
         Cycles(a);
         Kinds(a);
         Outputs(a, graph);
+        a.Faults.AddRange(exposed.Faults);
         return a;
     }
 
