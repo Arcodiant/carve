@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-123
 
-**Verify:** core-unit, server-unit
+**Verify:** core-unit, server-unit, scenario-bakes
 
 ## Goal
 
@@ -90,3 +90,63 @@ occlusion, roughness and metallic from bakes alone.
 - The person looks at the occlusion frames before this lands (a Waystone review). Treat "Commented" as unanswered.
 - **Verify line:** once scenario-bakes (T-123) is in `tests.json`, add it to this file's `**Verify:**` line, with the
   task's other suites.
+
+### Hand-off
+
+Agent 1, Claude Opus 5.5 (2026-11-19). Status: **QUESTION**. The numbers are below for the person to rule, and one check
+fails. Nothing is ruled yet.
+
+- **Done and committed.**
+  - Core: `RayCaster.cs` (a median-split BVH; closest hit; both sides block) and `BakeOcclusion.cs`. `Bake.Occlusion`
+    uses a Fibonacci-spiral cosine-weighted set, turned per texel by T-77's hash of `y × size + x`, with falloff
+    `1 − (t / reach)²` and value 1 − mean, and no curve. `Bake.Orm`, `Bake.OcclusionOffset` and `Bake.OcclusionDirections`.
+  - The offset rule is 1e-5 × max(box diagonal, largest absolute coordinate) over the occluders and the baked mesh. On the
+    wrench that is about 2.5 µm. The wrench at 256 with 8 rays has 0 self-hits.
+  - `bake` gains maps `occlusion` and `orm`, the `occlusion` block (`rays`, `reach`, `occluders`) and `ms` per file. The
+    default maps stay `masks` and `base_colour`, since `reach` has no default. The description has a new paragraph and the
+    example uses `orm` in both slots.
+  - Tests: `OcclusionTests` (14, unit) and `BakeOcclusionToolTests` (18, unit). T-122's example test now expects the ORM.
+  - `OcclusionStage.cs` and its line in `BakesStages.cs`. The `CLAUDE.md` Bakes row has a clause for it, and
+    `scenario-bakes` is on the Verify line.
+- **The wrench has no jaw opening.** It is a ratchet: separate solids stacked, with no concave edge. Its one crevice is
+  the steel square drive (faces 100 to 105) standing between the dark ring under the head (face 99) and the socket top
+  (face 118). The stage uses that crevice as "the jaw's inside corner" (`socket-top-by-drive`: texels of face 118 within
+  1.5 mm outside the drive's footprint). It replaces "the jaw from inside its opening" with `wrench-orm-drive-close`. The
+  open texel is the middle of grip facet 5, within 2 mm of its centre. **The person to confirm or redirect.**
+- **Probe** (job-less local runs 1 to 3 on this machine, Debug build; files in `G:\My Drive\artifacts\carve\M-24\T-124\probe`):
+
+  | region (8-bit occlusion) | n | min | mean | max |
+  |---|---|---|---|---|
+  | socket-top-by-drive (the crevice) | 818 | 103 | 133.7 | 183 |
+  | ring-under-by-drive | 818 | 100 | 130.9 | 187 |
+  | head-top-by-ring | 2001 | 91 | 186.5 | 223 |
+  | drive-sides-middle | 1950 | 188 | 202.1 | 218 |
+  | grip-facet-5-middle (open) | 123 | 255 | 255 | 255 |
+  | crevice margin (open min − crevice max) | | | 72 | |
+  | under break `reach` (0.0001): crevice | 818 | 255 | 255 | 255 (margin 0) |
+
+- **Timing**, wrench at 1024 with 32 rays, inside `carve` (Debug, as the suites build it): occlusion **8268 ms** (7354
+  and 8517 in the break runs), orm 365 ms. This is under the 10 s budget, with little room.
+- **Options to rule** (each names its check):
+
+  | check | option A | option B | option C |
+  |---|---|---|---|
+  | crevice darker than the grip's middle (`CreviceMargin`) | ≥ 36 (half of 72) | ≥ 50 | ≥ 60 |
+  | open texel near 1 (`OpenLeast`) | = 255 | ≥ 250 | ≥ 240 |
+  | ORM G and B exact | as built: exact bytes (break `metal`: 271418 of 497040 texels differ) | | |
+
+  Both constants are `null` in `OcclusionStage.cs` until ruled, so the stage only probes them now. Break `reach` drives
+  the margin to 0, so any option above catches it.
+- **Failing: render against `render_glb` with the full material.** Three-quarter: 215 px differ, largest patch 54. D-6's
+  rule allows a patch of 50. Front: 315 px, patch 39, a pass. With reach 0.0001 (occlusion about 1) the comparison
+  passes, and stage 1's comparison still passes (48 and 10 px). So the occlusion texture is what `render` and
+  `render_glb` disagree on. This is not investigated yet. It could be how `render` builds the material's occlusion
+  against the loader's, or filtering. Loosening the rule is the person's call, not ours.
+- **Left:**
+  - find the render/`render_glb` occlusion difference;
+  - land the ruled numbers and show each break failing (breaks `reach` and `metal` are wired);
+  - the Waystone frame review (11 frames, `wrench-orm-*`, plus the two `compare/good-wrench-orm-*` triptychs). No frame
+    has been opened yet;
+  - `### As built`, `cairn lint` and `finish`.
+- **Not checked:** a Release-build timing, and part transforms. Occluders use each mesh's stored positions, as Scope
+  says; a multi-part model's part offsets are not applied.

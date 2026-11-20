@@ -277,7 +277,8 @@ public class BakeToolTests : FileToolTests
 
         var files = result.GetProperty("files").EnumerateArray().ToArray();
         Assert.Equal(["rubber", "steel", "dark", "red", "black", "all"], files.Where(f => f.GetProperty("map").GetString() == "masks").Select(f => f.GetProperty("name").GetString()));
-        Assert.Equal(7, files.Length);
+        Assert.Equal(8, files.Length);
+        Assert.Equal("textures/wrench.orm.png", Entry(result, "orm").GetProperty("path").GetString());
         Assert.All(files, f => Assert.True(File.Exists(Path.Combine(Root, f.GetProperty("path").GetString()!))));
         var colour = Entry(result, "base_colour");
         Assert.Equal(1024, colour.GetProperty("size").GetInt32());
@@ -292,7 +293,7 @@ public class BakeToolTests : FileToolTests
         Assert.Contains(((byte)0, (byte)0, (byte)0), distinct); // beyond the padding
         Assert.Equal(4, distinct.Count);
 
-        Ok(await carve.CallToolAsync("define_material", """{"name":"wrench","base_colour_texture":"textures/wrench.base_colour.png"}"""));
+        Ok(await carve.CallToolAsync("define_material", """{"name":"wrench","base_colour_texture":"textures/wrench.base_colour.png","metallic_roughness_texture":"textures/wrench.orm.png","occlusion_texture":"textures/wrench.orm.png"}"""));
         Ok(await carve.CallToolAsync("set_material", """{"material":"wrench","group":"all"}"""));
     }
 
