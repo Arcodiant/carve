@@ -71,10 +71,44 @@ public abstract class NodeType
     /// </summary>
     public abstract void Evaluate(NodeEvaluation evaluation);
 
+    /// <summary>The input port name under which <see cref="EvaluateColumns"/> reads the row pass's tiles.</summary>
+    public const string RowsPort = "rows";
+
+    /// <summary>
+    /// Opting in to separable passes (T-155): non-null when, for these parameters and size, the node runs as a row pass
+    /// (<see cref="EvaluateRows"/>, reading every input over the tile widened by <see cref="SeparablePasses.RowReach"/>
+    /// in x only) and a column pass (<see cref="EvaluateColumns"/>, reading the row pass's tiles, as
+    /// <see cref="RowsPort"/>, over the tile widened by <see cref="SeparablePasses.ColumnReach"/> in y only). The
+    /// evaluator caches the row pass's tiles as a kind of their own, of the node's output kind, evicted and made again
+    /// like any other, so the node's cost grows with its radius rather than its square. Only a node with the one output
+    /// <c>out</c> and no <see cref="DependsOn"/> may opt in. Null by default: the node is made by <see cref="Evaluate"/>,
+    /// which an opted-in node still implements (both passes in one) so that tests can hold the two equal.
+    /// </summary>
+    public virtual SeparablePasses? Separable(NodeParameters parameters, int size) => null;
+
+    /// <summary>
+    /// The row pass of a node that opts in through <see cref="Separable"/>: fills <see cref="NodeEvaluation.Rect"/> of
+    /// <c>Output()</c>, the intermediate, from its inputs read over the tile widened in x. The same rules as
+    /// <see cref="Evaluate"/>: worked from image coordinates, the same bytes every time it is asked.
+    /// </summary>
+    public virtual void EvaluateRows(NodeEvaluation evaluation) =>
+        throw new NotSupportedException($"node type {Name} does not run as separable passes");
+
+    /// <summary>
+    /// The column pass of a node that opts in through <see cref="Separable"/>: fills <see cref="NodeEvaluation.Rect"/>
+    /// of <c>Output()</c> from <c>Input(RowsPort)</c>, the row pass's tiles over the tile widened in y. It reads no
+    /// other input.
+    /// </summary>
+    public virtual void EvaluateColumns(NodeEvaluation evaluation) =>
+        throw new NotSupportedException($"node type {Name} does not run as separable passes");
+
     public ParamSpec? Parameter(string name) => Parameters.FirstOrDefault(p => p.Name == name);
 
     public InputPort? Input(string name) => Inputs.FirstOrDefault(p => p.Name == name);
 }
+
+/// <summary>How far a separable node's row pass reads its inputs in x, and its column pass the row pass's tiles in y, in texels (T-155).</summary>
+public sealed record SeparablePasses(int RowReach, int ColumnReach);
 
 /// <summary>An input port: its name, what it takes, and whether a graph must connect it.</summary>
 public sealed record InputPort(string Name, PortKind Kind, bool Required = true);
