@@ -120,7 +120,7 @@ occlusion, roughness and metallic from bakes alone.
     byte-identical; if any changes, stop and report. The `render-glb-sampling-tests` frames are new, expected.
   - Run `scenario-bakes --fresh`: the ruled checks and the T-123/T-124 comparison numbers (`differences.tsv`,
     `orm-differences.tsv`); record the new stage-1 numbers. Show breaks `reach` and `metal` failing (`CARVE_BAKES_BREAK`).
-  - `cairn task T-124 verify`, then the Waystone review (round-1 under `G:\My Drivertifacts\carve\M-24\T-124ound-1`),
+  - `cairn task T-124 verify`, then the Waystone review (round-1 under `G:\My Drive\artifacts\carve\M-24\T-124\round-1`),
     then As built, `cairn lint`, `finish`.
 - **Not checked yet:** server-unit and core-unit as whole suites after the rebase; the bake stage after the fix.
 
