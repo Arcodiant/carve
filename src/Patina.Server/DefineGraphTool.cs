@@ -38,6 +38,12 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
     public const string WorkedStones =
         """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"stones":{"type":"worley","params":{"cells":[6,6],"jitter":0.85}},"stone":{"type":"colour","params":{"colour":"#8c857a"}},"base":{"type":"blend","inputs":{"a":"stone","b":"stones.random"},"params":{"mode":"multiply"}},"out":{"type":"output","inputs":{"in":"base"},"params":{"role":"base_colour"}}}}}""";
 
+    /// <summary>A worked example of blur and gradient_map: value noise softened by a blur, then coloured by a map of three stops. Tests run it as written.</summary>
+    public const string WorkedMap =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"cloud":{"type":"fbm","params":{"cells":[4,4],"octaves":4}},"soft":{"type":"blur","inputs":{"in":"cloud"},"params":{"radius":0.02,"quality":"smooth"}},"tint":{"type":"gradient_map","inputs":{"in":"soft"},"params":{"positions":[0,0.5,1],"colours":["#1c2b24","#4a6b52","#b9c9a8"]}},"out":{"type":"output","inputs":{"in":"tint"},"params":{"role":"base_colour"}}}}}""";
+
+    public const string WorkedMapResult = "define_graph: the open graph is now 4 nodes, size 256, seed 0; no faults: it evaluates";
+
     public static string Text(NodeRegistry registry) =>
         "Replaces the open texture graph with a whole new one, given as graph: the body of a .texgraph file, as JSON. "
         + "patina holds one graph per session. define_graph clears the snapshot stack (push_snapshot) and the graph's path (save gives it one), "
@@ -67,6 +73,9 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         + "Worked example, a tone per stone (worley's random output, one grey for each of 6 x 6 cells; a type with several outputs is named \"id.port\") on a stone colour:\n"
         + "define_graph " + WorkedStones + "\n"
         + "returns: " + WorkedResult + "\n"
+        + "Worked example, a mossy colour from a soft cloud (fbm noise, blurred, then coloured by a gradient_map: positions and colours are lists of the same length, the greyscale 0 taking the first colour and 1 the last):\n"
+        + "define_graph " + WorkedMap + "\n"
+        + "returns: " + WorkedMapResult + "\n"
         + "Worked example, a metal plate: grey, metallic from a gradient across u, roughness its inverse, and a named output edge (a triangle gradient down v):\n"
         + "define_graph " + WorkedMetal + "\n"
         + "returns: " + WorkedMetalResult + "\n"
