@@ -19,7 +19,7 @@ public sealed class HeightToNormalNode : NodeType
 
     public override IReadOnlyList<ParamSpec> Parameters { get; } = [ParamSpec.Float("strength", 0, 1000, 1)];
 
-    public override int Radius(NodeParameters parameters, int size) => 1;
+    public override TexelRect InputRect(string port, TexelRect output, NodeParameters parameters, int size) => output.Inflate(1);
 
     public override PortKind OutputKind(string port, IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters) => PortKind.Colour;
 
@@ -39,8 +39,8 @@ public sealed class HeightToNormalNode : NodeType
         var strength = e.Parameters.Float("strength");
         var h = e.Input("height")!;
         var output = e.Output();
-        for (var y = e.Y0; y < e.Y0 + e.Rows; y++)
-            for (var x = 0; x < e.Size; x++)
+        for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
+            for (var x = e.Rect.X; x < e.Rect.Right; x++)
             {
                 var n = Normal(h.Grey(x - 1, y), h.Grey(x + 1, y), h.Grey(x, y - 1), h.Grey(x, y + 1), e.Size, strength);
                 output.SetColour(x, y, n.X, n.Y, n.Z);

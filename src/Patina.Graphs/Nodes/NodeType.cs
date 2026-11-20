@@ -5,8 +5,8 @@ using Patina.Graphs.Imaging;
 namespace Patina.Graphs.Nodes;
 
 /// <summary>
-/// A kind of node, registered in a <see cref="NodeRegistry"/> rather than switched on: its ports, its parameters, its
-/// neighbourhood radius and its evaluation. One class per type, in a file of its own. A type made outside this package
+/// A kind of node, registered in a <see cref="NodeRegistry"/> rather than switched on: its ports, its parameters, the
+/// rectangle of each input it reads and its evaluation. One class per type, in a file of its own. A type made outside this package
 /// (M-29's mesh nodes, a test's) is registered the same way, with <see cref="NodeRegistry.With"/>.
 /// <para>Every parameter must be relative to the image (cells across, repeats across, slope per image width), so that
 /// a graph gives the same picture at every size; and evaluation must be deterministic: integer hashing, <c>float</c>
@@ -26,10 +26,13 @@ public abstract class NodeType
     public abstract IReadOnlyList<ParamSpec> Parameters { get; }
 
     /// <summary>
-    /// How many texels around a texel the node reads from its inputs, in each direction (0 for a pointwise node). The
-    /// evaluator asks its inputs for these many more rows above and below the band, wrapping around the image.
+    /// The rectangle of input <paramref name="port"/> that filling <paramref name="output"/> reads, in logical texels
+    /// (it may run past the image on any side; reads wrap). By default <paramref name="output"/> itself: a pointwise
+    /// node. A neighbourhood node returns <paramref name="output"/> widened by its radius
+    /// (<see cref="TexelRect.Inflate(int)"/>); a transform the bounding box of the output's corners mapped back
+    /// (<see cref="TexelRect.Bounding"/>). Reading outside it throws.
     /// </summary>
-    public virtual int Radius(NodeParameters parameters, int size) => 0;
+    public virtual TexelRect InputRect(string port, TexelRect output, NodeParameters parameters, int size) => output;
 
     /// <summary>What an output port carries, given what each connected input carries (an absent optional input is not in <paramref name="inputs"/>).</summary>
     public abstract PortKind OutputKind(string port, IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters);
@@ -41,8 +44,11 @@ public abstract class NodeType
     public virtual IEnumerable<(string Port, string Message)> CheckInputKinds(IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters) => [];
 
     /// <summary>
-    /// Fills rows <see cref="NodeEvaluation.Y0"/> to <see cref="NodeEvaluation.Y0"/> + <see cref="NodeEvaluation.Rows"/> - 1,
-    /// every column, of each output band, from input bands that hold those rows widened by <see cref="Radius"/>.
+    /// Fills every texel of <see cref="NodeEvaluation.Rect"/>, a tile inside the image, in each output port, from input
+    /// reads that hold what <see cref="InputRect"/> asked for. A node works each texel from its image coordinates and
+    /// <see cref="NodeEvaluation.Size"/>, never from its place in the tile: tiles come in no promised order, of any size,
+    /// and a tile may be asked for more than once (it must come out the same); a type is one instance shared by every
+    /// node and call, so it keeps no state between calls.
     /// </summary>
     public abstract void Evaluate(NodeEvaluation evaluation);
 
