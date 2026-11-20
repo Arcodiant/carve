@@ -14,9 +14,10 @@ namespace Patina.Server;
 /// What the sphere wears and the sheet labels: <paramref name="Images"/> by role (base colour, normal, roughness as the
 /// packed metallic-roughness image, occlusion; a missing role takes the material's default), and <paramref name="Metallic"/>
 /// when the roughness image carries the graph's metallic in B (the material's metallic factor is then 1, else 0), and
-/// <paramref name="Tiling"/>, the whole repeats of every map in u and v over the sphere (T-156; 1 draws the sphere as it always was).
+/// <paramref name="Tiling"/>, the whole repeats of every map in u and v over the sphere (T-156; 1 draws the sphere as it always was),
+/// and <paramref name="Cube"/>, which draws the cube (T-157) in the sphere's place, turned by <see cref="SwatchCube.Orientation"/>.
 /// </summary>
-public sealed record SwatchSpec(IReadOnlyDictionary<OutputRole, byte[]> Images, int Size, float Angle, IReadOnlyList<string>? Labels, bool Metallic = false, int Tiling = 1);
+public sealed record SwatchSpec(IReadOnlyDictionary<OutputRole, byte[]> Images, int Size, float Angle, IReadOnlyList<string>? Labels, bool Metallic = false, int Tiling = 1, bool Cube = false);
 
 /// <summary>The sphere view and, when labels were asked, the label atlas and each label's measured extent; RGBA, sRGB.</summary>
 public sealed record SwatchFrame(byte[] Sphere, byte[]? Atlas, IReadOnlyList<Vector2>? Extents);
@@ -89,6 +90,7 @@ internal sealed class SwatchSystem(
     private const string Scene = "patina";
 
     private Entity? _sphere;
+    private Entity? _cube;
     private bool _composed;
     private Texture[] _textures = [];
     private IAssetHolder? _holder;
@@ -140,6 +142,19 @@ internal sealed class SwatchSystem(
         });
         entities.AddComponent(sphere, new Transform3D { Position = Vector3.Zero, Orientation = Quaternion.Identity, Scale = Vector3.One });
         _sphere = sphere;
+
+        // The cube (T-157) waits beside the sphere on no layer; a cube request shows it and hides the sphere.
+        var cube = scenes.CreateEntity(Scene);
+        entities.AddComponent(cube, new MeshInstance
+        {
+            Mesh = resources.CreateMesh(SwatchCube.Mesh()),
+            Material = Material.Pbr(Vector4.One, 0, 1, null!, null!, null!, null!, null!, Vector3.Zero, 1, false),
+            Mode = RenderMode.Mode3D,
+            RenderLayerMask = RenderLayerMask.None,
+            CastsShadow = false,
+        });
+        entities.AddComponent(cube, new Transform3D { Position = Vector3.Zero, Orientation = Quaternion.Identity, Scale = Vector3.One });
+        _cube = cube;
     }
 
     private void Serve(SwatchRequest request)
@@ -148,10 +163,10 @@ internal sealed class SwatchSystem(
         {
             var spec = request.Spec;
             Dress(spec);
-            var instance = _sphere!.Value;
+            var instance = (spec.Cube ? _cube : _sphere)!.Value;
             // The world matrix is written too: the transform system has run this tick already, and the frame drawn below
             // would otherwise show the last request's turn.
-            var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, spec.Angle * MathF.PI / 180);
+            var turn = spec.Cube ? SwatchCube.Orientation(spec.Angle) : Quaternion.CreateFromAxisAngle(Vector3.UnitY, spec.Angle * MathF.PI / 180);
             entities.GetComponent<Transform3D>(instance).Orientation = turn;
             entities.GetOrAddComponent<WorldTransform>(instance) = new WorldTransform { Matrix = Matrix4x4.CreateFromQuaternion(turn) };
 
@@ -225,10 +240,14 @@ internal sealed class SwatchSystem(
         _textures = [.. made];
         _holder = residency.CreateHolder("patina swatch sphere");
         _holder.Hold(material);
-        ref var instance = ref entities.GetComponent<MeshInstance>(_sphere!.Value);
-        instance.Material = material;
         // Tiling n repeats every map n times in u and v: the instance's atlas rect widened to n x n, the sampler repeating. At 1 it is the whole texture.
-        instance.AtlasRect = new UvRect(0, 0, spec.Tiling, spec.Tiling);
-        instance.RenderLayerMask = RenderLayerMask.All;
+        // The shape asked for is drawn and the other is hidden, both wearing this material.
+        foreach (var (entity, shown) in new[] { (_sphere!.Value, !spec.Cube), (_cube!.Value, spec.Cube) })
+        {
+            ref var instance = ref entities.GetComponent<MeshInstance>(entity);
+            instance.Material = material;
+            instance.AtlasRect = new UvRect(0, 0, spec.Tiling, spec.Tiling);
+            instance.RenderLayerMask = shown ? RenderLayerMask.All : RenderLayerMask.None;
+        }
     }
 }

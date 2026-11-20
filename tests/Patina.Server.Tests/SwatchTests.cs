@@ -90,18 +90,21 @@ public class SwatchTests
     [InlineData("""{"size":100}""", "swatch: size 100 is not a power of two from 32 to 2048")]
     [InlineData("""{"size":16}""", "swatch: size 16 is not a power of two from 32 to 2048")]
     [InlineData("""{"size":"big"}""", "swatch: size is a whole number, a power of two from 32 to 2048, not a string \"big\"")]
-    [InlineData("""{"view":"side"}""", "swatch: view is 'side'; give sheet, flat, tiled or sphere")]
+    [InlineData("""{"view":"side"}""", "swatch: view is 'side'; give sheet, flat, tiled, sphere or cube")]
     [InlineData("""{"output":"normal"}""", "swatch: output is for flat and tiled; the sheet shows every output")]
-    [InlineData("""{"view":"flat","angle":90}""", "swatch: angle turns the sphere, for sheet and sphere; flat has none")]
+    [InlineData("""{"view":"flat","angle":90}""", "swatch: angle turns the sphere or cube, for sheet, sphere and cube; flat has none")]
     [InlineData("""{"view":"sphere","angle":1e300}""", "swatch: angle 1e300 is out of range; angle is a number of degrees")]
     [InlineData("""{"view":"flat","output":"emissive"}""", "swatch: the graph has no emissive output; its outputs are base_colour, normal, roughness, occlusion")]
     [InlineData("""{"view":"flat","output":"Edge!"}""", "swatch: output is 'Edge!'; give a role (base_colour, normal, roughness, metallic, occlusion, height) or a named output's name")]
     [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle, tiling, parameters")]
-    [InlineData("""{"view":"flat","tiling":3}""", "swatch: tiling repeats the sphere's maps, for sheet and sphere; flat has none")]
+    [InlineData("""{"view":"flat","tiling":3}""", "swatch: tiling repeats the maps over the sphere or cube, for sheet, sphere and cube; flat has none")]
     [InlineData("""{"view":"sphere","tiling":0}""", "swatch: tiling 0 is out of range; give a whole number from 1 to 8")]
     [InlineData("""{"view":"sphere","tiling":9}""", "swatch: tiling 9 is out of range; give a whole number from 1 to 8")]
     [InlineData("""{"view":"sphere","tiling":2.5}""", "swatch: tiling is a whole number from 1 to 8, not a number 2.5")]
     [InlineData("""{"view":"sphere","tiling":"3"}""", "swatch: tiling is a whole number from 1 to 8, not a string \"3\"")]
+    [InlineData("""{"view":"cube","tiling":9}""", "swatch: tiling 9 is out of range; give a whole number from 1 to 8")]
+    [InlineData("""{"view":"cube","output":"normal"}""", "swatch: output is for flat and tiled; the cube shows every output")]
+    [InlineData("""{"view":"cube"}""", "swatch: " + PatinaHarness.NoEngine)]
     [InlineData("""{"view":"sphere"}""", "swatch: " + PatinaHarness.NoEngine)]
     [InlineData("""{"view":"sphere","tiling":3}""", "swatch: " + PatinaHarness.NoEngine)]
     [InlineData("""{}""", "swatch: " + PatinaHarness.NoEngine)]
@@ -121,6 +124,32 @@ public class SwatchTests
         Assert.Equal("swatch: the graph has no normal output; its outputs are base_colour", await patina.Refused("swatch", """{"view":"flat","output":"normal"}"""));
         await patina.Ok("define_graph", """{"graph":{"version":1,"size":64,"seed":0,"nodes":{"out":{"type":"output","inputs":{"in":"nothing"}}}}}""");
         Assert.StartsWith("swatch: the graph does not evaluate; fix it first. 1 fault:\n- node 'out' input 'in': names 'nothing'", await patina.Refused("swatch", """{"view":"flat"}"""));
+    }
+
+    [Fact]
+    public void The_sphere_cells_label_names_the_tiling_only_when_it_is_not_1()
+    {
+        Assert.Equal("sphere, Pbr, carve lights, angle 0", SwatchSheet.Labels("t", PlanksRoles, 0)[^1]);
+        Assert.Equal("sphere, Pbr, carve lights, angle 0", SwatchSheet.Labels("t", PlanksRoles, 0, 1)[^1]);
+        Assert.Equal("sphere, Pbr, carve lights, angle 90, tiling 3", SwatchSheet.Labels("t", PlanksRoles, 90, 3)[^1]);
+    }
+
+    [Fact]
+    public void The_cube_is_six_faces_each_with_uvs_0_to_1_and_outward_normals()
+    {
+        var mesh = SwatchCube.Mesh();
+        Assert.Equal(24, mesh.VertexCount);
+        Assert.Equal(36, mesh.IndexCount);
+        for (var f = 0; f < 6; f++)
+        {
+            var corners = mesh.Vertices.Skip(f * 4).Take(4).ToArray();
+            Assert.Equal([new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1), new Vector2(1, 1)], corners.Select(c => c.TexCoord));
+            // Each corner lies on the face's own plane, half an edge out along its normal.
+            Assert.All(corners, c => Assert.Equal(SwatchCube.Edge / 2, Vector3.Dot(c.Position, c.Normal), 4));
+            // Triangles wind with the engine's sphere: the cross product of the edges points into the cube.
+            var t = mesh.Indices!.Skip(f * 6).Take(3).Select(i => mesh.Vertices[(int)i].Position).ToArray();
+            Assert.True(Vector3.Dot(Vector3.Cross(t[1] - t[0], t[2] - t[0]), corners[0].Normal) < 0);
+        }
     }
 
     [Fact]
@@ -162,6 +191,8 @@ public class SwatchTests
     {
         // The sphere needs an engine, so the drawn example is the scenario's (literals there); the refusal runs in the harness.
         Assert.Equal("""{"view":"sphere","tiling":3}""", SwatchTool.WorkedTiling);
+        Assert.Equal("""{"view":"cube","tiling":3}""", SwatchTool.WorkedCube);
+        Assert.Contains("swatch " + SwatchTool.WorkedCube + " returns an image and:\n" + SwatchTool.WorkedCubeResult, SwatchTool.Text, StringComparison.Ordinal);
         Assert.Contains("swatch " + SwatchTool.WorkedTiling + " returns an image and:\n" + SwatchTool.WorkedTilingResult, SwatchTool.Text, StringComparison.Ordinal);
         Assert.Contains("swatch " + SwatchTool.WorkedTilingRefused + " returns:\n" + SwatchTool.WorkedTilingRefusedResult, SwatchTool.Text, StringComparison.Ordinal);
     }

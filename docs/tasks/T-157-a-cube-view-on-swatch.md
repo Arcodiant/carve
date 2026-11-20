@@ -4,7 +4,7 @@ description: >-
 ---
 # T-157 — A cube view on swatch
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -43,3 +43,19 @@ see flat faces, the edges where faces meet, and a texel density near a game's.
   and a cube, with 3 x 3 tiling. T-156 gave the sphere a tiling option; this task adds the cube, as a new M-28 member.
   T-142, which commits each sample's swatch sheet, waits on it.
 - Sonnet: the scope is concrete.
+
+### As built
+
+Built and verified on Sonnet 5.5 (`claude-sonnet-5-5`), over two sessions.
+
+- `swatch` `view: cube` (`src/Patina.Server/SwatchCube.cs`): 24 vertices, each face its own UVs 0..1, flat normals, turned 35
+  degrees about y plus `angle`, leaned 25 degrees toward the camera, so the front, left and top show. Built in Patina.Server
+  (no engine need). `tiling` 1 to 8 as on the sphere; the cube and sphere wear the one material. The sheet is unchanged.
+- The sphere cell's label names the tiling when it is not 1 (byte-identical at 1).
+- Tests: label, cube geometry, refusals, worked example. Scenario (`SwatchCubeCheck.cs`) predicts each visible face from
+  geometry and exported texels at tiling 1, 3 and angle 20, 0.5 % wrong per face; five seeded breaks are all caught.
+- Frames: all 43 PNGs of the baseline job equal by SHA-256.
+- Review: floor-tiles on the sphere and the cube at tiling 3 and 1 (`G:\My Drivertifacts\carve\M-28\T-157
+ound-1`),
+  approved by the person in round 1.
+- Verify passed after rebasing onto T-138 (patina-unit, scenario-patina).
