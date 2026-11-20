@@ -4,7 +4,7 @@ description: >-
 ---
 # M-24 — Baked maps
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *Carve bakes occlusion, bevel normals and id masks into a mesh's UV layout as PNGs a material can name*
 
