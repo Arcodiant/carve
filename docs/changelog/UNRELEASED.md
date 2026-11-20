@@ -7,3 +7,4 @@
 - T-153: A node can ask for an input's rectangle after reading another input, so warp at a large amount reads the few tiles its offsets reach rather than a box widened by the whole amount
 - T-137: blur and gradient_map nodes, and samples/graphs/painted-metal.texgraph with its PNGs
 - T-139: A graph declares named parameters that drive its node parameters, and swatch and export take overrides, so one graph gives variants; the bricks sample exposes mortar, tint and jitter
+- T-156: swatch takes a sphere tiling (whole repeats, default 1), so a material can be judged on the sphere at a texel density nearer a game's; the samples' committed sheets use 3
