@@ -143,7 +143,11 @@ public static class SwatchSheet
 {
     /// <summary>The labels in atlas order: the title, then per column the flat and the tiled cell's, then the sphere's.</summary>
     public static IReadOnlyList<string> Labels(string title, IReadOnlyList<OutputRole> roles, float angle) =>
-        [title, .. roles.SelectMany(r => new[] { OutputRoles.Name(r), OutputRoles.Name(r) + " 3 x 3" }),
+        Labels(title, [.. roles.Select(OutputRoles.Name)], angle);
+
+    /// <summary>The labels for a sheet whose columns are <paramref name="outputs"/>, roles' names and named outputs' names, in sheet order.</summary>
+    public static IReadOnlyList<string> Labels(string title, IReadOnlyList<string> outputs, float angle) =>
+        [title, .. outputs.SelectMany(r => new[] { r, r + " 3 x 3" }),
             $"sphere, Pbr, carve lights, angle {angle.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}"];
 
     /// <param name="images">Each output's RGBA, <paramref name="size"/> a side, in role order.</param>

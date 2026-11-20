@@ -24,6 +24,8 @@ public class SwatchTests
         return patina;
     }
 
+    private static readonly IReadOnlyList<OutputRole> PlanksRoles = [OutputRole.BaseColour, OutputRole.Normal, OutputRole.Roughness, OutputRole.Occlusion];
+
     private static byte[] Texels(OutputRole role, int size)
     {
         var graph = TexGraphFile.Read(Planks, NodeRegistry.BuiltIn).Graph!;
@@ -92,7 +94,8 @@ public class SwatchTests
     [InlineData("""{"output":"normal"}""", "swatch: output is for flat and tiled; the sheet shows every output")]
     [InlineData("""{"view":"flat","angle":90}""", "swatch: angle turns the sphere, for sheet and sphere; flat has none")]
     [InlineData("""{"view":"sphere","angle":1e300}""", "swatch: angle 1e300 is out of range; angle is a number of degrees")]
-    [InlineData("""{"view":"flat","output":"emissive"}""", "swatch: output is 'emissive'; give base_colour, normal, roughness or occlusion")]
+    [InlineData("""{"view":"flat","output":"emissive"}""", "swatch: the graph has no emissive output; its outputs are base_colour, normal, roughness, occlusion")]
+    [InlineData("""{"view":"flat","output":"Edge!"}""", "swatch: output is 'Edge!'; give a role (base_colour, normal, roughness, metallic, occlusion, height) or a named output's name")]
     [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle")]
     [InlineData("""{"view":"sphere"}""", "swatch: " + PatinaHarness.NoEngine)]
     [InlineData("""{}""", "swatch: " + PatinaHarness.NoEngine)]
@@ -118,13 +121,13 @@ public class SwatchTests
     public void The_sheet_lays_out_as_agreed_flat_over_tiled_with_labels_from_the_atlas()
     {
         var size = 64;
-        var images = OutputRoles.All.Select(r => Texels(r, size)).ToList();
+        var images = PlanksRoles.Select(r => Texels(r, size)).ToList();
         var sphere = new byte[512 * 512 * 4];
         Array.Fill(sphere, (byte)7);
         // An atlas whose rows are all text (coverage 1): every label box comes out white.
         var atlas = new byte[LabelAtlas.Size * LabelAtlas.Size * 4];
         Array.Fill(atlas, (byte)255);
-        var labels = SwatchSheet.Labels("planks.texgraph   64 px   seed 77", OutputRoles.All, 0);
+        var labels = SwatchSheet.Labels("planks.texgraph   64 px   seed 77", PlanksRoles, 0);
         Assert.Equal(["planks.texgraph   64 px   seed 77", "base_colour", "base_colour 3 x 3", "normal", "normal 3 x 3", "roughness", "roughness 3 x 3",
             "occlusion", "occlusion 3 x 3", "sphere, Pbr, carve lights, angle 0"], labels);
         var extents = labels.Select(_ => new Vector2(40, 12)).ToList();

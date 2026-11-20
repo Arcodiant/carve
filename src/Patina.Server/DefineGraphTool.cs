@@ -16,6 +16,12 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
 
     public const string WorkedResult = "define_graph: the open graph is now 4 nodes, size 256, seed 0; no faults: it evaluates";
 
+    /// <summary>T-134's metal plate: a grey plate, metallic from a gradient (packed into roughness.png's B), and a named output <c>edge</c>; export's and swatch's examples use it too.</summary>
+    public const string WorkedMetal =
+        """{"graph":{"version":1,"size":64,"seed":0,"nodes":{"plate":{"type":"colour","params":{"colour":"#c8c8c8"}},"ramp":{"type":"gradient"},"rough":{"type":"levels","inputs":{"in":"ramp"},"params":{"out_low":0.7,"out_high":0.3}},"band":{"type":"gradient","params":{"axis":"v","shape":"triangle"}},"out_base":{"type":"output","inputs":{"in":"plate"}},"out_rough":{"type":"output","inputs":{"in":"rough"},"params":{"role":"roughness"}},"out_metal":{"type":"output","inputs":{"in":"ramp"},"params":{"role":"metallic"}},"out_edge":{"type":"output","inputs":{"in":"band"},"params":{"name":"edge"}}}}}""";
+
+    public const string WorkedMetalResult = "define_graph: the open graph is now 8 nodes, size 64, seed 0; no faults: it evaluates";
+
     /// <summary>The same graph with out's input misspelt: accepted, and the fault named.</summary>
     public const string WorkedFaulty =
         """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"wood":{"type":"colour","params":{"colour":"#aa7040"}},"tone":{"type":"noise","params":{"cells":[8,1],"interpolation":"step"}},"base":{"type":"blend","inputs":{"a":"wood","b":"tone"},"params":{"mode":"multiply"}},"out":{"type":"output","inputs":{"in":"bsae"},"params":{"role":"base_colour"}}}}}""";
@@ -36,17 +42,20 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         "Replaces the open texture graph with a whole new one, given as graph: the body of a .texgraph file, as JSON. "
         + "patina holds one graph per session. define_graph clears the snapshot stack (push_snapshot) and the graph's path (save gives it one), "
         + "and returns the graph's faults: none means it evaluates. A graph with faults is still taken, so edit_graph can fix it, but save refuses it until it has none. "
-        + "A graph is {\"version\": 1, \"size\": S, \"seed\": N, \"nodes\": {id: node}}: version is 1; size is the size the images are evaluated at, "
+        + "A graph is {\"version\": 1, \"size\": S, \"seed\": N, \"nodes\": {id: node}}: version is 1 (2 is read too, and written only for what later versions add); size is the size the images are evaluated at, "
         + TextureGraph.SizesText + "; seed, 0 to 4294967295, is the graph's seed, which every noise adds its own seed to, so the same graph gives the same pixels on every run. "
         + "Ids and port names are lower case, [a-z][a-z0-9_]*. A node is {\"type\": T, \"inputs\": {port: source}, \"params\": {name: value}}, inputs and params left out when empty; "
         + "a source is the id of another node (\"id.port\" for a type with several outputs); a parameter left out takes its default. "
-        + "A value is a number, a string, or an array of numbers. All of it is image-relative and tiles: an image tiled across a surface shows no seam. "
-        + "The images are the output nodes': one per role (base_colour, normal, roughness, occlusion), and a graph needs at least one. "
+        + "A value is a number, a string, or an array of numbers or of strings (a list parameter: [0, 0.5, 1], or [\"#202020\", \"#c0a080\"] of colours). All of it is image-relative and tiles: an image tiled across a surface shows no seam. "
+        + "The images are the output nodes': one per role (base_colour, normal, roughness, metallic, occlusion, height), and a graph needs at least one. "
+        + "metallic, greyscale, is packed into roughness.png's blue channel (glTF's metallic-roughness image: R 255, G roughness, B metallic; B is 0 without a metallic output), so a graph with metallic needs a roughness output too; "
+        + "height, greyscale, is written as height.png (Carve does not use it yet). "
+        + "An output may give a name ([a-z][a-z0-9_]*, not a role's) in place of a role: an extra image, greyscale or colour, written as <name>.png, such as a mask; export and swatch take it by its name. "
         + "A fault names the node and the input port or parameter it is on, and says what would be right (the types, the ids, the range): "
-        + "an unknown type, a source naming no node, a cycle, a greyscale/colour mismatch, a required input not connected, an unknown parameter or one out of range, two outputs with one role. "
+        + "an unknown type, a source naming no node, a cycle, a greyscale/colour mismatch, a required input not connected, an unknown parameter or one out of range, two outputs with one role or one name, an output with both a role and a name, a metallic output with no roughness. "
         + "The node types:\n"
         + NodeCatalogue.Text(registry)
-        + "A graph that is not a .texgraph body (a missing or unknown key, a value of the wrong kind, a version other than 1, a bad size or seed) is refused, naming what is wrong, and the open graph is unchanged. "
+        + "A graph that is not a .texgraph body (a missing or unknown key, a value of the wrong kind, a version other than 1 or 2, a bad size or seed) is refused, naming what is wrong, and the open graph is unchanged. "
         + "Returns one line: the open graph's nodes, size and seed, then its faults, one a line.\n"
         + "Worked example, a tone per stave (eight staves across u, one random grey each) on a wood colour:\n"
         + "define_graph " + Worked + "\n"
@@ -58,6 +67,9 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         + "Worked example, a tone per stone (worley's random output, one grey for each of 6 x 6 cells; a type with several outputs is named \"id.port\") on a stone colour:\n"
         + "define_graph " + WorkedStones + "\n"
         + "returns: " + WorkedResult + "\n"
+        + "Worked example, a metal plate: grey, metallic from a gradient across u, roughness its inverse, and a named output edge (a triangle gradient down v):\n"
+        + "define_graph " + WorkedMetal + "\n"
+        + "returns: " + WorkedMetalResult + "\n"
         + "Next: edit_graph to change it, get_graph to read it back, save to keep it.";
 
     public static McpServerTool Create(NodeRegistry registry) => Create<DefineGraphTool>("define_graph", Text(registry), new JsonObject
