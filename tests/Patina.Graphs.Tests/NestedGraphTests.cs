@@ -163,6 +163,129 @@ public sealed class NestedGraphTests : IDisposable
         Assert.Equal(OutputImage.Rgba8(new GraphEvaluator(set), "base_colour", 256), OutputImage.Rgba8(new GraphEvaluator(outer), "base_colour", 256));
     }
 
+    /// <summary>The person's ruling (2026-11-20): an outer exposed parameter drives a value on a graph node, "wall.mortar".</summary>
+    private static string PassThrough(string parameter) => $$"""
+        {
+          "version": 2,
+          "size": 256,
+          "seed": 21,
+          "parameters": {
+            {{parameter}}
+          },
+          "nodes": {
+            "base": { "type": "output", "inputs": { "in": "wall.base_colour" } },
+            "wall": { "type": "graph", "params": { "path": "bricks" } }
+          }
+        }
+        """;
+
+    private TextureGraph BricksWith(double mortar)
+    {
+        var bricks = Load(Path.Combine(_dir, "bricks.texgraph"));
+        return GraphParameters.WithOverrides(bricks, new Dictionary<string, ParamValue> { ["mortar"] = ParamValue.Of(mortar) }).Graph!;
+    }
+
+    [Fact]
+    public void An_outer_parameter_drives_a_graph_nodes_parameter_with_the_nested_range()
+    {
+        // The worked case: old-wall's kind of graph exposing mortar, which drives bricks' own mortar (0 to 0.45, its layout's gap) through the node.
+        File.Copy(Path.Combine(Samples.Folder, "bricks.texgraph"), Path.Combine(_dir, "bricks.texgraph"));
+        var outer = Load(Put("wall.texgraph", PassThrough("\"mortar\": { \"value\": 0.06, \"drives\": [\"wall.mortar\"] }")));
+        Assert.Empty(GraphValidator.Validate(outer));
+        var mortar = GraphParameters.Of(outer)["mortar"];
+        Assert.Equal((ParamKind.Float, 0.0, 0.45), (mortar.Kind, mortar.Range.Min, mortar.Range.Max));
+        Assert.Equal(OutputImage.Rgba8(new GraphEvaluator(BricksWith(0.06)), "base_colour", 256), OutputImage.Rgba8(new GraphEvaluator(outer), "base_colour", 256));
+
+        // An override on the outer graph reaches bricks, equal to the same override on bricks itself.
+        var set = GraphParameters.WithOverrides(outer, new Dictionary<string, ParamValue> { ["mortar"] = ParamValue.Of(0.12) });
+        Assert.Null(set.Error);
+        Assert.Equal(OutputImage.Rgba8(new GraphEvaluator(BricksWith(0.12)), "base_colour", 256), OutputImage.Rgba8(new GraphEvaluator(set.Graph!), "base_colour", 256));
+        Assert.Equal("parameters['mortar']: is 0.5, but must be a number from 0 to 0.45",
+            GraphParameters.WithOverrides(outer, new Dictionary<string, ParamValue> { ["mortar"] = ParamValue.Of(0.5) }).Error);
+
+        // The node's own value for a driven parameter is not written, and the graph reads back the same.
+        var written = TexGraphFile.Write(outer);
+        Assert.DoesNotContain("\"mortar\": 0.06 }", written);
+        Assert.Equal(written, TexGraphFile.Write(Load(Put("again.texgraph", written))));
+    }
+
+    [Fact]
+    public void A_pass_through_parameter_takes_the_narrowest_range_of_what_it_drives()
+    {
+        // amount drives inner's amount (0 to 1, itself driving a blend's opacity) on two graph nodes, and max narrows it again.
+        Put("inner.texgraph", Inner);
+        var outer = Load(Put("outer.texgraph", """
+            {
+              "version": 2,
+              "size": 64,
+              "seed": 5,
+              "parameters": {
+                "amount": { "value": 0.2, "drives": ["g.amount", "h.amount"], "max": 0.4 }
+              },
+              "nodes": {
+                "g": { "type": "graph", "inputs": { "in": "src" }, "params": { "amount": 0.9, "path": "inner.texgraph" } },
+                "h": { "type": "graph", "inputs": { "in": "g" }, "params": { "path": "inner.texgraph" } },
+                "out": { "type": "output", "inputs": { "in": "h" } },
+                "src": { "type": "colour", "params": { "colour": "#c08040" } }
+              }
+            }
+            """));
+        Assert.Empty(GraphValidator.Validate(outer));
+        var amount = GraphParameters.Of(outer)["amount"];
+        Assert.Equal((0.0, 0.4), (amount.Range.Min, amount.Range.Max));
+        // g's own 0.9 is ignored: both nodes take 0.2.
+        var byHand = Load(Put("byhand.texgraph", """
+            {
+              "version": 2,
+              "size": 64,
+              "seed": 5,
+              "nodes": {
+                "g": { "type": "graph", "inputs": { "in": "src" }, "params": { "amount": 0.2, "path": "inner.texgraph" } },
+                "h": { "type": "graph", "inputs": { "in": "g" }, "params": { "amount": 0.2, "path": "inner.texgraph" } },
+                "out": { "type": "output", "inputs": { "in": "h" } },
+                "src": { "type": "colour", "params": { "colour": "#c08040" } }
+              }
+            }
+            """));
+        Assert.Empty(byHand.Parameters);
+        Assert.Equal(Image(byHand, "base_colour"), Image(outer, "base_colour"));
+    }
+
+    public static TheoryData<string, string, string> PassThroughFaults => new()
+    {
+        { "a value outside the nested graph's range", "\"mortar\": { \"value\": 0.5, \"drives\": [\"wall.mortar\"] }",
+            "parameters['mortar']: is 0.5, but must be a number from 0 to 0.45" },
+        { "a parameter the nested graph does not have", "\"mortar\": { \"value\": 0.06, \"drives\": [\"wall.mortr\"] }",
+            "parameters['mortar']: drives 'wall.mortr', but 'wall', a graph node using bricks.texgraph, has no parameter 'mortr'; its parameters are path, " },
+        { "the graph node's path", "\"mortar\": { \"value\": 0.06, \"drives\": [\"wall.path\"] }",
+            "parameters['mortar']: drives 'wall.path', a path, which a graph parameter cannot drive; " },
+        { "two kinds", "\"mortar\": { \"value\": 0.06, \"drives\": [\"wall.mortar\", \"wall.tint\"] }",
+            "parameters['mortar']: drives 'wall.mortar', a number, and 'wall.tint', a colour; the parameters it drives are all of one kind" },
+        { "a range left empty by min", "\"mortar\": { \"value\": 0.6, \"drives\": [\"wall.mortar\"], \"min\": 0.5 }",
+            "parameters['mortar']: the parameters it drives have no value in common: wall.mortar is a number from 0 to 0.45; and it gives min 0.5" },
+    };
+
+    [Theory]
+    [MemberData(nameof(PassThroughFaults))]
+    public void A_pass_through_parameter_is_faulted_as_T139s_drives_are(string what, string parameter, string start)
+    {
+        File.Copy(Path.Combine(Samples.Folder, "bricks.texgraph"), Path.Combine(_dir, "bricks.texgraph"));
+        var fault = Assert.Single(GraphValidator.Validate(Load(Put("wall.texgraph", PassThrough(parameter)))));
+        Assert.Null(fault.Node);
+        Assert.StartsWith(start, fault.Message);
+        Assert.False(string.IsNullOrEmpty(what));
+    }
+
+    [Fact]
+    public void Drives_through_a_cycle_of_files_end_and_the_cycle_is_named()
+    {
+        string Use(string next) => $$"""{ "version": 2, "size": 64, "seed": 0, "parameters": { "p": { "value": 1, "drives": ["u.p"] } }, "nodes": { "o": { "type": "output", "inputs": { "in": "u" } }, "u": { "type": "graph", "params": { "path": "{{next}}" } } } }""";
+        Put("b.texgraph", Use("c.texgraph"));
+        Put("c.texgraph", Use("a.texgraph"));
+        var faults = GraphValidator.Validate(Load(Put("a.texgraph", Use("b.texgraph"))));
+        Assert.Contains(faults, f => f.Message.Contains("a cycle through files: b.texgraph -> c.texgraph -> a.texgraph -> b.texgraph"));
+    }
+
     [Fact]
     public void Relative_paths_resolve_from_each_graphs_own_folder()
     {
@@ -239,8 +362,9 @@ public sealed class NestedGraphTests : IDisposable
         Put("inner.texgraph", Inner.Replace("\"cells\": [8, 8]", "\"cells\": [8, 8], \"octaves\": 99"));
         var fault = Assert.Single(GraphValidator.Validate(Load(Put("outer.texgraph", Outer))));
         Assert.Equal(("g/n", "octaves", Path.Combine(_dir, "inner.texgraph")), (fault.Node, fault.Parameter, fault.File));
-        Assert.StartsWith("node 'g/n' parameter 'octaves' is 99, but must be a whole number from 1 to ", fault.Message);
-        Assert.EndsWith(" (in inner.texgraph)", fault.Message);
+        // The person's ruling (2026-11-20): the graph node's own over-range form, nodes['<path>'].params['<name>'], and the file.
+        Assert.StartsWith("nodes['g/n'].params['octaves']: is 99, but must be a whole number from 1 to ", fault.Message);
+        Assert.EndsWith(" (inner.texgraph)", fault.Message);
     }
 
     [Fact]
@@ -253,7 +377,7 @@ public sealed class NestedGraphTests : IDisposable
         var fault = Assert.Single(faults);
         // The top graph's own file is not in the chain (a graph knows its folder, not its name), so the cycle is found one file further down.
         Assert.Equal("u/u/u/u", fault.Node);
-        Assert.StartsWith("node 'u/u/u/u' parameter 'path': uses b.texgraph, a cycle through files: b.texgraph -> c.texgraph -> a.texgraph -> b.texgraph (each file uses the next as a node)", fault.Message);
+        Assert.Equal("nodes['u/u/u/u'].params['path']: uses b.texgraph, a cycle through files: b.texgraph -> c.texgraph -> a.texgraph -> b.texgraph (each file uses the next as a node) (a.texgraph)", fault.Message);
     }
 
     [Fact]

@@ -101,7 +101,13 @@ public static class GraphParameters
 
     private static bool IsNumeric(ParamKind kind) => kind is ParamKind.Int or ParamKind.Float or ParamKind.IntPair;
 
-    internal static ParameterAnalysis Analyse(TextureGraph graph, NodeRegistry registry)
+    /// <summary>
+    /// The parameters read against the nodes they drive. A drive may name a <c>graph</c> node's parameter (T-140,
+    /// <c>"wall.mortar"</c>): its range is the nested graph's exposed parameter's, read from the file through
+    /// <see cref="GraphValidator.NestedParameters"/>. <paramref name="chain"/> is the files read to get here, so a cycle
+    /// of drives through files ends (the validator names the cycle itself).
+    /// </summary>
+    internal static ParameterAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string>? chain = null)
     {
         var a = new ParameterAnalysis();
         foreach (var (name, parameter) in graph.Parameters)
@@ -129,7 +135,20 @@ public static class GraphParameters
                     continue;
                 }
                 if (registry.Find(node.Type) is not { } type) { complete = false; continue; }
-                if (type.Parameter(param) is not { } spec)
+                ParamSpec? spec;
+                if (type is NestedGraphNode && type.Parameter(param) is null)
+                {
+                    // A graph node's parameter is the nested graph's exposed parameter of that name, with its range.
+                    if (GraphValidator.NestedParameters(graph, node, registry, chain ?? []) is not { } nested) { complete = false; continue; } // the graph node's own fault says why
+                    if (nested.Exposed.TryGetValue(param, out var inner)) spec = inner.Range;
+                    else if (nested.Declared.Contains(param)) { complete = false; continue; } // at fault in its file, which the graph node's faults name
+                    else
+                    {
+                        Fault($"drives '{drive}', but '{id}', a graph node using {nested.FileName}, has no parameter '{param}'; its parameters are {string.Join(", ", type.Parameters.Select(p => p.Name).Concat(nested.Declared))}");
+                        continue;
+                    }
+                }
+                else if ((spec = type.Parameter(param)) is null)
                 {
                     Fault($"drives '{drive}', but '{id}', a node of type {type.Name}, has no parameter '{param}'; its parameters are {string.Join(", ", type.Parameters.Select(p => p.Name))}");
                     continue;
