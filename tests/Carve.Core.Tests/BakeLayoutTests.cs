@@ -24,7 +24,7 @@ public class BakeLayoutTests
     /// Each live face mapped into its own cell of a square grid: its corners projected onto the plane across its normal's
     /// largest axis, fitted into the cell with a margin. Planar faces never overlap themselves, so no layout overlaps.
     /// </summary>
-    private static PolygonMesh Celled(PolygonMesh mesh)
+    internal static PolygonMesh Celled(PolygonMesh mesh)
     {
         var faces = mesh.LiveFaces.ToArray();
         var n = (int)Math.Ceiling(Math.Sqrt(faces.Length));
