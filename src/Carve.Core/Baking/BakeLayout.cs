@@ -11,7 +11,11 @@ public enum BakeCoverage
     /// <summary>A triangle's uv triangle holds the texel's centre.</summary>
     Centre,
 
-    /// <summary>The centre lies outside every triangle but within half a texel's diagonal of one, and was clamped to its nearest point.</summary>
+    /// <summary>
+    /// The centre lies outside every triangle but within half a texel's diagonal of one, and was clamped to its nearest point.
+    /// A centre exactly on an island's bottom or right boundary, which the top-left rule gives to no triangle, is
+    /// <see cref="Centre"/>: it lies on the face.
+    /// </summary>
     Clamp,
 }
 

@@ -184,6 +184,34 @@ public class BakeLayoutTests
 
     /// <summary>Two islands, each covered texel valued by its index, padded, against a brute-force reading of the rule.</summary>
     [Fact]
+    public void A_clamped_texel_as_near_two_faces_takes_the_lower_face()
+    {
+        // Face 5 left of face 1 in the same rows, a quarter texel short of column 10's centre on each side.
+        var mesh = TestMeshes.Cube().WithUvs(MeshUvs.None
+            .WithFace(5, [new(2 / 64f, 26 / 64f), new(10.25f / 64, 26 / 64f), new(10.25f / 64, 12 / 64f), new(2 / 64f, 12 / 64f)])
+            .WithFace(1, [new(10.75f / 64, 26 / 64f), new(18 / 64f, 26 / 64f), new(18 / 64f, 12 / 64f), new(10.75f / 64, 12 / 64f)]));
+        var layout = Lay(mesh, 64);
+        // Rows 12 to 25, and the row past each end, as near the two faces' corners.
+        var column = layout.Texels().Where(t => t.X == 10).ToArray();
+        Assert.Equal(16, column.Length);
+        Assert.All(column, t => Assert.Equal((BakeCoverage.Clamp, 1), (t.Coverage, t.Face)));
+    }
+
+    [Fact]
+    public void A_centre_on_an_islands_right_boundary_counts_as_a_centre()
+    {
+        // The quad's right edge is u = 20.5 / 64, through column 20's centres, which the top-left rule gives to no one.
+        var mesh = TestMeshes.Cube().WithUvs(MeshUvs.None
+            .WithFace(1, [new(4 / 64f, 26 / 64f), new(20.5f / 64, 26 / 64f), new(20.5f / 64, 12 / 64f), new(4 / 64f, 12 / 64f)]));
+        var layout = Lay(mesh, 64);
+        // Its 14 rows lie on the face; the row past each end is clamped to a corner.
+        var edge = layout.Texels().Where(t => t.X == 20).OrderBy(t => t.Y).ToArray();
+        Assert.Equal(16, edge.Length);
+        Assert.All(edge[1..^1], t => Assert.Equal(BakeCoverage.Centre, t.Coverage));
+        Assert.Equal((BakeCoverage.Clamp, BakeCoverage.Clamp), (edge[0].Coverage, edge[^1].Coverage));
+    }
+
+    [Fact]
     public void Padding_fills_rings_from_the_nearest_island_leaves_covered_texels_and_breaks_ties_by_index()
     {
         var mesh = TestMeshes.Cube().WithUvs(MeshUvs.None

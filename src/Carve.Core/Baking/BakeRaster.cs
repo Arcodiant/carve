@@ -88,7 +88,9 @@ public sealed partial class BakeLayout
             {
                 double a, b, cc;
                 if (owner[i] >= 0) { triangle[n] = owner[i]; (a, b, cc) = Holds(shapes[owner[i]]!.Value, i % size, i / size)!.Value; }
-                else if (clamp.TryGetValue(i, out var k)) { triangle[n] = k.T; (a, b, cc) = (k.A, k.B, k.C); clamped[n] = true; }
+                // A centre exactly on a triangle's bottom or right edge (an island's outer boundary, which the top-left rule
+                // gives to no one) lies on the face: it takes the clamp's point, which is the centre, but counts as a centre.
+                else if (clamp.TryGetValue(i, out var k)) { triangle[n] = k.T; (a, b, cc) = (k.A, k.B, k.C); clamped[n] = k.D2 > 0; }
                 else continue;
                 weights[3 * n] = (float)a; weights[3 * n + 1] = (float)b; weights[3 * n + 2] = (float)cc;
                 slot[i] = n++;
