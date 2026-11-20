@@ -63,9 +63,7 @@ public class NestedGraphToolTests
 
         await patina.Ok("save", """{"path":"copy.texgraph"}""");
         // By text, line endings aside: a checkout may give the sample CRLF.
-        Assert.Equal(File.ReadAllText(Sample("old-wall.texgraph")).ReplaceLineEndings("
-"), File.ReadAllText(Path.Combine(folder.Path, "copy.texgraph")).ReplaceLineEndings("
-"));
+        Assert.Equal(File.ReadAllText(Sample("old-wall.texgraph")).ReplaceLineEndings(), File.ReadAllText(Path.Combine(folder.Path, "copy.texgraph")).ReplaceLineEndings());
         Assert.Equal(bricks, File.ReadAllBytes(Path.Combine(folder.Path, "bricks.texgraph")));
         Assert.Equal(grime, File.ReadAllBytes(Path.Combine(folder.Path, "grime.texgraph")));
     }
