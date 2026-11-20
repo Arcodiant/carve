@@ -80,68 +80,68 @@ node's output ports.
 - **Stop and ask:** a rule the spec does not settle (a nested graph's seed or size: the plan's default is that the
   outer graph's seed and size rule, and the nested graph's own are ignored, which the description says), or a committed
   PNG that changes.
+- **Ruled (2026-11-20, by the person)**, on the first hand-off's open points:
+  - a fault inside a nested graph takes the spec's form, the graph node's own over-range form:
+    `nodes['wall/layout'].params['gap']: ... (bricks.texgraph)`, not `node 'wall/layout' parameter 'gap' ... (in bricks.texgraph)`;
+  - pass-through parameters are in T-140: an exposed parameter of the outer graph may drive a value on a `graph` node by
+    `"node.param"` (`"wall.mortar"`), taking the narrowest range of what it drives, the nested graph's parameter range
+    included, faulted as T-139's drives are, tested with a worked case;
+  - the other two stand as built: grime's `height` is wired from `wall.occlusion`, and a cycle back to the top file is
+    found one level down.
 
 ### Hand-off
 
-Written by Claude Opus 5.5 (`claude-opus-5-5`), the first agent, at its call checkpoint (about 55 calls). Code and unit
-tests committed; the server side's tests, the worked example, the scenario stage, the docs and the review are left.
+Written by Claude Opus 5.5 (`claude-opus-5-5`), the second agent, at its call checkpoint (about 60 calls), code
+committed and `cairn task T-140 verify` passing (patina-unit and scenario-patina; WARN uncovered for CLAUDE.md and
+`tools/Patina.SampleGraphs/Program.cs`, which no suite takes as input). The first agent's hand-off is folded in below.
 
-**Done (committed):**
-- *Nodes* (`src/Patina.Graphs/Nodes/InputNode.cs`, `NestedGraphNode.cs`, both in `NodeRegistry.BuiltIn`, version 2 through
-  `TexGraphFormat.Current.WithNodeType`): `input` (`name`, `kind` grey/colour, optional `default` as the new
-  `ParamKind.GreyOrColour`); `graph` (`path`, the new `ParamKind.FilePath`). `input` has one optional input port, `value`,
-  which only expansion wires (a file wiring it is a fault): when wired the node passes its input through, else it fills
-  its default. That keeps a kind mismatch on the outer graph's input named on the graph node's input, with no cascade.
-- *Where a path resolves*: `TextureGraph.Folder` (an init property, never written; `TexGraphFile.ReadFile` and
-  `Read(..., folder)` set it, null is the working directory). `GraphStore` (now built with `ToolFolder`) sets it on every
-  graph it takes: the file's folder once saved or opened, else the tool folder. `GraphValidator.ResolvePath(graph, path)`
-  adds `.texgraph` when missing. **M-29**: a Carve material naming a graph should read it with `TexGraphFile.ReadFile`
-  (or set `Folder` to the material file's folder); nothing else is needed, the validator resolves nested files itself.
-- *Expansion* (`GraphValidator.Analyse`, recursive with the chain of files and the depth): each `graph` node is read with
-  `TexGraphFile.Parse` (new, internal: no validation), its other params checked one by one against the nested graph's
-  parameters (the spec's wording: `nodes['wall'].params['mortar']: is 0.5, but must be ... (bricks.texgraph, parameter
-  'mortar')`), set through `GraphParameters.WithOverrides`, and the nested graph analysed on its own. Its faults come
-  back renamed `wall/layout` with ` (in bricks.texgraph)` and `GraphFault.File` (new) set; a use with faults is left out
-  and sources naming it are not checked further (no cascade). Otherwise its nodes (`GraphAnalysis.Flat()`: sources
-  resolved to `"id.port"`, driven parameters set, outputs dropped) are added as `<node>/<id>`, and a source naming
-  `wall.base_colour` resolves to the nested output's own source. Expanded ids pass `GraphNames.IsValidPath` and their
-  sources `TryParsePathSource`; a source a file writes is parsed strictly, so `g/mix` is "not a source". The evaluator
-  is unchanged and uses the outer graph's seed and size (it only ever read `Graph.Seed` and the size it is given).
-- *Faults*: missing file (the `.texgraph` files in its folder, as open lists them), cycle through files (the top file's
-  own name is not known to the graph, so a cycle back to the top is found one level down: `u/u/u/u`), unknown parameter,
-  input or output, kind mismatch, an input with no default left unconnected, nesting deeper than 8
-  (`GraphValidator.MaxDepth`), a bad path, two inputs of one name. An `input` with no default on the graph's own level is
-  a fault with `GraphFault.OnItsOwn = true` (new): the evaluator refuses it, `save` writes it.
-- *Tools*: `get_graph` lists graph nodes (resolved file and what it resolved against, parameters with ranges, inputs,
-  outputs) through `GraphValidator.Uses` (new public `NestedGraphUse`, `NestedGraphInput`); `open` reads with the
-  file's folder and names the nested files it read; `save` ignores `OnItsOwn` faults; `NodeCatalogue` lines for `graph`
-  and `input`. `swatch` and `export` evaluate through the expansion with no change to them.
-- *Samples*: `samples/graphs/grime.texgraph` (input `in` colour `#808080`, `height` grey 0.5; `fbm` cells [24, 2]
-  streaks down v, mixed toward `#2e2a24` more at low height, `amount` 0.5 drives the mix's opacity) and
-  `old-wall.texgraph` (bricks at mortar 0.06, grime at amount 0.6 on its base colour, **grime's height wired from
-  `wall.occlusion`**, since bricks has no height output). PNGs in `samples/graphs/grime/` and `old-wall/` from the
-  sample tool, which skips a graph whose only faults are `OnItsOwn`. Every other committed PNG is unchanged
-  (sha256 of all `samples/graphs/*/*.png` and variants compared before and after).
-- *Tests* (`tests/Patina.Graphs.Tests`): `NestedGraphTests` (expansion equal to the nodes by hand, a warp among them, at
-  three tile sizes; three broken copies; the node's parameter equal to the T-139 override on bricks; paths from two
-  folders; every fault; a three-file cycle; depth 8 passes and 9 fails; `Uses`), `NestedSamplesTests` (PNGs equal the
-  graphs; old-wall's normal, roughness and occlusion equal bricks at mortar 0.06; check's rules measured: grime base
-  colour brightest channel 97..128, old-wall 79..196, none outside 20..245; old-wall normals worst |len-1| 0.0050;
-  wrap steps below the interior's; old-wall mean level 94.1 vs 107.5 clean, chroma 70.9 vs 83.0).
-  `GraphFaultTests`' type list gains `graph` and `input`. Patina.Graphs.Tests 328 pass, Patina.Server.Tests unit 114 pass.
+**Done by the first agent (committed):** the `input` and `graph` nodes (`Nodes/InputNode.cs`, `NestedGraphNode.cs`);
+`TextureGraph.Folder`, set by `TexGraphFile.ReadFile` and by `GraphStore` (the file's folder once saved or opened, else
+the tool folder), `GraphValidator.ResolvePath`; the expansion in `GraphValidator.Analyse`/`Expand` (nodes renamed
+`<node>/<id>`, a source `wall.base_colour` resolving to the nested output's own source, no cascade from a use at fault);
+every fault the spec lists (missing file listing the folder's `.texgraph` files, cycle naming the chain, unknown
+parameter, input or output, kind mismatch, an input lacking a default left unconnected, depth 8, `OnItsOwn` for an
+input with no default at the top); get_graph's graph-node lines (`GraphValidator.Uses`), open's nested-file line, save
+ignoring `OnItsOwn`; `grime.texgraph` and `old-wall.texgraph` with PNGs; `NestedGraphTests`, `NestedSamplesTests`
+(PNGs equal; check's rules measured: grime base colour brightest channel 97..128, old-wall 79..196, none outside
+20..245, normals worst |len-1| 0.0050, old-wall mean level 94.1 vs 107.5 clean, chroma 70.9 vs 83.0). Every other
+committed PNG unchanged (sha256 compared by the first agent).
+
+**Done by this agent (committed):**
+- *Ruling 1*: `GraphValidator.NestedMessage` rewrites a nested fault as `nodes['wall/layout'].params['gap']: ...`,
+  `nodes['wall/x'].inputs['in']: ...` or `nodes['wall/x']: ...`, prefixing again at each level up, with ` (<file>)`
+  for the innermost file. Tests updated: the nested fault, and the three-file cycle, now
+  `nodes['u/u/u/u'].params['path']: uses b.texgraph, a cycle through files: ... (a.texgraph)`.
+- *Ruling 2*: `GraphParameters.Analyse` takes the chain of files; a drive naming a `graph` node's parameter other than
+  `path` reads the nested graph's exposed parameter through `GraphValidator.NestedParameters` (null when unreadable, in
+  the chain or too deep, so a cycle of drives ends) and uses its `Range`. `Expand` leaves a driven value out of the
+  node's own overrides and sets the driver's value. Bricks' `mortar` range is **0 to 0.45** (its layout's gap), not the
+  spec's illustrative 0.2. Tests: the worked case (`An_outer_parameter_drives_a_graph_nodes_parameter_with_the_nested_range`:
+  equal to bricks with the override, an outer override reaching bricks, written without the node's own value), the
+  narrowest range over two graph nodes and `max`, a fault table (out of range, unknown nested parameter, `path`, two
+  kinds, an empty range), and drives through a three-file cycle ending with the cycle named.
+- *define_graph*: `WorkedNested` and `WorkedPassThrough` in its description, run by `NestedGraphToolTests` with
+  `bricks.texgraph` copied beside them. **A bug fixed**: define_graph validated the graph before the store placed it,
+  so a graph node in a never-saved graph resolved against the working directory; it now validates `store.Graph`.
+  `NodeCatalogue`'s `graph` line names the pass-through.
+- *Server tests* (`NestedGraphToolTests`): get_graph's graph-node lines, open's nested files, save writing only the open
+  graph (nested files unchanged by bytes), save of a graph whose input lacks a default, export of old-wall equal to its
+  sample PNGs, an export override out of bricks' range refused. Swatch needs the engine, so it is in the scenario.
+- *Scenario*: `NestedGraphStage.cs` (one line in `PatinaStages.cs`): old-wall opened from samples (both nested files
+  named), exported and compared byte for byte, get_graph's graph-node line, and frames `nested-old-wall-sheet` and
+  `nested-grime-sheet` (view sheet, which holds the sphere) captured. It passed in verify.
+- *Docs*: D-7's rule under "A graph is its own file"; CLAUDE.md's Layout lines for `Patina.Graphs`, `Patina.Server`,
+  `tools/Patina.SampleGraphs`, both test projects and `samples/`.
 
 **Left:**
-- `define_graph`'s description: a worked example using `bricks.texgraph` as a node, run by a server test that copies
-  the sample beside its temporary graph; server tests for get_graph's lines, open's nested-file line, save writing a
-  graph with an input lacking a default, and swatch/export of old-wall.
-- A scenario stage (a file and one line in `PatinaStages.cs`): old-wall opened, swatched and exported through patina.
-- D-7's rule (nested graphs expanded inline at validation, faults named by path, `input` nodes as ports); CLAUDE.md's
-  Layout lines (`Patina.Graphs`, `Patina.Server`, `tools/Patina.SampleGraphs`, the two test classes).
-- The review: the grime and old-wall PNGs and a swatch sheet with its sphere through patina's `swatch`, to the person
-  (`G:\My Drive\artifacts\carve\M-28\T-140\round-1`). No image has been opened by this agent.
-- `### As built`.
+- The review. Fetch the scenario-patina frames from this branch's verify job by job id (not `cairn test artifacts`,
+  which returns the newest job from any branch), check their hashes, and put `samples/graphs/grime/base_colour.png`,
+  `samples/graphs/old-wall/*.png` and the two sheets under `G:/My Drive/artifacts/carve/M-28/T-140/round-1`, then ask
+  the person with `mcp__waystone__review`. Or draw the sheets through patina's `swatch` with the script T-137's As built
+  names (`t138-swatch.py` in the user's Temp folder; read it first). No image has been opened by either agent.
+- Fold this section into `### As built`, with what T-141, T-142 and T-143 need and the models (both agents Opus 5.5).
+- Commit, `cairn lint`, `cairn task T-140 finish`.
 
-**For the person (not settled by the spec):** the wording of a fault inside a nested graph (`node 'wall/layout' parameter
-'gap' ... (in bricks.texgraph)`, the node faults' own style with the path, where the spec writes
-`nodes['wall/layout'].params['gap']`); grime's height taken from bricks' occlusion; an outer exposed parameter cannot
-yet drive a graph node's parameter (`wall.mortar` is "no such parameter"), which the spec does not ask for.
+**Surprising:** backslash escapes written through the Bash tool were consumed several times (a C# `\n` became a
+newline); use `chr(92)` or the Edit tool. The verify checkout gives samples CRLF, so a text comparison with a sample
+must ignore line endings.
