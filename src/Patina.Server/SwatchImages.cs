@@ -152,13 +152,13 @@ public static class LabelAtlas
 public static class SwatchSheet
 {
     /// <summary>The labels in atlas order: the title, then per column the flat and the tiled cell's, then the sphere's.</summary>
-    public static IReadOnlyList<string> Labels(string title, IReadOnlyList<OutputRole> roles, float angle) =>
-        Labels(title, [.. roles.Select(OutputRoles.Name)], angle);
+    public static IReadOnlyList<string> Labels(string title, IReadOnlyList<OutputRole> roles, float angle, int tiling = 1) =>
+        Labels(title, [.. roles.Select(OutputRoles.Name)], angle, tiling);
 
     /// <summary>The labels for a sheet whose columns are <paramref name="outputs"/>, roles' names and named outputs' names, in sheet order.</summary>
-    public static IReadOnlyList<string> Labels(string title, IReadOnlyList<string> outputs, float angle) =>
+    public static IReadOnlyList<string> Labels(string title, IReadOnlyList<string> outputs, float angle, int tiling = 1) =>
         [title, .. outputs.SelectMany(r => new[] { r, r + " 3 x 3" }),
-            $"sphere, Pbr, carve lights, angle {angle.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}"];
+            $"sphere, Pbr, carve lights, angle {angle.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}{(tiling == 1 ? "" : $", tiling {tiling}")}"];
 
     /// <param name="images">Each output's RGBA, <paramref name="size"/> a side, in role order.</param>
     /// <param name="sphere">The sphere view, <see cref="SwatchImages.SphereCell"/> a side, RGBA.</param>
