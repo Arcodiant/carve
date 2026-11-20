@@ -134,6 +134,23 @@ public sealed class TileRead
     }
 
     /// <summary>
+    /// Copies texels <paramref name="x"/> to <paramref name="x"/> + <paramref name="count"/> - 1 of logical row
+    /// <paramref name="y"/>, <see cref="PortKinds.Channels"/> floats each, into <paramref name="to"/>, a run of
+    /// <see cref="Row"/> for each tile they cross (T-155: the separable passes read long rows this way).
+    /// </summary>
+    public void CopyRow(int y, int x, int count, Span<float> to)
+    {
+        var side = 1 << _shift;
+        var at = 0;
+        while (count > 0)
+        {
+            var n = Math.Min(count, side - (Tile.Wrap(x, _size) & (side - 1)));
+            Row(y, x, n).CopyTo(to[at..]);
+            at += n * _channels; x += n; count -= n;
+        }
+    }
+
+    /// <summary>
     /// Texels <paramref name="x"/> to <paramref name="x"/> + <paramref name="count"/> - 1 of logical row
     /// <paramref name="y"/>, <see cref="PortKinds.Channels"/> floats each. They must lie in one tile (a pointwise node
     /// reading its own tile's row always does); otherwise it throws.

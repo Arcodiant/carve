@@ -120,6 +120,49 @@ public sealed class BlurNode : NodeType
         return to;
     }
 
+    /// <summary>T-155: the horizontal passes are the row pass, the vertical ones the column pass, each reaching <c>r</c> times the passes.</summary>
+    public override SeparablePasses? Separable(NodeParameters parameters, int size)
+    {
+        var reach = Reach(Texels(parameters.Float("radius"), size), Passes(parameters.Text("quality")));
+        return new SeparablePasses(reach, reach);
+    }
+
+    /// <summary>The horizontal passes over the tile's rows, read widened by the reach in x: exactly the rows <see cref="Evaluate"/>'s vertical passes start from.</summary>
+    public override void EvaluateRows(NodeEvaluation e)
+    {
+        var input = e.Input("in")!;
+        var output = e.Output();
+        var channels = output.Channels;
+        var texels = Texels(e.Parameters.Float("radius"), e.Size);
+        var passes = Passes(e.Parameters.Text("quality"));
+        var reach = Reach(texels, passes);
+        var rect = e.Rect;
+        int width = rect.Width + 2 * reach, stride = width * channels;
+        var buffer = new float[stride * rect.Height];
+        for (var y = 0; y < rect.Height; y++) input.CopyRow(rect.Y + y, rect.X - reach, width, buffer.AsSpan(y * stride, stride));
+        var window = 2 * texels + 1;
+        for (var p = 0; p < passes; p++) { buffer = Horizontal(buffer, width, rect.Height, channels, window); width -= 2 * texels; }
+        buffer.CopyTo(output.Data, 0);
+    }
+
+    /// <summary>The vertical passes over the row pass's tiles, read widened by the reach in y.</summary>
+    public override void EvaluateColumns(NodeEvaluation e)
+    {
+        var rows = e.Input(RowsPort)!;
+        var output = e.Output();
+        var channels = output.Channels;
+        var texels = Texels(e.Parameters.Float("radius"), e.Size);
+        var passes = Passes(e.Parameters.Text("quality"));
+        var reach = Reach(texels, passes);
+        var rect = e.Rect;
+        int height = rect.Height + 2 * reach, stride = rect.Width * channels;
+        var buffer = new float[stride * height];
+        for (var y = 0; y < height; y++) rows.CopyRow(rect.Y - reach + y, rect.X, rect.Width, buffer.AsSpan(y * stride, stride));
+        var window = 2 * texels + 1;
+        for (var p = 0; p < passes; p++) { buffer = Vertical(buffer, rect.Width, height, channels, window); height -= 2 * texels; }
+        buffer.CopyTo(output.Data, 0);
+    }
+
     public override void Evaluate(NodeEvaluation e)
     {
         var input = e.Input("in")!;

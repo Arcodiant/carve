@@ -147,13 +147,17 @@ public class EvaluationTests
 
         // h feeds b1 (radius 2), which feeds b2 (radius 2). At 256 in tiles of 32 (8 x 8), one output tile needs b2's
         // tile, b1's 3 x 3 around it and h's 5 x 5. Under the default cap each of the 3 x 64 node tiles is made once and
-        // all are held; with no cache each output tile makes its 35 again.
+        // all are held.
         const long grey32 = 32 * 32 * 4;
         var blurred = new GraphEvaluator(Blurred, TestNodes.Registry);
         blurred.Evaluate(OutputRole.Occlusion, 256, _ => { }, tileSize: 32);
         Assert.Equal(new EvaluationRun(32, 192, 192 * grey32, 64L << 20, 192), blurred.LastRun);
         blurred.Evaluate(OutputRole.Occlusion, 256, _ => { }, tileSize: 32, cacheBytes: 0);
-        Assert.Equal(new EvaluationRun(32, 35, 35 * grey32, 0, 64 * 35), blurred.LastRun);
+        // T-155: tiles are made depth first, each tile's inputs unpinned once it is made, so the most pinned at once is
+        // one path of reads, not the step's 35: eight of b1's tiles, the ninth and the 3 x 3 of h it reads, 18 tiles.
+        // The cache's bound is the cap or the most pinned, whichever is more, so those 18 tiles' worth stay held and
+        // each output tile makes fewer than 35 again.
+        Assert.Equal(new EvaluationRun(32, 18, 18 * grey32, 0, 2004), blurred.LastRun);
     }
 
     // Every node type, the seven built in and the four from outside, in one graph feeding all four roles.

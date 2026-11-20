@@ -93,3 +93,59 @@ change, and a cache simulation (`%TEMP%\t155\sim.py`: the evaluator's LRU and pi
 
 **Decision asked of the person** (round-1): what the blur's 10 s means, and whether the cap may grow for a separable
 node so the source is made once.
+
+**The person's rulings (round-1, 2026-11-20):** Q1 (a): the blur's 10 s is its own share, the run less its source
+alone. Q2 (A): keep the 64 MiB cap and recompute as little as it allows ("let's try for A").
+
+### Hand-off
+
+From the first agent (Claude Opus 5.5, `claude-opus-5-5`), at its call checkpoint. Work in progress, committed so the
+next agent can carry on; `verify` has not been run.
+
+**Done (uncommitted until this commit, built, Patina.Graphs tests run):**
+- API in `Nodes/NodeType.cs`: `Separable(parameters, size)` returning `SeparablePasses(RowReach, ColumnReach)` or
+  null, `EvaluateRows`, `EvaluateColumns`, `RowsPort = "rows"`. Design call: the passes are internal to the node
+  (not hidden nodes at validation), the evaluator caching the row pass under a key of its own (`steps.Length + i`).
+  Reason: a hidden node would need a port kind and a name in the graph, would show in faults and `get_graph`, and
+  T-140's expansion would have to know it; internal passes keep the graph as written and the node's one-pass
+  `Evaluate` as the reference the tests hold the passes to.
+- `BlurNode` and `DistanceNode` opt in. Distance's row tile holds the signed u distance to the other side capped at
+  the reach (+ inside, - outside, infinite when none), so it is the same in every tile.
+- `Imaging/TileRead.CopyRow` (a long row in runs of `Row`).
+- `Evaluation/GraphEvaluator.cs` rewritten: tiles made depth first (`Ensure`/`MakeTile`/`MakeRows`/`Finish`), each
+  tile's inputs unpinned once it is made, so the pin is one path of reads; output tiles in bands of at most 16 tile
+  columns walked downward (`Order`, `BandTiles`: narrowed so a band's row tiles fit three quarters of the cap).
+- `Evaluation/TileCache.cs`: `PinnedBytes`, `PeakPinnedBytes`, `Bound = max(cap, most ever pinned)`; trims to the
+  bound. This is what should bring the strong minify under 2 GB (only transform's direct input, the whole image, is
+  pinned, and kept, rather than every node behind it): **not yet measured**.
+- `EvaluationTests.TilesAreBoundedAndTheCacheStaysUnderItsCap`: its cap-0 line changed from 35 tiles held and 2,240
+  made to 18 and 2,004 (both lower: depth-first pinning, and the bound). **This is a changed test target, so it goes
+  to the person** before landing, though it is tighter, not looser.
+- `SeparablePassesTests.cs` (new): blur (4 cases) and distance (4 cases) equal their one-pass copies (`blur_one`,
+  `distance_one`, a wrapper not opting in) at tiles 16, 64, 256 and caps 0 and default: **all pass**. Blur's cap test
+  passes. All 371 earlier Patina.Graphs tests pass.
+
+**Failing / left:**
+- `Distance_at_its_largest_range_holds_no_more_than_the_cap` fails: held 1,261,568 bytes against a 1 MiB cap, and
+  takes about 2 minutes (too slow for `unit`). Cause, I think: `tiles` has four ports (mask, height, random, uv), held
+  together, so each mask entry pinned is about 96 KB rather than 16 KB; and `BandTiles` counts only the row tiles, not
+  the inputs a row tile pins. Fix the budget (count the input entries' bytes) or the test's cap/size, and make it fast.
+- **Blur at 8192 thrashed** with a seven-eighths budget (360 of 4,096 tiles in 600 s): the band's row tiles plus the
+  churn of source tiles just passed the cap and LRU fell over. Changed to three quarters; not measured since. Expect
+  the source made about 2.6 to 3 times (bands of 11 to 13), so the blur's own share at 8192 is likely about 25 to
+  30 s on the default fbm source (12.4 to 14.1 s alone): **probably not 10 s, which is a stop to report** with the
+  figure, per the ruling's "try".
+- Measure everything: `bash %TEMP%\t155\run-after.sh > %TEMP%\t155\after1.log` (blur 0.05 and 0.1, distance 0.1 and
+  0.25, the colour fbm source, rot30, tile16 at scale 0.25, at 8192, Release; harness `%TEMP%\t155\measure`, pointed
+  at this worktree). Run it with the tool's background option, not `&`. Then the cobblestones and planks at 8192
+  (`Measure file <path> 8192 <limit>`) against T-153's figures (before figures need a run on `origin/milestone/M-28`).
+- Rotation: the bands should cut its recompute; measure, then add the ratio test (a 30-degree turn at 2048 in tiles
+  of 32 under a 4 MiB cap, so it is 64 x 64 tiles as at 8192).
+- `TransformDistanceBoundedMemoryTests` (patina-regression): distance up to 8192 with the 10 s assert, blur at 8192,
+  the strong minify at 8192, each at 2 GB or less.
+- CLAUDE.md Layout lines (Patina.Graphs: separable passes, the bands; tests: `SeparablePassesTests`), As built, rebase
+  onto `origin/milestone/M-28` (T-141 landed), `verify`, `finish`.
+
+**Before figures so far** (this branch before code, Release harness): default fbm through gradient_map at 8192
+12.4 s (14.1 s on a later run); blur smooth 0.05 at 2048 6.7 s, 960 tiles. **After so far:** blur at 2048 3.3 s,
+1,312 tiles, peak 64 MiB, working set 179 MB (with the seven-eighths budget).
