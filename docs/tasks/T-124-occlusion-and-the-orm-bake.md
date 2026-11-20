@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-123
 
-**Verify:** core-unit, server-unit, scenario-bakes
+**Verify:** core-unit, server-unit, server-regression, scenario-bakes, scenario-orcward, scenario-morph
 
 ## Goal
 
@@ -92,6 +92,37 @@ occlusion, roughness and metallic from bakes alone.
   task's other suites.
 
 ### Hand-off
+
+**Agent 3 (Claude Opus 5.5, 2026-11-19): HANDOFF at the call checkpoint.**
+
+- **Done, committed in "T-124: render_glb mipmaps, the rulings, the unused-block warning".**
+  - Rebased onto `origin/milestone/M-24` (T-126). Conflicts in `CLAUDE.md` (Bakes row), `BakesStages.cs` and `BakeTool.cs`
+    only added; both sides kept (maps `curvature`, `occlusion`, `orm`; both blocks; both stages; breaks `swap`, `mirror`,
+    `curvature`, `reach`, `metal`). Builds.
+  - The person's rulings (2026-11-20) in `OcclusionStage.cs`: `CreviceMargin = 50`, checked as the crevice texels' **mean**
+    below the open texels' mean, as the ruling is worded; `OpenLeast = 250` on the open texels' least. Note for the
+    person: the probe's 72 was open least − crevice most; the means' difference measured 255 − 133.7 = 121.3. The ruling
+    names the mean, so the mean is what is checked.
+  - The fix: `RenderSystem.cs` loads with `new ModelLoadOptions { GenerateMipmaps = true }`, citing engine need 8.
+    `render_glb`'s description says textures are sampled as `render`'s (mips, Linear).
+  - `RenderGlbSamplingTests` (regression, `tests/Carve.Server.Tests`): a 1024 texel-noise face drawn by `render` and
+    `render_glb` under D-6's rule. **With the flag off it fails:** "184846 px differ (limit 1310.72), largest patch 184846
+    (limit 50)". With the fix it passes. `RenderGlbTargetsTests.Measure` is now `internal` for it.
+  - `bake` warns `occlusion: ignored, neither 'occlusion' nor 'orm' is in maps` via a shared `UnusedBlock` helper (T-125
+    adds `bevel`/`curvature` to it; keep both in a rebase); tested in `BakeOcclusionToolTests`. 62 bake/sampling tests pass.
+  - Verify line now has server-regression, scenario-orcward and scenario-morph.
+- **Before-fix hashes taken.** `cairn test run --fresh scenario-orcward scenario-morph server-regression` on the rebased
+  commit with the fix stashed: all PASS (local, 16 s, 26 s, 467 s). Every PNG under `artifacts/` hashed into
+  `G:\My Drivertifacts\carve\M-24\T-124\mipmap-fixefore.sha256` (287 files; run folders `orcward/1`, `morph/1`).
+- **Left.**
+  - Re-run the same three suites with the fix (`--fresh`), hash into `after.sha256`, compare by path within each run folder
+    (the scenario runs land in new numbered folders: `orcward/2`, `morph/2`). Every untextured `render_glb` frame must be
+    byte-identical; if any changes, stop and report. The `render-glb-sampling-tests` frames are new, expected.
+  - Run `scenario-bakes --fresh`: the ruled checks and the T-123/T-124 comparison numbers (`differences.tsv`,
+    `orm-differences.tsv`); record the new stage-1 numbers. Show breaks `reach` and `metal` failing (`CARVE_BAKES_BREAK`).
+  - `cairn task T-124 verify`, then the Waystone review (round-1 under `G:\My Drivertifacts\carve\M-24\T-124ound-1`),
+    then As built, `cairn lint`, `finish`.
+- **Not checked yet:** server-unit and core-unit as whole suites after the rebase; the bake stage after the fix.
 
 Agent 1, Claude Opus 5.5 (2026-11-19). Status: **QUESTION**. The numbers are below for the person to rule, and one check
 fails. Nothing is ruled yet.

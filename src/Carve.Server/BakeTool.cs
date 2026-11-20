@@ -49,7 +49,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "'orm' writes <folder>/<mesh>.orm.png, the RGB texture glTF reads for both occlusion_texture (R) and metallic_roughness_texture (G roughness, B metallic), linear: R is the occlusion above, G and B each face's roughness and metallic from surface, resolved as base_colour is (the last entry naming the face's group or material that gives it; else its material's; else roughness 1 and metallic 0). "
         + "occlusion is {rays: 1 to 1024, default 32; reach: metres, required for 'occlusion' and 'orm' and with no default, the distance within which geometry darkens a texel; occluders: the mesh names that occlude, every mesh of the model by default}. "
         + "surface is an object of entries, each keyed by a group or material name, applied in the order given, so a later entry wins a face that two of them name: put a group that holds every face first as a default and the specific groups after it. "
-        + "An entry is {base_colour: '#RRGGBB', roughness: 0 to 1, metallic: 0 to 1}, each optional and validated; an entry with no base_colour gives no colour to base_colour. roughness and metallic are for maps that read them and make no warning when no map in this call does. "
+        + "An entry is {base_colour: '#RRGGBB', roughness: 0 to 1, metallic: 0 to 1}, each optional and validated; an entry with no base_colour gives no colour to base_colour. roughness and metallic are for maps that read them and make no warning when no map in this call does. A block no asked map reads (occlusion with neither 'occlusion' nor 'orm' in maps) is ignored with a warning. "
         + "'curvature' writes <folder>/<mesh>.curvature.png, a single-channel grey PNG for wear: 128 (0.5) on flat ground, lighter toward a convex edge and darker toward a concave one, over the width given in the curvature block {width} (metres, greater than 0, required when 'curvature' is a map). "
         + "Each break edge (an edge the render draws hard: a marked hard edge on a smooth mesh, any edge between two faces that are not coplanar on a flat one) within width of a texel on its face adds half of its dihedral bend over a right angle (capped at 1), signed by convex (+) or concave (-), faded from full on the edge to nothing at width; the sum is clamped, so a right-angle convex edge reads 255 and a right-angle crease 0. "
         + "A material does not take the curvature map directly (it is not a colour, roughness or normal); it is for wear masks in a texture graph, or a tool of your own. "
@@ -243,6 +243,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         }
 
         var warnings = new List<string>();
+        UnusedBlock("occlusion", occlusion, [OcclusionMap, OrmMap], wanted, warnings);
         if (layout.Unmapped.Count > 0)
             warnings.Add($"{named.Name}: {layout.Unmapped.Count} face(s) have no UVs and were skipped: {string.Join(", ", layout.Unmapped.Take(10))}{(layout.Unmapped.Count > 10 ? ", ..." : "")}");
         return Ok(new { files, skipped_faces = layout.Unmapped, warnings });
@@ -357,6 +358,14 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
     /// The <c>occlusion</c> block, validated whether or not a map reads it; null when it is absent or wrong. <c>reach</c> is
     /// required when <c>occlusion</c> or <c>orm</c> is asked for.
     /// </summary>
+    /// <summary>A block given when no map in this call reads it: the call bakes what was asked, and a warning says the block was ignored.</summary>
+    private static void UnusedBlock(string block, JsonElement? value, string[] readers, List<string> wanted, List<string> warnings)
+    {
+        if (Absent(value) || readers.Any(wanted.Contains)) return;
+        var named = readers.Length == 1 ? $"'{readers[0]}' is" : "neither " + string.Join(" nor ", readers.Select(r => $"'{r}'")) + " is";
+        warnings.Add($"{block}: ignored, {named} in maps");
+    }
+
     private static OcclusionArgs? ReadOcclusion(JsonElement? block, List<string> wanted, Model model, List<string> errors)
     {
         var needed = wanted.Contains(OcclusionMap) || wanted.Contains(OrmMap);
