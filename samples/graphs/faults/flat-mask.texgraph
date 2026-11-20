@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "size": 64,
+  "seed": 141,
+  "nodes": {
+    "base": { "type": "gradient_map", "inputs": { "in": "mottle" }, "params": { "colours": ["#6b5a48", "#8a7560", "#a89478"], "positions": [0, 0.5, 1] } },
+    "base_out": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "base_colour" } },
+    "mottle": { "type": "fbm", "params": { "basis": "gradient", "cells": [4, 4], "gain": 0.5, "octaves": 4, "seed": 3 } },
+    "normal": { "type": "height_to_normal", "inputs": { "height": "mottle" }, "params": { "strength": 0.02 } },
+    "normal_out": { "type": "output", "inputs": { "in": "normal" }, "params": { "role": "normal" } },
+    "rough": { "type": "levels", "inputs": { "in": "mottle" }, "params": { "out_high": 0.9, "out_low": 0.6 } },
+    "rough_out": { "type": "output", "inputs": { "in": "rough" }, "params": { "role": "roughness" } },
+    "wear": { "type": "levels", "inputs": { "in": "mottle" }, "params": { "in_high": 0, "in_low": 0 } },
+    "wear_out": { "type": "output", "inputs": { "in": "wear" }, "params": { "name": "wear" } }
+  }
+}
