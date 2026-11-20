@@ -139,6 +139,7 @@ internal sealed class SwatchStage : IPatinaStage
 
         await MetalPlateAsync(driver, checks, read);
         await BricksAsync(driver, checks);
+        await SwatchTiling.RunAsync(driver, checks);
 
         await BreaksAsync(driver, checks, sample, read, spheres, sheet, small, tiled, seam);
     }
