@@ -152,6 +152,26 @@ public static class ToolPaths
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 
+    /// <summary>
+    /// Why <paramref name="folder"/>, resolved against <paramref name="baseDirectory"/> as <see cref="Resolve"/> resolves a file's
+    /// path, cannot be a folder: "holds the character '*', which a folder path may not" (in the words <see cref="Resolve"/> uses
+    /// for a file) or "is not a valid folder path: ...", or null. For a tool that writes several files into one folder, so a bad
+    /// folder is one problem and not one per file.
+    /// </summary>
+    public static string? FolderProblem(string folder, string? baseDirectory = null)
+    {
+        try
+        {
+            if (BadPathCharacter(folder) is { } bad) return $"holds {bad}, which a folder path may not";
+            var full = Path.GetFullPath(folder, baseDirectory ?? Environment.CurrentDirectory);
+            return BadSegmentCharacter(full) is { } badSegment ? $"holds {badSegment}, which a folder path may not" : null;
+        }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return $"is not a valid folder path: {e.Message}";
+        }
+    }
+
     /// <summary>The first character a path may not hold, described, or null.</summary>
     private static string? BadPathCharacter(string path) => Describe(path.IndexOfAny(Path.GetInvalidPathChars()), path);
 

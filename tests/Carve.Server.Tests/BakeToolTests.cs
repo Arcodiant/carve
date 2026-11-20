@@ -246,6 +246,52 @@ public class BakeToolTests : FileToolTests
     }
 
     [Fact]
+    public async Task A_bad_folder_is_one_folder_problem_listed_with_the_others()
+    {
+        // RV-74: the folder was judged only on a call with nothing else wrong, and then once for each file, as a path never given.
+        var (carve, _) = await StartStripAsync();
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_group", """{"name":"g","faces":[0]}"""));
+        var text = Refused(await carve.CallToolAsync("bake", """{"size":64,"folder":"a\u0000b","surface":{"g":{"roughness":2}}}"""));
+        Assert.StartsWith("bake failed with 2 problem(s)", text);
+        Assert.Contains("folder: \"a\0b\" holds the control character U+0000, which a folder path may not", text);
+        Assert.Contains("roughness: must be from 0 to 1", text);
+
+        text = Refused(await carve.CallToolAsync("bake", """{"size":64,"folder":"a\u0000b"}"""));
+        Assert.StartsWith("bake failed with 1 problem(s)", text);
+        Assert.DoesNotContain("path \"", text);
+        Assert.False(Directory.Exists(Path.Combine(Root, "textures")));
+    }
+
+    [Fact]
+    public async Task Two_masks_that_differ_only_by_case_are_refused_with_the_other_problems()
+    {
+        var (carve, _) = await StartStripAsync();
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_group", """{"name":"g","faces":[0]}"""));
+        Ok(await carve.CallToolAsync("define_group", """{"name":"G","faces":[1]}"""));
+        var text = Refused(await carve.CallToolAsync("bake", """{"size":64,"folder":"out","surface":{"g":{"roughness":2}}}"""));
+        Assert.StartsWith("bake failed with 2 problem(s)", text);
+        Assert.Contains("rename a group or material so their names differ by more than case", text);
+        Assert.False(Directory.Exists(Path.Combine(Root, "out")));
+    }
+
+    [Fact]
+    public async Task A_write_that_fails_part_way_names_the_files_written_before_it_and_those_not_written()
+    {
+        // RV-74: the files before the failed one are on disk, so the error says which, where it said nothing.
+        var (carve, _) = await StartStripAsync();
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_group", """{"name":"g","faces":[0]}"""));
+        Ok(await carve.CallToolAsync("define_group", """{"name":"h","faces":[1]}"""));
+        Directory.CreateDirectory(Path.Combine(Root, "out", "strip.mask.h.png")); // a folder where the second mask goes
+        var text = Refused(await carve.CallToolAsync("bake", """{"size":64,"folder":"out"}"""));
+        Assert.Contains("it is a folder. The bake stopped there; written before it, replacing any file of that name: out/strip.mask.g.png; not written: out/strip.base_colour.png.", text);
+        Assert.True(File.Exists(Path.Combine(Root, "out", "strip.mask.g.png")));
+        Assert.False(File.Exists(Path.Combine(Root, "out", "strip.base_colour.png")));
+    }
+
+    [Fact]
     public async Task A_group_name_a_file_cannot_hold_is_refused_naming_it_and_only_when_masks_need_it()
     {
         var (carve, _) = await StartStripAsync();

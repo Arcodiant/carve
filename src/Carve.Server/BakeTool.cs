@@ -56,11 +56,12 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "Each break edge (an edge the render draws hard: a marked hard edge on a smooth mesh, any edge between two faces that are not coplanar on a flat one) within width of a texel on its face adds half of its dihedral bend over a right angle (capped at 1), signed by convex (+) or concave (-), faded from full on the edge to nothing at width; the sum is clamped, so a right-angle convex edge reads 255 and a right-angle crease 0. "
         + "A material does not take the curvature map directly (it is not a colour, roughness or normal); it is for wear masks in a texture graph, or a tool of your own. "
         + "Returns JSON {files:[{map, name (a mask's group or material), path, size, replaced, coverage, min, max, mean, ms}], skipped_faces:[face ids], warnings:[]}. "
-        + "path is relative to carve's working folder with '/' separators (absolute when folder is), the form define_material takes. replaced is true when a file of that name was there and was overwritten: bake always overwrites. "
+        + "path is relative to carve's working folder with '/' separators, the form define_material takes: an absolute folder comes back relative too, with '..' for one outside the working folder (absolute only on another drive). replaced is true when a file of that name was there and was overwritten: bake always overwrites. "
         + "ms is the time the file took to bake and write, in milliseconds; work two files share (the masks, the occlusion the orm reads) is counted in the first of them. "
         + "coverage is the fraction of the image's texels the faces cover, before padding. min, max and mean are over those covered texels, from 0 to 1; for base_colour each is [r, g, b]. "
         + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a curvature map with no curvature width, or a width that is not above 0; occlusion or orm with no occlusion.reach, a reach not over 0, rays outside 1 to 1024, an unknown or empty occluders (the error lists the meshes); 'normal' without bevel, or a bevel width that is not a number more than 0; a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
-        + "a mesh, group or material name that a file name cannot hold. "
+        + "a mesh, group or material name that a file name cannot hold; a folder that cannot be a path (said once, as folder). "
+        + "A file that cannot be written (held open by another program, a full disk) stops the bake there: the error names the files written before it, which replaced any file of their name, and those not written. "
         + "Worked example, from bake to a material on the faces, on the wrench (open samples/wrench.carve): bake with the arguments below writes textures/wrench.base_colour.png, textures/wrench.orm.png and a mask for each group; then define_material {name: 'wrench', base_colour_texture: 'textures/wrench.base_colour.png', metallic_roughness_texture: 'textures/wrench.orm.png', occlusion_texture: 'textures/wrench.orm.png'} (one ORM file in both slots) and set_material {material: 'wrench', group: 'all'} (the wrench's group of every face) show the baked colours on the model:\n"
         + ExampleMarker + Example;
 
@@ -148,7 +149,15 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         var errors = UnknownArguments("bake", context, Known);
         var meshName = MeshName(mesh, errors);
         var folderText = OptionalString("folder", folder, errors) ?? DefaultFolder;
-        if (!Absent(folder) && folderText.Trim().Length == 0) errors.Add("folder: is empty; give a folder, or leave it out for 'textures'");
+        var folderOk = true;
+        if (!Absent(folder) && folderText.Trim().Length == 0) { errors.Add("folder: is empty; give a folder, or leave it out for 'textures'"); folderOk = false; }
+        else if (ToolPaths.FolderProblem(folderText, toolFolder.Directory) is { } folderProblem)
+        {
+            // Judged once here, with the call's other problems, and not once for each file it would hold.
+            errors.Add($"folder: \"{folderText}\" {folderProblem}");
+            folderOk = false;
+        }
+        var folderPath = folderText.Replace('\\', '/').TrimEnd('/');
         var side = Whole("size", size, DefaultSize, errors);
         var pad = Whole("padding", padding, DefaultPadding, errors);
         if (side is { } s && BakeLayout.SizeProblem(s) is { } sizeProblem) { errors.Add(sizeProblem); side = null; }
@@ -184,10 +193,27 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             var known = groups.Concat(materials).Distinct().ToList();
             foreach (var entry in entries.Where(e => !known.Contains(e.Name)))
                 errors.Add($"surface: '{entry.Name}' is not a group or a material; the names are {Quoted(known)}");
-            if (FileNameProblem(named.Name) is { } meshBad) errors.Add($"mesh: {meshBad}");
+            var namesOk = true;
+            if (FileNameProblem(named.Name) is { } meshBad) { errors.Add($"mesh: {meshBad}"); namesOk = false; }
             if (wanted.Contains(MasksMap))
                 foreach (var name in groups.Concat(materials).Distinct())
-                    if (FileNameProblem(name) is { } bad) errors.Add($"masks: the name {bad}, so its mask has no file name");
+                    if (FileNameProblem(name) is { } bad) { errors.Add($"masks: the name {bad}, so its mask has no file name"); namesOk = false; }
+
+            // The files' names do not need the layout, so two that differ only by case are found with the other problems.
+            if (folderOk && namesOk && wanted.Contains(MasksMap))
+            {
+                var live = named.Mesh.LiveFaces.Select(style.MaterialOf).OfType<string>().Distinct();
+                var maskFiles = groups.Select(g => $"{named.Name}.mask.{g}.png").Concat(live.Select(m => $"{named.Name}.material.{m}.png"));
+                var fulls = new List<string>();
+                foreach (var file in maskFiles)
+                {
+                    var target = ToolPaths.Resolve("bake", $"{folderPath}/{file}", ".png", out var pathError, toolFolder.Directory);
+                    if (target is null) errors.Add(pathError!);
+                    else fulls.Add(target.FullPath);
+                }
+                foreach (var clash in fulls.GroupBy(f => f, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+                    errors.Add($"two maps would write the file {clash.Key}; rename a group or material so their names differ by more than case");
+            }
         }
 
         if (errors.Count > 0 && (named is null || side is null)) return Failed("bake", errors);
@@ -225,7 +251,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             jobs.Add((OrmMap, null, $"{named.Name}.{OrmMap}.png", () => { var (r, m) = Factors(model, mapped, entries); return Bake.Orm(layout, Occluded(), r, m); }, true));
         if (wanted.Contains(NormalMap)) jobs.Add((NormalMap, null, $"{named.Name}.{NormalMap}.png", () => Bake.BevelNormal(layout, bevelWidth!.Value), true));
 
-        var folderPath = folderText.Replace('\\', '/').TrimEnd('/');
+        // The folder, the names and the masks' case clashes were judged above, with the other problems.
         var targets = new List<ToolPath>();
         foreach (var job in jobs)
         {
@@ -233,8 +259,6 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             if (target is null) errors.Add(pathError!);
             else targets.Add(target);
         }
-        foreach (var clash in targets.GroupBy(t => t.FullPath, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
-            errors.Add($"two maps would write the file {clash.Key}; rename a group or material so their names differ by more than case");
         if (errors.Count > 0) return Failed("bake", errors);
 
         var baseDirectory = toolFolder.Directory ?? Environment.CurrentDirectory;
@@ -245,7 +269,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             var clock = System.Diagnostics.Stopwatch.StartNew();
             var (stats, png) = Encode(job.Image(), layout, pad!.Value, job.Colour);
             if (!ToolPaths.Write("bake", targets[i], png, out var replaced, out var writeError, overwrite: true))
-                return Error(writeError!);
+                return Error(WriteStopped(writeError!, baseDirectory, targets, i));
             var entry = new Dictionary<string, object?> { ["map"] = job.Map };
             if (job.Name is not null) entry["name"] = job.Name;
             entry["path"] = ReportedPath(baseDirectory, targets[i].FullPath);
@@ -508,6 +532,18 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         if (bad != default) return $"'{name}' holds {(char.IsControl(bad) ? $"U+{(int)bad:X4}" : $"'{bad}'")}, which a file name may not";
         if (name.EndsWith('.') || name.EndsWith(' ')) return $"'{name}' ends in a '{name[^1]}', which a file name may not";
         return null;
+    }
+
+    /// <summary>
+    /// A write that failed on file <paramref name="at"/>, which stops the bake: the files before it are already written (each
+    /// replacing any file of its name), so the error names them, and the ones after it, which were not.
+    /// </summary>
+    private static string WriteStopped(string error, string baseDirectory, IReadOnlyList<ToolPath> targets, int at)
+    {
+        string Paths(IEnumerable<ToolPath> some) => string.Join(", ", some.Select(t => ReportedPath(baseDirectory, t.FullPath)));
+        var written = at == 0 ? "no file was written before it" : $"written before it, replacing any file of that name: {Paths(targets.Take(at))}";
+        var left = at + 1 == targets.Count ? "it was the last file" : $"not written: {Paths(targets.Skip(at + 1))}";
+        return $"{error.TrimEnd('.')}. The bake stopped there; {written}; {left}.";
     }
 
     private static string ReportedPath(string baseDirectory, string full)
