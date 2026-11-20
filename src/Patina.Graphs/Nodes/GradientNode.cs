@@ -37,13 +37,13 @@ public sealed class GradientNode : NodeType
         var repeat = e.Parameters.Int("repeat");
         var triangle = e.Parameters.Text("shape") == "triangle";
         var output = e.Output();
-        for (var y = e.Y0; y < e.Y0 + e.Rows; y++)
+        for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
         {
             var row = output.Row(y);
             if (alongU)
-                for (var x = 0; x < e.Size; x++) row[x] = Value(x, e.Size, repeat, triangle);
+                for (var x = e.Rect.X; x < e.Rect.Right; x++) row[x - e.Rect.X] = Value(x, e.Size, repeat, triangle);
             else
-                row.Fill(Value(Band.Wrap(y, e.Size), e.Size, repeat, triangle));
+                row.Fill(Value(Tile.Wrap(y, e.Size), e.Size, repeat, triangle));
         }
     }
 }

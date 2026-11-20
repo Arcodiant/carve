@@ -4,25 +4,32 @@ using Patina.Graphs.Nodes;
 namespace Patina.Graphs.Evaluation;
 
 /// <summary>
-/// Evaluates a graph with no faults, one output at a time, in row bands.
-/// <para><b>Bands.</b> An output is made in bands of <see cref="BandRowsFor"/> rows: <c>max(1, 2^18 / size)</c>,
-/// capped at the size, so a band is 2^18 texels (1 MB greyscale, 3 MB colour). Sizes up to 512 are therefore evaluated
-/// whole in one band (the threshold); 1024 in bands of 256 rows, 2048 of 128, 8192 of 32. For each band the evaluator
-/// works each node's row range from its consumers (the hull of every consumer's range widened by the consumer's
-/// <see cref="NodeType.Radius"/>, wrapping around the image), evaluates the nodes inputs-first into one band each,
-/// hands the output band to the caller and drops them all before the next band.</para>
-/// <para><b>Memory bound.</b> At any moment each node the output depends on holds exactly one band, of
-/// <c>bandRows + 2 * R</c> rows of the full width, where R is the sum of the radii on its longest way to the output
-/// (no node's full image is held above 512, unless R is near the size). At 8192 with no radius that is 1 MB per
-/// greyscale node and 3 MB per colour node, plus the caller's own result (<see cref="OutputImage"/> keeps the RGBA8
-/// image, 256 MB at 8192, which the PNG encoder needs whole). <see cref="LastRun"/> reports what one output held.</para>
-/// <para><b>Determinism.</b> Evaluation is single-threaded, in a fixed order, in <c>float</c> with integer hashing, so
-/// the same graph, size and seed give the same bytes whatever the machine, the band height or the thread count.</para>
+/// Evaluates a graph with no faults, one output at a time, in square tiles.
+/// <para><b>Tiles.</b> An output is made in canonical tiles of side <c>T = min(tileSize, size)</c>
+/// (<see cref="DefaultTileSize"/>, 128, unless a caller names another power of two), tile <c>(tx, ty)</c> holding
+/// columns <c>tx * T</c> to <c>tx * T + T - 1</c> and the same rows, always inside the image. Output tiles are made top
+/// row first, left to right. For each, the evaluator works back through the graph which tiles of each node it needs
+/// (each node names, by <see cref="NodeType.InputRect"/>, the rectangle of each input it reads for a tile; the tiles
+/// covering that rectangle, wrapping around the image, are needed), pins them, makes those not already held, inputs
+/// first, hands the output tile to the caller, then unpins them.</para>
+/// <para><b>Memory bound.</b> Tiles are kept between output tiles in a cache of at most <see cref="DefaultCacheBytes"/>
+/// (64 MiB) unless a caller names another cap, dropped least recently used first, never while a step needs them; so
+/// held bytes stay at most the cap or one step's pinned tiles, whichever is more (one tile a node in a pointwise
+/// chain; a few for a node reading around or away from its texels), plus the caller's own result
+/// (<see cref="OutputImage"/> keeps the RGBA8 image, 256 MB at 8192, which the PNG encoder needs whole). The cache is
+/// dropped at the end of the call. <see cref="LastRun"/> reports what one output held.</para>
+/// <para><b>Determinism.</b> A tile's texels are worked from their image coordinates, from inputs holding exactly the
+/// values a whole-image evaluation would, so an output's bytes depend on neither the tile size nor the cap: a dropped
+/// tile asked for again comes out the same. Evaluation is single-threaded, in a fixed order, in <c>float</c> with
+/// integer hashing, so the same graph, size and seed give the same bytes whatever the machine.</para>
 /// </summary>
 public sealed class GraphEvaluator
 {
-    /// <summary>The texels in one band: 2^18.</summary>
-    public const int BandTexels = 1 << 18;
+    /// <summary>The side of a tile unless a caller names another: 128 texels (64 KB greyscale, 192 KB colour).</summary>
+    public const int DefaultTileSize = 128;
+
+    /// <summary>The cache's cap unless a caller names another: 64 MiB.</summary>
+    public const long DefaultCacheBytes = 64L << 20;
 
     private readonly GraphAnalysis _analysis;
 
@@ -39,29 +46,35 @@ public sealed class GraphEvaluator
     /// <summary>The roles the graph has an output for, in role order.</summary>
     public IReadOnlyList<OutputRole> Roles => [.. OutputRoles.All.Where(_analysis.Outputs.ContainsKey)];
 
-    /// <summary>What the last <see cref="Evaluate"/> held: its band height, the most rows any node's band had, and the most bytes all bands held at once.</summary>
+    /// <summary>What the last <see cref="Evaluate"/> held: its tile size, the most tiles and bytes held at once, the cap, and how many node tiles it made.</summary>
     public EvaluationRun? LastRun { get; private set; }
 
-    /// <summary>The band height at a size: <c>max(1, 2^18 / size)</c>, no more than the size.</summary>
-    public static int BandRowsFor(int size) => Math.Clamp(BandTexels / size, 1, size);
+    private sealed record Source(string Port, int Node, int OutPort);
+
+    private sealed record Step(string Id, NodeType Type, NodeParameters Parameters, Source[] Sources, string[] Ports, PortKind[] Kinds);
 
     /// <summary>
-    /// Evaluates the output with <paramref name="role"/> at <paramref name="size"/>, band by band from the top, calling
-    /// <paramref name="onBand"/> with the band reaching the output node and the logical rows <c>y0</c> to
-    /// <c>y0 + rows - 1</c> of it that are this band's. The band is dropped after the call. <paramref name="bandRows"/>
-    /// overrides the band height (tests).
+    /// Evaluates the output with <paramref name="role"/> at <paramref name="size"/>, tile by tile, calling
+    /// <paramref name="onTile"/> with the tile reaching the output node for each canonical tile, top row first, left to
+    /// right. The tile is the evaluator's: read it during the call and do not keep it. <paramref name="tileSize"/> (a
+    /// power of two) and <paramref name="cacheBytes"/> override <see cref="DefaultTileSize"/> and
+    /// <see cref="DefaultCacheBytes"/>; neither changes a byte of the output.
     /// </summary>
-    public void Evaluate(OutputRole role, int size, Action<Band, int, int> onBand, int? bandRows = null)
+    public void Evaluate(OutputRole role, int size, Action<Tile> onTile, int? tileSize = null, long? cacheBytes = null)
     {
         if (!TextureGraph.IsValidSize(size))
             throw new ArgumentOutOfRangeException(nameof(size), size, "size is " + TextureGraph.SizesText);
         if (!_analysis.Outputs.TryGetValue(role, out var outputId))
             throw new ArgumentException($"the graph has no {OutputRoles.Name(role)} output; it has {string.Join(", ", Roles.Select(OutputRoles.Name))}", nameof(role));
-        var rows = bandRows ?? BandRowsFor(size);
-        ArgumentOutOfRangeException.ThrowIfLessThan(rows, 1, nameof(bandRows));
-        rows = Math.Min(rows, size);
+        var side = tileSize ?? DefaultTileSize;
+        if (side < 1 || (side & (side - 1)) != 0)
+            throw new ArgumentOutOfRangeException(nameof(tileSize), side, "a tile's side is a power of two");
+        var cap = cacheBytes ?? DefaultCacheBytes;
+        ArgumentOutOfRangeException.ThrowIfNegative(cap, nameof(cacheBytes));
+        var t = Math.Min(side, size);
+        var n = size / t;
 
-        // The nodes the output depends on, inputs first.
+        // The nodes the output depends on, inputs first, numbered to key the cache; the output node itself is not one.
         var needed = new HashSet<string>(StringComparer.Ordinal);
         void Need(string id)
         {
@@ -69,61 +82,106 @@ public sealed class GraphEvaluator
             foreach (var (source, _) in _analysis.Nodes[id].Sources.Values) Need(source);
         }
         Need(outputId);
-        var order = _analysis.Order.Where(needed.Contains).ToList();
-        var output = _analysis.Nodes[outputId];
-        var (inNode, inPort) = output.Sources["in"];
-        var radius = order.ToDictionary(id => id, id => _analysis.Nodes[id].Type.Radius(_analysis.Nodes[id].Parameters, size));
-
-        var run = new EvaluationRun(rows, 0, 0);
-        for (var y0 = 0; y0 < size; y0 += rows)
+        var ids = _analysis.Order.Where(id => needed.Contains(id) && id != outputId).ToList();
+        var index = ids.Select((id, i) => (id, i)).ToDictionary(p => p.id, p => p.i, StringComparer.Ordinal);
+        int PortIndex(string id, string port) => _analysis.Nodes[id].Type.Outputs.ToList().IndexOf(port);
+        var steps = ids.Select(id =>
         {
-            var count = Math.Min(rows, size - y0);
-            var ranges = new Dictionary<string, (int Lo, int Hi)>(StringComparer.Ordinal) { [outputId] = (y0, y0 + count) };
-            for (var i = order.Count - 1; i >= 0; i--)
-            {
-                var id = order[i];
-                if (!ranges.TryGetValue(id, out var range)) continue;
-                var r = radius[id];
-                foreach (var (source, _) in _analysis.Nodes[id].Sources.Values)
-                {
-                    var wanted = (Lo: range.Lo - r, Hi: range.Hi + r);
-                    ranges[source] = ranges.TryGetValue(source, out var had) ? (Math.Min(had.Lo, wanted.Lo), Math.Max(had.Hi, wanted.Hi)) : wanted;
-                }
-            }
+            var node = _analysis.Nodes[id];
+            var ports = node.Type.Outputs.ToArray();
+            return new Step(id, node.Type, node.Parameters,
+                [.. node.Sources.Select(p => new Source(p.Key, index[p.Value.Node], PortIndex(p.Value.Node, p.Value.Port)))],
+                ports, [.. ports.Select(p => node.OutputKinds[p])]);
+        }).ToArray();
+        var (inNode, inPort) = _analysis.Nodes[outputId].Sources["in"];
+        int outNode = index[inNode], outPort = PortIndex(inNode, inPort);
 
-            var bands = new Dictionary<(string Node, string Port), Band>();
-            long bytes = 0;
-            var mostRows = run.MostRows;
-            foreach (var id in order)
-            {
-                var node = _analysis.Nodes[id];
-                if (node.Type is OutputNode) continue;
-                var (lo, hi) = ranges[id];
-                var outputs = new Dictionary<string, Band>(StringComparer.Ordinal);
-                foreach (var port in node.Type.Outputs)
-                {
-                    var band = new Band(node.OutputKinds[port], size, lo, hi - lo);
-                    outputs[port] = band;
-                    bands[(id, port)] = band;
-                    bytes += band.Bytes;
-                    mostRows = Math.Max(mostRows, hi - lo);
-                }
-                var inputs = node.Sources.ToDictionary(p => p.Key, p => bands[p.Value], StringComparer.Ordinal);
-                node.Type.Evaluate(new NodeEvaluation(id, size, Graph.Seed, node.Parameters, lo, hi - lo, inputs, outputs));
-            }
-            run = new EvaluationRun(rows, mostRows, Math.Max(run.PeakBytes, bytes));
-            onBand(bands[(inNode, inPort)], y0, count);
+        var cache = new TileCache(n, cap);
+        var needs = steps.Select(_ => new List<(int Tx, int Ty)>()).ToArray();
+        var seen = steps.Select(_ => new HashSet<int>()).ToArray();
+        var pinned = new List<TileCache.Entry>();
+        var evaluated = 0;
+        TexelRect TileRect(int tx, int ty) => new(tx * t, ty * t, t, t);
+        void Add(int node, int tx, int ty)
+        {
+            if (seen[node].Add(ty * n + tx)) needs[node].Add((tx, ty));
         }
-        LastRun = run;
+
+        for (var ty = 0; ty < n; ty++)
+            for (var tx = 0; tx < n; tx++)
+            {
+                // Which tiles of each node this output tile needs, worked back from the output.
+                for (var i = 0; i < steps.Length; i++) { needs[i].Clear(); seen[i].Clear(); }
+                Add(outNode, tx, ty);
+                for (var i = steps.Length - 1; i >= 0; i--)
+                {
+                    var step = steps[i];
+                    foreach (var (x, y) in needs[i])
+                        foreach (var source in step.Sources)
+                        {
+                            var cover = TileRead.Cover(step.Type.InputRect(source.Port, TileRect(x, y), step.Parameters, size), size, t);
+                            for (var r = cover.Y; r < cover.Bottom; r++)
+                                for (var c = cover.X; c < cover.Right; c++)
+                                    Add(source.Node, Tile.Wrap(c, n), Tile.Wrap(r, n));
+                        }
+                }
+
+                // Pin what is held already, so nothing this step needs is dropped while it runs.
+                pinned.Clear();
+                for (var i = 0; i < steps.Length; i++)
+                    foreach (var (x, y) in needs[i])
+                        if (cache.Find(cache.Key(i, x, y)) is { } held) { cache.Pin(held); pinned.Add(held); }
+
+                // Make the rest, inputs first.
+                for (var i = 0; i < steps.Length; i++)
+                {
+                    var step = steps[i];
+                    foreach (var (x, y) in needs[i])
+                    {
+                        var key = cache.Key(i, x, y);
+                        if (cache.Find(key) is not null) continue;
+                        var rect = TileRect(x, y);
+                        var inputs = new Dictionary<string, TileRead>(StringComparer.Ordinal);
+                        foreach (var source in step.Sources)
+                        {
+                            var want = TileRead.Clamp(step.Type.InputRect(source.Port, rect, step.Parameters, size), size);
+                            var cover = TileRead.Cover(want, size, t);
+                            var tiles = new Tile[cover.Width * cover.Height];
+                            for (var r = 0; r < cover.Height; r++)
+                                for (var c = 0; c < cover.Width; c++)
+                                    tiles[r * cover.Width + c] = cache.Find(cache.Key(source.Node, Tile.Wrap(cover.X + c, n), Tile.Wrap(cover.Y + r, n)))!.Tiles[source.OutPort];
+                            inputs[source.Port] = new TileRead(steps[source.Node].Kinds[source.OutPort], size, t, want, tiles);
+                        }
+                        long incoming = 0;
+                        foreach (var kind in step.Kinds) incoming += (long)rect.Width * rect.Height * PortKinds.Channels(kind) * sizeof(float);
+                        cache.MakeRoom(incoming);
+                        var outputs = new Tile[step.Ports.Length];
+                        var named = new Dictionary<string, Tile>(StringComparer.Ordinal);
+                        for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect);
+                        step.Type.Evaluate(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named));
+                        pinned.Add(cache.AddPinned(key, outputs));
+                        evaluated++;
+                    }
+                }
+
+                onTile(cache.Find(cache.Key(outNode, tx, ty))!.Tiles[outPort]);
+                foreach (var entry in pinned) cache.Unpin(entry);
+                cache.Trim();
+            }
+        LastRun = new EvaluationRun(t, cache.MostTiles, cache.PeakBytes, cap, evaluated);
     }
 }
 
-/// <summary>What one output's evaluation held: the band height, the most rows any node's band had, and the most bytes of bands held at once.</summary>
-public sealed record EvaluationRun(int BandRows, int MostRows, long PeakBytes);
+/// <summary>
+/// What one output's evaluation held: the tile size; the most tiles (one port of one node at one position each) and
+/// the most bytes held at once; the cache's cap; and how many node tiles were made (a node's ports at one position
+/// count once; a tile dropped and asked for again counts again).
+/// </summary>
+public sealed record EvaluationRun(int TileSize, int MostTiles, long PeakBytes, long CapBytes, int TilesEvaluated);
 
-/// <summary>What a node's <see cref="NodeType.Evaluate"/> is given: where it is, its parameters, its input bands and the output bands it fills.</summary>
-public sealed class NodeEvaluation(string nodeId, int size, uint seed, NodeParameters parameters, int y0, int rows,
-    IReadOnlyDictionary<string, Band> inputs, IReadOnlyDictionary<string, Band> outputs)
+/// <summary>What a node's <see cref="NodeType.Evaluate"/> is given: where it is, its parameters, its input reads and the output tiles it fills.</summary>
+public sealed class NodeEvaluation(string nodeId, int size, uint seed, NodeParameters parameters, TexelRect rect,
+    IReadOnlyDictionary<string, TileRead> inputs, IReadOnlyDictionary<string, Tile> outputs)
 {
     public string NodeId { get; } = nodeId;
 
@@ -135,14 +193,12 @@ public sealed class NodeEvaluation(string nodeId, int size, uint seed, NodeParam
 
     public NodeParameters Parameters { get; } = parameters;
 
-    /// <summary>The first logical row to fill (it may be negative or past the size: the image's row is <c>Band.Wrap(y, Size)</c>).</summary>
-    public int Y0 { get; } = y0;
+    /// <summary>The tile to fill: a rectangle inside the image, of any size up to the image's (never assume which).</summary>
+    public TexelRect Rect { get; } = rect;
 
-    public int Rows { get; } = rows;
+    /// <summary>The read of an input port, holding what <see cref="NodeType.InputRect"/> asked for, or null for an optional input left unconnected.</summary>
+    public TileRead? Input(string port) => inputs.TryGetValue(port, out var r) ? r : null;
 
-    /// <summary>The band reaching an input port, holding rows <see cref="Y0"/> - radius to <see cref="Y0"/> + <see cref="Rows"/> + radius - 1, or null for an optional input left unconnected.</summary>
-    public Band? Input(string port) => inputs.TryGetValue(port, out var b) ? b : null;
-
-    /// <summary>The band to fill for an output port.</summary>
-    public Band Output(string port = "out") => outputs[port];
+    /// <summary>The tile to fill for an output port; every texel of it must be written.</summary>
+    public Tile Output(string port = "out") => outputs[port];
 }

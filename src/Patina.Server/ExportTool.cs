@@ -36,7 +36,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         + "roughness is a glTF metallic-roughness image (R 255, roughness in G, metallic 0 in B), so define_material's metallic_roughness_texture takes it as it is; occlusion is grey. "
         + "The result lists each file with its size, its bytes and the Carve material slot it belongs in: base_colour in base_colour_texture, normal in normal_texture, roughness in metallic_roughness_texture, occlusion in occlusion_texture. "
         + "Exporting the graph at its own size gives the same bytes every time, and equals the PNGs beside samples/graphs/planks.texgraph. "
-        + "Outputs are evaluated and written one at a time, in bands, so memory stays bounded at 8192 (under 2 GB for the process), but 8192 is slow, minutes and not seconds: the planks' four outputs took about 2.5 minutes here (a debug build), of which about 10 s an output is the PNG encode, and each PNG is some 3 MB. A client with a short call timeout should ask for one or two outputs at a time. "
+        + "Outputs are evaluated and written one at a time, in tiles, so memory stays bounded at 8192 (under 2 GB for the process), but 8192 is slow, minutes and not seconds: the planks' four outputs took about 3 minutes here (a debug build), of which about 10 s an output is the PNG encode, and each PNG is some 3 MB. A client with a short call timeout should ask for one or two outputs at a time. "
         + "To look at a graph, swatch is the way (it renders at 2048 or below); export is for files. "
         + "Refused, writing nothing, while the graph has a fault (the error lists them; fix them with edit_graph); no open graph; a size that is not a power of two from 32 to 8192; a role the graph has no output for; "
         + "and a folder that cannot be written (the error names the folder and the system's reason).\n"
@@ -69,7 +69,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         }
         // The graph is a value, so it is evaluated outside the store's lock and the other tools answer while an export
         // runs (minutes at 8192). Exports take turns, as two could write the same files. A cancelled call
-        // (notifications/cancelled) stops between bands, writing nothing more, and gives up its turn.
+        // (notifications/cancelled) stops between tiles, writing nothing more, and gives up its turn.
         Exports.Wait(cancellationToken);
         try
         {
@@ -132,10 +132,10 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                 long length;
                 try
                 {
-                    evaluator.Evaluate(role, pixels, (band, y0, rows) =>
+                    evaluator.Evaluate(role, pixels, tile =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        for (var y = y0; y < y0 + rows; y++) OutputPacking.PackRow(role, band, y, rgba.AsSpan(y * pixels * 4, pixels * 4));
+                        OutputPacking.PackTile(role, tile, rgba, pixels);
                     });
                     cancellationToken.ThrowIfCancellationRequested();
                     using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))

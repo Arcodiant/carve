@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Engine-free texture graphs (D-7, T-110): the .texgraph format, validation, banded evaluation and PNG encoding.
+  <!-- Engine-free texture graphs (D-7, T-110): the .texgraph format, validation, tiled evaluation and PNG encoding.
        Never references the engine, an Arcodiant package, System.Random or the wall clock (PatinaGraphsIsEngineFreeTests). -->
   <PropertyGroup>
     <RootNamespace>Patina.Graphs</RootNamespace>

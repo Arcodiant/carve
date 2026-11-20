@@ -6,7 +6,7 @@ namespace Patina.Server.Tests;
 
 /// <summary>
 /// T-115: the real patina exports the planks at 8192, all four outputs, and the process's peak working set stays at 2 GB
-/// or less (outputs are encoded one at a time, and the evaluation holds bands, never a node's full image). The time and
+/// or less (outputs are encoded one at a time, and the evaluation holds tiles under a capped cache, never a node's full image). The time and
 /// the peak are written to <c>patina-export-8192.txt</c> in the temp folder and to the test's output.
 /// </summary>
 [Trait("Tier", "regression")]

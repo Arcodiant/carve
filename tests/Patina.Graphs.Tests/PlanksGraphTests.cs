@@ -52,19 +52,47 @@ public class PlanksGraphTests
         return image.Data;
     }
 
-    // The built-in nodes, height_to_normal's radius among them, give the same bytes in any band height as in one band.
+    // The built-in nodes, height_to_normal's radius among them, give the same bytes in any tile size as in one tile.
     [Theory]
     [InlineData(OutputRole.BaseColour)]
     [InlineData(OutputRole.Normal)]
     [InlineData(OutputRole.Roughness)]
     [InlineData(OutputRole.Occlusion)]
-    public void ThePlanksGiveTheSameBytesBandedAsWhole(OutputRole role)
+    public void ThePlanksGiveTheSameBytesTiledAsWhole(OutputRole role)
     {
         const int size = 64;
         var g = Planks();
-        var whole = OutputImage.Rgba8(new GraphEvaluator(g), role, size, bandRows: size);
-        foreach (var rows in new[] { 1, 3, 7, 32 })
-            Assert.True(whole.AsSpan().SequenceEqual(OutputImage.Rgba8(new GraphEvaluator(g), role, size, bandRows: rows)), $"{OutputRoles.Name(role)} in bands of {rows} rows differs from one band");
+        var whole = OutputImage.Rgba8(new GraphEvaluator(g), role, size, tileSize: size);
+        foreach (var side in new[] { 1, 4, 16, 32 })
+            Assert.True(whole.AsSpan().SequenceEqual(OutputImage.Rgba8(new GraphEvaluator(g), role, size, tileSize: side)), $"{OutputRoles.Name(role)} in tiles of {side} differs from one tile");
+    }
+
+    // At its own size, 256, in tiles of 16, 64 and 256 under no cache and the default cap: the same bytes. Under the
+    // default cap every node tile is made once: the tiles across times the nodes the output depends on.
+    [Theory]
+    [InlineData(OutputRole.BaseColour)]
+    [InlineData(OutputRole.Normal)]
+    [InlineData(OutputRole.Roughness)]
+    [InlineData(OutputRole.Occlusion)]
+    public void ThePlanksGiveTheSameBytesAtEveryTileSizeAndCapAndMakeEachTileOnce(OutputRole role)
+    {
+        var g = Planks();
+        var evaluator = new GraphEvaluator(g);
+        var whole = OutputImage.Rgba8(evaluator, role, Size, tileSize: Size);
+        foreach (var side in new[] { 16, 64, 256 })
+            foreach (var cap in new[] { 0, GraphEvaluator.DefaultCacheBytes })
+                Assert.True(whole.AsSpan().SequenceEqual(OutputImage.Rgba8(evaluator, role, Size, side, cap)), $"{OutputRoles.Name(role)} in tiles of {side} under a cap of {cap} differs from one tile");
+
+        var output = g.Nodes.Single(p => p.Value.Type == "output" && (p.Value.Params.TryGetValue("role", out var r) ? r.Text : "base_colour") == OutputRoles.Name(role)).Key;
+        var nodes = new HashSet<string>();
+        void Need(string id)
+        {
+            foreach (var source in g.Nodes[id].Inputs.Values)
+                if (nodes.Add(source.Split('.')[0])) Need(source.Split('.')[0]);
+        }
+        Need(output);
+        OutputImage.Rgba8(evaluator, role, Size, tileSize: 16);
+        Assert.Equal(16 * 16 * nodes.Count, evaluator.LastRun!.TilesEvaluated);
     }
 
     [Fact]

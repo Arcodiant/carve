@@ -40,9 +40,9 @@ public sealed class LevelsNode : NodeType
         float olo = e.Parameters.Float("out_low"), ohi = e.Parameters.Float("out_high"), gamma = e.Parameters.Float("gamma");
         var input = e.Input("in")!;
         var output = e.Output();
-        for (var y = e.Y0; y < e.Y0 + e.Rows; y++)
+        for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
         {
-            var from = input.Row(y);
+            var from = input.Row(y, e.Rect.X, e.Rect.Width);
             var to = output.Row(y);
             for (var i = 0; i < to.Length; i++) to[i] = Map(from[i], lo, hi, olo, ohi, gamma);
         }
