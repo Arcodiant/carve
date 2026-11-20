@@ -152,3 +152,5 @@ three-quarter rise from 10 to 15.
 
 **Not checked:** no frame has been opened (0 of 12 images). No queued run has been made. `server-regression` has run
 only the new test, not the whole suite.
+
+Verify at `c72e478` (job `J-20261120-013321-9792c3`): core-unit, server-unit and server-regression (652 s) pass. scenario-bakes fails, and only on the three strip checks of item 1 ("faces or strips are not in sight").
