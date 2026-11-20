@@ -17,6 +17,15 @@ public class WorkedExampleTests
     }
 
     [Fact]
+    public async Task Define_graph_takes_the_brick_layout_as_written()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+
+        Assert.Equal(DefineGraphTool.WorkedTilesResult, await patina.Ok("define_graph", DefineGraphTool.WorkedTiles));
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedTiles + "\nreturns: " + DefineGraphTool.WorkedTilesResult, DefineGraphTool.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Get_graph_after_define_graph_returns_the_description_s_text()
     {
         await using var patina = await PatinaHarness.StartAsync();
