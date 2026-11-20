@@ -123,7 +123,7 @@ Agent 1 Claude Opus 5.5 (BVH, occlusion, ORM, `bake`, stage, probe); research ag
   (`RenderGlbTexts.Sampling`, taken out of `PartToolsListTests`' digest as T-94's sentences are). `RenderGlbSamplingTests`
   (regression) draws a 1024 texel-noise face with both tools under D-6's rule: without the flag 184846 px differ (limit
   1310.72); with it the two frames are byte-identical.
-- **Before and after hashes** (`G:\My Drivertifacts\carve\M-24\T-124\mipmap-fix`, `before.sha256`, `after.sha256`,
+- **Before and after hashes** (`G:\My Drive\artifacts\carve\M-24\T-124\mipmap-fix`, `before.sha256`, `after.sha256`,
   `compare.py`): scenario-orcward, scenario-morph and server-regression run `--fresh` without and with the fix (all
   PASS). Of 287 PNGs, 286 byte-identical; the one change is `render-glb-sampling-tests/noise-render-glb.png`, which now
   equals `noise-render.png`. No untextured `render_glb` frame changed.
@@ -145,6 +145,7 @@ Agent 1 Claude Opus 5.5 (BVH, occlusion, ORM, `bake`, stage, probe); research ag
 - **Timing**, wrench at 1024 × 32 rays, Debug, this machine: occlusion 8788 ms (8268 in the probe), orm 605 ms. Under
   10 s, with little room. A Release timing was not taken.
 - **Review:** Waystone round 1 (17 items: the occlusion `uvs` frame, the `wrench-orm-*` frames, the two compare
-  triptychs and the sampling test's two frames, `G:\My Drivertifacts\carve\M-24\T-124ound-1`): **approved**, no notes.
+  triptychs and the sampling test's two frames, `G:\My Drive\artifacts\carve\M-24\T-124
+ound-1`): **approved**, no notes.
 - **Not checked:** part transforms; occluders use each mesh's stored positions, so a multi-part model's part offsets are
   not applied. T-125's normal-map comparison moves with the fix; it was not run here.
