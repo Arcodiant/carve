@@ -4,7 +4,7 @@ description: >-
 ---
 # T-126 — Curvature
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
@@ -95,6 +95,7 @@ flat middle 127, both L-block texels 251 and 241 against at most 64). Clean run 
 concave texel is half a texel inside the face, not the one on the UV edge (which landed in a neighbouring island's convex rim).
 
 **Frames:** Waystone round 1 (wrench `uvs`, jaw 4x, L-block `uvs`, L-block inner 4x): approved, no notes. The L-block changed no wrench
-frame or bake (hash compared with a run without it). Evidence: `G:\My Drivertifacts\carve\M-24\T-126ound-1`.
+frame or bake (hash compared with a run without it). Evidence: `G:\My Drivertifacts\carve\M-24\T-126
+ound-1`.
 
 **Not checked:** the margin's slack on other block sizes or widths; the L-block frame by eye beyond a scaled look.
