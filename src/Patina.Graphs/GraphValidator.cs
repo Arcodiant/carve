@@ -57,7 +57,7 @@ public static class GraphValidator
         var a = new GraphAnalysis();
         var ids = string.Join(", ", graph.Nodes.Keys);
         // The exposed parameters first: what they drive takes their value, and its own value in the node is not checked.
-        var exposed = GraphParameters.Analyse(graph, registry);
+        var exposed = GraphParameters.Analyse(graph, registry, chain);
 
         // Each graph node expanded inline (T-140): the nodes analysed are the graph's own and, for each graph node, the
         // nested graph's nodes renamed <node>/<id>. A graph node is never one of them; a source naming it resolves to the
@@ -69,7 +69,7 @@ public static class GraphValidator
         {
             if (registry.Find(node.Type) is not NestedGraphNode) { nodes[id] = node; continue; }
             var faults = useFaults[id] = [];
-            a.Uses[id] = Expand(id, node, graph, registry, chain, depth, faults, nodes, a, wiredHere);
+            a.Uses[id] = Expand(id, node, graph, registry, chain, depth, faults, nodes, a, wiredHere, exposed);
         }
 
         foreach (var id in nodes.Keys.Concat(useFaults.Keys).Order(StringComparer.Ordinal))
@@ -224,7 +224,7 @@ public static class GraphValidator
     /// <see cref="GraphUse.Failed"/>, and nothing of it is added.
     /// </summary>
     private static GraphUse Expand(string id, GraphNode node, TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth,
-        List<GraphFault> faults, SortedDictionary<string, GraphNode> nodes, GraphAnalysis a, HashSet<string> wiredHere)
+        List<GraphFault> faults, SortedDictionary<string, GraphNode> nodes, GraphAnalysis a, HashSet<string> wiredHere, ParameterAnalysis exposed)
     {
         var use = new GraphUse(id);
         void Fault(string? port, string? parameter, string message) => faults.Add(new(id, port, parameter, message));
@@ -280,7 +280,9 @@ public static class GraphValidator
         }
 
         // The values set on the node: the nested graph's exposed parameters by name, each checked alone so every one at fault is named.
-        var overrides = node.Params.Where(p => p.Key != "path").ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
+        // A value an outer parameter drives ("wall.mortar") is that parameter's, already checked against this range by
+        // GraphParameters (its own value in the node is ignored); one at fault leaves the nested graph's own value.
+        var overrides = node.Params.Where(p => p.Key != "path" && !exposed.DrivenBy.ContainsKey((id, p.Key))).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
         foreach (var (name, value) in overrides.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
             var where = $"nodes['{id}'].params['{name}']";
@@ -297,6 +299,8 @@ public static class GraphValidator
             }
         }
         if (faults.Count > 0) return use;
+        foreach (var ((driven, name), value) in exposed.Values)
+            if (driven == id) overrides[name] = value;
         var set = GraphParameters.WithOverrides(nested, overrides, registry).Graph!;
 
         var inner = Analyse(set, registry, [.. chain, full], depth + 1);
@@ -306,10 +310,8 @@ public static class GraphValidator
         foreach (var f in inner.Faults.Where(f => !f.OnItsOwn))
         {
             var path = f.Node is null ? id : $"{id}/{f.Node}";
-            var message = f.Node is not null && f.Message.StartsWith($"node '{f.Node}'", StringComparison.Ordinal)
-                ? $"node '{path}'" + f.Message[$"node '{f.Node}'".Length..]
-                : $"node '{id}' ({fileName}): {f.Message}";
-            faults.Add(f with { Node = path, Message = f.File is null ? $"{message} (in {fileName})" : message, File = f.File ?? full });
+            var message = NestedMessage(id, f);
+            faults.Add(f with { Node = path, Message = f.File is null ? $"{message} ({fileName})" : message, File = f.File ?? full });
         }
 
         // The nested graph's ports: its own input nodes (not those of graphs it uses) and its outputs.
@@ -348,6 +350,51 @@ public static class GraphValidator
     }
 
     /// <summary>A missing nested file, as open's missing file (and carve's missing texture, T-81) gives it: the path and the .texgraph files in its folder.</summary>
+    /// <summary>
+    /// A nested graph's fault named from the level above, in the form the graph node's own faults take (the person's
+    /// ruling, 2026-11-20): <c>node 'layout' parameter 'gap' is ...</c> becomes <c>nodes['wall/layout'].params['gap']: is ...</c>,
+    /// an input <c>nodes['wall/x'].inputs['in']: ...</c>, a node <c>nodes['wall/x']: ...</c>, and one already in this form
+    /// (from a level further down) gains the prefix; a fault on no node (a nested parameter's) is put under the graph node.
+    /// </summary>
+    private static string NestedMessage(string id, GraphFault f)
+    {
+        if (f.Node is null) return $"nodes['{id}']: {f.Message}";
+        var path = $"{id}/{f.Node}";
+        var m = f.Message;
+        string Rest(string head) => m[head.Length..].TrimStart(':', ' ');
+        if (f.Parameter is { } p && m.StartsWith($"node '{f.Node}' parameter '{p}'", StringComparison.Ordinal))
+            return $"nodes['{path}'].params['{p}']: {Rest($"node '{f.Node}' parameter '{p}'")}";
+        if (f.Port is { } q && m.StartsWith($"node '{f.Node}' input '{q}'", StringComparison.Ordinal))
+            return $"nodes['{path}'].inputs['{q}']: {Rest($"node '{f.Node}' input '{q}'")}";
+        if (m.StartsWith($"node '{f.Node}'", StringComparison.Ordinal))
+            return $"nodes['{path}']: {Rest($"node '{f.Node}'")}";
+        if (m.StartsWith("nodes['", StringComparison.Ordinal))
+            return "nodes['" + id + "/" + m["nodes['".Length..];
+        return $"nodes['{path}']: {m}";
+    }
+
+    /// <summary>
+    /// What a <c>graph</c> node's parameters are, for an outer parameter driving one (<c>"wall.mortar"</c>): the nested
+    /// file's name, its parameters, and those not at fault with their ranges. Null when the file cannot be read, is in
+    /// <paramref name="chain"/> or is too deep; the graph node's own faults say why.
+    /// </summary>
+    internal static NestedParameterSet? NestedParameters(TextureGraph graph, GraphNode node, NodeRegistry registry, IReadOnlyList<string> chain)
+    {
+        if (chain.Count >= MaxDepth || !node.Params.TryGetValue("path", out var pathValue) || ParamSpec.FilePath("path").Check(pathValue) is not null) return null;
+        if (ResolvePath(graph, pathValue.Text!) is not { } full || chain.Contains(full, StringComparer.OrdinalIgnoreCase) || !File.Exists(full)) return null;
+        string text;
+        try
+        {
+            text = File.ReadAllText(full);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+        if (TexGraphFile.Parse(text, null, Path.GetDirectoryName(full)).Graph is not { } nested) return null;
+        return new(Path.GetFileName(full), [.. nested.Parameters.Keys], GraphParameters.Analyse(nested, registry, [.. chain, full]).Exposed);
+    }
+
     private static string Missing(string full)
     {
         const int limit = 20;
@@ -618,3 +665,6 @@ public sealed record NestedGraphInput(string Name, PortKind Kind, bool HasDefaul
 /// </summary>
 public sealed record NestedGraphUse(string Node, string? File, bool Expanded, IReadOnlyDictionary<string, ExposedParameter> Parameters,
     IReadOnlyList<NestedGraphInput> Inputs, IReadOnlyList<string> Outputs, IReadOnlyList<string> Files);
+
+/// <summary>A nested graph's parameters as an outer parameter driving its graph node reads them: see <see cref="GraphValidator.NestedParameters"/>.</summary>
+internal sealed record NestedParameterSet(string FileName, IReadOnlyList<string> Declared, IReadOnlyDictionary<string, ExposedParameter> Exposed);
