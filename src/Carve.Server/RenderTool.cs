@@ -314,10 +314,9 @@ internal static class RenderTool
             return await RunUvs(context, status, store, queue, size, labels, highlight, mesh, image, toolFolder?.Directory, cancellationToken);
         }
 
-        if (image is not null)
-        {
-            return Error($"image: not with mode '{mode ?? "shaded"}'; it is the picture drawn under the layout of mode 'uvs'.");
-        }
+        // RV-74: the image's refusal is listed with the call's other problems, in its own words, and alone when it is the only one.
+        var imageProblem = image is null ? null : $"image: not with mode '{mode ?? "shaded"}'; it is the picture drawn under the layout of mode 'uvs'.";
+        CallToolResult Refuse(string problem) => imageProblem is null ? Error(problem) : Failed("render", [imageProblem, problem]);
 
         var sheet = !Absent(views);
         var given = context.Params?.Arguments;
@@ -327,54 +326,54 @@ internal static class RenderTool
             && !(name == "zoom" && value.ValueKind == JsonValueKind.Number && value.GetDouble() == 1);
         if (sheet && new[] { "view", "direction", "zoom", "target" }.Any(Given))
         {
-            return Error("views: not with view, direction, zoom or target; give those in each entry instead.");
+            return Refuse("views: not with view, direction, zoom or target; give those in each entry instead.");
         }
 
         if (columns is { } asked && asked is not (1 or 2 or 3))
         {
-            return Error($"columns: {Join([asked])} is not 1, 2 or 3.");
+            return Refuse($"columns: {Join([asked])} is not 1, 2 or 3.");
         }
 
         if (!sheet && CameraRefusal(view, direction, zoom, target) is { } refused)
         {
-            return Error(refused);
+            return Refuse(refused);
         }
 
         string? tileProblem = null;
         var tiles = sheet ? Tiles(views!.Value, out tileProblem) : [new Tile(view, direction, zoom, target)];
         if (tileProblem is not null)
         {
-            return Error(tileProblem);
+            return Refuse(tileProblem);
         }
 
         if (projection is not (null or "perspective" or "orthographic"))
         {
-            return Error($"projection: '{projection}' is not a projection; use 'perspective' or 'orthographic'.");
+            return Refuse($"projection: '{projection}' is not a projection; use 'perspective' or 'orthographic'.");
         }
 
         if (!RenderComposition.Sizes.Any(s => s == size))
         {
-            return Error($"size: {Join([size])} is not a size; use 256, 512 or 1024");
+            return Refuse($"size: {Join([size])} is not a size; use 256, 512 or 1024");
         }
 
         if (mode is not (null or "shaded" or "wireframe" or "normals" or "checker"))
         {
-            return Error($"mode: '{mode}' is not a mode; use 'shaded', 'wireframe', 'normals', 'checker' or 'uvs'.");
+            return Refuse($"mode: '{mode}' is not a mode; use 'shaded', 'wireframe', 'normals', 'checker' or 'uvs'.");
         }
 
         if (labels is not (null or "none" or "faces" or "vertices" or "both"))
         {
-            return Error($"labels: '{labels}' is not a label set; use 'none', 'faces', 'vertices' or 'both'.");
+            return Refuse($"labels: '{labels}' is not a label set; use 'none', 'faces', 'vertices' or 'both'.");
         }
 
         if (bone_labels == true && bones != true)
         {
-            return Error("bone_labels: needs bones: true; the names are written beside the bones.");
+            return Refuse("bone_labels: needs bones: true; the names are written beside the bones.");
         }
 
         if (weights is not null && mode is "wireframe" or "normals" or "checker")
         {
-            return Error($"weights: not with mode '{mode}'; the weights look draws the faces itself.");
+            return Refuse($"weights: not with mode '{mode}'; the weights look draws the faces itself.");
         }
 
         var problems = new List<string>();
@@ -390,9 +389,14 @@ internal static class RenderTool
                 if (on) problems.Add($"level: not with {name}; a kept level is drawn as it was kept, at rest");
         }
 
-        if (problems.Count > 0)
+        if (imageProblem is not null) problems.Insert(0, imageProblem);
+        if (problems.Count > 1 || (problems.Count == 1 && imageProblem is null))
         {
             return Failed("render", problems);
+        }
+        if (imageProblem is not null)
+        {
+            return Error(imageProblem);
         }
 
         // The part is checked against the model of the call before the engine is waited on, so a wrong name needs no device.

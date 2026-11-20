@@ -76,4 +76,18 @@ public sealed class UvImageArgumentTests() : TempFolderTests("carve-uv-image-arg
         Assert.Contains("image: no file at ", text);
         Assert.Contains("2 problem", text);
     }
+
+    [Theory]
+    [InlineData("""{"image":"a.png","view":"nope"}""", "view")]
+    [InlineData("""{"image":"a.png","projection":"fisheye"}""", "projection: 'fisheye' is not a projection")]
+    [InlineData("""{"image":"a.png","level":-1}""", "level: -1 is not a level")]
+    public async Task Image_with_another_mode_is_reported_with_the_calls_other_problems(string arguments, string other)
+    {
+        // RV-74: with a mode other than 'uvs' the image's refusal came back alone, before the call's other problems.
+        File.WriteAllBytes(Path.Combine(Root, "a.png"), TestPng.Marker);
+        var text = await RenderAsync(arguments);
+        Assert.Contains("render failed with 2 problem(s)", text);
+        Assert.Contains("image: not with mode 'shaded'; it is the picture drawn under the layout of mode 'uvs'.", text);
+        Assert.Contains(other, text);
+    }
 }
