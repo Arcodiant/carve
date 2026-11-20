@@ -298,7 +298,8 @@ slowdown from noise. Runs 1 to 3 overlapped the agent's file reads and edits; ru
 
 ### As built
 
-Built by Claude Opus 5.5 (`claude-opus-5-5`), following the research's plan.
+Built by Claude Opus 5.5 (`claude-opus-5-5`), following the research's plan, in two agents: the first to a call
+checkpoint, the second (also Claude Opus 5.5) finishing from its hand-off.
 
 **Rulings since the research (2026-11-19, by the person):**
 - *Accepted:* the evaluator fills only canonical tiles inside the image; only a node's reads wrap, and the rectangles a
@@ -310,7 +311,8 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`), following the research's plan.
 **What was built.** `Imaging/TexelRect.cs`, `Tile.cs`, `TileRead.cs` and `PortKind.cs` (moved out of the deleted
 `Band.cs`); `Evaluation/TileCache.cs` (internal) and the tiled `GraphEvaluator`; `NodeType.InputRect` for `Radius`;
 `OutputPacking.PackRow` over a `Tile` and `PackTile`; `OutputImage.Make`/`Rgba8(…, tileSize, cacheBytes)`;
-`ExportTool` packs tile by tile and checks for cancellation once a tile. The research's commits 1 and 2 went in as one
+`ExportTool` packs tile by tile and checks for cancellation once a tile, and its description says tiles and "about 3
+minutes" (it said bands and 2.5). `swatch`'s description never spoke of bands. The research's commits 1 and 2 went in as one
 (the types and the switch), since `PortKind` moved out of `Band.cs`; the new tests are a commit of their own. Every
 committed `samples/graphs/*/*.png` is unchanged. Test start lines moved: `FirstNodesTests.Run`'s callback and its
 `CheckSeam` line (`Band.Wrap` is `Tile.Wrap`), `EvaluationTests.Rgba` and its packing helper, `PlanksGraphTests`' tiled
@@ -365,7 +367,8 @@ inside one tile (it throws across two).
 
 **Tile size and cap.** `GraphEvaluator.DefaultTileSize = 128` (a greyscale tile 64 KB, a colour one 192 KB; 4096 tiles
 at 8192; one tile at sizes to 128) and `DefaultCacheBytes = 64 MiB`, per `Evaluate` call. Tiles a step needs are pinned;
-past the cap, unpinned tiles are dropped least recently unpinned first. `EvaluationRun(TileSize, MostTiles, PeakBytes,
+past the cap, unpinned tiles are dropped least recently unpinned first, and room is made (`TileCache.MakeRoom`) before
+a node's tiles are allocated, so what is held never passes the cap by the tile being made. `EvaluationRun(TileSize, MostTiles, PeakBytes,
 CapBytes, TilesEvaluated)` is in `LastRun`. Neither the tile size nor the cap changes a byte: tests hold it at tile
 sizes 16, 64 and 256 under caps 0 and the default, for the planks and for a graph with every node type.
 
@@ -379,29 +382,14 @@ node works texels from image coordinates and `e.Size`, never from its place insi
 7 5800X3D, Windows 10 Pro): before (bands) 196.0 s median; after (tiles) 187.6 s, 181.1 s, 195.0 s, 188.8 s, 167.8 s (measured on commit `ab42c20`, before the new tests); **median 187.6 s** (4 % faster than before), peak
 working set 1566 to 1567 MB in every run, as before. The runs overlapped only this agent's light file edits.
 
-**Frames.** scenario-patina's and scenario-planks' frames compared by hash with `main`'s: not yet compared (see the Hand-off).
+**Frames.** scenario-patina: run on one runner (Xellotath) from `main` (`7d7752d`, in a temporary detached worktree)
+and from this branch (`8870aea`), with `CAIRN_ARTIFACTS` set: all 10 frames and the 16 export and swatch PNGs equal by
+SHA-256; the queued job `J-20261120-035840-c10d3a` (Mantorok) gives the same 10 frame hashes. scenario-planks: none of
+its inputs changed (verify carried its pass, `ed3feee` on Xellotath, the pass `main` carries too), so its frames are
+the same job's.
 
-### Hand-off
-
-Written by Claude Opus 5.5 (`claude-opus-5-5`) at the call checkpoint. "As built" above is a draft: correct it as the
-rest lands.
-
-Done: the switch (commit `ab42c20`: types, evaluator, cache, the seven nodes and the test nodes ported; patina-unit
-passed on it, every committed PNG unchanged); the 8192 time (above: median 187.6 s against 196.0 s, no stop); the new
-tests and the docs (CLAUDE.md's rule and its two Layout rows, `ExportBoundedMemoryTests`' summary), in the commit after.
-
-Left, in order:
-1. `AFarReadingNodeStaysUnderTheCap` fails: `held 8454144 bytes, past the cap of 8388608`, one 64 KB tile over.
-   `TileCache.AddPinned` takes `PeakBytes` after adding the new tile and before `Trim`, and the tile is allocated
-   before anything is dropped, so the cache really does hold cap + one tile for a moment. Fix it in the evaluator, not
-   the test: before allocating a node's output tiles, drop unpinned tiles until `Bytes + incoming <= Cap` (a
-   `TileCache.MakeRoom(long incoming)`), then add. `TilesAreBoundedAndTheCacheStaysUnderItsCap`'s worked runs should
-   still hold (check the cap-0 cases: held is then exactly the pinned tiles). Every other patina-unit test passed.
-2. `export`'s description (`src/Patina.Server/ExportTool.cs` line 39): "in bands" to "in tiles", and "about 2.5
-   minutes" to the measured time (about 3 minutes, 187.6 s here). Check whether a test quotes that text.
-3. scenario-patina's and scenario-planks' frames by hash against `main`'s, fetched by job id.
-4. `cairn task T-133 verify`, then fold this Hand-off into As built, commit, `cairn lint`, `cairn task T-133 finish`.
-
-Not done: the research's commit 1 was not split from commit 2 (`PortKind` moved out of `Band.cs`; As built says so).
-Surprising: a stray empty folder `D:\Users\andre\AppData\Local\Temp` was made on D: by a mistyped path (the
-script in it was moved to `%TEMP%`); a safety check refused its removal, so it is left for the person to delete.
+**Since the first agent's hand-off.** The cache could hold the cap and one tile more for a moment
+(`AFarReadingNodeStaysUnderTheCap` failed by one 64 KB tile): a tile was allocated before anything was dropped. Fixed
+in the evaluator (`TileCache.MakeRoom` before a node's tiles are made), not the test. A stray empty folder
+`D:\Users\andre\AppData\Local\Temp`, made on D: by a mistyped path in the first agent, is left for the person to
+delete.
