@@ -4,7 +4,7 @@ description: >-
 ---
 # T-140 — Graphs as nodes
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
