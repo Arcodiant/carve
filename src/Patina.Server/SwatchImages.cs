@@ -122,7 +122,14 @@ public sealed record SheetLayout(int Columns)
 /// </summary>
 public static class LabelAtlas
 {
-    public const int Size = 512;
+    /// <summary>
+    /// The atlas's side: 32 rows, so a title, 15 columns' two labels and the sphere's. It was 512 (16 rows, 7 columns) until
+    /// T-134; rows are where they were, so a sheet of 7 columns or fewer draws the same pixels.
+    /// </summary>
+    public const int Size = 1024;
+
+    /// <summary>The widest a label is drawn, its text and padding: as it was when the atlas was 512 a side.</summary>
+    public const int LabelWidth = 512 - Inset + Padding;
 
     public const int Pitch = 32;
 
@@ -174,7 +181,7 @@ public static class SwatchSheet
         void Label(int row, int left, int top, bool backed)
         {
             var extent = extents[row];
-            var w = Math.Min((int)MathF.Ceiling(extent.X) + 2 * LabelAtlas.Padding, LabelAtlas.Size - LabelAtlas.Inset + LabelAtlas.Padding);
+            var w = Math.Min((int)MathF.Ceiling(extent.X) + 2 * LabelAtlas.Padding, LabelAtlas.LabelWidth);
             var h = Math.Min((int)MathF.Ceiling(extent.Y) + 2 * LabelAtlas.Padding, SwatchImages.LabelBand - LabelAtlas.Padding);
             for (var y = 0; y < h; y++)
             {
