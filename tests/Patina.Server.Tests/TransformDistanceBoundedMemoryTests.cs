@@ -27,22 +27,28 @@ public class TransformDistanceBoundedMemoryTests
     /// <summary>The floor's 4 x 4 tiles' mask, measured inside at range 0.1.</summary>
     public const string Measured = """{"version":1,"size":256,"seed":7,"nodes":{"t":{"type":"tiles","params":{"count":[4,4],"gap":0.06,"bevel":0}},"d":{"type":"distance","inputs":{"in":"t.mask"},"params":{"range":0.1}},"out":{"type":"output","inputs":{"in":"d"},"params":{"role":"height"}}}}""";
 
-    /// <summary>How long the export may take, in a Debug patina, before the test gives up.</summary>
-    private static readonly TimeSpan Deadline = TimeSpan.FromMinutes(60);
+    /// <summary>
+    /// How long an export may take, in a Debug patina, before the test gives up: about four times what each took in
+    /// Debug on the T-155 machine (turn 129 s, distance 147 s, minify 114 s; blur 640 s).
+    /// </summary>
+    private static readonly TimeSpan Deadline = TimeSpan.FromMinutes(10);
+
+    /// <summary>The blur's deadline: it took 640 s in Debug, so about three times that.</summary>
+    private static readonly TimeSpan BlurDeadline = TimeSpan.FromMinutes(30);
 
     [Fact]
-    public Task A_30_degree_turn_of_a_colour_fbm_at_8192_peaks_at_2_GB_or_less() => ExportAsync("turn", Turned, "base_colour", 8192);
+    public Task A_30_degree_turn_of_a_colour_fbm_at_8192_peaks_at_2_GB_or_less() => ExportAsync("turn", Turned, "base_colour", 8192, Deadline);
 
     [Fact]
-    public Task Distance_at_range_0_1_at_8192_peaks_at_2_GB_or_less() => ExportAsync("distance", Measured, "height", 8192);
+    public Task Distance_at_range_0_1_at_8192_peaks_at_2_GB_or_less() => ExportAsync("distance", Measured, "height", 8192, Deadline);
 
     [Fact]
-    public Task A_smooth_blur_at_radius_0_05_at_8192_peaks_at_2_GB_or_less() => ExportAsync("blur", Blurred, "base_colour", 8192);
+    public Task A_smooth_blur_at_radius_0_05_at_8192_peaks_at_2_GB_or_less() => ExportAsync("blur", Blurred, "base_colour", 8192, BlurDeadline);
 
     [Fact]
-    public Task A_strong_minify_at_8192_peaks_at_2_GB_or_less() => ExportAsync("minify", Minified, "base_colour", 8192);
+    public Task A_strong_minify_at_8192_peaks_at_2_GB_or_less() => ExportAsync("minify", Minified, "base_colour", 8192, Deadline);
 
-    private static async Task ExportAsync(string label, string graph, string role, int size)
+    private static async Task ExportAsync(string label, string graph, string role, int size, TimeSpan deadline)
     {
             using var folder = new TempFolder();
             var start = new ProcessStartInfo("dotnet")
@@ -84,7 +90,7 @@ public class TransformDistanceBoundedMemoryTests
                 Assert.True(said.EndsWith("no faults: it evaluates", StringComparison.Ordinal), said);
 
             var clock = Stopwatch.StartNew();
-            var result = await Send(3, "tools/call", JsonSerializer.Serialize(new { name = "export", arguments = new { folder = "big", size, outputs = new[] { role } } }), Deadline);
+            var result = await Send(3, "tools/call", JsonSerializer.Serialize(new { name = "export", arguments = new { folder = "big", size, outputs = new[] { role } } }), deadline);
             clock.Stop();
             process.Refresh();
             var peak = process.PeakWorkingSet64;
