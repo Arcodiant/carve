@@ -81,9 +81,9 @@ internal sealed class OcclusionStage : IBakesStage
         CheckOcclusion(regions);
         WriteProbe(driver, files, regions);
 
-        // RV-74: no block-rule check yet. Strict, 96 of 22558 inside pixels break it (up to 8 levels, the look minified on the
-        // occlusion's gradients); with blend 1 none do. A blend is a threshold, so it waits on the person.
-        await driver.CaptureAsync("wrench-orm-uvs-occlusion", new { mode = "uvs", image = occlusionPath, size = Size });
+        // T-121's block rule, with blend 1: the look is minified on the occlusion's gradients (the person's ruling, RV-74).
+        var uvs = await driver.CaptureAsync("wrench-orm-uvs-occlusion", new { mode = "uvs", image = occlusionPath, size = Size });
+        CheckUvImage("wrench-orm-uvs-occlusion", uvs, mesh, occlusion, blend: 1);
         var jaw = Mean(mesh, groups["dark"]);
         var grip = Mean(mesh, groups["rubber"]);
         var drive = Mean(mesh, Drive);

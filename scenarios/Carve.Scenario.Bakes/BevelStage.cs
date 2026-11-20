@@ -78,9 +78,9 @@ internal sealed class BevelStage : IBakesStage
             CheckStrip(view, "normal", frame, scene, mesh, edge, tsv, judge: true);
         }
 
-        // RV-74: no block-rule check yet. Strict, 3 of 22558 inside pixels break it (one channel 3 levels off N); a blend does not
-        // clear them. A tolerance is a threshold, so it waits on the person.
-        await driver.CaptureAsync("wrench-uvs-normal", new { mode = "uvs", image = normal, size = Size });
+        // T-121's block rule, with blend 1 read per channel, as for the occlusion frame (the person's ruling, RV-74).
+        var uvs = await driver.CaptureAsync("wrench-uvs-normal", new { mode = "uvs", image = normal, size = Size });
+        CheckUvImage("wrench-uvs-normal", uvs, mesh, png, blend: 1);
 
         var sides = new View[]
         {

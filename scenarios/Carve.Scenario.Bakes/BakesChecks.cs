@@ -77,7 +77,7 @@ internal static class BakesChecks
     /// each axis and 4 pixels or more from every face edge, whose lines are drawn over the image (T-121's placement).
     /// <para>
     /// Inside an island the frame is also held to <paramref name="worked"/>, the face's colour worked from its groups, so a bake of
-    /// the wrong colours fails even though the frame shows the PNG faithfully. With <paramref name="blend"/> above 0 an inside pixel may also show a blend of the texels around its own (for a grey ramp steeper than a pixel). Returns the counts (inside, outside).
+    /// the wrong colours fails even though the frame shows the PNG faithfully. With <paramref name="blend"/> above 0 an inside pixel may also show a blend of the texels around its own (for a ramp steeper than a pixel, each channel read on its own). Returns the counts (inside, outside).
     /// </para>
     /// </summary>
     public static (int Inside, int Outside) CheckUvImage(string what, ScenarioFrame frame, SceneMesh mesh, Texels png, Func<int, (int R, int G, int B)>? worked = null, int blend = 0)
@@ -137,13 +137,20 @@ internal static class BakesChecks
         return (inside, outside);
     }
 
-    /// <summary>Whether a grey frame value lies, within 2, between the least and the most of the PNG's texels within <paramref name="blend"/> texels of the sampled one: the look is minified there (a texel is under a pixel), so a steep ramp shows a blend of neighbours.</summary>
+    /// <summary>Whether each channel of a frame value lies, within 2, between the least and the most of that channel over the PNG's texels within <paramref name="blend"/> texels of the sampled one: the look is minified there (a texel is under a pixel), so a steep ramp shows a blend of neighbours. On a grey PNG the three channels read alike.</summary>
     private static bool Blended((int R, int G, int B) got, Texels png, int x, int y, int blend)
     {
-        int lo = 255, hi = 0;
+        int loR = 255, hiR = 0, loG = 255, hiG = 0, loB = 255, hiB = 0;
         for (var j = Math.Max(0, y - blend); j <= Math.Min(png.Height - 1, y + blend); j++)
-        for (var i = Math.Max(0, x - blend); i <= Math.Min(png.Width - 1, x + blend); i++) { var r = png.At(i, j).R; lo = Math.Min(lo, r); hi = Math.Max(hi, r); }
-        return got.R >= lo - 2 && got.R <= hi + 2 && got.G >= lo - 2 && got.G <= hi + 2 && got.B >= lo - 2 && got.B <= hi + 2;
+        for (var i = Math.Max(0, x - blend); i <= Math.Min(png.Width - 1, x + blend); i++)
+        {
+            var t = png.At(i, j);
+            loR = Math.Min(loR, t.R); hiR = Math.Max(hiR, t.R);
+            loG = Math.Min(loG, t.G); hiG = Math.Max(hiG, t.G);
+            loB = Math.Min(loB, t.B); hiB = Math.Max(hiB, t.B);
+        }
+
+        return got.R >= loR - 2 && got.R <= hiR + 2 && got.G >= loG - 2 && got.G <= hiG + 2 && got.B >= loB - 2 && got.B <= hiB + 2;
     }
 
     private static bool Clear(Vector2 p, (Vector2 A, Vector2 B)[] segments, float clear)
