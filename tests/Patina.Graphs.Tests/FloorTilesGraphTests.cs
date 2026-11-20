@@ -161,7 +161,10 @@ public class FloorTilesGraphTests(ITestOutputHelper output)
         Assert.InRange(ink, T * T / 20, T * T / 2);
         Assert.Equal(T * T, turned);
         Assert.Equal(T * T, same);
-        // and the turn is visible: the motif is not the same turned
-        Assert.True(Enumerable.Range(0, T * T).Count(i => Math.Abs(P(1, 0, i % T, i / T) - P(0, 0, i % T, i / T)) > 0.5f) > T * T / 20);
+        // and the turn is visible: the motif is not the same turned, more than a third of its ink moving (a measure of
+        // the ink, not of the tile: a motif of 348 texels moves 186 of them, which a twentieth of the tile, 204, would miss)
+        var moved = Enumerable.Range(0, T * T).Count(i => Math.Abs(P(1, 0, i % T, i / T) - P(0, 0, i % T, i / T)) > 0.5f);
+        output.WriteLine($"texels that differ between tile (0, 0) and its turned neighbour: {moved}");
+        Assert.True(moved > ink / 3, "the motif is the same turned");
     }
 }

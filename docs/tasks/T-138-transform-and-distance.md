@@ -66,6 +66,19 @@ tiles.
   check's rules.
 - Runs beside T-137 and T-139: its own node files, registry lines, sample and tests. A conflict that only adds is settled
   by keeping both sides.
+- **Rulings on the stop (2026-11-20, by the person):**
+  - *Distance's speed and pinned window:* a separable two-pass evaluation, in M-28, as a new member, T-155
+    (separable passes and rotated-read locality). T-155 depends on T-138, makes `distance` opt in, and brings its
+    pinned window under the cap. T-138 lands without meeting the 10 s.
+  - *Transform's speed:* fix the source recomputed under a free rotation, rather than accept it or bound the overhead.
+    This is also T-155's, in the evaluator. T-138 lands without meeting the 10 s.
+  - Both 10 s checks move to T-155. T-138 does not change `Evaluation/`, which T-155 owns. The regression test's peak
+    working set of 2 GB or less still holds here. A time over 10 s is recorded, not asserted; T-155 asserts it.
+  - *Scale* stays as built. Scale is the image's size, so 1/n gives n repeats and tiles, and a whole number above 1
+    zooms in and does not tile. The description says so.
+- **The floor tiles approved (2026-11-20, by the person, Waystone round-1):** the five PNGs, the swatch sheet and the
+  sphere. The person's note: "Let's show the swatch on a sphere and a cube, with 3x3 tiling". That is a change to
+  `swatch`, which is T-139's (the swatch overrides), so T-138 does not make it. It is passed on, not built here.
 
 ### Hand-off
 
