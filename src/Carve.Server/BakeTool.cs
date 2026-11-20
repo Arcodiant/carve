@@ -34,7 +34,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
     public const int DefaultPadding = 8;
 
     /// <summary>The example call in the description; a test runs it on <c>samples/wrench.carve</c>.</summary>
-    public const string Example = """{"mesh":"wrench","folder":"textures","size":1024,"maps":["masks","base_colour","orm"],"surface":{"all":{"base_colour":"#80858A","roughness":0.4,"metallic":1},"rubber":{"base_colour":"#282A2E","roughness":0.88,"metallic":0},"red":{"base_colour":"#B02A22"}},"occlusion":{"rays":32,"reach":0.035}}""";
+    public const string Example = """{"mesh":"wrench","folder":"textures","size":512,"maps":["masks","base_colour","orm"],"surface":{"all":{"base_colour":"#80858A","roughness":0.4,"metallic":1},"rubber":{"base_colour":"#282A2E","roughness":0.88,"metallic":0},"red":{"base_colour":"#B02A22"}},"occlusion":{"rays":32,"reach":0.035}}""";
 
     public const string Text =
         "Bakes the mesh's maps into PNG files that define_material takes as they come back: the model is not changed (no undo step, nothing to save). "

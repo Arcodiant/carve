@@ -144,6 +144,10 @@ Agent 1 Claude Opus 5.5 (BVH, occlusion, ORM, `bake`, stage, probe); research ag
   `metal` fails "271418 of 497040 covered texels differ from the surface's roughness and metallic".
 - **Timing**, wrench at 1024 × 32 rays, Debug, this machine: occlusion 8788 ms (8268 in the probe), orm 605 ms. Under
   10 s, with little room. A Release timing was not taken.
+- **The description's example bakes at 512**, not 1024: with `orm` it cast 32 rays per texel at 1024 and took 13 s
+  alone in `BakeToolTests`, and under `finish`'s load (server-regression on the same machine) it ran past the harness's
+  30 s answer window (server-unit failed once on a TaskCanceledException). At 512 it takes 3 s. No check changed; the
+  test's size assertion follows the example.
 - **Review:** Waystone round 1 (17 items: the occlusion `uvs` frame, the `wrench-orm-*` frames, the two compare
   triptychs and the sampling test's two frames, `G:\My Drive\artifacts\carve\M-24\T-124
 ound-1`): **approved**, no notes.
