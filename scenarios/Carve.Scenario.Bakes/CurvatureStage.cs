@@ -18,10 +18,14 @@ internal sealed class CurvatureStage : IBakesStage
     private const double Width = 0.003;
 
     /// <summary>
-    /// PROVISIONAL, not ruled: a texel at the middle of a convex jaw edge's UV edge must read at least 128 plus this. Probed on the
-    /// wrench: the least is 227 (a 71 degree edge, margin 99), 254 on the 90 and 109 degree edges (margin 126).
+    /// The person's ruling (2026-11-20): a texel at the middle of a convex jaw edge's UV edge, on all 120 edges, the 71 degree ones
+    /// included, must read at least 128 plus this (218). Probed on the wrench: the least is 227 (a 71 degree edge, margin 99), 254 on
+    /// the 90 and 109 degree edges (margin 126).
     /// </summary>
     private const int ConvexMargin = 90;
+
+    /// <summary>PROVISIONAL, not yet answered by the person: a texel on the L-block's inner edge must read at most 128 minus this.</summary>
+    private const int ConcaveMargin = 90;
 
     /// <summary>Bends of at least this many degrees between two jaw faces count as the jaw's edges (the wrench's are 65 and up, its rounding 30 and under).</summary>
     private const double EdgeDegrees = 60;
@@ -72,7 +76,63 @@ internal sealed class CurvatureStage : IBakesStage
         rows.Add($"flat\t{handle}\t-\t0\t{fx}\t{fy}\t{flat}");
         if (flat != 128) Note($"curvature: the middle of the handle's face {handle}, texel ({fx}, {fy}), reads {flat}, expected exactly 128");
 
+        await ConcaveAsync(driver, rows);
         File.WriteAllLines(Path.Combine(driver.RunFolder, "curvature.tsv"), rows);
+    }
+
+    /// <summary>
+    /// The concave check (the person's ruling, 2026-11-20): the wrench has no concave break edge, so a small L-block (the L hexagon
+    /// of 0.1 m arms, extruded 0.1 m) is built through the tools, given box UVs, and baked with <c>curvature</c>. A texel on its inner edge,
+    /// the one just inside each of its two faces (4 and 5) at the middle of that edge's UV edge, reads below 128 by
+    /// <see cref="ConcaveMargin"/>. The block is undone afterwards so the wrench's model is as the earlier stages left it.
+    /// </summary>
+    private async Task ConcaveAsync(ScenarioDriver driver, List<string> rows)
+    {
+        int[][] l = [[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]];
+        var vertices = l.Select(p => new[] { p[0] * 0.1, p[1] * 0.1, 0.0 }).Concat(l.Select(p => new[] { p[0] * 0.1, p[1] * 0.1, 0.1 })).ToArray();
+        var faces = new List<int[]> { new[] { 5, 4, 3, 2, 1, 0 }, new[] { 6, 7, 8, 9, 10, 11 } };
+        for (var i = 0; i < 6; i++) faces.Add(new[] { i, (i + 1) % 6, (i + 1) % 6 + 6, i + 6 });
+        await CallJsonAsync(driver, "define_mesh", new { name = "lblock", vertices, faces });
+        await CallJsonAsync(driver, "project_uvs", new { mesh = "lblock", method = "box", into = new[] { 0.04, 0.04, 0.96, 0.96 } });
+        var block = await Scene.ReadOneAsync(driver, "lblock");
+
+        var textures = Path.Combine(driver.RunFolder, "textures");
+        var bake = await CallJsonAsync(driver, "bake", new { mesh = "lblock", folder = textures, size = Size, padding = 8, maps = new[] { "curvature" }, curvature = new { width = Width } });
+        var path = bake.GetProperty("files").EnumerateArray().Single().GetProperty("path").GetString()!;
+        if (Path.GetFileName(path) != "lblock.curvature.png") Note($"curvature: the L-block's file is {path}, expected lblock.curvature.png");
+        if (bake.GetProperty("skipped_faces").GetArrayLength() != 0 || bake.GetProperty("warnings").GetArrayLength() != 0) Note($"curvature: the L-block: expected no skipped faces and no warnings, got {bake}");
+        var png = Texels.Read(path);
+
+        var frame = await driver.CaptureAsync("lblock-uvs-curvature", new { mode = "uvs", mesh = "lblock", image = path, size = Size });
+        CheckUvImage("lblock-uvs-curvature", frame, block, png, blend: 2);
+
+        // The inner edge is between side faces 4 (vertices 2, 3, 9, 8: its edge 3-9 is corner 1) and 5 (3, 4, 10, 9: corner 3). Box
+        // islands abut with no gap, so the texel is the one half a texel inside the face from the middle of its UV edge, never the
+        // neighbouring island's.
+        foreach (var (face, corner) in new[] { (4, 1), (5, 3) })
+        {
+            var uv = block.Uvs[face];
+            var (a, b) = (uv[corner], uv[(corner + 1) % uv.Length]);
+            var inward = uv.Aggregate(Vector2.Zero, (s, p) => s + p) / uv.Length - (a + b) / 2;
+            var along = Vector2.Normalize(b - a);
+            inward -= along * Vector2.Dot(inward, along);
+            var at = (a + b) / 2 + Vector2.Normalize(inward) * (0.5f / Size);
+            var (x, y) = ((int)Math.Floor(at.X * Size), (int)Math.Floor(at.Y * Size));
+            var value = Break == "curvature" ? 255 - png.At(x, y).R : png.At(x, y).R;
+            rows.Add(string.Create(CultureInfo.InvariantCulture, $"concave	{face}	-	90.0	{x}	{y}	{value}"));
+            if (value > 128 - ConcaveMargin) Note($"curvature: the L-block's inner edge, face {face}, texel ({x}, {y}) reads {value}, over {128 - ConcaveMargin}");
+        }
+
+        var (c, edge) = (block.Uvs[4][1], block.Uvs[4][2]);
+        var centre = (c + edge) / 2;
+        var (px, py) = ((int)(Size / 16.0 + centre.X * Size * 7 / 8.0), (int)(Size / 16.0 + centre.Y * Size * 7 / 8.0));
+        WriteCrop(frame, Path.Combine(driver.RunFolder, "frames", "lblock-uvs-curvature-inner-4x.png"), px - 64, py - 64, 128, 4);
+
+        // Put the model back as it was: the L-block's UVs and its definition.
+        await CallJsonAsync(driver, "undo", new { });
+        await CallJsonAsync(driver, "undo", new { });
+        if ((await driver.CallAsync("get_mesh", new { mesh = "lblock" })).IsError is not true) Note("curvature: the L-block is still in the model after its two undos");
+        if ((await driver.CallAsync("get_mesh", new { mesh = "wrench" })).IsError is true) Note("curvature: the wrench is gone after the L-block's undos");
     }
 
     private static float Area(Vector2[] p)
