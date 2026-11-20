@@ -44,6 +44,16 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
 
     public const string WorkedMapResult = "define_graph: the open graph is now 4 nodes, size 256, seed 0; no faults: it evaluates";
 
+    /// <summary>T-140's worked example: bricks.texgraph (beside the graph, or in the tool folder for a graph never saved) used as one node, its mortar set by name. Tests run it as written, with the sample copied beside it.</summary>
+    public const string WorkedNested =
+        """{"graph":{"version":2,"size":256,"seed":0,"nodes":{"wall":{"type":"graph","params":{"path":"bricks.texgraph","mortar":0.06}},"out":{"type":"output","inputs":{"in":"wall.base_colour"}},"rough":{"type":"output","inputs":{"in":"wall.roughness"},"params":{"role":"roughness"}}}}}""";
+
+    public const string WorkedNestedResult = "define_graph: the open graph is now 3 nodes, size 256, seed 0; no faults: it evaluates";
+
+    /// <summary>The same with mortar a parameter of this graph passed through to the node (the person's ruling, 2026-11-20): its range is bricks' own, 0 to 0.45.</summary>
+    public const string WorkedPassThrough =
+        """{"graph":{"version":2,"size":256,"seed":0,"parameters":{"mortar":{"value":0.06,"drives":["wall.mortar"]}},"nodes":{"wall":{"type":"graph","params":{"path":"bricks.texgraph"}},"out":{"type":"output","inputs":{"in":"wall.base_colour"}},"rough":{"type":"output","inputs":{"in":"wall.roughness"},"params":{"role":"roughness"}}}}}""";
+
     public static string Text(NodeRegistry registry) =>
         "Replaces the open texture graph with a whole new one, given as graph: the body of a .texgraph file, as JSON. "
         + "patina holds one graph per session. define_graph clears the snapshot stack (push_snapshot) and the graph's path (save gives it one), "
@@ -79,6 +89,12 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         + "Worked example, a metal plate: grey, metallic from a gradient across u, roughness its inverse, and a named output edge (a triangle gradient down v):\n"
         + "define_graph " + WorkedMetal + "\n"
         + "returns: " + WorkedMetalResult + "\n"
+        + "Worked example, a graph used as a node: bricks.texgraph as the node wall, mortar 0.06 set on it by name, its base_colour and roughness outputs taken as wall.base_colour and wall.roughness:\n"
+        + "define_graph " + WorkedNested + "\n"
+        + "returns: " + WorkedNestedResult + "\n"
+        + "An exposed parameter of the using graph may drive a value on a graph node, as \"wall.mortar\", and takes the nested graph's range for it (swatch and export then set it by name); the same graph with mortar passed through:\n"
+        + "define_graph " + WorkedPassThrough + "\n"
+        + "returns: " + WorkedNestedResult + "\n"
         + "Next: edit_graph to change it, get_graph to read it back, save to keep it.";
 
     public static McpServerTool Create(NodeRegistry registry) => Create<DefineGraphTool>("define_graph", Text(registry), new JsonObject
@@ -103,7 +119,9 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         lock (store.Gate)
         {
             store.Replace(read.Graph, null);
-            return Line($"define_graph: the open graph is now {Describe(read.Graph)}; {Faults(read.Faults)}");
+            // Validated again once placed: a graph node's path resolves against the tool folder the store gives a graph never saved (T-140).
+            var placed = store.Graph!;
+            return Line($"define_graph: the open graph is now {Describe(placed)}; {Faults(GraphValidator.Validate(placed, registry))}");
         }
     }
 }
