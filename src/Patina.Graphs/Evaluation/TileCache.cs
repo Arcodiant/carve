@@ -8,6 +8,11 @@ namespace Patina.Graphs.Evaluation;
 /// <see cref="Bound"/> bytes (the cap, or the most ever pinned at once if that is more, T-155) the unpinned ones are
 /// dropped least recently used first, so what is held stays at most the cap or the most one step pinned, whichever is
 /// more. No clock: "recent" is the order tiles were last unpinned.
+/// <para><b>Cold tiles</b> (T-155). A tile last unpinned by a separable node's row pass is cold: the row pass reads its
+/// inputs along one tile row, so once that row is made they are not read again, while its own row tiles are read by
+/// every column tile below them. Cold tiles are dropped before any other, least recently used first; pinned again by
+/// any reader, a tile is no longer cold. Without it a row's sources, unpinned between its row tiles, push the row
+/// tiles out under a tight cap.</para>
 /// </summary>
 internal sealed class TileCache(int tilesAcross, long cap)
 {
@@ -22,6 +27,7 @@ internal sealed class TileCache(int tilesAcross, long cap)
 
     private readonly Dictionary<long, Entry> _entries = [];
     private readonly LinkedList<Entry> _unpinned = new();
+    private readonly LinkedList<Entry> _cold = new();
 
     public long Cap { get; } = cap;
     public long Bytes { get; private set; }
@@ -49,16 +55,17 @@ internal sealed class TileCache(int tilesAcross, long cap)
         if (entry.Pins++ != 0) return;
         if (entry.Unpinned is { } node)
         {
-            _unpinned.Remove(node);
+            node.List!.Remove(node);
             entry.Unpinned = null;
         }
         AddPinnedBytes(entry.Bytes);
     }
 
-    public void Unpin(Entry entry)
+    /// <summary>Unpins the entry; unpinned by a row pass (<paramref name="cold"/>), it is dropped before any warm tile.</summary>
+    public void Unpin(Entry entry, bool cold = false)
     {
         if (--entry.Pins != 0) return;
-        entry.Unpinned = _unpinned.AddLast(entry);
+        entry.Unpinned = (cold ? _cold : _unpinned).AddLast(entry);
         PinnedBytes -= entry.Bytes;
     }
 
@@ -88,14 +95,14 @@ internal sealed class TileCache(int tilesAcross, long cap)
     /// </summary>
     public void MakeRoom(long incoming) => Trim(Bound - incoming);
 
-    /// <summary>Drops unpinned tiles, least recently used first, until no more than the bound is held or none is left.</summary>
+    /// <summary>Drops unpinned tiles, cold ones first, each least recently used first, until no more than the bound is held or none is left.</summary>
     public void Trim() => Trim(Bound);
 
     private void Trim(long limit)
     {
-        while (Bytes > limit && _unpinned.First is { } first)
+        while (Bytes > limit && (_cold.First ?? _unpinned.First) is { } first)
         {
-            _unpinned.RemoveFirst();
+            first.List!.Remove(first);
             var entry = first.Value;
             entry.Unpinned = null;
             _entries.Remove(entry.Key);
