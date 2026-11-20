@@ -150,7 +150,7 @@ the swatch on a sphere and a cube, tiled 3x3, is in the Notes and is not built h
 - *The regression class, real patina, debug build, one output exported:*
   - The 30-degree turn: 261.6 s, peak working set 1,721 MB (bound 2,048 MB): passes, with little headroom.
   - Distance at range 0.1, inside: 3,566.7 s (59 m 27 s for the test), peak working set 904 MB: passes. A run of
-    `patina-regression` therefore takes over an hour until T-155.
+    `patina-regression` takes long until T-155: `cairn task T-138 verify` ran it in 1,799 s.
 
 **Surprising:** `tools/Patina.SampleGraphs -- --canonical` rewrites every committed `.texgraph` with LF endings,
 though the bytes are otherwise the same. Restore the other samples with `git checkout --` after a run. (The second
