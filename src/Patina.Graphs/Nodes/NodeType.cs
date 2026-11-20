@@ -60,19 +60,25 @@ public abstract class NodeType
 /// <summary>An input port: its name, what it takes, and whether a graph must connect it.</summary>
 public sealed record InputPort(string Name, PortKind Kind, bool Required = true);
 
-public enum ParamKind { Int, Float, Enum, IntPair, Colour }
+public enum ParamKind { Int, Float, Enum, IntPair, Colour, Floats, Colours, Name }
 
 /// <summary>
 /// A parameter: its name, kind, range or choices, and default. <see cref="Check"/> says what is wrong with a value in
 /// words that give the range. Make one with <see cref="Int"/>, <see cref="Float"/>, <see cref="Enum"/>,
-/// <see cref="IntPair"/> or <see cref="Colour"/>.
+/// <see cref="IntPair"/>, <see cref="Colour"/>, the lists <see cref="Floats"/> and <see cref="Colours"/> (a count range,
+/// each in a range), or <see cref="Identifier"/> (optional: it has no default, and a node that leaves it out has none).
+/// <para>In the file a list is a JSON array: <c>[0, 0.25, 1]</c> of numbers, <c>["#202020", "#c0a080"]</c> of colours; an
+/// empty list, <c>[]</c>, reads as numbers and is taken by either kind.</para>
 /// </summary>
 public sealed class ParamSpec
 {
-    private ParamSpec(string name, ParamKind kind, double min, double max, IReadOnlyList<string> choices, ParamValue @default)
+    private ParamSpec(string name, ParamKind kind, double min, double max, IReadOnlyList<string> choices, ParamValue @default,
+        int minCount = 0, int maxCount = 0, bool optional = false)
     {
         Name = name; Kind = kind; Min = min; Max = max; Choices = choices; Default = @default;
-        if (Check(@default) is { } wrong) throw new ArgumentException($"parameter '{name}': its default {wrong}");
+        MinCount = minCount; MaxCount = maxCount; Optional = optional;
+        if (minCount < 0 || maxCount < minCount) throw new ArgumentException($"parameter '{name}': a count range is 0 <= min <= max");
+        if (!optional && Check(@default) is { } wrong) throw new ArgumentException($"parameter '{name}': its default {wrong}");
     }
 
     public string Name { get; }
@@ -81,6 +87,13 @@ public sealed class ParamSpec
     public double Max { get; }
     public IReadOnlyList<string> Choices { get; }
     public ParamValue Default { get; }
+
+    /// <summary>The fewest and most items of a list (<see cref="ParamKind.Floats"/>, <see cref="ParamKind.Colours"/>).</summary>
+    public int MinCount { get; }
+    public int MaxCount { get; }
+
+    /// <summary>True for a parameter with no default (<see cref="ParamKind.Name"/>): <see cref="NodeParameters.Has"/> says whether a node gives it.</summary>
+    public bool Optional { get; }
 
     /// <summary>A whole number from <paramref name="min"/> to <paramref name="max"/>.</summary>
     public static ParamSpec Int(string name, int min, int max, int @default) => new(name, ParamKind.Int, min, max, [], ParamValue.Of(@default));
@@ -97,6 +110,17 @@ public sealed class ParamSpec
     /// <summary>An sRGB colour, <c>"#rrggbb"</c>.</summary>
     public static ParamSpec Colour(string name, string @default) => new(name, ParamKind.Colour, 0, 0, [], ParamValue.Of(@default));
 
+    /// <summary>A list of <paramref name="minCount"/> to <paramref name="maxCount"/> numbers, each from <paramref name="min"/> to <paramref name="max"/>.</summary>
+    public static ParamSpec Floats(string name, int minCount, int maxCount, double min, double max, params double[] @default) =>
+        new(name, ParamKind.Floats, min, max, [], ParamValue.Of(@default), minCount, maxCount);
+
+    /// <summary>A list of <paramref name="minCount"/> to <paramref name="maxCount"/> sRGB colours, each <c>"#rrggbb"</c>.</summary>
+    public static ParamSpec Colours(string name, int minCount, int maxCount, params string[] @default) =>
+        new(name, ParamKind.Colours, 0, 0, [], @default.Length == 0 ? ParamValue.Of(Array.Empty<double>()) : ParamValue.OfTexts(@default), minCount, maxCount);
+
+    /// <summary>An optional name, <c>[a-z][a-z0-9_]*</c>, with no default.</summary>
+    public static ParamSpec Identifier(string name) => new(name, ParamKind.Name, 0, 0, [], ParamValue.Of(""), optional: true);
+
     /// <summary>What a value must be, for a message: "a whole number from 1 to 4".</summary>
     public string Describe() => Kind switch
     {
@@ -104,8 +128,13 @@ public sealed class ParamSpec
         ParamKind.Float => $"a number from {N(Min)} to {N(Max)}",
         ParamKind.Enum => "one of " + string.Join(", ", Choices),
         ParamKind.IntPair => $"two whole numbers [x, y], each from {N(Min)} to {N(Max)}",
+        ParamKind.Floats => $"a list of {Count()} numbers [a, b, ...], each from {N(Min)} to {N(Max)}",
+        ParamKind.Colours => $"a list of {Count()} colours [\"#rrggbb\", ...]",
+        ParamKind.Name => $"a name, {GraphNames.Pattern} (lower case letters, digits and _, starting with a letter)",
         _ => "a colour \"#rrggbb\"",
     };
+
+    private string Count() => MinCount == MaxCount ? N(MinCount) : $"{N(MinCount)} to {N(MaxCount)}";
 
     /// <summary>Null when <paramref name="value"/> is right; otherwise what is wrong, giving the range.</summary>
     public string? Check(ParamValue value)
@@ -117,6 +146,10 @@ public sealed class ParamSpec
             ParamKind.Float => value.Kind == ParamValueKind.Number && InRange(value.Number) ? null : wrong,
             ParamKind.Enum => value.Kind == ParamValueKind.Text && Choices.Contains(value.Text) ? null : wrong,
             ParamKind.IntPair => value.Kind == ParamValueKind.Numbers && value.Numbers.Length == 2 && value.Numbers.All(n => IsWhole(n) && InRange(n)) ? null : wrong,
+            ParamKind.Floats => value.Kind == ParamValueKind.Numbers && InCount(value.Numbers.Length) && value.Numbers.All(InRange) ? null : wrong,
+            ParamKind.Colours => (value.Kind == ParamValueKind.Texts && InCount(value.Texts.Length) && value.Texts.All(t => TryParseColour(t, out _)))
+                || (value.Kind == ParamValueKind.Numbers && value.Numbers.Length == 0 && InCount(0)) ? null : wrong,
+            ParamKind.Name => value.Kind == ParamValueKind.Text && GraphNames.IsValid(value.Text!) ? null : wrong,
             _ => value.Kind == ParamValueKind.Text && TryParseColour(value.Text!, out _) ? null : wrong,
         };
     }
@@ -132,6 +165,8 @@ public sealed class ParamSpec
     }
 
     private bool InRange(double v) => v >= Min && v <= Max;
+
+    private bool InCount(int n) => n >= MinCount && n <= MaxCount;
 
     private static bool IsWhole(double v) => v == Math.Floor(v) && Math.Abs(v) <= int.MaxValue;
 
@@ -176,4 +211,16 @@ public sealed class NodeParameters
         ParamSpec.TryParseColour(Value(name).Text!, out var c);
         return c;
     }
+
+    /// <summary>A <see cref="ParamKind.Floats"/> list, as <c>float</c>s.</summary>
+    public float[] Floats(string name) => [.. Value(name).Numbers.Select(n => (float)n)];
+
+    /// <summary>A <see cref="ParamKind.Colours"/> list, each as sRGB bytes.</summary>
+    public (byte R, byte G, byte B)[] Colours(string name) =>
+        [.. Value(name).Texts.Select(t => { ParamSpec.TryParseColour(t, out var c); return c; })];
+
+    /// <summary>True when the node gives the parameter, and gives it rightly; for an optional parameter, whether it has one at all.</summary>
+    public bool Has(string name) =>
+        _type.Parameter(name) is { } spec ? _values.TryGetValue(name, out var v) && spec.Check(v) is null
+            : throw new ArgumentException($"type '{_type.Name}' has no parameter '{name}'", nameof(name));
 }

@@ -10,7 +10,12 @@ namespace Patina.Server;
 /// What swatch asks of the frame thread: the outputs to dress the sphere in (RGBA, <paramref name="Size"/> a side, by
 /// role), its turn about y, and the labels to draw into the atlas (null for the sphere view alone).
 /// </summary>
-public sealed record SwatchSpec(IReadOnlyDictionary<OutputRole, byte[]> Images, int Size, float Angle, IReadOnlyList<string>? Labels);
+/// <summary>
+/// What the sphere wears and the sheet labels: <paramref name="Images"/> by role (base colour, normal, roughness as the
+/// packed metallic-roughness image, occlusion; a missing role takes the material's default), and <paramref name="Metallic"/>
+/// when the roughness image carries the graph's metallic in B (the material's metallic factor is then 1, else 0).
+/// </summary>
+public sealed record SwatchSpec(IReadOnlyDictionary<OutputRole, byte[]> Images, int Size, float Angle, IReadOnlyList<string>? Labels, bool Metallic = false);
 
 /// <summary>The sphere view and, when labels were asked, the label atlas and each label's measured extent; RGBA, sRGB.</summary>
 public sealed record SwatchFrame(byte[] Sphere, byte[]? Atlas, IReadOnlyList<Vector2>? Extents);
@@ -213,7 +218,7 @@ internal sealed class SwatchSystem(
             return texture;
         }
 
-        var material = Material.Pbr(Vector4.One, 0, 1,
+        var material = Material.Pbr(Vector4.One, spec.Metallic ? 1 : 0, 1,
             Upload(OutputRole.BaseColour, true)!, Upload(OutputRole.Roughness, false)!, Upload(OutputRole.Normal, false)!,
             null!, Upload(OutputRole.Occlusion, false)!, Vector3.Zero, 1, false);
         _textures = [.. made];
