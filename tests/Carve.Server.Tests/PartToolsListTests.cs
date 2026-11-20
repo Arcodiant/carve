@@ -15,6 +15,7 @@ namespace Carve.Server.Tests;
 /// (the milestone tip), the digest was the one before (EBD17198...), and export's description was the only field of tools/list that changed.
 /// Taken again for RV-71 (Opus 5.5), whose project_uvs text says planar sees the mesh's own axes and whose export text says a piece of an
 /// instance or an empty is refused as save's is: with those two changes stripped the digest was the one before (DCE3D7BA...).
+/// T-124 (Opus 5.5) adds render_glb's sentence on texture sampling (mip maps, as render's); it is taken out with T-94's additions.
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
@@ -28,7 +29,8 @@ public class PartToolsListTests
     private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check,
         carve::Carve.Server.PartTexts.PartTarget];
 
-    private static readonly string[] T94Added = [carve::Carve.Server.RenderPartTexts.Parts, carve::Carve.Server.GetMeshTool.PlacementText, carve::Carve.Server.RenderPartTexts.Image];
+    private static readonly string[] T94Added = [carve::Carve.Server.RenderPartTexts.Parts, carve::Carve.Server.GetMeshTool.PlacementText, carve::Carve.Server.RenderPartTexts.Image,
+        carve::Carve.Server.RenderGlbTexts.Sampling];
 
     private static readonly (string Now, string Was)[] T94Reworded =
     [
