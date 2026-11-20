@@ -47,7 +47,11 @@ byte-identical, so the speed checks T-137 and T-138 moved here can be met.
   - the cobblestones and the planks at 8192: no more than 10% slower than T-153's figures.
   - Write every figure, before and after, here.
 - A `regression` test for each of blur and distance at 8192 with the peak working set at 2 GB or less, beside T-138's
-  `TransformDistanceBoundedMemoryTests`.
+  `TransformDistanceBoundedMemoryTests`. T-138 lands its distance memory test at 2048 (the person, 2026-11-20: at
+  8192 it took about an hour in Debug); this task raises it to 8192 and asserts the 10 s there.
+- **Transform's strong minify under the memory bound** (the person, 2026-11-20): T-138 measured `transform` at tile 16
+  and scale 0.25 at 8192 with a working set of 4,348 MB, over the 2 GB bound. Bring it under 2 GB, and add a
+  `regression` test that holds it there at 8192. Write the figure before and after.
 
 ## Notes
 
