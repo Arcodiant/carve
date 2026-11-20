@@ -8,11 +8,14 @@ namespace Patina.Graphs.Imaging;
 /// throws, so a node that asks for less than it reads fails at once rather than giving a quiet wrong value.
 /// <para>An axis asked <c>size</c> or more across is held as the whole axis, <c>[0, size)</c>, so any read on it is
 /// allowed.</para>
+/// <para>A read may hold several rectangles (<see cref="Nodes.NodeType.InputRects"/>, T-153): a texel is readable when
+/// it lies in any of them, the first tried first.</para>
 /// </summary>
 public sealed class TileRead
 {
     private readonly int _x, _y, _width, _height, _size, _tile, _shift, _mask, _coverX, _coverY, _columns, _channels;
     private readonly Tile[] _tiles;
+    private readonly TileRead[] _rest = [];
 
     /// <summary>
     /// <paramref name="tiles"/> are the canonical tiles of side <paramref name="tileSize"/> covering
@@ -26,6 +29,7 @@ public sealed class TileRead
             throw new ArgumentOutOfRangeException(nameof(tileSize), tileSize, "a tile's side is a power of two dividing the size");
         Kind = kind; Size = size;
         Asked = Clamp(asked, size);
+        Parts = [Asked];
         var cover = Cover(Asked, size, tileSize);
         if (tiles.Length != cover.Width * cover.Height)
             throw new ArgumentException($"the cover of {Asked} is {cover.Width} x {cover.Height} tiles, but {tiles.Length} were given", nameof(tiles));
@@ -36,11 +40,25 @@ public sealed class TileRead
         _channels = PortKinds.Channels(kind);
     }
 
+    /// <summary>
+    /// A read holding several rectangles, each with the tiles covering it as the single-rectangle constructor takes them:
+    /// a texel is readable when it lies in any. There is at least one.
+    /// </summary>
+    public TileRead(PortKind kind, int size, int tileSize, IReadOnlyList<(TexelRect Asked, Tile[] Tiles)> parts)
+        : this(kind, size, tileSize, parts.Count > 0 ? parts[0].Asked : throw new ArgumentException("a read holds at least one rectangle", nameof(parts)), parts[0].Tiles)
+    {
+        _rest = [.. parts.Skip(1).Select(p => new TileRead(kind, size, tileSize, p.Asked, p.Tiles))];
+        Parts = [Asked, .. _rest.Select(r => r.Asked)];
+    }
+
     public PortKind Kind { get; }
     public int Size { get; }
 
     /// <summary>The rectangle asked for, each axis <c>size</c> or more across clamped to <c>[0, size)</c>.</summary>
     public TexelRect Asked { get; }
+
+    /// <summary>Every rectangle the read holds, <see cref="Asked"/> first, each clamped as it is.</summary>
+    public IReadOnlyList<TexelRect> Parts { get; } = [];
 
     /// <summary><paramref name="asked"/> with each axis <paramref name="size"/> or more across made <c>[0, size)</c>.</summary>
     public static TexelRect Clamp(TexelRect asked, int size) => new(
@@ -61,26 +79,41 @@ public sealed class TileRead
 
     private static int FloorDiv(int v, int d) => v >= 0 ? v / d : -((-v + d - 1) / d);
 
-    // The offset of (x, y) from the cover's top-left texel, after the wrap and the check against Asked.
-    private int Offset(int v, int origin, int extent, int cover, int x, int y)
+    // The offset of v from the cover's first texel on one axis, after the wrap; false when, wrapped, it is not asked for.
+    private bool TryOffset(int v, int origin, int extent, int cover, out int offset)
     {
         var a = v - origin;
         if ((uint)a >= (uint)extent)
         {
             a = Tile.Wrap(a, _size);
-            if (a >= extent)
-                throw new ArgumentOutOfRangeException(nameof(x), $"texel ({x}, {y}) is not in the rectangle asked for ({Asked}, wrapping by {_size})");
+            if (a >= extent) { offset = 0; return false; }
         }
-        return origin + a - cover;
+        offset = origin + a - cover;
+        return true;
+    }
+
+    private bool TryIndex(int x, int y, out Tile tile, out int index)
+    {
+        if (!TryOffset(x, _x, _width, _coverX, out var lx) || !TryOffset(y, _y, _height, _coverY, out var ly))
+        {
+            tile = null!; index = 0;
+            return false;
+        }
+        tile = _tiles[(ly >> _shift) * _columns + (lx >> _shift)];
+        index = (((ly & _mask) << _shift) + (lx & _mask)) * _channels;
+        return true;
     }
 
     private int Index(int x, int y, out Tile tile)
     {
-        var lx = Offset(x, _x, _width, _coverX, x, y);
-        var ly = Offset(y, _y, _height, _coverY, x, y);
-        tile = _tiles[(ly >> _shift) * _columns + (lx >> _shift)];
-        return (((ly & _mask) << _shift) + (lx & _mask)) * _channels;
+        if (TryIndex(x, y, out tile, out var index)) return index;
+        foreach (var part in _rest)
+            if (part.TryIndex(x, y, out tile, out index)) return index;
+        throw Outside(x, y);
     }
+
+    private ArgumentOutOfRangeException Outside(int x, int y) => new("x",
+        $"texel ({x}, {y}) is not in the rectangle asked for ({string.Join("; ", Parts)}, wrapping by {_size})");
 
     /// <summary>The greyscale value at logical (x, y), wrapping. A colour input has none, and throws.</summary>
     public float Grey(int x, int y)
@@ -106,8 +139,13 @@ public sealed class TileRead
     public ReadOnlySpan<float> Row(int y, int x, int count)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
-        var lx = Offset(x, _x, _width, _coverX, x, y);
-        var ly = Offset(y, _y, _height, _coverY, x, y);
+        if (!TryOffset(x, _x, _width, _coverX, out var lx) || !TryOffset(y, _y, _height, _coverY, out var ly))
+        {
+            foreach (var part in _rest)
+                if (part.TryOffset(x, part._x, part._width, part._coverX, out _) && part.TryOffset(y, part._y, part._height, part._coverY, out _))
+                    return part.Row(y, x, count);
+            throw Outside(x, y);
+        }
         if (lx + _coverX - _x + count > _width || (lx >> _shift) != ((lx + count - 1) >> _shift))
             throw new ArgumentOutOfRangeException(nameof(count), $"texels {x} to {x + count - 1} of row {y} are not in one tile of the rectangle asked for ({Asked})");
         var tile = _tiles[(ly >> _shift) * _columns + (lx >> _shift)];
