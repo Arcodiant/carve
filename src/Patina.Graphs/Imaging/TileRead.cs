@@ -80,6 +80,7 @@ public sealed class TileRead
     private static int FloorDiv(int v, int d) => v >= 0 ? v / d : -((-v + d - 1) / d);
 
     // The offset of v from the cover's first texel on one axis, after the wrap; false when, wrapped, it is not asked for.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private bool TryOffset(int v, int origin, int extent, int cover, out int offset)
     {
         var a = v - origin;
@@ -92,6 +93,7 @@ public sealed class TileRead
         return true;
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private bool TryIndex(int x, int y, out Tile tile, out int index)
     {
         if (!TryOffset(x, _x, _width, _coverX, out var lx) || !TryOffset(y, _y, _height, _coverY, out var ly))
