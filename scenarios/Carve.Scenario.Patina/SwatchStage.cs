@@ -33,6 +33,8 @@ namespace Carve.Scenario.Patina;
 /// that reads lighter is the one whose texels are lighter, for every pair of staves whose tones differ by 3 % or more.</item>
 /// <item><b>Highlight</b> (T-128): a grey sphere at roughness 0 has a peak luma at least <see cref="HighlightStep"/> above the same
 /// sphere at roughness 1: the directional light's highlight, which a smooth material shows and a rough one spreads out.</item>
+/// <item><b>Metallic</b> (T-134): a grey-200 sphere at roughness 0.2 and metallic 1, against metallic 0, has a median luma inside the
+/// silhouette at least <see cref="MetallicStep"/> lower and more pixels at luma 255.</item>
 /// </list>
 /// The thresholds were probed on the planks' own colours (T-114's As built), and Dark, In band and Highlight again under carve's lights (T-128's).
 /// </remarks>
@@ -48,8 +50,8 @@ internal sealed class SwatchStage : IPatinaStage
     public const double BandHigh = 128;
     public const double ToneStep = 0.03;
     public const double HighlightStep = 40;
-    /// <summary>Not yet measured: 0 until the person sets it from the run's swatch-checks.tsv (T-134).</summary>
-    public const double MetallicStep = 0;
+    /// <summary>T-134, approved by the person: measured 65.3 (median 192.4 at metallic 0, 127.1 at 1), set at about 60 % as <see cref="HighlightStep"/> was.</summary>
+    public const double MetallicStep = 40;
     /// <summary>Carve's slate, (0.03, 0.035, 0.04) linear, through half floats and sRGB, as a frame shows it.</summary>
     private static readonly byte[] Slate = [.. new[] { 0.03f, 0.035f, 0.04f }.Select(v =>
     {
@@ -336,7 +338,7 @@ internal sealed class SwatchStage : IPatinaStage
     /// (base_colour, roughness, metallic, edge), each cell from the exported texels (roughness alone is roughness.png with B
     /// 0, metallic alone is its B spread grey, edge is edge.png); its sphere, the silhouette the camera puts and the sheet's
     /// sphere cell; then the metallic highlight: a grey-200 sphere at metallic 1 shows a highlight tinted by the base colour,
-    /// so its peak luma is at least <see cref="MetallicStep"/> below the same sphere at metallic 0, whose highlight is white.
+    /// drawn as a metal it loses its diffuse light and reflects the sky (<see cref="MetallicReads"/>; a grey base cannot show a tint in hue, and both peaks clip at 255).
     /// </summary>
     private async Task MetalPlateAsync(ScenarioDriver driver, PatinaChecks checks, Readback planks)
     {
@@ -382,16 +384,38 @@ internal sealed class SwatchStage : IPatinaStage
                 (x, y) => sphere.Pixels.AsSpan((y * 512 + x) * 4, 4));
         }
 
-        var peaks = new Dictionary<int, double>();
+        var lit = new Dictionary<int, (double Median, int Clipped)>();
         foreach (var metallic in new[] { 0, 1 })
         {
             await checks.CallAsync("define_graph", MetallicSphere.Replace("METALLIC", metallic.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
-            peaks[metallic] = PeakLuma(await driver.CaptureToolAsync("swatch", $"swatch-sphere-metallic-{metallic}", new { view = "sphere" }));
+            lit[metallic] = Lit(await driver.CaptureToolAsync("swatch", $"swatch-sphere-metallic-{metallic}", new { view = "sphere" }), planks);
         }
         File.AppendAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), string.Create(CultureInfo.InvariantCulture,
-            $"\nmetallic\tpeak_luma_metallic_0\tpeak_luma_metallic_1\tstep\n\t{peaks[0]:0.0}\t{peaks[1]:0.0}\t{peaks[0] - peaks[1]:0.0}\n"));
-        checks.Check(peaks[0] - peaks[1] >= MetallicStep,
-            $"swatch: the metallic-1 grey-200 sphere's peak luma {peaks[1]:0.0} is not {MetallicStep} below the metallic-0 sphere's {peaks[0]:0.0}: its highlight is not tinted");
+            $"\nmetallic\tmedian_luma_0\tmedian_luma_1\tstep\tclipped_0\tclipped_1\n\t{lit[0].Median:0.0}\t{lit[1].Median:0.0}\t{lit[0].Median - lit[1].Median:0.0}\t{lit[0].Clipped}\t{lit[1].Clipped}\n"));
+        checks.Check(MetallicReads(lit[0], lit[1]),
+            $"swatch: the metallic-1 grey-200 sphere (median luma {lit[1].Median:0.0}, {lit[1].Clipped} px at 255) does not read metallic against metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px): the rule is a median {MetallicStep} lower and more px at 255");
+        // The break, made here: metallic 0 judged against itself must fail the rule.
+        checks.Check(!MetallicReads(lit[0], lit[0]), "swatch: the metallic rule passes metallic 0 against itself");
+    }
+
+    /// <summary>The metallic rule (T-134, approved by the person): the diffuse light goes, so the median inside luma drops by <see cref="MetallicStep"/> or more, and the highlight, the sky reflected, clips over more pixels.</summary>
+    private static bool MetallicReads((double Median, int Clipped) dielectric, (double Median, int Clipped) metal) =>
+        dielectric.Median - metal.Median >= MetallicStep && metal.Clipped > dielectric.Clipped;
+
+    /// <summary>A sphere view's median luma over the pixels the silhouette puts inside, and its count of pixels at luma 255 (254 or more).</summary>
+    private static (double Median, int Clipped) Lit(ScenarioFrame frame, Readback planks)
+    {
+        var judged = Judge(planks, 256, 0);
+        var lumas = new List<double>();
+        var clipped = 0;
+        for (var at = 0; at < judged.Length; at++)
+        {
+            var luma = Luma(frame.Pixels.AsSpan(at * 4, 4));
+            if (luma >= 254) clipped++;
+            if (judged[at].Inside) lumas.Add(luma);
+        }
+        lumas.Sort();
+        return (lumas.Count == 0 ? 0 : lumas[lumas.Count / 2], clipped);
     }
 
     /// <summary>define_graph's worked metal plate: base colour grey 200, roughness and metallic from a u ramp, a named edge output.</summary>
