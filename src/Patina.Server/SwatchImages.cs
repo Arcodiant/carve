@@ -131,6 +131,9 @@ public static class LabelAtlas
     /// <summary>The widest a label is drawn, its text and padding: as it was when the atlas was 512 a side.</summary>
     public const int LabelWidth = 512 - Inset + Padding;
 
+    /// <summary>The widest the title is drawn (T-139: a title naming parameter overrides runs past <see cref="LabelWidth"/>): the atlas row's whole width. A title that fits in <see cref="LabelWidth"/> draws the same pixels.</summary>
+    public const int TitleWidth = Size - Inset + Padding;
+
     public const int Pitch = 32;
 
     /// <summary>Where a row's text starts, from the row's top-left corner, both ways.</summary>
@@ -181,7 +184,7 @@ public static class SwatchSheet
         void Label(int row, int left, int top, bool backed)
         {
             var extent = extents[row];
-            var w = Math.Min((int)MathF.Ceiling(extent.X) + 2 * LabelAtlas.Padding, LabelAtlas.LabelWidth);
+            var w = Math.Min((int)MathF.Ceiling(extent.X) + 2 * LabelAtlas.Padding, row == 0 ? LabelAtlas.TitleWidth : LabelAtlas.LabelWidth);
             var h = Math.Min((int)MathF.Ceiling(extent.Y) + 2 * LabelAtlas.Padding, SwatchImages.LabelBand - LabelAtlas.Padding);
             for (var y = 0; y < h; y++)
             {
