@@ -31,8 +31,9 @@ internal sealed class OcclusionStage : IBakesStage
     ];
 
     /// <summary>
-    /// Ruled by the person (2026-11-20): the crevice texels' mean (socket top by the drive) is at least this far below the open
-    /// texels' mean (the grip's middle), in 8-bit occlusion. Break: <c>reach</c>.
+    /// Ruled by the person (2026-11-20, corrected): every crevice texel (socket top by the drive) reads at least this far below
+    /// every open texel (the grip's middle), in 8-bit occlusion: the open texels' least minus the crevice texels' most. Break:
+    /// <c>reach</c>.
     /// </summary>
     private const int CreviceMargin = 50;
 
@@ -165,9 +166,9 @@ internal sealed class OcclusionStage : IBakesStage
         var corner = regions.Single(r => r.Name == "socket-top-by-drive");
         var open = regions.Single(r => r.Name == "grip-facet-5-middle");
         if (corner.Values.Length < 20 || open.Values.Length < 20) Note($"occlusion: too few texels probed ({corner.Name} {corner.Values.Length}, {open.Name} {open.Values.Length})");
-        var below = open.Values.Average() - corner.Values.Average();
+        var below = open.Min - corner.Max;
         if (below < CreviceMargin)
-            Note($"occlusion: the crevice's mean ({corner.Values.Average():0.0}) is only {below:0.0} below the grip's middle's ({open.Values.Average():0.0}), under {CreviceMargin}");
+            Note($"occlusion: the crevice's most ({corner.Max}) is only {below} below the grip's middle's least ({open.Min}), under {CreviceMargin}");
         if (open.Min < OpenLeast) Note($"occlusion: the grip's middle reads {open.Min}, under {OpenLeast}");
     }
 
