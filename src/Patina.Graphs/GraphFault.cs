@@ -9,6 +9,15 @@ namespace Patina.Graphs;
 /// </summary>
 public sealed record GraphFault(string? Node, string? Port, string? Parameter, string Message, string? GraphParameter = null)
 {
+    /// <summary>
+    /// True for a fault that only stops the graph being evaluated on its own (T-140: an <c>input</c> with no default): the
+    /// evaluator refuses it, but save writes it, since a graph using it as a node gives the input.
+    /// </summary>
+    public bool OnItsOwn { get; init; }
+
+    /// <summary>The nested <c>.texgraph</c> the fault is in (T-140: a fault inside a graph used as a node, its node named by path from the top, <c>wall/layout</c>); null for the graph's own.</summary>
+    public string? File { get; init; }
+
     public override string ToString() => Message;
 }
 

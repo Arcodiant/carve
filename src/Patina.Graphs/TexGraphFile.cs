@@ -82,14 +82,26 @@ public static class TexGraphFile
         return s.ToString();
     }
 
-    /// <summary>Reads a file's text, and validates what it holds against <paramref name="registry"/> (the built-in types when null).</summary>
-    public static TexGraphReadResult Read(string text, NodeRegistry? registry = null, TexGraphFormat? format = null)
+    /// <summary>
+    /// Reads a file's text, and validates what it holds against <paramref name="registry"/> (the built-in types when null).
+    /// <paramref name="folder"/> becomes the graph's <see cref="TextureGraph.Folder"/>, what its <c>graph</c> nodes'
+    /// paths resolve against (T-140; null: the working directory).
+    /// </summary>
+    public static TexGraphReadResult Read(string text, NodeRegistry? registry = null, TexGraphFormat? format = null, string? folder = null)
+    {
+        var parsed = Parse(text, format, folder);
+        return parsed.Graph is { } graph ? new(graph, null, GraphValidator.Validate(graph, registry ?? NodeRegistry.BuiltIn)) : parsed;
+    }
+
+    /// <summary>Reads a file's text without validating it (T-140: expansion reads a nested file this way, and validates it with the chain of files above it).</summary>
+    internal static TexGraphReadResult Parse(string text, TexGraphFormat? format, string? folder)
     {
         var bytes = Encoding.UTF8.GetBytes(text);
         try
         {
             var graph = new Parser(bytes, format ?? TexGraphFormat.Current).Parse();
-            return new(graph, null, GraphValidator.Validate(graph, registry ?? NodeRegistry.BuiltIn));
+            if (folder is not null) graph = graph with { Folder = folder };
+            return new(graph, null, []);
         }
         catch (JsonException e)
         {
@@ -106,7 +118,9 @@ public static class TexGraphFile
         }
     }
 
-    public static TexGraphReadResult ReadFile(string path, NodeRegistry? registry = null, TexGraphFormat? format = null) => Read(File.ReadAllText(path), registry, format);
+    /// <summary>Reads and validates a file; its folder is the graph's <see cref="TextureGraph.Folder"/>.</summary>
+    public static TexGraphReadResult ReadFile(string path, NodeRegistry? registry = null, TexGraphFormat? format = null) =>
+        Read(File.ReadAllText(path), registry, format, Path.GetDirectoryName(Path.GetFullPath(path)));
 
     public static void WriteFile(string path, TextureGraph graph, TexGraphFormat? format = null) => File.WriteAllText(path, Write(graph, format), new UTF8Encoding(false));
 
@@ -408,7 +422,7 @@ public sealed class TexGraphFormat
     public static TexGraphFormat Version1 { get; } = new([], ImmutableSortedDictionary.Create<string, int>(StringComparer.Ordinal));
 
     /// <summary>The format this build uses: version 2 adds <c>parameters</c> (T-139).</summary>
-    public static TexGraphFormat Current { get; } = Version1.With(ParametersField.Instance);
+    public static TexGraphFormat Current { get; } = Version1.With(ParametersField.Instance).WithNodeType(NestedGraphNode.TypeName, 2).WithNodeType(InputNode.TypeName, 2);
 
     public ImmutableArray<TexGraphField> Fields { get; }
 

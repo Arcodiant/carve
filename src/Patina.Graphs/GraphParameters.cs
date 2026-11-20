@@ -92,6 +92,8 @@ public static class GraphParameters
         ParamKind.Colour => "a colour",
         ParamKind.Floats => "a list of numbers",
         ParamKind.Colours => "a list of colours",
+        ParamKind.GreyOrColour => "a grey value or a colour",
+        ParamKind.FilePath => "a path",
         _ => "a name",
     };
 
