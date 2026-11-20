@@ -18,7 +18,7 @@ namespace Patina.Server;
 /// </summary>
 public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineStatus status, OffscreenQueue<SwatchRequest> queue)
 {
-    public static readonly string[] Views = ["sheet", "flat", "tiled", "sphere"];
+    public static readonly string[] Views = ["sheet", "flat", "tiled", "sphere", "cube"];
 
     /// <summary>The worked example: the planks' tiled base colour at 128.</summary>
     public const string Worked = """{"view":"tiled","output":"base_colour","size":128}""";
@@ -39,13 +39,15 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         + "lit as Carve's render lights a model (its ambient light, fixed sky and directional light, placed relative to the camera as Carve places it) on Carve's dark slate, from a fixed camera, 512 px. "
         + "metallic, height and greyscale named outputs are drawn grey; roughness's column is roughness alone. "
         + "output: a role or a named output's name, for flat and tiled (default the first role the graph has). size: the evaluation size, a power of two from 32 to 2048 (default the graph's size, at most 2048; for larger PNGs use export). "
-        + "tiling: a whole number from 1 to 8 (default 1), for sheet and sphere: the sphere wears every map repeated that many times in u and v, to judge a material at a texel density nearer a game's; the sheet's title and the result name it when it is not 1. "
-        + "angle: the sphere's turn about y in degrees, for sheet and sphere (default 0; counter-clockwise seen from above). "
+        + "cube is a lit cube (edge 0.7, each face its own UVs 0 to 1, u to the right and v down as the face is seen) wearing the same material, turned so the front, the left and the top show, to judge a material on flat faces and the edges between them; lit and framed as the sphere is, 512 px. "
+        + "tiling: a whole number from 1 to 8 (default 1), for sheet, sphere and cube: the sphere or cube wears every map repeated that many times in u and v, to judge a material at a texel density nearer a game's; the sheet's title and the result name it when it is not 1. "
+        + "angle: the sphere's or cube's turn about y in degrees, for sheet, sphere and cube (default 0; counter-clockwise seen from above). "
         + "parameters: the graph's exposed parameters to set for this call only, by name (get_graph lists them and their ranges); the graph is not changed, a value out of range is refused naming the parameter and its range, and the sheet's title and the result name them. "
         + "Refused while the graph has a fault. Changes nothing.\n"
         + "Worked example, with the planks open (samples/graphs/planks.texgraph): swatch " + Worked + " returns an image and:\n" + WorkedResult + "\n"
         + "Worked example, after define_graph's metal plate: swatch " + WorkedEdge + " returns an image and:\n" + WorkedEdgeResult + "\n"
         + "Worked example, with samples/graphs/bricks.texgraph open: swatch " + WorkedParameters + " shows grey stone bricks' base colour and returns:\n" + WorkedParametersResult + "\n"
+        + "Worked example, with samples/graphs/planks.texgraph open: swatch " + WorkedCube + " returns an image and:\n" + WorkedCubeResult + "\n"
         + "Worked example, with samples/graphs/planks.texgraph open: swatch " + WorkedTiling + " returns an image and:\n" + WorkedTilingResult + "\n"
         + "and swatch " + WorkedParametersRefused + " returns:\n" + WorkedParametersRefusedResult + "\n"
         + "and swatch " + WorkedTilingRefused + " returns:\n" + WorkedTilingRefusedResult;
@@ -56,7 +58,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         ["output"] = new JsonObject { ["type"] = "string", ["description"] = "A role (" + string.Join(", ", OutputRoles.Names) + ") or a named output's name, for flat and tiled." },
         ["size"] = new JsonObject { ["type"] = "integer" },
         ["angle"] = new JsonObject { ["type"] = "number" },
-        ["tiling"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = MaxTiling, ["description"] = "Whole repeats of every map over the sphere in u and v, 1 to 8 (default 1), for sheet and sphere." },
+        ["tiling"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = MaxTiling, ["description"] = "Whole repeats of every map over the sphere or cube in u and v, 1 to 8 (default 1), for sheet, sphere and cube." },
         ["parameters"] = new JsonObject { ["type"] = "object", ["description"] = ParameterOverrides.Description },
     });
 
@@ -74,6 +76,11 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
 
     public const string WorkedTilingResult = "swatch sphere: planks.texgraph at 256 px on the engine's UV sphere, angle 0, tiling 3, 512 x 512 px";
 
+    /// <summary>The cube's worked example (T-157): the planks' cube with every map repeated 3 x 3.</summary>
+    public const string WorkedCube = """{"view":"cube","tiling":3}""";
+
+    public const string WorkedCubeResult = "swatch cube: planks.texgraph at 256 px on a cube, each face 0 to 1 in u and v, angle 0, tiling 3, 512 x 512 px";
+
     public const string WorkedTilingRefused = """{"view":"sphere","tiling":9}""";
 
     public const string WorkedTilingRefusedResult = "swatch: tiling 9 is out of range; give a whole number from 1 to 8";
@@ -90,12 +97,12 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
 
         if (!TryText("swatch", "view", Arg("view"), out var view, out var error)) return error!;
         view ??= "sheet";
-        if (!Views.Contains(view)) return Error($"swatch: view is '{view}'; give sheet, flat, tiled or sphere");
+        if (!Views.Contains(view)) return Error($"swatch: view is '{view}'; give sheet, flat, tiled, sphere or cube");
         if (!TryText("swatch", "output", Arg("output"), out var outputName, out error)) return error!;
-        if (outputName is not null && view is "sheet" or "sphere")
+        if (outputName is not null && view is "sheet" or "sphere" or "cube")
             return Error($"swatch: output is for flat and tiled; the {view} shows every output");
         if (Arg("angle") is { ValueKind: not JsonValueKind.Null } && view is "flat" or "tiled")
-            return Error($"swatch: angle turns the sphere, for sheet and sphere; {view} has none");
+            return Error($"swatch: angle turns the sphere or cube, for sheet, sphere and cube; {view} has none");
 
         TextureGraph graph;
         string? path;
@@ -138,7 +145,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         var tiling = 1;
         if (Arg("tiling") is { ValueKind: not JsonValueKind.Null } tilingArg)
         {
-            if (view is "flat" or "tiled") return Error($"swatch: tiling repeats the sphere's maps, for sheet and sphere; {view} has none");
+            if (view is "flat" or "tiled") return Error($"swatch: tiling repeats the maps over the sphere or cube, for sheet, sphere and cube; {view} has none");
             if (tilingArg.ValueKind != JsonValueKind.Number || !tilingArg.TryGetInt32(out tiling))
                 return Error($"swatch: tiling is a whole number from 1 to {MaxTiling}, not {Kind(tilingArg)} {tilingArg.GetRawText()}");
             if (tiling < 1 || tiling > MaxTiling) return Error($"swatch: tiling {tiling} is out of range; give a whole number from 1 to {MaxTiling}");
@@ -180,11 +187,11 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
             worn[r] = r == OutputRole.Roughness && metallic ? OutputImage.FileRgba8(evaluator, OutputRoles.Name(r), size) : images[OutputRoles.Name(r)];
         var title = $"{(path is null ? "unsaved graph" : name)}   {size} px   seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}" + (set == "" ? "" : "   " + set) + (tiled3 == "" ? "" : "   " + tiled3);
         var columns = roles.ToList();
-        var labels = view == "sheet" ? SwatchSheet.Labels(title, columns, angle) : null;
+        var labels = view == "sheet" ? SwatchSheet.Labels(title, columns, angle, tiling) : null;
 
         await status.WhenSettled.WaitAsync(cancellationToken);
         if (status.FaultMessage is { } fault) return Error("swatch: " + fault);
-        var request = new SwatchRequest(new SwatchSpec(worn, size, angle, labels, metallic, tiling));
+        var request = new SwatchRequest(new SwatchSpec(worn, size, angle, labels, metallic, tiling, view == "cube"));
         queue.Enqueue(request);
         await Task.WhenAny(request.Result, status.WhenStopped).WaitAsync(cancellationToken);
         if (!request.Result.IsCompleted) return Error("swatch: " + (status.FaultMessage ?? "the engine has stopped, so nothing can be drawn"));
@@ -196,6 +203,11 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         {
             return Image(frame.Sphere, SwatchImages.SphereCell, SwatchImages.SphereCell,
                 $"swatch sphere: {name} at {size} px on the engine's UV sphere, angle {angleText}, {(tiling == 1 ? "" : $"tiling {tiling}, ")}{SwatchImages.SphereCell} x {SwatchImages.SphereCell} px" + (set == "" ? "" : "; " + set));
+        }
+        if (view == "cube")
+        {
+            return Image(frame.Sphere, SwatchImages.SphereCell, SwatchImages.SphereCell,
+                $"swatch cube: {name} at {size} px on a cube, each face 0 to 1 in u and v, angle {angleText}, {(tiling == 1 ? "" : $"tiling {tiling}, ")}{SwatchImages.SphereCell} x {SwatchImages.SphereCell} px" + (set == "" ? "" : "; " + set));
         }
         var (sheet, layout) = SwatchSheet.Compose([.. columns.Select(r => images[r])], size, frame.Sphere, frame.Atlas!, frame.Extents!);
         return Image(sheet, layout.Width, layout.Height,
