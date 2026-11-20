@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Text.Json;
 using Patina.Graphs;
 using Xunit;
@@ -120,5 +121,20 @@ public class ExposedParameterToolTests
             Assert.Equal(File.ReadAllBytes(Path.Combine(temp.Path, "textures", "set", file)), bytes);
             Assert.Equal(File.ReadAllBytes(Path.Combine(Paths.RepoRoot, "samples", "graphs", "bricks", "variants", "grey", file)), bytes);
         }
+    }
+
+    /// <summary>A title naming overrides runs past a cell label's 512 px; the sheet draws it to the atlas's width, where a cell's label stops at 512.</summary>
+    [Fact]
+    public void LongTitleIsNotCutAtACellLabelsWidth()
+    {
+        var images = new List<byte[]> { new byte[64 * 64 * 4], new byte[64 * 64 * 4], new byte[64 * 64 * 4] };
+        var atlas = new byte[LabelAtlas.Size * LabelAtlas.Size * 4];
+        Array.Fill(atlas, (byte)255);
+        var labels = SwatchSheet.Labels("bricks.texgraph   256 px   seed 21   parameters mortar 0.08, tint \"#7a7a70\"", ["a", "b", "c"], 0);
+        var extents = labels.Select(_ => new Vector2(800, 12)).ToList();
+        var (pixels, layout) = SwatchSheet.Compose(images, 64, new byte[512 * 512 * 4], atlas, extents);
+        byte[] At(int x, int y) => pixels.AsSpan((y * layout.Width + x) * 4, 3).ToArray();
+        Assert.Equal(new byte[] { 255, 255, 255 }, At(700, 8));                  // the title, past 512
+        Assert.Equal(new byte[] { 255, 255, 255 }, At(500, 24 + 8));             // a cell's label, inside 512
     }
 }

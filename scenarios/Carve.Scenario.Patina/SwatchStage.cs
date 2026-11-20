@@ -437,6 +437,8 @@ internal sealed class SwatchStage : IPatinaStage
         var caption = sheets["bricks-grey"].Caption ?? "";
         checks.Check(caption.Contains("parameters mortar 0.08, tint \"#7a7a70\"", StringComparison.Ordinal), "swatch: the grey bricks sheet's caption does not name the overrides: " + caption);
         checks.Check(!(sheets["bricks"].Caption ?? "").Contains("parameters", StringComparison.Ordinal), "swatch: the plain bricks sheet's caption names parameters: " + sheets["bricks"].Caption);
+        // The title naming the overrides runs past the 512 px a cell's label may take; it must be drawn, not cut there.
+        checks.Check(Bright(sheets["bricks-grey"], 560, 0, 200, SheetTop - 2), "swatch: the grey bricks sheet's title has no text past x 560: the overrides are cut from it");
 
         var probe = new PatinaChecks(driver);
         CheckBricksSheet(probe, "bricks-grey", sheets["bricks-grey"], texels["bricks"]);
