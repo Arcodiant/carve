@@ -123,10 +123,16 @@ public sealed partial class BakeLayout
                 if (!coplanar)
                 {
                     bend = Math.Acos(Math.Clamp(Vector3.Dot(n1, n2), -1f, 1f));
-                    // Which side of this face's plane the other face lies on, from the edge's midpoint to its corners' mean.
-                    var m = (mesh.Vertices[edge.Lo] + mesh.Vertices[edge.Hi]) * 0.5f;
-                    var o = Mean(mesh, mesh.Faces[b.Face].Loop);
-                    var side = (o.X - m.X) * n1.X + (o.Y - m.Y) * n1.Y + (o.Z - m.Z) * n1.Z;
+                    // Which side of this face's plane the other face lies on, next to the edge: the direction into the other
+                    // face, across the edge in its own plane, is its normal crossed with the edge as its winding runs it. That
+                    // holds for a non-convex other face (an extruded L's cap), whose corners' mean may lie beyond the edge's
+                    // line, and does not rest on the two faces being wound alike, since the other face's normal and its
+                    // run of the edge turn over together.
+                    var lo = mesh.Vertices[edge.Lo];
+                    var hi = mesh.Vertices[edge.Hi];
+                    var run = b.LoToHi ? hi - lo : lo - hi;
+                    var inward = Vector3.Cross(n2, run);
+                    var side = (double)inward.X * n1.X + (double)inward.Y * n1.Y + (double)inward.Z * n1.Z;
                     shape = side > 0 ? EdgeShape.Concave : EdgeShape.Convex;
                 }
                 lists[a.Face].Add(new BreakEdge(edge.Lo, edge.Hi, b.Face, n2, bend, shape));

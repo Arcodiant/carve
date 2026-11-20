@@ -338,6 +338,30 @@ public class BakeLayoutTests
     }
 
     [Fact]
+    public void On_a_long_armed_l_block_only_the_inner_edge_is_concave()
+    {
+        // One arm three long: the caps' corner mean, (1.33, 0.83), lies beyond the inner wall x = 1's line, so a side
+        // test from the other face's mean calls the wall's two cap edges, (3, 4) and (9, 10), concave.
+        var block = Celled(TestMeshes.LBlock([new(0, 0, 0), new(3, 0, 0), new(3, 1, 0), new(1, 1, 0), new(1, 2, 0), new(0, 2, 0)]));
+        var layout = Lay(block, 128);
+        var concave = new List<(int Face, NearEdge Edge)>();
+        for (var f = 0; f < block.Faces.Count; f++)
+            foreach (var e in layout.NearEdges(TexelOf(layout, f), 10))
+            {
+                Assert.Equal(Math.PI / 2, e.Bend, 5);
+                if (e.Shape == EdgeShape.Concave) concave.Add((f, e));
+            }
+        Assert.Equal(2, concave.Count);
+        Assert.All(concave, c => Assert.Equal((3, 9), (c.Edge.Lo, c.Edge.Hi)));
+        Assert.Equal([4, 5], concave.Select(c => c.Face).Order());
+
+        // The wall x = 1 (side 5, corner 3 to 4) reads light by its cap edges, as a box's edges do.
+        var wall = layout.NearEdges(TexelOf(layout, 5), 10).Where(e => e.OtherFace is 0 or 1).ToArray();
+        Assert.Equal(2, wall.Length);
+        Assert.All(wall, e => Assert.Equal(EdgeShape.Convex, e.Shape));
+    }
+
+    [Fact]
     public void On_a_smooth_mesh_only_the_marked_hard_edge_is_a_break_and_normals_interpolate()
     {
         var cube = Celled(TestMeshes.Cube()).WithShade(MeshShade.Of(ShadingMode.Smooth, [(4, 5)]));
