@@ -280,7 +280,21 @@ found cannot fall below about 2.4 times under 64 MiB.
    scope), landing what is here: the thrash fixed, the pinned windows at the cap, the turn and the minify met.
 4. **Lower the bounds** (blur's radius, distance's range) at which the 10 s is asserted.
 
-**Left once the person rules:** the samples at 8192 before and after (running at hand-off: `%TEMP%\t155\samples.log`;
-T-153's cobblestones: base_colour 75.5 s, normal 129.2 s, roughness 57.4 s, occlusion 54.9 s); run
+**The samples at 8192** (`%TEMP%\t155\run-samples.sh`, Release, one run each, before on `origin/milestone/M-28`'s
+`src` and after on this branch, interleaved; its `file` lines had their arguments in the wrong order, fixed):
+
+| output | cobblestones before | cobblestones after | planks before | planks after |
+|---|---|---|---|---|
+| base_colour | 105.2 s, 95,589 tiles | 99.6 s, 90,562 (-5%) | 14.3 s, 40,960 | 14.3 s, 40,960 |
+| normal | 165.3 s, 133,783 | **189.9 s, 148,877 (+15%)** | 2.3 s, 12,544 | 2.3 s, 13,576 |
+| roughness | 72.2 s, 62,821 | 62.8 s, 57,790 (-13%) | 5.2 s, 8,192 | 5.2 s, 8,192 |
+| occlusion | 72.7 s, 50,533 | 50.1 s, 45,502 (-31%) | 0.4 s, 8,192 | 0.4 s, 8,192 |
+
+The cobblestones' normal is **15% slower** than the base, past the 10% check, with 11% more tiles made. The base
+itself is well past T-153's figures (base_colour 75.5 s, normal 129.2 s, roughness 57.4 s, occlusion 54.9 s), so
+either the machine was slower in this run or what landed since T-153 costs that much. A second run is needed before
+reading either as settled. Not yet looked into: which node of the normal chain is made more often under the bands.
+
+**Left once the person rules:** the cobblestones' normal (above); run
 `TransformDistanceBoundedMemoryTests` in Debug and set its deadline from it; CLAUDE.md's `tests/Patina.Server.Tests`
 line; As built; `verify`, `cairn lint`, `finish`.
