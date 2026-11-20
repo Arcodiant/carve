@@ -38,8 +38,8 @@ internal sealed class BevelStage : IBakesStage
     /// </summary>
     private const double PredictedSlack = 2;
 
-    /// <summary>The grip's (<c>steel</c>) colour, from <see cref="SurfaceStage"/>'s table.</summary>
-    private const string Steel = "#80858A";
+    /// <summary>The grip's (<c>steel</c>) colour, <see cref="SurfaceStage"/>'s.</summary>
+    private const string Steel = SurfaceStage.SteelColour;
 
     public async Task RunAsync(ScenarioDriver driver)
     {
@@ -47,8 +47,7 @@ internal sealed class BevelStage : IBakesStage
         var hard = HardEdges(Path.Combine(here, "wrench.carve"));
         var scene = await Scene.ReadAsync(driver, "wrench");
         var mesh = scene["wrench"];
-        var groups = mesh.Raw.GetProperty("groups").EnumerateArray()
-            .ToDictionary(g => g.GetProperty("name").GetString()!, g => g.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToArray());
+        var groups = GroupsOf(mesh.Raw);
 
         var textures = Path.Combine(driver.RunFolder, "textures");
         var bake = await CallJsonAsync(driver, "bake", new { mesh = "wrench", folder = textures, size = Size, padding = 8, maps = new[] { "normal" }, bevel = new { width = Width } });

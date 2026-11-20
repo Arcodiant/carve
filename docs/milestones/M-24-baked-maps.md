@@ -229,7 +229,8 @@ milestone and wraps T-120's API as mesh-input nodes.
 - **T-121's review agent was stopped by an app restart** after it had folded the hand-off and committed the person's
   approval. The orchestrator saw the approval only as that commit and said so to the person; a third agent finished.
 - **T-126's As built merged with a garbled evidence path** (backslashes lost in the write); the orchestrator repaired the
-  line in this commit.
+  line in this commit. T-123's and T-124's As built carried the same fault (a `\r` read as a line break) and were
+  repaired in the answer to RV-74.
 - **Every member left its task folder on disk.** `finish` could not remove `branches/task/T-120` to `T-126` while a shell
   sat in them; each is unregistered from git and safe to delete.
 

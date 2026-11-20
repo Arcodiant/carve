@@ -109,7 +109,6 @@ person's rulings, showed each failing and ran the frame review.
 - **Frame review:** Waystone round 1, the 14 frames, the crop and both compare triptychs from job
   `J-20261120-005533-8f1553` (06f0844; byte-identical to job `J-20261120-004722-5c8b13`), in
   `G:\My Drive\artifacts\carve\M-24\T-123\round-1`. The person **approved**, no notes. Agent 2 looked at the frames
-ound-1`. The person **approved**, no notes. Agent 2 looked at the frames
   itself, scaled, before sending. Break logs in `...\T-123\breaks`, the probe in `...\T-123\probe`.
 - **Not checked:** `samples/wrench.carve`'s stats against fps-arms.
 - **Surprising.** The first run failed on the `uvs` square's border line and on mirror checks in the views along x (a

@@ -34,10 +34,16 @@ internal static class BakesChecks
 {
     public static readonly List<string> Failures = [];
 
+    /// <summary>A mesh's groups from <c>get_mesh</c>'s answer: each group's name and its face ids.</summary>
+    public static Dictionary<string, int[]> GroupsOf(System.Text.Json.JsonElement raw) => raw.GetProperty("groups").EnumerateArray()
+        .ToDictionary(g => g.GetProperty("name").GetString()!, g => g.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToArray());
+
     /// <summary>
     /// <c>CARVE_BAKES_BREAK</c>: <c>swap</c> bakes the base colour with <c>steel</c> and <c>red</c> swapped (the checks still expect
     /// the right colours); <c>faint</c> bakes <c>steel</c> a dimmer grey and <c>red</c> a duller red, under the ruled steel margin
-    /// and red lead but still grey and still red-leading; <c>mirror</c> works every render sample through a camera mirrored left to right.
+    /// and red lead but still grey and still red-leading; <c>mirror</c> works every render sample through a camera mirrored left to right;
+    /// <c>curvature</c> reads the curvature map inverted; <c>reach</c> bakes occlusion with a reach of 0.0001; <c>metal</c> bakes
+    /// <c>steel</c>'s metallic as 0; <c>bevel-g</c> puts the bevel normal map on the material with its green inverted.
     /// </summary>
     public static string? Break { get; } = Environment.GetEnvironmentVariable("CARVE_BAKES_BREAK");
 

@@ -34,8 +34,7 @@ internal sealed class CurvatureStage : IBakesStage
     {
         var scene = await Scene.ReadAsync(driver, "wrench");
         var mesh = scene["wrench"];
-        var groups = mesh.Raw.GetProperty("groups").EnumerateArray()
-            .ToDictionary(g => g.GetProperty("name").GetString()!, g => g.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToArray());
+        var groups = GroupsOf(mesh.Raw);
         var textures = Path.Combine(driver.RunFolder, "textures");
         var bake = await CallJsonAsync(driver, "bake", new { mesh = "wrench", folder = textures, size = Size, padding = 8, maps = new[] { "curvature" }, curvature = new { width = Width } });
         var file = bake.GetProperty("files").EnumerateArray().Single();

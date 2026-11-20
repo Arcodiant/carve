@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** — (none)
 
-**Verify:** server-unit, server-regression, scenario-materials
+**Verify:** server-unit, server-regression, scenario-materials, scenario-crate, scenario-uvs
 
 ## Goal
 

@@ -20,10 +20,13 @@ internal sealed class SurfaceStage : IBakesStage
 {
     private const int Size = 1024;
 
+    /// <summary>fps-arms' <c>steel</c> colour, which <see cref="BevelStage"/> predicts its strips' shade from.</summary>
+    internal const string SteelColour = "#80858A";
+
     /// <summary>fps-arms' <c>GROUP_RGB</c> (<c>pipeline/tools.py</c>), <c>all</c> first as <c>dark</c> so a later group wins its faces.</summary>
     private static readonly (string Group, string Colour)[] Surface =
     [
-        ("all", "#36393E"), ("rubber", "#282A2E"), ("steel", "#80858A"), ("dark", "#36393E"), ("red", "#BE3C32"), ("black", "#1E1F22"),
+        ("all", "#36393E"), ("rubber", "#282A2E"), ("steel", SteelColour), ("dark", "#36393E"), ("red", "#BE3C32"), ("black", "#1E1F22"),
     ];
 
     /// <summary>
@@ -44,8 +47,7 @@ internal sealed class SurfaceStage : IBakesStage
         await CallJsonAsync(driver, "open", new { path = Path.Combine(here, "wrench.carve") });
         var scene = await Scene.ReadAsync(driver, "wrench");
         var mesh = scene["wrench"];
-        var groups = mesh.Raw.GetProperty("groups").EnumerateArray()
-            .ToDictionary(g => g.GetProperty("name").GetString()!, g => g.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToArray());
+        var groups = GroupsOf(mesh.Raw);
 
         // The face's group and colour as the surface's order gives them: the last entry naming a group the face is in.
         var groupOf = new Dictionary<int, string>();
@@ -63,7 +65,7 @@ internal sealed class SurfaceStage : IBakesStage
         string Baked(string group, string colour) => (Break, group) switch
         {
             ("swap", "steel") => "#BE3C32",
-            ("swap", "red") => "#80858A",
+            ("swap", "red") => SteelColour,
             ("faint", "steel") => "#5C6064",
             ("faint", "red") => "#8C6460",
             _ => colour,

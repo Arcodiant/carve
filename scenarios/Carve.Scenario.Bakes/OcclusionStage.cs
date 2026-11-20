@@ -54,8 +54,7 @@ internal sealed class OcclusionStage : IBakesStage
     {
         var scene = await Scene.ReadAsync(driver, "wrench");
         var mesh = scene["wrench"];
-        var groups = mesh.Raw.GetProperty("groups").EnumerateArray()
-            .ToDictionary(g => g.GetProperty("name").GetString()!, g => g.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToArray());
+        var groups = GroupsOf(mesh.Raw);
         var factorOf = new Dictionary<int, (double R, double M)>();
         foreach (var (group, r, m) in Surface)
         {

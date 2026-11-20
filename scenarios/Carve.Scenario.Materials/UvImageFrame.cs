@@ -13,8 +13,9 @@ namespace Carve.Scenario.Materials;
 /// The rule. The window is the unit square grown by 8/7 (<c>UvWindow.Growth</c>), so at size 1024 the square is 896 pixels from x = 64:
 /// frame pixel x has its centre at u = (x + 0.5 - 64) / 896, and one texel of the 256-texel image is 3.5 pixels. The engine samples this
 /// look nearest with no mips (<c>RenderSystem.MakeUvImage</c>, probed by <c>UvImageLookTests</c>), so the pixel shows texel
-/// <c>floor(u * 256)</c> as stored. The barrel's UVs fill the unit square (the cylinder is all of it, the caps lie over it), so it is inside
-/// the islands and the image is drawn as stored. A texel is under 4 frame pixels, so a check takes only pixels whose centre lies 0.25 to
+/// <c>floor(u * 256)</c>, as stored inside an island and as <c>(c + 1) / 2</c> in the padding outside every island. The barrel's
+/// islands do not fill the unit square, so a sample is either inside an island or in the padding, and the check needs ten or more of
+/// each. A texel is under 4 frame pixels, so a check takes only pixels whose centre lies 0.25 to
 /// 0.75 of a texel into it (a quarter texel, nearly a pixel, from the neighbour) and 4 pixels or more from every face edge, whose white
 /// lines are drawn over the image.
 /// </para>

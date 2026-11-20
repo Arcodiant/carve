@@ -149,7 +149,6 @@ Agent 1 Claude Opus 5.5 (BVH, occlusion, ORM, `bake`, stage, probe); research ag
   30 s answer window (server-unit failed once on a TaskCanceledException). At 512 it takes 3 s. No check changed; the
   test's size assertion follows the example.
 - **Review:** Waystone round 1 (17 items: the occlusion `uvs` frame, the `wrench-orm-*` frames, the two compare
-  triptychs and the sampling test's two frames, `G:\My Drive\artifacts\carve\M-24\T-124
-ound-1`): **approved**, no notes.
+  triptychs and the sampling test's two frames, `G:\My Drive\artifacts\carve\M-24\T-124\round-1`): **approved**, no notes.
 - **Not checked:** part transforms; occluders use each mesh's stored positions, so a multi-part model's part offsets are
   not applied. T-125's normal-map comparison moves with the fix; it was not run here.
