@@ -233,7 +233,7 @@ internal sealed class SwatchStage : IPatinaStage
     private const int SheetTop = 24;
 
     /// <summary>A copy of <paramref name="frame"/> whose pixel (x, y) is the frame's at <paramref name="from"/>(x, y).</summary>
-    private static ScenarioFrame Tampered(ScenarioFrame frame, Func<int, int, (int X, int Y)> from)
+    internal static ScenarioFrame Tampered(ScenarioFrame frame, Func<int, int, (int X, int Y)> from)
     {
         var pixels = new byte[frame.Pixels.Length];
         for (var y = 0; y < frame.Height; y++)
@@ -248,7 +248,7 @@ internal sealed class SwatchStage : IPatinaStage
     }
 
     /// <summary>A copy of <paramref name="frame"/> whose pixel (x, y) is <paramref name="drawn"/>(x, y), or the frame's own where that is null.</summary>
-    private static ScenarioFrame Drawn(ScenarioFrame frame, Func<int, int, byte[]?> drawn)
+    internal static ScenarioFrame Drawn(ScenarioFrame frame, Func<int, int, byte[]?> drawn)
     {
         var pixels = (byte[])frame.Pixels.Clone();
         for (var y = 0; y < frame.Height; y++)
@@ -270,7 +270,7 @@ internal sealed class SwatchStage : IPatinaStage
     private static ScenarioFrame Rolled(ScenarioFrame frame, int shift) =>
         Tampered(frame, (x, y) => ((x + shift) % frame.Width, (y + shift) % frame.Height));
 
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(typeof(SwatchStage).Assembly.Location)!);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Carve.slnx"))) directory = directory.Parent;
@@ -513,7 +513,7 @@ internal sealed class SwatchStage : IPatinaStage
         Image(read, role, size).AsSpan((y * size + x) * 4, 4);
 
     /// <summary>The texel under the centre of destination pixel <paramref name="at"/> of <paramref name="to"/>, from <paramref name="from"/>.</summary>
-    private static int Under(int at, int to, int from) => (int)Math.Floor((at + 0.5) * from / to);
+    internal static int Under(int at, int to, int from) => (int)Math.Floor((at + 0.5) * from / to);
 
     /// <summary>The brightest pixel's luma: on a sphere view, the sphere's (the slate is darker than any lit face).</summary>
     private static double PeakLuma(ScenarioFrame frame)
@@ -523,7 +523,7 @@ internal sealed class SwatchStage : IPatinaStage
         return peak;
     }
 
-    private static double Luma(ReadOnlySpan<byte> p) => 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+    internal static double Luma(ReadOnlySpan<byte> p) => 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
 
     private static void CheckExact(PatinaChecks checks, string what, ScenarioFrame frame, int width, int height, Func<int, int, ReadOnlySpan<byte>> texel)
     {
@@ -536,7 +536,7 @@ internal sealed class SwatchStage : IPatinaStage
     }
 
     /// <summary>Exact over a region of the frame, leaving out its top <paramref name="skipRows"/>; reports the first difference and the count.</summary>
-    private static void CheckRegion(PatinaChecks checks, string what, ScenarioFrame frame, int left, int top, int width, int height, int skipRows,
+    internal static void CheckRegion(PatinaChecks checks, string what, ScenarioFrame frame, int left, int top, int width, int height, int skipRows,
         Func<int, int, ReadOnlySpan<byte>> texel)
     {
         var wrong = 0;
@@ -625,14 +625,14 @@ internal sealed class SwatchStage : IPatinaStage
         }
     }
 
-    private static bool IsSlate(ScenarioFrame frame, int x, int y)
+    internal static bool IsSlate(ScenarioFrame frame, int x, int y)
     {
         var at = (y * frame.Width + x) * 4;
         return Math.Abs(frame.Pixels[at] - Slate[0]) <= 1 && Math.Abs(frame.Pixels[at + 1] - Slate[1]) <= 1 && Math.Abs(frame.Pixels[at + 2] - Slate[2]) <= 1;
     }
 
     /// <summary>Whether a region holds label text: some pixel near white.</summary>
-    private static bool Bright(ScenarioFrame frame, int left, int top, int width, int height)
+    internal static bool Bright(ScenarioFrame frame, int left, int top, int width, int height)
     {
         for (var y = top; y < top + height; y++)
             for (var x = left; x < left + width; x++)
