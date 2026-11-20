@@ -4,7 +4,7 @@ description: >-
 ---
 # T-157 — A cube view on swatch
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
