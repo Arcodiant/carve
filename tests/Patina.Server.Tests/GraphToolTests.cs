@@ -18,7 +18,7 @@ public class GraphToolTests
         await using var patina = await PatinaHarness.StartAsync();
         var tools = (await patina.ListToolsAsync()).EnumerateArray().ToList();
 
-        Assert.Equal(["define_graph", "edit_graph", "get_graph", "save", "open", "push_snapshot", "pop_snapshot", "export", "swatch"], tools.Select(t => t.GetProperty("name").GetString()));
+        Assert.Equal(["define_graph", "edit_graph", "get_graph", "save", "open", "push_snapshot", "pop_snapshot", "export", "swatch", "check"], tools.Select(t => t.GetProperty("name").GetString()));
         Assert.All(tools, t => Assert.False(t.GetProperty("inputSchema").GetProperty("additionalProperties").GetBoolean()));
     }
 
