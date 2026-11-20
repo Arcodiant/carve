@@ -145,7 +145,7 @@ description: >-
 - **Consequence:** the occlusion map changes value from texel to texel, which is the case that exposed `render_glb`'s missing mips. If the look sampled or dimmed it wrongly, or drew a normal map's RGB wrongly, no check would catch it. One stage keeps a rule that two other stages drop, and the tracker says the opposite.
 - **Severity:** Minor
 
-**Outcome:** fixed (claude-sonnet-5-5)
+**Outcome:** fixed
 
 **Fix:** (claude-sonnet-5-5) 9b23429, with the retrospective's rulings in the commit that answers this review; the person ruled `blend: 1` for both frames (2026-11-20). `Blended` now reads each channel against its own range (a grey image has three equal ranges, so curvature's `blend: 2` and the strict rule are unchanged). OcclusionStage checks `wrench-orm-uvs-occlusion` and BevelStage `wrench-uvs-normal` with `CheckUvImage(..., blend: 1)`: 22558 inside and 28344 outside pixels placed in each, none failing (strictly 96 and 3 did). All 66 PNGs of `scenario-bakes` are byte-identical to run 12. No existing break reaches these checks (a break changes the bake and so the PNG the frame is checked against), so each was shown failing by a temporary, uncommitted edit that checks the frame against another bake's PNG: occlusion against the ORM, normal against the base colour, each 27293 pixels failing (4735 outside, 22558 inside-png). The existing breaks `dark` (2 failures) and `bevel-g` (6) still fail as before.
 
