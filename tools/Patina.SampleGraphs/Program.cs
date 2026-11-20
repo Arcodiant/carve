@@ -5,7 +5,13 @@ using Patina.Graphs.Imaging;
 // Usage: dotnet run --project tools/Patina.SampleGraphs [--canonical]
 // Evaluates every samples/graphs/*.texgraph (beside Carve.slnx) at the graph's own size into samples/graphs/<name>/
 // <role>.png, one PNG for each output the graph has. With --canonical it first rewrites each graph in the format's own
-// canonical text (what TexGraphFile.Write gives).
+// canonical text (what TexGraphFile.Write gives). Each variant below, a graph with its exposed parameters set to other
+// values (T-139, through GraphParameters.WithOverrides, as swatch and export set them), goes into
+// samples/graphs/<name>/variants/<variant>/<role>.png.
+var variants = new (string Graph, string Variant, (string Name, ParamValue Value)[] Values)[]
+{
+    ("bricks", "grey", [("mortar", ParamValue.Of(0.08)), ("tint", ParamValue.Of("#7a7a70"))]), // grey stone bricks
+};
 var root = FindRoot();
 var folder = Path.Combine(root, "samples", "graphs");
 foreach (var path in Directory.GetFiles(folder, "*" + TexGraphFile.Extension).Order(StringComparer.Ordinal))
@@ -19,18 +25,29 @@ foreach (var path in Directory.GetFiles(folder, "*" + TexGraphFile.Extension).Or
     }
     var graph = read.Graph!;
     if (args.Contains("--canonical")) TexGraphFile.WriteFile(path, graph);
+    var name = Path.GetFileNameWithoutExtension(path);
+    WritePngs(graph, Path.Combine(folder, name), name);
+    foreach (var (_, variant, values) in variants.Where(v => v.Graph == name))
+    {
+        var set = GraphParameters.WithOverrides(graph, values.ToDictionary(v => v.Name, v => v.Value));
+        if (!set.Ok) { Console.Error.WriteLine($"{path} variant {variant}: {set.Error}"); return 1; }
+        WritePngs(set.Graph!, Path.Combine(folder, name, "variants", variant), $"{name}/variants/{variant}");
+    }
+}
+return 0;
+
+static void WritePngs(TextureGraph graph, string outFolder, string label)
+{
     var evaluator = new GraphEvaluator(graph);
-    var outFolder = Path.Combine(folder, Path.GetFileNameWithoutExtension(path));
     Directory.CreateDirectory(outFolder);
     // Each output's file: metallic is packed into roughness.png, so it has none of its own.
     foreach (var output in evaluator.Outputs.Where(o => o != OutputRoles.Name(OutputRole.Metallic)))
     {
         var image = OutputImage.Make(evaluator, output, graph.Size);
         File.WriteAllBytes(Path.Combine(outFolder, OutputRoles.FileOf(output)), image.Png);
-        Console.Error.WriteLine($"{Path.GetFileName(outFolder)}/{OutputRoles.FileOf(output)}: {image.Png.Length} bytes");
+        Console.Error.WriteLine($"{label}/{OutputRoles.FileOf(output)}: {image.Png.Length} bytes");
     }
 }
-return 0;
 
 static string FindRoot()
 {

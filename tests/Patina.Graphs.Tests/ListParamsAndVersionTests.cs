@@ -121,7 +121,7 @@ public class ListParamsAndVersionTests
         }
     }
 
-    private static readonly TexGraphFormat Format = TexGraphFormat.Current.With(new StandIn()).WithNodeType("nested", 2);
+    private static readonly TexGraphFormat Format = TexGraphFormat.Version1.With(new StandIn()).WithNodeType("nested", 2);
 
     private static TextureGraph Plain() =>
         TextureGraph.Empty(64, 9).WithNode("c", GraphNode.Of("colour")).WithNode("o", GraphNode.Of("output", [new("in", "c")]));
@@ -148,7 +148,7 @@ public class ListParamsAndVersionTests
         Assert.Equal("kept", value);
         Assert.Equal(text, TexGraphFile.Write(read.Graph!, Format));
         // The same text without the format: the field is unknown.
-        Assert.Equal("unknown key 'stand_in': a graph has version, size, seed and nodes", TexGraphFile.Read(text).Error!.Message);
+        Assert.Equal("unknown key 'stand_in': a graph has version, size, seed, parameters and nodes", TexGraphFile.Read(text).Error!.Message);
         Assert.Equal("unknown key 'other': a graph has version, size, seed, stand_in and nodes", TexGraphFile.Read(text.Replace("stand_in", "other"), null, Format).Error!.Message);
     }
 
