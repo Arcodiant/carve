@@ -26,6 +26,19 @@ public class WorkedExampleTests
     }
 
     [Fact]
+    public async Task Define_graph_takes_the_turned_stripes_and_says_they_do_not_tile()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+
+        Assert.Equal(DefineGraphTool.WorkedTurnResult, await patina.Ok("define_graph", DefineGraphTool.WorkedTurn));
+        var text = DefineGraphTool.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn);
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedTurn + "\nreturns: " + DefineGraphTool.WorkedTurnResult, text, StringComparison.Ordinal);
+        Assert.Contains("a turn that is not a quarter turn does not tile", text, StringComparison.Ordinal);
+        Assert.Contains("- transform: ", text, StringComparison.Ordinal);
+        Assert.Contains("- distance: ", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Define_graph_takes_the_tone_per_stone_from_worleys_random_output()
     {
         await using var patina = await PatinaHarness.StartAsync();
