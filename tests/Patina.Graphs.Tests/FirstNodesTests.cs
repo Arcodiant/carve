@@ -21,19 +21,19 @@ public class FirstNodesTests
         return read.Graph!;
     }
 
-    /// <summary>The floats of node "t" (greyscale, or colour taking the first channel) as the output role's band holds them, row-major.</summary>
+    /// <summary>The floats of node "t" (greyscale, or colour taking the first channel) as the output role's tiles hold them, row-major.</summary>
     private static float[] Run(string nodes, int size, OutputRole role, int channel = 0, int? evalSize = null, uint seed = 7)
     {
         var roleName = OutputRoles.Name(role);
         var g = Graph(nodes + $$""", "o": { "type": "output", "inputs": { "in": "t" }, "params": { "role": "{{roleName}}" } }""", size, seed);
         var n = evalSize ?? size;
         var result = new float[n * n];
-        new GraphEvaluator(g).Evaluate(role, n, (band, y0, rows) =>
+        new GraphEvaluator(g).Evaluate(role, n, tile =>
         {
-            for (var y = y0; y < y0 + rows; y++)
-                for (var x = 0; x < n; x++)
+            for (var y = tile.Rect.Y; y < tile.Rect.Bottom; y++)
+                for (var x = tile.Rect.X; x < tile.Rect.Right; x++)
                 {
-                    var (r, gr, b) = band.Colour(x, y);
+                    var (r, gr, b) = tile.Colour(x, y);
                     result[y * n + x] = channel == 0 ? r : channel == 1 ? gr : b;
                 }
         });
@@ -379,7 +379,7 @@ public class FirstNodesTests
         CheckLevels(LevelsNode.Map);
         CheckBlend(BlendNode.Apply);
         CheckNormal(HeightToNormalNode.Normal);
-        CheckSeam((dx, size) => Band.Wrap(dx, size));
+        CheckSeam((dx, size) => Tile.Wrap(dx, size));
 
         // the table: what was broken, and that the check that catches it fails
         var breaks = new (string Name, Action Check)[]

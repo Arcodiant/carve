@@ -48,12 +48,12 @@ public sealed class BlendNode : NodeType
     {
         var mode = e.Parameters.Text("mode");
         var opacity = e.Parameters.Float("opacity");
-        Band a = e.Input("a")!, b = e.Input("b")!;
+        TileRead a = e.Input("a")!, b = e.Input("b")!;
         var mask = e.Input("mask");
         var output = e.Output();
         var colour = output.Kind == PortKind.Colour;
-        for (var y = e.Y0; y < e.Y0 + e.Rows; y++)
-            for (var x = 0; x < e.Size; x++)
+        for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
+            for (var x = e.Rect.X; x < e.Rect.Right; x++)
             {
                 var k = opacity * (mask?.Grey(x, y) ?? 1f);
                 if (!colour)
