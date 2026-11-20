@@ -24,8 +24,8 @@ internal sealed class CurvatureStage : IBakesStage
     /// </summary>
     private const int ConvexMargin = 90;
 
-    /// <summary>PROVISIONAL, not yet answered by the person: a texel on the L-block's inner edge must read at most 128 minus this.</summary>
-    private const int ConcaveMargin = 90;
+    /// <summary>The person's answer (2026-11-20, Waystone): a texel just inside the L-block's inner edge must read at most 128 minus this (64). Probed: 4 and 14.</summary>
+    private const int ConcaveMargin = 64;
 
     /// <summary>Bends of at least this many degrees between two jaw faces count as the jaw's edges (the wrench's are 65 and up, its rounding 30 and under).</summary>
     private const double EdgeDegrees = 60;
