@@ -281,7 +281,7 @@ public class BakeToolTests : FileToolTests
         Assert.Equal("textures/wrench.orm.png", Entry(result, "orm").GetProperty("path").GetString());
         Assert.All(files, f => Assert.True(File.Exists(Path.Combine(Root, f.GetProperty("path").GetString()!))));
         var colour = Entry(result, "base_colour");
-        Assert.Equal(1024, colour.GetProperty("size").GetInt32());
+        Assert.Equal(512, colour.GetProperty("size").GetInt32());
 
         // "all" first is the default: dark and black take it, rubber and red their own.
         var rgb = ImageResult.FromMemory(Read(colour.GetProperty("path").GetString()!), ColorComponents.RedGreenBlue);
