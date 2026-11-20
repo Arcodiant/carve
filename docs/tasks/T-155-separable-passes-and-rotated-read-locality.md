@@ -155,6 +155,10 @@ and 2,004 made (against 35 and 2,240 before) is approved. The two round-1 ruling
 8192 is blur's own share, the run less its source alone; the 64 MiB cap is kept, with as little recomputation as it
 allows.
 
+**The person's ruling since the second hand-off (2026-11-20):** `patina-regression` runs a Debug build, so its 8192
+regression tests assert the 2 GB peak only. The 10 s checks (blur's own share, distance) are measured in Release, like
+every other speed figure here, and written in As built.
+
 ### Hand-off (second agent, Claude Opus 5.5, `claude-opus-5-5`, at its call checkpoint)
 
 Rebased onto `origin/milestone/M-28` (T-141 landed) cleanly, no conflicts. `verify` has not been run; the unit tests
@@ -215,3 +219,68 @@ its source), then at 8192.
 smooth 0.05 at 2048 6.7 s, 960 tiles. After: blur at 2048 3.3 s, 1,312 tiles, peak 64 MiB, working set 179 MB
 (seven-eighths budget); blur at 8192 not finished (above). Proxy (2048, tiles of 32, 4 MiB): source 1.1 s, 8,192
 tiles; blur stopped at 300 s with 3,091 of 4,096 output tiles.
+
+### Hand-off (third agent, Claude Opus 5.5, `claude-opus-5-5`): stopped, two speed checks not met
+
+Stopped and reported rather than finished: the person's ruled 10 s checks for blur's own share and for distance at
+8192 are not met in Release, and the cause is now the passes' own arithmetic as well as the source's recompute.
+`verify` has not been run; the Patina.Graphs suite (432 tests) passed before the turn test's count was fixed, and
+`SeparablePassesTests` (11) pass after it.
+
+**Done this round (committed):**
+- **The blur thrash is fixed.** Two causes, both in the evaluator, neither changing a byte:
+  - *Warm-up* (`GraphEvaluator.WarmRows`): before a column tile reads its row tiles, each row of them not held is made
+    across the rest of the band, left to right, so a source row is read once for the band, not once per output tile.
+  - *Cold tiles* (`TileCache`, the `cold` flag in `GraphEvaluator`): everything unpinned while a row pass is being made
+    (its inputs, and their inputs in turn) goes on a cold list dropped before any other. The warm-up alone did not help:
+    the row's sources, unpinned between its row tiles, sat in LRU among the row tiles and pushed them out (a proxy of
+    512 in tiles of 8 under 256 KiB, the same 64 x 64 tile geometry, made 136 row tiles per output tile with the
+    warm-up alone, 22 with cold sources from the row pass only, and 1 with everything under the row pass cold).
+    A column pass made inside an outer row pass unpins its own row tiles warm again.
+- `A_30_degree_turn_makes_its_source_close_to_once`: its count was wrong (it took the output node to make tiles, which
+  it does not), fixed; **measured 1.16** (14,196 source tiles against 12,288 alone, at 2048 in tiles of 32 under
+  4 MiB), so `MostTurnRemakes = 1.2`, a new target set from that run.
+- `TransformDistanceBoundedMemoryTests`: distance raised to 8192, blur smooth 0.05 at 8192 and the strong minify
+  (tile 16 x 16, scale 0.25) at 8192 added, each asserting the 2 GB peak only (the ruling above). Deadline 60 min
+  as a placeholder: **not yet run in Debug**, so neither the Debug times nor the peaks are measured.
+- The ruling since the second hand-off is in the Notes.
+
+**Figures at 8192, Release, tiles of 128, 64 MiB cap (harness `%TEMP%\t155\measure`, this branch):**
+
+| run | before | after |
+|---|---|---|
+| default fbm through gradient_map, alone (`src`) | 12.4 s, 14.1 s | 11.7 s, 8,192 tiles |
+| blur smooth 0.05 on `src` | about an hour (T-137); about 6,100 s (thrash, this branch earlier) | **132.1 s**, 43,744 tiles, peak 64 MiB, working set 281 MB |
+| blur smooth 0.05 on a flat `colour` (its own arithmetic) | — | **110.1 s**, 26,608 tiles, working set 499 MB |
+| blur smooth 0.1 on `src` | — | stopped at 200 s, 2,476 of 4,096, about 331 s |
+| `tiles` mask alone | — | 7.7 s, 4,096 tiles |
+| distance 0.1 inside on the `tiles` mask | 474 s, pinned 84 MiB (T-138) | **25.3 s**, 18,448 tiles, peak 64 MiB, working set 193 MB |
+| distance 0.25 both | — | 75.6 s, 31,872 tiles, peak 64 MiB |
+| colour fbm (8 x 8, 4 octaves) alone (`csrc`) | 16.8 s, 16,384 tiles (T-138) | 14.2 s, 8,192 tiles |
+| 30-degree turn of `csrc` | 46.7 s, 39,478 tiles (T-138) | **21.2 s**, 13,528 tiles: source made 1.15 times |
+| tile 16, scale 0.25 of `csrc` | working set 4,348 MB (T-138) | 30.0 s, peak held 768 MiB, **working set 1,561 MB** |
+
+Blur's own share (the run less its source alone) is **120.4 s** against 10 s; distance is **25.3 s** against 10 s
+(17.6 s less its mask). The pinned windows are at the cap for both, and the turn and the minify meet their checks.
+
+**Why 10 s is out of reach as built.** Blur on a flat source still takes 110 s: each 128-texel tile's running sum
+runs the whole widened window, 128 + 2 x 1,229 = 2,586 texels, for every one of 128 rows, three box passes, in each of
+the two passes; about 20 times the arithmetic of a whole-image pass. On a real source the band (10 tiles wide, reach
+10 tiles each side) makes the source about 4.3 times over besides (35,456 source tiles for 8,192), which the research
+found cannot fall below about 2.4 times under 64 MiB.
+
+**Options for the person:**
+1. **Strip passes** (an API change to T-155's own API): the row pass made over a whole band's tile row at once (one
+   running sum across `band x 128 + 2r` texels, cut into row tiles) and the column pass over a tall strip of output
+   tiles. That cuts the 20 times to about 3. Estimate: blur's arithmetic about 15 to 20 s, plus the source's recompute
+   (about 3.3 x 11.7 s), so blur's own share about 50 s, distance about 12 to 15 s. Still over 10 s under the cap.
+2. **Strip passes and a larger cap for separable nodes** (reverses round-1 Q2 (A)): with the source made once, blur's
+   own share is about the strip arithmetic, perhaps 15 s; 10 s is still not sure.
+3. **Accept the figures** above as the speed reached, and move the 10 s checks to a later task (with option 1 as its
+   scope), landing what is here: the thrash fixed, the pinned windows at the cap, the turn and the minify met.
+4. **Lower the bounds** (blur's radius, distance's range) at which the 10 s is asserted.
+
+**Left once the person rules:** the samples at 8192 before and after (running at hand-off: `%TEMP%\t155\samples.log`;
+T-153's cobblestones: base_colour 75.5 s, normal 129.2 s, roughness 57.4 s, occlusion 54.9 s); run
+`TransformDistanceBoundedMemoryTests` in Debug and set its deadline from it; CLAUDE.md's `tests/Patina.Server.Tests`
+line; As built; `verify`, `cairn lint`, `finish`.
