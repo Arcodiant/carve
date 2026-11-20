@@ -113,7 +113,7 @@ occlusion, roughness and metallic from bakes alone.
   - Verify line now has server-regression, scenario-orcward and scenario-morph.
 - **Before-fix hashes taken.** `cairn test run --fresh scenario-orcward scenario-morph server-regression` on the rebased
   commit with the fix stashed: all PASS (local, 16 s, 26 s, 467 s). Every PNG under `artifacts/` hashed into
-  `G:\My Drivertifacts\carve\M-24\T-124\mipmap-fixefore.sha256` (287 files; run folders `orcward/1`, `morph/1`).
+  `G:\My Drive\artifacts\carve\M-24\T-124\mipmap-fix\before.sha256` (287 files; run folders `orcward/1`, `morph/1`).
 - **Left.**
   - Re-run the same three suites with the fix (`--fresh`), hash into `after.sha256`, compare by path within each run folder
     (the scenario runs land in new numbered folders: `orcward/2`, `morph/2`). Every untextured `render_glb` frame must be
