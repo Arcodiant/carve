@@ -27,6 +27,8 @@ public sealed class NodeRegistry
         new GradientMapNode(),
         new InputNode(),
         new NestedGraphNode(),
+        new TransformNode(),
+        new DistanceNode(),
     ]);
 
     private readonly IReadOnlyDictionary<string, NodeType> _types;

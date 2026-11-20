@@ -54,6 +54,12 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
     public const string WorkedPassThrough =
         """{"graph":{"version":2,"size":256,"seed":0,"parameters":{"mortar":{"value":0.06,"drives":["wall.mortar"]}},"nodes":{"wall":{"type":"graph","params":{"path":"bricks.texgraph"}},"out":{"type":"output","inputs":{"in":"wall.base_colour"}},"rough":{"type":"output","inputs":{"in":"wall.roughness"},"params":{"role":"roughness"}}}}}""";
 
+    /// <summary>A worked example of transform: stripes turned 30 degrees, which does not tile. Tests run it as written.</summary>
+    public const string WorkedTurn =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"stripes":{"type":"stripes","params":{"count":8}},"turned":{"type":"transform","inputs":{"in":"stripes"},"params":{"rotation":30}},"out":{"type":"output","inputs":{"in":"turned"},"params":{"role":"base_colour"}}}}}""";
+
+    public const string WorkedTurnResult = "define_graph: the open graph is now 3 nodes, size 256, seed 0; no faults: it evaluates";
+
     public static string Text(NodeRegistry registry) =>
         "Replaces the open texture graph with a whole new one, given as graph: the body of a .texgraph file, as JSON. "
         + "patina holds one graph per session. define_graph clears the snapshot stack (push_snapshot) and the graph's path (save gives it one), "
@@ -86,6 +92,10 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
         + "Worked example, a mossy colour from a soft cloud (fbm noise, blurred, then coloured by a gradient_map: positions and colours are lists of the same length, the greyscale 0 taking the first colour and 1 the last):\n"
         + "define_graph " + WorkedMap + "\n"
         + "returns: " + WorkedMapResult + "\n"
+
+        + "Worked example, stripes turned 30 degrees by transform. It evaluates, but a turn that is not a quarter turn does not tile, so the image shows a seam where it repeats and check's seam rule reports it; rotation 90 would tile:\n"
+        + "define_graph " + WorkedTurn + "\n"
+        + "returns: " + WorkedTurnResult + "\n"
         + "Worked example, a metal plate: grey, metallic from a gradient across u, roughness its inverse, and a named output edge (a triangle gradient down v):\n"
         + "define_graph " + WorkedMetal + "\n"
         + "returns: " + WorkedMetalResult + "\n"
