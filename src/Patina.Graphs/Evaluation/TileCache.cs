@@ -59,10 +59,18 @@ internal sealed class TileCache(int tilesAcross, long cap)
         return entry;
     }
 
+    /// <summary>
+    /// Drops unpinned tiles, least recently used first, until <paramref name="incoming"/> more bytes fit under the cap
+    /// or none is left: called before a node's tiles are allocated, so the cache never holds the cap and a tile more.
+    /// </summary>
+    public void MakeRoom(long incoming) => Trim(Cap - incoming);
+
     /// <summary>Drops unpinned tiles, least recently used first, until no more than the cap is held or none is left.</summary>
-    public void Trim()
+    public void Trim() => Trim(Cap);
+
+    private void Trim(long limit)
     {
-        while (Bytes > Cap && _unpinned.First is { } first)
+        while (Bytes > limit && _unpinned.First is { } first)
         {
             _unpinned.RemoveFirst();
             var entry = first.Value;

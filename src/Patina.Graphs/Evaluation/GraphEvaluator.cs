@@ -152,6 +152,9 @@ public sealed class GraphEvaluator
                                     tiles[r * cover.Width + c] = cache.Find(cache.Key(source.Node, Tile.Wrap(cover.X + c, n), Tile.Wrap(cover.Y + r, n)))!.Tiles[source.OutPort];
                             inputs[source.Port] = new TileRead(steps[source.Node].Kinds[source.OutPort], size, t, want, tiles);
                         }
+                        long incoming = 0;
+                        foreach (var kind in step.Kinds) incoming += (long)rect.Width * rect.Height * PortKinds.Channels(kind) * sizeof(float);
+                        cache.MakeRoom(incoming);
                         var outputs = new Tile[step.Ports.Length];
                         var named = new Dictionary<string, Tile>(StringComparer.Ordinal);
                         for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect);
