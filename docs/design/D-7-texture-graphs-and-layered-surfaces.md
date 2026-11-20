@@ -101,7 +101,11 @@ Every mask on a layer is given by exact arguments with a checkable result: a `se
   `height_to_normal` and `output` (T-110, T-112).
 - **Resolution.** Partly answered at M-27's planning: a graph states a default `size`, every parameter is relative to
   the image, and patina may evaluate at any power of two up to 8192 (swatches up to 2048). What size Carve evaluates
-  a graph material at is still M-29's to decide.
+  a graph material at was answered at M-29's planning (2026-11-20, by the person): each slot states a size, a power
+  of two from 64 to 4096, default the graph's own.
+- **Mesh inputs and patina.** Answered at M-29's planning (by the person): the mesh-input nodes are in an engine-free
+  project both servers reference; carve feeds them bakes and patina neutral stand-ins. A material's graph files are
+  read at each render and export, and a material that reads the mesh is baked once per mesh that uses it.
 - **Hosting.** Answered at M-27's planning: both servers host through a shared `Carve.Hosting` library extracted from
   `Carve.Server` (T-111), and patina loads the same extensions as carve.
 - **How quality is judged.** Value checks catch broken textures, not ugly ones. Whether swatch renders let an agent judge a texture well enough is for M-27's and M-28's acceptance runs to show.
