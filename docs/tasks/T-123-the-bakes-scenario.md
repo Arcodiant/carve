@@ -133,7 +133,8 @@ Also the person's to rule: the sampling placement (`Facing` 0.5, corners at 0.7,
 frames and the crop; then `### As built`, `cairn lint` and `finish`. Not checked: the frames by eye beyond the sheet
 and the crop (both look right: the ratchet wrench, red box at +x, a white steel island with its grey padding); the
 `samples/wrench.carve` stats against fps-arms. Evidence: `G:\My Drive\artifacts\carve\M-24\T-123\probe` (run 2's
-frames, `compare/`, the TSVs, and `probe.tsv` of both breaks). The queued run, job `J-20261120-004722-5c8b13` (22a6fb7a7), is byte-identical frame for frame to run 2; its frames, `compare/` and TSVs are staged in `G:\My Drivertifacts\carve\M-24\T-123ound-1` for the review.
+frames, `compare/`, the TSVs, and `probe.tsv` of both breaks). The queued run, job `J-20261120-004722-5c8b13` (22a6fb7a7), is byte-identical frame for frame to run 2; its frames, `compare/` and TSVs are staged in `G:\My Drive\artifacts\carve\M-24\T-123
+ound-1` for the review.
 
 **Surprising.** The first run failed on the `uvs` square's border line (white over the image) and on mirror checks in
 the views along x (a point and its mirror share a line of sight); both are now excluded by rule, not by tolerance. Two
