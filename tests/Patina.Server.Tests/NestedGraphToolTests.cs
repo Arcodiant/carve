@@ -62,7 +62,10 @@ public class NestedGraphToolTests
         Assert.Contains("\nread 2 nested files for its graph nodes: <folder>/grime.texgraph, <folder>/bricks.texgraph", opened);
 
         await patina.Ok("save", """{"path":"copy.texgraph"}""");
-        Assert.Equal(File.ReadAllText(Sample("old-wall.texgraph")), File.ReadAllText(Path.Combine(folder.Path, "copy.texgraph")));
+        // By text, line endings aside: a checkout may give the sample CRLF.
+        Assert.Equal(File.ReadAllText(Sample("old-wall.texgraph")).ReplaceLineEndings("
+"), File.ReadAllText(Path.Combine(folder.Path, "copy.texgraph")).ReplaceLineEndings("
+"));
         Assert.Equal(bricks, File.ReadAllBytes(Path.Combine(folder.Path, "bricks.texgraph")));
         Assert.Equal(grime, File.ReadAllBytes(Path.Combine(folder.Path, "grime.texgraph")));
     }
