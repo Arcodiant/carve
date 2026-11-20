@@ -96,8 +96,14 @@ public class SwatchTests
     [InlineData("""{"view":"sphere","angle":1e300}""", "swatch: angle 1e300 is out of range; angle is a number of degrees")]
     [InlineData("""{"view":"flat","output":"emissive"}""", "swatch: the graph has no emissive output; its outputs are base_colour, normal, roughness, occlusion")]
     [InlineData("""{"view":"flat","output":"Edge!"}""", "swatch: output is 'Edge!'; give a role (base_colour, normal, roughness, metallic, occlusion, height) or a named output's name")]
-    [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle, parameters")]
+    [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle, tiling, parameters")]
+    [InlineData("""{"view":"flat","tiling":3}""", "swatch: tiling repeats the sphere's maps, for sheet and sphere; flat has none")]
+    [InlineData("""{"view":"sphere","tiling":0}""", "swatch: tiling 0 is out of range; give a whole number from 1 to 8")]
+    [InlineData("""{"view":"sphere","tiling":9}""", "swatch: tiling 9 is out of range; give a whole number from 1 to 8")]
+    [InlineData("""{"view":"sphere","tiling":2.5}""", "swatch: tiling is a whole number from 1 to 8, not a number 2.5")]
+    [InlineData("""{"view":"sphere","tiling":"3"}""", "swatch: tiling is a whole number from 1 to 8, not a string \"3\"")]
     [InlineData("""{"view":"sphere"}""", "swatch: " + PatinaHarness.NoEngine)]
+    [InlineData("""{"view":"sphere","tiling":3}""", "swatch: " + PatinaHarness.NoEngine)]
     [InlineData("""{}""", "swatch: " + PatinaHarness.NoEngine)]
     public async Task Refusals_say_what_to_do(string arguments, string said)
     {
@@ -149,5 +155,22 @@ public class SwatchTests
         Assert.Equal(sphere.AsSpan(0, 4).ToArray(), At(layout.SphereLeft + 300, 25 + 300));
         Assert.Equal([255, 255, 255, 255], At(5, 5));
         Assert.Equal(SwatchImages.Slate, At(1000, 10));
+    }
+
+    [Fact]
+    public void The_tiling_is_described_with_worked_examples_the_scenario_draws()
+    {
+        // The sphere needs an engine, so the drawn example is the scenario's (literals there); the refusal runs in the harness.
+        Assert.Equal("""{"view":"sphere","tiling":3}""", SwatchTool.WorkedTiling);
+        Assert.Contains("swatch " + SwatchTool.WorkedTiling + " returns an image and:\n" + SwatchTool.WorkedTilingResult, SwatchTool.Text, StringComparison.Ordinal);
+        Assert.Contains("swatch " + SwatchTool.WorkedTilingRefused + " returns:\n" + SwatchTool.WorkedTilingRefusedResult, SwatchTool.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_worked_tiling_refusal_is_what_the_description_says()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+        await patina.Ok("define_graph", DefineGraphTool.Worked);
+        Assert.Equal(SwatchTool.WorkedTilingRefusedResult, await patina.Refused("swatch", SwatchTool.WorkedTilingRefused));
     }
 }

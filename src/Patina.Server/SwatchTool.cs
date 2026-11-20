@@ -39,13 +39,16 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         + "lit as Carve's render lights a model (its ambient light, fixed sky and directional light, placed relative to the camera as Carve places it) on Carve's dark slate, from a fixed camera, 512 px. "
         + "metallic, height and greyscale named outputs are drawn grey; roughness's column is roughness alone. "
         + "output: a role or a named output's name, for flat and tiled (default the first role the graph has). size: the evaluation size, a power of two from 32 to 2048 (default the graph's size, at most 2048; for larger PNGs use export). "
+        + "tiling: a whole number from 1 to 8 (default 1), for sheet and sphere: the sphere wears every map repeated that many times in u and v, to judge a material at a texel density nearer a game's; the sheet's title and the result name it when it is not 1. "
         + "angle: the sphere's turn about y in degrees, for sheet and sphere (default 0; counter-clockwise seen from above). "
         + "parameters: the graph's exposed parameters to set for this call only, by name (get_graph lists them and their ranges); the graph is not changed, a value out of range is refused naming the parameter and its range, and the sheet's title and the result name them. "
         + "Refused while the graph has a fault. Changes nothing.\n"
         + "Worked example, with the planks open (samples/graphs/planks.texgraph): swatch " + Worked + " returns an image and:\n" + WorkedResult + "\n"
         + "Worked example, after define_graph's metal plate: swatch " + WorkedEdge + " returns an image and:\n" + WorkedEdgeResult + "\n"
         + "Worked example, with samples/graphs/bricks.texgraph open: swatch " + WorkedParameters + " shows grey stone bricks' base colour and returns:\n" + WorkedParametersResult + "\n"
-        + "and swatch " + WorkedParametersRefused + " returns:\n" + WorkedParametersRefusedResult;
+        + "Worked example, with samples/graphs/planks.texgraph open: swatch " + WorkedTiling + " returns an image and:\n" + WorkedTilingResult + "\n"
+        + "and swatch " + WorkedParametersRefused + " returns:\n" + WorkedParametersRefusedResult + "\n"
+        + "and swatch " + WorkedTilingRefused + " returns:\n" + WorkedTilingRefusedResult;
 
     public static McpServerTool Create() => Create<SwatchTool>("swatch", Text, new JsonObject
     {
@@ -53,6 +56,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         ["output"] = new JsonObject { ["type"] = "string", ["description"] = "A role (" + string.Join(", ", OutputRoles.Names) + ") or a named output's name, for flat and tiled." },
         ["size"] = new JsonObject { ["type"] = "integer" },
         ["angle"] = new JsonObject { ["type"] = "number" },
+        ["tiling"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = MaxTiling, ["description"] = "Whole repeats of every map over the sphere in u and v, 1 to 8 (default 1), for sheet and sphere." },
         ["parameters"] = new JsonObject { ["type"] = "object", ["description"] = ParameterOverrides.Description },
     });
 
@@ -62,13 +66,25 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
     public const string WorkedParametersResult =
         "swatch flat: base_colour of bricks.texgraph, 256 x 256 px, exact texels; parameters mortar 0.08, tint \"#7a7a70\"";
 
+    /// <summary>The sphere's tiling's largest value.</summary>
+    public const int MaxTiling = 8;
+
+    /// <summary>The tiling's worked example (T-156): the planks' sphere with every map repeated 3 x 3.</summary>
+    public const string WorkedTiling = """{"view":"sphere","tiling":3}""";
+
+    public const string WorkedTilingResult = "swatch sphere: planks.texgraph at 256 px on the engine's UV sphere, angle 0, tiling 3, 512 x 512 px";
+
+    public const string WorkedTilingRefused = """{"view":"sphere","tiling":9}""";
+
+    public const string WorkedTilingRefusedResult = "swatch: tiling 9 is out of range; give a whole number from 1 to 8";
+
     public const string WorkedParametersRefused = """{"parameters":{"mortar":0.5}}""";
 
     public const string WorkedParametersRefusedResult = "swatch: parameters['mortar']: is 0.5, but must be a number from 0 to 0.45";
 
     public async Task<CallToolResult> Run(RequestContext<CallToolRequestParams> context, CancellationToken cancellationToken)
     {
-        if (Unknown("swatch", context, "view", "output", "size", "angle", "parameters") is { } unknown) return unknown;
+        if (Unknown("swatch", context, "view", "output", "size", "angle", "tiling", "parameters") is { } unknown) return unknown;
         var arguments = context.Params?.Arguments ?? new Dictionary<string, JsonElement>();
         JsonElement? Arg(string name) => arguments.TryGetValue(name, out var v) ? v : null;
 
@@ -119,6 +135,16 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
             if (!float.IsFinite(angle)) return Error($"swatch: angle {angleArg.GetRawText()} is out of range; angle is a number of degrees");
         }
 
+        var tiling = 1;
+        if (Arg("tiling") is { ValueKind: not JsonValueKind.Null } tilingArg)
+        {
+            if (view is "flat" or "tiled") return Error($"swatch: tiling repeats the sphere's maps, for sheet and sphere; {view} has none");
+            if (tilingArg.ValueKind != JsonValueKind.Number || !tilingArg.TryGetInt32(out tiling))
+                return Error($"swatch: tiling is a whole number from 1 to {MaxTiling}, not {Kind(tilingArg)} {tilingArg.GetRawText()}");
+            if (tiling < 1 || tiling > MaxTiling) return Error($"swatch: tiling {tiling} is out of range; give a whole number from 1 to {MaxTiling}");
+        }
+        var tiled3 = tiling == 1 ? "" : $"tiling {tiling}";
+
         var evaluator = new GraphEvaluator(graph, registry);
         var roles = evaluator.Outputs;
         var name = path is null ? "the open graph" : System.IO.Path.GetFileName(path);
@@ -152,13 +178,13 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         var worn = new Dictionary<OutputRole, byte[]>();
         foreach (var r in new[] { OutputRole.BaseColour, OutputRole.Normal, OutputRole.Roughness, OutputRole.Occlusion }.Where(r => evaluator.Has(OutputRoles.Name(r))))
             worn[r] = r == OutputRole.Roughness && metallic ? OutputImage.FileRgba8(evaluator, OutputRoles.Name(r), size) : images[OutputRoles.Name(r)];
-        var title = $"{(path is null ? "unsaved graph" : name)}   {size} px   seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}" + (set == "" ? "" : "   " + set);
+        var title = $"{(path is null ? "unsaved graph" : name)}   {size} px   seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}" + (set == "" ? "" : "   " + set) + (tiled3 == "" ? "" : "   " + tiled3);
         var columns = roles.ToList();
         var labels = view == "sheet" ? SwatchSheet.Labels(title, columns, angle) : null;
 
         await status.WhenSettled.WaitAsync(cancellationToken);
         if (status.FaultMessage is { } fault) return Error("swatch: " + fault);
-        var request = new SwatchRequest(new SwatchSpec(worn, size, angle, labels, metallic));
+        var request = new SwatchRequest(new SwatchSpec(worn, size, angle, labels, metallic, tiling));
         queue.Enqueue(request);
         await Task.WhenAny(request.Result, status.WhenStopped).WaitAsync(cancellationToken);
         if (!request.Result.IsCompleted) return Error("swatch: " + (status.FaultMessage ?? "the engine has stopped, so nothing can be drawn"));
@@ -169,11 +195,11 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         if (view == "sphere")
         {
             return Image(frame.Sphere, SwatchImages.SphereCell, SwatchImages.SphereCell,
-                $"swatch sphere: {name} at {size} px on the engine's UV sphere, angle {angleText}, {SwatchImages.SphereCell} x {SwatchImages.SphereCell} px" + (set == "" ? "" : "; " + set));
+                $"swatch sphere: {name} at {size} px on the engine's UV sphere, angle {angleText}, {(tiling == 1 ? "" : $"tiling {tiling}, ")}{SwatchImages.SphereCell} x {SwatchImages.SphereCell} px" + (set == "" ? "" : "; " + set));
         }
         var (sheet, layout) = SwatchSheet.Compose([.. columns.Select(r => images[r])], size, frame.Sphere, frame.Atlas!, frame.Extents!);
         return Image(sheet, layout.Width, layout.Height,
-            $"swatch sheet: {name}, {size} px, seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}{(set == "" ? "" : ", " + set)}; columns {string.Join(", ", columns)}, flat over tiled 3 x 3; sphere at angle {angleText}; {layout.Width} x {layout.Height} px");
+            $"swatch sheet: {name}, {size} px, seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}{(set == "" ? "" : ", " + set)}; columns {string.Join(", ", columns)}, flat over tiled 3 x 3; sphere at angle {angleText}{(tiling == 1 ? "" : $", tiling {tiling}")}; {layout.Width} x {layout.Height} px");
     }
 
     private static CallToolResult Image(byte[] rgba, int width, int height, string caption) => new()
