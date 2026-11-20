@@ -75,3 +75,49 @@ with `export` without editing the graph.
   `SwatchTool.cs` and `ExportTool.cs` in wave 3. T-137 and T-138 run beside it and touch none of them.
 - **Stop and ask:** a rule the spec does not settle (an exposed parameter driving a list kind, say), or a committed
   PNG that changes.
+
+### Hand-off
+
+Written by Claude Opus 5.5 (`claude-opus-5-5`), the first agent, at its call checkpoint (about 58 calls). One commit.
+
+**Done (committed, unit tests green: Patina.Graphs.Tests 240 pass, Patina.Server.Tests unit 112 pass):**
+- *Format*: `GraphParameter` (value, drives, optional min/max) and `TextureGraph.Parameters` (an `init` slot; `WithParameter`,
+  `WithoutParameter`, `DriverOf`). `ParametersField` (in `GraphParameters.cs`) is added to `TexGraphFormat.Current`
+  (`Current = Version1.With(ParametersField.Instance)`; `TexGraphFormat.Version1` is the bare format). Written after
+  `seed`, one parameter a line in name order, keys `value`, `drives`, `min`, `max` (the last two left out when absent); drives
+  in the order given. A driven node parameter is left out of its node by the writer. `TexGraphFile.WriteShowingDriven`
+  is get_graph's form (`"gap": { "driven_by": "mortar" }`), and `Read` takes it back (a `driven_by` naming a parameter that
+  does not drive it is a load error).
+- *Faults* (`GraphParameters.Analyse`, appended by `GraphValidator` after the node faults): `GraphFault` gained a fifth
+  field, `GraphParameter` (Node null). Wording is in `ExposedParametersTests.FaultCases`. A driven parameter takes the value
+  (where it fits that node parameter's own range) and its own value in the node is not checked.
+- *The one function*: `GraphParameters.WithOverrides(graph, overrides, registry)` -> `OverrideResult(Graph, Error)`;
+  `GraphParameters.Of(graph)` gives each parameter not at fault as `ExposedParameter` with `Range`, a `ParamSpec` named after
+  it (its `Check`/`Describe` give the words). Server side, `ParameterOverrides.TryApply(tool, graph, JsonElement?, registry, ...)`
+  reads the `parameters` argument; swatch and export call it, check (T-141) should too.
+- *Tools*: edit_graph `set_parameter`, `remove_parameter`, `set_parameters` (worked example and shapes in its text, run by
+  `ExposedParameterToolTests`); get_graph's parameter lines (`GetGraphTool.WorkedBricksParameters`) and driven form; swatch
+  and export `parameters` (title, caption and export head name the overrides). The edit's new-fault key includes `GraphParameter`.
+- *Content*: bricks.texgraph is version 2 with `jitter`, `mortar`, `tint` at their old values; every committed PNG kept its
+  SHA-256 (all 20 compared before and after the sample tool ran). `tools/Patina.SampleGraphs` has a variant list and wrote
+  `samples/graphs/bricks/variants/grey/` (mortar 0.08, tint #7a7a70); a test holds it equal.
+- D-7's open question added as answered; CLAUDE.md's Patina Layout line names `GraphParameters`.
+- Test targets moved only where the spec moves them: swatch's and export's argument lists name `parameters`; the
+  stand-in field test builds on `TexGraphFormat.Version1` and the unknown-key message lists `parameters`;
+  `PatinaHarness.GraphText` skips get_graph's parameter lines.
+
+**Left:**
+1. scenario-patina: a bricks stage (after `MetalPlateAsync` in `SwatchStage.cs`): open the bricks, export at 256 with and
+   without `{"mortar":0.08,"tint":"#7a7a70"}`, check each against the committed PNGs, capture `swatch-bricks-sheet` and
+   `swatch-bricks-grey-sheet` (4 columns, 1544 x 538) and check every flat and tiled cell against the exported texels as the
+   plate's sheet is checked; check the grey sheet's caption names the overrides. Nothing written there yet.
+2. `cairn task T-139 verify`; compare the existing 10 planks frames and 16 PNGs by hash against main's job (fetch by job id).
+3. Review round 1 with the person (Waystone, `G:\My Drive\artifacts\carve\M-28\T-139\round-1`): the grey variant's look
+   (its sheet, scaled), which must be approved before landing, and two rulings below.
+4. `### As built` (with the T-140/T-141 notes above), commit, `cairn lint`, `cairn task T-139 finish`.
+
+**For the person to rule (the spec does not settle them):** a graph parameter may not drive a list (`Floats`, `Colours`)
+or a `Name` (a fault says so); `IntPair` (`[x, y]`, one range for both) may be driven. An `Int` range narrowed by a
+non-whole min/max rounds inward.
+
+**Not checked:** no scenario run, no frame seen, no image opened.

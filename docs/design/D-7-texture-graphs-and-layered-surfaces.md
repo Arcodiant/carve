@@ -106,6 +106,11 @@ Every mask on a layer is given by exact arguments with a checkable result: a `se
 - **Mesh inputs and patina.** Answered at M-29's planning (by the person): the mesh-input nodes are in an engine-free
   project both servers reference; carve feeds them bakes and patina neutral stand-ins. A material's graph files are
   read at each render and export, and a material that reads the mesh is baked once per mesh that uses it.
+- ~~**A graph's parameters.**~~ Answered at M-28's planning (2026-11-19, by the person): a graph declares its
+  parameters in a top-level `parameters` (version 2), each driving node parameters by name (`"node.param"`) and taking
+  the narrowest range of what it drives; `swatch` and `export` take overrides for variants, and a `graph` node in
+  another graph sets them by name (T-140). `"$name"` references in node parameters and one `values` object on the
+  graph node were declined (T-139).
 - **Hosting.** Answered at M-27's planning: both servers host through a shared `Carve.Hosting` library extracted from
   `Carve.Server` (T-111), and patina loads the same extensions as carve.
 - **How quality is judged.** Value checks catch broken textures, not ugly ones. Whether swatch renders let an agent judge a texture well enough is for M-27's and M-28's acceptance runs to show.

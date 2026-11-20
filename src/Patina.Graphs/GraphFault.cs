@@ -4,9 +4,10 @@ namespace Patina.Graphs;
 /// One thing wrong with a graph that still loads: the node it is on, the input port or the parameter it concerns
 /// (at most one of the two), and a message that names them itself and says what would be right (the types there are,
 /// the ids there are, the range), so a server can return the list as it stands. <see cref="Node"/> is null only for
-/// the one fault of the whole graph, that it has no output.
+/// the one fault of the whole graph, that it has no output, and for a fault of an exposed parameter (T-139), which
+/// <see cref="GraphParameter"/> names instead.
 /// </summary>
-public sealed record GraphFault(string? Node, string? Port, string? Parameter, string Message)
+public sealed record GraphFault(string? Node, string? Port, string? Parameter, string Message, string? GraphParameter = null)
 {
     public override string ToString() => Message;
 }

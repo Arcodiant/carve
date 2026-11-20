@@ -27,6 +27,17 @@ public sealed record TextureGraph(int Size, uint Seed, ImmutableSortedDictionary
     public TextureGraph WithNode(string id, GraphNode node) => this with { Nodes = Nodes.SetItem(id, node) };
 
     public TextureGraph WithoutNode(string id) => this with { Nodes = Nodes.Remove(id) };
+
+    /// <summary>The exposed parameters by name (T-139, the file's <c>parameters</c>, version 2): none unless the graph declares some.</summary>
+    public ImmutableSortedDictionary<string, GraphParameter> Parameters { get; init; } = ImmutableSortedDictionary.Create<string, GraphParameter>(StringComparer.Ordinal);
+
+    public TextureGraph WithParameter(string name, GraphParameter parameter) => this with { Parameters = Parameters.SetItem(name, parameter) };
+
+    public TextureGraph WithoutParameter(string name) => this with { Parameters = Parameters.Remove(name) };
+
+    /// <summary>The exposed parameter driving <paramref name="node"/>'s <paramref name="param"/>, or null (the first in name order, should two claim it).</summary>
+    public string? DriverOf(string node, string param) =>
+        Parameters.FirstOrDefault(p => p.Value.Drives.Contains($"{node}.{param}")).Key;
 }
 
 /// <summary>
