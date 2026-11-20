@@ -282,8 +282,12 @@ public sealed class GraphEvaluator
         LastRun = new EvaluationRun(t, cache.MostTiles, cache.PeakBytes, cap, evaluated);
     }
 
-    /// <summary>The widest band of tile columns walked: 16, or narrower when a separable node's row tiles for one column must all stay held.</summary>
-    public const int MostBandTiles = 16;
+    /// <summary>The widest band of tile columns walked: 32, or narrower when a separable node's row tiles for one column must all stay held.</summary>
+    // 32, not 16: a node reading past its tile (height_to_normal, one texel) remakes the chain under each band's edge
+    // columns once the band beside has passed, so fewer edges make fewer tiles; at 8192 the cobblestones' normal made
+    // 148,877 tiles in bands of 16, 141,044 in 32 and 133,783 in raster order, where its other outputs lost the bands'
+    // saving (T-155).
+    public const int MostBandTiles = 32;
 
     // Bands of `band` tile columns, each walked down a row at a time, left to right in the row (T-155): a tile's later
     // reads by the rows below come while it is still held, where a row of the whole image between them would have
