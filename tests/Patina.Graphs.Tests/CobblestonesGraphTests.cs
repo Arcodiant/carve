@@ -32,6 +32,9 @@ public class CobblestonesGraphTests
         return read.Graph!;
     }
 
+    /// <summary>The cobblestones' outputs: the four roles there were before T-134 added metallic and height.</summary>
+    private static readonly OutputRole[] FourRoles = [OutputRole.BaseColour, OutputRole.Normal, OutputRole.Roughness, OutputRole.Occlusion];
+
     private static string PngPath(OutputRole role) => Path.Combine(Root(), "samples", "graphs", "cobblestones", OutputRoles.Name(role) + ".png");
 
     private static byte[] Committed(OutputRole role)
@@ -48,7 +51,7 @@ public class CobblestonesGraphTests
     {
         var g = Cobblestones();
         Assert.Equal(Size, g.Size);
-        Assert.Equal(OutputRoles.All, new GraphEvaluator(g).Roles);
+        Assert.Equal(FourRoles, new GraphEvaluator(g).Roles);
         Assert.Equal(TexGraphFile.Write(g), File.ReadAllText(GraphPath()).Replace("\r\n", "\n"));
     }
 
@@ -99,7 +102,7 @@ public class CobblestonesGraphTests
     [Fact]
     public void EveryOutputVariesAndNoOutputPacksToOneByte()
     {
-        foreach (var role in OutputRoles.All)
+        foreach (var role in FourRoles)
         {
             var image = Committed(role);
             var seen = new HashSet<int>();
