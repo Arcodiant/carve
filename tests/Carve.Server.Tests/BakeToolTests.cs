@@ -18,10 +18,10 @@ public class BakeToolTests : FileToolTests
     /// Four quads in a strip, face i mapped to the cell [i/4, (i+1)/4] x [1/4, 3/4]: at 64 a cell is 16 texels wide and 32 high,
     /// islands that touch but never overlap.
     /// </summary>
-    private const string Strip =
+    internal const string Strip =
         """{"name":"strip","vertices":[[0,0,0],[1,0,0],[2,0,0],[3,0,0],[4,0,0],[0,1,0],[1,1,0],[2,1,0],[3,1,0],[4,1,0]],"faces":[[0,1,6,5],[1,2,7,6],[2,3,8,7],[3,4,9,8]]}""";
 
-    private static string StripUvs()
+    internal static string StripUvs()
     {
         var faces = Enumerable.Range(0, 4).Select(i => $$"""{"face":{{i}},"uv":[[{{i * 0.25}},0.75],[{{(i + 1) * 0.25}},0.75],[{{(i + 1) * 0.25}},0.25],[{{i * 0.25}},0.25]]}""");
         return "{\"faces\":[" + string.Join(",", faces) + "]}";
@@ -46,7 +46,7 @@ public class BakeToolTests : FileToolTests
 
     private ImageResult Image(string path, ColorComponents components) => ImageResult.FromMemory(Read(path), components);
 
-    private static JsonElement Entry(JsonElement result, string map, string? name = null) =>
+    internal static JsonElement Entry(JsonElement result, string map, string? name = null) =>
         result.GetProperty("files").EnumerateArray().Single(f => f.GetProperty("map").GetString() == map && (name is null || f.GetProperty("name").GetString() == name));
 
     private static (byte R, byte G, byte B) Pixel(ImageResult image, int x, int y)

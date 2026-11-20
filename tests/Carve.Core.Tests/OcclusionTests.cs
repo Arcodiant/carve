@@ -17,18 +17,11 @@ public class OcclusionTests
 
     private static Vector2[] FloorUvs() => Floor.Select(i => new Vector2(V[i].X, V[i].Z)).ToArray();
 
-    private static BakeLayout Lay(PolygonMesh mesh, int size)
-    {
-        var result = BakeLayout.Create(mesh, size);
-        Assert.True(result.Succeeded, result.Error);
-        return result.Layout!;
-    }
-
     private static PolygonMesh FloorMesh(params int[][] more) =>
         TestMeshes.Make(V, [Floor, .. more]).WithUvs(MeshUvs.None.WithFace(0, FloorUvs()));
 
     private static OcclusionBake Occlude(PolygonMesh mesh, int size, int rays, float reach, params PolygonMesh[] others) =>
-        Bake.Occlusion(Lay(mesh, size), new RayCaster([mesh, .. others]), 0, rays, reach);
+        Bake.Occlusion(BakeLayoutTests.Lay(mesh, size), new RayCaster([mesh, .. others]), 0, rays, reach);
 
     /// <summary>The mean of each column of covered texels, x from 0 to 1.</summary>
     private static double[] Columns(BakeImage image) =>
@@ -114,7 +107,7 @@ public class OcclusionTests
         Assert.True(floorFace >= 0);
         var mesh = TestMeshes.Make(V, inward).WithUvs(MeshUvs.None.WithFace(floorFace, FloorUvs()));
         Assert.True(mesh.FaceNormal(floorFace).Y > 0.99f);
-        var layout = Lay(mesh, 64);
+        var layout = BakeLayoutTests.Lay(mesh, 64);
         var bake = Bake.Occlusion(layout, new RayCaster([mesh]), 0, 32, 1000);
         foreach (var t in layout.Texels()) Assert.True(bake.Image[t.X, t.Y] < 0.5f / 255, $"({t.X}, {t.Y}) reads {bake.Image[t.X, t.Y]}");
         Assert.Equal(0, bake.SelfHits);
@@ -126,7 +119,7 @@ public class OcclusionTests
         var mesh = FloorMesh();
         Assert.True(mesh.FaceNormal(0).Y > 0.99f);
         var bake = Occlude(mesh, 64, 64, 10);
-        Assert.All(Lay(mesh, 64).Texels(), t => Assert.Equal(1f, bake.Image[t.X, t.Y]));
+        Assert.All(BakeLayoutTests.Lay(mesh, 64).Texels(), t => Assert.Equal(1f, bake.Image[t.X, t.Y]));
         Assert.Equal(0, bake.SelfHits);
         Assert.Equal(64L * 64 * 64, bake.Rays);
     }
@@ -151,7 +144,7 @@ public class OcclusionTests
         // and occludes by 1 - (t / 0.5)^2 = 0.5.
         var ceiling = TestMeshes.Make([new(-5, 0.25f, -5), new(5, 0.25f, -5), new(5, 0.25f, 5), new(-5, 0.25f, 5)], [[0, 1, 2, 3]]);
         var bake = Occlude(FloorMesh(), 64, 1, 0.5f, ceiling);
-        var t = Lay(FloorMesh(), 64).Texels().First();
+        var t = BakeLayoutTests.Lay(FloorMesh(), 64).Texels().First();
         var f = (0.25 - bake.Offset) / Math.Sqrt(0.5) / 0.5; // the origin is lifted by the offset
         Assert.Equal(f * f, bake.Image[t.X, t.Y], 5);
         Assert.Equal(0.5, f * f, 2);
@@ -162,7 +155,7 @@ public class OcclusionTests
     {
         var floor = FloorMesh();
         var wall = TestMeshes.Make(V, [Wall]);
-        var layout = Lay(floor, 64);
+        var layout = BakeLayoutTests.Lay(floor, 64);
         var both = Bake.Occlusion(layout, new RayCaster([floor, wall]), 0, 32, 0.5f);
         var alone = Bake.Occlusion(layout, new RayCaster([floor]), 0, 32, 0.5f);
         Assert.True(Columns(both.Image)[^1] < 0.8);
@@ -182,7 +175,7 @@ public class OcclusionTests
     public void The_orm_carries_occlusion_roughness_and_metallic_exactly()
     {
         var mesh = FloorMesh();
-        var layout = Lay(mesh, 64);
+        var layout = BakeLayoutTests.Lay(mesh, 64);
         var occlusion = layout.NewImage(1);
         foreach (var t in layout.Texels()) occlusion[t.X, t.Y] = (t.X + t.Y) / 200f;
         var orm = Bake.Orm(layout, occlusion, [0.36f], [1f]);
@@ -200,7 +193,7 @@ public class OcclusionTests
     public void Rays_and_reach_out_of_range_are_refused()
     {
         var mesh = FloorMesh();
-        var layout = Lay(mesh, 64);
+        var layout = BakeLayoutTests.Lay(mesh, 64);
         var caster = new RayCaster([mesh]);
         Assert.Throws<ArgumentOutOfRangeException>(() => Bake.Occlusion(layout, caster, 0, 0, 1));
         Assert.Throws<ArgumentOutOfRangeException>(() => Bake.Occlusion(layout, caster, 0, Bake.MaxRays + 1, 1));
@@ -213,8 +206,8 @@ public class OcclusionTests
     {
         var small = FloorMesh();
         var big = TestMeshes.Make(V.Select(v => v * 100), [Floor]).WithUvs(MeshUvs.None.WithFace(0, FloorUvs()));
-        var a = Bake.OcclusionOffset(Lay(small, 64), new RayCaster([small]));
-        var b = Bake.OcclusionOffset(Lay(big, 64), new RayCaster([big]));
+        var a = Bake.OcclusionOffset(BakeLayoutTests.Lay(small, 64), new RayCaster([small]));
+        var b = Bake.OcclusionOffset(BakeLayoutTests.Lay(big, 64), new RayCaster([big]));
         // The mesh holds all eight cube corners, so its box is the unit cube's.
         Assert.Equal(Bake.OffsetScale * MathF.Sqrt(3), a, 9);
         Assert.Equal(100 * a, b, 4);
@@ -226,7 +219,7 @@ public class OcclusionTests
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (!File.Exists(Path.Combine(dir.FullName, "samples", "wrench.carve"))) dir = dir.Parent!;
         var wrench = CarveFile.Read(File.ReadAllText(Path.Combine(dir.FullName, "samples", "wrench.carve"))).Mesh!;
-        var bake = Bake.Occlusion(Lay(wrench, 256), new RayCaster([wrench]), 0, 8, 0.035f);
+        var bake = Bake.Occlusion(BakeLayoutTests.Lay(wrench, 256), new RayCaster([wrench]), 0, 8, 0.035f);
         Assert.Equal(0, bake.SelfHits);
         Assert.InRange(bake.Offset, 1e-6f, 1e-5f);
     }

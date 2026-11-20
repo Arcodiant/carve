@@ -124,8 +124,7 @@ internal sealed class CurvatureStage : IBakesStage
         }
 
         var (c, edge) = (block.Uvs[4][1], block.Uvs[4][2]);
-        var centre = (c + edge) / 2;
-        var (px, py) = ((int)(Size / 16.0 + centre.X * Size * 7 / 8.0), (int)(Size / 16.0 + centre.Y * Size * 7 / 8.0));
+        var (px, py) = UvPixel((c + edge) / 2, Size);
         WriteCrop(frame, Path.Combine(driver.RunFolder, "frames", "lblock-uvs-curvature-inner-4x.png"), px - 64, py - 64, 128, 4);
 
         // Put the model back as it was: the L-block's UVs and its definition.
@@ -185,18 +184,17 @@ internal sealed class CurvatureStage : IBakesStage
     /// </summary>
     private static (int X, int Y, int Side) JawBox(SceneMesh mesh, int[] jaw)
     {
-        static string Key(Vector2 p) => string.Create(CultureInfo.InvariantCulture, $"{p.X:F5},{p.Y:F5}");
         var start = jaw.Where(mesh.Uvs.ContainsKey).MaxBy(f => Area(mesh.Uvs[f]));
         var cluster = new HashSet<int> { start };
-        var corners = mesh.Uvs[start].Select(Key).ToHashSet();
+        var corners = mesh.Uvs[start].Select(UvKey).ToHashSet();
         for (var grown = true; grown;)
         {
             grown = false;
             foreach (var f in jaw.Where(mesh.Uvs.ContainsKey).Where(f => !cluster.Contains(f)).ToList())
             {
-                if (!mesh.Uvs[f].Any(p => corners.Contains(Key(p)))) continue;
+                if (!mesh.Uvs[f].Any(p => corners.Contains(UvKey(p)))) continue;
                 cluster.Add(f);
-                foreach (var p in mesh.Uvs[f]) corners.Add(Key(p));
+                foreach (var p in mesh.Uvs[f]) corners.Add(UvKey(p));
                 grown = true;
             }
         }

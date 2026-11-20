@@ -14,26 +14,16 @@ public class BakeOcclusionToolTests : FileToolTests
 
     private static JsonElement Body(string text) => JsonDocument.Parse(text).RootElement;
 
-    /// <summary>Four quads in a strip in z = 0 facing +z, face i mapped to the cell [i/4, (i+1)/4] x [1/4, 3/4] (as BakeToolTests').</summary>
-    private const string Strip =
-        """{"name":"strip","vertices":[[0,0,0],[1,0,0],[2,0,0],[3,0,0],[4,0,0],[0,1,0],[1,1,0],[2,1,0],[3,1,0],[4,1,0]],"faces":[[0,1,6,5],[1,2,7,6],[2,3,8,7],[3,4,9,8]]}""";
-
     /// <summary>A lid 0.2 over the strip, wider than it.</summary>
     private const string Lid =
         """{"name":"lid","vertices":[[-1,-1,0.2],[5,-1,0.2],[5,2,0.2],[-1,2,0.2]],"faces":[[0,1,2,3]]}""";
 
-    private static string StripUvs()
-    {
-        var faces = Enumerable.Range(0, 4).Select(i => $$"""{"face":{{i}},"uv":[[{{i * 0.25}},0.75],[{{(i + 1) * 0.25}},0.75],[{{(i + 1) * 0.25}},0.25],[{{i * 0.25}},0.25]]}""");
-        return "{\"faces\":[" + string.Join(",", faces) + "]}";
-    }
-
     private async Task<ToolHarness> StartStripAsync(bool lid = false)
     {
-        var (carve, _) = await StartAsync(Strip);
+        var (carve, _) = await StartAsync(BakeToolTests.Strip);
         try
         {
-            Ok(await carve.CallToolAsync("set_uvs", StripUvs()));
+            Ok(await carve.CallToolAsync("set_uvs", BakeToolTests.StripUvs()));
             if (lid) Ok(await carve.CallToolAsync("define_mesh", Lid));
             return carve;
         }
@@ -47,9 +37,6 @@ public class BakeOcclusionToolTests : FileToolTests
     private byte[] Read(string path) => File.ReadAllBytes(Path.Combine(Root, path));
 
     private ImageResult Image(string path, ColorComponents components) => ImageResult.FromMemory(Read(path), components);
-
-    private static JsonElement Entry(JsonElement result, string map) =>
-        result.GetProperty("files").EnumerateArray().Single(f => f.GetProperty("map").GetString() == map);
 
     /// <summary>Covered texels of the strip at 64: the middle row of each face's cell.</summary>
     private static readonly (int X, int Y)[] Centres = [(8, 32), (24, 32), (40, 32), (56, 32)];
@@ -68,10 +55,10 @@ public class BakeOcclusionToolTests : FileToolTests
             """{"size":64,"padding":0,"maps":["occlusion","orm"],"occlusion":{"reach":0.5},"surface":{"a":{"roughness":0.88,"metallic":0},"b":{"roughness":0.36}}}""")));
         var files = result.GetProperty("files").EnumerateArray().ToArray();
         Assert.Equal(["occlusion", "orm"], files.Select(f => f.GetProperty("map").GetString()));
-        Assert.Equal("textures/strip.occlusion.png", Entry(result, "occlusion").GetProperty("path").GetString());
-        Assert.Equal("textures/strip.orm.png", Entry(result, "orm").GetProperty("path").GetString());
+        Assert.Equal("textures/strip.occlusion.png", BakeToolTests.Entry(result, "occlusion").GetProperty("path").GetString());
+        Assert.Equal("textures/strip.orm.png", BakeToolTests.Entry(result, "orm").GetProperty("path").GetString());
         Assert.All(files, f => Assert.True(f.GetProperty("ms").GetInt64() >= 0));
-        Assert.Equal(1, Entry(result, "occlusion").GetProperty("min").GetDouble());
+        Assert.Equal(1, BakeToolTests.Entry(result, "occlusion").GetProperty("min").GetDouble());
 
         var grey = Image("textures/strip.occlusion.png", ColorComponents.Grey);
         Assert.Equal(ColorComponents.Grey, grey.SourceComp);
@@ -96,10 +83,10 @@ public class BakeOcclusionToolTests : FileToolTests
         var first = Read("textures/strip.occlusion.png");
         Ok(await carve.CallToolAsync("bake", Covered));
         Assert.Equal(first, Read("textures/strip.occlusion.png"));
-        Assert.True(Entry(lidded, "occlusion").GetProperty("max").GetDouble() < 0.5);
+        Assert.True(BakeToolTests.Entry(lidded, "occlusion").GetProperty("max").GetDouble() < 0.5);
 
         var alone = Body(Ok(await carve.CallToolAsync("bake", """{"mesh":"strip","size":64,"maps":["occlusion"],"occlusion":{"reach":1,"occluders":["strip"]}}""")));
-        Assert.Equal(1, Entry(alone, "occlusion").GetProperty("min").GetDouble());
+        Assert.Equal(1, BakeToolTests.Entry(alone, "occlusion").GetProperty("min").GetDouble());
     }
 
     [Theory]

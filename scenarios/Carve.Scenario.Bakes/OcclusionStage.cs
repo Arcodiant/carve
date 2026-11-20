@@ -1,9 +1,7 @@
 using System.Globalization;
 using System.Numerics;
-using System.Text;
 using System.Text.Json;
 using Carve.Debug;
-using Carve.Scenario.Orcward;
 using Carve.Scenario.Uvs;
 using static Carve.Scenario.Bakes.BakesChecks;
 using static Carve.Scenario.Crate.CrateBuild;
@@ -52,8 +50,6 @@ internal sealed class OcclusionStage : IBakesStage
     /// <summary>How far from the drive's footprint, in metres, a texel of the faces it stands between still counts as the crevice's corner.</summary>
     private const float CornerBand = 0.0015f;
 
-    private static readonly Vector3 ThreeQuarter = new(1, 0.6f, 1.5f);
-
     public async Task RunAsync(ScenarioDriver driver)
     {
         var scene = await Scene.ReadAsync(driver, "wrench");
@@ -101,7 +97,7 @@ internal sealed class OcclusionStage : IBakesStage
         var frames = new Dictionary<string, ScenarioFrame>();
         foreach (var view in views) frames[view.Name] = await driver.CaptureAsync(view.Name, view.Args);
 
-        await CompareExportAsync(driver, frames, views);
+        await CompareExportAsync(driver, frames, views, "orm-");
     }
 
     /// <summary>
@@ -220,37 +216,5 @@ internal sealed class OcclusionStage : IBakesStage
         var wb = Cross(c - p, a - p) / area;
         var wc = 1 - wa - wb;
         return wa > 1e-6f && wb > 1e-6f && wc > 1e-6f ? new Vector3(wa, wb, wc) : null;
-    }
-
-    private static Vector3 Mean(SceneMesh mesh, int[] faces) => faces.Aggregate(Vector3.Zero, (sum, f) => sum + mesh.Centre(f)) / faces.Length;
-
-    /// <summary>
-    /// The export with the full material: <c>render_glb</c> of it against <c>render</c> front and three-quarter under D-6's rule, as stage
-    /// 1 does, with the same control that must fail it; the files are stage 1's names with <c>orm-</c> before them.
-    /// </summary>
-    private static async Task CompareExportAsync(ScenarioDriver driver, Dictionary<string, ScenarioFrame> frames, View[] views)
-    {
-        var models = Path.Combine(driver.RunFolder, "game", "Content", "models");
-        Directory.CreateDirectory(models);
-        var glb = Path.Combine(models, "wrench-orm.glb");
-        var exported = await CallTextAsync(driver, "export", new { path = glb });
-        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "orm-export-result.txt"), exported);
-        Directory.CreateDirectory(Path.Combine(driver.RunFolder, "compare"));
-
-        var rows = new List<Comparison.Result>();
-        var glbFrames = new Dictionary<string, ScenarioFrame>();
-        foreach (var name in new[] { "wrench-orm-front", "wrench-orm-three-quarter" })
-        {
-            var d = views.Single(v => v.Name == name).Direction;
-            var frame = glbFrames[name] = await driver.CaptureToolAsync("render_glb", name + "-glb", new { path = glb, direction = new[] { d.X, d.Y, d.Z }, size = Size });
-            rows.Add(Comparison.Measure(name, "good", frames[name], frame));
-            Comparison.WriteTriptych(Path.Combine(driver.RunFolder, "compare", $"good-{name}.png"), frames[name], frame);
-        }
-        rows.Add(Comparison.Measure("orm-three-quarter-glb-against-front", "control", frames["wrench-orm-front"], glbFrames["wrench-orm-three-quarter"]));
-        var tsv = new StringBuilder("name\tkind\tdiffering\ttotal\tlargest_patch\tfails\n");
-        foreach (var r in rows) tsv.AppendJoin('\t', r.Name, r.Kind, r.Differing, r.Total, r.LargestPatch, r.Fails).Append('\n');
-        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "orm-differences.tsv"), tsv.ToString());
-        foreach (var r in rows.Where(r => r.Kind == "good" && r.Fails)) Note($"{r.Name}: render_glb differs from render in {r.Differing} of {r.Total} pixels, largest patch {r.LargestPatch} (D-6's rule: 0.5 % or a patch of {Comparison.PatchLimit})");
-        foreach (var r in rows.Where(r => r.Kind == "control" && !r.Fails)) Note($"the control {r.Name} passes the frame rule, so the rule cannot tell two views apart");
     }
 }

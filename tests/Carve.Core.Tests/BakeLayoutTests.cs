@@ -13,7 +13,8 @@ public class BakeLayoutTests
     private static PolygonMesh Quad(params Vector2[] uv) =>
         TestMeshes.Make(QuadVertices, [[0, 1, 2, 3]]).WithUvs(MeshUvs.None.WithFace(0, uv));
 
-    private static BakeLayout Lay(PolygonMesh mesh, int size, IEnumerable<int>? faces = null)
+    /// <summary>The layout of <paramref name="mesh"/> at <paramref name="size"/>, asserted to succeed.</summary>
+    internal static BakeLayout Lay(PolygonMesh mesh, int size, IEnumerable<int>? faces = null)
     {
         var result = BakeLayout.Create(mesh, size, faces);
         Assert.True(result.Succeeded, result.Error);

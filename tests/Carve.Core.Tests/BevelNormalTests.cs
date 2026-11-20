@@ -10,13 +10,6 @@ public class BevelNormalTests
 {
     private static readonly Vector2[] FrontUvs = [new(0, 1), new(1, 1), new(1, 0), new(0, 0)];
 
-    private static BakeLayout Lay(PolygonMesh mesh, int size)
-    {
-        var result = BakeLayout.Create(mesh, size);
-        Assert.True(result.Succeeded, result.Error);
-        return result.Layout!;
-    }
-
     /// <summary>A unit cube with only its +Z face mapped, as MaterialRenderTests.FrontUvs lays it (u = x, v = 1 − y).</summary>
     private static PolygonMesh FrontBox(Vector2[]? uv = null) => TestMeshes.Cube().WithUvs(MeshUvs.None.WithFace(1, uv ?? FrontUvs));
 
@@ -44,7 +37,7 @@ public class BevelNormalTests
     [Fact]
     public void On_a_box_the_top_edge_takes_the_mean_normal_and_a_texel_at_the_width_or_farther_the_face_normal()
     {
-        var layout = Lay(FrontBox(), 64);
+        var layout = BakeLayoutTests.Lay(FrontBox(), 64);
         var image = Bake.BevelNormal(layout, 0.1);
         Assert.True(layout.TryGetTexel(32, 0, out var any));
 
@@ -79,7 +72,7 @@ public class BevelNormalTests
     [Fact]
     public void A_corner_texel_sums_the_pulls_of_both_edges()
     {
-        var layout = Lay(FrontBox(), 64);
+        var layout = BakeLayoutTests.Lay(FrontBox(), 64);
         Assert.True(layout.TryGetTexel(62, 1, out var any));
         var corner = any with { Position = new Vector3(0.97f, 0.97f, 1) };
         var edges = layout.NearEdges(corner, 0.1);
@@ -100,7 +93,7 @@ public class BevelNormalTests
     public void A_concave_edge_of_an_l_block_leans_toward_the_other_face()
     {
         var block = BakeLayoutTests.Celled(TestMeshes.LBlock());
-        var layout = Lay(block, 128);
+        var layout = BakeLayoutTests.Lay(block, 128);
         var image = Bake.BevelNormal(layout, 0.3);
         var seen = 0;
         foreach (var texel in layout.Texels().Where(t => t.Face is 4 or 5))
@@ -122,8 +115,8 @@ public class BevelNormalTests
     [Fact]
     public void A_mirrored_island_stores_red_flipped_and_decodes_to_the_same_world_normal()
     {
-        var plain = Lay(FrontBox(), 64);
-        var mirrored = Lay(FrontBox([new(1, 1), new(0, 1), new(0, 0), new(1, 0)]), 64);
+        var plain = BakeLayoutTests.Lay(FrontBox(), 64);
+        var mirrored = BakeLayoutTests.Lay(FrontBox([new(1, 1), new(0, 1), new(0, 0), new(1, 0)]), 64);
         var a = Bake.BevelNormal(plain, 0.1);
         var b = Bake.BevelNormal(mirrored, 0.1);
         // Column 63 of the plain island is by the +X edge; in the mirrored one that edge is at column 0.
@@ -142,9 +135,9 @@ public class BevelNormalTests
     [Fact]
     public void Two_bakes_are_identical()
     {
-        var layout = Lay(BakeLayoutTests.Celled(TestMeshes.LBlock()), 128);
+        var layout = BakeLayoutTests.Lay(BakeLayoutTests.Celled(TestMeshes.LBlock()), 128);
         var one = Bake.BevelNormal(layout, 0.2).Values.ToArray();
-        var two = Bake.BevelNormal(Lay(BakeLayoutTests.Celled(TestMeshes.LBlock()), 128), 0.2).Values.ToArray();
+        var two = Bake.BevelNormal(BakeLayoutTests.Lay(BakeLayoutTests.Celled(TestMeshes.LBlock()), 128), 0.2).Values.ToArray();
         Assert.Equal(one, two);
     }
 
@@ -155,7 +148,7 @@ public class BevelNormalTests
     [InlineData(double.PositiveInfinity)]
     public void A_width_that_is_not_more_than_zero_and_finite_is_refused(double width)
     {
-        var layout = Lay(FrontBox(), 64);
+        var layout = BakeLayoutTests.Lay(FrontBox(), 64);
         Assert.Throws<ArgumentOutOfRangeException>(() => Bake.BevelNormal(layout, width));
     }
 

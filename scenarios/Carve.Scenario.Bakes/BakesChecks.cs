@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Numerics;
+using System.Text;
 using Carve.Debug;
 using Carve.Scenario.Crate;
+using Carve.Scenario.Orcward;
 using Carve.Scenario.Uvs;
 using StbImageSharp;
 
@@ -272,5 +274,61 @@ internal static class BakesChecks
         if (Break == "mirror") x = view.Size - 1 - x;
         if (x < 0 || y < 0 || x >= view.Size || y >= view.Size) return null;
         return (x, y, Rgb(frame, x, y));
+    }
+
+    /// <summary>The three-quarter view's direction, shared by every stage.</summary>
+    public static readonly Vector3 ThreeQuarter = new(1, 0.6f, 1.5f);
+
+    /// <summary>The mean of <paramref name="faces"/>' centres.</summary>
+    public static Vector3 Mean(SceneMesh mesh, int[] faces) => faces.Aggregate(Vector3.Zero, (sum, f) => sum + mesh.Centre(f)) / faces.Length;
+
+    /// <summary>A uv point as a key, to five places, so corners that share a uv match.</summary>
+    public static string UvKey(Vector2 p) => string.Create(CultureInfo.InvariantCulture, $"{p.X:F5},{p.Y:F5}");
+
+    /// <summary>The pixel of <paramref name="uv"/> in a <paramref name="size"/> <c>uvs</c> frame, whose unit square spans its middle seven eighths.</summary>
+    public static (int X, int Y) UvPixel(Vector2 uv, int size) => ((int)(size / 16.0 + uv.X * size * 7 / 8.0), (int)(size / 16.0 + uv.Y * size * 7 / 8.0));
+
+    /// <summary>
+    /// The model exported to <c>game/Content/models/</c><paramref name="glb"/> (the export's result in <paramref name="result"/>), and
+    /// <c>render_glb</c> of each named view measured against <c>render</c>'s frame under D-6's rule, each pair's triptych in <c>compare/</c>.
+    /// </summary>
+    public static async Task<(Dictionary<string, ScenarioFrame> Frames, List<Comparison.Result> Rows)> RenderExportAsync(
+        ScenarioDriver driver, Dictionary<string, ScenarioFrame> frames, View[] views, string glb, string result, string[] names)
+    {
+        var models = Path.Combine(driver.RunFolder, "game", "Content", "models");
+        Directory.CreateDirectory(models);
+        var path = Path.Combine(models, glb);
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, result), await CrateBuild.CallTextAsync(driver, "export", new { path }));
+        Directory.CreateDirectory(Path.Combine(driver.RunFolder, "compare"));
+
+        var rows = new List<Comparison.Result>();
+        var glbFrames = new Dictionary<string, ScenarioFrame>();
+        foreach (var name in names)
+        {
+            var view = views.Single(v => v.Name == name);
+            var d = view.Direction;
+            var frame = glbFrames[name] = await driver.CaptureToolAsync("render_glb", name + "-glb", new { path, direction = new[] { d.X, d.Y, d.Z }, size = view.Size });
+            rows.Add(Comparison.Measure(name, "good", frames[name], frame));
+            Comparison.WriteTriptych(Path.Combine(driver.RunFolder, "compare", $"good-{name}.png"), frames[name], frame);
+        }
+        return (glbFrames, rows);
+    }
+
+    /// <summary>
+    /// The export against <c>render</c> front and three-quarter under D-6's rule, with the control that must fail it: the three-quarter
+    /// <c>render_glb</c> against the front. <paramref name="prefix"/> (<c>""</c> or, say, <c>"orm-"</c>) goes before the file and view names.
+    /// </summary>
+    public static async Task CompareExportAsync(ScenarioDriver driver, Dictionary<string, ScenarioFrame> frames, View[] views, string prefix = "")
+    {
+        var (front, threeQuarter) = ($"wrench-{prefix}front", $"wrench-{prefix}three-quarter");
+        var glb = prefix.Length == 0 ? "wrench.glb" : $"wrench-{prefix.TrimEnd('-')}.glb";
+        var (glbFrames, rows) = await RenderExportAsync(driver, frames, views, glb, $"{prefix}export-result.txt", [front, threeQuarter]);
+
+        rows.Add(Comparison.Measure($"{prefix}three-quarter-glb-against-front", "control", frames[front], glbFrames[threeQuarter]));
+        var tsv = new StringBuilder("name\tkind\tdiffering\ttotal\tlargest_patch\tfails\n");
+        foreach (var r in rows) tsv.AppendJoin('\t', r.Name, r.Kind, r.Differing, r.Total, r.LargestPatch, r.Fails).Append('\n');
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, $"{prefix}differences.tsv"), tsv.ToString());
+        foreach (var r in rows.Where(r => r.Kind == "good" && r.Fails)) Note($"{r.Name}: render_glb differs from render in {r.Differing} of {r.Total} pixels, largest patch {r.LargestPatch} (D-6's rule: 0.5 % or a patch of {Comparison.PatchLimit})");
+        foreach (var r in rows.Where(r => r.Kind == "control" && !r.Fails)) Note($"the control {r.Name} passes the frame rule, so the rule cannot tell two views apart");
     }
 }

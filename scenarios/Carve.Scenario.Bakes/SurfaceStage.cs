@@ -1,9 +1,7 @@
 using System.Globalization;
 using System.Numerics;
-using System.Text;
 using System.Text.Json;
 using Carve.Debug;
-using Carve.Scenario.Orcward;
 using Carve.Scenario.Uvs;
 using static Carve.Scenario.Bakes.BakesChecks;
 using static Carve.Scenario.Crate.CrateBuild;
@@ -39,8 +37,6 @@ internal sealed class SurfaceStage : IBakesStage
     /// (lead at most 0). Probed: red at least 105, the rest at most −6.
     /// </summary>
     private const int RedLeadMin = 50;
-
-    private static readonly Vector3 ThreeQuarter = new(1, 0.6f, 1.5f);
 
     public async Task RunAsync(ScenarioDriver driver)
     {
@@ -175,51 +171,16 @@ internal sealed class SurfaceStage : IBakesStage
     }
 
     /// <summary>
-    /// The export: <c>export</c> the textured wrench, then <c>render_glb</c> of it against <c>render</c> in the front and
-    /// three-quarter views under D-6's frame rule, with a control (the glb's three-quarter against render's front) that must fail it.
-    /// </summary>
-    private static async Task CompareExportAsync(ScenarioDriver driver, Dictionary<string, ScenarioFrame> frames, View[] views)
-    {
-        var models = Path.Combine(driver.RunFolder, "game", "Content", "models");
-        Directory.CreateDirectory(models);
-        var glb = Path.Combine(models, "wrench.glb");
-        var exported = await CallTextAsync(driver, "export", new { path = glb });
-        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "export-result.txt"), exported);
-        Directory.CreateDirectory(Path.Combine(driver.RunFolder, "compare"));
-
-        var rows = new List<Comparison.Result>();
-        var glbFrames = new Dictionary<string, ScenarioFrame>();
-        foreach (var name in new[] { "wrench-front", "wrench-three-quarter" })
-        {
-            var view = views.Single(v => v.Name == name);
-            var d = view.Direction;
-            var frame = glbFrames[name] = await driver.CaptureToolAsync("render_glb", name + "-glb", new { path = glb, direction = new[] { d.X, d.Y, d.Z }, size = view.Size });
-            rows.Add(Comparison.Measure(name, "good", frames[name], frame));
-            Comparison.WriteTriptych(Path.Combine(driver.RunFolder, "compare", $"good-{name}.png"), frames[name], frame);
-        }
-
-        rows.Add(Comparison.Measure("three-quarter-glb-against-front", "control", frames["wrench-front"], glbFrames["wrench-three-quarter"]));
-        var tsv = new StringBuilder("name\tkind\tdiffering\ttotal\tlargest_patch\tfails\n");
-        foreach (var r in rows) tsv.AppendJoin('\t', r.Name, r.Kind, r.Differing, r.Total, r.LargestPatch, r.Fails).Append('\n');
-        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "differences.tsv"), tsv.ToString());
-        foreach (var r in rows.Where(r => r.Kind == "good" && r.Fails)) Note($"{r.Name}: render_glb differs from render in {r.Differing} of {r.Total} pixels, largest patch {r.LargestPatch} (D-6's rule: 0.5 % or a patch of {Comparison.PatchLimit})");
-        foreach (var r in rows.Where(r => r.Kind == "control" && !r.Fails)) Note($"the control {r.Name} passes the frame rule, so the rule cannot tell two views apart");
-    }
-
-    private static Vector3 Mean(SceneMesh mesh, int[] faces) => faces.Aggregate(Vector3.Zero, (sum, f) => sum + mesh.Centre(f)) / faces.Length;
-
-    /// <summary>
     /// The pixel, in a 1024 <c>uvs</c> frame, at the middle of the longest UV edge of a steel face that no other face shares: an
     /// island's border, where the padding starts.
     /// </summary>
     private static (int X, int Y) SteelEdge(SceneMesh mesh, HashSet<int> steel)
     {
-        static string Key(Vector2 a) => string.Create(CultureInfo.InvariantCulture, $"{a.X:F5},{a.Y:F5}");
         var count = new Dictionary<string, int>();
         IEnumerable<(Vector2 A, Vector2 B, string K)> Edges(int f) => mesh.Uvs[f].Select((c, i) =>
         {
             var d = mesh.Uvs[f][(i + 1) % mesh.Uvs[f].Length];
-            var (k1, k2) = (Key(c), Key(d));
+            var (k1, k2) = (UvKey(c), UvKey(d));
             return (c, d, string.CompareOrdinal(k1, k2) < 0 ? k1 + "|" + k2 : k2 + "|" + k1);
         });
         foreach (var f in mesh.Uvs.Keys)
@@ -228,8 +189,7 @@ internal sealed class SurfaceStage : IBakesStage
         }
 
         var best = steel.Where(mesh.Uvs.ContainsKey).SelectMany(Edges).Where(e => count[e.K] == 1).MaxBy(e => Vector2.Distance(e.A, e.B));
-        var mid = (best.A + best.B) / 2;
-        return ((int)(Size / 16.0 + mid.X * Size * 7 / 8.0), (int)(Size / 16.0 + mid.Y * Size * 7 / 8.0));
+        return UvPixel((best.A + best.B) / 2, Size);
     }
 
     /// <summary><c>bakes.tsv</c>: one row per baked file with its stats from the result.</summary>

@@ -3,7 +3,6 @@ using System.Numerics;
 using System.Text.Json;
 using Carve.Debug;
 using Carve.Scenario.Crate;
-using Carve.Scenario.Orcward;
 using Carve.Scenario.Uvs;
 using StbImageWriteSharp;
 using static Carve.Scenario.Bakes.BakesChecks;
@@ -41,8 +40,6 @@ internal sealed class BevelStage : IBakesStage
 
     /// <summary>The grip's (<c>steel</c>) colour, from <see cref="SurfaceStage"/>'s table.</summary>
     private const string Steel = "#80858A";
-
-    private static readonly Vector3 ThreeQuarter = new(1, 0.6f, 1.5f);
 
     public async Task RunAsync(ScenarioDriver driver)
     {
@@ -289,17 +286,10 @@ internal sealed class BevelStage : IBakesStage
     /// <summary>The wrench with the map exported, and <c>render_glb</c> against <c>render</c> front and three-quarter under D-6's rule.</summary>
     private static async Task CompareExportAsync(ScenarioDriver driver, Dictionary<string, ScenarioFrame> frames, View[] views, List<string> tsv)
     {
-        var models = Path.Combine(driver.RunFolder, "game", "Content", "models");
-        Directory.CreateDirectory(models);
-        var glb = Path.Combine(models, "wrench-bevel.glb");
-        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "export-bevel-result.txt"), await CallTextAsync(driver, "export", new { path = glb }));
-        Directory.CreateDirectory(Path.Combine(driver.RunFolder, "compare"));
-        foreach (var name in new[] { "wrench-bevel-front", "wrench-bevel-three-quarter" })
+        var (_, rows) = await RenderExportAsync(driver, frames, views, "wrench-bevel.glb", "export-bevel-result.txt", ["wrench-bevel-front", "wrench-bevel-three-quarter"]);
+        foreach (var row in rows)
         {
-            var d = views.Single(v => v.Name == name).Direction;
-            var frame = await driver.CaptureToolAsync("render_glb", name + "-glb", new { path = glb, direction = new[] { d.X, d.Y, d.Z }, size = Size });
-            var row = Comparison.Measure(name, "good", frames[name], frame);
-            Comparison.WriteTriptych(Path.Combine(driver.RunFolder, "compare", $"good-{name}.png"), frames[name], frame);
+            var name = row.Name;
             tsv.Add($"glb\t{name}\t{row.Differing}\tof {row.Total}, patch {row.LargestPatch}, fails {row.Fails}");
             if (row.Fails) Note($"bevel: {name}: render_glb differs from render with the map, {row.Differing} pixels, patch {row.LargestPatch}");
         }
