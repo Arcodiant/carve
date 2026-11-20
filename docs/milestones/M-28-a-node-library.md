@@ -133,7 +133,8 @@ check {}          (open graph, its own size; optional size<=2048,
 | 3 | T-137 blur, gradient_map + painted metal | Sonnet | T-134, T-135, T-136 | its node files and sample |
 | 3 | T-138 transform, distance + floor tiles | Opus | T-133, T-134, T-136 | its node files and sample |
 | 3 | T-139 exposed parameters + bricks variant | Opus | T-134, T-136 | `TexGraphFile.cs`, `GraphValidator.cs`, `EditGraphTool.cs`, `FileTools.cs`, swatch and export overrides |
-| 4 | T-140 graphs as nodes + grime, old wall | Opus (two agents) | T-139, T-135 | `TexGraphFile.cs`, `GraphValidator.cs`, `FileTools.cs`, `tools/Patina.SampleGraphs` |
+| 2b | T-153 data-dependent input requests (added 2026-11-20) | Opus | T-135 | `Evaluation/`, `NodeType.cs`, `WarpNode` |
+| 4 | T-140 graphs as nodes + grime, old wall | Opus (two agents) | T-139, T-135, T-153 | `TexGraphFile.cs`, `GraphValidator.cs`, `FileTools.cs`, `tools/Patina.SampleGraphs` |
 | 4 | T-141 check | Sonnet | T-134, T-137, T-138, T-139 | `CheckTool.cs`, `Patina.Graphs/Checks/` |
 | 5 | T-142 library stage in scenario-patina | Sonnet (+ frame review) | T-140, T-141 | `LibraryStage.cs`, `samples/graphs/*/swatch.png` |
 | 6 | T-143 acceptance | Sonnet (inner sessions on the default, Opus) | T-142 | its round folders and checks |
@@ -160,5 +161,6 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-141](../tasks/T-141-the-check-tool.md) — patina's check lists texture faults in the open graph's outputs or in PNG files: seams, base colour out of range, metallic not near 0 or 1, normals not of unit length, and an output of one value
 - [ ] [T-142](../tasks/T-142-the-node-library-in-scenario-patina.md) — scenario-patina's library stage opens, swatches, checks and exports every sample material and variant, with every pixel worked from its texels, and commits each sample's swatch sheet
 - [ ] [T-143](../tasks/T-143-node-library-acceptance-run.md) — Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
+- [ ] [T-153](../tasks/T-153-data-dependent-input-requests-for-warp.md) — A node can ask for an input's rectangle after reading another input, so warp at a large amount reads the few tiles its offsets reach
 
 ## Retrospective
