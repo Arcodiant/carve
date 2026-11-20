@@ -184,7 +184,8 @@ public sealed class GraphEvaluator
             cache.MakeRoom(incoming);
             var outputs = new Tile[step.Ports.Length];
             var named = new Dictionary<string, Tile>(StringComparer.Ordinal);
-            for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect);
+            for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect,
+                    cache.Take((long)rect.Width * rect.Height * PortKinds.Channels(step.Kinds[p])));
             fill(named);
             var entry = cache.AddPinned(key, outputs);
             foreach (var pin in pins) cache.Unpin(pin, cold);

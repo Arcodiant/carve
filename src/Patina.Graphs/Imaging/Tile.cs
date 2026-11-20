@@ -8,14 +8,19 @@ namespace Patina.Graphs.Imaging;
 /// </summary>
 public sealed class Tile
 {
-    public Tile(PortKind kind, TexelRect rect)
+    public Tile(PortKind kind, TexelRect rect) : this(kind, rect, null) { }
+
+    /// <summary>A tile over <paramref name="data"/>, zeros of the tile's length (the evaluator reuses dropped tiles' arrays, T-155).</summary>
+    internal Tile(PortKind kind, TexelRect rect, float[]? data)
     {
         if (kind == PortKind.Any) throw new ArgumentException("a tile is greyscale or colour", nameof(kind));
         ArgumentOutOfRangeException.ThrowIfNegative(rect.X, nameof(rect));
         ArgumentOutOfRangeException.ThrowIfNegative(rect.Y, nameof(rect));
         Kind = kind; Rect = rect;
         Channels = PortKinds.Channels(kind);
-        Data = new float[(long)rect.Width * rect.Height * Channels];
+        var length = (long)rect.Width * rect.Height * Channels;
+        if (data is not null && data.LongLength != length) throw new ArgumentException("the array is not the tile's length", nameof(data));
+        Data = data ?? new float[length];
     }
 
     public PortKind Kind { get; }

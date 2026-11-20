@@ -174,6 +174,11 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                             OutputPacking.PackMetallicTile(tile, rgba, pixels);
                         });
                     cancellationToken.ThrowIfCancellationRequested();
+                    // The evaluation's cache and every tile it dropped are garbage once it returns: given back before
+                    // the encoder allocates, so the two never peak together (T-155: the strong minify at 8192 pins its
+                    // whole 768 MiB input, and held it through the encode).
+                    GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                    GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
                     using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
                         new StbImageWriteSharp.ImageWriter().WritePng(rgba, pixels, pixels, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, stream);
