@@ -79,7 +79,7 @@ public abstract class NodeType
 /// <summary>An input port: its name, what it takes, and whether a graph must connect it.</summary>
 public sealed record InputPort(string Name, PortKind Kind, bool Required = true);
 
-public enum ParamKind { Int, Float, Enum, IntPair, Colour, Floats, Colours, Name }
+public enum ParamKind { Int, Float, Enum, IntPair, Colour, Floats, Colours, Name, GreyOrColour, FilePath }
 
 /// <summary>
 /// A parameter: its name, kind, range or choices, and default. <see cref="Check"/> says what is wrong with a value in
@@ -140,6 +140,12 @@ public sealed class ParamSpec
     /// <summary>An optional name, <c>[a-z][a-z0-9_]*</c>, with no default.</summary>
     public static ParamSpec Identifier(string name) => new(name, ParamKind.Name, 0, 0, [], ParamValue.Of(""), optional: true);
 
+    /// <summary>An optional grey value from 0 to 1 or a colour <c>"#rrggbb"</c>, with no default (an <c>input</c>'s <c>default</c>, T-140).</summary>
+    public static ParamSpec GreyOrColour(string name) => new(name, ParamKind.GreyOrColour, 0, 1, [], ParamValue.Of(0), optional: true);
+
+    /// <summary>A path to a <c>.texgraph</c> file (a <c>graph</c> node's <c>path</c>, T-140), with no default.</summary>
+    public static ParamSpec FilePath(string name) => new(name, ParamKind.FilePath, 0, 0, [], ParamValue.Of(""), optional: true);
+
     /// <summary>What a value must be, for a message: "a whole number from 1 to 4".</summary>
     public string Describe() => Kind switch
     {
@@ -150,6 +156,8 @@ public sealed class ParamSpec
         ParamKind.Floats => $"a list of {Count()} numbers [a, b, ...], each from {N(Min)} to {N(Max)}",
         ParamKind.Colours => $"a list of {Count()} colours [\"#rrggbb\", ...]",
         ParamKind.Name => $"a name, {GraphNames.Pattern} (lower case letters, digits and _, starting with a letter)",
+        ParamKind.GreyOrColour => $"a number from {N(Min)} to {N(Max)} for a grey input, or a colour \"#rrggbb\" for a colour one",
+        ParamKind.FilePath => "a path to a .texgraph file, relative to this graph's file",
         _ => "a colour \"#rrggbb\"",
     };
 
@@ -169,6 +177,8 @@ public sealed class ParamSpec
             ParamKind.Colours => (value.Kind == ParamValueKind.Texts && InCount(value.Texts.Length) && value.Texts.All(t => TryParseColour(t, out _)))
                 || (value.Kind == ParamValueKind.Numbers && value.Numbers.Length == 0 && InCount(0)) ? null : wrong,
             ParamKind.Name => value.Kind == ParamValueKind.Text && GraphNames.IsValid(value.Text!) ? null : wrong,
+            ParamKind.GreyOrColour => (value.Kind == ParamValueKind.Number && InRange(value.Number)) || (value.Kind == ParamValueKind.Text && TryParseColour(value.Text!, out _)) ? null : wrong,
+            ParamKind.FilePath => value.Kind == ParamValueKind.Text && value.Text!.Length > 0 ? null : wrong,
             _ => value.Kind == ParamValueKind.Text && TryParseColour(value.Text!, out _) ? null : wrong,
         };
     }

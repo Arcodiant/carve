@@ -25,6 +25,8 @@ public sealed class NodeRegistry
         new WarpNode(),
         new BlurNode(),
         new GradientMapNode(),
+        new InputNode(),
+        new NestedGraphNode(),
     ]);
 
     private readonly IReadOnlyDictionary<string, NodeType> _types;

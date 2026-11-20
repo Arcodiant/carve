@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "size": 256,
+  "seed": 21,
+  "nodes": {
+    "base_out": { "type": "output", "inputs": { "in": "dirt" }, "params": { "role": "base_colour" } },
+    "dirt": { "type": "graph", "inputs": { "height": "wall.occlusion", "in": "wall.base_colour" }, "params": { "amount": 0.6, "path": "grime.texgraph" } },
+    "normal_out": { "type": "output", "inputs": { "in": "wall.normal" }, "params": { "role": "normal" } },
+    "occlusion_out": { "type": "output", "inputs": { "in": "wall.occlusion" }, "params": { "role": "occlusion" } },
+    "roughness_out": { "type": "output", "inputs": { "in": "wall.roughness" }, "params": { "role": "roughness" } },
+    "wall": { "type": "graph", "params": { "mortar": 0.06, "path": "bricks.texgraph" } }
+  }
+}
