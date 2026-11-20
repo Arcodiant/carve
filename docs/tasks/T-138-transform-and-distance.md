@@ -78,7 +78,7 @@ tiles.
     zooms in and does not tile. The description says so.
 - **The floor tiles approved (2026-11-20, by the person, Waystone round-1):** the five PNGs, the swatch sheet and the
   sphere. The person's note: "Let's show the swatch on a sphere and a cube, with 3x3 tiling". That is a change to
-  `swatch`, which is T-139's (the swatch overrides), so T-138 does not make it. It is passed on, not built here.
+  `swatch`, not T-138's. T-156 (landed) adds a sphere tiling option; a cube is in no member. T-138 builds neither.
 
 ### As built
 
@@ -158,3 +158,18 @@ agent did not run it: the floor's PNGs and graph were current.)
 
 **Not checked:** the strong minify's working set is not under any test. The pinned window's 84 MiB over the cap is
 the evaluator's pinning, not a leak, and T-155 brings it under.
+
+### Hand-off
+
+Written by Claude Opus 5.5 (`claude-opus-5-5`), the second agent, at its call checkpoint (about 67 calls). As built
+above is complete except for this section.
+
+- **Done:** the person's rulings are in the Notes, and the floor tiles are approved. `verify` gave VERIFY PASS before
+  `finish`. Then `finish`'s rebase stopped on T-137, T-139 and T-156, which had landed. I rebased by hand and kept both
+  sides in `NodeRegistry.BuiltIn`, `NodeCatalogue`, `DefineGraphTool` (`WorkedMap` and `WorkedTurn`),
+  `GraphFaultTests`' type list and CLAUDE.md's three Layout lines. After the rebase, the solution builds in Debug and
+  `patina-unit` passes (321 + 123).
+- **Left:** run `cairn task T-138 verify` again on the rebased branch. `patina-regression` takes 30 to 35 minutes, so
+  run it in the background. Then fold this section into As built and say the third agent's model. Then `cairn lint`
+  and `cairn task T-138 finish`.
+- **Surprising:** none new. If `finish` meets another landing, the same additive resolution applies.
