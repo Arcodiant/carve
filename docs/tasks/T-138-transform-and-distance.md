@@ -79,13 +79,24 @@ tiles.
 - **The floor tiles approved (2026-11-20, by the person, Waystone round-1):** the five PNGs, the swatch sheet and the
   sphere. The person's note: "Let's show the swatch on a sphere and a cube, with 3x3 tiling". That is a change to
   `swatch`, not T-138's. T-156 (landed) adds a sphere tiling option; a cube is in no member. T-138 builds neither.
+- **Rulings on the second hand-off (2026-11-20, by the person):**
+  - *The loosened floor-tiles test is accepted:* the alternate-tile check asks for more than a third of the motif's
+    ink to move, with the exact per-texel checks unchanged.
+  - *Transform's strong minify* (tile 16, scale 0.25, at 8192, a working set of 4,348 MB) goes to T-155, which brings
+    it under 2 GB with a regression test. T-138 lands with the figure recorded in As built.
+  - *The distance memory test runs at 2048, not 8192, until T-155,* with a deadline that suits 2048 in place of the
+    120-minute guard. T-155 raises it to 8192 and asserts the 10 s. The 8192 figures stay in As built.
+  - *The cube view* asked for on the floor tiles' approval is a new member, T-157. T-138 builds nothing for it.
 
 ### As built
 
-Built by Claude Opus 5.5 (`claude-opus-5-5`) in two agents: the first wrote the nodes, the sample and the tests up to its
-call checkpoint (its hand-off is folded in here); the second, also Claude Opus 5.5, rebased onto T-153, took the
-person's rulings and the review, ran the regression class and `verify`, and finished. **Status: done, without the
-spec's 10 s for either node, which the person moved to T-155 (see the Notes).**
+Built by Claude Opus 5.5 (`claude-opus-5-5`) in three agents, all on that model: the first wrote the nodes, the sample
+and the tests up to its call checkpoint; the second rebased onto T-153, took the person's rulings and the review, ran
+the regression class and `verify`, and at `finish` rebased by hand onto T-137, T-139 and T-156, keeping both sides of
+the registry, catalogue, `DefineGraphTool`, `GraphFaultTests` and CLAUDE.md Layout lines; the third rebased onto the
+milestone again (T-157 planned), made the person's second rulings, moved the distance memory test to 2048, ran
+`verify` and finished. Both hand-offs are folded in here. **Status: done, without the spec's 10 s for either node,
+which the person moved to T-155 (see the Notes).**
 
 **Nodes:**
 - `Nodes/TransformNode.cs`: `in` (any); `offset` [u, v] -1..1 (0, 0), `tile` [x, y] 1..16 (1, 1), `mirror`
@@ -120,10 +131,12 @@ spec's 10 s for either node, which the person moved to T-155 (see the Notes).**
   a twentieth of the tile differs between a tile and its turned neighbour. The motif has 348 ink texels, and 186 of
   them move, which is under a twentieth of the tile (204). It now asks for more than a third of the motif's ink to move,
   a measure of the ink rather than the tile. The exact checks above it (every texel turned, the diagonal the same) are
-  unchanged. The person may want to look at this one.
+  unchanged. The person accepted this (see the Notes).
 - `TransformDistanceBoundedMemoryTests` (regression, the real patina, debug build) asserts the peak working set at
-  2 GB or less and records the time; the 10 s is T-155's to assert. Its export deadline was 10 minutes, which distance
-  did not meet in a debug patina (cancelled at 10 m 4 s). It is now a 120-minute hang guard, not a time mark.
+  2 GB or less and records the time; the 10 s is T-155's to assert. The turn exports at 8192. Distance exports at 2048,
+  as the person ruled: at 8192 it took about an hour in a debug patina, past the 10-minute deadline (cancelled at
+  10 m 4 s), and a 120-minute guard made `patina-regression` take half an hour. The deadline is 10 minutes again;
+  T-155 raises distance to 8192.
 
 **The floor tiles,** `samples/graphs/floor-tiles.texgraph` (256, seed 138), with its five PNGs. It is `tiles` 4x4,
 gap 0.06, bevel 0. The bevel is `distance` inside at range 0.035, put through `levels` gamma 0.7 into `height`. A
@@ -144,32 +157,22 @@ the swatch on a sphere and a cube, tiled 3x3, is in the Notes and is not built h
   - Scale 0.25: 278.5 s, 300,556 tiles, working set 381 MB. Tile 4 at scale 0.25 was stopped at 300 s with 336 of 4,096
     output tiles, about 61 minutes in all, working set 668 MB. Tile 16 at scale 0.25 was stopped at 305.5 s with 24 of
     4,096, about 869 minutes in all, working set 4,348 MB. That is over the 2 GB, from the whole-image input
-    rectangle a strong minify asks for every tile. No test covers that case; it is for T-155 (rotated-read locality).
+    rectangle a strong minify asks for every tile. No test covers that case; the person gave it to T-155, which
+    brings it under 2 GB with a regression test.
   - Distance of a 4x4 tiles mask at range 0.1: inside 473.8 s, both 378.6 s, each 288,138 tiles evaluated, peak held
     84 MiB, which is over the 64 MiB cap (the 196 pinned window tiles of each output tile), working set 331-332 MB.
 - *The regression class, real patina, debug build, one output exported:*
   - The 30-degree turn: 261.6 s, peak working set 1,721 MB (bound 2,048 MB): passes, with little headroom.
-  - Distance at range 0.1, inside: 3,566.7 s (59 m 27 s for the test), peak working set 904 MB: passes. A run of
-    `patina-regression` takes long until T-155: `cairn task T-138 verify` ran it in 1,799 s.
+  - Distance at range 0.1, inside: 3,566.7 s (59 m 27 s for the test), peak working set 904 MB: passes. With that
+    test at 8192, `cairn task T-138 verify` ran `patina-regression` in 1,799 s. The test now runs at 2048:
+    `verify` ran the whole of `patina-regression`, the 8192 turn included, in 318 s (on the runner Mantorok), so
+    the distance figure at 2048 is not recorded separately.
 
 **Surprising:** `tools/Patina.SampleGraphs -- --canonical` rewrites every committed `.texgraph` with LF endings,
 though the bytes are otherwise the same. Restore the other samples with `git checkout --` after a run. (The second
 agent did not run it: the floor's PNGs and graph were current.)
 
-**Not checked:** the strong minify's working set is not under any test. The pinned window's 84 MiB over the cap is
-the evaluator's pinning, not a leak, and T-155 brings it under.
+**Not checked:** the strong minify's working set is not under any test; T-155 adds one. The pinned window's 84 MiB
+over the cap is the evaluator's pinning, not a leak, and T-155 brings it under. Distance's peak at 8192 is not under
+test until T-155 raises the test again. The cube view (T-157) is not built here.
 
-### Hand-off
-
-Written by Claude Opus 5.5 (`claude-opus-5-5`), the second agent, at its call checkpoint (about 67 calls). As built
-above is complete except for this section.
-
-- **Done:** the person's rulings are in the Notes, and the floor tiles are approved. `verify` gave VERIFY PASS before
-  `finish`. Then `finish`'s rebase stopped on T-137, T-139 and T-156, which had landed. I rebased by hand and kept both
-  sides in `NodeRegistry.BuiltIn`, `NodeCatalogue`, `DefineGraphTool` (`WorkedMap` and `WorkedTurn`),
-  `GraphFaultTests`' type list and CLAUDE.md's three Layout lines. After the rebase, the solution builds in Debug and
-  `patina-unit` passes (321 + 123).
-- **Left:** run `cairn task T-138 verify` again on the rebased branch. `patina-regression` takes 30 to 35 minutes, so
-  run it in the background. Then fold this section into As built and say the third agent's model. Then `cairn lint`
-  and `cairn task T-138 finish`.
-- **Surprising:** none new. If `finish` meets another landing, the same additive resolution applies.
