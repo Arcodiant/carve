@@ -54,6 +54,12 @@ public class SeparablePassesTests
         "o": { "type": "output", "inputs": { "in": "d" }, "params": { "role": "roughness" } }
         """;
 
+    private static string FbmDistance(string type) => $$"""
+        "m": { "type": "fbm", "params": { "cells": [4, 4], "octaves": 2 } },
+        "d": { "type": "{{type}}", "inputs": { "in": "m" }, "params": { "range": 0.25, "side": "both" } },
+        "o": { "type": "output", "inputs": { "in": "d" }, "params": { "role": "roughness" } }
+        """;
+
     [Theory]
     [InlineData(0.0, "box", false)]
     [InlineData(0.01, "box", true)]
@@ -99,11 +105,42 @@ public class SeparablePassesTests
     public void Distance_at_its_largest_range_holds_no_more_than_the_cap()
     {
         // At 1024 in tiles of 64 range 0.25 reaches 257 texels: one pass pinned a window of 10 x 10 greyscale tiles,
-        // 1.56 MiB, past a 1 MiB cap.
+        // 1.56 MiB, past a 1 MiB cap. The mask is a one-port greyscale node so the window is distance's own; a source
+        // of several ports (tiles) pins its whole entries, which the band's budget counts (held at 8192 in
+        // TransformDistanceBoundedMemoryTests).
         const long cap = 1L << 20;
-        var (_, run) = Run(Graph(Distance("distance", 0.25, "both")), OutputRole.Roughness, 1024, 64, cap);
+        var (_, run) = Run(Graph(FbmDistance("distance")), OutputRole.Roughness, 1024, 64, cap);
         Assert.True(run.PeakBytes <= cap, $"held {run.PeakBytes} bytes");
-        var (_, one) = Run(Graph(Distance("distance_one", 0.25, "both")), OutputRole.Roughness, 1024, 64, cap);
+        var (_, one) = Run(Graph(FbmDistance("distance_one")), OutputRole.Roughness, 1024, 64, cap);
         Assert.True(one.PeakBytes > cap, $"one pass held {one.PeakBytes} bytes");
+    }
+
+    /// <summary>The most times over a 30-degree turn may make its source (T-155; T-138 measured 2.4 at 8192 in raster order).</summary>
+    public const double MostTurnRemakes = 1.25;
+
+    [Fact]
+    public void A_30_degree_turn_makes_its_source_close_to_once()
+    {
+        // At 2048 in tiles of 32 under a 4 MiB cap the image is 64 x 64 tiles and the cap holds what 64 MiB holds of
+        // tiles of 128 at 8192: the evaluator's order is what decides how often the source is made again.
+        const string source = """
+            "f": { "type": "fbm", "params": { "cells": [8, 8], "octaves": 2 } },
+            "tint": { "type": "colour", "params": { "colour": "#c08040" } },
+            "c": { "type": "blend", "inputs": { "a": "tint", "b": "f" }, "params": { "mode": "multiply" } },
+            """;
+        const int size = 2048, tile = 32, n = size / tile;
+        const long cap = 4L << 20;
+        var (_, alone) = Run(Graph(source + """ "o": { "type": "output", "inputs": { "in": "c" }, "params": { "role": "base_colour" } }"""), OutputRole.BaseColour, size, tile, cap);
+        var (_, turned) = Run(Graph(source + """
+            "t": { "type": "transform", "inputs": { "in": "c" }, "params": { "rotation": 30 } },
+            "o": { "type": "output", "inputs": { "in": "t" }, "params": { "role": "base_colour" } }
+            """), OutputRole.BaseColour, size, tile, cap);
+        // Each run makes n x n output tiles, and the turn n x n transform tiles besides; the rest is the source.
+        var once = alone.TilesEvaluated - n * n;
+        var made = turned.TilesEvaluated - 2 * n * n;
+        var remakes = (double)made / once;
+        TestContext.Current.SendDiagnosticMessage($"30-degree turn at {size} in tiles of {tile}: source made {made} tiles against {once} alone, {remakes:0.00} times; {turned.TilesEvaluated} tiles in all against {alone.TilesEvaluated}");
+        Assert.True(remakes <= MostTurnRemakes, $"the source was made {remakes:0.00} times over ({made} tiles against {once})");
+        Assert.True(turned.PeakBytes <= cap, $"held {turned.PeakBytes} bytes");
     }
 }

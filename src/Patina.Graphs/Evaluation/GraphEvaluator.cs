@@ -256,17 +256,21 @@ public sealed class GraphEvaluator
     }
 
     // So many tile columns that every separable node's row tiles for the band (a column of them as tall as its column
-    // pass reaches, times the band) fit in three quarters of the cap, leaving room for the tiles a row tile reads (LRU fails all at once
-    // when a cycle of reads only just passes what it holds).
+    // pass reaches, times the band) fit in three quarters of the cap less what one row tile pins while it is made (the
+    // whole entries of its inputs across the row's reach: a node of several ports, such as tiles, pins them all). The
+    // quarter left is room for the churn of the tiles a row tile reads; LRU fails all at once when a cycle of reads only
+    // just passes what it holds.
     private static int BandTiles(Step[] steps, SeparablePasses?[] passes, int n, int t, long cap)
     {
+        long EntryBytes(Step step) => step.Kinds.Sum(k => (long)t * t * PortKinds.Channels(k) * sizeof(float));
+        int Spanned(int reach) => Math.Min(n, (t + 2 * reach + t - 1) / t + 1);
         var band = Math.Min(n, MostBandTiles);
         for (var i = 0; i < steps.Length; i++)
         {
             if (passes[i] is not { } p) continue;
-            var tall = Math.Min(n, (t + 2 * p.ColumnReach + t - 1) / t + 1);
-            var column = (long)tall * t * t * PortKinds.Channels(steps[i].Kinds[0]) * sizeof(float);
-            band = Math.Min(band, (int)Math.Max(1, cap / 4 * 3 / column));
+            var column = Spanned(p.ColumnReach) * (long)t * t * PortKinds.Channels(steps[i].Kinds[0]) * sizeof(float);
+            var reading = Spanned(p.RowReach) * steps[i].Sources.Sum(s => EntryBytes(steps[s.Node]));
+            band = Math.Min(band, (int)Math.Max(1, (cap / 4 * 3 - reading) / column));
         }
         return band;
     }
