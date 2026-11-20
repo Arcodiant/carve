@@ -95,12 +95,13 @@ and a version 2 that a file is written in only when it needs it.
 - **Stop and ask:** any committed PNG or frame that changes; a sphere threshold; metallic packed anywhere else.
 - Breaks for the frame checks are made on the scenario side, never by a switch in the product (M-27's ruling on T-114).
 
-### Hand-off
+### As built
 
-Written by Claude Opus 5.5 (`claude-opus-5-5`), first agent, at its call checkpoint (about 58 tool calls). Not verified
-yet: `cairn task T-134 verify` has not been run; the patina-unit tests were run by hand (below).
+Built by Claude Opus 5.5 (`claude-opus-5-5`) in two agents: the first wrote the code up to its call checkpoint (its
+hand-off is folded in here); the second fixed the label atlas, wrote the scenario stage, measured the metallic rule,
+had it and the sheet approved, and finished the task.
 
-**Done (committed):**
+**Built:**
 - *Roles* (`Imaging/OutputPacking.cs`): `OutputRole` is `BaseColour, Normal, Roughness, Metallic, Occlusion, Height`
   (role order); `OutputRoles.Order` (roles in role order, then named a to z), `FileOf` (`metallic` -> `roughness.png`),
   `PackedAs` (a named output packs as `base_colour`: grey spread, colour sRGB); `PackTile` packs metallic and height grey;
@@ -135,15 +136,55 @@ yet: `cairn task T-134 verify` has not been run; the patina-unit tests were run 
   valid name, so the export refusal names the missing output; the planks' four roles named in the tests).
   Patina.Graphs.Tests: 140 pass. Patina.Server.Tests unit: 104 pass, 1 fails (below).
 
-**Surprising, and left:** the sheet's label atlas (`LabelAtlas`, 512 px, 32 px pitch) holds 16 labels, a title, two a
-column and the sphere's, so 7 columns at most. A graph with every role and two named outputs (8 columns, the spec's
-unit test) throws `IndexOutOfRangeException` in `SwatchSheet.Compose`
-(`MetalPlateTests.The_sheet_has_a_column_per_output_...`). Fix in the atlas (taller, or two labels a row) without
-moving the planks' label pixels, and check the planks' sheet hash is unchanged; `SwatchRendering` draws the atlas.
+- *The label atlas* (`Patina.Server/SwatchImages.cs`, `LabelAtlas`): it was 512 a side and held 16 labels (a title,
+  two for each column, the sphere's), so a sheet could have 7 columns at most. A graph with every role and two named outputs
+  threw `IndexOutOfRangeException`. It is now 1024 a side with 32 rows, enough for 15 columns. The rows sit where they
+  did, and a label's width keeps its old cap (`LabelAtlas.LabelWidth`, 512 - Inset + Padding), so a sheet of 7 columns or
+  fewer draws the same pixels.
+- *scenario-patina* (`SwatchStage.cs`, `MetalPlateAsync`): define_graph's metal plate is exported at 64. There is no
+  `metallic.png`. Its sheet (`swatch-plate-sheet`, 1544 x 538) has columns base_colour, roughness, metallic and edge.
+  Each flat and tiled cell is checked exactly against the exported texels: roughness alone is `roughness.png` with B 0,
+  metallic is that file's B spread grey, edge is `edge.png`. Its sphere (`swatch-plate-sphere`) is checked for the
+  silhouette and against the sheet's sphere cell. Then the **metallic rule**, below.
 
-**Left:** the atlas fix; scenario-patina's swatch stage (metal plate sheet and sphere worked from texels as
-`SwatchStage.cs` does; the metallic-1 vs metallic-0 grey-200 highlight check, threshold measured and put to the
-person); `cairn task T-134 verify`; compare the planks' sheet and committed PNGs and scenario frames by hash (fetch by
-job id); the person's approval of the new sheet look (frames under `G:\My Drive\artifacts\carve\M-28\T-134\round-1`);
-CLAUDE.md's Layout lines (Patina.Graphs: roles, list params, format versions); `### As built`; lint and finish.
-No images have been opened.
+**The metallic rule (approved by the person, round 1).** The spec's measure was a peak luma tinted lower at metallic 1.
+It could not work: both spheres' peaks are 255, because carve's lights clip the highlight, and a grey base cannot show a
+tint in hue. Measured on a grey-200 sphere at roughness 0.2 (`swatch-sphere-metallic-0`/`-1`), metallic 0 against
+metallic 1 inside the silhouette:
+
+- median luma 192.4 against 127.1, a step of 65.3;
+- mean 191.0 against 134.0;
+- p99 218.2 against 242.0;
+- 261 against 1256 pixels at luma 255.
+
+Metallic 1 loses its diffuse light and reflects the sky. The rule (`MetallicReads`): metallic 1's median is at least
+`MetallicStep` = 40 lower (about 60 %, the margin T-128's `HighlightStep` uses), and more of its pixels are at 255. The
+break is made on the scenario side: metallic 0 judged against itself must fail. The numbers go to `swatch-checks.tsv`.
+
+**Checked.** `cairn task T-134 verify` passed: patina-unit, patina-regression and scenario-patina. In the first run,
+scenario-patina job `J-20261120-043600-a719a7` gave the 10 planks frames (both sheets, all spheres, flat, tiled, seam,
+the roughness spheres) and the 16 export and swatch-texel PNGs equal by SHA-256 to main's job `J-20261120-035840-c10d3a`.
+So the planks' sheet and every committed PNG keep their bytes. `ListParamsAndVersionTests` rewrites every committed
+`.texgraph` byte for byte. On 2026-11-19 the person approved the new sheet look (the plate's sheet and sphere) and the
+metallic rule, from `G:\My Drive\artifacts\carve\M-28\T-134\round-1`. The scenario frames were opened only as
+scaled copies.
+
+**What T-137, T-138 and T-139 build on.**
+- *List parameters*: `ParamSpec.Floats(name, minCount, maxCount, min, max, default...)` and `ParamSpec.Colours(name,
+  minCount, maxCount, default...)`, read through `NodeParameters.Floats`/`Colours`. In the file they are a JSON array of
+  numbers, or of `"#rrggbb"` strings. `[]` is either kind. A mixed array is a load error ("an array is all numbers or all
+  strings"). Describe and Check give "a list of 2 to 8 numbers [a, b, ...], each from 0 to 1" and "a list of 0 to 4
+  colours [\"#rrggbb\", ...]". A file with them stays version 1. T-137's `gradient_map` is their first user.
+- *Version 2*: `TexGraphFile` reads versions 1 and 2 and writes the lowest version that holds the graph
+  (`TexGraphFormat.VersionOf`).
+  - To add a top-level field, subclass `TexGraphField` (`Name`, `Version`, `IsIn`, `Write`, `Read`) and add it to
+    `TexGraphFormat.Current` with `.With(field)`. Fields are written after `seed` and before `nodes`. T-139 adds
+    `parameters` this way, with a slot on `TextureGraph` for its value.
+  - To add a node type of version 2, call `.WithNodeType(type, 2)`. T-140 does this for `graph` and `input`.
+  - A version-1 file that uses either is a load error at the field or node.
+  - The round trip is tested on a stand-in field and node type in `ListParamsAndVersionTests`.
+- *Roles and columns*: `OutputRoles.Order` gives the role order, `base_colour, normal, roughness, metallic, occlusion,
+  height`, then named outputs a to z. The sheet has one column per output the graph has, in that order, and a missing
+  role has no column. A named output packs as `base_colour`: a grey output is spread to grey, a colour one is sRGB. The
+  label atlas holds 15 columns. A sheet wider than that needs the atlas taller again (`LabelAtlas.Size`).
+- *Engine needs*: none.
