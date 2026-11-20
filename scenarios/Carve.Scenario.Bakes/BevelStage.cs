@@ -14,11 +14,13 @@ namespace Carve.Scenario.Bakes;
 /// <summary>
 /// T-125: the bevel normal map. <c>bake</c> <c>normal</c> with <c>bevel.width</c> 0.0016 at 1024 (5 texels at the wrench's 3.1
 /// texels per mm), padding 8, and add it to the material (<c>wrench-bevel</c>: stage 1's base colour and the map as
-/// <c>normal_texture</c>). Frames: the <c>uvs</c> look with the map under it; zoom 8 on a convex jaw edge from three directions, each
-/// without and then with the map; the wrench from the six sides and the three-quarter view. Checks: texels farther than the width from
-/// every break edge of their face hold N itself, (128, 128, 255) or a level from it; in the close frames the strip by the edge lies
+/// <c>normal_texture</c>). Frames: the <c>uvs</c> look with the map under it; zoom 8 on a convex grip (<c>steel</c>) edge from three
+/// directions, each without and then with the map (the person's ruling, 2026-11-20: the lighter steel spreads the shades wider than
+/// the dark jaw, where the map and its break read within 2 luma of each other); the wrench from the six sides and the three-quarter
+/// view. Checks: texels farther than the width from every break edge of their face hold N itself, (128, 128, 255) or a level from it; in the close frames the strip by the edge lies
 /// between the two faces' shades; <c>render_glb</c> of the export with the map agrees with <c>render</c> under D-6's rule.
-/// <c>CARVE_BAKES_BREAK</c>: <c>bevel-thin</c> bakes width 0.00001; <c>bevel-g</c> puts the map on with G inverted.
+/// <c>CARVE_BAKES_BREAK</c>: <c>bevel-g</c> puts the map on with G inverted. The thin-width break is the Core seam test's
+/// (<c>WrenchBevelSeamTests</c>), so the stage has none (the person's ruling, 2026-11-20).
 /// </summary>
 internal sealed class BevelStage : IBakesStage
 {
@@ -26,8 +28,6 @@ internal sealed class BevelStage : IBakesStage
 
     /// <summary>fps-arms' 1.6 mm bevel.</summary>
     internal const double Width = 0.0016;
-
-    private const double ThinWidth = 0.00001;
 
     /// <summary>The spec's own rule: a texel with no edge within reach is (128, 128, 255) or one level from it.</summary>
     private const int FlatLevels = 1;
@@ -38,8 +38,8 @@ internal sealed class BevelStage : IBakesStage
     /// </summary>
     private const double PredictedSlack = 2;
 
-    /// <summary>The jaw's (<c>dark</c>) colour, from <see cref="SurfaceStage"/>'s table.</summary>
-    private const string Dark = "#36393E";
+    /// <summary>The grip's (<c>steel</c>) colour, from <see cref="SurfaceStage"/>'s table.</summary>
+    private const string Steel = "#80858A";
 
     private static readonly Vector3 ThreeQuarter = new(1, 0.6f, 1.5f);
 
@@ -52,9 +52,8 @@ internal sealed class BevelStage : IBakesStage
         var groups = mesh.Raw.GetProperty("groups").EnumerateArray()
             .ToDictionary(g => g.GetProperty("name").GetString()!, g => g.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToArray());
 
-        var width = Break == "bevel-thin" ? ThinWidth : Width;
         var textures = Path.Combine(driver.RunFolder, "textures");
-        var bake = await CallJsonAsync(driver, "bake", new { mesh = "wrench", folder = textures, size = Size, padding = 8, maps = new[] { "normal" }, bevel = new { width } });
+        var bake = await CallJsonAsync(driver, "bake", new { mesh = "wrench", folder = textures, size = Size, padding = 8, maps = new[] { "normal" }, bevel = new { width = Width } });
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "bevel-bake.json"), bake.ToString());
         if (bake.GetProperty("skipped_faces").GetArrayLength() != 0 || bake.GetProperty("warnings").GetArrayLength() != 0) Note($"bevel bake: expected no skipped faces and no warnings, got {bake}");
         var normal = bake.GetProperty("files")[0].GetProperty("path").GetString()!;
@@ -64,9 +63,11 @@ internal sealed class BevelStage : IBakesStage
         var tsv = new List<string> { "check\twhat\tvalue\tdetail" };
         CheckFlat(mesh, hard, png, tsv);
 
-        // Close on a convex jaw edge, from three directions, without the map (stage 1's material) and then with it.
-        var edge = JawEdge(scene, mesh, hard, groups["dark"].ToHashSet());
-        var close = Directions(edge).Select((d, k) => new View($"bevel-jaw-{k + 1}", d, Size, 8, edge.Mid, Mirror: false)).ToArray();
+        // Close on a convex grip edge, from three directions, without the map (stage 1's material) and then with it. A face is steel
+        // when no later group of SurfaceStage's table (dark, red, black) takes it.
+        var steel = groups["steel"].Except(groups["dark"]).Except(groups["red"]).Except(groups["black"]).ToHashSet();
+        var edge = CloseEdge(scene, mesh, hard, steel);
+        var close = Directions(edge).Select((d, k) => new View($"bevel-grip-{k + 1}", d, Size, 8, edge.Mid, Mirror: false)).ToArray();
         var plain = new Dictionary<string, ScenarioFrame>();
         foreach (var view in close) plain[view.Name] = await driver.CaptureAsync(view.Name + "-plain", view.Args);
 
@@ -147,12 +148,11 @@ internal sealed class BevelStage : IBakesStage
     internal sealed record Edge(int Lo, int Hi, int FaceA, int FaceB, Vector3 Mid, Vector3 Axis, Vector3 NormalA, Vector3 NormalB, float Length);
 
     /// <summary>
-    /// The longest convex hard edge between two jaw (<c>dark</c>) faces bending at least 60 degrees, the lower ids on a tie, whose
+    /// The longest convex hard edge between two of the given faces bending at least 60 degrees, the lower ids on a tie, whose
     /// sample points (<see cref="Samples"/>) are all on their face, facing the eye and in sight from each of the three close
-    /// directions. The longest edge alone, (112, 113), is the underside of the dark boss where it sits 0.5 mm over the ring: the
-    /// ring hides every point of it from every direction.
+    /// directions (the rule T-125's agent 2 made for the jaw, whose longest edge, (112, 113), the ring hides from every direction).
     /// </summary>
-    private static Edge JawEdge(Scene scene, SceneMesh mesh, HashSet<(int, int)> hard, HashSet<int> jaw)
+    private static Edge CloseEdge(Scene scene, SceneMesh mesh, HashSet<(int, int)> hard, HashSet<int> group)
     {
         var candidates = new List<Edge>();
         var faces = new Dictionary<(int, int), List<int>>();
@@ -160,7 +160,7 @@ internal sealed class BevelStage : IBakesStage
             foreach (var e in Loop(mesh.Faces[f])) (faces.TryGetValue(e, out var l) ? l : faces[e] = []).Add(f);
         foreach (var ((lo, hi), around) in faces.OrderBy(k => k.Key))
         {
-            if (around.Count != 2 || !hard.Contains((lo, hi)) || !jaw.Contains(around[0]) || !jaw.Contains(around[1])) continue;
+            if (around.Count != 2 || !hard.Contains((lo, hi)) || !group.Contains(around[0]) || !group.Contains(around[1])) continue;
             var (a, b) = (around.Min(), around.Max());
             var (na, nb) = (Vector3.Normalize(mesh.Normal(a)), Vector3.Normalize(mesh.Normal(b)));
             var mid = (mesh.Vertices[lo] + mesh.Vertices[hi]) / 2;
@@ -179,7 +179,7 @@ internal sealed class BevelStage : IBakesStage
             });
             if (seen) return edge;
         }
-        throw new InvalidOperationException($"none of the wrench's {candidates.Count} convex jaw hard edges is in sight from all three close directions");
+        throw new InvalidOperationException($"none of the wrench's {candidates.Count} convex hard edges of the group is in sight from all three close directions");
     }
 
     /// <summary>
@@ -243,7 +243,7 @@ internal sealed class BevelStage : IBakesStage
             return lumas.Count > 0 ? lumas.Average() : null;
         }
 
-        // JawEdge chose the edge so every point is on its face and in sight from this direction.
+        // CloseEdge chose the edge so every point is on its face and in sight from this direction.
         var faceA = Shade(e.FaceA, strip: false);
         var faceB = Shade(e.FaceB, strip: false);
         var stripA = Shade(e.FaceA, strip: true);
@@ -260,7 +260,7 @@ internal sealed class BevelStage : IBakesStage
         // shade between the two faces'; elsewhere hold each strip to that predicted shade, within PredictedSlack.
         double Predicted(Vector3 n)
         {
-            var lit = ColourRule.Lit(Dark, n, view.Direction);
+            var lit = ColourRule.Lit(Steel, n, view.Direction);
             return Luma((ColourRule.Encode(lit[0]), ColourRule.Encode(lit[1]), ColourRule.Encode(lit[2])));
         }
         var (pa, pb, pm) = (Predicted(e.NormalA), Predicted(e.NormalB), Predicted(Vector3.Normalize(e.NormalA + e.NormalB)));
