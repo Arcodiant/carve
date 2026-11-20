@@ -4,7 +4,7 @@ description: >-
 ---
 # T-133 — Tiled texture graph evaluation
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
