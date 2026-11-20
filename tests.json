@@ -639,7 +639,7 @@
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 30
+      "est-seconds": 300
     }
   ],
   "todo": []
