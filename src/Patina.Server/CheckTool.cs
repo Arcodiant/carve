@@ -27,17 +27,17 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
     public const string Worked = """{"size":64}""";
 
     /// <summary>What it returns for the bricks open (samples/graphs/bricks.texgraph).</summary>
-    public const string WorkedResult = "<set by the measured run>";
+    public const string WorkedResult = """{"ok":true,"problems":[],"notes":[],"stats":{"size":64,"outputs":{"base_colour":{"min":[108,45,30],"max":[194,186,169],"mean":[160.3,104.4,86.5]},"normal":{"min":[72,72,242],"max":[183,183,255],"mean":[127.9,127.7,250.3]},"roughness":{"min":[167],"max":[255],"mean":[202.6]},"occlusion":{"min":[115],"max":[255],"mean":[183.6]}}}}""";
 
     /// <summary>The second: samples/graphs/faults/chrome-in-paint.texgraph open, paint with a metallic of about 0.5.</summary>
     public const string WorkedFault = """{}""";
 
-    public const string WorkedFaultResult = "<set by the measured run>";
+    public const string WorkedFaultResult = """{"ok":false,"problems":[{"check":"metallic-not-binary","output":"metallic","message":"100% of texels are between 0.1 and 0.9; over 5% is a fault. Fix: metallic is 1 on bare metal and 0 on everything else, with a sharp edge between; a middle value is a half-metal that does not exist in a real surface, and renders as a dull chrome. Drive it from a mask pushed to 0 and 1 (a levels node with in_low equal to in_high is a step), or set it to 0 or 1."}],"notes":["metal texels (metallic 0.5 or more): 52%"],"stats":{"size":64,"outputs":{"base_colour":{"min":[145,170,125],"max":[169,191,150],"mean":[157,180.8,137.7]},"normal":{"min":[115,116,254],"max":[141,140,255],"mean":[127.5,127.5,255]},"roughness":{"min":[159],"max":[199],"mean":[178.5]},"metallic":{"min":[121],"max":[134],"mean":[127.5]}}}}""";
 
     /// <summary>The third: PNG files, read with their roles.</summary>
     public const string WorkedFiles = """{"files":[{"path":"samples/graphs/bricks/base_colour.png","role":"base_colour"},{"path":"samples/graphs/bricks/normal.png","role":"normal"}]}""";
 
-    public const string WorkedFilesResult = "<set by the measured run>";
+    public const string WorkedFilesResult = """{"ok":true,"problems":[],"notes":["base_colour: base_colour.png, 256x256","normal: normal.png, 256x256"],"stats":{"size":256,"outputs":{"base_colour":{"min":[107,44,30],"max":[196,188,171],"mean":[159.7,102.2,84.3]},"normal":{"min":[62,62,237],"max":[193,193,255],"mean":[127.9,127.8,248.4]}}}}""";
 
     public const string Text =
         "Measures what the open graph's outputs came to, as numbers, rather than judging by a render: lists what is wrong with each output, with the fix in words, as carve's check lists a mesh's faults. "
@@ -55,7 +55,8 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         + "Fix: make it with height_to_normal, which normalises, and do not mix a normal's components as colours.\n"
         + "- one-value: a greyscale output (roughness, metallic, occlusion, height, a greyscale named output) whose texels all pack to one byte; a mask of one value masks nothing. "
         + "Fix: widen its levels, or drive it from a noise or pattern, or drop the output.\n"
-        + "- does-not-tile: across the wrap in u or v, the mean step between the last and first column (or row) is more than twice the mean step between neighbours plus 2 levels, so the texture shows a seam when it repeats. "
+        + "- does-not-tile: the mean step between neighbouring columns (and rows, for v), in packed levels over the channels, is measured at every column boundary, the wrap's between the last and first included; "
+        + "the wrap is a fault when its step is more than twice the 99th percentile of the steps inside, plus 2 levels, so the texture shows a seam when it repeats (a pattern's own hard edge that falls on the wrap is not one). The message gives the measured wrap step and that percentile. "
         + "Fix: whole-number frequencies and counts and quarter turns; swatch's tiled view shows where.\n"
         + "Result: {ok, problems:[{check, output, message}], notes, stats}. ok is true when there are no problems; each message gives the share, the worst texel and the fix; "
         + "notes say how the texels were read (the share of metal texels, a metallic read from a roughness file); stats gives each output's min, max and mean per channel, in packed levels 0 to 255 "
@@ -132,7 +133,7 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         if (set.Find(OutputRoles.Name(OutputRole.Metallic)) is { IsGrey: true } metallic)
         {
             long metal = metallic.Data.LongCount(v => v >= BaseColourRangeRule.MetallicIsMetal);
-            notes.Insert(0, $"metal texels (metallic>=0.5): {CheckRules.Percent(metal, metallic.Texels)}");
+            notes.Insert(0, $"metal texels (metallic 0.5 or more): {CheckRules.Percent(metal, metallic.Texels)}");
         }
         var outputs = new JsonObject();
         foreach (var o in set.Outputs) outputs[o.Name] = Stats(o);
