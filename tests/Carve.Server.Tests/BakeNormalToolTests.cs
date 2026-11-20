@@ -83,7 +83,6 @@ public class BakeNormalToolTests : FileToolTests
     [InlineData("""{"maps":["normal"],"bevel":{"width":-0.5}}""", "bevel.width: must be more than 0 metres, not -0.5")]
     [InlineData("""{"maps":["normal"],"bevel":{"width":"wide"}}""", "bevel.width: expected a number of metres")]
     [InlineData("""{"maps":["normal"],"bevel":{"width":0.1,"radius":2}}""", "bevel.radius: not a field of bevel")]
-    [InlineData("""{"maps":["masks"],"bevel":{"width":0.1}}""", "bevel: only with map 'normal'")]
     public async Task A_bad_bevel_is_refused_by_name_and_writes_nothing(string arguments, string expected)
     {
         using var carve = await BoxAsync();
@@ -91,6 +90,18 @@ public class BakeNormalToolTests : FileToolTests
         Assert.Contains(expected, text);
         Assert.StartsWith("bake failed with", text);
         Assert.False(Directory.Exists(Path.Combine(Root, "textures")));
+    }
+
+    [Theory]
+    [InlineData("""{"maps":["base_colour"],"bevel":{"width":0.1}}""", "bevel: ignored, 'normal' is not in maps", "box.base_colour.png")]
+    [InlineData("""{"maps":["normal"],"bevel":{"width":0.1},"curvature":{"width":0.1}}""", "curvature: ignored, 'curvature' is not in maps", "box.normal.png")]
+    public async Task A_block_for_a_map_not_asked_for_is_ignored_with_a_warning_and_the_maps_asked_for_are_baked(string arguments, string warning, string file)
+    {
+        using var carve = await BoxAsync();
+        var body = Body(Ok(await carve.CallToolAsync("bake", arguments)));
+        Assert.Contains(warning, body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()));
+        Assert.True(File.Exists(Path.Combine(Root, "textures", file)), file);
+        Assert.Single(body.GetProperty("files").EnumerateArray());
     }
 
     [Fact]
