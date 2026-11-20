@@ -4,7 +4,7 @@ description: >-
 ---
 # T-121 — An image under the UV layout look
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
