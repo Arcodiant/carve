@@ -75,67 +75,43 @@ T-124 to T-126 each add theirs.
   will add. Once scenario-bakes is in `tests.json`, add it to this file's `**Verify:**` line, with the task's other
   suites.
 
-### Hand-off
+### As built
 
-By Claude Opus 5.5 (2026-11-19), agent 1 of 2. Status: built, run and probed; a threshold waits on the person; the frame
-review (Waystone, round 1) is the next agent's.
+By Claude Opus 5.5 in two agents: agent 1 (Opus 5.5) built, ran and probed the scenario; agent 2 (Opus 5.5) landed the
+person's rulings, showed each failing and ran the frame review.
 
-**Done.** `scenarios/Carve.Scenario.Bakes` (`BakesScenario.cs`, `BakesStages.cs`, `SurfaceStage.cs`, `BakesChecks.cs`),
-in `Carve.slnx`, suite `scenario-bakes` in `tests.json` (every linked file and `samples/wrench.carve` as inputs), its
-`CLAUDE.md` row, and the suite on the `**Verify:**` line. A new stage is one file and one line in `BakesStages.cs`.
-Stage 1 bakes all six masks and the base colour (coverage 0.4856), checks the file list, no skipped faces and no
-warnings, writes `bakes.tsv`, and captures 14 frames plus the 4x crop `wrench-uvs-steel-padding-4x.png`.
-
-**Checks and their breaks** (all run on this machine; the clean run passes, run 2):
-
-- `uvs` frames by T-121's block rule (nearest texel, tolerance 2, a pixel taken a quarter to three quarters into its
-  texel and 4 px from every face edge and the square's border), the island pixels also held to the colour worked from
-  the groups. `CARVE_BAKES_BREAK=swap` (steel and red swapped in the bake): 13778 island pixels fail.
-- Render frames: every face turned to the eye (cosine ≥ 0.5, `BakesChecks.Facing`), at its centre and 0.7 of the way
-  to each corner, kept only when the rays through the pixel and 1.5 px around it all meet that face, in sight. `red`
-  must be red-dominant (R > max(G, B)) and no other group may be. Swap: 441 failures in all nine views.
-- M-2: the x-mirror of each red-box centre (front, back, top, three-quarter, the two zoom-4 closes; not the views
-  along x) must not be red. `CARVE_BAKES_BREAK=mirror`: 51 failures, the mirror check among them.
-- Export: `render_glb` against `render` under D-6's rule: front 48 px differ, patch 15; three-quarter 10 px, patch 3;
-  the control (glb three-quarter against render front) fails it, as it must.
-
-**The question: the steel split (not landed).** `SurfaceStage.SteelSplit` is `null`, so no steel check runs; the
-numbers go to `probe.tsv`. Rec. 709 luma of the sRGB pixel, per view, over the sampled points (392 steel):
-
-| view | steel min | rubber max | dark max | black max | margin (steel min − darkest max) | red lead min | others' lead max |
-|---|---|---|---|---|---|---|---|
-| front (+z) | 119.1 | 47.7 | 59.4 | – | 59.6 | 112 | −11 |
-| back (−z) | 118.1 | 47.7 | – | 39.9 | 70.4 | – | −10 |
-| left (−x) | 108.5 | 47.7 | 63.1 | – | 45.4 | 110 | −6 |
-| right (+x) | 109.4 | 47.7 | 63.1 | – | 46.3 | 107 | −6 |
-| top (+y) | 127.5 | – | 61.2 | – | 66.3 | 105 | −18 |
-| three-quarter | 117.3 | 46.7 | 64.2 | – | 53.1 | 105 | −8 |
-| jaw close ×4 | 120.0 | – | 62.4 | – | 57.6 | 106 | −10 |
-| grip close ×4 | 114.1 | 46.7 | – | – | 67.4 | – | −11 |
-| face 80 close ×8 | 111.6 | – | 62.1 | – | 49.5 | 117 | −6 |
-| all | 108.5 | 47.7 | 64.2 | 39.9 | 44.3 | 105 | −6 |
-
-Under the swap break the steel faces read luma 73.6 to 89.2 (margin 10.5 to 33.1 by view), so a luma rule alone
-does not catch the swap; red-dominance does.
-
-Options I would offer:
-
-1. **One split at luma 86** (midway between 64.2 and 108.5): steel above, rubber, dark and black below; 22 of headroom
-   each side.
-2. **A per-view margin**: in each view, the least steel luma exceeds the most of `rubber`, `dark` and `black` by at
-   least 30 (the least seen is 45.4, left).
-3. **Red-dominance with a lead**: red's R exceeds max(G, B) by at least 50 and every other group's lead stays below 0
-   (seen: red ≥ 105, others ≤ −6). Today it is a lead above 0, with no number chosen; say if that stands.
-
-Also the person's to rule: the sampling placement (`Facing` 0.5, corners at 0.7, the 1.5 px solid test).
-
-**Left.** The person's ruling, landed with its break shown failing; the Waystone frame review (round 1) of the 14
-frames and the crop; then `### As built`, `cairn lint` and `finish`. Not checked: the frames by eye beyond the sheet
-and the crop (both look right: the ratchet wrench, red box at +x, a white steel island with its grey padding); the
-`samples/wrench.carve` stats against fps-arms. Evidence: `G:\My Drive\artifacts\carve\M-24\T-123\probe` (run 2's
-frames, `compare/`, the TSVs, and `probe.tsv` of both breaks). The queued run, job `J-20261120-004722-5c8b13` (22a6fb7a7), is byte-identical frame for frame to run 2; its frames, `compare/` and TSVs are staged in `G:\My Drive\artifacts\carve\M-24\T-123
-ound-1` for the review.
-
-**Surprising.** The first run failed on the `uvs` square's border line (white over the image) and on mirror checks in
-the views along x (a point and its mirror share a line of sight); both are now excluded by rule, not by tolerance. Two
-dark corners next to the red box read red-dominant until the solid-pixel ray test was added.
+- **`scenarios/Carve.Scenario.Bakes`** (`BakesScenario.cs`, `BakesStages.cs`, `SurfaceStage.cs`, `BakesChecks.cs`), in
+  `Carve.slnx`; suite `scenario-bakes` in `tests.json` (every linked file and `samples/wrench.carve` as inputs), its
+  `CLAUDE.md` row, and the suite on the `**Verify:**` line. A new stage is one file and one line in `BakesStages.cs`.
+- **Stage 1** bakes all six masks and the base colour at 1024, padding 8 (coverage 0.4856), checks the file list, no
+  skipped faces and no warnings, writes `bakes.tsv`, `samples.tsv`, `mirrors.tsv`, `probe.tsv` and `differences.tsv`,
+  and captures 14 frames plus the 4x crop `wrench-uvs-steel-padding-4x.png`.
+- **Checks.** `uvs` frames by T-121's block rule (nearest texel, tolerance 2, a pixel a quarter to three quarters into
+  its texel and 4 px from every face edge and the square's border), the islands also held to the colour worked from the
+  groups. Render frames sampled on faces turned to the eye (cosine ≥ 0.5, `BakesChecks.Facing`), at the centre and 0.7
+  of the way to each corner, kept only when the rays through the pixel and 1.5 px around it all meet that face. M-2: the
+  x-mirror of each red-box centre (views not along x) must not lead red. Export: `render_glb` against `render` under
+  D-6's rule, front 48 px differ (patch 15), three-quarter 10 px (patch 3); the control (glb three-quarter against render
+  front) fails it, as it must.
+- **The person's rulings (2026-11-20)**, landed as written:
+  - *Steel:* in each view, the darkest `steel` sample is at least 30 luma (Rec. 709) above the lightest `rubber`,
+    `dark` or `black` sample of that view (`SurfaceStage.SteelMargin`). No fixed split. Least margin seen: 45.4 (left).
+  - *Red:* `red` samples lead max(G, B) by 50 or more (`RedLeadMin`); every other group's lead is at most 0. Seen: red
+    ≥ 105, the rest ≤ −6.
+  - *Sample placement:* accepted as built (cos 0.5, centre plus 0.7 toward each corner, the 1.5 px solid test).
+- **Breaks** (`CARVE_BAKES_BREAK`, scenario side only), each run on this machine after the rulings landed; the clean
+  run passes:
+  - `swap` (steel and red swapped in the bake): 448 failures: red lead under 50 ×38, another group leading ×392, steel
+    margin ×7 (10.5 to 23.9), the mirror ×2, the `uvs` frames ×9.
+  - `faint` (new: steel baked #5C6064, red #8C6460, so steel stays grey and red still leads): 53 failures: red lead
+    under 50 ×38 (leads 16 to 35, which the old lead-above-0 rule passed), steel margin ×6 (16.5 to 27.9), `uvs` ×9.
+  - `mirror` (camera mirrored left to right): 57 failures, the mirror check ×2 among them.
+- **Frame review:** Waystone round 1, the 14 frames, the crop and both compare triptychs from job
+  `J-20261120-005533-8f1553` (06f0844; byte-identical to job `J-20261120-004722-5c8b13`), in
+  `G:\My Drive\artifacts\carve\M-24\T-123\round-1`. The person **approved**, no notes. Agent 2 looked at the frames
+ound-1`. The person **approved**, no notes. Agent 2 looked at the frames
+  itself, scaled, before sending. Break logs in `...\T-123\breaks`, the probe in `...\T-123\probe`.
+- **Not checked:** `samples/wrench.carve`'s stats against fps-arms.
+- **Surprising.** The first run failed on the `uvs` square's border line and on mirror checks in the views along x (a
+  point and its mirror share a line of sight); both are excluded by rule, not by tolerance. Two dark corners next to the
+  red box read red-dominant until the solid-pixel ray test was added.
