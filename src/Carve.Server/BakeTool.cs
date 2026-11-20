@@ -22,9 +22,10 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
     public const string CurvatureMap = "curvature";
     public const string OcclusionMap = "occlusion";
     public const string OrmMap = "orm";
+    public const string NormalMap = "normal";
 
     /// <summary>The maps there are; T-124 to T-126 add theirs.</summary>
-    public static readonly string[] Maps = [MasksMap, BaseColourMap, CurvatureMap, OcclusionMap, OrmMap];
+    public static readonly string[] Maps = [MasksMap, BaseColourMap, CurvatureMap, OcclusionMap, OrmMap, NormalMap];
 
     /// <summary>The maps a call with no <c>maps</c> bakes: the ones that need no block.</summary>
     public static readonly string[] DefaultMaps = [MasksMap, BaseColourMap];
@@ -42,12 +43,13 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "Faces with no UVs are skipped, listed in skipped_faces and named in a warning. "
         + "Arguments: mesh (the mesh to bake; required when the model has several, as render's is), folder (where the PNGs go, relative to carve's working folder like export's paths, or absolute; created when missing; default 'textures'), "
         + "size (the image's side in texels, a power of two from 64 to 4096; default 1024), curvature (below), padding (texels of the island's edge colour spread past it so filtering and mip maps never reach the empty background, 0 to size/2; default 8), "
-        + "maps (which maps to bake, at least one of 'masks', 'base_colour', 'curvature', 'occlusion' and 'orm'; default masks and base_colour), surface and occlusion (below). "
+        + "maps (which maps to bake, at least one of 'masks', 'base_colour', 'curvature', 'occlusion', 'orm' and 'normal'; default masks and base_colour), surface and occlusion (below) and bevel ({width}, for 'normal'). "
         + "The maps: 'masks' writes one single-channel grey PNG for each face group, <folder>/<mesh>.mask.<group>.png, and one for each material the mesh's faces use, <folder>/<mesh>.material.<name>.png (a group and a material with one name never collide): a texel is white (255) where its face is in the group or has the material and black (0) elsewhere, then padded; a group with no faces gives an all-black mask. "
         + "'base_colour' writes <folder>/<mesh>.base_colour.png, an RGB PNG of sRGB bytes, so define_material's base_colour_texture reads it as it is: each texel takes its face's colour, which is, in this order, the base_colour of the last surface entry that names a group the face is in or its material; else the face's own colour (set_colour); else its material's base_colour; else white (#FFFFFF). "
         + "'occlusion' writes <folder>/<mesh>.occlusion.png, a single-channel grey PNG of ambient occlusion, linear with no curve: each texel casts rays over the hemisphere about its face's normal against the meshes at rest (their own positions, never a pose; both sides of a face block), a ray meeting geometry at distance t under reach occludes by 1 - (t / reach)^2, so distant geometry only tints, and the texel is 1 - the mean (white 255 open, black 0 closed); the rays are a fixed set, so two bakes are byte-identical. "
         + "'orm' writes <folder>/<mesh>.orm.png, the RGB texture glTF reads for both occlusion_texture (R) and metallic_roughness_texture (G roughness, B metallic), linear: R is the occlusion above, G and B each face's roughness and metallic from surface, resolved as base_colour is (the last entry naming the face's group or material that gives it; else its material's; else roughness 1 and metallic 0). "
         + "occlusion is {rays: 1 to 1024, default 32; reach: metres, required for 'occlusion' and 'orm' and with no default, the distance within which geometry darkens a texel; occluders: the mesh names that occlude, every mesh of the model by default}. "
+        + "'normal' writes <folder>/<mesh>.normal.png, an RGB tangent-space normal map that rounds the mesh's hard edges over bevel.width metres, as a modelled bevel would, with no extra geometry: the shading breaks render draws hard (a smooth mesh's marked hard edges, every edge between faces that are not coplanar on a flat one). On a break edge the normal is the mean of the two faces' normals, easing by smoothstep to the shading normal at width from the edge, measured in 3D, so it runs on across a UV seam; elsewhere it is the shading normal itself, (128, 128, 255). It is glTF's normal map, green up, in the engine's own tangent frame (no tangents are exported), so give it to define_material as normal_texture and render shows the rounded edge as the game will. bevel is {width: metres, more than 0}, required with 'normal' (there is no default; a few texels' worth is typical, e.g. 0.0016 on a 0.3 m tool at 1024); given without 'normal' in maps it is ignored with a warning, as the curvature block is without 'curvature'. "
         + "surface is an object of entries, each keyed by a group or material name, applied in the order given, so a later entry wins a face that two of them name: put a group that holds every face first as a default and the specific groups after it. "
         + "An entry is {base_colour: '#RRGGBB', roughness: 0 to 1, metallic: 0 to 1}, each optional and validated; an entry with no base_colour gives no colour to base_colour. roughness and metallic are for maps that read them and make no warning when no map in this call does. A block no asked map reads (occlusion with neither 'occlusion' nor 'orm' in maps) is ignored with a warning. "
         + "'curvature' writes <folder>/<mesh>.curvature.png, a single-channel grey PNG for wear: 128 (0.5) on flat ground, lighter toward a convex edge and darker toward a concave one, over the width given in the curvature block {width} (metres, greater than 0, required when 'curvature' is a map). "
@@ -57,12 +59,12 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "path is relative to carve's working folder with '/' separators (absolute when folder is), the form define_material takes. replaced is true when a file of that name was there and was overwritten: bake always overwrites. "
         + "ms is the time the file took to bake and write, in milliseconds; work two files share (the masks, the occlusion the orm reads) is counted in the first of them. "
         + "coverage is the fraction of the image's texels the faces cover, before padding. min, max and mean are over those covered texels, from 0 to 1; for base_colour each is [r, g, b]. "
-        + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a curvature map with no curvature width, or a width that is not above 0; occlusion or orm with no occlusion.reach, a reach not over 0, rays outside 1 to 1024, an unknown or empty occluders (the error lists the meshes); a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
+        + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a curvature map with no curvature width, or a width that is not above 0; occlusion or orm with no occlusion.reach, a reach not over 0, rays outside 1 to 1024, an unknown or empty occluders (the error lists the meshes); 'normal' without bevel, or a bevel width that is not a number more than 0; a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
         + "a mesh, group or material name that a file name cannot hold. "
         + "Worked example, from bake to a material on the faces, on the wrench (open samples/wrench.carve): bake with the arguments below writes textures/wrench.base_colour.png, textures/wrench.orm.png and a mask for each group; then define_material {name: 'wrench', base_colour_texture: 'textures/wrench.base_colour.png', metallic_roughness_texture: 'textures/wrench.orm.png', occlusion_texture: 'textures/wrench.orm.png'} (one ORM file in both slots) and set_material {material: 'wrench', group: 'all'} (the wrench's group of every face) show the baked colours on the model:\n"
         + ExampleMarker + Example;
 
-    private static readonly string[] Known = ["mesh", "folder", "size", "padding", "maps", "surface", "curvature", "occlusion"];
+    private static readonly string[] Known = ["mesh", "folder", "size", "padding", "maps", "surface", "curvature", "occlusion", "bevel"];
 
     private static readonly string[] OcclusionKnown = ["rays", "reach", "occluders"];
 
@@ -79,7 +81,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             ["padding"] = new JsonObject { ["description"] = "Texels of colour spread past each island's edge, 0 to size/2. Default 8.", ["type"] = "integer", ["minimum"] = 0 },
             ["maps"] = new JsonObject
             {
-                ["description"] = "The maps to bake, at least one of: masks (one grey PNG per group and per material), base_colour (an RGB PNG), curvature (a grey PNG, needs the curvature block), occlusion (a grey PNG), orm (an RGB PNG: occlusion, roughness, metallic). Default masks and base_colour.",
+                ["description"] = "The maps to bake, at least one of: masks (one grey PNG per group and per material), base_colour (an RGB PNG), curvature (a grey PNG, needs the curvature block), occlusion (a grey PNG), orm (an RGB PNG: occlusion, roughness, metallic), normal (an RGB tangent-space normal map rounding the hard edges; needs bevel). Default masks and base_colour.",
                 ["type"] = "array",
                 ["items"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(Maps.Select(m => (JsonNode)m).ToArray()) },
                 ["minItems"] = 1,
@@ -119,6 +121,14 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
                     ["additionalProperties"] = false,
                 },
             },
+            ["bevel"] = new JsonObject
+            {
+                ["description"] = "For the normal map: {width}, how far from each hard edge the rounding reaches, in metres, more than 0. Required with 'normal'; no default.",
+                ["type"] = "object",
+                ["properties"] = new JsonObject { ["width"] = new JsonObject { ["type"] = "number", ["exclusiveMinimum"] = 0 } },
+                ["required"] = new JsonArray("width"),
+                ["additionalProperties"] = false,
+            },
         },
     });
 
@@ -133,7 +143,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? folder = null,
         JsonElement? size = null, JsonElement? padding = null, JsonElement? maps = null, JsonElement? surface = null, JsonElement? curvature = null,
-        JsonElement? occlusion = null)
+        JsonElement? occlusion = null, JsonElement? bevel = null)
     {
         var errors = UnknownArguments("bake", context, Known);
         var meshName = MeshName(mesh, errors);
@@ -149,6 +159,11 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         }
 
         var wanted = ReadMaps(maps, errors);
+        var warnings = new List<string>();
+        UnusedBlock("occlusion", occlusion, [OcclusionMap, OrmMap], wanted, warnings);
+        UnusedBlock("bevel", bevel, [NormalMap], wanted, warnings);
+        UnusedBlock("curvature", curvature, [CurvatureMap], wanted, warnings);
+        var bevelWidth = ReadBevel(bevel, wanted.Contains(NormalMap), errors);
 
         var model = store.Current.Model;
         var named = model.Target(meshName, out var meshProblem);
@@ -207,6 +222,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         if (wanted.Contains(OcclusionMap)) jobs.Add((OcclusionMap, null, $"{named.Name}.{OcclusionMap}.png", Occluded, false));
         if (wanted.Contains(OrmMap))
             jobs.Add((OrmMap, null, $"{named.Name}.{OrmMap}.png", () => { var (r, m) = Factors(model, mapped, entries); return Bake.Orm(layout, Occluded(), r, m); }, true));
+        if (wanted.Contains(NormalMap)) jobs.Add((NormalMap, null, $"{named.Name}.{NormalMap}.png", () => Bake.BevelNormal(layout, bevelWidth!.Value), true));
 
         var folderPath = folderText.Replace('\\', '/').TrimEnd('/');
         var targets = new List<ToolPath>();
@@ -242,8 +258,6 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             files.Add(entry);
         }
 
-        var warnings = new List<string>();
-        UnusedBlock("occlusion", occlusion, [OcclusionMap, OrmMap], wanted, warnings);
         if (layout.Unmapped.Count > 0)
             warnings.Add($"{named.Name}: {layout.Unmapped.Count} face(s) have no UVs and were skipped: {string.Join(", ", layout.Unmapped.Take(10))}{(layout.Unmapped.Count > 10 ? ", ..." : "")}");
         return Ok(new { files, skipped_faces = layout.Unmapped, warnings });
@@ -306,6 +320,33 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         return bad ? null : width;
     }
 
+    /// <summary>bevel's width when <c>normal</c> is asked for; null with the problem added when it is wrong, missing, or given without <c>normal</c>.</summary>
+    private static double? ReadBevel(JsonElement? bevel, bool normal, List<string> errors)
+    {
+        if (Absent(bevel))
+        {
+            if (normal) errors.Add("bevel: required with map 'normal': give {width: metres, more than 0}, how far from each hard edge the rounding reaches (no default)");
+            return null;
+        }
+        if (bevel!.Value.ValueKind != JsonValueKind.Object)
+        {
+            errors.Add($"bevel: expected {{width}}, got {Describe(bevel.Value)}");
+            return null;
+        }
+        double? width = null;
+        var given = false;
+        foreach (var field in bevel.Value.EnumerateObject())
+        {
+            if (field.Name != "width") { errors.Add($"bevel.{field.Name}: not a field of bevel; its one field is width"); continue; }
+            given = true;
+            if (field.Value.ValueKind != JsonValueKind.Number || !field.Value.TryGetDouble(out var w) || !double.IsFinite(w)) errors.Add($"bevel.width: expected a number of metres, got {Describe(field.Value)}");
+            else if (!(w > 0)) errors.Add($"bevel.width: must be more than 0 metres, not {w.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            else width = w;
+        }
+        if (!given) errors.Add("bevel.width: required: how far from each hard edge the rounding reaches, in metres, more than 0");
+        return normal ? width : null;
+    }
+
     private static List<SurfaceEntry> ReadSurface(JsonElement? surface, List<string> errors)
     {
         var entries = new List<SurfaceEntry>();
@@ -358,11 +399,14 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
     /// The <c>occlusion</c> block, validated whether or not a map reads it; null when it is absent or wrong. <c>reach</c> is
     /// required when <c>occlusion</c> or <c>orm</c> is asked for.
     /// </summary>
-    /// <summary>A block given when no map in this call reads it: the call bakes what was asked, and a warning says the block was ignored.</summary>
+    /// <summary>
+    /// A block given when no map in this call reads it: the call bakes what was asked, and a warning says the block was ignored.
+    /// The block is still read, so a wrong one is still an error. For bevel and curvature this is the person's ruling (2026-11-20).
+    /// </summary>
     private static void UnusedBlock(string block, JsonElement? value, string[] readers, List<string> wanted, List<string> warnings)
     {
         if (Absent(value) || readers.Any(wanted.Contains)) return;
-        var named = readers.Length == 1 ? $"'{readers[0]}' is" : "neither " + string.Join(" nor ", readers.Select(r => $"'{r}'")) + " is";
+        var named = readers.Length == 1 ? $"'{readers[0]}' is not" : "neither " + string.Join(" nor ", readers.Select(r => $"'{r}'")) + " is";
         warnings.Add($"{block}: ignored, {named} in maps");
     }
 

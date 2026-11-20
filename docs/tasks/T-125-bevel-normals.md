@@ -4,7 +4,7 @@ description: >-
 ---
 # T-125 — Bevel normals
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-123
 
-**Verify:** core-unit, server-unit, server-regression
+**Verify:** core-unit, server-unit, server-regression, scenario-bakes
 
 ## Goal
 
@@ -81,3 +81,40 @@ Render shows a rounded edge the way the game will, because the map is written in
 - The person looks at the close frames before this lands (a Waystone review). Treat "Commented" as unanswered.
 - **Verify line:** `server-regression` is named because the reconciliation test renders. Once scenario-bakes is in
   `tests.json`, add it to this file's `**Verify:**` line.
+
+### As built
+
+Agents 1 to 3 Claude Opus 5.5 (Core `BevelNormal`, `bake`'s `normal` map and `bevel` block, `BevelRenderTests`, `BevelStage`,
+the probes); agent 4 Claude Opus 5.5 (the rebase onto T-124, the strip ruling landed, the runs, the review, finish).
+
+- **Core:** `src/Carve.Core/Baking/BevelNormal.cs` as the Scope says, on T-120's `NearEdges`, `ToTangentSpace` and `Pad`,
+  neither changed. Unit tests in `BevelNormalTests`; the seam check is the Core `unit` test `WrenchBevelSeamTests`.
+- **`bake`:** map `normal` (`<mesh>.normal.png`, colour, glTF green up), block `bevel: {width}` required with `normal`, no
+  default. A block given without a map that reads it warns and is ignored (still validated): one `UnusedBlock` helper for
+  `occlusion` (T-124), `bevel` and `curvature`; its single-reader wording now reads "'normal' is not in maps". The
+  description's worked example stays T-124's at size 512.
+- **Stage:** `BevelStage.cs`, the strip check on the steel grip's edge (72, 74), faces 42 and 46, predicted with `#80858A`.
+
+**The person's rulings (2026-11-20):** `TopGain` 4.7 and `SideLoss` 1.6 in `BevelRenderTests`, with "toward +X" dropped; the
+seam check as a Core test with `SeamAngle` 9 degrees (probed largest 8.33, the thin-width break's least 32.4); the stage's strip
+check on the steel grip, not the dark jaw; `bevel-thin` dropped from the stage (the Core seam test's thin break covers it);
+unused blocks warn; and **every strip in every grip view reads within 2 luma (`PredictedSlack`) of the colour rule's predicted
+shade for the mean normal, the "between the two faces" reading dropped**.
+
+**Numbers after the rebase** (queued job `J-20261120-033403-db21c3` good, local run `bakes/9` bevel-g; same as the pre-rebase
+probe), strip less predicted mean-normal shade 126.96, luma:
+
+| view | good | bevel-g |
+|---|---|---|
+| grip-1 | -0.77, +0.07 | -11.89, -8.14 |
+| grip-2 | +0.18, +0.25 | -8.21, -10.14 |
+| grip-3 | -1.00, +1.00 | -12.14, -5.21 |
+
+Good at most 1.00 off; bevel-g at least 5.21 off. **Breaks:** bevel-g fails 6 of 6 strip checks; `BevelRenderTests` fails G
+inverted and R inverted; the seam test's thin width fails (least 32.4 degrees).
+
+**`render_glb` against `render` with the map** (D-6's rule): before T-124's mipmap fix front 47 px (patch 13), three-quarter
+15 px (patch 5); after it front 0 px (patch 0), three-quarter 1 px (patch 1). The map introduces no difference.
+
+**Review:** round 1 (`G:\My Drive\artifacts\carve\M-24\T-125\round-1`, 19 frames: the `uvs` normal look, grip close frames with
+and without the map, six sides, the box render test's four frames, the two compare triptychs): **approved**, no notes.

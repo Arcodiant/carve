@@ -16,5 +16,6 @@ internal static class BakesStages
         new SurfaceStage(),
         new CurvatureStage(),
         new OcclusionStage(),
+        new BevelStage(),
     ];
 }

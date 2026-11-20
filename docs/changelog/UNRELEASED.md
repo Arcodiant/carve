@@ -6,3 +6,4 @@
 - T-123: Suite scenario-bakes opens the wrench, bakes its masks and base colour, and sees them in the UV layout look and on the textured wrench from every side and up close
 - T-126: bake writes a curvature map for wear, grey where flat, lighter toward convex edges and darker toward concave ones over a given width
 - T-124: bake writes ray-cast ambient occlusion against the whole model with a ray count and reach, and an ORM PNG with occlusion, roughness and metallic for glTF
+- T-125: bake writes a tangent-space normal map, glTF green up in the engine's own frame, that rounds every shading-break edge over a given width
