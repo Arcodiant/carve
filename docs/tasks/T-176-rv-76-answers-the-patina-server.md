@@ -28,7 +28,7 @@ The patina server's RV-76 findings on save, the swatch sheet, export and overrid
 
 ## Notes
 
-- **Decided (2026-11-20, by the person):** the label atlas grows to fit the outputs, rather than the sheet refusing more than 15; every sheet of 15 outputs or fewer stays byte-identical.
+- **Decided (2026-11-21, by the person):** the label atlas grows to fit the outputs, rather than the sheet refusing more than 15; every sheet of 15 outputs or fewer stays byte-identical.
 - The save fix covers `pop_snapshot`'s move too, with a test that saves into a different folder.
 - Owns `FileTools.cs`, `GraphStore.cs`, `SwatchImages.cs`, `SwatchRendering.cs`, `ParameterOverrides.cs`, and export's metallic refusal in `ExportTool.cs` (T-173 adds a GC there; keep both sides). Every description stays at 3,686 characters or under.
 - **Answering RV-76:** for each finding listed, fix it, or answer it `skipped: <reason>` or `no change needed: <reason>`, by filling its `**Outcome:**` line in `docs/reviews/RV-76-review-of-m-28.md`, in this task's worktree. Leave the other findings' lines as they are. A fix that would change behaviour beyond the finding, loosen a check, or change a committed output or an approved frame goes to the person first.

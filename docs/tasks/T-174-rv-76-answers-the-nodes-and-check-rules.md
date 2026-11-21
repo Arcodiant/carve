@@ -28,7 +28,7 @@ Every finding of RV-76's `## Findings: the nodes, check rules and samples`, and 
 
 ## Notes
 
-- **Decided (2026-11-20, by the person):**
+- **Decided (2026-11-21, by the person):**
   - a graph's metallic is exempt from `one-value`, as a PNG's already is (an all-metal or all-non-metal material is legitimate; `metallic-not-binary` still judges its values);
   - in `check`'s `files`, a roughness PNG's blue channel is read as metallic only when the file is given as the packed glTF image, role `metallic_roughness`; role `roughness` means roughness only. Patina's own `roughness.png` exports are named for the packed role in check's description. This replaces T-141's ruling that blue is always metallic;
   - metallic in PNGs is not exempt from `does-not-tile` (the exemption was only ever from `one-value`).
