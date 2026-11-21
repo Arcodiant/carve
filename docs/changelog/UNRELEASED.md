@@ -14,3 +14,4 @@
 - T-141: patina's check lists texture faults in the open graph's outputs or in PNG files: seams, base colour out of range, metallic not near 0 or 1, normals not of unit length, and an output of one value
 - T-155: A wide neighbourhood node runs as a cached row pass and a column pass, so blur and distance at 8192 meet 10 s within the memory cap, and a free rotation stops recomputing its source
 - T-142: scenario-patina's library stage opens, swatches, checks and exports every sample material and variant, with every pixel worked from its texels, and commits each sample's swatch sheet
+- T-143: Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
