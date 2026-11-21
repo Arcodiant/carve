@@ -4,7 +4,7 @@ description: >-
 ---
 # T-171 — edit_graph takes list parameters
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
