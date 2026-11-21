@@ -95,7 +95,7 @@ public class TransformDistanceTests
                 double fx = centres ? qx - 0.5 : qx, fy = centres ? qy - 0.5 : qy;
                 int ix = (int)Math.Floor(fx), iy = (int)Math.Floor(fy);
                 float tx = (float)(fx - ix), ty = (float)(fy - iy);
-                result[y * N + x] = TransformNode.Bilinear(Read(ix, iy), Read(ix + 1, iy), Read(ix, iy + 1), Read(ix + 1, iy + 1), tx, ty);
+                result[y * N + x] = TileRead.Bilinear(Read(ix, iy), Read(ix + 1, iy), Read(ix, iy + 1), Read(ix + 1, iy + 1), tx, ty);
             }
         return result;
     }

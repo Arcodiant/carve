@@ -97,13 +97,6 @@ public sealed class WarpNode : NodeType
         return colour ? ((r - 0.5f) * k, (g - 0.5f) * k) : ((r - 0.5f) * k * cos, (r - 0.5f) * k * sin);
     }
 
-    public static float Bilinear(float a, float b, float c, float d, float fx, float fy)
-    {
-        var top = a + (b - a) * fx;
-        var bottom = c + (d - c) * fx;
-        return top + (bottom - top) * fy;
-    }
-
     public override void Evaluate(NodeEvaluation e)
     {
         var amount = e.Parameters.Float("amount");
@@ -122,17 +115,7 @@ public sealed class WarpNode : NodeType
             {
                 var j = (x - e.Rect.X) * step;
                 var (ix, iy, tx, ty) = Source(x, y, offsets[j], byColour ? offsets[j + 1] : offsets[j], byColour, amount, cos, sin, e.Size);
-                var (r0, g0, b0) = input.Colour(ix, iy);
-                var (r1, g1, b1) = input.Colour(ix + 1, iy);
-                var (r2, g2, b2) = input.Colour(ix, iy + 1);
-                var (r3, g3, b3) = input.Colour(ix + 1, iy + 1);
-                var i = (x - e.Rect.X) * channels;
-                row[i] = Bilinear(r0, r1, r2, r3, tx, ty);
-                if (channels == 3)
-                {
-                    row[i + 1] = Bilinear(g0, g1, g2, g3, tx, ty);
-                    row[i + 2] = Bilinear(b0, b1, b2, b3, tx, ty);
-                }
+                input.Bilinear(ix, iy, tx, ty, row.Slice((x - e.Rect.X) * channels, channels));
             }
         }
     }

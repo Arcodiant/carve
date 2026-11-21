@@ -98,13 +98,6 @@ public sealed class TransformNode : NodeType
         return TexelRect.Bounding((float)minX, (float)minY, (float)maxX, (float)maxY, margin: 2);
     }
 
-    public static float Bilinear(float a, float b, float c, float d, float fx, float fy)
-    {
-        var top = a + (b - a) * fx;
-        var bottom = c + (d - c) * fx;
-        return top + (bottom - top) * fy;
-    }
-
     public override void Evaluate(NodeEvaluation e)
     {
         var m = Mapping.Of(e.Parameters, e.Size);
@@ -131,18 +124,7 @@ public sealed class TransformNode : NodeType
                 double fx = sx - 0.5, fy = sy - 0.5;
                 int ix = (int)Math.Floor(fx), iy = (int)Math.Floor(fy);
                 float tx = (float)(fx - ix), ty = (float)(fy - iy);
-                if (grey)
-                {
-                    row[i] = Bilinear(input.Grey(ix, iy), input.Grey(ix + 1, iy), input.Grey(ix, iy + 1), input.Grey(ix + 1, iy + 1), tx, ty);
-                    continue;
-                }
-                var (r0, g0, b0) = input.Colour(ix, iy);
-                var (r1, g1, b1) = input.Colour(ix + 1, iy);
-                var (r2, g2, b2) = input.Colour(ix, iy + 1);
-                var (r3, g3, b3) = input.Colour(ix + 1, iy + 1);
-                row[i] = Bilinear(r0, r1, r2, r3, tx, ty);
-                row[i + 1] = Bilinear(g0, g1, g2, g3, tx, ty);
-                row[i + 2] = Bilinear(b0, b1, b2, b3, tx, ty);
+                input.Bilinear(ix, iy, tx, ty, row.Slice(i, channels));
             }
         }
     }
