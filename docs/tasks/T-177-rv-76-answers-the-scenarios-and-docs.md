@@ -44,7 +44,8 @@ Run on Opus 5.5 (claude-opus-5-5), in one agent.
   - The tiling-3 sheet's sphere cell is judged against the sphere at tiling 3, with the break `sheet-tiling-ignored`.
   - The nested stage's old-wall and grime sheets are judged cell by cell against their exports (`LibraryStage.CheckGraphSheet`).
   - Their sphere cells are judged against two new frames, `nested-old-wall-sphere` and `nested-grime-sphere`, whose silhouettes are judged too.
-  - The tiling-3 frame's change since T-140 is T-157's ", tiling 3" label: 1,600 px, all inside the label band.
+  - The tiling-3 frame's change since T-140's job J-20261120-085227-39ade3 is T-157's ", tiling 3" label (9b207c2).
+    The 1,600 px that differ lie at x 536 to 615, y 27 to 46, all inside the sphere cell's label band.
 - **CLAUDE.md's Patina scenario row and the `src/Patina.Server` row:** fixed.
 - **CLAUDE.md's Patina.SampleGraphs row:** fixed.
 - **CLAUDE.md's edit_graph clause:** fixed.
@@ -58,4 +59,8 @@ Run on Opus 5.5 (claude-opus-5-5), in one agent.
   - All 68 shared files are equal, except `swatch-tiling-checks.tsv`, which gains the new break's lines.
   - New in the run: `frames/nested-old-wall-sphere.png`, `frames/nested-grime-sphere.png` and `export-grime/`.
   - Looked at: the two new spheres, scaled down. They show bricks with grime, and grey streaks.
-- **Not done:** the library suites were not run locally; `verify` runs them. The person has not reviewed the two new frames.
+- **RV-76's outcomes** are `fixed` for seven findings, as `cairn lint` takes them, and `no change needed` for the threshold.
+- **Not checked:**
+  - The library suites' frames were not compared by hash. No milestone job holding them is fetchable, as T-172 found.
+    This member changes no capture in the library stage; it only adds `CheckGraphSheet` beside it.
+  - The person has not reviewed the two new sphere frames.
