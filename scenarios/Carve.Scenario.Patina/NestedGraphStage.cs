@@ -15,7 +15,7 @@ internal sealed class NestedGraphStage : IPatinaStage
 
     public async Task RunAsync(ScenarioDriver driver, PatinaChecks checks)
     {
-        var samples = Path.Combine(FindRoot(), "samples", "graphs");
+        var samples = Path.Combine(SwatchStage.RepoRoot(), "samples", "graphs");
         var opened = await checks.CallAsync("open", JsonSerializer.Serialize(new { path = Path.Combine(samples, "old-wall.texgraph") }));
         checks.Check(opened.Contains($"read 2 nested files for its graph nodes: {Path.Combine(samples, "grime.texgraph")}, {Path.Combine(samples, "bricks.texgraph")}", StringComparison.Ordinal),
             "nested: open did not name the nested files it read: " + opened);
@@ -37,12 +37,5 @@ internal sealed class NestedGraphStage : IPatinaStage
 
         await checks.CallAsync("open", JsonSerializer.Serialize(new { path = Path.Combine(samples, "grime.texgraph") }));
         await driver.CaptureToolAsync("swatch", "nested-grime-sheet", new { view = "sheet" });
-    }
-
-    private static string FindRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Carve.slnx"))) directory = directory.Parent;
-        return directory?.FullName ?? throw new InvalidOperationException("Carve.slnx was not found above " + AppContext.BaseDirectory);
     }
 }

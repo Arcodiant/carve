@@ -24,17 +24,6 @@ internal static class LibrarySphere
     /// <summary>A sphere with metallic texels must correlate at least this much (painted-metal measured 0.661 with metallic in the prediction and 0.571 without; set between).</summary>
     public const double MetalMin = 0.62;
 
-    private static readonly Dictionary<float, SwatchSphere.Hit?[,]> Hits = [];
-
-    private static SwatchSphere.Hit?[,] HitsAt(float angle)
-    {
-        if (Hits.TryGetValue(angle, out var hits)) return hits;
-        var sphere = new SwatchSphere(angle);
-        hits = new SwatchSphere.Hit?[N + 1, N + 1];
-        for (var y = 0; y <= N; y++) for (var x = 0; x <= N; x++) hits[x, y] = sphere.Trace(x + 0.5f, y + 0.5f);
-        return Hits[angle] = hits;
-    }
-
     /// <summary>Per pixel the predicted tone, NaN where the pixel is not judged.</summary>
     public static double[] Tones(byte[] baseColour, byte[]? roughnessFile, float angle, int tiling, double metalDrop)
     {
@@ -46,7 +35,7 @@ internal static class LibrarySphere
         }
         static float Wrapped(float d) => MathF.Abs(d - MathF.Round(d));
         static int Wrap(int v) => ((v % Size) + Size) % Size;
-        var hits = HitsAt(angle);
+        var hits = SwatchSphere.HitsAt(angle);
         var result = new double[N * N];
         for (var y = 0; y < N; y++)
         {
@@ -93,7 +82,7 @@ internal static class LibrarySphere
     public static (int Outside, int SlateInside, int Inside) Silhouette(ScenarioFrame frame, float angle)
     {
         var sphere = new SwatchSphere(angle);
-        var hits = HitsAt(angle);
+        var hits = SwatchSphere.HitsAt(angle);
         const float m = SwatchStage.SilhouetteMargin;
         int outside = 0, slateInside = 0, inside = 0;
         for (var y = 0; y < N; y++)

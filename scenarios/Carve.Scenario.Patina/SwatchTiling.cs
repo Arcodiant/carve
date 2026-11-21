@@ -32,21 +32,10 @@ internal static class SwatchTiling
           "out":{"type":"output","inputs":{"in":"both"},"params":{"role":"base_colour"}}}}}
         """;
 
-    private static readonly Dictionary<float, SwatchSphere.Hit?[,]> Hits = [];
-
-    private static SwatchSphere.Hit?[,] HitsAt(float angle)
-    {
-        if (Hits.TryGetValue(angle, out var hits)) return hits;
-        var sphere = new SwatchSphere(angle);
-        hits = new SwatchSphere.Hit?[N + 1, N + 1];
-        for (var y = 0; y <= N; y++) for (var x = 0; x <= N; x++) hits[x, y] = sphere.Trace(x + 0.5f, y + 0.5f);
-        return Hits[angle] = hits;
-    }
-
     /// <summary>Per pixel: +1 predicted white, -1 predicted black, 0 not judged, from the 64 px red channel at tiling (tu, tv).</summary>
     public static sbyte[] Predict(byte[] texels, float angle, int tu, int tv, SwatchSphere.Hit?[,]? given = null, float facing = Facing)
     {
-        var hits = given ?? HitsAt(angle);
+        var hits = given ?? SwatchSphere.HitsAt(angle);
         bool White(int x, int y) => texels[((((y % Size) + Size) % Size) * Size + (((x % Size) + Size) % Size)) * 4] >= 128;
         static float Wrapped(float d) => MathF.Abs(d - MathF.Round(d));
         var judged = new sbyte[N * N];
