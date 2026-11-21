@@ -27,6 +27,7 @@ public partial class Program
     public static McpServerTool[] Tools(NodeRegistry registry) =>
     [
         DefineGraphTool.Create(registry),
+        NodeTool.Create(registry),
         EditGraphTool.Create(),
         GetGraphTool.Create(),
         SaveTool.Create(),
