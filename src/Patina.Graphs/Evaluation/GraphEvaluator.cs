@@ -24,8 +24,9 @@ namespace Patina.Graphs.Evaluation;
 /// quarters of the cap.</para>
 /// <para><b>Memory bound.</b> Tiles are kept between output tiles in a cache of at most <see cref="DefaultCacheBytes"/>
 /// (64 MiB) unless a caller names another cap, dropped least recently used first, never while pinned; so held bytes
-/// stay at most the cap or the most ever pinned at once, whichever is more (one tile a node in a pointwise chain; a
-/// few for a node reading around or away from its texels; a strong minify's whole input), plus the caller's own
+/// of tiles stay at most the cap or the most ever pinned at once, whichever is more (one tile a node in a pointwise
+/// chain; a few for a node reading around or away from its texels; a strong minify's whole input, of the ports read),
+/// plus arrays kept for reuse (<see cref="LastHeldBytes"/>, RV-76), plus the caller's own
 /// result (<see cref="OutputImage"/> keeps the RGBA8 image, 256 MB at 8192, which the PNG encoder needs whole). The
 /// cache is dropped at the end of the call. <see cref="LastRun"/> reports what one output held.</para>
 /// <para><b>Determinism.</b> A tile's texels are worked from their image coordinates, from inputs holding exactly the
@@ -74,6 +75,14 @@ public sealed class GraphEvaluator
 
     /// <summary>What the last <see cref="Evaluate"/> held: its tile size, the most tiles and bytes held at once, the cap, and how many node tiles it made.</summary>
     public EvaluationRun? LastRun { get; private set; }
+
+    /// <summary>
+    /// The most bytes the last <see cref="Evaluate"/> kept reachable at once (RV-76): the tiles of
+    /// <see cref="EvaluationRun.PeakBytes"/>, with the dropped arrays waiting to be taken again (at most the larger of
+    /// 4 MiB and a sixteenth of the bound) and the scratch of the node being made and of the last tile
+    /// (<see cref="NodeEvaluation.Scratch"/>).
+    /// </summary>
+    public long LastHeldBytes { get; private set; }
 
     // Dependent: the port's rectangles come from InputRects once the inputs it depends on are made (T-153).
     private sealed record Source(string Port, int Node, int OutPort, string[] DependsOn)
@@ -130,6 +139,13 @@ public sealed class GraphEvaluator
         }).ToArray();
         var (inNode, inPort) = _analysis.Nodes[outputId].Sources["in"];
         int outNode = index[inNode], outPort = PortIndex(inNode, inPort);
+        // The ports some step (or the output) reads (RV-76): only these are kept in the cache, so a read of one port of
+        // a node of several, such as tiles.mask, pins that port and not the node's others.
+        var read = steps.Select(s => new bool[s.Ports.Length]).ToArray();
+        foreach (var s in steps)
+            foreach (var source in s.Sources) read[source.Node][source.OutPort] = true;
+        read[outNode][outPort] = true;
+        bool[] rowPorts = [true];
 
         var cache = new TileCache(n, cap);
         var evaluated = 0;
@@ -177,14 +193,27 @@ public sealed class GraphEvaluator
         }
 
         // Fills and caches a tile, then unpins its inputs: cold while a row pass is being made (TileCache).
-        TileCache.Entry Finish(long key, Step step, TexelRect rect, Action<Dictionary<string, Tile>> fill, List<TileCache.Entry> pins)
+        // Every port is filled, but only the ports read (`keep`) are cached; the others' arrays, and the node's scratch
+        // (NodeEvaluation.Scratch), are released once it is made (RV-76).
+        TileCache.Entry Finish(long key, Step step, bool[] keep, TexelRect rect, Action<Dictionary<string, Tile>, Func<int, float[]>> fill, List<TileCache.Entry> pins)
         {
             var lengths = step.Kinds.Select(k => (long)rect.Width * rect.Height * PortKinds.Channels(k)).ToArray();
-            cache.MakeRoom(lengths.Sum() * sizeof(float));
+            var arrays = cache.Allocate(lengths);
             var outputs = new Tile[step.Ports.Length];
             var named = new Dictionary<string, Tile>(StringComparer.Ordinal);
-            for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect, cache.Take(lengths[p]));
-            fill(named);
+            for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect, arrays[p]);
+            var scratch = new List<float[]>();
+            fill(named, length =>
+            {
+                var data = cache.TakeScratch(length);
+                scratch.Add(data);
+                return data;
+            });
+            cache.ReleaseScratch(scratch);
+            var unread = new List<float[]>();
+            for (var p = 0; p < outputs.Length; p++)
+                if (!keep[p]) { unread.Add(arrays[p]); outputs[p] = null!; }
+            cache.Release(unread);
             var entry = cache.AddPinned(key, outputs);
             foreach (var pin in pins) cache.Unpin(pin, cold);
             cache.Trim();
@@ -208,8 +237,8 @@ public sealed class GraphEvaluator
                 {
                     WarmRows(i, x, rect.Inflate(0, separable.ColumnReach));
                     inputs[NodeType.RowsPort] = Gather(steps.Length + i, 0, step.Kinds[0], [rect.Inflate(0, separable.ColumnReach)], pins);
-                    return Finish(cache.Key(i, x, y), step, rect,
-                        named => step.Type.EvaluateColumns(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+                    return Finish(cache.Key(i, x, y), step, read[i], rect,
+                        (named, scratch) => step.Type.EvaluateColumns(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named, scratch)), pins);
                 }
                 finally { cold = was; }
             }
@@ -225,16 +254,18 @@ public sealed class GraphEvaluator
                     throw new InvalidOperationException($"node type {step.Type.Name} asked for no rectangle of its input {source.Port}");
                 inputs[source.Port] = GatherSource(source, wanted, pins);
             }
-            return Finish(cache.Key(i, x, y), step, rect,
-                named => step.Type.Evaluate(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+            return Finish(cache.Key(i, x, y), step, read[i], rect,
+                (named, scratch) => step.Type.Evaluate(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named, scratch)), pins);
         }
 
         // Before a column tile reads its row tiles, each row of them not held is made across the rest of the band
         // (from x to the band's right edge), left to right, and unpinned: a row tile's source row is then read once
         // for the band, not once for each output tile beside it. Without it a band's first row makes its row tiles a
         // column at a time, each column reading a tall square of source tiles, which flushes the row tiles beside it,
-        // and LRU never recovers (T-155: blur at 8192 made 21 row tiles for every output tile). A column tile outside
-        // the band (a deeper step read away from its output tile) makes only its own.
+        // and LRU never recovers (T-155: blur at 8192 made 21 row tiles for every output tile). A column tile in a column
+        // outside the band's makes only its own. The test is the column's number alone (RV-76), so a deeper step's
+        // column tile (under a transform, or read across a row pass) whose column falls inside the band warms row tiles
+        // to the band's right edge it may not read, which costs time but never a byte.
         void WarmRows(int i, int x, TexelRect column)
         {
             var cover = TileRead.Cover(TileRead.Clamp(column, size), size, t);
@@ -262,13 +293,13 @@ public sealed class GraphEvaluator
             {
                 foreach (var source in step.Sources)
                     inputs[source.Port] = GatherSource(source, [rect.Inflate(passes[i]!.RowReach, 0)], pins);
-                return Finish(cache.Key(steps.Length + i, x, y), step, rect,
-                    named => step.Type.EvaluateRows(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named)), pins);
+                return Finish(cache.Key(steps.Length + i, x, y), step, rowPorts, rect,
+                    (named, scratch) => step.Type.EvaluateRows(new NodeEvaluation(step.Id, size, Graph.Seed, step.Parameters, rect, inputs, named, scratch)), pins);
             }
             finally { cold = was; }
         }
 
-        var band = BandTiles(steps, passes, n, t, cap);
+        var band = BandTiles(steps, passes, read, n, t, cap);
         foreach (var (tx, ty) in Order(n, band))
         {
             if (tx >= bandEnd || tx < bandStart) (bandStart, bandEnd) = (tx, Math.Min(n, tx + band));
@@ -278,6 +309,7 @@ public sealed class GraphEvaluator
             cache.Trim();
         }
         LastRun = new EvaluationRun(t, cache.MostTiles, cache.PeakBytes, cap, evaluated);
+        LastHeldBytes = cache.PeakHeldBytes;
     }
 
     /// <summary>The widest band of tile columns walked: 32, or narrower when a separable node's row tiles for one column must all stay held.</summary>
@@ -300,20 +332,22 @@ public sealed class GraphEvaluator
 
     // So many tile columns that every separable node's row tiles for the band (a column of them as tall as its column
     // pass reaches, times the band) fit in three quarters of the cap less what one row tile pins while it is made (the
-    // whole entries of its inputs across the row's reach: a node of several ports, such as tiles, pins them all). The
+    // entries of its inputs across the row's reach, each holding the ports the evaluation reads, RV-76). The
     // quarter left is room for the churn of the tiles a row tile reads; LRU fails all at once when a cycle of reads only
     // just passes what it holds.
-    private static int BandTiles(Step[] steps, SeparablePasses?[] passes, int n, int t, long cap)
+    // The quotient is clamped in long before the cast (RV-76: a cap of long.MaxValue truncated it to -2, and Order
+    // looped for ever).
+    private static int BandTiles(Step[] steps, SeparablePasses?[] passes, bool[][] read, int n, int t, long cap)
     {
-        long EntryBytes(Step step) => step.Kinds.Sum(k => (long)t * t * PortKinds.Channels(k) * sizeof(float));
+        long EntryBytes(int node) => steps[node].Kinds.Where((_, p) => read[node][p]).Sum(k => (long)t * t * PortKinds.Channels(k) * sizeof(float));
         int Spanned(int reach) => Math.Min(n, (t + 2 * reach + t - 1) / t + 1);
         var band = Math.Min(n, MostBandTiles);
         for (var i = 0; i < steps.Length; i++)
         {
             if (passes[i] is not { } p) continue;
             var column = Spanned(p.ColumnReach) * (long)t * t * PortKinds.Channels(steps[i].Kinds[0]) * sizeof(float);
-            var reading = Spanned(p.RowReach) * steps[i].Sources.Sum(s => EntryBytes(steps[s.Node]));
-            band = Math.Min(band, (int)Math.Max(1, (cap / 4 * 3 - reading) / column));
+            var reading = Spanned(p.RowReach) * steps[i].Sources.Sum(s => EntryBytes(s.Node));
+            band = (int)Math.Min(band, Math.Max(1, (cap / 4 * 3 - reading) / column));
         }
         return band;
     }
@@ -335,14 +369,15 @@ public sealed class GraphEvaluator
 
 /// <summary>
 /// What one output's evaluation held: the tile size; the most tiles (one port of one node at one position each) and
-/// the most bytes held at once; the cache's cap; and how many node tiles were made (a node's ports at one position
+/// the most bytes of tiles held at once (RV-76: with the dropped arrays waiting and nodes' scratch, the most is
+/// <see cref="GraphEvaluator.LastHeldBytes"/>); the cache's cap; and how many node tiles were made (a node's ports at one position
 /// count once; a separable node's row pass tile counts as one too; a tile dropped and asked for again counts again).
 /// </summary>
 public sealed record EvaluationRun(int TileSize, int MostTiles, long PeakBytes, long CapBytes, int TilesEvaluated);
 
 /// <summary>What a node's <see cref="NodeType.Evaluate"/> is given: where it is, its parameters, its input reads and the output tiles it fills.</summary>
 public sealed class NodeEvaluation(string nodeId, int size, uint seed, NodeParameters parameters, TexelRect rect,
-    IReadOnlyDictionary<string, TileRead> inputs, IReadOnlyDictionary<string, Tile> outputs)
+    IReadOnlyDictionary<string, TileRead> inputs, IReadOnlyDictionary<string, Tile> outputs, Func<int, float[]>? scratch = null)
 {
     public string NodeId { get; } = nodeId;
 
@@ -362,6 +397,13 @@ public sealed class NodeEvaluation(string nodeId, int size, uint seed, NodeParam
 
     /// <summary>The tile to fill for an output port; every texel of it must be written.</summary>
     public Tile Output(string port = "out") => outputs[port];
+
+    /// <summary>
+    /// A zeroed array of exactly <paramref name="length"/> floats to work in while the tile is filled (RV-76): the
+    /// evaluator's, counted in <see cref="GraphEvaluator.LastHeldBytes"/> and taken again by later tiles, so a node working in large buffers
+    /// (blur, distance) makes no garbage a tile. Use it only until the fill returns, and do not keep it.
+    /// </summary>
+    public float[] Scratch(int length) => scratch?.Invoke(length) ?? new float[length];
 }
 
 /// <summary>

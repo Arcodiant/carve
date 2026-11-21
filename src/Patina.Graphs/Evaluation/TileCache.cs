@@ -3,11 +3,17 @@ using Patina.Graphs.Imaging;
 namespace Patina.Graphs.Evaluation;
 
 /// <summary>
-/// The tiles one <see cref="GraphEvaluator.Evaluate"/> holds, keyed by node and tile position, every output port of a
-/// node at one position held together. Tiles the current step needs are pinned and never dropped; past
-/// <see cref="Bound"/> bytes (the cap, or the most ever pinned at once if that is more, T-155) the unpinned ones are
-/// dropped least recently used first, so what is held stays at most the cap or the most one step pinned, whichever is
-/// more. No clock: "recent" is the order tiles were last unpinned.
+/// The tiles one <see cref="GraphEvaluator.Evaluate"/> holds, keyed by node and tile position, the ports of a node at
+/// one position that the evaluation reads held together (RV-76: a node's other ports are filled into arrays released
+/// once it is made, so a strong minify of one port of <c>tiles</c> pins that port alone). Tiles the current step needs
+/// are pinned and never dropped; past <see cref="Bound"/> bytes (the cap, or the most ever pinned at once if that is
+/// more, T-155) the unpinned ones are dropped least recently used first, so the tiles held stay at most the cap or the
+/// most one step pinned, whichever is more. No clock: "recent" is the order tiles were last unpinned.
+/// <para><b>Past the tiles</b> (RV-76) the cache keeps two more kinds of array reachable, outside the bound:
+/// dropped arrays waiting to be taken again, at most <see cref="FreeLimit"/> bytes, and the scratch of the node being
+/// made (<see cref="TakeScratch"/>) with the last tile's, kept for the next. <see cref="PeakBytes"/> counts the tiles alone; <see cref="PeakHeldBytes"/>
+/// counts all three. Putting the waiting arrays and scratch under the bound was tried (T-173) and took their room from
+/// the tiles: a blur at 1024 in tiles of 64 under 4 MiB made 12,640 tiles against 1,840.</para>
 /// <para><b>Cold tiles</b> (T-155). A tile last unpinned by a separable node's row pass is cold: the row pass reads its
 /// inputs along one tile row, so once that row is made they are not read again, while its own row tiles are read by
 /// every column tile below them. Cold tiles are dropped before any other, least recently used first; pinned again by
@@ -19,8 +25,11 @@ internal sealed class TileCache(int tilesAcross, long cap)
     internal sealed class Entry(long key, Tile[] tiles)
     {
         public long Key { get; } = key;
+
+        /// <summary>The tile of each port, null for a port the evaluation does not read.</summary>
         public Tile[] Tiles { get; } = tiles;
-        public long Bytes { get; } = tiles.Sum(t => t.Bytes);
+        public long Bytes { get; } = tiles.Sum(t => t?.Bytes ?? 0);
+        public int Count { get; } = tiles.Count(t => t is not null);
         public int Pins;
         public LinkedListNode<Entry>? Unpinned;
     }
@@ -29,13 +38,19 @@ internal sealed class TileCache(int tilesAcross, long cap)
     private readonly LinkedList<Entry> _unpinned = new();
     private readonly LinkedList<Entry> _cold = new();
     private readonly Dictionary<long, Stack<float[]>> _free = [];
-    private long _freeBytes;
+    private long _freeBytes, _scratchBytes, _keptScratchBytes;
+    private List<float[]> _keptScratch = []; // the last tile's scratch, outside FreeLimit: the next tile asks for the same
 
     public long Cap { get; } = cap;
+
+    /// <summary>The bytes of the cache's tiles, with those of a tile being made (<see cref="Allocate"/>).</summary>
     public long Bytes { get; private set; }
     public int Tiles { get; private set; }
     public int MostTiles { get; private set; }
     public long PeakBytes { get; private set; }
+
+    /// <summary>The most bytes the cache kept reachable at once: its tiles, the dropped arrays waiting and a node's scratch.</summary>
+    public long PeakHeldBytes { get; private set; }
 
     /// <summary>The bytes of the tiles pinned now, and the most there have been.</summary>
     public long PinnedBytes { get; private set; }
@@ -77,24 +92,80 @@ internal sealed class TileCache(int tilesAcross, long cap)
         PeakPinnedBytes = Math.Max(PeakPinnedBytes, PinnedBytes);
     }
 
-    /// <summary>Adds a node's tiles at one position, pinned once: <see cref="MakeRoom"/> has made room for them.</summary>
+    /// <summary>
+    /// Arrays of these lengths, zeroed, for the ports of a tile being made, counted as held and pinned: first drops
+    /// unpinned tiles, least recently used first, until they fit under the bound or none is left, so the cache never
+    /// holds the bound and a tile more. Each array is handed back by <see cref="AddPinned"/> or <see cref="Release"/>.
+    /// </summary>
+    public float[][] Allocate(IReadOnlyList<long> lengths)
+    {
+        var bytes = lengths.Sum() * sizeof(float);
+        Trim(Bound - bytes);
+        var arrays = lengths.Select(Take).ToArray();
+        Bytes += bytes;
+        PeakBytes = Math.Max(PeakBytes, Bytes);
+        AddPinnedBytes(bytes);
+        NoteHeld();
+        return arrays;
+    }
+
+    /// <summary>Hands back the arrays of ports from <see cref="Allocate"/> that the evaluation does not read.</summary>
+    public void Release(IEnumerable<float[]> arrays)
+    {
+        foreach (var data in arrays)
+        {
+            var bytes = data.LongLength * sizeof(float);
+            Bytes -= bytes;
+            PinnedBytes -= bytes;
+            Free(data);
+        }
+    }
+
+    /// <summary>A zeroed array for a node's scratch while it fills a tile: a waiting array of that length, or a new one.</summary>
+    public float[] TakeScratch(long length)
+    {
+        var kept = _keptScratch.FindIndex(a => a.LongLength == length);
+        float[] data;
+        if (kept < 0) data = Take(length);
+        else
+        {
+            data = _keptScratch[kept];
+            _keptScratch.RemoveAt(kept);
+            _keptScratchBytes -= length * sizeof(float);
+            Array.Clear(data);
+        }
+        _scratchBytes += length * sizeof(float);
+        NoteHeld();
+        return data;
+    }
+
+    /// <summary>
+    /// Hands back scratch from <see cref="TakeScratch"/> once the tile is made: kept whole for the next tile's (blur's
+    /// at 8192 is two arrays of about 4 MB, past <see cref="FreeLimit"/>), the scratch kept before it waiting as dropped
+    /// arrays do.
+    /// </summary>
+    public void ReleaseScratch(List<float[]> arrays)
+    {
+        if (arrays.Count == 0) return;
+        foreach (var data in _keptScratch) Free(data);
+        _keptScratch = arrays;
+        _keptScratchBytes = 0;
+        foreach (var data in arrays)
+        {
+            _scratchBytes -= data.LongLength * sizeof(float);
+            _keptScratchBytes += data.LongLength * sizeof(float);
+        }
+    }
+
+    /// <summary>Adds a node's tiles at one position, pinned once: their arrays came from <see cref="Allocate"/>, so they are already counted.</summary>
     public Entry AddPinned(long key, Tile[] tiles)
     {
         var entry = new Entry(key, tiles) { Pins = 1 };
         _entries.Add(key, entry);
-        Bytes += entry.Bytes;
-        Tiles += tiles.Length;
+        Tiles += entry.Count;
         MostTiles = Math.Max(MostTiles, Tiles);
-        PeakBytes = Math.Max(PeakBytes, Bytes);
-        AddPinnedBytes(entry.Bytes);
         return entry;
     }
-
-    /// <summary>
-    /// Drops unpinned tiles, least recently used first, until <paramref name="incoming"/> more bytes fit under the cap
-    /// or none is left: called before a node's tiles are allocated, so the cache never holds the bound and a tile more.
-    /// </summary>
-    public void MakeRoom(long incoming) => Trim(Bound - incoming);
 
     /// <summary>Drops unpinned tiles, cold ones first, each least recently used first, until no more than the bound is held or none is left.</summary>
     public void Trim() => Trim(Bound);
@@ -108,15 +179,16 @@ internal sealed class TileCache(int tilesAcross, long cap)
             entry.Unpinned = null;
             _entries.Remove(entry.Key);
             Bytes -= entry.Bytes;
-            Tiles -= entry.Tiles.Length;
-            foreach (var tile in entry.Tiles) Free(tile.Data);
+            Tiles -= entry.Count;
+            foreach (var tile in entry.Tiles)
+                if (tile is not null) Free(tile.Data);
         }
     }
 
-    // Dropped tiles' arrays, kept for the next tiles made (T-155). A tile is a large object, collected only in the
-    // runtime's rare full collections; made and dropped by the thousand, they piled up as garbage past the cap (the
-    // strong minify at 8192 peaked over 2 GB with 768 MiB held). At most FreeLimit bytes wait here.
-    private long FreeLimit => Math.Max(4L << 20, Bound / 16);
+    // Dropped tiles' arrays, and scratch, kept for the next tiles made (T-155, RV-76). A tile is a large object,
+    // collected only in the runtime's rare full collections; made and dropped by the thousand, they piled up as garbage
+    // past the cap (the strong minify at 8192 peaked over 2 GB with 768 MiB held). At most FreeLimit bytes wait here.
+    public long FreeLimit => Math.Max(4L << 20, Bound / 16);
 
     private void Free(float[] data)
     {
@@ -127,12 +199,14 @@ internal sealed class TileCache(int tilesAcross, long cap)
         _freeBytes += bytes;
     }
 
-    /// <summary>An array of <paramref name="length"/> zeros for a new tile: a dropped tile's, cleared, or a new one.</summary>
-    public float[] Take(long length)
+    // An array of `length` zeros: a waiting one, cleared, or a new one.
+    private float[] Take(long length)
     {
         if (!_free.TryGetValue(length, out var stack) || !stack.TryPop(out var data)) return new float[length];
         _freeBytes -= length * sizeof(float);
         Array.Clear(data);
         return data;
     }
+
+    private void NoteHeld() => PeakHeldBytes = Math.Max(PeakHeldBytes, Bytes + _freeBytes + _scratchBytes + _keptScratchBytes);
 }
