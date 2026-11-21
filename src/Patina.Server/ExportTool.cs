@@ -45,8 +45,8 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         + "a named output is grey if greyscale, sRGB if colour. "
         + "The result lists each file with its size, its bytes and the Carve material slot it belongs in: base_colour in base_colour_texture, normal in normal_texture, roughness in metallic_roughness_texture, occlusion in occlusion_texture; height and named outputs have no slot. "
         + "Exporting the graph at its own size gives the same bytes every time, and equals the PNGs beside samples/graphs/planks.texgraph. "
-        + "Outputs are evaluated and written one at a time, in tiles, so memory stays bounded at 8192 (under 2 GB for the process), but 8192 is slow, minutes and not seconds: the planks' four outputs took about 3 minutes here (a debug build), of which about 10 s an output is the PNG encode, and each PNG is some 3 MB. A client with a short call timeout should ask for one or two outputs at a time. "
-        + "To look at a graph, swatch is the way (it renders at 2048 or below); export is for files. "
+        + "Outputs are evaluated and written one at a time, in tiles, so memory stays bounded at 8192 (under 2 GB for the process), but 8192 is slow, minutes and not seconds: the planks' four outputs took about 3 minutes (a debug build), and each PNG is some 3 MB. A client with a short call timeout should ask for one or two outputs at a time. "
+        + "To look at a graph, use swatch (at 2048 or below); export is for files. "
         + "Refused, writing nothing, while the graph has a fault (the error lists them; fix them with edit_graph); no open graph; a size that is not a power of two from 32 to 8192; an output the graph has not; metallic named alone; "
         + "and a folder that cannot be written (the error names the folder and the system's reason).\n"
         + "Worked example, after open of samples/graphs/planks.texgraph (<folder> is the absolute path of textures/planks under patina's working directory):\n"
@@ -55,7 +55,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         + "parameters: the graph's exposed parameters to set for this export only, by name (get_graph lists them and their ranges); the graph is not changed, the first line names them, and a value out of range is refused naming the parameter and its range, writing nothing. "
         + "The files equal those of the same values set in the graph with edit_graph's set_parameters, byte for byte.\n"
         + "Worked example, after open of samples/graphs/bricks.texgraph: export " + WorkedParameters + " writes its four outputs as grey stone bricks (equal to samples/graphs/bricks/variants/grey/) and its first line is:\n" + WorkedParametersHead + "\n"
-        + "Worked example, after define_graph's metal plate (<folder> is the absolute path of textures/plate):\n"
+        + "Worked example, after define_graph of the metal plate (nodes' output example) (<folder> is the absolute path of textures/plate):\n"
         + "export " + WorkedMetal + "\nreturns:\n" + WorkedMetalResult;
 
     public static McpServerTool Create() => Create<ExportTool>("export", Text, new JsonObject

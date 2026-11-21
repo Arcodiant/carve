@@ -48,7 +48,7 @@ public class SwatchTests
         await using var patina = await WithPlanksAsync(folder);
         var (png, caption) = await ImageAsync(patina, SwatchTool.Worked);
         Assert.Equal(SwatchTool.WorkedResult, caption);
-        Assert.Contains(SwatchTool.Worked + " returns an image and:\n" + SwatchTool.WorkedResult, SwatchTool.Text, StringComparison.Ordinal);
+        Assert.Contains(SwatchTool.Worked + " returns:\n" + SwatchTool.WorkedResult, SwatchTool.Text, StringComparison.Ordinal);
         var texels = Texels(OutputRole.BaseColour, 128);
         var expected = new byte[384 * 384 * 4];
         for (var y = 0; y < 384; y++)
@@ -192,8 +192,8 @@ public class SwatchTests
         // The sphere needs an engine, so the drawn example is the scenario's (literals there); the refusal runs in the harness.
         Assert.Equal("""{"view":"sphere","tiling":3}""", SwatchTool.WorkedTiling);
         Assert.Equal("""{"view":"cube","tiling":3}""", SwatchTool.WorkedCube);
-        Assert.Contains("swatch " + SwatchTool.WorkedCube + " returns an image and:\n" + SwatchTool.WorkedCubeResult, SwatchTool.Text, StringComparison.Ordinal);
-        Assert.Contains("swatch " + SwatchTool.WorkedTiling + " returns an image and:\n" + SwatchTool.WorkedTilingResult, SwatchTool.Text, StringComparison.Ordinal);
+        Assert.Contains("swatch " + SwatchTool.WorkedCube + " returns:\n" + SwatchTool.WorkedCubeResult, SwatchTool.Text, StringComparison.Ordinal);
+        Assert.Contains("swatch " + SwatchTool.WorkedTiling + " returns:\n" + SwatchTool.WorkedTilingResult, SwatchTool.Text, StringComparison.Ordinal);
         Assert.Contains("swatch " + SwatchTool.WorkedTilingRefused + " returns:\n" + SwatchTool.WorkedTilingRefusedResult, SwatchTool.Text, StringComparison.Ordinal);
     }
 

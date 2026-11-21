@@ -29,7 +29,7 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
     /// <summary>What it returns for the bricks open (samples/graphs/bricks.texgraph).</summary>
     public const string WorkedResult = """{"ok":true,"problems":[],"notes":[],"stats":{"size":64,"outputs":{"base_colour":{"min":[108,45,30],"max":[194,186,169],"mean":[160.3,104.4,86.5]},"normal":{"min":[72,72,242],"max":[183,183,255],"mean":[127.9,127.7,250.3]},"roughness":{"min":[167],"max":[255],"mean":[202.6]},"occlusion":{"min":[115],"max":[255],"mean":[183.6]}}}}""";
 
-    /// <summary>The second: samples/graphs/faults/chrome-in-paint.texgraph open, paint with a metallic of about 0.5.</summary>
+    /// <summary>The second, run by the tests but not in the description since T-170 (the description is held under Claude Code's 4,096-character cut): samples/graphs/faults/chrome-in-paint.texgraph open, paint with a metallic of about 0.5.</summary>
     public const string WorkedFault = """{}""";
 
     public const string WorkedFaultResult = """{"ok":false,"problems":[{"check":"metallic-not-binary","output":"metallic","message":"100% of texels are between 0.1 and 0.9; over 5% is a fault. Fix: metallic is 1 on bare metal and 0 on everything else, with a sharp edge between; a middle value is a half-metal that does not exist in a real surface, and renders as a dull chrome. Drive it from a mask pushed to 0 and 1 (a levels node with in_low equal to in_high is a step), or set it to 0 or 1."}],"notes":["metal texels (metallic 0.5 or more): 52%"],"stats":{"size":64,"outputs":{"base_colour":{"min":[145,170,125],"max":[169,191,150],"mean":[157,180.8,137.7]},"normal":{"min":[115,116,254],"max":[141,140,255],"mean":[127.5,127.5,255]},"roughness":{"min":[159],"max":[199],"mean":[178.5]},"metallic":{"min":[121],"max":[134],"mean":[127.5]}}}}""";
@@ -40,31 +40,29 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
     public const string WorkedFilesResult = """{"ok":true,"problems":[],"notes":["base_colour: base_colour.png, 256x256","normal: normal.png, 256x256"],"stats":{"size":256,"outputs":{"base_colour":{"min":[107,44,30],"max":[196,188,171],"mean":[159.7,102.2,84.3]},"normal":{"min":[62,62,237],"max":[193,193,255],"mean":[127.9,127.8,248.4]}}}}""";
 
     public const string Text =
-        "Measures what the open graph's outputs came to, as numbers, rather than judging by a render: lists what is wrong with each output, with the fix in words, as carve's check lists a mesh's faults. "
-        + "Changes nothing, and never refuses a graph that evaluates: a fault is a problem in the list, not an error. "
-        + "Takes size (a power of two from 32 to 2048; default the graph's own, at most 2048), parameters (the graph's exposed parameters to set for this call only, as swatch and export take them) "
-        + "and files (a list of {path, role} for PNGs, the path relative to patina's working directory or absolute, the role one of base_colour, normal, roughness, metallic, occlusion, height, or a named output's name; with files only those are checked, no graph is needed, and size and parameters are not used). "
-        + "A roughness file is read as the glTF metallic-roughness image export writes: G is the roughness and B the metallic, which judges the base colour's metal texels. "
+        "Measures the open graph's outputs as numbers, rather than judging by a render, and lists what is wrong with each, with the fix in words. "
+        + "Changes nothing, and never refuses a graph that evaluates: a fault is a problem in the list. "
+        + "Takes size (a power of two from 32 to 2048; default the graph's own, at most 2048), parameters (the graph's exposed parameters, for this call only, as swatch and export take them) "
+        + "and files (a list of {path, role} of PNGs, the path absolute or relative to patina's working directory, the role a role or a named output's name; only those are checked, no graph is needed, and size and parameters are not used). "
+        + "A roughness file is read as export writes it: G the roughness, B the metallic, which judges the base colour's metal texels. "
         + "The rules, each with its thresholds and what it means for a game:\n"
         + "- base-colour-range: base colour's brightest channel, in sRGB levels 0 to 255, should be 20 to 245 for a non-metal texel (metallic below 0.5, or no metallic) and 120 or more for a metal texel (metallic 0.5 or more); "
         + "near black is a hole under game lighting, near white blows out, and dark metal, which takes its colour from reflection, shows almost nothing. A fault when over 1% of texels are out. "
         + "Fix: pull the darks up and the lights in with a levels or gradient_map node.\n"
         + "- metallic-not-binary: metallic should be 0 or 1, with a sharp edge between (a half-metal is not a real surface and renders as dull chrome). A fault when over 5% of texels are from 0.1 to 0.9. "
         + "Fix: push the mask to 0 and 1 (a levels node with in_low equal to in_high is a step), or set a constant.\n"
-        + "- normal-not-unit: a normal is a unit vector (a longer or shorter one lights too strongly or too weakly). A fault when over 0.1% of texels' length differs from 1 by more than 0.02 (0.03 for a PNG, for the 8-bit rounding). "
+        + "- normal-not-unit: a normal is a unit vector. A fault when over 0.1% of texels' length differs from 1 by more than 0.02 (0.03 for a PNG, for the 8-bit rounding). "
         + "Fix: make it with height_to_normal, which normalises, and do not mix a normal's components as colours.\n"
         + "- one-value: a greyscale output (roughness, metallic, occlusion, height, a greyscale named output) whose texels all pack to one byte; a mask of one value masks nothing. "
         + "Fix: widen its levels, or drive it from a noise or pattern, or drop the output.\n"
         + "- does-not-tile: the mean step between neighbouring columns (and rows, for v), in packed levels over the channels, is measured at every column boundary, the wrap's between the last and first included; "
-        + "the wrap is a fault when its step is more than twice the 99th percentile of the steps inside, plus 2 levels, so the texture shows a seam when it repeats (a pattern's own hard edge that falls on the wrap is not one). The message gives the measured wrap step and that percentile. "
+        + "the wrap is a fault when its step is more than twice the 99th percentile of the steps inside, plus 2 levels, so the texture shows a seam when it repeats (a pattern's own hard edge that falls on the wrap is not one). "
         + "Fix: whole-number frequencies and counts and quarter turns; swatch's tiled view shows where.\n"
         + "Result: {ok, problems:[{check, output, message}], notes, stats}. ok is true when there are no problems; each message gives the share, the worst texel and the fix; "
         + "notes say how the texels were read (the share of metal texels, a metallic read from a roughness file); stats gives each output's min, max and mean per channel, in packed levels 0 to 255 "
         + "(a normal's too: 127.5 is zero), at stats.size. "
         + "Errors, writing nothing: no open graph (when no files are given), a graph with a fault (the error lists them; fix them with edit_graph), a size that is not allowed, a parameter that is refused, and a file that is missing or not a PNG.\n"
-        + "Worked example, with samples/graphs/bricks.texgraph open: check " + Worked + " returns, clean:\n" + WorkedResult + "\n"
-        + "Worked example, with samples/graphs/faults/chrome-in-paint.texgraph open (a paint whose metallic is about 0.5 everywhere): check " + WorkedFault + " returns:\n" + WorkedFaultResult + "\n"
-        + "Worked example, PNG files: check " + WorkedFiles + " returns:\n" + WorkedFilesResult;
+        + "Worked example, with samples/graphs/bricks.texgraph open: check " + Worked + " returns, clean:\n" + WorkedResult;
 
     public static McpServerTool Create() => Create<CheckTool>("check", Text, new JsonObject
     {
