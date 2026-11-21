@@ -23,10 +23,10 @@ public class CheckToolTests
 
         await patina.Ok("open", Open("faults/chrome-in-paint.texgraph"));
         Assert.Equal(CheckTool.WorkedFaultResult, await patina.Ok("check", CheckTool.WorkedFault));
-        Assert.Contains("check " + CheckTool.WorkedFault + " returns:\n" + CheckTool.WorkedFaultResult, text, StringComparison.Ordinal);
+        // T-170: the fault and files examples left the description (it is held under Claude Code's 4,096-character cut); they still run as written.
+        Assert.DoesNotContain(CheckTool.WorkedFaultResult, text, StringComparison.Ordinal);
 
         Assert.Equal(CheckTool.WorkedFilesResult, await patina.Ok("check", CheckTool.WorkedFiles));
-        Assert.Contains("check " + CheckTool.WorkedFiles + " returns:\n" + CheckTool.WorkedFilesResult, text, StringComparison.Ordinal);
     }
 
     [Fact]

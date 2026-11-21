@@ -24,7 +24,7 @@ public class MetalPlateTests
     [Fact]
     public async Task Define_graph_takes_the_metal_plate_and_export_writes_its_three_files()
     {
-        Assert.Contains("define_graph " + DefineGraphTool.WorkedMetal + "\nreturns: " + DefineGraphTool.WorkedMetalResult, DefineGraphTool.Text(NodeRegistry.BuiltIn));
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedMetal + "\nreturns: " + DefineGraphTool.WorkedMetalResult, NodeCatalogue.Text(NodeRegistry.BuiltIn));
         Assert.Contains("export " + ExportTool.WorkedMetal + "\nreturns:\n" + ExportTool.WorkedMetalResult, ExportTool.Text);
         using var folder = new TempFolder();
         await using var patina = await PatinaHarness.StartAsync(folder.Path);

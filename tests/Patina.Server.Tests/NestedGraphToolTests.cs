@@ -26,7 +26,7 @@ public class NestedGraphToolTests
         await using var patina = await PatinaHarness.StartAsync(folder.Path);
 
         Assert.Equal(DefineGraphTool.WorkedNestedResult, await patina.Ok("define_graph", DefineGraphTool.WorkedNested));
-        Assert.Contains("define_graph " + DefineGraphTool.WorkedNested + "\nreturns: " + DefineGraphTool.WorkedNestedResult, DefineGraphTool.Text(NodeRegistry.BuiltIn), StringComparison.Ordinal);
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedNested + "\nreturns: " + DefineGraphTool.WorkedNestedResult, NodeCatalogue.Text(NodeRegistry.BuiltIn), StringComparison.Ordinal);
 
         var graph = folder.Normalise(await patina.Ok("get_graph", "{}"));
         Assert.Contains("graph nodes (1), paths resolved against the tool folder <folder> (the graph has never been saved):\n", graph);
@@ -43,7 +43,7 @@ public class NestedGraphToolTests
         await using var patina = await PatinaHarness.StartAsync(folder.Path);
 
         Assert.Equal(DefineGraphTool.WorkedNestedResult, await patina.Ok("define_graph", DefineGraphTool.WorkedPassThrough));
-        Assert.Contains("define_graph " + DefineGraphTool.WorkedPassThrough + "\nreturns: " + DefineGraphTool.WorkedNestedResult, DefineGraphTool.Text(NodeRegistry.BuiltIn), StringComparison.Ordinal);
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedPassThrough + "\nreturns: " + DefineGraphTool.WorkedNestedResult, NodeCatalogue.Text(NodeRegistry.BuiltIn), StringComparison.Ordinal);
         Assert.Contains("parameters['mortar']: is 0.5, but must be a number from 0 to 0.45",
             await patina.Refused("export", """{"folder":"out","parameters":{"mortar":0.5}}"""));
         await patina.Ok("export", """{"folder":"out","parameters":{"mortar":0.06}}""");
