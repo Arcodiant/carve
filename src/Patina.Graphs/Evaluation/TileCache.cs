@@ -77,7 +77,7 @@ internal sealed class TileCache(int tilesAcross, long cap)
         PeakPinnedBytes = Math.Max(PeakPinnedBytes, PinnedBytes);
     }
 
-    /// <summary>Adds a node's tiles at one position, pinned once, then drops unpinned tiles past the cap.</summary>
+    /// <summary>Adds a node's tiles at one position, pinned once: <see cref="MakeRoom"/> has made room for them.</summary>
     public Entry AddPinned(long key, Tile[] tiles)
     {
         var entry = new Entry(key, tiles) { Pins = 1 };
@@ -87,7 +87,6 @@ internal sealed class TileCache(int tilesAcross, long cap)
         MostTiles = Math.Max(MostTiles, Tiles);
         PeakBytes = Math.Max(PeakBytes, Bytes);
         AddPinnedBytes(entry.Bytes);
-        Trim();
         return entry;
     }
 
