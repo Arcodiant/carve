@@ -87,6 +87,8 @@ checking. So: split. Nothing is loosened: no size, tolerance, frame, check or th
   the two thirds (200 s) target.
 
 **Measured after the split** (Xellotath, alone, Debug): base 52 s, library-1 80 s, library-2 82 s, all three passing.
+In the second agent's verify on `8c2183a`, the three queued together on Xellotath beside core-unit: base 124 s,
+library-1 152 s, library-2 148 s, all passing and inside the 200 s target.
 
 **Frames.** Every one of the 128 files of the three runs together equals by SHA-256 the pre-split whole run on the same
 tree, except `library-breaks.txt` and `library-checks.tsv`, which are written per half; their lines taken together are
