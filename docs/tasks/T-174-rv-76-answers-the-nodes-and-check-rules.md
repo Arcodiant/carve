@@ -4,7 +4,7 @@ description: >-
 ---
 # T-174 — RV-76 answers: the nodes and check rules
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
