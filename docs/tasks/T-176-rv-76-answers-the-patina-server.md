@@ -66,4 +66,10 @@ at its call checkpoint; the second compared the frames, wrote this section and f
   - T-140's `J-20261120-085227-39ade3`, the last good job recorded on the milestone: 23 of the 24 frames it has equal;
     `swatch-sheet-grid-tiling-3.png` differs, as T-172 and RV-76 recorded for work landed after that job, not this
     member. No M-28 tip job of the milestone's own verify could be found in the queue's history.
-  - No frame image was opened.
+  - After the rebase onto M-28 (T-174 and T-177 landed), this member's verify job `J-20261121-184545-5c2ba5`
+    (`b4353ab`) against T-177's `J-20261121-183529-2c4ced`, now on the milestone: all 31 frames and every other file
+    equal but `run.json`, the run's record of calls. No frame image was opened.
+- **Outcome form:** cairn lint reads an `**Outcome:**` line as exactly `fixed`, `skipped: <reason>` or
+  `no change needed: <reason>`, so this member's four are `**Outcome:** fixed` with the detail in a `**Fix:**` line,
+  RV-69's form. The nine T-174 lines on the milestone in the `fixed (T-174, ...): ...` form still fail `cairn lint`;
+  they are left as filled, for the person.
