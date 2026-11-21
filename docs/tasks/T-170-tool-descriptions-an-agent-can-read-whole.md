@@ -4,7 +4,7 @@ description: >-
 ---
 # T-170 — Tool descriptions an agent can read whole
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
