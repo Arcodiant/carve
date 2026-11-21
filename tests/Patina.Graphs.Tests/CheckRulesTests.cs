@@ -152,21 +152,70 @@ public class CheckRulesTests
         Assert.Single(Run(new OneValueRule(), Of(CheckSource.Graph, o)));
     }
 
+    /// <summary>A packed image of <paramref name="w"/> x <paramref name="h"/>: G from <paramref name="g"/>, B from <paramref name="b"/>, R 0.</summary>
+    private static byte[] Packed(int w, int h, Func<int, int, int> g, Func<int, int, int> b)
+    {
+        var rgba = new byte[w * h * 4];
+        for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                var i = (y * w + x) * 4;
+                rgba[i + 1] = (byte)g(x, y); rgba[i + 2] = (byte)b(x, y); rgba[i + 3] = 255;
+            }
+        return rgba;
+    }
+
     [Fact]
-    public void A_roughness_pngs_blue_channel_is_read_as_metallic_and_is_exempt_from_one_value()
+    public void A_metallic_roughness_pngs_blue_channel_is_read_as_metallic_and_is_exempt_from_one_value()
     {
         // G varies (the roughness); B is 0 everywhere (a constant metallic).
-        var rgba = new byte[8 * 8 * 4];
-        for (var i = 0; i < 64; i++) { rgba[i * 4 + 1] = (byte)(100 + i); rgba[i * 4 + 3] = 255; }
-        var set = CheckSet.OfPngs([("roughness", 8, 8, rgba)]);
+        var rgba = Packed(8, 8, (x, y) => 100 + y * 8 + x, (_, _) => 0);
+        var set = CheckSet.OfPngs([(CheckSet.PackedRole, 8, 8, rgba)]);
         Assert.Equal(["roughness", "metallic"], set.Outputs.Select(o => o.Name));
         Assert.DoesNotContain(CheckRules.Run(set), p => p.Check == OneValueRule.Id);
-        Assert.Contains("metallic read from roughness's blue channel", set.Notes);
+        Assert.Contains("metallic read from metallic_roughness's blue channel", set.Notes);
         // A constant G is the roughness's own fault, and only its.
-        var flatG = new byte[8 * 8 * 4];
-        for (var i = 0; i < 64; i++) { flatG[i * 4 + 1] = 128; flatG[i * 4 + 3] = 255; }
-        var one = Assert.Single(CheckRules.Run(CheckSet.OfPngs([("roughness", 8, 8, flatG)])), p => p.Check == OneValueRule.Id);
+        var one = Assert.Single(CheckRules.Run(CheckSet.OfPngs([(CheckSet.PackedRole, 8, 8, Packed(8, 8, (_, _) => 128, (_, _) => 0))])), p => p.Check == OneValueRule.Id);
         Assert.Equal("roughness", one.Output);
+    }
+
+    [Fact]
+    public void A_roughness_png_is_roughness_only_and_its_blue_channel_is_never_metallic()
+    {
+        // RV-76: a plain greyscale roughness (R = G = B, mid grey) is not a half-metal.
+        var grey = new byte[8 * 8 * 4];
+        for (var i = 0; i < 64; i++) grey[i * 4] = grey[i * 4 + 1] = grey[i * 4 + 2] = (byte)(100 + 20 * ((i % 8 + i / 8) % 2)); // a checker, which tiles
+        for (var i = 0; i < 64; i++) grey[i * 4 + 3] = 255;
+        var set = CheckSet.OfPngs([("roughness", 8, 8, grey)]);
+        Assert.Equal(["roughness"], set.Outputs.Select(o => o.Name));
+        Assert.Empty(set.Notes);
+        Assert.Empty(CheckRules.Run(set));
+        // The same bytes as a metallic-roughness image are a half-metal.
+        Assert.Contains(CheckRules.Run(CheckSet.OfPngs([(CheckSet.PackedRole, 8, 8, grey)])), p => p.Check == MetallicNotBinaryRule.Id);
+    }
+
+    [Fact]
+    public void A_seam_in_a_metallic_roughness_pngs_blue_channel_is_a_seam_in_metallic()
+    {
+        // RV-76: the metallic read from B is exempt from one-value only. A binary B, 0 then 1 halfway, steps at its edge
+        // inside as it does at the wrap, so it tiles; a ramp of B steps 93 back at the wrap, a seam.
+        var tiles = CheckSet.OfPngs([(CheckSet.PackedRole, 32, 32, Packed(32, 32, (_, _) => 128, (x, _) => x < 16 ? 0 : 255))]);
+        Assert.DoesNotContain(CheckRules.Run(tiles), p => p.Check == DoesNotTileRule.Id);
+        var seam = CheckSet.OfPngs([(CheckSet.PackedRole, 32, 32, Packed(32, 32, (x, y) => 100 + (x + y) % 2, (x, _) => 3 * x))]);
+        var problem = Assert.Single(CheckRules.Run(seam), p => p.Check == DoesNotTileRule.Id);
+        Assert.Equal("metallic", problem.Output);
+    }
+
+    [Fact]
+    public void A_graphs_constant_metallic_is_exempt_from_one_value_as_a_pngs_is()
+    {
+        // RV-76, the person's ruling: bare steel (metallic 1 everywhere) and an all-non-metal material are legitimate.
+        foreach (var level in new[] { 0, 255 })
+            Assert.Empty(Run(new OneValueRule(), Of(CheckSource.Graph, Image("metallic", 8, 8, (_, _) => G(level)))));
+        // metallic-not-binary still judges a constant half-metal.
+        Assert.Single(Run(new MetallicNotBinaryRule(), Of(CheckSource.Graph, Image("metallic", 8, 8, (_, _) => G(128)))));
+        // A PNG of role metallic is exempt too.
+        Assert.Empty(Run(new OneValueRule(), Of(CheckSource.Png, Image("metallic", 8, 8, (_, _) => G(255)))));
     }
 
     // ---- does-not-tile: 32 x 32. The wrap is compared with the 99th percentile of the interior boundaries.
@@ -216,6 +265,26 @@ public class CheckRulesTests
         Assert.Empty(Run(rule, Of(source, Image("mask", 32, 32, (x, y) => G(120 + Noise(x, y))))));
     }
 
+    /// <summary>
+    /// 256 x 32 (RV-76): a slow ramp, 0.1 level a column spread over the rows, so each interior boundary steps about 0.1
+    /// and the wrap steps back about 25, a seam; with outliers, boundaries inside that step far more. Of 255 interior
+    /// boundaries the 99th percentile by nearest rank is the 253rd smallest, so the two largest are dropped and the third is not.
+    /// </summary>
+    private static CheckOutput WideRamp(bool spike, bool step) => Image("mask", 256, 32, (x, y) =>
+        G((int)Math.Floor(40 + 0.1 * x + y / 32.0) + (spike && x == 100 ? 100 : 0) + (step && x >= 200 ? 60 : 0)));
+
+    [Theory]
+    [MemberData(nameof(Sources))]
+    public void The_two_largest_interior_steps_of_255_are_dropped_by_the_percentile_and_the_third_is_not(CheckSource source)
+    {
+        var rule = new DoesNotTileRule();
+        Assert.Contains("seam in u", Assert.Single(Run(rule, Of(source, WideRamp(spike: false, step: false)))).Message);
+        // A spike column steps 100 up and 100 down: two outliers, ignored, so the wrap is still a seam (the largest step would hide it).
+        Assert.Contains("seam in u", Assert.Single(Run(rule, Of(source, WideRamp(spike: true, step: false)))).Message);
+        // And a step of 60 that holds to the wrap: a third outlier, the percentile, and a wrap of about 85 under 2 x 60 + 2.
+        Assert.Empty(Run(rule, Of(source, WideRamp(spike: true, step: true))));
+    }
+
     [Fact]
     public void A_seam_in_v_is_found_and_named()
     {
@@ -258,6 +327,12 @@ public class CheckRulesTests
             () => Of(CheckSource.Graph, Columns(Bands)), false),
         new("the wrap compared with the step alone, without 2 x and 2 levels", DoesNotTileRule.Id, "a wrap of 6 against a step of 2 is clean",
             () => Of(CheckSource.Graph, Ramp(2, 3)), false),
+        new("the wrap compared with the largest step inside", DoesNotTileRule.Id, "a wrap of 25 beside two lone steps of 100 is a seam",
+            () => Of(CheckSource.Graph, WideRamp(spike: true, step: false)), true),
+        new("the percentile one rank too high", DoesNotTileRule.Id, "the second-largest step of 255 is dropped",
+            () => Of(CheckSource.Graph, WideRamp(spike: true, step: false)), true),
+        new("the percentile one rank too low", DoesNotTileRule.Id, "the third-largest step of 255 is kept",
+            () => Of(CheckSource.Graph, WideRamp(spike: true, step: true)), false),
         new("only u compared", DoesNotTileRule.Id, "a seam in v is a fault",
             () => Of(CheckSource.Graph, Rows(y => 100 + 4 * y)), true),
     ];

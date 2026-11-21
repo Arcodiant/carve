@@ -72,8 +72,10 @@ public sealed class WarpNode : NodeType
 
     private static (float Cos, float Sin) Direction(NodeParameters parameters)
     {
-        var radians = parameters.Float("angle") * Math.PI / 180.0;
-        return ((float)Math.Cos(radians), (float)Math.Sin(radians));
+        // TransformNode.SinCos's series rather than Math.Cos and Math.Sin, which are the platform's and may differ in
+        // the last bit between machines (RV-76); exact at quarter turns.
+        var (sin, cos) = TransformNode.SinCos(parameters.Float("angle"));
+        return ((float)cos, (float)sin);
     }
 
     /// <summary>
