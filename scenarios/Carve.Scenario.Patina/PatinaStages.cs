@@ -19,4 +19,17 @@ internal static class PatinaStages
         new NestedGraphStage(),
         new LibraryStage(),
     ];
+
+    /// <summary>The key of the configuration (<c>--Patina:Stages=</c> on the command line) that picks a suite's share of the run (T-172); unset runs everything.</summary>
+    public const string SelectionKey = "Patina:Stages";
+
+    /// <summary>The stages of one suite: <c>base</c> every stage but the library's, <c>library-1</c> and <c>library-2</c> half of its samples each (the second with the planted faults); none or <c>all</c> every stage; anything else is refused.</summary>
+    public static IReadOnlyList<IPatinaStage> For(string? selection) => selection switch
+    {
+        "base" => [.. All.Where(s => s is not LibraryStage)],
+        "library-1" => [new LibraryStage(1)],
+        "library-2" => [new LibraryStage(2)],
+        null or "" or "all" => All,
+        _ => throw new ArgumentException($"{SelectionKey} is '{selection}': one of base, library-1, library-2, all"),
+    };
 }

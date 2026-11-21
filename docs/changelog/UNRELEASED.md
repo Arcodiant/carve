@@ -17,3 +17,4 @@
 - T-143: Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
 - T-171: edit_graph's set_params and set_node take list parameters (Floats, Colours) as define_graph does, so gradient_map's stops can be edited in place
 - T-170: patina's tool descriptions reach an agent whole, with the node catalogue no longer crammed into define_graph's, so a fresh agent learns the node types by reading rather than by sending wrong graphs
+- T-172: scenario-patina runs well inside run-scenario's 300 s guard again, by smaller textures where evaluation is the cost, otherwise by splitting the library stage into a suite of its own, with no check and no approved frame lost

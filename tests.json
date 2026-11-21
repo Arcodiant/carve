@@ -623,7 +623,7 @@
       "id": "scenario-patina",
       "tier": "regression",
       "build": "solution",
-      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments:--Patina:Stages=base",
       "inputs": [
         {
           "dotnet-closure": "scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj"
@@ -639,7 +639,51 @@
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 300
+      "est-seconds": 90
+    },
+    {
+      "id": "scenario-patina-library-1",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments:--Patina:Stages=library-1",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj"
+        },
+        {
+          "dotnet-closure": "src/Patina.Server/Patina.Server.csproj"
+        },
+        "samples/graphs/**",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 120
+    },
+    {
+      "id": "scenario-patina-library-2",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments:--Patina:Stages=library-2",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj"
+        },
+        {
+          "dotnet-closure": "src/Patina.Server/Patina.Server.csproj"
+        },
+        "samples/graphs/**",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 120
     }
   ],
   "todo": []
