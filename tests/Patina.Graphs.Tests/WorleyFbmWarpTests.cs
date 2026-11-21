@@ -176,6 +176,48 @@ public class WorleyFbmWarpTests
         Assert.InRange(random.Distinct().Count(), 40, 64);   // at most one value per cell, and most of the 64 cells own a texel
     }
 
+    /// <summary>
+    /// RV-76: f1 and f2 are the true nearest two points, as a search of every cell (each in its wrapped copies) finds
+    /// them, by both metrics and at jitter 1, where a point two cells away can be the second nearest. A search of the 3 x 3
+    /// cells alone misses some, so the comparison is shown to bite.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WorleyFindsTheTrueNearestTwoPointsAsASearchOfEveryCellDoes(bool manhattan)
+    {
+        const int Size = 256, Cells = 8;
+        var missedBy3x3 = 0;
+        foreach (var seed in new uint[] { 1, 7, 12345 })
+            for (var y = 0; y < Size; y++)
+                for (var x = 0; x < Size; x++)
+                {
+                    var s = WorleyNode.Sample(x, y, Size, Cells, Cells, 1, manhattan, seed);
+                    var (bf1, bf2) = Nearest(x, y, Size, Cells, manhattan, seed, all: true);
+                    Assert.True(s.F1 == bf1 && s.Edge == bf2 - bf1, $"seed {seed} at ({x}, {y}): f1 {s.F1}, edge {s.Edge}; every cell gives {bf1}, {bf2 - bf1}");
+                    if (Nearest(x, y, Size, Cells, manhattan, seed, all: false).F2 != bf2) missedBy3x3++;
+                }
+        Assert.True(missedBy3x3 > 0, "a 3 x 3 search finds every second-nearest point here, so the test does not bite");
+    }
+
+    private static (float F1, float F2) Nearest(int x, int y, int size, int cells, bool manhattan, uint seed, bool all)
+    {
+        float px = (x + 0.5f) * cells / size, py = (y + 0.5f) * cells / size;
+        int ix = (int)MathF.Floor(px), iy = (int)MathF.Floor(py);
+        float f1 = float.MaxValue, f2 = float.MaxValue;
+        int lo = all ? -cells : -1, hi = all ? 2 * cells - 1 : 1;
+        for (var j = all ? lo : iy + lo; j <= (all ? hi : iy + hi); j++)
+            for (var i = all ? lo : ix + lo; i <= (all ? hi : ix + hi); i++)
+            {
+                var (ox, oy) = WorleyNode.Point(i, j, cells, cells, 1, seed);
+                float dx = i + ox - px, dy = j + oy - py;
+                var d = manhattan ? MathF.Abs(dx) + MathF.Abs(dy) : MathF.Sqrt(dx * dx + dy * dy);
+                if (d < f1) { f2 = f1; f1 = d; }
+                else if (d < f2) f2 = d;
+            }
+        return (f1, f2);
+    }
+
     // ---- fbm --------------------------------------------------------------------------------------------------
 
     private delegate float FbmFn(int x, int y, int size, int cx, int cy, int octaves, float gain, bool gradient, string style, uint graphSeed, int nodeSeed);

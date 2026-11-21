@@ -7,7 +7,7 @@ namespace Patina.Graphs.Nodes;
 /// <c>stripes</c>: greyscale stripes, 1 on a stripe and 0 between. <c>count</c> whole stripes across the image; <c>axis</c> <c>u</c>
 /// (stripes stand upright and vary along u), <c>v</c> (they lie across) or <c>diagonal</c> (they run along the image's diagonal, with
 /// <c>count</c> stripes along each axis, so they tile); <c>width</c> 0..1 of a period; <c>softness</c> 0..0.5 of a period, the
-/// smoothstep across each edge, centred on it. A stripe is centred on each multiple of 1/count (the first at the image's edge), so
+/// smoothstep's reach each side of each edge, so the ramp, centred on the edge, is 2 x softness wide (RV-76). A stripe is centred on each multiple of 1/count (the first at the image's edge), so
 /// a set of half the count at width 0.5 covers every second stripe of a set of the full count. Sampled at texel centres.
 /// </summary>
 public sealed class StripesNode : NodeType

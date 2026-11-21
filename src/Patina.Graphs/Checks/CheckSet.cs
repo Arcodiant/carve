@@ -20,7 +20,7 @@ public sealed class CheckOutput(string name, int width, int height, int channels
     public int Channels { get; } = channels;
     public float[] Data { get; } = data;
 
-    /// <summary>True for a reading made of another file (the metallic in a roughness PNG's blue channel), which measures for the rules and is not an output of its own.</summary>
+    /// <summary>True for a reading made of another file (the metallic in a metallic-roughness PNG's blue channel), not a file of its own.</summary>
     public bool Derived { get; } = derived;
 
     public long Texels => (long)Width * Height;
@@ -99,9 +99,14 @@ public sealed class CheckSet(CheckSource source, IReadOnlyList<CheckOutput> outp
     public static CheckSet OfGraph(GraphEvaluator evaluator, int size) =>
         new(CheckSource.Graph, [.. evaluator.Outputs.Select(o => CheckOutput.Evaluate(evaluator, o, size))]);
 
+    /// <summary>The role of a glTF metallic-roughness image, such as export's <c>roughness.png</c>: G the roughness, B the metallic.</summary>
+    public const string PackedRole = "metallic_roughness";
+
     /// <summary>
-    /// A set from decoded PNGs, each with its role or output name. A <c>roughness</c> file is a glTF metallic-roughness
-    /// image: its G is the roughness and its B a metallic reading, added as <c>metallic</c> when no file of that role was given.
+    /// A set from decoded PNGs, each with its role or output name. A <see cref="PackedRole"/> file is a glTF
+    /// metallic-roughness image: its G is read as <c>roughness</c> and its B as a metallic reading, added as
+    /// <c>metallic</c> when no file of that role was given. A <c>roughness</c> file is roughness only (its G; a greyscale's
+    /// channels are equal): its B is never read as metallic (RV-76, replacing T-141's ruling).
     /// </summary>
     public static CheckSet OfPngs(IReadOnlyList<(string Role, int Width, int Height, byte[] Rgba)> files)
     {
@@ -110,12 +115,14 @@ public sealed class CheckSet(CheckSource source, IReadOnlyList<CheckOutput> outp
         var outputs = new List<CheckOutput>();
         var notes = new List<string>();
         foreach (var (role, w, h, rgba) in files)
-            outputs.Add(CheckOutput.FromRgba8(role, w, h, rgba, channel: role == rough ? 1 : null));
-        var packed = files.Where(f => f.Role == rough).ToList();
+            outputs.Add(role == PackedRole
+                ? CheckOutput.FromRgba8(rough, w, h, rgba, channel: 1)
+                : CheckOutput.FromRgba8(role, w, h, rgba, channel: role == rough ? 1 : null));
+        var packed = files.Where(f => f.Role == PackedRole).ToList();
         if (packed.Count == 1 && !files.Any(f => f.Role == metallic))
         {
             outputs.Add(CheckOutput.FromRgba8(metallic, packed[0].Width, packed[0].Height, packed[0].Rgba, channel: 2, derived: true));
-            notes.Add("metallic read from roughness's blue channel");
+            notes.Add($"metallic read from {PackedRole}'s blue channel");
         }
         return new(CheckSource.Png, outputs, notes);
     }
