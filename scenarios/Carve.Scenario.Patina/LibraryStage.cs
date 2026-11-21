@@ -236,6 +236,20 @@ internal sealed class LibraryStage : IPatinaStage
             (x, y) => d.Sphere0.Pixels.AsSpan((y * 512 + x) * 4, 4));
     }
 
+    /// <summary>
+    /// The sheet check for a graph outside the library's samples (RV-76: the nested stage's old-wall and grime at their defaults):
+    /// the columns from the graph file, each flat and tiled cell against the texels in <paramref name="texels"/>, the title, the
+    /// gutters, and the sphere cell against <paramref name="sphere"/>.
+    /// </summary>
+    internal static void CheckGraphSheet(PatinaChecks checks, string name, string graphPath, string texels, ScenarioFrame sheet, ScenarioFrame sphere)
+    {
+        var files = Directory.GetFiles(texels, "*.png").ToDictionary(f => Path.GetFileName(f), Decode);
+        var columns = ColumnsOf(graphPath).Where(c => files.ContainsKey(c.File)).ToList();
+        checks.Check(columns.Count > 0, $"library: {name} has no output with a file in {texels}");
+        var sample = new Sample(name, Path.GetFileName(graphPath), texels, null, 0);
+        CheckSheet(checks, new Done(sample, columns, files, sheet, sphere, sphere), mirror: false, shift: 0, sheet);
+    }
+
     /// <summary>chrome-in-paint must report metallic-not-binary; the floor tiles turned 30 degrees through edit_graph must report does-not-tile.</summary>
     private static async Task FaultsAsync(ScenarioDriver driver, PatinaChecks checks, string samples)
     {

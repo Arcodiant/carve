@@ -115,7 +115,11 @@ internal static class SwatchTiling
         checks.Check(caption.Contains("tiling 3", StringComparison.Ordinal), "swatch: the sheet's caption at tiling 3 does not name it: " + caption);
         var plainSheet = await checks.CallAsync("swatch", "{}");
         checks.Check(!plainSheet.Contains("tiling", StringComparison.Ordinal), "swatch: the sheet's caption at the default names a tiling: " + plainSheet);
-        checks.Check(sheet.Width > N, "swatch: the sheet at tiling 3 was not drawn");
+        checks.Check(sheet.Width > N && sheet.Height == 538, $"swatch: the sheet at tiling 3 is {sheet.Width} x {sheet.Height}, not a sheet with a 512 x 512 sphere cell");
+        // RV-76: the sheet's sphere cell (its last 512 columns, below the title) is the sphere view at tiling 3, pixel for pixel.
+        void SheetSphere(PatinaChecks on, string what, ScenarioFrame sphere) =>
+            SwatchStage.CheckRegion(on, what, sheet, sheet.Width - N, 25, N, N, SwatchStage.LabelBand, (x, y) => sphere.Pixels.AsSpan((y * N + x) * 4, 4));
+        if (sheet.Width > N && sheet.Height == 538) SheetSphere(checks, "tiling sheet sphere cell against the sphere view at tiling 3", frames[(0f, 3)]);
 
         // The worked example as written: a sphere at tiling 3 of the open graph, and its refusals.
         var worked = await checks.CallAsync("swatch", """{"view":"sphere","tiling":3}""");
@@ -140,6 +144,15 @@ internal static class SwatchTiling
         Caught("tiling-2-for-3", probe => Check(probe, "2 for 3", three, texels, 0, 2, 2));
         Caught("tiling-3-for-1", probe => Check(probe, "3 for 1", frames[(0f, 3)], texels, 0, 1, 1));
         Caught("axes-swapped", probe => Check(probe, "swapped", three, SwapAxes(texels), 0, 3, 3));
+        // The sheet's break (RV-76): its sphere cell judged against the sphere at tiling 1 must fail, so the cell is shown to wear the tiling.
+        if (sheet.Width > N && sheet.Height == 538)
+        {
+            var probe = new PatinaChecks(driver);
+            SheetSphere(probe, "tiling sheet sphere cell against the sphere view at tiling 1", frames[(0f, 1)]);
+            log.AppendLine("== sheet-tiling-ignored");
+            foreach (var failure in probe.Failures) log.AppendLine("  " + failure);
+            checks.Check(probe.Failures.Any(f => f.Contains("tiling sheet sphere cell", StringComparison.Ordinal)), "swatch: the break sheet-tiling-ignored was not caught by the sheet's sphere cell check");
+        }
         await SwatchCubeCheck.RunAsync(driver, checks, measured, log);
         File.WriteAllText(Path.Combine(driver.RunFolder, "swatch-tiling-checks.tsv"), measured + "\n" + log);
     }

@@ -12,9 +12,10 @@
 - T-138: transform (offset, tile, mirror, rotation, scale) and distance-from-an-edge nodes on the tiled evaluator, and samples/graphs/floor-tiles.texgraph with its PNGs
 - T-157: swatch gains a cube view, with the same tiling option as the sphere, so a material can be judged on flat faces and edges as well as a curve
 - T-141: patina's check lists texture faults in the open graph's outputs or in PNG files: seams, base colour out of range, metallic not near 0 or 1, normals not of unit length, and an output of one value
-- T-155: A wide neighbourhood node runs as a cached row pass and a column pass, so blur and distance at 8192 meet 10 s within the memory cap, and a free rotation stops recomputing its source
+- T-155: A wide neighbourhood node runs as a cached row pass and a column pass, so blur at 8192 takes about 2 minutes, not an hour, and distance 18 s, not 474, within the memory cap (the 10 s target moved to T-159), and a free rotation stops recomputing its source
 - T-142: scenario-patina's library stage opens, swatches, checks and exports every sample material and variant, with every pixel worked from its texels, and commits each sample's swatch sheet
 - T-143: Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
 - T-171: edit_graph's set_params and set_node take list parameters (Floats, Colours) as define_graph does, so gradient_map's stops can be edited in place
 - T-170: patina's tool descriptions reach an agent whole, with the node catalogue no longer crammed into define_graph's, so a fresh agent learns the node types by reading rather than by sending wrong graphs
-- T-172: scenario-patina runs well inside run-scenario's 300 s guard again, by smaller textures where evaluation is the cost, otherwise by splitting the library stage into a suite of its own, with no check and no approved frame lost
+- T-172: scenario-patina runs well inside run-scenario's 300 s guard again: the library stage is split into two halves, suites `scenario-patina-library-1` and `scenario-patina-library-2`, beside `scenario-patina` for the other stages, with no check and no approved frame lost
+- T-177: Every finding of RV-76's `## Findings: the scenarios and test configuration` and `## Findings: the whole diff` is answered
