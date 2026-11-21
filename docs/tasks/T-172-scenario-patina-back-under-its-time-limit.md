@@ -52,7 +52,12 @@ busy with another suite, and every check and every approved frame it holds today
 
 ### As built
 
-Run on Sonnet 5.5 (claude-sonnet-5-5).
+Run on Sonnet 5.5 (claude-sonnet-5-5), which measured, split and committed `df4f877` and `43f2660` and was stopped by a
+usage limit; continued on Opus 5.5 (claude-opus-5-5), since Sonnet was unavailable until the limit resets. The second
+agent checked the split (every sample in one half, the planted faults in half 2 only, the bricks-variant and metal
+breaks each within one half), corrected `PatinaStages.For`'s summary (it said an unknown selection runs everything;
+it is refused), found no stale T-172 job to cancel (the first agent's last verify was still running on the current
+head and was left to finish), verified and finished.
 
 **Measured** (Xellotath, Debug build, one run of the whole suite as it stood):
 
