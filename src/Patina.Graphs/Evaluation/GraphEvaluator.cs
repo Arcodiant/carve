@@ -9,7 +9,7 @@ namespace Patina.Graphs.Evaluation;
 /// (<see cref="DefaultTileSize"/>, 128, unless a caller names another power of two), tile <c>(tx, ty)</c> holding
 /// columns <c>tx * T</c> to <c>tx * T + T - 1</c> and the same rows, always inside the image. Output tiles are made in
 /// bands of at most <see cref="MostBandTiles"/> tile columns (T-155), each band walked down a row at a time, left to
-/// right in the row: up to 16 tiles across that is the image's raster order. A tile is made depth first: each tile of
+/// right in the row: up to 32 tiles across, unless a separable node narrows the band, that is the image's raster order. A tile is made depth first: each tile of
 /// each input it reads (each node names, by <see cref="NodeType.InputRect"/>, the rectangle of each input it reads for
 /// a tile; the tiles covering that rectangle, wrapping around the image, are read) is found or made and pinned, the
 /// tile is filled, and its inputs are unpinned. So what is pinned at once is one path of reads through the graph.</para>
@@ -76,14 +76,17 @@ public sealed class GraphEvaluator
     public EvaluationRun? LastRun { get; private set; }
 
     // Dependent: the port's rectangles come from InputRects once the inputs it depends on are made (T-153).
-    private sealed record Source(string Port, int Node, int OutPort, bool Dependent, string[] DependsOn);
+    private sealed record Source(string Port, int Node, int OutPort, string[] DependsOn)
+    {
+        public bool Dependent => DependsOn.Length > 0;
+    }
 
     private sealed record Step(string Id, NodeType Type, NodeParameters Parameters, Source[] Sources, string[] Ports, PortKind[] Kinds);
 
     /// <summary>
     /// Evaluates the output with <paramref name="role"/> at <paramref name="size"/>, tile by tile, calling
     /// <paramref name="onTile"/> with the tile reaching the output node for each canonical tile, in the bands the
-    /// class describes (the image's raster order up to 16 tiles across). The tile is the evaluator's: read it during the call and do not keep it. <paramref name="tileSize"/> (a
+    /// class describes (the image's raster order up to 32 tiles across, unless a separable node narrows the band). The tile is the evaluator's: read it during the call and do not keep it. <paramref name="tileSize"/> (a
     /// power of two) and <paramref name="cacheBytes"/> override <see cref="DefaultTileSize"/> and
     /// <see cref="DefaultCacheBytes"/>; neither changes a byte of the output.
     /// </summary>
@@ -122,10 +125,7 @@ public sealed class GraphEvaluator
             var ports = node.Type.Outputs.ToArray();
             return new Step(id, node.Type, node.Parameters,
                 [.. node.Sources.Select(p =>
-                {
-                    var on = DependsOn(node.Type, p.Key, node.Parameters);
-                    return new Source(p.Key, index[p.Value.Node], PortIndex(p.Value.Node, p.Value.Port), on.Length > 0, on);
-                })],
+                    new Source(p.Key, index[p.Value.Node], PortIndex(p.Value.Node, p.Value.Port), DependsOn(node.Type, p.Key, node.Parameters)))],
                 ports, [.. ports.Select(p => node.OutputKinds[p])]);
         }).ToArray();
         var (inNode, inPort) = _analysis.Nodes[outputId].Sources["in"];
@@ -179,13 +179,11 @@ public sealed class GraphEvaluator
         // Fills and caches a tile, then unpins its inputs: cold while a row pass is being made (TileCache).
         TileCache.Entry Finish(long key, Step step, TexelRect rect, Action<Dictionary<string, Tile>> fill, List<TileCache.Entry> pins)
         {
-            long incoming = 0;
-            foreach (var kind in step.Kinds) incoming += (long)rect.Width * rect.Height * PortKinds.Channels(kind) * sizeof(float);
-            cache.MakeRoom(incoming);
+            var lengths = step.Kinds.Select(k => (long)rect.Width * rect.Height * PortKinds.Channels(k)).ToArray();
+            cache.MakeRoom(lengths.Sum() * sizeof(float));
             var outputs = new Tile[step.Ports.Length];
             var named = new Dictionary<string, Tile>(StringComparer.Ordinal);
-            for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect,
-                    cache.Take((long)rect.Width * rect.Height * PortKinds.Channels(step.Kinds[p])));
+            for (var p = 0; p < outputs.Length; p++) named[step.Ports[p]] = outputs[p] = new Tile(step.Kinds[p], rect, cache.Take(lengths[p]));
             fill(named);
             var entry = cache.AddPinned(key, outputs);
             foreach (var pin in pins) cache.Unpin(pin, cold);
