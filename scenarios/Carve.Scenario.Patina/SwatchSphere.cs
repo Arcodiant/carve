@@ -34,6 +34,18 @@ internal sealed class SwatchSphere
         _sin = MathF.Sin(a);
     }
 
+    private static readonly Dictionary<float, Hit?[,]> Hits = [];
+
+    /// <summary>The hit at every pixel's centre of the frame turned by <paramref name="angle"/> degrees, indexed [x, y] to <see cref="Size"/>, made once an angle.</summary>
+    public static Hit?[,] HitsAt(float angle)
+    {
+        if (Hits.TryGetValue(angle, out var hits)) return hits;
+        var sphere = new SwatchSphere(angle);
+        hits = new Hit?[Size + 1, Size + 1];
+        for (var y = 0; y <= Size; y++) for (var x = 0; x <= Size; x++) hits[x, y] = sphere.Trace(x + 0.5f, y + 0.5f);
+        return Hits[angle] = hits;
+    }
+
     /// <summary>A point of the frame, in pixels from the top-left corner (a pixel's centre is x + 0.5).</summary>
     public Hit? Trace(float px, float py)
     {
