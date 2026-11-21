@@ -46,7 +46,7 @@ public static class SwatchCamera
     public static Quaternion Light => RenderLights.Orientation(Eye);
 }
 
-/// <summary>patina's offscreen pipeline: the sphere's 512 target and the 512 label atlas, both on Carve's slate.</summary>
+/// <summary>patina's offscreen pipeline: the sphere's 512 target and the 1024 label atlas page, both on Carve's slate.</summary>
 internal sealed class SwatchComposition(IGraphicsResourceManager resources) : IRenderPipelineConfigurator
 {
     public const string SphereTag = "swatch-sphere";
@@ -170,7 +170,7 @@ internal sealed class SwatchSystem(
             entities.GetComponent<Transform3D>(instance).Orientation = turn;
             entities.GetOrAddComponent<WorldTransform>(instance) = new WorldTransform { Matrix = Matrix4x4.CreateFromQuaternion(turn) };
 
-            Task<RenderTargetPixels>? atlas = null;
+            List<Task<RenderTargetPixels>>? atlas = null;
             List<Vector2>? extents = null;
             if (spec.Labels is { } labels)
             {
@@ -182,36 +182,58 @@ internal sealed class SwatchSystem(
                 }
                 var surface = surfaces.Get(SwatchComposition.AtlasTag);
                 extents = [];
-                for (var row = 0; row < labels.Count && row < LabelAtlas.Rows; row++)
+                // The atlas grows a page of LabelAtlas.Rows rows at a time (RV-76): the first page is drawn in the sphere's
+                // frame, as it always was, and each further page in a frame of its own, read back after it.
+                void Page(int page)
                 {
-                    extents.Add(surface.Text.MeasureText(labels[row], 1));
-                    surface.Text.DrawText(labels[row], new Vector2(LabelAtlas.Inset, row * LabelAtlas.Pitch + LabelAtlas.Inset), Vector4.One);
+                    for (var row = page * LabelAtlas.Rows; row < labels.Count && row < (page + 1) * LabelAtlas.Rows; row++)
+                    {
+                        extents.Add(surface.Text.MeasureText(labels[row], 1));
+                        surface.Text.DrawText(labels[row], new Vector2(LabelAtlas.Inset, (row - page * LabelAtlas.Rows) * LabelAtlas.Pitch + LabelAtlas.Inset), Vector4.One);
+                    }
                 }
-                atlas = readback.ReadAsync(composition.Atlas.Resolved);
+                Page(0);
+                atlas = [readback.ReadAsync(composition.Atlas.Resolved)];
+                var sphereFirst = OffscreenFrame.ReadAsync(renderer, readback, composition.Sphere.Resolved);
+                _composed = true;
+                for (var page = 1; page < LabelAtlas.Pages(labels.Count); page++)
+                {
+                    Page(page);
+                    atlas.Add(OffscreenFrame.ReadAsync(renderer, readback, composition.Atlas.Resolved));
+                }
+                Finish(request, sphereFirst, atlas, extents);
+                return;
             }
 
             var sphere = OffscreenFrame.ReadAsync(renderer, readback, composition.Sphere.Resolved);
             _composed = true;
-            Task all = atlas is null ? sphere : Task.WhenAll(sphere, atlas);
-            _ = all.ContinueWith(
-                task =>
-                {
-                    if (task.IsCompletedSuccessfully)
-                    {
-                        request.Complete(new SwatchFrame(sphere.Result.ToDecodedImage().Pixels, atlas?.Result.ToDecodedImage().Pixels, extents));
-                    }
-                    else
-                    {
-                        request.Fail(task.Exception?.GetBaseException() ?? new TaskCanceledException());
-                    }
-                },
-                TaskScheduler.Default);
+            Finish(request, sphere, null, null);
         }
         catch (Exception e)
         {
             log.LogError(e, "swatch: the sphere render failed");
             request.Fail(e);
         }
+    }
+
+    /// <summary>Answers the request once the sphere and every atlas page are read: the pages stacked top to bottom are the atlas.</summary>
+    private static void Finish(SwatchRequest request, Task<RenderTargetPixels> sphere, List<Task<RenderTargetPixels>>? atlas, List<Vector2>? extents)
+    {
+        Task all = atlas is null ? sphere : Task.WhenAll([sphere, .. atlas]);
+        _ = all.ContinueWith(
+            task =>
+            {
+                if (task.IsCompletedSuccessfully)
+                {
+                    request.Complete(new SwatchFrame(sphere.Result.ToDecodedImage().Pixels,
+                        atlas is null ? null : [.. atlas.SelectMany(page => page.Result.ToDecodedImage().Pixels)], extents));
+                }
+                else
+                {
+                    request.Fail(task.Exception?.GetBaseException() ?? new TaskCanceledException());
+                }
+            },
+            TaskScheduler.Default);
     }
 
     /// <summary>

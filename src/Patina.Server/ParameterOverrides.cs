@@ -38,7 +38,7 @@ public static class ParameterOverrides
         {
             if (Read(p.Value) is not { } v)
             {
-                error = $"{tool}: {GraphParameters.Where(p.Name)}{WhyNot(p.Value).Replace(" is ", ": is ", StringComparison.Ordinal)}";
+                error = $"{tool}: {GraphParameters.Where(p.Name)}{Colon(WhyNot(p.Value))}";
                 return false;
             }
             read[p.Name] = v;
@@ -71,6 +71,9 @@ public static class ParameterOverrides
             default: return null;
         }
     }
+
+    /// <summary><see cref="WhyNot"/>'s words after <see cref="GraphParameters.Where"/>: a colon before its first "is", and only there (RV-76).</summary>
+    private static string Colon(string why) => why.StartsWith(" is ", StringComparison.Ordinal) ? ":" + why : why;
 
     /// <summary>What follows the name for a value <see cref="Read"/> refused, as the file words it: a mixed array is its own fault.</summary>
     public static string WhyNot(JsonElement v) =>

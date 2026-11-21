@@ -263,7 +263,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). Diff: `git diff origin/main...H
   - `push_snapshot`/`pop_snapshot` share the cause: `Pop` re-places a snapshot into the current folder.
   - `NestedGraphToolTests` saves only into the folder it already resolves against (lines 64 and 79), so no test would catch this.
 
-**Outcome:** —
+**Outcome:** fixed (T-176, claude-opus-5-5): save judges the graph in the target's folder (`graph with { Folder = <target's folder> }`), so a graph node not found from there is a fault and the save is refused, naming that folder; nothing is written and the open graph is unchanged. Paths are not rewritten: that is save's existing rule (a saved graph evaluates) applied where the file goes. pop_snapshot now reports the restored graph as it is placed in the current folder, so a snapshot pushed before a save into another folder comes back with its faults listed, not as it was when pushed. Both descriptions say so. Tests: `NestedGraphToolTests.Save_into_another_folder_is_judged_there_and_refused_when_a_graph_node_would_not_resolve` and `Pop_snapshot_after_a_save_into_another_folder_lists_the_faults_the_snapshot_has_there`.
 
 ### A sheet of more than 15 outputs throws instead of drawing or refusing
 
@@ -276,7 +276,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). Diff: `git diff origin/main...H
   - Nothing caps the outputs: six roles plus any number of named outputs, and named outputs are the masks M-30 will layer with. The atlas comment ("15 columns' two labels") knows the limit, but no code path enforces it or falls back.
   - No test covers a sheet of more than 7 columns.
 
-**Outcome:** —
+**Outcome:** fixed (T-176, claude-opus-5-5), as the person ruled: the label atlas grows a page at a time. Page 0 (rows 0 to 31) is drawn in the sphere's frame as before; each further page of 32 rows is drawn in a frame of its own, and the pages stacked are the atlas, so `Compose` reads row r at r x 32 unchanged (`LabelAtlas.Pages`). A sheet of 15 outputs or fewer draws exactly what it drew. Tests: `SwatchTests.A_sheet_of_more_than_15_outputs_reads_its_labels_from_a_second_atlas_page`, and scenario-patina's `WideSheetStage` (18 columns drawn through the engine, the second page's labels found).
 
 ### export refuses `metallic` even when `roughness` is named too, against its own description
 
@@ -287,7 +287,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). Diff: `git diff origin/main...H
   - The description lists "metallic named alone" among the refusals. The loop refuses any `metallic` in `outputs`, so `{"outputs":["roughness","metallic"]}` is refused with "so name roughness to write it", although roughness was named.
   - Either the refusal should fire only when roughness is absent (the description's rule), or the description and message should say that metallic is never named.
 
-**Outcome:** —
+**Outcome:** fixed (T-176, claude-opus-5-5): the description's rule. metallic is refused only when roughness is not named too; named beside it, metallic is written in roughness.png. Test: `MetalPlateTests` (both orders write the same roughness.png and only it).
 
 ### check on files reads the blue channel of any roughness PNG as metallic
 
@@ -313,7 +313,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). Diff: `git diff origin/main...H
   - A mixed array gives `parameters['mortar']: an array: is all numbers or all strings`. T-171's As built gives the intended words.
   - No test covers either override path. The tested `edit_graph` path does not go through the `Replace`.
 
-**Outcome:** —
+**Outcome:** fixed (T-176, claude-opus-5-5): the colon goes only before a leading " is ", giving `parameters['mortar']: is true or false; a value is a number, ...` and `parameters['mortar']: an array is all numbers or all strings`. Test: `ExposedParameterToolTests.An_override_value_patina_cannot_read_is_worded_with_one_colon` (swatch, export and check).
 
 ### check on files reports one `stats.size` for files of different sizes
 
