@@ -141,6 +141,8 @@ check {}          (open graph, its own size; optional size<=2048,
 | 4 | T-141 check | Sonnet | T-134, T-137, T-138, T-139 | `CheckTool.cs`, `Patina.Graphs/Checks/` |
 | 5 | T-142 library stage in scenario-patina | Sonnet (+ frame review) | T-140, T-141, T-155, T-156, T-157 | `LibraryStage.cs`, `samples/graphs/*/swatch.png` |
 | 6 | T-143 acceptance | Sonnet (inner sessions on the default, Opus) | T-142 | its round folders and checks |
+| 7 | T-170 tool descriptions read whole (added 2026-11-20) | Opus | T-143 | `DefineGraphTool.cs`, `NodeCatalogue`, any new tool |
+| 7 | T-171 edit_graph takes list parameters (added 2026-11-20) | Sonnet | T-143 | `EditGraphTool.cs` |
 
 Dependencies on a sibling's feature: T-137's gradient map needs T-134's list parameters, and its sample T-134's
 `metallic` and named outputs. T-138's floor tiles need T-136's `tiles` and T-134's `height`. T-139's content edits
@@ -168,5 +170,7 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-155](../tasks/T-155-separable-passes-and-rotated-read-locality.md) — A wide neighbourhood node runs as a cached row pass and a column pass, so blur and distance at 8192 meet 10 s within the cap, and a free rotation stops recomputing its source
 - [ ] [T-156](../tasks/T-156-a-sphere-tiling-option-on-swatch.md) — swatch takes a sphere tiling, default 1, so a material can be judged on the sphere at a texel density nearer a game's; the samples' sheets use 3
 - [ ] [T-157](../tasks/T-157-a-cube-view-on-swatch.md) — swatch gains a cube view, with the same tiling option as the sphere, so a material can be judged on flat faces and edges as well as a curve
+- [ ] [T-170](../tasks/T-170-tool-descriptions-an-agent-can-read-whole.md) — patina's tool descriptions reach an agent whole, with the node catalogue no longer crammed into define_graph's
+- [ ] [T-171](../tasks/T-171-edit-graph-takes-list-parameters.md) — edit_graph's set_params and set_node take list parameters as define_graph does
 
 ## Retrospective
