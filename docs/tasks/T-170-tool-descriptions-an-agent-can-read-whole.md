@@ -44,12 +44,16 @@ parameters from them, without probing with graphs it expects to fail.
   T-143's spec said a description problem is fixed in the task; it was not.
 - Runs beside T-171, which owns `EditGraphTool.cs`. This task owns `DefineGraphTool.cs`, `NodeCatalogue` and any new
   tool. Shared lines that only add (`Program.Tools`, the tool-list tests, CLAUDE.md's Layout) are kept on both sides.
+- **edit_graph falls to T-170 (2026-11-20).** T-171 closed without bringing `edit_graph` under the cap and its list
+  example made it longer (4,950). The round-1 ruling left it to T-171; with T-171 closed, the Goal (every description
+  arrives whole) is this task's, so it was trimmed here the way check was, and the length test exempts no tool. The
+  person approved it with the re-run's conditions (Waystone, round 2).
 - Opus: the cause is unconfirmed, and the fix shapes how every later agent learns patina.
 
 ### As built
 
-Built by Claude Opus 5.5 (`claude-opus-5-5`); the probe session ran on `claude-opus-5-5` (its init line, Claude Code
-2.1.329).
+Built by Claude Opus 5.5 (`claude-opus-5-5`) in two agents (the second after a hand-off, rebasing onto T-171 and
+running the re-run); the probe and re-run sessions ran on `claude-opus-5-5` (their init lines, Claude Code 2.1.329).
 
 - **Cause, measured.** One fresh `claude -p` probe under round 1's flags (`--model claude-opus-5-5 --allowedTools
   "mcp__patina__*" --tools ""`), asked to quote the last 150 characters of every description without calling a tool.
@@ -58,8 +62,7 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`); the probe session ran on `claude-o
   exactly character 4,096: `define_graph` (17,908; cut inside fbm's entry, so 13 of 19 types and every worked example
   never arrived), `check` (5,408) and `edit_graph` (4,239). Probe prompt and answer: `G:\My Drive\artifacts\carve\M-28\T-170\round-1\`.
 - **Approved by the person (Waystone, 2026-11-20)** before building: the named shape for define_graph; check trimmed in
-  this task; edit_graph (T-171's file, over the limit and growing there) left to T-171 to bring under, named in the
-  test rather than skipped silently; a margin of 10%, each description at most 3,686 characters, so swatch and export
+  this task; edit_graph (T-171's file) left to T-171, since taken back (Notes); a margin of 10%, each description at most 3,686 characters, so swatch and export
   were trimmed too.
 - **`nodes`** (`NodeTool.cs`, listed after define_graph in `Program.Tools`): `nodes {}` returns every type's entry,
   `nodes {"type": T}` one; an entry is what the type does, its inputs, outputs, every parameter with range and default
@@ -72,24 +75,24 @@ Built by Claude Opus 5.5 (`claude-opus-5-5`); the probe session ran on `claude-o
   chrome-in-paint and PNG-files examples left the description and still run as written in `CheckToolTests`. swatch's
   and export's examples now say the metal plate is nodes' output example.
 - **Lengths now** (`tools/list` of a Release publish): define_graph 3,430, nodes 1,533, export 3,672, swatch 3,666,
-  check 3,680, get_graph 2,214, the rest under 1,500; edit_graph 4,239, still cut, T-171's.
-- **Tests:** `NodeToolTests` (every description from `tools/list` at most 3,686 = 4,096 x 0.9, edit_graph named as
-  T-171's; every type's examples run as written and held to its entry; `nodes` one, all and refused; define_graph's
+  check 3,680, get_graph 2,214, the rest under 1,500.
+- **Tests:** `NodeToolTests` (every description from `tools/list` at most 3,686 = 4,096 x 0.9, no tool exempt; every type's examples run as written and held to its entry; `nodes` one, all and refused; define_graph's
   index names every type). The tool-list checks in `GraphToolTests`, `PatinaProcessTests` and scenario-patina's
   `GraphStage` gain `nodes`, so Verify adds scenario-patina.
-
-### Hand-off
-
-Checkpoint reached (code committed and verified, a real run still to come), by Claude Opus 5.5.
-
-- **Done:** cause measured and recorded above; fix approved and built; tests; CLAUDE.md's Layout.
-- **Left:** (1) put the re-run's conditions to the person before it: T-143 round 1's session 1 (`s1-rug`, its
-  `prompt.txt` unchanged) with `run-session.cmd`'s flags, against a Release publish of this branch (one is at
-  `%LOCALAPPDATA%\Temp\carve-m28-t170\patina\`), into `C:\Users\andre\artifacts\carve\M-28\T-143\round-2-descriptions\`;
-  write `.mcp.json` with `json.dump`, not by hand. (2) Run it, and record whether the agent read the descriptions
-  whole and its probing calls against round 1's 3 (calls 1 to 3 of 25 were deliberately wrong graphs). (3) `cairn lint`,
-  `finish`.
-- **Checked:** `patina-unit` passed (143, 6 skipped) before the Verify line gained scenario-patina; see the verify
-  output in the report for scenario-patina.
-- **Surprising:** the cut is the same 4,096 for every tool; check and edit_graph were cut as well as define_graph,
-  which T-143's record did not name. T-171 should be told that edit_graph must come under 3,686.
+- **edit_graph, after T-171 landed** (4,950 characters): trimmed as check was. The bricks `set_parameters` example,
+  T-171's gradient_map list example and the `set_parameter`/`remove_parameter` sentence on the bricks left the
+  description and still run as written (`ExposedParameterToolTests`, `EditGraphListParameterTests`, which now hold that
+  they are gone from it); a few phrases tightened. Every operation and its rule, the list-parameter rule, the grain
+  example and its refused example stay. Now under 3,686 (the test holds it). `patina-unit`: 157 passed, 6 skipped.
+- **Re-run** (approved by the person, Waystone round 2, with the edit_graph trim): T-143 round 1's `s1-rug`, its
+  `prompt.txt` and `run-session.cmd` unchanged (`--model claude-opus-5-5 --allowedTools "mcp__patina__*" --tools ""
+  --mcp-config .mcp.json --strict-mcp-config`), against a fresh Release publish of the rebased branch at
+  `%LOCALAPPDATA%\Temp\carve-m28-t170\patina\`, into `C:\Users\andre\artifacts\carve\M-28\T-143\round-2-descriptions\s1-rug\`.
+  **10 calls, none probing** (round 1: 25, the first 3 deliberately wrong graphs). Its first call was `nodes {}`, then
+  one `define_graph` of 32 nodes accepted with no fault, then swatch, check (default and with the variant's
+  parameters), save, two exports, get_graph and a sheet. It mentioned no cut description and no error; its account
+  says "there were no errors along the way". It named its setting `border` (round 1: `border_colour`).
+- **Not checked:** the re-run's sheets were not judged by eye, and `AcceptanceRoundTests` was not run on the re-run
+  folder (its `round.json` names all four sessions and round 1's parameter name).
+- Written outside the worktree: the re-run folder, `G:\My Drive\artifacts\carve\M-28\T-170\` (probe, round 2's
+  conditions), `%LOCALAPPDATA%\Temp\carve-m28-t170\` (publish) and `%LOCALAPPDATA%\Temp\t170tools\` (script).
