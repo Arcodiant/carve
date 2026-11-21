@@ -22,18 +22,18 @@ internal sealed class LibraryStage : IPatinaStage
     private const int Tiling = 3;
     private const int SheetTop = 24;
 
-    private sealed record Sample(string Name, string Graph, string Committed, string? Overrides);
+    private sealed record Sample(string Name, string Graph, string Committed, string? Overrides, int Part);
 
     private static readonly Sample[] Samples =
     [
-        new("cobblestones", "cobblestones.texgraph", "cobblestones", null),
-        new("bricks", "bricks.texgraph", "bricks", null),
-        new("bricks-grey", "bricks.texgraph", "bricks/variants/grey", GreyOverrides),
-        new("fabric", "fabric.texgraph", "fabric", null),
-        new("painted-metal", "painted-metal.texgraph", "painted-metal", null),
-        new("floor-tiles", "floor-tiles.texgraph", "floor-tiles", null),
-        new("old-wall", "old-wall.texgraph", "old-wall", null),
-        new("grime", "grime.texgraph", "grime", null),
+        new("cobblestones", "cobblestones.texgraph", "cobblestones", null, 1),
+        new("bricks", "bricks.texgraph", "bricks", null, 1),
+        new("bricks-grey", "bricks.texgraph", "bricks/variants/grey", GreyOverrides, 1),
+        new("fabric", "fabric.texgraph", "fabric", null, 1),
+        new("painted-metal", "painted-metal.texgraph", "painted-metal", null, 2),
+        new("floor-tiles", "floor-tiles.texgraph", "floor-tiles", null, 2),
+        new("old-wall", "old-wall.texgraph", "old-wall", null, 2),
+        new("grime", "grime.texgraph", "grime", null, 2),
     ];
 
     private enum Kind { Plain, RoughnessOnly, MetallicOnly }
@@ -46,14 +46,20 @@ internal sealed class LibraryStage : IPatinaStage
 
     private readonly StringBuilder _measured = new("sample\tsphere_pixels\tr_with_metallic\tr_without_metallic\tr_mirrored\tsilhouette_wrong\tslate_inside\tinside\n");
 
+    /// <param name="part">0 runs every sample, the planted faults and every break; 1 or 2 only that half of the samples (T-172: the
+    /// stage's own time, not the server's, is what filled the 300 s guard), part 2 with the planted faults.</param>
+    public LibraryStage(int part = 0) => _part = part;
+
+    private readonly int _part;
+
     public async Task RunAsync(ScenarioDriver driver, PatinaChecks checks)
     {
         var samples = Path.Combine(SwatchStage.RepoRoot(), "samples", "graphs");
         var done = new Dictionary<string, Done>();
-        foreach (var sample in Samples) done[sample.Name] = await SampleAsync(driver, checks, samples, sample);
+        foreach (var sample in Samples.Where(s => _part == 0 || s.Part == _part)) done[sample.Name] = await SampleAsync(driver, checks, samples, sample);
         File.WriteAllText(Path.Combine(driver.RunFolder, "library-checks.tsv"), _measured.ToString());
 
-        await FaultsAsync(driver, checks, samples);
+        if (_part != 1) await FaultsAsync(driver, checks, samples);
         Breaks(driver, checks, done);
     }
 
@@ -277,18 +283,21 @@ internal sealed class LibraryStage : IPatinaStage
             }, $"{n} sphere: tone difference correlates");
         }
         // The grey variant drawn from the plain bricks' texels.
-        var plain = done["bricks"];
-        var grey = done["bricks-grey"];
-        Caught("bricks variant from the base graph's texels", p => CheckSheet(p, new Done(grey.Sample, grey.Columns, plain.Files, grey.Sheet, grey.Sphere0, grey.Sphere90), mirror: false, shift: 0, grey.Sheet),
-            "bricks-grey sheet base_colour flat", "bricks-grey sheet base_colour tiled");
-        // The painted metal's sphere predicted without its metallic.
-        var metal = done["painted-metal"];
-        var without = Tones(metal, false, false);
-        Caught("painted-metal sphere predicted without metallic", p =>
+        if (done.TryGetValue("bricks", out var plain) && done.TryGetValue("bricks-grey", out var grey))
         {
-            var (r, count) = LibrarySphere.Correlation(without[0], without[1], metal.Sphere0, metal.Sphere90);
-            p.Check(r >= LibrarySphere.MetalMin, $"library: painted-metal sphere: predicted without metallic correlates {r:0.000} over {count} pixels, the rule at least {LibrarySphere.MetalMin}");
-        }, "painted-metal sphere: predicted without metallic");
+            Caught("bricks variant from the base graph's texels", p => CheckSheet(p, new Done(grey.Sample, grey.Columns, plain.Files, grey.Sheet, grey.Sphere0, grey.Sphere90), mirror: false, shift: 0, grey.Sheet),
+                "bricks-grey sheet base_colour flat", "bricks-grey sheet base_colour tiled");
+        }
+        // The painted metal's sphere predicted without its metallic.
+        if (done.TryGetValue("painted-metal", out var metal))
+        {
+            var without = Tones(metal, false, false);
+            Caught("painted-metal sphere predicted without metallic", p =>
+            {
+                var (r, count) = LibrarySphere.Correlation(without[0], without[1], metal.Sphere0, metal.Sphere90);
+                p.Check(r >= LibrarySphere.MetalMin, $"library: painted-metal sphere: predicted without metallic correlates {r:0.000} over {count} pixels, the rule at least {LibrarySphere.MetalMin}");
+            }, "painted-metal sphere: predicted without metallic");
+        }
         File.WriteAllText(Path.Combine(driver.RunFolder, "library-breaks.txt"), log.ToString());
     }
 }
