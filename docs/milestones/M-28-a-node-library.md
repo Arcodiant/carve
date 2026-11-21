@@ -173,12 +173,12 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-142](../tasks/T-142-the-node-library-in-scenario-patina.md) — scenario-patina's library stage opens, swatches, checks and exports every sample material and variant, with every pixel worked from its texels, and commits each sample's swatch sheet
 - [ ] [T-143](../tasks/T-143-node-library-acceptance-run.md) — Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
 - [ ] [T-153](../tasks/T-153-data-dependent-input-requests-for-warp.md) — A node can ask for an input's rectangle after reading another input, so warp at a large amount reads the few tiles its offsets reach
-- [ ] [T-155](../tasks/T-155-separable-passes-and-rotated-read-locality.md) — A wide neighbourhood node runs as a cached row pass and a column pass, so blur and distance at 8192 meet 10 s within the cap, and a free rotation stops recomputing its source
+- [ ] [T-155](../tasks/T-155-separable-passes-and-rotated-read-locality.md) — A wide neighbourhood node runs as a cached row pass and a column pass, so blur at 8192 takes about 2 minutes, not an hour, and distance 18 s, not 474, within the memory cap (the 10 s target moved to T-159), and a free rotation stops recomputing its source
 - [ ] [T-156](../tasks/T-156-a-sphere-tiling-option-on-swatch.md) — swatch takes a sphere tiling, default 1, so a material can be judged on the sphere at a texel density nearer a game's; the samples' sheets use 3
 - [ ] [T-157](../tasks/T-157-a-cube-view-on-swatch.md) — swatch gains a cube view, with the same tiling option as the sphere, so a material can be judged on flat faces and edges as well as a curve
 - [ ] [T-170](../tasks/T-170-tool-descriptions-an-agent-can-read-whole.md) — patina's tool descriptions reach an agent whole, with the node catalogue no longer crammed into define_graph's
 - [ ] [T-171](../tasks/T-171-edit-graph-takes-list-parameters.md) — edit_graph's set_params and set_node take list parameters as define_graph does
-- [ ] [T-172](../tasks/T-172-scenario-patina-back-under-its-time-limit.md) — scenario-patina runs well inside run-scenario's 300 s guard again, by smaller textures where evaluation is the cost, otherwise by splitting the library stage
+- [ ] [T-172](../tasks/T-172-scenario-patina-back-under-its-time-limit.md) — scenario-patina runs well inside run-scenario's 300 s guard again: the library stage is split into two halves, suites `scenario-patina-library-1` and `scenario-patina-library-2`, beside `scenario-patina` for the other stages, with no check and no approved frame lost
 - [ ] [T-173](../tasks/T-173-rv-76-answers-the-evaluation-engine.md) — Every finding of RV-76's `## Findings: the evaluation engine` is answered, fixed where it is a defect, with outputs byte-identical
 - [ ] [T-174](../tasks/T-174-rv-76-answers-the-nodes-and-check-rules.md) — Every finding of RV-76's `## Findings: the nodes, check rules and samples`, and the check-tool findings of the server's, is answered
 - [ ] [T-175](../tasks/T-175-rv-76-answers-the-file-format-and-graph-model.md) — Every finding of RV-76's `## Findings: the file format and graph model` is answered, fixed where it is a defect
@@ -274,8 +274,10 @@ reached from a plain `patina` launch, through its MCP tools.
 **Never verified.**
 
 - **Frames nobody opened:**
-  - `swatch-sheet-grid-tiling-3.png` differs from T-140's job. T-172 traced the difference to work after that job,
-    most likely T-157's label change.
+  - `swatch-sheet-grid-tiling-3.png` differs from T-140's job. T-172 traced the difference to work after that job;
+    T-177 (RV-76) found it: the 1,600 pixels that differ lie at x 536 to 615, y 27 to 46, inside the sphere cell's label
+    band, where T-157 (9b207c2) added ", tiling 3" to the sphere's label. The cell below the band is now judged against
+    the sphere view at tiling 3, pixel for pixel.
   - The re-run rug's sheets (T-170).
   - The library frames after T-172's split, which were held by hash only.
 - **Not measured after the last evaluator change** (T-155's bands of 32):

@@ -350,7 +350,7 @@ Reviewer: claude-opus-5-5. Read in `D:\Repos\carve\branches\milestone\M-28` (`gi
 - **Rubric:** Breaks: each one actually exercised and caught.
 - **What is wrong:** The break is `checks.Check(!MetallicReads(lit[0], lit[0]), ...)`. `MetallicReads(d, m)` is `d.Median - m.Median >= MetallicStep && m.Clipped > d.Clipped`. With the same tuple on both sides that is `0 >= 40 && x > x`, so it is false for every frame and the break passes whatever patina draws. It shows only that the rule's arithmetic is not vacuous. It never shows the rule catching a wrong frame, such as metallic dropped from the material. Self-comparison (`lit[1]` against `lit[1]`) would be constant-false in the same way. A meaningful break must judge one frame against a different, wrong prediction, for example the two frames swapped, `MetallicReads(lit[1], lit[0])`.
 
-**Outcome:** —
+**Outcome:** fixed (T-177): the break judges the two frames swapped, `!MetallicReads(lit[1], lit[0])` in `SwatchStage.cs`, so a frame drawn the wrong way round fails it. Shown failing: with the two spheres defined the other way round (metallic 1 drawn first), the run failed on the rule and on the break, "the metallic rule passes the frames swapped: metallic 0 (126.9, 1256 px) read as metal against metallic 1 (192.3, 261 px)".
 
 ### The painted-metal sphere threshold was fitted to the frame it judges
 - **Where:** `scenarios/Carve.Scenario.Patina/LibrarySphere.cs:21-25` (`MetalDrop = 0.34`, `MetalMin = 0.62`). Used in `LibraryStage.cs` `SampleAsync` (`least = ... MetalMin`) and in the break "painted-metal sphere predicted without metallic".
@@ -358,7 +358,7 @@ Reviewer: claude-opus-5-5. Read in `D:\Repos\carve\branches\milestone\M-28` (`gi
 - **Rubric:** Weak or circular predictions.
 - **What is wrong:** T-142's As built gives the figures on this same sample's frames: r 0.661 with metallic in the prediction, 0.571 without. `MetalMin` 0.62 was then set between the two. So the check, and the break that says metallic is "weighed in", both rest on a line drawn through the output being checked. The margin is 0.04 on one side and 0.05 on the other. `MetalDrop` 0.34 is also patina's own measured drop (T-134), not something derived independently. The other samples' rule (0.6 against 0.896 to 0.994, with the mirrored texels at -0.31 to 0.05) separates clearly. This one does not, so the painted-metal check and its metal break show little beyond "this frame is the one measured". T-142 discloses the thin margin, but it is not ruled as acceptable.
 
-**Outcome:** —
+**Outcome:** no change needed: the person accepted `MetalMin` 0.62 and `CorrelationMin` 0.6 after T-142 (2026-11-20, in T-142's Notes, "Decided after landing"), with the thin margin disclosed. No sharper measure was looked for.
 
 ### Two scenario frames are captured with no pixel judged, and one has changed unexplained
 - **Where:** `scenarios/Carve.Scenario.Patina/SwatchTiling.cs:113-118` (`swatch-sheet-grid-tiling-3`, judged only by `sheet.Width > N`). `NestedGraphStage.cs:36,39` (`nested-old-wall-sheet`, `nested-grime-sheet`, "for the person to judge").
@@ -366,7 +366,7 @@ Reviewer: claude-opus-5-5. Read in `D:\Repos\carve\branches\milestone\M-28` (`gi
 - **Rubric:** Weak predictions.
 - **What is wrong:** The comment at SwatchTiling.cs:112 says "The sheet's sphere cell wears the tiling". Nothing checks this: the sphere cell is never compared with `frames[(0f, 3)]`, as `LibraryStage.CheckSheet` and the plate's sheet compare theirs. So a sheet that ignored the tiling would pass. T-172's As built records that this exact frame, `frames/swatch-sheet-grid-tiling-3.png`, differs from T-140's job J-20261120-085227-39ade3. It puts the change down to "work landed after that job", but the reason it gives (the cube rows) explains only the tsv. A frame that changed with nothing judging it is the case a check would have explained. The nested stage's two sheets are checked nowhere in the `base` suite. The library stage checks old-wall and grime only at tiling 3, in another suite.
 
-**Outcome:** —
+**Outcome:** fixed (T-177): the tiling-3 sheet's sphere cell is judged against the sphere view at tiling 3, pixel for pixel below the label band, and the break `sheet-tiling-ignored` (the cell against tiling 1, 78,131 px wrong) must be caught. The nested stage's old-wall and grime sheets are judged in `base`: every flat and tiled cell against the stage's own export (`LibraryStage.CheckGraphSheet`), and the sphere cell against a new sphere-view frame per graph (`nested-<name>-sphere`), whose silhouette is judged by the planks' rule. Shown failing: with the sheet drawn at tiling 1, the cell check failed on 78,131 px. With old-wall's sheet judged against the planks' texels, every column's flat and tiled cell failed. The frame's change is explained: against T-140's job J-20261120-085227-39ade3, the 1,600 pixels that differ lie at x 536 to 615, y 27 to 46, inside the sphere cell's label band, where T-157 (9b207c2) added ", tiling 3" to the sphere's label.
 
 ### CLAUDE.md's Patina scenario row leaves out the split, the nested stage and the cube
 - **Where:** `CLAUDE.md:88` (the `scenarios/Carve.Scenario.Patina` row).
@@ -379,7 +379,7 @@ Reviewer: claude-opus-5-5. Read in `D:\Repos\carve\branches\milestone\M-28` (`gi
 
   The `src/Patina.Server` row (`CLAUDE.md:73`) also describes swatch as "flat, tiled 3 x 3 and the sphere", with no `cube` (`SwatchTool.Views` has it).
 
-**Outcome:** —
+**Outcome:** fixed (T-177): the row names `PatinaStages.For`, `Patina:Stages` and the three suites with their selections, `NestedGraphStage.cs`, and the cube's `SwatchCubeCheck.cs` with its breaks. The `src/Patina.Server` row now names the `cube` view.
 
 ### CLAUDE.md's Patina.SampleGraphs row omits the variants and half the samples
 - **Where:** `CLAUDE.md:96`; `tools/Patina.SampleGraphs/Program.cs:12-15,36-40`.
@@ -387,7 +387,7 @@ Reviewer: claude-opus-5-5. Read in `D:\Repos\carve\branches\milestone\M-28` (`gi
 - **Rubric:** CLAUDE.md's Layout against the code.
 - **What is wrong:** The row says the tool writes `samples/graphs/<name>/<role>.png`. It names the tests that keep planks, bricks, fabric and floor-tiles. The code also writes `samples/graphs/<name>/variants/<variant>/` (the bricks' `grey`, through `GraphParameters.WithOverrides`), and names each file by `OutputRoles.FileOf`, so metallic gets none of its own. The row is also silent on cobblestones, painted-metal, old-wall and grime, and on the tests that keep them: `CobblestonesGraphTests`, `PaintedMetalTests`, `NestedSamplesTests`, and `ExposedParametersTests` for the variant.
 
-**Outcome:** —
+**Outcome:** fixed (T-177): the row gives `OutputRoles.FileOf` (metallic has no file of its own) and the `variants/<variant>/` folders through `GraphParameters.WithOverrides`, kept by `ExposedParametersTests`. It now names cobblestones, painted-metal, old-wall and grime with `CobblestonesGraphTests`, `PaintedMetalTests` and `NestedSamplesTests`.
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -397,7 +397,7 @@ Reviewer: claude-opus-5-5. Read in `D:\Repos\carve\branches\milestone\M-28` (`gi
 - **Rubric:** Tracker docs and CLAUDE.md contradicting the code; a leftover from the hand-offs.
 - **What is wrong:** `Every_description_is_under_the_limit` checks every tool from `tools/list`, edit_graph included. T-170's Notes say "edit_graph falls to T-170" after T-171 closed, and its As built trimmed edit_graph from 4,950 characters. The CLAUDE.md clause is the first agent's state, from before that hand-off.
 
-**Outcome:** —
+**Outcome:** fixed (T-177): the clause now says every description, edit_graph's too, is held at 3,686 or less by `NodeToolTests`.
 
 ### T-155's line in the changelog, the milestone and its own description claims the 10 s it did not meet
 - **Where:** `docs/changelog/UNRELEASED.md` (the T-155 line); `docs/milestones/M-28-a-node-library.md:171`; `docs/tasks/T-155-separable-passes-and-rotated-read-locality.md:3`.
@@ -405,7 +405,7 @@ Reviewer: claude-opus-5-5. Read in `D:\Repos\carve\branches\milestone\M-28` (`gi
 - **Rubric:** Tracker docs that contradict the code they describe.
 - **What is wrong:** All three say "so blur and distance at 8192 meet 10 s within the (memory) cap". T-155's own Notes (lines 67-69) and the milestone retrospective (line 232, "The 10 s targets for blur and distance at 8192 were not met"; blur 120 s) say otherwise, and T-159 (off-milestone) now owns the target. The changelog is what ships. In the same way, the T-172 changelog line repeats the goal's "by smaller textures ..., otherwise by splitting" rather than what was done (the split).
 
-**Outcome:** —
+**Outcome:** fixed (T-177): T-155's line in the changelog, in the milestone and in its description now gives what was built: blur at 8192 about 2 minutes, not an hour, and distance 18 s, not 474, with the 10 s target moved to T-159. T-172's line in all three now says the library stage was split into two suites.
 
 ### T-172's Scope says the committed swatch.png sheets are compared byte for byte; nothing compares them
 - **Where:** `docs/tasks/T-172-scenario-patina-back-under-its-time-limit.md` Scope ("the committed `samples/graphs/*/*.png` and `swatch.png` sheets stay 256 and are still compared byte for byte"). Against it: `scenarios/Carve.Scenario.Patina/LibraryStage.cs:139` (`.Where(f => f != "swatch.png")`), and T-142's Scope and As built ("not compared by the scenario").
@@ -413,7 +413,7 @@ Reviewer: claude-opus-5-5. Read in `D:\Repos\carve\branches\milestone\M-28` (`gi
 - **Rubric:** Tracker docs that contradict the code.
 - **What is wrong:** No scenario or test reads `samples/graphs/*/swatch.png`; a grep of `tests`, `scenarios` and `tools` finds only the exclusion. The claim is T-172's and is wrong, though nothing is lost by it.
 
-**Outcome:** —
+**Outcome:** fixed (T-177): T-172's Scope now says the PNGs are compared byte for byte, and the `swatch.png` sheets are compared by no scenario or test, as T-142 built them.
 
 ## Summary
 
