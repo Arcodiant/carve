@@ -1,6 +1,6 @@
 ---
 description: >-
-  scenario-patina runs well inside run-scenario's 300 s guard again, by smaller textures where evaluation is the cost, otherwise by splitting the library stage into a suite of its own, with no check and no approved frame lost
+  scenario-patina runs well inside run-scenario's 300 s guard again: the library stage is split into two halves, suites `scenario-patina-library-1` and `scenario-patina-library-2`, beside `scenario-patina` for the other stages, with no check and no approved frame lost
 ---
 # T-172 — scenario-patina back under its time limit
 
@@ -29,7 +29,8 @@ busy with another suite, and every check and every approved frame it holds today
 - **Then the person's rule (2026-11-20):** if evaluating at texture size is what costs the time, use smaller textures;
   otherwise split the test.
   - **Smaller textures** only where nothing approved or committed changes: the committed `samples/graphs/*/*.png` and
-    `swatch.png` sheets stay 256 and are still compared byte for byte, and every approved frame stays as it is.
+    `swatch.png` sheets stay 256, the PNGs still compared byte for byte (the `swatch.png` sheets are not compared by
+    any scenario or test, as T-142 built them; corrected by T-177, RV-76), and every approved frame stays as it is.
     A scenario-only check (a variant, a planted fault, an edited graph) may run at a smaller size if it still catches
     its break.
   - **Split** otherwise: the library stage (or the stage that dominates) becomes a scenario suite of its own in

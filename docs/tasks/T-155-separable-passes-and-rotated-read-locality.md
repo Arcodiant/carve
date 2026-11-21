@@ -1,6 +1,6 @@
 ---
 description: >-
-  A wide neighbourhood node runs as a cached row pass and a column pass, so blur and distance at 8192 meet 10 s within the memory cap, and a free rotation stops recomputing its source
+  A wide neighbourhood node runs as a cached row pass and a column pass, so blur at 8192 takes about 2 minutes, not an hour, and distance 18 s, not 474, within the memory cap (the 10 s target moved to T-159), and a free rotation stops recomputing its source
 ---
 # T-155 — Separable passes and rotated-read locality
 
