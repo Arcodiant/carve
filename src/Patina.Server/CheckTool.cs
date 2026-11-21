@@ -196,7 +196,7 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
             string full;
             try
             {
-                full = Path.GetFullPath(p.GetString()!, toolFolder.Directory ?? Environment.CurrentDirectory);
+                full = toolFolder.Full(p.GetString()!);
             }
             catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
             {
