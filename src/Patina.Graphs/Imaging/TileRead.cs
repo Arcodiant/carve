@@ -133,6 +133,35 @@ public sealed class TileRead
         return Kind == PortKind.Grey ? (d[i], d[i], d[i]) : (d[i], d[i + 1], d[i + 2]);
     }
 
+    /// <summary>The bilinear blend of four values: <paramref name="a"/> to <paramref name="b"/> and <paramref name="c"/> to <paramref name="d"/> by <paramref name="fx"/>, then the first to the second by <paramref name="fy"/>.</summary>
+    public static float Bilinear(float a, float b, float c, float d, float fx, float fy)
+    {
+        var top = a + (b - a) * fx;
+        var bottom = c + (d - c) * fx;
+        return top + (bottom - top) * fy;
+    }
+
+    /// <summary>
+    /// The bilinear blend of texels (<paramref name="x"/>, <paramref name="y"/>) to (x + 1, y + 1), wrapping, at
+    /// (<paramref name="fx"/>, <paramref name="fy"/>) between them, <see cref="PortKinds.Channels"/> floats into
+    /// <paramref name="texel"/> (warp and transform's linear filter).
+    /// </summary>
+    public void Bilinear(int x, int y, float fx, float fy, Span<float> texel)
+    {
+        if (Kind == PortKind.Grey)
+        {
+            texel[0] = Bilinear(Grey(x, y), Grey(x + 1, y), Grey(x, y + 1), Grey(x + 1, y + 1), fx, fy);
+            return;
+        }
+        var (r0, g0, b0) = Colour(x, y);
+        var (r1, g1, b1) = Colour(x + 1, y);
+        var (r2, g2, b2) = Colour(x, y + 1);
+        var (r3, g3, b3) = Colour(x + 1, y + 1);
+        texel[0] = Bilinear(r0, r1, r2, r3, fx, fy);
+        texel[1] = Bilinear(g0, g1, g2, g3, fx, fy);
+        texel[2] = Bilinear(b0, b1, b2, b3, fx, fy);
+    }
+
     /// <summary>
     /// Copies texels <paramref name="x"/> to <paramref name="x"/> + <paramref name="count"/> - 1 of logical row
     /// <paramref name="y"/>, <see cref="PortKinds.Channels"/> floats each, into <paramref name="to"/>, a run of

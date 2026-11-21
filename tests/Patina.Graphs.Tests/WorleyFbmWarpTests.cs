@@ -340,7 +340,7 @@ public class WorleyFbmWarpTests
     public void WarpOffsetBilinearAndWrapHoldTheHandWorkedValues()
     {
         CheckWarpOffset(WarpNode.Offset);
-        CheckBilinear(WarpNode.Bilinear);
+        CheckBilinear(TileRead.Bilinear);
         CheckWrappedRead(Tile.Wrap);
     }
 
@@ -452,7 +452,7 @@ public class WorleyFbmWarpTests
         CheckWorley(WorleyNode.Sample);
         CheckFbm(FbmNode.Value);
         CheckWarpOffset(WarpNode.Offset);
-        CheckBilinear(WarpNode.Bilinear);
+        CheckBilinear(TileRead.Bilinear);
         CheckWrappedRead(Tile.Wrap);
         // and so do the copies, unbroken
         CheckWorley((x, y, s, cx, cy, j, m, seed) => WorleyCopy(x, y, s, cx, cy, j, m, seed));
@@ -472,7 +472,7 @@ public class WorleyFbmWarpTests
             ("warp: the offset's sign flipped", () => CheckWarpOffset((r, g, c, a, co, si, s) => { var d = WarpNode.Offset(r, g, c, a, co, si, s); return (-d.Dx, -d.Dy); })),
             ("warp: u and v swapped", () => CheckWarpOffset((r, g, c, a, co, si, s) => { var d = WarpNode.Offset(r, g, c, a, co, si, s); return (d.Dy, d.Dx); })),
             ("warp: the angle's cos and sin swapped", () => CheckWarpOffset((r, g, c, a, co, si, s) => WarpNode.Offset(r, g, c, a, si, co, s))),
-            ("warp: bilinear weights swapped", () => CheckBilinear((a, b, c, d, fx, fy) => WarpNode.Bilinear(a, b, c, d, fy, fx))),
+            ("warp: bilinear weights swapped", () => CheckBilinear((a, b, c, d, fx, fy) => TileRead.Bilinear(a, b, c, d, fy, fx))),
             ("warp: reads clamped instead of wrapping", () => CheckWrappedRead((v, n) => Math.Clamp(v, 0, n - 1))),
         };
         foreach (var (name, check) in breaks)
