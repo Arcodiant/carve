@@ -4,7 +4,7 @@ description: >-
 ---
 # T-172 — scenario-patina back under its time limit
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
