@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Carve.Debug;
 using Carve.Extensibility;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 
@@ -20,12 +21,12 @@ public sealed class PatinaExtension : ICarveExtension
 /// patina's stages, one after another in the order of <see cref="PatinaStages.All"/>. A failed check is noted and the
 /// run goes on; the run fails at its end with every failure of every stage.
 /// </summary>
-public sealed class PatinaScenario : IScenario
+public sealed class PatinaScenario(IConfiguration configuration) : IScenario
 {
     public async Task RunAsync(ScenarioDriver driver)
     {
         var checks = new PatinaChecks(driver);
-        foreach (var stage in PatinaStages.All)
+        foreach (var stage in PatinaStages.For(configuration[PatinaStages.SelectionKey]))
         {
             await stage.RunAsync(driver, checks);
         }
