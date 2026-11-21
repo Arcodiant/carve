@@ -176,3 +176,168 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-172](../tasks/T-172-scenario-patina-back-under-its-time-limit.md) — scenario-patina runs well inside run-scenario's 300 s guard again, by smaller textures where evaluation is the cost, otherwise by splitting the library stage
 
 ## Retrospective
+
+**As planned.**
+
+- **The library is there and reachable from a plain `patina` launch.**
+  - **New nodes:** worley, fbm and warp (T-135); tiles, stripes and shape (T-136); blur and gradient_map (T-137);
+    transform and distance (T-138).
+  - **New outputs:** metallic, height and named outputs (T-134).
+  - **Variants:** exposed parameters with overrides on swatch, export and check (T-139).
+  - **Graphs as nodes,** with `input` nodes and parameters that pass through (T-140).
+  - **The check tool** (T-141).
+  - **Samples:** seven, plus a grey variant of the bricks, each look approved by the person before its task landed.
+    They are the cobblestones, bricks, fabric, painted metal, floor tiles, grime and the old wall.
+- **Tiled evaluation first (T-133) held.** Every committed PNG and frame stayed byte-identical through it, and the
+  planks at 8192 got 4% faster (187.6 s against 196.0 s, Debug, medians of five).
+- **Acceptance (T-143).** Fresh agents made all three materials from the tool descriptions alone, each with an exposed
+  parameter and a variant, and `check` clean:
+  - the woven rug in 25 calls;
+  - the rusted corrugated iron in 18;
+  - the mossy path, with a moss filter graph used as a node, in 19.
+
+  A fourth agent found all three planted faults from one `check`, kept all 14 node ids and saved it clean, in 11 calls.
+  The person approved every sheet.
+- **`cairn milestone M-28 verify`** (2026-11-21, after T-172): every check passes but `review`, which comes after the
+  person's go.
+  - 18 of 18 members done and merged.
+  - 25 suites passed, 19 ran and 6 carried, `server-regression`, `patina-regression` and every scenario among them.
+- No engine need was recorded.
+
+**Not as planned.**
+
+- **Eighteen members, not eleven.** Seven were added mid-milestone, each by the person's ruling on a stop:
+  - **T-153, data-dependent input requests.** A warp at amount 0.25 at 8192 was on course for about 55 minutes, because
+    a static input rectangle had to cover the largest offset. It now takes 26.9 s, and the cobblestones became 36 to
+    63% faster.
+  - **T-155, separable passes and rotated-read locality.**
+    - **The misses it fixed:** blur at 8192 was about an hour and distance 474 s, against the 10 s the plan set.
+    - **The other fixes:** a 30-degree turn made its source about 2.4 times over, and the strong minify needed 4.3 GB.
+    - **The figures now:** blur 90.9 s, distance 15.1 s, the turn 12.1 s with its source made 1.09 times, and the
+      minify 1.5 GB in Debug.
+    - It took five Opus agents.
+  - **T-156 and T-157, the sphere's tiling and a cube view on swatch.** Both were asked for by the person in reviews;
+    the samples' sheets are drawn at tiling 3.
+  - **T-170, descriptions an agent can read whole.** Claude Code cuts each MCP tool description at 4,096 characters.
+    `define_graph` was 17,908, so T-143's agents saw 6 of 19 node types and learned the rest by sending wrong graphs.
+    - **The fix:** a `nodes` tool, and every description held at 3,686 or under by a test.
+    - **The re-run:** the rug took 10 calls, none probing, against 25.
+  - **T-171, edit_graph takes list parameters.** T-143's fix session had to redefine a whole graph to change one
+    gradient stop.
+  - **T-172, scenario-patina under its time limit.** The milestone's first verify was stopped by run-scenario's 300 s
+    guard after T-142's library stage.
+    - **Why a split:** export and check cost about 20 s of 220; the rest is the stage's own per-pixel checking.
+    - **The suites now:** `scenario-patina`, `scenario-patina-library-1` and `scenario-patina-library-2`, at 52, 80 and
+      82 s alone.
+- **The 10 s targets for blur and distance at 8192 were not met.** Blur's own share is 120 s and distance's 17.6 s
+  (Release). The person landed T-155 without them and filed **T-159** (strip passes, off-milestone) to own them.
+- **Rules changed from planning, each by the person:**
+  - **`does-not-tile`** compared one wrap step with the mean interior step, and so flagged the committed planks, whose
+    stave edge falls on u = 0. It now judges the wrap against the 99th percentile of the interior boundaries.
+  - **T-134's metallic check.** Both spheres peak at 255 under carve's lights, so the planned peak measure could not
+    work. The check uses the median inside the silhouette and the count of pixels at 255 instead.
+  - **Transform's scale.** 1/n tiles; a whole number above 1 zooms in and does not tile. No meaning of scale lets both
+    tile.
+  - **The Debug regression tests at 8192 assert only the 2 GB peak.** The 10 s checks are measured in Release.
+- **Smaller rulings:**
+  - gradient_map allows equal stops;
+  - a graph parameter may drive an `IntPair` but not a list;
+  - ranges round inward;
+  - nested-graph faults use the `nodes['a/b'].params['c']` form;
+  - the sphere's correlation bars are 0.6, and 0.62 for metal;
+  - T-138's floor-tiles test bound was loosened, with approval.
+- **A gap between two members.** T-141 added `check` to the tool list, and scenario-patina's graph stage, which
+  checks that list exactly, then failed. T-141's `**Verify:**` named only `patina-unit`, so nothing caught it until
+  T-142 fixed it.
+- **The default model moved.** With no `--model`, `claude -p` now starts Fable 5.2, not Opus 5.5. The person had T-143's
+  sessions pinned to `claude-opus-5-5`.
+- **Interruptions:**
+  - Waystone closed twice with an agent under way (T-155 and T-143); both were resumed from what was on disk.
+  - T-172's Sonnet agent hit the weekly usage limit, and its last steps ran on Opus.
+- **Backslashes eaten in transit** spoiled an `.mcp.json` (T-143's first launch did nothing), C# string escapes
+  (T-157) and a path in T-157's As built, which the orchestrator repaired.
+- **Hand-offs** were many:
+  - T-155: four;
+  - T-133, T-138 and T-140: two each;
+  - T-134, T-137, T-139, T-141, T-157, T-170 and T-172: one each.
+
+**Never verified.**
+
+- **Frames nobody opened:**
+  - `swatch-sheet-grid-tiling-3.png` differs from T-140's job. T-172 traced the difference to work after that job,
+    most likely T-157's label change.
+  - The re-run rug's sheets (T-170).
+  - The library frames after T-172's split, which were held by hash only.
+- **Not measured after the last evaluator change** (T-155's bands of 32):
+  - the turn ratio, measured at 1.16 with bands of 16;
+  - any Debug peak, with bands of 32.
+
+  Distance's own time at 2048 was not recorded either.
+- **The metal sphere bar has 0.04 of margin** (0.661 against 0.62).
+- **Swatch's tiling relies on undocumented engine behaviour.** It uses a `UvRect` larger than 1, which Empyrean 0.129.0
+  draws as a repeat although its docs say components lie in [0, 1]. A scenario check would catch a change, but no
+  engine need was recorded.
+- **Untested since T-171:** a list given as a parameter override, now read since T-171, is expected to be refused by
+  kind, but no test holds it. T-143's fix session was not re-run after T-171.
+- **The 90-degree sphere at tiling 3** is not distinguished on T-156's stripe grid.
+- **The M-7 barrel textures fail `check`.** These are reported, not judged:
+  - iron: base colour and roughness seams in u, and metallic not binary in 8.7% of texels;
+  - staves: a small v step;
+  - end grain: the normal off unit length in 0.62% of texels.
+
+  No one has looked at those seams.
+- `ExportToolTests.Other_tools_answer_while_an_export_runs` timed out once on one runner (T-139) and passed on re-run.
+
+**Known and left.**
+
+- **T-159** (strip passes and the 10 s targets) and **T-169** (cube captures in the library stage), both off-milestone.
+- **T-130** (faster 8192 evaluation) was held for T-133 and now wants re-scoping against the tiled, banded evaluator.
+- **T-129** (a heavy tier for 8192 tests) matters more now: patina-regression ran 1,162 s in the last verify.
+- CLAUDE.md and `tools/Patina.SampleGraphs/Program.cs` are inputs of no suite (verify warns).
+- **Files for the person to delete:**
+  - the unregistered member worktree folders `branches/task/T-133` to `T-172`;
+  - an empty `D:\Users\andre\AppData\Local\Temp` made by a mistyped path (T-133);
+  - a stray `t157-review-err.log` in `G:\My Drive\artifacts\carve\M-28\T-157\`.
+
+**Models.**
+
+| Member | Model | Agents |
+|---|---|---|
+| T-133 | Opus 5.5 | 3 (research, build, finish) |
+| T-134 | Opus 5.5 | 2 |
+| T-135 | Sonnet 5.5 | 1 |
+| T-136 | Sonnet 5.5 | 1 |
+| T-137 | Sonnet 5.5 | 2 |
+| T-138 | Opus 5.5 | 3 |
+| T-139 | Opus 5.5 | 2 |
+| T-140 | Opus 5.5 | 3 |
+| T-141 | Sonnet 5.5 | 2 (a stop on the tile rule, then the build) |
+| T-142 | Sonnet 5.5 | 1 |
+| T-143 | Sonnet 5.5; inner sessions Opus 5.5 | 1 (resumed once) |
+| T-153 | Opus 5.5 | 1 |
+| T-155 | Opus 5.5 | 5 (resumed once) |
+| T-156 | Sonnet 5.5 | 1 |
+| T-157 | Sonnet 5.5 | 2 |
+| T-170 | Opus 5.5; probe and re-run Opus 5.5 | 2 |
+| T-171 | Sonnet 5.5 | 1 |
+| T-172 | Sonnet 5.5, then Opus 5.5 (usage limit) | 2 |
+
+No rework was traced to the Sonnet tier. The Sonnet members' stops (T-137's blur speed, T-141's tile rule) were real
+findings, put to the person correctly. The extra agents went on performance work on Opus, mostly T-155.
+
+**For the next plan.**
+
+- **Probe every wide node at 8192 at planning.** Do it before setting a time target: warp at its largest amount, blur
+  at its largest radius, distance, a free rotation, a strong minify. M-27's retrospective said to measure an 8192 claim
+  on the real graph; the 10 s targets here were set without a probe, and three members (T-153, T-155, T-159) came from
+  them.
+- **Hold every MCP tool description under 4,096 characters from the start,** by a test, in carve too. Check carve's
+  descriptions against the cap now.
+- **A member that changes the tool list names every suite that checks it** in its `**Verify:**` line.
+- **Size a scenario at planning.** A stage that adds many frames and per-pixel checks gets its own suite before the
+  milestone's verify finds the guard.
+- **Pin `--model` in every acceptance run's conditions,** since the default moves.
+- **Brief every agent that writes configs, docs or code through the shell about backslashes** (`chr(92)`), as later
+  briefs here did.
+- **Expect performance members to hand off repeatedly.** Each long measurement costs a checkpoint, so plan them as a
+  research agent plus a build agent with the harness written down for the next.
