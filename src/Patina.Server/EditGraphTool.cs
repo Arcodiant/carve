@@ -40,6 +40,12 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
     public const string SetParameterExample = """{"op":"set_parameter","name":"variation","value":0.7,"drives":["tone.out_low"],"max":0.9}""";
     public const string RemoveParameterExample = """{"op":"remove_parameter","name":"jitter"}""";
 
+    /// <summary>The list parameters' worked example (T-171), after define_graph's gradient_map one: the middle stop moved and made lighter, in place.</summary>
+    public const string WorkedList =
+        """{"operations":[{"op":"set_params","node":"tint","params":{"positions":[0,0.4,1],"colours":["#1c2b24","#6b8f55","#b9c9a8"]}}]}""";
+
+    public const string WorkedListResult = "edit_graph: 1 operation applied: set 'tint' positions [0, 0.4, 1], colours [\"#1c2b24\", \"#6b8f55\", \"#b9c9a8\"]. The graph is 4 nodes, size 256, seed 0; no faults: it evaluates";
+
     public const string Text =
         "Edits the open graph by a list of operations, applied in order and all or nothing: when any operation cannot be applied, or the list would leave a fault the graph did not have, "
         + "nothing changes and the result says why (the operation by number, or the new faults, each naming its node and port or parameter). "
@@ -58,6 +64,7 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
         + "- set_parameters {values}: sets several parameters' values by name at once, such as {\"mortar\": 0.08}.\n"
         + "A value out of a parameter's range is a new fault (parameters['mortar']: is 0.5, but must be a number from 0 to 0.45), so the list is refused. get_graph lists the parameters; swatch and export take them for one call without editing the graph.\n"
         + "For example " + SetParamsExample + " gives tone another seed, " + DisconnectExample + " on its own is refused (a blend's b is required, so leaving it open is a new fault), and " + SetExample + " doubles the size and changes the seed. "
+        + "A list parameter (a gradient_map's positions or colours) is given whole in the same shape as define_graph reads it, an array of numbers or of strings, and replaces the list; give both lists of a gradient_map in one operation when the count changes. "
         + "Types, ports and parameters are define_graph's. Returns one line: what each operation did, then the graph's nodes, size, seed and faults.\n"
         + "Worked example, after define_graph's worked example: a grain running along v, multiplied in at 0.3:\n"
         + "edit_graph " + Worked + "\n"
@@ -66,6 +73,9 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
         + "Worked example, after open of samples/graphs/bricks.texgraph (its parameters mortar, tint and jitter drive layout.gap, clay.colour and layout.jitter), grey stone bricks:\n"
         + "edit_graph " + WorkedParameters + "\n"
         + "returns: " + WorkedParametersResult + "\n"
+        + "Worked example, after define_graph's mossy gradient_map example: its middle stop moved to 0.4 and made lighter, the other stops as they were:\n"
+        + "edit_graph " + WorkedList + "\n"
+        + "returns: " + WorkedListResult + "\n"
         + "Then the operation " + SetParameterExample + " exposes tone's out_low as variation, from 0 to 0.9 (tone's own range is wider), and " + RemoveParameterExample + " leaves layout.jitter at 0.25 as its own.";
 
     public static McpServerTool Create() => Create<EditGraphTool>("edit_graph", Text, new JsonObject
@@ -249,7 +259,7 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
             if (!graph.Parameters.TryGetValue(p.Name, out var existing))
                 return fail($"there is no parameter '{p.Name}'; the parameters are {Names(graph)}");
             if (ParameterOverrides.Read(p.Value) is not { } value)
-                return fail($"parameter '{p.Name}' is {Kind(p.Value)}; a value is a number, a string or an array of numbers");
+                return fail($"parameter '{p.Name}'" + ParameterOverrides.WhyNot(p.Value));
             said.Add($"{p.Name} {value} (was {existing.Value})");
             graph = graph.WithParameter(p.Name, existing with { Value = value });
         }
@@ -272,7 +282,7 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
         var parameter = existing ?? new GraphParameter(ParamValue.Of(0), []);
         if (operation.TryGetProperty("value", out var valueArg))
         {
-            if (ParameterOverrides.Read(valueArg) is not { } value) return fail($"value is {Kind(valueArg)}; a value is a number, a string or an array of numbers");
+            if (ParameterOverrides.Read(valueArg) is not { } value) return fail("value" + ParameterOverrides.WhyNot(valueArg));
             said.Add($"value {value}" + (existing is null ? "" : $" (was {existing.Value})"));
             parameter = parameter with { Value = value };
         }
@@ -356,16 +366,8 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
             return $"params is {Kind(value)}; it is an object of name: value, such as {{\"seed\": 3}}";
         foreach (var parameter in value.EnumerateObject())
         {
-            var v = parameter.Value;
-            ParamValue? read = v.ValueKind switch
-            {
-                JsonValueKind.Number when double.IsFinite(v.GetDouble()) => ParamValue.Of(v.GetDouble()),
-                JsonValueKind.String => ParamValue.Of(v.GetString()!),
-                JsonValueKind.Array when v.EnumerateArray().All(e => e.ValueKind == JsonValueKind.Number) =>
-                    ParamValue.Of([.. v.EnumerateArray().Select(e => e.GetDouble())]),
-                _ => null,
-            };
-            if (read is null) return $"parameter '{parameter.Name}' is {Kind(v)}; a value is a number, a string or an array of numbers";
+            if (ParameterOverrides.Read(parameter.Value) is not { } read)
+                return $"parameter '{parameter.Name}'" + ParameterOverrides.WhyNot(parameter.Value);
             parameters = parameters.SetItem(parameter.Name, read);
         }
         return null;

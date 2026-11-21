@@ -80,7 +80,7 @@ public class GraphToolTests
     [InlineData("""[{"op":"set_node","node":"n"}]""", "operation 1 (set_node): type is missing")]
     [InlineData("""[{"op":"set_node","node":"n","type":"colour","inputs":[]}]""", "operation 1 (set_node): inputs is an array; it is an object of port: source")]
     [InlineData("""[{"op":"set_node","node":"n","type":"colour","inputs":{"a":1}}]""", "operation 1 (set_node): input 'a' is a number; a source is a string")]
-    [InlineData("""[{"op":"set_params","node":"c","params":{"colour":true}}]""", "operation 1 (set_params): parameter 'colour' is true or false; a value is a number, a string or an array of numbers")]
+    [InlineData("""[{"op":"set_params","node":"c","params":{"colour":true}}]""", "operation 1 (set_params): parameter 'colour' is true or false; a value is a number, a string, or an array of numbers or of strings")]
     [InlineData("""[{"op":"set_params","node":"c"}]""", "operation 1 (set_params): params is missing")]
     [InlineData("""[{"op":"connect","node":"out","port":"in"}]""", "operation 1 (connect): from is missing")]
     [InlineData("""[{"op":"disconnect","node":"c","port":"in"}]""", "operation 1 (disconnect): node 'c' input 'in' is not connected; its connected inputs are none")]

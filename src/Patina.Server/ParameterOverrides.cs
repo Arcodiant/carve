@@ -38,7 +38,7 @@ public static class ParameterOverrides
         {
             if (Read(p.Value) is not { } v)
             {
-                error = $"{tool}: {GraphParameters.Where(p.Name)}: is {Kind(p.Value)}; a value is a number, a string or an array of numbers";
+                error = $"{tool}: {GraphParameters.Where(p.Name)}{WhyNot(p.Value).Replace(" is ", ": is ", StringComparison.Ordinal)}";
                 return false;
             }
             read[p.Name] = v;
@@ -54,13 +54,27 @@ public static class ParameterOverrides
         return true;
     }
 
-    /// <summary>A JSON value as a parameter value: a number, a string or an array of numbers; null for anything else.</summary>
-    public static ParamValue? Read(JsonElement v) => v.ValueKind switch
+    /// <summary>A JSON value as a parameter value, as the file reads one (T-134, T-171): a number, a string, or an array of numbers or of strings (an empty array is numbers); null for anything else, including a mixed array.</summary>
+    public static ParamValue? Read(JsonElement v)
     {
-        JsonValueKind.Number when double.IsFinite(v.GetDouble()) => ParamValue.Of(v.GetDouble()),
-        JsonValueKind.String => ParamValue.Of(v.GetString()!),
-        JsonValueKind.Array when v.EnumerateArray().All(e => e.ValueKind == JsonValueKind.Number) =>
-            ParamValue.Of([.. v.EnumerateArray().Select(e => e.GetDouble())]),
-        _ => null,
-    };
+        switch (v.ValueKind)
+        {
+            case JsonValueKind.Number when double.IsFinite(v.GetDouble()): return ParamValue.Of(v.GetDouble());
+            case JsonValueKind.String: return ParamValue.Of(v.GetString()!);
+            case JsonValueKind.Array:
+                var items = v.EnumerateArray().ToList();
+                if (items.All(e => e.ValueKind == JsonValueKind.Number && double.IsFinite(e.GetDouble())))
+                    return ParamValue.Of([.. items.Select(e => e.GetDouble())]);
+                if (items.All(e => e.ValueKind == JsonValueKind.String))
+                    return ParamValue.OfTexts([.. items.Select(e => e.GetString()!)]);
+                return null;
+            default: return null;
+        }
+    }
+
+    /// <summary>What follows the name for a value <see cref="Read"/> refused, as the file words it: a mixed array is its own fault.</summary>
+    public static string WhyNot(JsonElement v) =>
+        v.ValueKind == JsonValueKind.Array && v.EnumerateArray().All(e => e.ValueKind is JsonValueKind.Number or JsonValueKind.String)
+            ? ": an array is all numbers or all strings"
+            : $" is {ToolSupport.Kind(v)}; a value is a number, a string, or an array of numbers or of strings";
 }
