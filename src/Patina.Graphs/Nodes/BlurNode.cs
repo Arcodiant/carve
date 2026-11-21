@@ -76,10 +76,12 @@ public sealed class BlurNode : NodeType
 
     private static long Quantise(float v) => (long)Math.Floor(v * Fixed + 0.5);
 
-    private static float[] Horizontal(float[] from, int width, int height, int channels, int window)
+    // Into `to` when given (its first w x height texels; RV-76: the separable passes work in the evaluator's scratch),
+    // else a new array.
+    private static float[] Horizontal(float[] from, int width, int height, int channels, int window, float[]? to = null)
     {
         var w = width - window + 1;
-        var to = new float[w * height * channels];
+        to ??= new float[w * height * channels];
         var scale = window * Fixed;
         for (var y = 0; y < height; y++)
             for (var c = 0; c < channels; c++)
@@ -98,11 +100,11 @@ public sealed class BlurNode : NodeType
         return to;
     }
 
-    private static float[] Vertical(float[] from, int width, int height, int channels, int window)
+    private static float[] Vertical(float[] from, int width, int height, int channels, int window, float[]? to = null)
     {
         var h = height - window + 1;
         var stride = width * channels;
-        var to = new float[stride * h];
+        to ??= new float[stride * h];
         var scale = window * Fixed;
         var sums = new long[stride];
         for (var k = 0; k < window; k++)
@@ -138,11 +140,17 @@ public sealed class BlurNode : NodeType
         var reach = Reach(texels, passes);
         var rect = e.Rect;
         int width = rect.Width + 2 * reach, stride = width * channels;
-        var buffer = new float[stride * rect.Height];
+        // Two scratch arrays, each pass reading one and writing the other (RV-76: new arrays each pass were large-object
+        // garbage, about 8 MB a row tile at 8192).
+        float[] buffer = e.Scratch(stride * rect.Height), spare = e.Scratch(stride * rect.Height);
         for (var y = 0; y < rect.Height; y++) input.CopyRow(rect.Y + y, rect.X - reach, width, buffer.AsSpan(y * stride, stride));
         var window = 2 * texels + 1;
-        for (var p = 0; p < passes; p++) { buffer = Horizontal(buffer, width, rect.Height, channels, window); width -= 2 * texels; }
-        buffer.CopyTo(output.Data, 0);
+        for (var p = 0; p < passes; p++)
+        {
+            (buffer, spare) = (Horizontal(buffer, width, rect.Height, channels, window, spare), buffer);
+            width -= 2 * texels;
+        }
+        buffer.AsSpan(0, output.Data.Length).CopyTo(output.Data);
     }
 
     /// <summary>The vertical passes over the row pass's tiles, read widened by the reach in y.</summary>
@@ -156,11 +164,15 @@ public sealed class BlurNode : NodeType
         var reach = Reach(texels, passes);
         var rect = e.Rect;
         int height = rect.Height + 2 * reach, stride = rect.Width * channels;
-        var buffer = new float[stride * height];
+        float[] buffer = e.Scratch(stride * height), spare = e.Scratch(stride * height);
         for (var y = 0; y < height; y++) rows.CopyRow(rect.Y - reach + y, rect.X, rect.Width, buffer.AsSpan(y * stride, stride));
         var window = 2 * texels + 1;
-        for (var p = 0; p < passes; p++) { buffer = Vertical(buffer, rect.Width, height, channels, window); height -= 2 * texels; }
-        buffer.CopyTo(output.Data, 0);
+        for (var p = 0; p < passes; p++)
+        {
+            (buffer, spare) = (Vertical(buffer, rect.Width, height, channels, window, spare), buffer);
+            height -= 2 * texels;
+        }
+        buffer.AsSpan(0, output.Data.Length).CopyTo(output.Data);
     }
 
     public override void Evaluate(NodeEvaluation e)

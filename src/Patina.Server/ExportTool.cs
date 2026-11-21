@@ -173,11 +173,16 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                         OutputPacking.PackTile(packedAs, tile, rgba, pixels);
                     });
                     if (withMetallic)
+                    {
+                        // The same between roughness's evaluation and metallic's, so their two peaks never stack (RV-76).
+                        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
                         evaluator.Evaluate(metallic, pixels, tile =>
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             OutputPacking.PackMetallicTile(tile, rgba, pixels);
                         });
+                    }
                     cancellationToken.ThrowIfCancellationRequested();
                     // The evaluation's cache and every tile it dropped are garbage once it returns: given back before
                     // the encoder allocates, so the two never peak together (T-155: the strong minify at 8192 pins its

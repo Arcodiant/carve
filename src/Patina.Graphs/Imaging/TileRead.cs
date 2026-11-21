@@ -181,22 +181,31 @@ public sealed class TileRead
 
     /// <summary>
     /// Texels <paramref name="x"/> to <paramref name="x"/> + <paramref name="count"/> - 1 of logical row
-    /// <paramref name="y"/>, <see cref="PortKinds.Channels"/> floats each. They must lie in one tile (a pointwise node
-    /// reading its own tile's row always does); otherwise it throws.
+    /// <paramref name="y"/>, <see cref="PortKinds.Channels"/> floats each. They must lie in one tile of one rectangle
+    /// asked for (a pointwise node reading its own tile's row always does), each rectangle tried in turn, the first
+    /// first (RV-76: a run past the first rectangle's edge is found in a later one that holds it whole); otherwise it
+    /// throws.
     /// </summary>
     public ReadOnlySpan<float> Row(int y, int x, int count)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
-        if (!TryOffset(x, _x, _width, _coverX, out var lx) || !TryOffset(y, _y, _height, _coverY, out var ly))
-        {
-            foreach (var part in _rest)
-                if (part.TryOffset(x, part._x, part._width, part._coverX, out _) && part.TryOffset(y, part._y, part._height, part._coverY, out _))
-                    return part.Row(y, x, count);
-            throw Outside(x, y);
-        }
-        if (lx + _coverX - _x + count > _width || (lx >> _shift) != ((lx + count - 1) >> _shift))
-            throw new ArgumentOutOfRangeException(nameof(count), $"texels {x} to {x + count - 1} of row {y} are not in one tile of the rectangle asked for ({Asked})");
+        if (TryRow(y, x, count, out var row)) return row;
+        foreach (var part in _rest)
+            if (part.TryRow(y, x, count, out row)) return row;
+        if (!Holds(x, y) && !_rest.Any(part => part.Holds(x, y))) throw Outside(x, y);
+        throw new ArgumentOutOfRangeException(nameof(count), $"texels {x} to {x + count - 1} of row {y} are not in one tile of the rectangle asked for ({Asked})");
+    }
+
+    private bool Holds(int x, int y) => TryOffset(x, _x, _width, _coverX, out _) && TryOffset(y, _y, _height, _coverY, out _);
+
+    // This rectangle's run of the row, when it holds the whole run in one of its tiles.
+    private bool TryRow(int y, int x, int count, out ReadOnlySpan<float> row)
+    {
+        row = default;
+        if (!TryOffset(x, _x, _width, _coverX, out var lx) || !TryOffset(y, _y, _height, _coverY, out var ly)) return false;
+        if (lx + _coverX - _x + count > _width || (lx >> _shift) != ((lx + count - 1) >> _shift)) return false;
         var tile = _tiles[(ly >> _shift) * _columns + (lx >> _shift)];
-        return tile.Data.AsSpan((((ly & _mask) << _shift) + (lx & _mask)) * _channels, count * _channels);
+        row = tile.Data.AsSpan((((ly & _mask) << _shift) + (lx & _mask)) * _channels, count * _channels);
+        return true;
     }
 }
