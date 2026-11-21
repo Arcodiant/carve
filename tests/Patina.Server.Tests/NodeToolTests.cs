@@ -18,12 +18,6 @@ public class NodeToolTests
     /// <summary>The margin, approved by the person (2026-11-20): 10% under the cut, so at most 3,686 characters.</summary>
     public const int Limit = ClientCut * 9 / 10;
 
-    /// <summary>
-    /// edit_graph is T-171's (EditGraphTool.cs), over the limit when T-170 began (4,239) and growing there; the person
-    /// approved leaving it to T-171 to bring under, so it is named here rather than skipped silently.
-    /// </summary>
-    public static readonly string[] LeftToT171 = ["edit_graph"];
-
     [Fact]
     public async Task Every_description_is_under_the_limit()
     {
@@ -32,7 +26,7 @@ public class NodeToolTests
             .Select(t => (Name: t.GetProperty("name").GetString()!, Length: t.GetProperty("description").GetString()!.Length)).ToList();
 
         Assert.Contains(tools, t => t.Name == "nodes");
-        var over = tools.Where(t => t.Length > Limit && !LeftToT171.Contains(t.Name)).Select(t => $"{t.Name} {t.Length}").ToList();
+        var over = tools.Where(t => t.Length > Limit).Select(t => $"{t.Name} {t.Length}").ToList();
         Assert.True(over.Count == 0, $"over {Limit} characters (Claude Code cuts at {ClientCut}): {string.Join(", ", over)}");
     }
 

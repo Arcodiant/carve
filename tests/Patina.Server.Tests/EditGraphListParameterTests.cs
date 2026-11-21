@@ -15,7 +15,8 @@ public class EditGraphListParameterTests
     [Fact]
     public async Task The_worked_example_changes_one_stop_in_place_and_equals_the_same_graph_defined()
     {
-        Assert.Contains("edit_graph " + EditGraphTool.WorkedList + "\nreturns: " + EditGraphTool.WorkedListResult, EditGraphTool.Text);
+        // T-170: this example left the description (held under Claude Code's 4,096-character cut); it still runs as written.
+        Assert.DoesNotContain(EditGraphTool.WorkedListResult, EditGraphTool.Text, StringComparison.Ordinal);
         await using var patina = await PatinaHarness.StartAsync();
         await patina.Ok("define_graph", DefineGraphTool.WorkedMap);
         Assert.Equal(EditGraphTool.WorkedListResult, await patina.Ok("edit_graph", EditGraphTool.WorkedList));

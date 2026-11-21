@@ -29,7 +29,8 @@ public class ExposedParameterToolTests
     [Fact]
     public async Task Edit_graph_sets_adds_and_removes_parameters_as_its_description_says()
     {
-        Assert.Contains("edit_graph " + EditGraphTool.WorkedParameters + "\nreturns: " + EditGraphTool.WorkedParametersResult, EditGraphTool.Text);
+        // T-170: this example left the description (held under Claude Code's 4,096-character cut); it still runs as written.
+        Assert.DoesNotContain(EditGraphTool.WorkedParametersResult, EditGraphTool.Text, StringComparison.Ordinal);
         await using var patina = await PatinaHarness.StartAsync();
         await OpenBricksAsync(patina);
         Assert.Equal(EditGraphTool.WorkedParametersResult, await patina.Ok("edit_graph", EditGraphTool.WorkedParameters));
