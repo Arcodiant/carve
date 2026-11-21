@@ -42,9 +42,9 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
     public const string Text =
         "Measures the open graph's outputs as numbers, rather than judging by a render, and lists what is wrong with each, with the fix in words. "
         + "Changes nothing, and never refuses a graph that evaluates: a fault is a problem in the list. "
-        + "Takes size (a power of two from 32 to 2048; default the graph's own, at most 2048), parameters (the graph's exposed parameters, for this call only, as swatch and export take them) "
-        + "and files (a list of {path, role} of PNGs, the path absolute or relative to patina's working directory, the role a role or a named output's name; only those are checked, no graph is needed, and size and parameters are not used). "
-        + "A roughness file is read as export writes it: G the roughness, B the metallic, which judges the base colour's metal texels. "
+        + "Takes size (a power of two from 32 to 2048; default the graph's own, at most 2048), parameters (the graph's exposed parameters, for this call only) "
+        + "and files (a list of {path, role} of PNGs, the path absolute or relative to patina's working directory; only those are checked, no graph is needed, and size and parameters are not used). "
+        + "Role metallic_roughness is a packed image as export writes roughness.png (G roughness, B metallic); role roughness is roughness only. "
         + "The rules, each with its thresholds and what it means for a game:\n"
         + "- base-colour-range: base colour's brightest channel, in sRGB levels 0 to 255, should be 20 to 245 for a non-metal texel (metallic below 0.5, or no metallic) and 120 or more for a metal texel (metallic 0.5 or more); "
         + "near black is a hole under game lighting, near white blows out, and dark metal, which takes its colour from reflection, shows almost nothing. A fault when over 1% of texels are out. "
@@ -53,14 +53,14 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         + "Fix: push the mask to 0 and 1 (a levels node with in_low equal to in_high is a step), or set a constant.\n"
         + "- normal-not-unit: a normal is a unit vector. A fault when over 0.1% of texels' length differs from 1 by more than 0.02 (0.03 for a PNG, for the 8-bit rounding). "
         + "Fix: make it with height_to_normal, which normalises, and do not mix a normal's components as colours.\n"
-        + "- one-value: a greyscale output (roughness, metallic, occlusion, height, a greyscale named output) whose texels all pack to one byte; a mask of one value masks nothing. "
+        + "- one-value: a greyscale output (roughness, occlusion, height, a greyscale named output; not metallic) whose texels all pack to one byte; a mask of one value masks nothing. "
         + "Fix: widen its levels, or drive it from a noise or pattern, or drop the output.\n"
         + "- does-not-tile: the mean step between neighbouring columns (and rows, for v), in packed levels over the channels, is measured at every column boundary, the wrap's between the last and first included; "
         + "the wrap is a fault when its step is more than twice the 99th percentile of the steps inside, plus 2 levels, so the texture shows a seam when it repeats (a pattern's own hard edge that falls on the wrap is not one). "
         + "Fix: whole-number frequencies and counts and quarter turns; swatch's tiled view shows where.\n"
         + "Result: {ok, problems:[{check, output, message}], notes, stats}. ok is true when there are no problems; each message gives the share, the worst texel and the fix; "
-        + "notes say how the texels were read (the share of metal texels, a metallic read from a roughness file); stats gives each output's min, max and mean per channel, in packed levels 0 to 255 "
-        + "(a normal's too: 127.5 is zero), at stats.size. "
+        + "notes say how the texels were read (the share of metal texels, a metallic read from a packed file); stats gives each output's min, max and mean per channel, in packed levels 0 to 255 "
+        + "(a normal's too: 127.5 is zero), at stats.size (mixed-size files: each output's width and height). "
         + "Errors, writing nothing: no open graph (when no files are given), a graph with a fault (the error lists them; fix them with edit_graph), a size that is not allowed, a parameter that is refused, and a file that is missing or not a PNG.\n"
         + "Worked example, with samples/graphs/bricks.texgraph open: check " + Worked + " returns, clean:\n" + WorkedResult;
 
@@ -71,7 +71,7 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         ["files"] = new JsonObject
         {
             ["type"] = "array",
-            ["description"] = "PNG files to check instead of the open graph, each {path, role}: the role is base_colour, normal, roughness (a metallic-roughness image), metallic, occlusion, height, or a named output's name.",
+            ["description"] = "PNG files to check instead of the open graph, each {path, role}: the role is base_colour, normal, roughness (roughness only), metallic_roughness (a packed image: G roughness, B metallic, as export writes roughness.png), metallic, occlusion, height, or a named output's name.",
             ["items"] = new JsonObject
             {
                 ["type"] = "object",
@@ -86,11 +86,11 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         if (Unknown("check", context, "size", "parameters", "files") is { } unknown) return unknown;
         var haveFiles = files is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) };
         CheckSet set;
-        int pixels;
+        int? pixels;
         if (haveFiles)
         {
             if (!TryFiles(files!.Value, out set, out var fileError)) return Error(fileError!);
-            pixels = set.Outputs.Count == 0 ? 0 : set.Outputs[0].Width;
+            pixels = OneSize(set);
             var ignored = new List<string>();
             if (size is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) }) ignored.Add("size");
             if (parameters is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) }) ignored.Add("parameters");
@@ -110,19 +110,27 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
                 return Error($"check: the graph has {Faults(faults)}\nA check needs a graph that evaluates; fix them with edit_graph, then check again.");
             if (!ParameterOverrides.TryApply("check", graph, parameters, registry, out graph, out _, out var overrideError))
                 return Error(overrideError!);
-            pixels = Math.Min(graph.Size, MaxSize);
+            var side = Math.Min(graph.Size, MaxSize);
             if (size is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } given)
             {
-                if (!(given.ValueKind == JsonValueKind.Number && given.TryGetInt32(out pixels) && TextureGraph.IsValidSize(pixels) && pixels <= MaxSize))
+                if (!(given.ValueKind == JsonValueKind.Number && given.TryGetInt32(out side) && TextureGraph.IsValidSize(side) && side <= MaxSize))
                     return Error($"check: size {given.GetRawText()} is not allowed; size is a power of two from 32 to {MaxSize} (32, 64, 128, 256, 512, 1024 or 2048)");
             }
-            set = CheckSet.OfGraph(new GraphEvaluator(graph, registry), pixels);
+            set = CheckSet.OfGraph(new GraphEvaluator(graph, registry), side);
+            pixels = side;
         }
         return Line(Report(set, pixels).ToJsonString());
     }
 
-    /// <summary>The report for <paramref name="set"/>: <c>{ok, problems, notes, stats}</c>.</summary>
-    public static JsonObject Report(CheckSet set, int size)
+    /// <summary>The one square size every output of <paramref name="set"/> has, or null when they differ or one is not square (RV-76).</summary>
+    public static int? OneSize(CheckSet set) =>
+        set.Outputs.Count > 0 && set.Outputs.All(o => o.Width == set.Outputs[0].Width && o.Height == set.Outputs[0].Width) ? set.Outputs[0].Width : null;
+
+    /// <summary>
+    /// The report for <paramref name="set"/>: <c>{ok, problems, notes, stats}</c>. With a <paramref name="size"/> it is
+    /// <c>stats.size</c>; with none (files of mixed sizes) each output's stats name its own <c>width</c> and <c>height</c>.
+    /// </summary>
+    public static JsonObject Report(CheckSet set, int? size)
     {
         var problems = CheckRules.Run(set);
         var notes = new List<string>(set.Notes);
@@ -134,13 +142,19 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
             notes.Insert(0, $"metal texels (metallic 0.5 or more): {CheckRules.Percent(metal, metallic.Texels)}");
         }
         var outputs = new JsonObject();
-        foreach (var o in set.Outputs) outputs[o.Name] = Stats(o);
+        foreach (var o in set.Outputs)
+        {
+            var stats = Stats(o);
+            if (size is null) { stats["width"] = o.Width; stats["height"] = o.Height; }
+            outputs[o.Name] = stats;
+        }
+        var statsObject = size is { } one ? new JsonObject { ["size"] = one, ["outputs"] = outputs } : new JsonObject { ["outputs"] = outputs };
         return new JsonObject
         {
             ["ok"] = problems.Count == 0,
             ["problems"] = new JsonArray([.. problems.Select(p => (JsonNode)new JsonObject { ["check"] = p.Check, ["output"] = p.Output, ["message"] = p.Message })]),
             ["notes"] = new JsonArray([.. notes.Select(n => (JsonNode)n)]),
-            ["stats"] = new JsonObject { ["size"] = size, ["outputs"] = outputs },
+            ["stats"] = statsObject,
         };
     }
 
@@ -166,6 +180,8 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         };
     }
 
+    private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
     private bool TryFiles(JsonElement files, out CheckSet set, out string? error)
     {
         set = null!;
@@ -184,13 +200,18 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
                 || !item.TryGetProperty("role", out var r) || r.ValueKind != JsonValueKind.String
                 || string.IsNullOrWhiteSpace(p.GetString()) || !GraphNames.IsValid(r.GetString()!))
             {
-                error = $"check: files holds {item.GetRawText()}, which is not {{path, role}}: a path, and a role (base_colour, normal, roughness, metallic, occlusion, height) or a named output's name";
+                error = $"check: files holds {item.GetRawText()}, which is not {{path, role}}: a path, and a role (base_colour, normal, roughness, metallic_roughness, metallic, occlusion, height) or a named output's name";
                 return false;
             }
             var role = r.GetString()!;
             if (decoded.Any(d => d.Role == role))
             {
                 error = $"check: files names the role {role} twice; give each output one file";
+                return false;
+            }
+            if (decoded.Any(d => (d.Role, role) is ("roughness", CheckSet.PackedRole) or (CheckSet.PackedRole, "roughness")))
+            {
+                error = $"check: files names roughness and {CheckSet.PackedRole}, two roughness files; a {CheckSet.PackedRole} file is the roughness (its G), so give one of them";
                 return false;
             }
             string full;
@@ -210,7 +231,14 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
             }
             try
             {
-                var image = ImageResult.FromMemory(File.ReadAllBytes(full), ColorComponents.RedGreenBlueAlpha);
+                var bytes = File.ReadAllBytes(full);
+                // RV-76: StbImageSharp reads JPEG, BMP and others too; only a PNG is checked.
+                if (!bytes.AsSpan().StartsWith(PngSignature))
+                {
+                    error = $"check: {full} is not a PNG (it does not start with the PNG signature)";
+                    return false;
+                }
+                var image = ImageResult.FromMemory(bytes, ColorComponents.RedGreenBlueAlpha);
                 decoded.Add((role, image.Width, image.Height, image.Data));
             }
             catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException)

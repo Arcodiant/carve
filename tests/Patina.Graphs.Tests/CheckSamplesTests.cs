@@ -74,7 +74,7 @@ public class CheckSamplesTests(ITestOutputHelper output)
         (string File, string Role)[] files =
         [
             ("end-grain-base.png", "base_colour"), ("end-grain-normal.png", "normal"),
-            ("iron-base.png", "base_colour"), ("iron-mr.png", "roughness"),
+            ("iron-base.png", "base_colour"), ("iron-mr.png", "metallic_roughness"),
             ("rune-emissive.png", "emissive"),
             ("staves-base.png", "base_colour"), ("staves-normal.png", "normal"), ("staves-occlusion.png", "occlusion"),
         ];

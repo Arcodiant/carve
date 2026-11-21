@@ -6,7 +6,8 @@ namespace Patina.Graphs.Checks;
 /// <c>does-not-tile</c>: the mean step (in packed levels, over the channels and over every row) is measured across each
 /// column boundary, the wrap's between the last and first column included, and the same for rows in v. The wrap is a
 /// fault when its mean step is greater than twice the 99th percentile of the interior boundaries' mean steps plus 2
-/// levels, so a pattern's own hard edge that falls on the wrap, which every interior edge matches, is not a seam.
+/// levels, so a pattern's own hard edge that falls on the wrap, which every interior edge matches, is not a seam. Every
+/// output is judged, a metallic read from a packed image's blue channel too (RV-76: it is exempt from one-value only).
 /// </summary>
 public sealed class DoesNotTileRule : ICheckRule
 {
@@ -17,7 +18,7 @@ public sealed class DoesNotTileRule : ICheckRule
 
     public IEnumerable<CheckProblem> Run(CheckSet set)
     {
-        foreach (var o in set.Outputs.Where(o => !o.Derived && o.Width > 1 && o.Height > 1))
+        foreach (var o in set.Outputs.Where(o => o.Width > 1 && o.Height > 1))
         {
             var seams = new List<string>();
             var (wrapU, p99U) = Steps(o, alongX: true);
