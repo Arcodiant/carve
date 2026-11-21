@@ -143,6 +143,7 @@ check {}          (open graph, its own size; optional size<=2048,
 | 6 | T-143 acceptance | Sonnet (inner sessions on the default, Opus) | T-142 | its round folders and checks |
 | 7 | T-170 tool descriptions read whole (added 2026-11-20) | Opus | T-143 | `DefineGraphTool.cs`, `NodeCatalogue`, any new tool |
 | 7 | T-171 edit_graph takes list parameters (added 2026-11-20) | Sonnet | T-143 | `EditGraphTool.cs` |
+| 8 | T-172 scenario-patina under its time limit (added 2026-11-20) | Sonnet | T-170, T-171 | `scenarios/Carve.Scenario.Patina/`, `tests.json`'s patina suites |
 
 Dependencies on a sibling's feature: T-137's gradient map needs T-134's list parameters, and its sample T-134's
 `metallic` and named outputs. T-138's floor tiles need T-136's `tiles` and T-134's `height`. T-139's content edits
@@ -172,5 +173,6 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-157](../tasks/T-157-a-cube-view-on-swatch.md) — swatch gains a cube view, with the same tiling option as the sphere, so a material can be judged on flat faces and edges as well as a curve
 - [ ] [T-170](../tasks/T-170-tool-descriptions-an-agent-can-read-whole.md) — patina's tool descriptions reach an agent whole, with the node catalogue no longer crammed into define_graph's
 - [ ] [T-171](../tasks/T-171-edit-graph-takes-list-parameters.md) — edit_graph's set_params and set_node take list parameters as define_graph does
+- [ ] [T-172](../tasks/T-172-scenario-patina-back-under-its-time-limit.md) — scenario-patina runs well inside run-scenario's 300 s guard again, by smaller textures where evaluation is the cost, otherwise by splitting the library stage
 
 ## Retrospective
