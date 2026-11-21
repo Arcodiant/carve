@@ -623,7 +623,7 @@
       "id": "scenario-patina",
       "tier": "regression",
       "build": "solution",
-      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments --Patina:Stages=base",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments:--Patina:Stages=base",
       "inputs": [
         {
           "dotnet-closure": "scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj"
@@ -645,7 +645,7 @@
       "id": "scenario-patina-library-1",
       "tier": "regression",
       "build": "solution",
-      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments --Patina:Stages=library-1",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments:--Patina:Stages=library-1",
       "inputs": [
         {
           "dotnet-closure": "scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj"
@@ -667,7 +667,7 @@
       "id": "scenario-patina-library-2",
       "tier": "regression",
       "build": "solution",
-      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments --Patina:Stages=library-2",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments:--Patina:Stages=library-2",
       "inputs": [
         {
           "dotnet-closure": "scenarios/Carve.Scenario.Patina/Carve.Scenario.Patina.csproj"

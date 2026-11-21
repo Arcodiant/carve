@@ -73,10 +73,20 @@ checking. So: split. Nothing is loosened: no size, tolerance, frame, check or th
   part 2 runs painted-metal, floor-tiles, old-wall and grime with the planted faults. The break replays run for
   whichever samples the part holds (the bricks-variant break needs bricks and bricks-grey, the metal break needs
   painted-metal, both in their own parts as built, so every break is still made once).
-- `PatinaStages.For(selection)` and the configuration key `Patina:Stages` (`--Patina:Stages=base|library-1|library-2`;
+- `PatinaStages.For(selection)` and the configuration key `Patina:Stages` (`-CarveArguments:--Patina:Stages=base|library-1|library-2` on `run-scenario.ps1`: the colon form, since `pwsh -File` takes `-CarveArguments --Patina:...` for a missing argument;
   unset runs everything, as before). `PatinaScenario` reads it from `IConfiguration`.
 - `tests.json`: `scenario-patina` (`base`: every stage but the library's, est 90 s), `scenario-patina-library-1` and
   `scenario-patina-library-2` (est 120 s each). No new project, so `Carve.slnx` is unchanged. The member's `**Verify:**`
   holds all three.
 - Expected per suite alone: base about 60 s, each library half about 80 s; a busy runner at 1.5 times is 120 s, inside
   the two thirds (200 s) target.
+
+**Measured after the split** (Xellotath, alone, Debug): base 52 s, library-1 80 s, library-2 82 s, all three passing.
+
+**Frames.** Every one of the 128 files of the three runs together equals by SHA-256 the pre-split whole run on the same
+tree, except `library-breaks.txt` and `library-checks.tsv`, which are written per half; their lines taken together are
+equal to the whole run's. Against `J-20261120-085227-39ade3` (T-140's job, the last good one by job id that is
+fetchable; none of the M-28 jobs holding the library frames was kept, so the library frames are compared with the
+pre-split run): 61 of its 63 files equal; `frames/swatch-sheet-grid-tiling-3.png` and `swatch-tiling-checks.tsv`
+differ, and equally so in the pre-split run, so they come from work landed after that job (the cube rows of T-157
+are in the tsv); not from this member. Not looked at by eye; no frame image was opened.
