@@ -69,4 +69,8 @@ public sealed class GraphStore(ToolFolder folder)
 }
 
 /// <summary>What a tool resolves a relative file path against: <see cref="Directory"/>, or the working directory when null.</summary>
-public sealed record ToolFolder(string? Directory);
+public sealed record ToolFolder(string? Directory)
+{
+    /// <summary><paramref name="path"/> made full against the folder; throws as <see cref="Path.GetFullPath(string, string)"/> does.</summary>
+    public string Full(string path) => Path.GetFullPath(path, Directory ?? Environment.CurrentDirectory);
+}

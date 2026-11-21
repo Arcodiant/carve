@@ -133,7 +133,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
             string target;
             try
             {
-                target = Path.GetFullPath(folderText, toolFolder.Directory ?? Environment.CurrentDirectory);
+                target = toolFolder.Full(folderText);
             }
             catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
             {
