@@ -396,8 +396,8 @@ internal sealed class SwatchStage : IPatinaStage
             $"\nmetallic\tmedian_luma_0\tmedian_luma_1\tstep\tclipped_0\tclipped_1\n\t{lit[0].Median:0.0}\t{lit[1].Median:0.0}\t{lit[0].Median - lit[1].Median:0.0}\t{lit[0].Clipped}\t{lit[1].Clipped}\n"));
         checks.Check(MetallicReads(lit[0], lit[1]),
             $"swatch: the metallic-1 grey-200 sphere (median luma {lit[1].Median:0.0}, {lit[1].Clipped} px at 255) does not read metallic against metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px): the rule is a median {MetallicStep} lower and more px at 255");
-        // The break, made here: metallic 0 judged against itself must fail the rule.
-        checks.Check(!MetallicReads(lit[0], lit[0]), "swatch: the metallic rule passes metallic 0 against itself");
+        // The break, made here (RV-76): the two frames swapped, metallic 0 judged as the metal against metallic 1, must fail the rule.
+        checks.Check(!MetallicReads(lit[1], lit[0]), $"swatch: the metallic rule passes the frames swapped: metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px) read as metal against metallic 1 ({lit[1].Median:0.0}, {lit[1].Clipped} px)");
     }
 
     /// <summary>
