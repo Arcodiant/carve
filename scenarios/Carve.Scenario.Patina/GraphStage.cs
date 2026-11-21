@@ -27,7 +27,7 @@ internal sealed class GraphStage : IPatinaStage
     public async Task RunAsync(ScenarioDriver driver, PatinaChecks checks)
     {
         var tools = (await driver.ListToolsAsync()).Select(t => t.Name).ToList();
-        checks.Check(tools.SequenceEqual(["define_graph", "edit_graph", "get_graph", "save", "open", "push_snapshot", "pop_snapshot", "export", "swatch", "check"]),
+        checks.Check(tools.SequenceEqual(["define_graph", "nodes", "edit_graph", "get_graph", "save", "open", "push_snapshot", "pop_snapshot", "export", "swatch", "check"]),
             "graph: tools/list is " + string.Join(", ", tools));
 
         var defined = await checks.CallAsync("define_graph", Tone);
