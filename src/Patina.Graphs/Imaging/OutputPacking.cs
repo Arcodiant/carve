@@ -47,7 +47,10 @@ public static class OutputRoles
     /// The PNG an output is written to by <c>export</c>: <c>&lt;role&gt;.png</c> or <c>&lt;name&gt;.png</c>, except
     /// <c>metallic</c>, which is packed into <c>roughness.png</c>'s blue channel and has no file of its own.
     /// </summary>
-    public static string FileOf(string output) => (output == Name(OutputRole.Metallic) ? Name(OutputRole.Roughness) : output) + ".png";
+    public static string FileOf(string output) => (HasOwnFile(output) ? output : Name(OutputRole.Roughness)) + ".png";
+
+    /// <summary>False for <c>metallic</c> alone, which <see cref="FileOf"/> packs into <c>roughness.png</c>.</summary>
+    public static bool HasOwnFile(string output) => output != Name(OutputRole.Metallic);
 
     /// <summary>The role whose packing an output takes: its own role, or <c>base_colour</c>'s for a named output (greyscale spread to grey, colour as sRGB).</summary>
     public static OutputRole PackedAs(string output) => TryParse(output, out var role) ? role : OutputRole.BaseColour;

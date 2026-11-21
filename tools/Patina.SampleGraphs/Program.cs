@@ -48,7 +48,7 @@ static void WritePngs(TextureGraph graph, string outFolder, string label)
     var evaluator = new GraphEvaluator(graph);
     Directory.CreateDirectory(outFolder);
     // Each output's file: metallic is packed into roughness.png, so it has none of its own.
-    foreach (var output in evaluator.Outputs.Where(o => o != OutputRoles.Name(OutputRole.Metallic)))
+    foreach (var output in evaluator.Outputs.Where(OutputRoles.HasOwnFile))
     {
         var image = OutputImage.Make(evaluator, output, graph.Size);
         File.WriteAllBytes(Path.Combine(outFolder, OutputRoles.FileOf(output)), image.Png);

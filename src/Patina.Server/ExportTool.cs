@@ -109,7 +109,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
             var evaluator = new GraphEvaluator(graph, registry);
             var metallic = OutputRoles.Name(OutputRole.Metallic);
             // The outputs with a file of their own, in sheet order: metallic goes into roughness.png.
-            IReadOnlyList<string> roles = [.. evaluator.Outputs.Where(o => o != metallic)];
+            IReadOnlyList<string> roles = [.. evaluator.Outputs.Where(OutputRoles.HasOwnFile)];
             if (outputs is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } list)
             {
                 var known = $"the roles are {string.Join(", ", OutputRoles.Names)}, and a named output is given by its name";
@@ -122,7 +122,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                     var output = item.GetString()!;
                     if (!evaluator.Has(output))
                         return Error($"export: the graph has no {output} output; it has {string.Join(", ", evaluator.Outputs)}");
-                    if (output == metallic)
+                    if (!OutputRoles.HasOwnFile(output))
                         return Error("export: metallic has no file of its own: it is packed into roughness.png's blue channel, so name roughness to write it");
                     if (!chosen.Contains(output)) chosen.Add(output);
                 }
