@@ -40,10 +40,6 @@ public sealed record TextureGraph(int Size, uint Seed, ImmutableSortedDictionary
     /// saved to one, the tool folder for a graph never saved, the working directory when null. Never written to the file.
     /// </summary>
     public string? Folder { get; init; }
-
-    /// <summary>The exposed parameter driving <paramref name="node"/>'s <paramref name="param"/>, or null (the first in name order, should two claim it).</summary>
-    public string? DriverOf(string node, string param) =>
-        Parameters.FirstOrDefault(p => p.Value.Drives.Contains($"{node}.{param}")).Key;
 }
 
 /// <summary>
