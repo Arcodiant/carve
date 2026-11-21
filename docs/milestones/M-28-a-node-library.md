@@ -144,6 +144,11 @@ check {}          (open graph, its own size; optional size<=2048,
 | 7 | T-170 tool descriptions read whole (added 2026-11-20) | Opus | T-143 | `DefineGraphTool.cs`, `NodeCatalogue`, any new tool |
 | 7 | T-171 edit_graph takes list parameters (added 2026-11-20) | Sonnet | T-143 | `EditGraphTool.cs` |
 | 8 | T-172 scenario-patina under its time limit (added 2026-11-20) | Sonnet | T-170, T-171 | `scenarios/Carve.Scenario.Patina/`, `tests.json`'s patina suites |
+| 9 | T-173 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 9 | T-174 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 9 | T-175 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 9 | T-176 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 9 | T-177 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
 
 Dependencies on a sibling's feature: T-137's gradient map needs T-134's list parameters, and its sample T-134's
 `metallic` and named outputs. T-138's floor tiles need T-136's `tiles` and T-134's `height`. T-139's content edits
@@ -174,6 +179,11 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-170](../tasks/T-170-tool-descriptions-an-agent-can-read-whole.md) — patina's tool descriptions reach an agent whole, with the node catalogue no longer crammed into define_graph's
 - [ ] [T-171](../tasks/T-171-edit-graph-takes-list-parameters.md) — edit_graph's set_params and set_node take list parameters as define_graph does
 - [ ] [T-172](../tasks/T-172-scenario-patina-back-under-its-time-limit.md) — scenario-patina runs well inside run-scenario's 300 s guard again, by smaller textures where evaluation is the cost, otherwise by splitting the library stage
+- [ ] [T-173](../tasks/T-173-rv-76-answers-the-evaluation-engine.md) — Every finding of RV-76's `## Findings: the evaluation engine` is answered, fixed where it is a defect, with outputs byte-identical
+- [ ] [T-174](../tasks/T-174-rv-76-answers-the-nodes-and-check-rules.md) — Every finding of RV-76's `## Findings: the nodes, check rules and samples`, and the check-tool findings of the server's, is answered
+- [ ] [T-175](../tasks/T-175-rv-76-answers-the-file-format-and-graph-model.md) — Every finding of RV-76's `## Findings: the file format and graph model` is answered, fixed where it is a defect
+- [ ] [T-176](../tasks/T-176-rv-76-answers-the-patina-server.md) — The patina server's RV-76 findings on save, the swatch sheet, export and override wording are answered, fixed where they are defects
+- [ ] [T-177](../tasks/T-177-rv-76-answers-the-scenarios-and-docs.md) — Every finding of RV-76's `## Findings: the scenarios and test configuration` and `## Findings: the whole diff` is answered
 
 ## Retrospective
 
