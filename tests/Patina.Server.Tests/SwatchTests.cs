@@ -187,6 +187,29 @@ public class SwatchTests
     }
 
     [Fact]
+    public void A_sheet_of_more_than_15_outputs_reads_its_labels_from_a_second_atlas_page()
+    {
+        // RV-76: 18 columns give 38 labels, past the 32 rows of a page; the pages stacked are the atlas, so row r is at r x 32.
+        Assert.Equal([1, 1, 2, 2, 3], new[] { 0, 32, 33, 64, 65 }.Select(LabelAtlas.Pages));
+        string[] outputs = ["base_colour", .. Enumerable.Range(0, 17).Select(i => "m" + (char)('a' + i))];
+        var labels = SwatchSheet.Labels("wide", outputs, 0);
+        Assert.Equal(38, labels.Count);
+        Assert.Equal(2, LabelAtlas.Pages(labels.Count));
+        var size = 32;
+        var images = outputs.Select(_ => Enumerable.Repeat((byte)32, size * size * 4).ToArray()).ToList();
+        var sphere = new byte[512 * 512 * 4];
+        // The first page is blank and the second all text, so only labels 32 to 37 come out white.
+        var atlas = new byte[LabelAtlas.Size * LabelAtlas.Size * 4 * 2];
+        Array.Fill(atlas, (byte)255, LabelAtlas.Size * LabelAtlas.Size * 4, LabelAtlas.Size * LabelAtlas.Size * 4);
+        var (pixels, layout) = SwatchSheet.Compose(images, size, sphere, atlas, [.. labels.Select(_ => new Vector2(40, 12))]);
+        byte At(int x, int y) => pixels[(y * layout.Width + x) * 4];
+        Assert.Equal(13, At(layout.ColumnLeft(15) + 3, 24 + 3)); // label 31, page one: the cell under the backing, 32 x 0.4
+        Assert.Equal(255, At(layout.ColumnLeft(15) + 3, 282 + 3)); // label 32, page two
+        Assert.Equal(255, At(layout.ColumnLeft(17) + 3, 282 + 3)); // label 36
+        Assert.Equal(255, At(layout.SphereLeft + 3, 25 + 3)); // label 37, the sphere's
+    }
+
+    [Fact]
     public void The_tiling_is_described_with_worked_examples_the_scenario_draws()
     {
         // The sphere needs an engine, so the drawn example is the scenario's (literals there); the refusal runs in the harness.

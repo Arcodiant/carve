@@ -122,9 +122,14 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                     var output = item.GetString()!;
                     if (!evaluator.Has(output))
                         return Error($"export: the graph has no {output} output; it has {string.Join(", ", evaluator.Outputs)}");
-                    if (!OutputRoles.HasOwnFile(output))
-                        return Error("export: metallic has no file of its own: it is packed into roughness.png's blue channel, so name roughness to write it");
                     if (!chosen.Contains(output)) chosen.Add(output);
+                }
+                // metallic has no file of its own; named beside roughness it is written in roughness.png, named alone it is refused (RV-76).
+                if (chosen.Any(o => !OutputRoles.HasOwnFile(o)))
+                {
+                    if (!chosen.Contains(OutputRoles.Name(OutputRole.Roughness)))
+                        return Error("export: metallic has no file of its own: it is packed into roughness.png's blue channel, so name roughness to write it");
+                    chosen.RemoveAll(o => !OutputRoles.HasOwnFile(o));
                 }
                 if (chosen.Count == 0) return Error("export: outputs is empty; name at least one output, or leave it out for every output");
                 roles = [.. roles.Where(chosen.Contains)];

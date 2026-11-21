@@ -45,6 +45,15 @@ public class MetalPlateTests
 
         Assert.Equal("export: metallic has no file of its own: it is packed into roughness.png's blue channel, so name roughness to write it",
             await patina.Refused("export", """{"folder":"t","outputs":["metallic"]}"""));
+
+        // RV-76: metallic named beside roughness is not refused, as the description has it; roughness.png carries it.
+        foreach (var (name, outputs) in new[] { ("rm", """["roughness","metallic"]"""), ("mr", """["metallic","roughness"]""") })
+        {
+            var written = await patina.Ok("export", "{\"folder\":\"" + name + "\",\"outputs\":" + outputs + "}");
+            Assert.Contains("slot metallic_roughness_texture, metallic in B", written);
+            Assert.Equal(["roughness.png"], Directory.GetFiles(Path.Combine(folder.Path, name)).Select(Path.GetFileName));
+            Assert.Equal(File.ReadAllBytes(Path.Combine(plate, "roughness.png")), File.ReadAllBytes(Path.Combine(folder.Path, name, "roughness.png")));
+        }
     }
 
     [Fact]
