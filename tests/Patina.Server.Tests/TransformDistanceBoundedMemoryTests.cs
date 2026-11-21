@@ -6,8 +6,8 @@ namespace Patina.Server.Tests;
 
 /// <summary>
 /// T-138 and T-155: the real patina exports, at 8192, a colour fbm turned 30 degrees by transform, a tiles mask measured
-/// by distance at range 0.1, the colour fbm blurred smooth at radius 0.05, and the colour fbm tiled 16 x 16 at scale
-/// 0.25 (a strong minify), each in a process whose peak working set stays at 2 GB or less
+/// by distance at range 0.1, the colour fbm blurred smooth at radius 0.05, the colour fbm tiled 16 x 16 at scale
+/// 0.25 (a strong minify), and (T-173) the tiles mask minified the same, each in a process whose peak working set stays at 2 GB or less
 /// (<see cref="ExportBoundedMemoryTests.BoundBytes"/>). The time and the peak are written to <c>patina-t138-*.txt</c> in
 /// the temp folder and to the test's output; the time is a figure, not a pass mark: the person ruled (2026-11-20) that
 /// this suite, a Debug patina, asserts the peak only, and the 10 s checks are measured in Release (T-155's As built).
@@ -23,6 +23,12 @@ public class TransformDistanceBoundedMemoryTests
 
     /// <summary>The same colour fbm tiled 16 x 16 at scale 0.25: each output tile reads its whole input (T-155).</summary>
     public const string Minified = """{"version":1,"size":256,"seed":7,"nodes":{"f":{"type":"fbm","params":{"cells":[8,8],"octaves":4}},"tint":{"type":"colour","params":{"colour":"#c08040"}},"c":{"type":"blend","inputs":{"a":"tint","b":"f"},"params":{"mode":"multiply"}},"m":{"type":"transform","inputs":{"in":"c"},"params":{"tile":[16,16],"scale":0.25}},"out":{"type":"output","inputs":{"in":"m"},"params":{"role":"base_colour"}}}}""";
+
+    /// <summary>
+    /// The floor's 4 x 4 tiles' mask tiled 16 x 16 at scale 0.25: a strong minify of one port of a node of four, six
+    /// floats a texel (RV-76: 1.5 GiB pinned at 8192 when a read pinned every port; T-173 pins the mask alone).
+    /// </summary>
+    public const string MinifiedMask = """{"version":1,"size":256,"seed":7,"nodes":{"t":{"type":"tiles","params":{"count":[4,4],"gap":0.06,"bevel":0}},"m":{"type":"transform","inputs":{"in":"t.mask"},"params":{"tile":[16,16],"scale":0.25}},"out":{"type":"output","inputs":{"in":"m"},"params":{"role":"height"}}}}""";
 
     /// <summary>The floor's 4 x 4 tiles' mask, measured inside at range 0.1.</summary>
     public const string Measured = """{"version":1,"size":256,"seed":7,"nodes":{"t":{"type":"tiles","params":{"count":[4,4],"gap":0.06,"bevel":0}},"d":{"type":"distance","inputs":{"in":"t.mask"},"params":{"range":0.1}},"out":{"type":"output","inputs":{"in":"d"},"params":{"role":"height"}}}}""";
@@ -47,6 +53,9 @@ public class TransformDistanceBoundedMemoryTests
 
     [Fact]
     public Task A_strong_minify_at_8192_peaks_at_2_GB_or_less() => ExportAsync("minify", Minified, "base_colour", 8192, Deadline);
+
+    [Fact]
+    public Task A_strong_minify_of_the_tiles_mask_at_8192_peaks_at_2_GB_or_less() => ExportAsync("minify-mask", MinifiedMask, "height", 8192, Deadline);
 
     private static async Task ExportAsync(string label, string graph, string role, int size, TimeSpan deadline)
     {

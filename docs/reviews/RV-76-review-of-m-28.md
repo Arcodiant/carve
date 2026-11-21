@@ -35,7 +35,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** the memory bound; API contract against docs; tests that pass for the wrong reason.
 - **What:** dropped arrays wait in `_free` and are not counted in `Bytes`, so `PeakBytes` leaves them out. The free list can hold up to 4 MiB however small the cap, plus a sixteenth of the bound (48 MiB for the strong minify's 768 MiB). The class doc says what is held stays at most the cap or the most pinned. `EvaluationTests` says "With no cache, one tile is held at a time" (cap 0, `PeakBytes` = one 64 KB tile), but up to 4 MiB of arrays can still be live then. `Distance_at_its_largest_range_holds_no_more_than_the_cap` uses a 1 MiB cap, and up to 5 MiB can be live. The blur and turn tests use 4 MiB caps, and up to twice the cap can be live. These tests prove only what the cache counts, not what it keeps reachable. At the default 64 MiB the gap is 6%, but the contract and the tests' wording promise the cap.
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5): the contract now says what is kept reachable. `PeakBytes` stays the tiles (under the bound, as the cap tests hold); the new `GraphEvaluator.LastHeldBytes` counts the tiles, the dropped arrays waiting (at most the larger of 4 MiB and a sixteenth of the bound) and nodes' scratch, and the docs of `TileCache`, `GraphEvaluator` and `EvaluationRun` say so; `Dropped_arrays_and_scratch_are_counted_in_what_is_held` holds it. Putting the waiting arrays and scratch under the bound was tried and took their room from the tiles: a blur at 1024 in tiles of 64 under 4 MiB made 12,640 tiles against 1,840, so that is left as a question for the person rather than landed.
 
 ### A strong minify of a multi-port node pins every port of the whole image, past 2 GB at 8192
 - **Where:** `src/Patina.Graphs/Evaluation/GraphEvaluator.cs:155-161` (`Gather` pins the whole `Entry`), `TileCache.cs:23` (`Bytes` sums every port), `TileCache.cs:45-49` (`Bound`); `tests/Patina.Server.Tests/TransformDistanceBoundedMemoryTests.cs:25` (the one minify tested).
@@ -43,7 +43,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** the memory bound at 8192.
 - **What:** `transform` at tile 16 x 16 and scale 0.25 reads its whole input for every tile, and a read pins the whole entry: every output port of the source node at that position. The 2 GB test minifies `blend`, which has one colour port: 8192² x 3 x 4 = 768 MiB pinned. The same minify of `tiles.mask` pins all of `tiles`' ports (`mask`, `height` and `random` grey, plus colour `uv`: 6 floats a texel). That is 8192² x 6 x 4 = 1.5 GiB. `Bound` then becomes 1.5 GiB and the free list adds 96 MiB, on top of the export's 256 MB RGBA buffer and the runtime: past the 2 GB the milestone checks. A minify of a minify does the same: the outer one pins its whole input while each inner tile pins its own, about 1.5 GiB. "Holds that and no more" (`TileCache.cs:45-48`) holds only for a one-port source. Neither case is tested, and no sample hits either today (`floor-tiles` only turns by 90°).
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5, as the person ruled): an entry keeps only the ports the evaluation reads; the others are filled into arrays released once the tile is made, and `BandTiles` counts only the ports read. `A_strong_minify_of_one_port_of_tiles_pins_that_port_alone` (unit, 512) and `A_strong_minify_of_the_tiles_mask_at_8192_peaks_at_2_GB_or_less` (regression) hold it. A minify of a minify is not changed: both whole images are read at once, the most-pinned case the bound already names.
 
 ### `BandTiles` casts to `int` after the clamp, so a very large cap makes the band negative and `Evaluate` loops forever
 - **Where:** `src/Patina.Graphs/Evaluation/GraphEvaluator.cs:316` (`band = Math.Min(band, (int)Math.Max(1, (cap / 4 * 3 - reading) / column))`), and `Order` at `:293-299`.
@@ -51,7 +51,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** cache correctness; API contract (the public `cacheBytes`).
 - **What:** the quotient is a `long`, clamped to at least 1 and only then truncated to `int`. With `cacheBytes: long.MaxValue` (a natural way to ask for "no cap") and a blur in tiles of 128, the quotient is 35,184,372,088,830, which truncates to **-2** (worked out for reaches 2, 10 and 100 texels). `Math.Min(32, -2)` makes the band -2. `Order` then steps `b += -2` from 0, so `b < n` stays true for ever and the inner loop yields nothing: the call hangs, doing no work. The server never passes a cap, so no tool can reach this, but `GraphEvaluator.Evaluate` and `OutputImage` take the cap publicly. Clamp in `long` before the cast: `Math.Min(band, Math.Max(1, ...))`.
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5): clamped in `long` before the cast; `A_cap_of_long_MaxValue_evaluates` holds it, with the bytes of a default run.
 
 ### Blur and distance's scratch buffers are large objects allocated per tile, outside both the bound and the array reuse
 - **Where:** `src/Patina.Graphs/Nodes/BlurNode.cs:81, 105, 141, 159`; `DistanceNode.cs:70, 106`; against `TileCache.cs:116-118`.
@@ -59,7 +59,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** the memory bound at 8192.
 - **What:** T-155 reused tile arrays because dropped 192 KB colour tiles piled up as large-object garbage. A blur row tile at 8192, smooth radius 0.05, allocates a buffer of (128 + 2 x 1,229) x 3 x 128 floats, about 4 MB, then one more array for each of its three passes, about 8 MB of LOH garbage a row tile. Each column tile allocates about the same. The 8192 run made 43,744 tiles. That is the same pattern about 40 times larger, and neither the cache's bound nor `PeakBytes` sees it. The blur's 2 GB test passes (1,226 MB in Debug), but As built says the peaks "move with the collector's timing". This garbage is what they move with, and it scales with the radius.
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5): `NodeEvaluation.Scratch(length)` hands out the evaluator's arrays, the last tile's kept for the next and counted in `LastHeldBytes`; blur's two passes ping-pong between two scratch arrays and distance's column buffer is scratch. A blur at 1024 in tiles of 64 under 4 MiB allocated 397 MiB before and 18 MiB after (`A_separable_blur_allocates_little_past_its_cache`); bytes unchanged (the two-pass tests against the one-pass node pass).
 
 ### No unit test fails if the warm-up, the cold list or the band narrowing is removed
 - **Where:** `src/Patina.Graphs/Evaluation/GraphEvaluator.cs:238-249` (`WarmRows`), `TileCache.cs:30, 67-71, 104` (cold list), `GraphEvaluator.cs:306-319` (`BandTiles`); `tests/Patina.Graphs.Tests/SeparablePassesTests.cs`.
@@ -67,7 +67,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** tests: does each risky part have a test that fails without it.
 - **What:** T-155 says these three ended a 6,100 s thrash of blur at 8192. The unit tests check bytes (which order never changes) and `PeakBytes <= cap`. The cache enforces that cap whatever the order, so it holds with or without the three. The only test that would catch a return of the thrash is the Debug regression tier's 30-minute deadline on the blur export (`TransformDistanceBoundedMemoryTests.cs:37`). Nothing at unit tier bounds a separable node's `TilesEvaluated` against its minimum, the way `WarpAtTheLargestAmountMakesFewMoreTilesThanTheMinimum` does for warp (`DependentInputTests.cs:117`). A blur at 1024 in tiles of 64 under a few MiB would do it.
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5): `A_blur_under_a_tight_cap_makes_close_to_the_fewest_tiles` holds a blur at 1024 in tiles of 64 under 4 MiB at 2.1 times the fewest (made 1,840 of 1,024); without the warm-up it made 2,716, without the cold list 48,620, without the band narrowing 11,407, each run.
 
 ### CLAUDE.md says transform is separable
 - **Where:** `CLAUDE.md:72` ("`transform` and `distance` (T-138: ...; both separable since T-155)").
@@ -75,7 +75,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** misleading docs.
 - **What:** only `BlurNode` and `DistanceNode` override `Separable` (grep `override SeparablePasses` over `src`). `transform` runs in one pass. Its fix in T-155 was the order and depth-first making, not separable passes.
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5): CLAUDE.md now says distance is separable since T-155 and transform runs in one pass, made depth first in T-155's bands.
 
 ### `WarmRows`' comment says a column tile read away from its output tile makes only its own; the code tests only the column's number
 - **Where:** `src/Patina.Graphs/Evaluation/GraphEvaluator.cs:236-237` against `:241`.
@@ -83,7 +83,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** misleading comments.
 - **What:** `last = x >= bandStart && x < bandEnd ? bandEnd : x + 1` compares a deeper step's tile column with the *output's* band. A separable node under a transform, or read across a row pass, whose column happens to fall inside the band therefore warms row tiles to the band's right edge it may never read. That costs time only, since bytes are unchanged. The comment should say "a column outside the band's columns", not "read away from its output tile".
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5): the comment now says a column tile in a column outside the band's makes only its own, and that the test is the column's number alone, so a deeper step's tile inside the band may warm row tiles it does not read (time, never bytes).
 
 ### `TileRead.Row` with several rectangles gives up on the first one that holds the start texel
 - **Where:** `src/Patina.Graphs/Imaging/TileRead.cs:190-198`, against the class doc at `:11-12` ("readable when it lies in any of them").
@@ -91,7 +91,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** API contract against docs.
 - **What:** when part 0 holds `(x, y)` but the run passes its edge, `Row` throws without trying `_rest`, even if a later, overlapping part holds the whole run in one tile. `Grey`, `Colour` and `Index` do try every part. No live caller hits this: warp asks for one rectangle, and `pair`'s two do not overlap. But T-153's contract, "a texel in any of them is readable", is looser than `Row` keeps.
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5): `Row` tries each rectangle in turn and returns the first that holds the whole run in one tile; `A_row_past_the_first_rectangle_is_read_from_a_later_one_that_holds_it` holds it.
 
 ### Export collects before encoding but not between the roughness and metallic evaluations
 - **Where:** `src/Patina.Server/ExportTool.cs:165-181`.
@@ -99,7 +99,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). No tests run; every figure belo
 - **Rubric:** the memory bound at 8192 (the forced GC in export).
 - **What:** when roughness carries metallic, the second `Evaluate` starts while the first one's whole cache is unreachable but not collected: up to its `Bound` plus the free list. The forced collection at `:181` comes only after both. The comment's reason for collecting is that two peaks should never stack, and that applies here too. With grey roughness and metallic it is at most about 256 MiB more for two strong minifies, so it is unlikely to pass 2 GB, and no test exports roughness with metallic at 8192.
 
-**Outcome:** —
+**Outcome:** fixed (T-173, Opus 5.5): export collects between the roughness and metallic evaluations as it does before encoding. No test holds it: a forced collection's effect on the peak working set is not one a test can pin without an 8192 roughness-with-metallic export, which none of the samples needs.
 
 ## Findings: the nodes, check rules and samples (claude-opus-5-5)
 

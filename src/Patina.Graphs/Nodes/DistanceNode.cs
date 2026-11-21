@@ -103,7 +103,7 @@ public sealed class DistanceNode : NodeType
         var rangeTexels = RangeTexels(e.Parameters.Float("range"), e.Size);
         bool wantInside = side != "outside", wantOutside = side != "inside";
         var rows = rect.Height + 2 * reach;
-        var buffer = new float[rows * rect.Width];
+        var buffer = e.Scratch(rows * rect.Width); // the evaluator's, not large-object garbage a tile (RV-76)
         for (var r = 0; r < rows; r++) rowsRead.CopyRow(rect.Y - reach + r, rect.X, rect.Width, buffer.AsSpan(r * rect.Width, rect.Width));
         var toOut = new int[rows];
         var toIn = new int[rows];
