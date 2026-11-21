@@ -35,10 +35,10 @@ public sealed record OutputImage(string Output, int Size, byte[] Rgba, byte[] Pn
     /// </summary>
     public static byte[] FileRgba8(GraphEvaluator evaluator, string output, int size, int? tileSize = null, long? cacheBytes = null)
     {
-        var metallic = OutputRoles.Name(OutputRole.Metallic);
-        if (output == metallic)
+        if (!OutputRoles.HasOwnFile(output))
             throw new ArgumentException("metallic has no file of its own: it is packed into roughness.png's blue channel", nameof(output));
         var rgba = Rgba8(evaluator, output, size, tileSize, cacheBytes);
+        var metallic = OutputRoles.Name(OutputRole.Metallic);
         if (output == OutputRoles.Name(OutputRole.Roughness) && evaluator.Has(metallic))
             evaluator.Evaluate(metallic, size, tile => OutputPacking.PackMetallicTile(tile, rgba, size), tileSize, cacheBytes);
         return rgba;
