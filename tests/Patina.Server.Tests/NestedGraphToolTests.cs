@@ -69,6 +69,52 @@ public class NestedGraphToolTests
     }
 
     [Fact]
+    public async Task Save_into_another_folder_is_judged_there_and_refused_when_a_graph_node_would_not_resolve()
+    {
+        // RV-76: the never-saved graph uses bricks.texgraph from the tool folder; saved into materials/ it would name
+        // materials/bricks.texgraph, which does not exist, so the save is refused and nothing changes.
+        using var folder = new TempFolder();
+        CopySamples(folder.Path, "bricks.texgraph");
+        await using var patina = await PatinaHarness.StartAsync(folder.Path);
+        await patina.Ok("define_graph", DefineGraphTool.WorkedNested);
+
+        var refused = folder.Normalise(await patina.Refused("save", """{"path":"materials/wall.texgraph"}"""));
+        Assert.StartsWith("save: refused: the graph saved in <folder>/materials, where its graph nodes' paths resolve, has 1 fault", refused);
+        Assert.Contains("node 'wall' parameter 'path'", refused);
+        Assert.Contains("materials", refused);
+        Assert.EndsWith("Nothing was written.", refused);
+        Assert.False(File.Exists(Path.Combine(folder.Path, "materials", "wall.texgraph")));
+        Assert.Contains("paths resolved against the tool folder <folder> (the graph has never been saved)", folder.Normalise(await patina.Ok("get_graph", "{}")));
+        await patina.Ok("export", """{"folder":"out","outputs":["base_colour"]}""");
+
+        // With the nested file beside it, the same save is judged there and written, and the file opens with no fault.
+        Directory.CreateDirectory(Path.Combine(folder.Path, "materials"));
+        CopySamples(Path.Combine(folder.Path, "materials"), "bricks.texgraph");
+        await patina.Ok("save", """{"path":"materials/wall.texgraph"}""");
+        Assert.Contains("no faults", await patina.Ok("open", """{"path":"materials/wall.texgraph"}"""));
+    }
+
+    [Fact]
+    public async Task Pop_snapshot_after_a_save_into_another_folder_lists_the_faults_the_snapshot_has_there()
+    {
+        // RV-76: a snapshot pushed while its graph node resolved against the tool folder comes back in the saved file's
+        // folder, where bricks.texgraph is not, and pop_snapshot names that fault rather than reporting the graph sound.
+        using var folder = new TempFolder();
+        CopySamples(folder.Path, "bricks.texgraph");
+        await using var patina = await PatinaHarness.StartAsync(folder.Path);
+        await patina.Ok("define_graph", DefineGraphTool.WorkedNested);
+        await patina.Ok("push_snapshot", """{"label":"with bricks"}""");
+        await patina.Ok("edit_graph", """{"operations":[{"op":"set_node","node":"c","type":"colour","params":{"colour":"#808080"}},{"op":"connect","node":"out","port":"in","from":"c"},{"op":"remove_node","node":"rough"},{"op":"remove_node","node":"wall"}]}""");
+        await patina.Ok("save", """{"path":"materials/plain.texgraph"}""");
+
+        var popped = await patina.Ok("pop_snapshot", "{}");
+        Assert.StartsWith("pop_snapshot: restored 'with bricks'; depth 0. The graph is 3 nodes, size 256, seed 0; 1 fault", popped);
+        Assert.Contains("node 'wall' parameter 'path'", popped);
+        Assert.Contains("materials", popped);
+        Assert.Contains("refused", await patina.Refused("export", """{"folder":"out"}"""));
+    }
+
+    [Fact]
     public async Task Save_writes_a_graph_whose_input_lacks_a_default()
     {
         using var folder = new TempFolder();

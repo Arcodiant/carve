@@ -101,7 +101,7 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
         "Writes the open graph to a .texgraph file, so the work outlives this session; open reads it back. Takes path: .texgraph is added when the path does not end in it; "
         + "a relative path resolves against patina's working directory, and the result gives the absolute path; missing folders are created; an existing file is replaced, and the result says (replaced). "
         + "The file is the graph as get_graph shows it: versioned JSON, keys in one order, one node a line, so the same graph always gives the same bytes and a diff shows what changed. "
-        + "The path becomes the graph's path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates, but for an input node with no default, which a graph using this one as a node gives. Only the open graph is written, never a file it uses as a graph node. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. "
+        + "The path becomes the graph's path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates, but for an input node with no default, which a graph using this one as a node gives. A graph node's path resolves against the file's folder, so the graph is judged there: saved into another folder, a nested file not found from it is a fault. Only the open graph is written, never a file it uses as a graph node. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. "
         + "Also refused: no open graph, an empty path, one naming a folder or holding a character a path may not, and a write that fails (naming the path and the system's message; no partial file is left). "
         + "save changes nothing in the graph or the snapshot stack, which is never saved.\n"
         + "Worked example, after define_graph's and edit_graph's worked examples (put patina's working directory for <folder>):\n"
@@ -121,10 +121,17 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
             if (store.Graph is not { } graph) return Error("save: " + NoGraph);
             var target = Resolve("save", text, folder.Directory, out var pathError);
             if (target is null) return Error(pathError!);
+            // The graph is judged where it will be: a graph node's path resolves against the file's folder (T-140), so a save into
+            // another folder is judged there, and refused when a nested file is not found from it (RV-76).
+            var folderTo = Path.GetDirectoryName(target)!;
+            var moved = !string.Equals(folderTo, store.Folder, StringComparison.OrdinalIgnoreCase);
             // A fault that only stops the graph evaluating on its own (an input with no default, T-140) does not stop the save: a graph using it as a node gives the input.
-            var faults = GraphValidator.Validate(graph, registry).Where(f => !f.OnItsOwn).ToList();
+            var faults = GraphValidator.Validate(graph with { Folder = folderTo }, registry).Where(f => !f.OnItsOwn).ToList();
             if (faults.Count > 0)
-                return Error($"save: refused: the graph has {Faults(faults)}\nA saved graph evaluates; fix them with edit_graph, then save again. Nothing was written.");
+            {
+                var where = moved ? $" saved in {folderTo}, where its graph nodes' paths resolve," : "";
+                return Error($"save: refused: the graph{where} has {Faults(faults)}\nA saved graph evaluates; fix them with edit_graph, then save again. Nothing was written.");
+            }
             if (!Write("save", target, TexGraphFile.Write(graph), out var replaced, out var writeError)) return Error(writeError!);
             store.Saved(target);
             return Line($"save: saved {Path.GetFileName(target)} to {target}{(replaced ? " (replaced)" : "")}: {Describe(graph)}");
@@ -257,7 +264,7 @@ public sealed class PopSnapshotTool(GraphStore store, NodeRegistry registry)
 
     public const string Text =
         "Restores the graph on top of the snapshot stack (push_snapshot) as the open graph, byte for byte as it was pushed, and removes it from the stack. "
-        + "Takes nothing. Returns the snapshot's label, the new depth, and the restored graph's nodes, size, seed and faults. The graph's path is kept; nothing is written to a file. "
+        + "Takes nothing. Returns the snapshot's label, the new depth, and the restored graph's nodes, size, seed and faults. The graph's path is kept, so its graph nodes resolve against that path's folder (a snapshot pushed before a save into another folder is judged there, and its faults listed); nothing is written to a file. "
         + "On an empty stack it is an error that says so, and changes nothing.\n"
         + "Worked example, after push_snapshot's: edit_graph's worked example adds the grain (6 nodes), then pop_snapshot {} returns:\n"
         + WorkedResult + "\n"
@@ -271,7 +278,7 @@ public sealed class PopSnapshotTool(GraphStore store, NodeRegistry registry)
         lock (store.Gate)
         {
             if (store.Pop() is not { } top) return Error(Empty);
-            return Line($"pop_snapshot: restored {PushSnapshotTool.Label(top.Label)}; depth {store.Depth.ToString(CultureInfo.InvariantCulture)}. The graph is {State(top.Graph, registry)}");
+            return Line($"pop_snapshot: restored {PushSnapshotTool.Label(top.Label)}; depth {store.Depth.ToString(CultureInfo.InvariantCulture)}. The graph is {State(store.Graph!, registry)}");
         }
     }
 }

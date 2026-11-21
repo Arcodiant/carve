@@ -21,3 +21,4 @@
 - T-177: Every finding of RV-76's `## Findings: the scenarios and test configuration` and `## Findings: the whole diff` is answered
 - T-172: scenario-patina runs well inside run-scenario's 300 s guard again, by smaller textures where evaluation is the cost, otherwise by splitting the library stage into a suite of its own, with no check and no approved frame lost
 - T-174: Every finding of RV-76's `## Findings: the nodes, check rules and samples`, and the check-tool findings of the server's, is answered
+- T-176: The patina server's RV-76 findings on save, the swatch sheet, export and override wording are answered, fixed where they are defects

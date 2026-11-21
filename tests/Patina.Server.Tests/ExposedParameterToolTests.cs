@@ -80,6 +80,23 @@ public class ExposedParameterToolTests
         Assert.Equal(File.ReadAllText(Bricks).Replace("\r\n", "\n"), TexGraphFile.Write(TexGraphFile.Read(await patina.GraphText()).Graph!));
     }
 
+    [Theory]
+    [InlineData("swatch", """{"view":"flat","parameters":{"mortar":true}}""",
+        "swatch: parameters['mortar']: is true or false; a value is a number, a string, or an array of numbers or of strings")]
+    [InlineData("swatch", """{"view":"flat","parameters":{"mortar":[1,"a"]}}""",
+        "swatch: parameters['mortar']: an array is all numbers or all strings")]
+    [InlineData("export", """{"folder":"never","parameters":{"mortar":true}}""",
+        "export: parameters['mortar']: is true or false; a value is a number, a string, or an array of numbers or of strings. Nothing was written.")]
+    [InlineData("check", """{"parameters":{"mortar":[1,"a"]}}""",
+        "check: parameters['mortar']: an array is all numbers or all strings")]
+    public async Task An_override_value_patina_cannot_read_is_worded_with_one_colon(string tool, string arguments, string expected)
+    {
+        // RV-76: the colon went before every " is " in the words, not just the first.
+        await using var patina = await PatinaHarness.StartAsync();
+        await OpenBricksAsync(patina);
+        Assert.Equal(expected, await patina.Refused(tool, arguments));
+    }
+
     [Fact]
     public async Task Swatch_overrides_equal_the_same_values_set_in_the_graph()
     {
