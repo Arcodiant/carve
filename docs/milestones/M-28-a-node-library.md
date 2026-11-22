@@ -157,6 +157,7 @@ check {}          (open graph, its own size; optional size<=2048,
 | 10 | T-179 RV-77 answers (added 2026-11-21) | Opus | — | see its Notes |
 | 10 | T-180 the README, kept current (added 2026-11-22) | Opus | — | `README.md`, CLAUDE.md's working rules |
 | 11 | T-181 carve's README sections caught up (added 2026-11-22) | Opus | T-180 | `README.md`'s carve sections and Build and test |
+| 12 | T-183 every colliding outer node is a fault (added 2026-11-22) | Opus | — | `GraphValidator.cs` |
 
 Dependencies on a sibling's feature: T-137's gradient map needs T-134's list parameters, and its sample T-134's
 `metallic` and named outputs. T-138's floor tiles need T-136's `tiles` and T-134's `height`. T-139's content edits
@@ -196,6 +197,7 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-179](../tasks/T-179-rv-77-answers-the-format-server-and-scenarios.md) — Every finding of RV-77's `## Findings: round 2, the format, server and scenarios` is answered
 - [ ] [T-180](../tasks/T-180-the-readme-for-the-node-library-kept-current-from-now-on.md) — The README's patina section describes M-28's node library, and CLAUDE.md makes keeping the README current part of every change
 - [ ] [T-181](../tasks/T-181-carve-s-readme-sections-caught-up.md) — The README's carve sections and its Build and test list describe what carve's server offers now
+- [ ] [T-183](../tasks/T-183-every-colliding-outer-node-is-a-fault.md) — Any outer node whose id collides with an expanded id is a fault on that node, whatever its type
 
 ## Retrospective
 
