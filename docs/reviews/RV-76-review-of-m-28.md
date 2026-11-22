@@ -129,7 +129,9 @@ Reviewed on claude-opus-5-5, from `git diff origin/main...HEAD` in `D:\Repos\car
 - **Rubric:** the check rules against the person's rulings.
 - **What is wrong:** T-141's ruling 2 exempts the roughness PNG's blue channel from `one-value` only. It also says "`does-not-tile` runs on every output". The code skips every `Derived` output in `does-not-tile` too. In PNG mode the roughness output is read from G alone (`channel: role == rough ? 1 : null`), so nothing ever looks at B for a seam. A metallic seam in a `files` check is never reported. The same metallic made by a graph is checked (graph outputs are never `Derived`). So the one rule gives different answers for the graph and for its exported PNGs. No test covers a seam in B.
 
-**Outcome:** fixed (T-174, claude-opus-5-5): `does-not-tile` judges every output, the metallic read from a packed image's B too, as the person ruled (2026-11-21: the exemption was only ever from `one-value`). `A_seam_in_a_metallic_roughness_pngs_blue_channel_is_a_seam_in_metallic` fails without it.
+**Outcome:** fixed
+
+**Fix:** (T-174, claude-opus-5-5): `does-not-tile` judges every output, the metallic read from a packed image's B too, as the person ruled (2026-11-21: the exemption was only ever from `one-value`). `A_seam_in_a_metallic_roughness_pngs_blue_channel_is_a_seam_in_metallic` fails without it.
 
 ### An all-metal graph cannot check clean: one-value fires on a constant metallic, and its fix is wrong
 - **Where:** `src/Patina.Graphs/Checks/OneValueRule.cs:187-194`.
@@ -137,7 +139,9 @@ Reviewed on claude-opus-5-5, from `git diff origin/main...HEAD` in `D:\Repos\car
 - **Rubric:** check rules, edge cases (an all-metal image).
 - **What is wrong:** A graph whose `metallic` output is 1 everywhere (bare steel) raises `one-value` with "a mask of one value masks nothing". The fix it gives is "if the one value is meant, leave the output out of the graph", but leaving metallic out makes the material non-metal. So the fix changes what the graph is. The same material checked from its PNGs is clean, because the B channel is `Derived` and exempt, so graph and PNG disagree again. The ruling names metallic among one-value's outputs, so firing is as ruled. The defect is the inconsistency with the PNG path and a fix that cannot be followed. Either the message for `metallic` should say something else, or a constant 0/1 metallic should be exempt in graph mode as it is in PNG mode. No test has an all-metal graph.
 
-**Outcome:** fixed (T-174, claude-opus-5-5): by the person's ruling (2026-11-21), metallic is exempt from `one-value` from a graph or a PNG alike, and `metallic-not-binary` still judges its values; check's description says so. `A_graphs_constant_metallic_is_exempt_from_one_value_as_a_pngs_is` fails without it.
+**Outcome:** fixed
+
+**Fix:** (T-174, claude-opus-5-5): by the person's ruling (2026-11-21), metallic is exempt from `one-value` from a graph or a PNG alike, and `metallic-not-binary` still judges its values; check's description says so. `A_graphs_constant_metallic_is_exempt_from_one_value_as_a_pngs_is` fails without it.
 
 ### No test tells the 99th percentile from the largest interior step
 - **Where:** `tests/Patina.Graphs.Tests/CheckRulesTests.cs:172-262` (every does-not-tile case is `Image("mask", 32, 32, ...)`). The rule is at `src/Patina.Graphs/Checks/DoesNotTileRule.cs:60`.
@@ -145,7 +149,9 @@ Reviewed on claude-opus-5-5, from `git diff origin/main...HEAD` in `D:\Repos\car
 - **Rubric:** tests (a risky part without a test that would fail without it).
 - **What is wrong:** T-141's ruling uses the 99th percentile by nearest rank. With 32 columns there are 31 interior boundaries, rank `ceil(0.99*31)-1 = 30`, which is the largest one. T-141's As built says so itself. A broken copy using `inside.Max()`, or an off-by-one in `rank`, passes every test in the file. The broken-copies table (lines 238-262) has "the wrap compared with the mean step" but no "with the max". The percentile and max differ only when there are 101 or more boundaries, for example 256 at the samples' size, where the top 2 interior steps are dropped. No case at that width checks that a lone interior outlier is ignored.
 
-**Outcome:** fixed (T-174, claude-opus-5-5): a 256-wide ramp with two lone outlier steps (dropped: still a seam) and a third (kept: clean), in a theory and as three broken copies (the largest step, one rank too high, one rank too low). The rule is unchanged.
+**Outcome:** fixed
+
+**Fix:** (T-174, claude-opus-5-5): a 256-wide ramp with two lone outlier steps (dropped: still a seam) and a third (kept: clean), in a theory and as three broken copies (the largest step, one rank too high, one rank too low). The rule is unchanged.
 
 ### warp still calls Math.Cos and Math.Sin, where transform and shape use the series
 - **Where:** `src/Patina.Graphs/Nodes/WarpNode.cs:73-77`.
@@ -153,7 +159,9 @@ Reviewed on claude-opus-5-5, from `git diff origin/main...HEAD` in `D:\Repos\car
 - **Rubric:** determinism (hand-rolled maths that is exact).
 - **What is wrong:** `Direction` uses `Math.Cos` and `Math.Sin` for a grey `by` at a non-zero `angle`. It is now the only transcendental call in `Nodes/` (grep `Math(F)?\.(Sin|Cos|Pow|Exp|Log|Tan|Atan)`). .NET leaves these to the platform's C runtime, so the last bit may differ between machines, while `TransformNode` (line 24-25) and `ShapeNode` (line 12-13) use `ShapeNode.SinCos` "so the result is the same on every machine". NodeType's rule (line 13) forbids only Pow and Exp, so this breaks no letter, and T-135's As built records it. No committed sample uses a grey `by` at an angle (cobblestones' warps use the default angle 0, where cos and sin are exact). So the risk is only in agents' graphs. Routing it through `TransformNode.SinCos(angle)` would also make 90 and 180 exact, where `Math.Cos(pi/2)` is 6e-17.
 
-**Outcome:** fixed (T-174, claude-opus-5-5): warp's direction goes through `TransformNode.SinCos` (the series, exact at quarter turns). `PatinaGraphsIsEngineFreeTests.CallsNoPlatformTranscendental` scans the assembly's member references for `Math`/`MathF` Sin, Cos, Tan, Atan, Pow, Exp, Log and the like, and fails without it. No committed sample uses an angle, and every sample's bytes are as committed.
+**Outcome:** fixed
+
+**Fix:** (T-174, claude-opus-5-5): warp's direction goes through `TransformNode.SinCos` (the series, exact at quarter turns). `PatinaGraphsIsEngineFreeTests.CallsNoPlatformTranscendental` scans the assembly's member references for `Math`/`MathF` Sin, Cos, Tan, Atan, Pow, Exp, Log and the like, and fails without it. No committed sample uses an angle, and every sample's bytes are as committed.
 
 ### worley's 3 x 3 search misses the true second-nearest point at the default jitter 1
 - **Where:** `src/Patina.Graphs/Nodes/WorleyNode.cs:55-63`, with `jitter` defaulting to 1 at line 28.
@@ -161,7 +169,9 @@ Reviewed on claude-opus-5-5, from `git diff origin/main...HEAD` in `D:\Repos\car
 - **Rubric:** formulas against the node description.
 - **What is wrong:** The description says `f1` is "the distance to the nearest point" and `edge` is "f2 - f1". With jitter 1 a point can sit anywhere in its cell. A texel near its cell's left edge can then have a point in cell `ix - 2` (outside the window) at just over 1 cell away, closer than every point inside the window. A simulation with uniform points (jitter 1, 16 x 16 cells, 40,000 samples, the 3 x 3 window against a 5 x 5 one) found f2 wrong in 0.0125% of samples and f1 never. So `edge` has rare one-texel jumps where the window shifts. This is minor in practice, and the description does say "searched in the 3 x 3 cells". But no test compares worley with a brute-force search, as distance's tests do.
 
-**Outcome:** fixed (T-174, claude-opus-5-5): after the 3 x 3 cells, worley searches each further ring that could still hold a point nearer than f2 (a bound from the texel's distance to its cell's edge and the jitter's margin), up to ring 4. `WorleyFindsTheTrueNearestTwoPointsAsASearchOfEveryCellDoes` compares with a search of every cell at jitter 1 by both metrics, and shows a 3 x 3 search misses some. The committed samples (cobblestones at jitter 0.85, painted-metal at 0.9) are byte for byte as committed: their tests pass unchanged.
+**Outcome:** fixed
+
+**Fix:** (T-174, claude-opus-5-5): after the 3 x 3 cells, worley searches each further ring that could still hold a point nearer than f2 (a bound from the texel's distance to its cell's edge and the jitter's margin), up to ring 4. `WorleyFindsTheTrueNearestTwoPointsAsASearchOfEveryCellDoes` compares with a search of every cell at jitter 1 by both metrics, and shows a 3 x 3 search misses some. The committed samples (cobblestones at jitter 0.85, painted-metal at 0.9) are byte for byte as committed: their tests pass unchanged.
 
 ### stripes' softness ramp is twice the width the description gives
 - **Where:** `src/Patina.Graphs/Nodes/StripesNode.cs:31-37` against its description at lines 9-10.
@@ -169,7 +179,9 @@ Reviewed on claude-opus-5-5, from `git diff origin/main...HEAD` in `D:\Repos\car
 - **Rubric:** formulas against the node descriptions.
 - **What is wrong:** The description says "`softness` 0..0.5 of a period, the smoothstep across each edge, centred on it". The code ramps from `half - softness` to `half + softness`, so the ramp is `2 * softness` of a period wide. At the top of the range (0.5) the ramp covers the whole period. A width-0.5 stripe then never reaches 1 or 0 (it peaks at 0.84 and bottoms at 0.16). The hand-worked test (`PatternNodesTests.cs:320-322`) is "worked from the ramp's formula", so it holds the code rather than the description. Either the description should say "softness each side of the edge", or the ramp should be `softness` wide. The fabric sample (softness 0.35, width 0.9) was approved by eye as it is, so changing the code would change its look.
 
-**Outcome:** fixed in the words (T-174, claude-opus-5-5): the code is kept, so the fabric sample keeps its approved look; `StripesNode`'s description and the `nodes` catalogue now say softness is the ramp's reach each side of the edge, so the ramp is 2 x softness wide.
+**Outcome:** fixed
+
+**Fix:** in the words (T-174, claude-opus-5-5): the code is kept, so the fabric sample keeps its approved look; `StripesNode`'s description and the `nodes` catalogue now say softness is the ramp's reach each side of the edge, so the ramp is 2 x softness wide.
 
 ## Findings: the file format and graph model (claude-opus-5-5)
 
@@ -325,7 +337,9 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). Diff: `git diff origin/main...H
   - The description does say "read as export writes it", but the report names a problem the file does not have. The only way out is giving a separate metallic file.
   - `CheckToolTests` never exercises this reading through the tool; only `Patina.Graphs.Tests` touches `OfPngs`.
 
-**Outcome:** fixed (T-174, claude-opus-5-5), by the person's ruling (2026-11-21, replacing T-141's): role `roughness` is roughness only; role `metallic_roughness` is the packed glTF image, its G the roughness and its B the metallic, and is how check's description and schema name export's `roughness.png`. Giving both is an error. `Only_a_metallic_roughness_file_has_its_blue_channel_read_as_metallic` (through the tool) and two `CheckRulesTests` hold it.
+**Outcome:** fixed
+
+**Fix:** (T-174, claude-opus-5-5), by the person's ruling (2026-11-21, replacing T-141's): role `roughness` is roughness only; role `metallic_roughness` is the packed glTF image, its G the roughness and its B the metallic, and is how check's description and schema name export's `roughness.png`. Giving both is an error. `Only_a_metallic_roughness_file_has_its_blue_channel_read_as_metallic` (through the tool) and two `CheckRulesTests` hold it.
 
 ### swatch, export and check word a refused override's value wrongly
 
@@ -350,7 +364,9 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). Diff: `git diff origin/main...H
   - `pixels` is the first file's width, so `stats.size` is wrong for every other file when the files differ in size (and for a non-square PNG). The code knows this case happens: it writes a "different sizes" note at line 130.
   - The agreed shape has one `size`. With files, either use the size shared by all of them, or name each file's size in its stats.
 
-**Outcome:** fixed (T-174, claude-opus-5-5): `stats.size` is given when every output has one square size; otherwise it is left out and each output's stats name its `width` and `height`, as the description says. `Files_of_different_sizes_name_each_ones_size_and_files_of_one_size_give_stats_size`.
+**Outcome:** fixed
+
+**Fix:** (T-174, claude-opus-5-5): `stats.size` is given when every output has one square size; otherwise it is left out and each output's stats name its `width` and `height`, as the description says. `Files_of_different_sizes_name_each_ones_size_and_files_of_one_size_give_stats_size`.
 
 ### check's "not a PNG" error has no test
 
@@ -362,7 +378,9 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`). Diff: `git diff origin/main...H
   - So the `catch (InvalidOperationException or IOException or UnauthorizedAccessException)` is never shown to catch what StbImageSharp throws on a corrupt or non-image file.
   - `ImageResult.FromMemory` also accepts JPEG, BMP and others, so "not a PNG" is not what is checked.
 
-**Outcome:** fixed (T-174, claude-opus-5-5): a file must start with the PNG signature (StbImageSharp reads JPEG and BMP too), and `A_file_that_is_not_a_png_or_is_a_broken_one_is_an_error` covers text, a BMP header and a PNG cut short (the last showing the catch holds what StbImageSharp throws).
+**Outcome:** fixed
+
+**Fix:** (T-174, claude-opus-5-5): a file must start with the PNG signature (StbImageSharp reads JPEG and BMP too), and `A_file_that_is_not_a_png_or_is_a_broken_one_is_an_error` covers text, a BMP header and a PNG cut short (the last showing the catch holds what StbImageSharp throws).
 
 # M-28 review, part E: the scenarios and test configuration, and the whole diff
 
