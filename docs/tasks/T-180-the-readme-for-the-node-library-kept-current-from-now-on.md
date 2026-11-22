@@ -4,7 +4,7 @@ description: >-
 ---
 # T-180 — The README for the node library, kept current from now on
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -54,3 +54,41 @@ member's `### As built` accounts for.
 - The README is what a person reads; tool descriptions are what an agent reads. Keep the README short and point at the
   `nodes` tool and the descriptions for detail rather than copying them.
 - Opus 5.5: Sonnet is under its weekly usage limit until 2026-11-23.
+
+### As built
+
+Written by Opus 5.5 (claude-opus-5-5), from the code (`src/Patina.Server/*Tool.cs`, `NodeCatalogue.cs`,
+`Program.Tools`) and T-155's As built, not from the plan.
+
+**The README.** `## patina: texture graphs` is rewritten and split into short subsections: the tool list (now with
+`nodes`, `swatch`, `export`, `check`, and `edit_graph`'s `set_parameter`, `set_parameters`, `remove_parameter`); Nodes
+(all nineteen types, grouped as sources, filters and structure, pointing at `nodes {}` for detail); Outputs and export
+(the roles, metallic in `roughness.png`'s blue channel, height and named outputs, each file's carve slot); Exposed
+parameters and graphs as nodes (overrides on `swatch`, `export` and `check`; a nested `path` relative to the using
+file; version 2); swatch's views (sheet, flat, tiled, sphere, cube) and `tiling`; `check`, its two targets
+(`files` with `metallic_roughness`) and its five rules a line each; the samples, the grey bricks variant and the fault
+graphs; a worked example; and what is slow or bounded (8192 minutes under 2 GB, blur about 2 minutes and distance
+about 20 s at 8192 against T-159's 10 s, swatch and check at 2048). The old node list of seven types and the claim that
+a faulted graph only cannot be saved were the parts M-28 had made untrue. carve's sections are unchanged.
+
+**The worked example was run as written.** A throwaway stdio MCP client (in the temp folder, not the repo) started the
+worktree's own `Patina.Server` (built, `dotnet run --no-build`) in the worktree and called `nodes {"type":"tiles"}`,
+then steps 1 to 4: `open` and `get_graph` listed `jitter`, `mortar`, `tint`; `swatch` returned the sheet
+(its line names "parameters mortar 0.08, tint #7a7a70", 1544 x 538 px); `check` returned `"ok":true`; `export` wrote the four files,
+each byte-equal (`cmp`) to `samples/graphs/bricks/variants/grey/`. Step 5 ran against the worktree's `Carve.Server` in
+the same folder: `define_mesh` (the unit cube), `project_uvs` box on faces 1 and 3, the `define_material` as written
+(all four textures loaded, 256 x 256) and `set_material` succeeded. The exported `textures/` folder was then deleted.
+The published `patina` MCP copy was not used: it predates `nodes` and `check`.
+
+**CLAUDE.md.** Working rules gain "The README is kept current", in the Scope's words. Planning rules' content rule
+gains a sentence: the README's account of what a user or an agent can reach is part of that content, and a planned
+task that changes it names the `README.md` change in its scope.
+
+**Outside M-28, stale-looking, not edited.** The README never names carve's `bake`, `keep_level`, `define_part` / `get_parts` or
+`define_target` / `delete_target`, which carve's server offers (M-24's bake among them); "Build and test" names only carve's two suites, not patina's (`tests.json` lists them).
+Carve's `check` after the step-5 calls also warns of the cube's four faces without UVs, as its README says it does.
+
+**Suite proposal (not added).** No test reads `README.md`, so no suite can honestly list it as an input today. A
+reasonable one: a `patina-unit` test that pulls the call lines of the README's patina worked example and runs them, as
+the tool descriptions' worked examples are run; then `README.md` becomes `patina-unit`'s input. The cost is that every
+README edit, carve's sections included, re-runs `patina-unit` (145 s here). Left to the person.

@@ -161,9 +161,9 @@ A character is a model with a skeleton, bone weights and clips. `export` then wr
 ## patina: texture graphs
 
 `patina` is a second MCP server, beside carve, for texture graphs (D-7): an agent
-defines a graph of nodes (`noise`, `gradient`, `levels`, `blend`,
-`height_to_normal`, `colour`, `output`), edits it, reads it back, and saves it
-as a `.texgraph` file. Add it to the same `.mcp.json`, next to carve's entry:
+defines a graph of nodes, edits it, reads it back, looks at it, measures it, and
+saves it as a `.texgraph` file whose PNGs a carve material wears. Add it to the
+same `.mcp.json`, next to carve's entry:
 
 ```json
 {
@@ -180,29 +180,127 @@ as a `.texgraph` file. Add it to the same `.mcp.json`, next to carve's entry:
 }
 ```
 
-Its tools: `define_graph` (the whole graph, as a `.texgraph` body), `edit_graph`
-(a list of operations, all or nothing: `set_node`, `remove_node`, `connect`,
-`disconnect`, `set_params`, `set`), `get_graph`, `save`, `open`, and
-`push_snapshot` / `pop_snapshot` to try a change and go back. Every fault names
-its node and its port or parameter. A graph with faults can be opened and fixed
-with `edit_graph`, but not saved. `samples/graphs/planks.texgraph` is a whole
-material to open.
+Its tools: `define_graph` (the whole graph, as a `.texgraph` body), `nodes` (the
+node catalogue), `edit_graph` (a list of operations, all or nothing: `set_node`,
+`remove_node`, `connect`, `disconnect`, `set_params`, `set`, and
+`set_parameter`, `set_parameters`, `remove_parameter` for exposed parameters),
+`get_graph`, `save`, `open`, `push_snapshot` / `pop_snapshot` to try a change
+and go back, `swatch`, `export` and `check`. Every fault names its node and its
+port or parameter. A graph with faults can be opened and fixed with
+`edit_graph`, but not saved, swatched, exported or checked. Each tool's
+description says what it takes and returns, with worked examples; this section
+is the overview.
 
-`export` writes the open graph's outputs as `<folder>/<role>.png` at a size you
-name, a power of two from 32 to 8192 (default the graph's own), ready for a
-carve material's texture slots: `base_colour.png` for `base_colour_texture`,
-`normal.png` for `normal_texture`, `roughness.png` (a glTF metallic-roughness
-image) for `metallic_roughness_texture`, `occlusion.png` for `occlusion_texture`.
-At 8192 it works in bounded memory but takes minutes for four outputs.
+### Nodes
 
-`swatch` shows the open graph: by default a sheet with a column per output (flat
-over tiled 3 x 3, to show seams) beside a sphere wearing all of them through the
-engine's PBR material lit as Carve's `render` lights a model (its ambient light,
-fixed sky and the directional light that keeps its place beside the camera, so a
-smooth material shows a highlight); or `view` `flat`, `tiled` or
-`sphere` alone, at a `size` from 32 to 2048, the sphere turned by `angle`.
-patina needs a Vulkan device to draw the sphere and the sheet; flat and tiled
-need none.
+`nodes {}` lists every node type with its inputs, outputs, parameters (kind,
+range, default) and a worked example; `nodes {"type":"tiles"}` gives one.
+
+- Sources: `noise` (value noise), `worley` (cells), `fbm` (layered noise),
+  `gradient`, `colour`, and the patterns `tiles` (tiles and bricks, with gaps,
+  bevel and jitter), `stripes` and `shape` (a circle, square, ring, diamond or
+  polygon in each cell of a grid).
+- Filters: `levels`, `blend`, `warp` (domain warp), `blur`, `gradient_map`,
+  `transform` (offset, tile, mirror, free rotation and scale), `distance` (from
+  a mask's edge) and `height_to_normal`.
+- Structure: `output` (one per role), `input` (an image input of a graph used
+  as a node) and `graph` (another `.texgraph` used as one node).
+
+### Outputs and export
+
+An `output` node has a role: `base_colour`, `normal`, `roughness`, `metallic`,
+`occlusion`, `height`, or a name of its own (a mask, written as `<name>.png`).
+`export` writes them as `<folder>/<role>.png` at a size you name, a power of two
+from 32 to 8192 (default the graph's own), ready for a carve material's texture
+slots: `base_colour.png` for `base_colour_texture`, `normal.png` for
+`normal_texture`, `roughness.png` for `metallic_roughness_texture`,
+`occlusion.png` for `occlusion_texture`. `roughness.png` is a glTF
+metallic-roughness image: roughness in green, the graph's `metallic` in blue (0
+when it has none), so metallic has no file of its own. `height` and named
+outputs are grey (or sRGB, for a colour named output) and have no slot.
+
+### Exposed parameters and graphs as nodes
+
+A graph may declare `parameters`, each driving one or more node parameters
+(`"layout.gap"`) and taking the narrowest range of what it drives; `get_graph`
+lists them, and `edit_graph`'s `set_parameters` changes them. `swatch`, `export`
+and `check` take `parameters` for that call only, so one graph gives variants
+without being changed.
+
+A `graph` node uses another `.texgraph` by `path`, relative to the file of the
+graph that uses it (a graph never saved: patina's working directory). Its other
+parameters are the nested graph's exposed parameters by name; its inputs are
+the nested graph's `input` nodes, so a reusable graph can be a filter; its
+outputs are the nested graph's outputs (`wall.base_colour`). Graphs that use
+these are format version 2; every other file is written as version 1.
+
+### Looking: swatch
+
+`swatch` shows the open graph as an image, at a `size` from 32 to 2048, with a
+`view`:
+
+- `sheet` (the default): a column per output, flat over tiled 3 x 3 to show
+  seams, beside a sphere wearing the material;
+- `flat` or `tiled`: one `output` alone;
+- `sphere` or `cube`: the material on a lit sphere, or on a cube showing three
+  faces and their edges, turned by `angle`.
+
+`tiling` (1 to 8) repeats the maps on the sphere and cube, to judge a material
+at a texel density nearer a game's. The sphere and cube are drawn with the
+engine's PBR material, lit as carve's `render` lights a model, so patina needs a
+Vulkan device for `sheet`, `sphere` and `cube`; `flat` and `tiled` need none.
+
+### Measuring: check
+
+`check` measures outputs as numbers rather than by eye, and lists each problem
+with its share of texels, the worst texel and the fix in words. It reports and
+never refuses a graph that evaluates. It looks at the open graph (at its size,
+at most 2048, with `parameters` if given), or at PNG files given as `files`,
+each `{path, role}`; role `metallic_roughness` is a packed `roughness.png` as
+export writes it. The rules:
+
+- `base-colour-range`: base colour too dark or too bright for game lighting
+  (outside 20 to 245 sRGB, or under 120 for metal), in over 1% of texels.
+- `metallic-not-binary`: metallic between 0.1 and 0.9 in over 5% of texels.
+- `normal-not-unit`: normals not of unit length.
+- `one-value`: a greyscale output of one value, a mask that masks nothing.
+- `does-not-tile`: a seam where the texture wraps.
+
+### Samples
+
+`samples/graphs/` holds a graph per material, each with its exported PNGs and
+its swatch sheet in a folder of its name: `planks`, `cobblestones`, `bricks`
+(with mortar, tint and jitter exposed; `bricks/variants/grey/` is its grey stone
+variant), `fabric`, `painted-metal`, `floor-tiles`, `grime` (a filter graph with
+an `input`) and `old-wall` (the bricks and the grime used as `graph` nodes).
+`samples/graphs/faults/` holds two graphs that `check` finds faults in.
+
+### A worked example
+
+With patina started in the carve checkout (paths are relative to patina's
+working directory, or absolute), grey stone bricks from the bricks sample:
+
+1. `open` `{"path":"samples/graphs/bricks.texgraph"}`, then `get_graph` `{}`
+   lists its parameters `jitter`, `mortar` and `tint`.
+2. `swatch` `{"parameters":{"mortar":0.08,"tint":"#7a7a70"}}` shows the grey
+   variant's sheet.
+3. `check` `{"size":64,"parameters":{"mortar":0.08,"tint":"#7a7a70"}}` returns
+   `"ok":true` and each output's statistics.
+4. `export` `{"folder":"textures/bricks_grey","parameters":{"mortar":0.08,"tint":"#7a7a70"}}`
+   writes `base_colour.png`, `normal.png`, `roughness.png` and `occlusion.png`,
+   equal to those in `samples/graphs/bricks/variants/grey/`.
+5. In carve, started in the same folder, with UVs on the faces (above):
+   `define_material`
+   `{"name":"bricks","base_colour_texture":"textures/bricks_grey/base_colour.png","normal_texture":"textures/bricks_grey/normal.png","metallic_roughness_texture":"textures/bricks_grey/roughness.png","occlusion_texture":"textures/bricks_grey/occlusion.png"}`,
+   then `set_material` puts the bricks on them.
+
+### What is slow or bounded
+
+`export` at 8192 evaluates in tiles, one output at a time, so the process stays
+under 2 GB, but it takes minutes, not seconds: a client with a short call
+timeout should ask for one or two outputs at a time. `blur` and `distance` are
+the slowest nodes at 8192 (about 2 minutes and about 20 s); the 10 s target for
+each is T-159's, not yet met. `swatch` and `check` stop at 2048.
 
 ## License
 
