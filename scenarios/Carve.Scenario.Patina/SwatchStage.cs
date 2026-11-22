@@ -396,9 +396,19 @@ internal sealed class SwatchStage : IPatinaStage
             $"\nmetallic\tmedian_luma_0\tmedian_luma_1\tstep\tclipped_0\tclipped_1\n\t{lit[0].Median:0.0}\t{lit[1].Median:0.0}\t{lit[0].Median - lit[1].Median:0.0}\t{lit[0].Clipped}\t{lit[1].Clipped}\n"));
         checks.Check(MetallicReads(lit[0], lit[1]),
             $"swatch: the metallic-1 grey-200 sphere (median luma {lit[1].Median:0.0}, {lit[1].Clipped} px at 255) does not read metallic against metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px): the rule is a median {MetallicStep} lower and more px at 255");
-        // The break, made here (RV-76): the two frames swapped, metallic 0 judged as the metal against metallic 1, must fail the rule.
-        checks.Check(!MetallicReads(lit[1], lit[0]), $"swatch: the metallic rule passes the frames swapped: metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px) read as metal against metallic 1 ({lit[1].Median:0.0}, {lit[1].Clipped} px)");
+        // The break, made here (RV-77): a wrong frame that is not the metal one, a darker dielectric (grey 100, metallic 0, the
+        // same roughness), judged as the metal against metallic 0, must fail the rule. Its median is far lower, as the metal's
+        // is, so only the rule's clipped-pixel half refuses it: the break can fail while the check above passes (a rule that
+        // lost that half), which the swapped frames of RV-76 could not.
+        await checks.CallAsync("define_graph", MetallicSphere.Replace("METALLIC", "0", StringComparison.Ordinal).Replace(MetallicGrey, DarkGrey, StringComparison.Ordinal));
+        var dark = Lit(await driver.CaptureToolAsync("swatch", "swatch-sphere-metallic-0-dark", new { view = "sphere" }), planks);
+        File.AppendAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), string.Create(CultureInfo.InvariantCulture,
+            $"\nmetallic_break_dark\tmedian_luma_0\tmedian_luma_dark\tstep\tclipped_0\tclipped_dark\n\t{lit[0].Median:0.0}\t{dark.Median:0.0}\t{lit[0].Median - dark.Median:0.0}\t{lit[0].Clipped}\t{dark.Clipped}\n"));
+        checks.Check(!MetallicReads(lit[0], dark), $"swatch: the metallic rule reads a darker dielectric as metal: grey 100 at metallic 0 ({dark.Median:0.0}, {dark.Clipped} px at 255) against grey 200 at metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px)");
     }
+
+    /// <summary>The metallic sphere's grey, and the break's darker one (grey 100).</summary>
+    private const string MetallicGrey = "\"colour\":\"#c8c8c8\"", DarkGrey = "\"colour\":\"#646464\"";
 
     /// <summary>
     /// The bricks and their grey variant (T-139): <c>samples/graphs/bricks.texgraph</c> opened, exported at 256 without and with

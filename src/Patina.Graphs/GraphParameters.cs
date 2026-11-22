@@ -59,10 +59,15 @@ public static class GraphParameters
     /// parameter at fault, or a value out of its range gives <see cref="OverrideResult.Error"/>, in validation's words:
     /// <c>parameters['mortar']: is 0.5, but must be a number from 0 to 0.2</c>. Overrides are taken in name order.
     /// </summary>
-    public static OverrideResult WithOverrides(TextureGraph graph, IReadOnlyDictionary<string, ParamValue> overrides, NodeRegistry? registry = null)
+    public static OverrideResult WithOverrides(TextureGraph graph, IReadOnlyDictionary<string, ParamValue> overrides, NodeRegistry? registry = null) =>
+        WithOverrides(graph, overrides, registry, null, null);
+
+    /// <summary><see cref="WithOverrides(TextureGraph, IReadOnlyDictionary{string, ParamValue}, NodeRegistry?)"/> within one validation: the chain of files above, and its budget and reads (RV-77).</summary>
+    internal static OverrideResult WithOverrides(TextureGraph graph, IReadOnlyDictionary<string, ParamValue> overrides, NodeRegistry? registry,
+        IReadOnlyList<string>? chain, GraphValidator.NodeBudget? budget)
     {
         if (overrides.Count == 0) return new(graph, null);
-        var analysis = Analyse(graph, registry ?? NodeRegistry.BuiltIn);
+        var analysis = Analyse(graph, registry ?? NodeRegistry.BuiltIn, chain, budget);
         var result = graph;
         foreach (var (name, value) in overrides.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
@@ -105,10 +110,13 @@ public static class GraphParameters
     /// The parameters read against the nodes they drive. A drive may name a <c>graph</c> node's parameter (T-140,
     /// <c>"wall.mortar"</c>): its range is the nested graph's exposed parameter's, read from the file through
     /// <see cref="GraphValidator.NestedParameters"/>. <paramref name="chain"/> is the files read to get here, so a cycle
-    /// of drives through files ends (the validator names the cycle itself).
+    /// of drives through files ends (the validator names the cycle itself). <paramref name="budget"/> is the validation's
+    /// (a new one when null): each nested file read for a range is charged to <see cref="GraphValidator.MaxNodes"/> and read
+    /// once for each chain (RV-77), so many drives through many levels cannot hang where a fault is wanted.
     /// </summary>
-    internal static ParameterAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string>? chain = null)
+    internal static ParameterAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string>? chain = null, GraphValidator.NodeBudget? budget = null)
     {
+        budget ??= new(graph.Nodes.Count);
         var a = new ParameterAnalysis();
         foreach (var (name, parameter) in graph.Parameters)
         {
@@ -139,7 +147,12 @@ public static class GraphParameters
                 if (type is NestedGraphNode && type.Parameter(param) is null)
                 {
                     // A graph node's parameter is the nested graph's exposed parameter of that name, with its range.
-                    if (GraphValidator.NestedParameters(graph, node, registry, chain ?? []) is not { } nested) { complete = false; continue; } // the graph node's own fault says why
+                    if (GraphValidator.NestedParameters(graph, node, registry, chain ?? [], budget) is not { } nested) { complete = false; continue; } // the graph node's own fault says why
+                    if (nested.OverBudget)
+                    {
+                        Fault($"drives '{drive}', but reading {nested.FileName} for its range takes the nodes validated past {GraphValidator.MaxNodes} (the graph's own and each nested file's each time it is read, all levels down)");
+                        continue;
+                    }
                     if (nested.Exposed.TryGetValue(param, out var inner)) spec = inner.Range;
                     else if (nested.Declared.Contains(param)) { complete = false; continue; } // at fault in its file, which the graph node's faults name
                     else
