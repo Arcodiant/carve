@@ -83,6 +83,10 @@ About **7 tasks**:
   path with a moss filter graph used as a node), and fix a planted draft from check's report.
 - **Eleven tasks in one milestone** (the estimate was 7), kept by the person over splitting the milestone or merging
   tasks.
+- **The tile cache's cap stays tiles-only** (decided 2026-11-21, RV-76 and RV-77, recorded by T-178). Arrays waiting
+  for reuse and nodes' scratch are counted in `GraphEvaluator.LastHeldBytes` and documented, not put under the cap;
+  the 2 GB regression tests hold the whole process. Putting them under the cap was built and measured in T-173 (a blur
+  at 1024 in tiles of 64 under 4 MiB made 12,640 tiles against 1,840).
 
 **The check report, as agreed:**
 
