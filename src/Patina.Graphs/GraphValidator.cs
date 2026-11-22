@@ -552,7 +552,10 @@ public static class GraphValidator
             var unknown = new List<string>();
             foreach (var input in node.Type.Inputs)
             {
-                if (node.Sources.TryGetValue(input.Name, out var from) && !a.Cyclic.Contains(from.Node) && a.Nodes[from.Node].OutputKinds.TryGetValue(from.Port, out var gives))
+                // A source may name no resolved node: a use's output resolving to an outer node of an id the expansion also
+                // makes, faulted and left out for its type (RV-78). Its kind is not known, as an input at fault's is not.
+                if (node.Sources.TryGetValue(input.Name, out var from) && !a.Cyclic.Contains(from.Node)
+                    && a.Nodes.TryGetValue(from.Node, out var giver) && giver.OutputKinds.TryGetValue(from.Port, out var gives))
                     inputs[input.Name] = gives;
                 else if (node.Connected.Contains(input.Name) || input.Required)
                     unknown.Add(input.Name);

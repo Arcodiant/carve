@@ -179,6 +179,38 @@ public sealed class NestedGraphTests : IDisposable
         Assert.StartsWith("node 'g/c': an id is", Assert.Single(read.Faults.Select(f => f.Message)));
     }
 
+    /// <summary>
+    /// RV-78, the person's ruling: the collision is a fault on the outer node whatever its type, every built-in one, a
+    /// <c>graph</c> node and an unknown type alike, and never a throw, read through <see cref="TexGraphFile.ReadFile"/> as
+    /// RV-78's probe was (the inner file's output reads <c>c</c>, so the outer output resolves to <c>g/c</c>).
+    /// </summary>
+    [Fact]
+    public void An_outer_node_of_any_type_with_an_expanded_id_is_faulted_not_thrown()
+    {
+        Put("plain.texgraph", """
+            { "version": 2, "size": 64, "seed": 0, "nodes": { "c": { "type": "colour", "params": { "colour": "#ff0000" } }, "o": { "type": "output", "inputs": { "in": "c" } } } }
+            """);
+        Put("other.texgraph", """
+            { "version": 2, "size": 64, "seed": 0, "nodes": { "k": { "type": "colour", "params": { "colour": "#00ff00" } }, "o": { "type": "output", "inputs": { "in": "k" } } } }
+            """);
+        string[] types = [.. NodeRegistry.BuiltIn.Names, "nosuch"];
+        Assert.Contains("graph", types);
+        foreach (var type in types)
+        {
+            var clash = type == "graph" ? """{ "type": "graph", "params": { "path": "other" } }""" : $$"""{ "type": "{{type}}" }""";
+            var path = Put("probe.texgraph", $$"""
+                { "version": 2, "size": 64, "seed": 0, "nodes": { "g": { "type": "graph", "params": { "path": "plain" } }, "g/c": {{clash}}, "o": { "type": "output", "inputs": { "in": "g" } } } }
+                """);
+            TexGraphReadResult read;
+            try { read = TexGraphFile.ReadFile(path); }
+            catch (Exception e) { throw new Xunit.Sdk.XunitException($"type {type}: threw {e.GetType().Name}: {e.Message}"); }
+            Assert.True(read.Loaded, type);
+            Assert.True(read.Faults.Any(f => f.Node == "g/c" && f.Message.StartsWith("node 'g/c': an id is", StringComparison.Ordinal)), $"type {type}: {string.Join(" | ", read.Faults.Select(f => f.Message))}");
+            // Every fault is the outer node's own; an outer output also takes o's role, which is said on o.
+            Assert.True(read.Faults.All(f => f.Node == "g/c" || (type == "output" && f.Node == "o" && f.Parameter == "role")), $"type {type}: {string.Join(" | ", read.Faults.Select(f => f.Message))}");
+        }
+    }
+
     /// <summary>RV-76: a graph node's path is relative to the using graph's file (T-140): absolute, drive-relative, from-the-root and UNC paths are faults, and nothing is opened for them.</summary>
     [Fact]
     public void A_rooted_path_is_a_fault_and_is_not_opened()
