@@ -123,6 +123,11 @@ public class RolesAndNamedOutputsTests
         var role = Assert.Single(Faults(string.Join(",", ramp, Out("a", "ramp", "\"name\": \"height\""))));
         Assert.Equal("node 'a' parameter 'name': height is a role; give it as role, or name the output something else", role.Message);
 
+        // metallic_roughness is check's role for the packed image, so an output of that name would be read as packed (RV-77).
+        var packed = Assert.Single(Faults(string.Join(",", ramp, Out("a", "ramp", "\"name\": \"metallic_roughness\""))));
+        Assert.Equal(("a", "name"), (packed.Node, packed.Parameter));
+        Assert.Equal("node 'a' parameter 'name': metallic_roughness is reserved for the packed image export writes as roughness.png (check's role for it); name the output something else", packed.Message);
+
         var bad = Assert.Single(Faults(string.Join(",", ramp, Out("a", "ramp", "\"name\": \"Edge\""))));
         Assert.Equal("node 'a' parameter 'name' is \"Edge\", but must be a name, [a-z][a-z0-9_]* (lower case letters, digits and _, starting with a letter)", bad.Message);
 

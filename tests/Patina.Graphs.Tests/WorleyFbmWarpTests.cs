@@ -179,12 +179,17 @@ public class WorleyFbmWarpTests
     /// <summary>
     /// RV-76: f1 and f2 are the true nearest two points, as a search of every cell (each in its wrapped copies) finds
     /// them, by both metrics and at jitter 1, where a point two cells away can be the second nearest. A search of the 3 x 3
-    /// cells alone misses some, so the comparison is shown to bite.
+    /// cells alone misses some, so the comparison is shown to bite. RV-77: also below jitter 1, where the ring search's
+    /// margin (1 - jitter) / 2 is not zero: a margin of 1 - jitter, which agrees at jitter 1, fails the manhattan case at 0.9.
+    /// Each jitter is one at which the 3 x 3 search still misses, so the test bites (at 0.5 neither metric's does, nor
+    /// euclidean's at 0.75 or 0.9).
     /// </summary>
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void WorleyFindsTheTrueNearestTwoPointsAsASearchOfEveryCellDoes(bool manhattan)
+    [InlineData(false, 1f)]
+    [InlineData(true, 1f)]
+    [InlineData(false, 0.95f)]
+    [InlineData(true, 0.9f)]
+    public void WorleyFindsTheTrueNearestTwoPointsAsASearchOfEveryCellDoes(bool manhattan, float jitter)
     {
         const int Size = 256, Cells = 8;
         var missedBy3x3 = 0;
@@ -192,15 +197,15 @@ public class WorleyFbmWarpTests
             for (var y = 0; y < Size; y++)
                 for (var x = 0; x < Size; x++)
                 {
-                    var s = WorleyNode.Sample(x, y, Size, Cells, Cells, 1, manhattan, seed);
-                    var (bf1, bf2) = Nearest(x, y, Size, Cells, manhattan, seed, all: true);
-                    Assert.True(s.F1 == bf1 && s.Edge == bf2 - bf1, $"seed {seed} at ({x}, {y}): f1 {s.F1}, edge {s.Edge}; every cell gives {bf1}, {bf2 - bf1}");
-                    if (Nearest(x, y, Size, Cells, manhattan, seed, all: false).F2 != bf2) missedBy3x3++;
+                    var s = WorleyNode.Sample(x, y, Size, Cells, Cells, jitter, manhattan, seed);
+                    var (bf1, bf2) = Nearest(x, y, Size, Cells, jitter, manhattan, seed, all: true);
+                    Assert.True(s.F1 == bf1 && s.Edge == bf2 - bf1, $"jitter {jitter}, seed {seed} at ({x}, {y}): f1 {s.F1}, edge {s.Edge}; every cell gives {bf1}, {bf2 - bf1}");
+                    if (Nearest(x, y, Size, Cells, jitter, manhattan, seed, all: false).F2 != bf2) missedBy3x3++;
                 }
         Assert.True(missedBy3x3 > 0, "a 3 x 3 search finds every second-nearest point here, so the test does not bite");
     }
 
-    private static (float F1, float F2) Nearest(int x, int y, int size, int cells, bool manhattan, uint seed, bool all)
+    private static (float F1, float F2) Nearest(int x, int y, int size, int cells, float jitter, bool manhattan, uint seed, bool all)
     {
         float px = (x + 0.5f) * cells / size, py = (y + 0.5f) * cells / size;
         int ix = (int)MathF.Floor(px), iy = (int)MathF.Floor(py);
@@ -209,7 +214,7 @@ public class WorleyFbmWarpTests
         for (var j = all ? lo : iy + lo; j <= (all ? hi : iy + hi); j++)
             for (var i = all ? lo : ix + lo; i <= (all ? hi : ix + hi); i++)
             {
-                var (ox, oy) = WorleyNode.Point(i, j, cells, cells, 1, seed);
+                var (ox, oy) = WorleyNode.Point(i, j, cells, cells, jitter, seed);
                 float dx = i + ox - px, dy = j + oy - py;
                 var d = manhattan ? MathF.Abs(dx) + MathF.Abs(dy) : MathF.Sqrt(dx * dx + dy * dy);
                 if (d < f1) { f2 = f1; f1 = d; }

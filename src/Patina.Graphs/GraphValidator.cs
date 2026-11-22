@@ -10,7 +10,7 @@ namespace Patina.Graphs;
 /// the range), an input port the type has not (listing its inputs), a source that is not a node (listing the ids) or
 /// names a port that node has not, a required input missing; then each cycle (naming the nodes on it), each input
 /// given the wrong kind (greyscale where colour is wanted, or the other way), an output given both a role and a name, a
-/// name that is a role's, two outputs with one role or one name, a metallic output with no roughness to be packed with,
+/// name that is a role's or the reserved metallic_roughness, two outputs with one role or one name, a metallic output with no roughness to be packed with,
 /// and no output at all; then each exposed parameter's faults (T-139), in name order, each naming it
 /// (<c>parameters['mortar']: ...</c>, <see cref="GraphFault.GraphParameter"/>): a bad name, no drives, a drive that is not
 /// <c>"node.param"</c> or names no node or no parameter, a node parameter driven twice, a kind that cannot be driven (a
@@ -583,6 +583,8 @@ public static class GraphValidator
             {
                 if (OutputRoles.TryParse(name, out _))
                     a.Fault(node.Id, null, "name", $"node '{node.Id}' parameter 'name': {name} is a role; give it as role, or name the output something else");
+                else if (name == Checks.CheckSet.PackedRole)
+                    a.Fault(node.Id, null, "name", $"node '{node.Id}' parameter 'name': {name} is reserved for the packed image export writes as roughness.png (check's role for it); name the output something else");
                 else if (byName.TryGetValue(name, out var other))
                     a.Fault(node.Id, null, "name", $"node '{node.Id}' parameter 'name': {name} is already the name of output '{other}'; a graph has one output per name");
                 else byName[name] = node.Id;

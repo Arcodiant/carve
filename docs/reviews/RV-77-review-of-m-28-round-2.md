@@ -41,7 +41,9 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), from `git diff b8df3fd..HEAD` i
   - So the rise has no explanation. The margin under the 2,048 MB milestone bound shrank from 822 MB to 456 MB.
   - The answer "fixed" holds for allocation. It is not shown for the peak working set the finding cited. Until the 1,592 MB is explained, or reproduced as noise by a rerun on main, the claim that the bound is unaffected is not supported.
 
-**Outcome:** —
+**Outcome:** no change needed: measured, the rise is heap the collector leaves uncollected, not memory the code holds; the margin is about 450 MB
+
+**Fix:** three Debug patina processes exported the blur graph at 8192 side by side, sampled every 250 ms (`artifacts/T-178/`). The code before T-173 peaked at 1,154 MB, early (59 s), then settled near 850 MB; the current code peaked at 1,595 MB, its working set climbing through the evaluation (870 MB at 75 s, 1,349 MB at 528 s); so the 1,592 MB is reproduced, not noise. The current code with the GC heap held to 900 MB (`DOTNET_GCHeapHardLimit`) finished in the same 753 s at 1,112 MB, the same output bytes: what the code keeps reachable fits well under that, and the extra 480 MB is garbage the collector had no pressure to take. That fits the scratch fix: without blur's 8 MB large-object arrays each tile, the large-object budget that triggered full collections is spent far more slowly, so dropped tiles wait longer (an inference from the samples, not traced). No defect, so nothing is changed: the bound is held under pressure, and the 2 GB regression test, unchanged, still holds the whole process with 453 MB to spare. (T-178, claude-opus-5-5)
 
 ### The open question on putting waiting arrays and scratch under the bound is left nowhere the person will rule on it
 - **Where:** `docs/reviews/RV-76-review-of-m-28.md:40` (the Fix: "left as a question for the person rather than landed") and `docs/tasks/T-173-...md:40` (As built).
@@ -52,7 +54,9 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), from `git diff b8df3fd..HEAD` i
   - The question sits only in a Fix line and an As built bullet. There is no Notes entry asking it, and no line in `docs/milestones/M-28-a-node-library.md`. A grep for `LastHeldBytes`, `12,640` and "question for the person" over the milestone and T-173 to T-177 finds only those two lines.
   - Once RV-76 closes, nothing carries the question forward. It should be filed as a question to the person, or the Fix should say the contract change is the whole answer.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the person ruled (2026-11-21): the tile cache's cap stays tiles-only; arrays waiting for reuse and nodes' scratch are counted in `LastHeldBytes` and documented, and the 2 GB regression tests hold the whole process. The ruling is recorded in T-173's Notes and in M-28's decisions ("The tile cache's cap stays tiles-only"), so the question is closed, not carried. (T-178, claude-opus-5-5)
 
 ### The new role `metallic_roughness` is also a legal name for a named output, so check can read that output's file as packed
 - **Where:** `src/Patina.Graphs/Checks/CheckSet.cs:103, 118-126`, `src/Patina.Server/CheckTool.cs:212` and `src/Patina.Graphs/GraphValidator.cs:584-585`.
@@ -64,7 +68,9 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), from `git diff b8df3fd..HEAD` i
   - check's schema says a file's role is "a role or a named output's name". Giving that file with its own name as the role makes `OfPngs` read it as the packed image: an output named `roughness` from G, plus a derived `metallic` from B. That gives metallic-not-binary and base-colour-range faults for an output that is neither.
   - The validator should treat `metallic_roughness` as reserved, as it does the role names.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the validator reserves `metallic_roughness` as it does the role names: an output named so is a fault on `name` ("metallic_roughness is reserved for the packed image export writes as roughness.png (check's role for it); name the output something else"), so no output's file can be given check under that role. `A_name_and_a_role_together_two_outputs_one_name_and_a_role_s_name_are_faults` holds it. (T-178, claude-opus-5-5)
 
 ### worley's ring bound is tested only at jitter 1, where its jitter margin is zero
 - **Where:** `src/Patina.Graphs/Nodes/WorleyNode.cs:69-73` (`edge = ... + (1 - jitter) / 2`) and `tests/Patina.Graphs.Tests/WorleyFbmWarpTests.cs` (`WorleyFindsTheTrueNearestTwoPointsAsASearchOfEveryCellDoes`, jitter fixed at 1).
@@ -76,7 +82,9 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), from `git diff b8df3fd..HEAD` i
   - The committed samples, at 0.85 and 0.9, catch a miss only if one happens to fall in their images.
   - One more jitter in the theory, such as 0.5, would hold the bound.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** `WorleyFindsTheTrueNearestTwoPointsAsASearchOfEveryCellDoes` also runs manhattan at jitter 0.9 and euclidean at 0.95, where the margin `(1 - jitter) / 2` is not zero. With the margin made `1 - jitter` (equal at jitter 1) the manhattan case at 0.9 fails (seed 7 at (229, 0)); the jitter-1 cases pass it. Jitter 0.5 cannot hold the bound: there the 3 x 3 cells always hold the true second nearest (as at 0.75 and 0.9 for euclidean), so no margin can make a miss; each jitter is one where the 3 x 3 search still misses, so the test bites. (T-178, claude-opus-5-5)
 
 ## Findings: round 2, the format, server and scenarios (claude-opus-5-5)
 
