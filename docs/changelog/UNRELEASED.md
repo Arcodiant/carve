@@ -24,3 +24,4 @@
 - T-173: Every finding of RV-76's `## Findings: the evaluation engine` is answered, fixed where it is a defect, with outputs byte-identical
 - T-175: Every finding of RV-76's `## Findings: the file format and graph model` is answered, fixed where it is a defect
 - T-178: Every finding of RV-77's `## Findings: round 2, the engine, nodes and checks` is answered
+- T-179: Every finding of RV-77's `## Findings: round 2, the format, server and scenarios` is answered
