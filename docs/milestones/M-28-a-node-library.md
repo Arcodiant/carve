@@ -155,6 +155,7 @@ check {}          (open graph, its own size; optional size<=2048,
 | 9 | T-177 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
 | 10 | T-178 RV-77 answers (added 2026-11-21) | Opus | — | see its Notes |
 | 10 | T-179 RV-77 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 10 | T-180 the README, kept current (added 2026-11-22) | Opus | — | `README.md`, CLAUDE.md's working rules |
 
 Dependencies on a sibling's feature: T-137's gradient map needs T-134's list parameters, and its sample T-134's
 `metallic` and named outputs. T-138's floor tiles need T-136's `tiles` and T-134's `height`. T-139's content edits
@@ -192,6 +193,7 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-177](../tasks/T-177-rv-76-answers-the-scenarios-and-docs.md) — Every finding of RV-76's `## Findings: the scenarios and test configuration` and `## Findings: the whole diff` is answered
 - [ ] [T-178](../tasks/T-178-rv-77-answers-the-engine-nodes-and-checks.md) — Every finding of RV-77's `## Findings: round 2, the engine, nodes and checks` is answered
 - [ ] [T-179](../tasks/T-179-rv-77-answers-the-format-server-and-scenarios.md) — Every finding of RV-77's `## Findings: round 2, the format, server and scenarios` is answered
+- [ ] [T-180](../tasks/T-180-the-readme-for-the-node-library-kept-current-from-now-on.md) — The README's patina section describes M-28's node library, and CLAUDE.md makes keeping the README current part of every change
 
 ## Retrospective
 
