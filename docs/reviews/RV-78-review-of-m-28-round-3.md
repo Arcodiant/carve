@@ -40,7 +40,9 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only, in `D:\Repos\carve\b
   - So `open`, `define_graph` and `edit_graph` still give the generic error for this shape. The person's ruling in T-179's Notes is "a fault, never a throw". It is the third fix to this collision, and each has closed one type of outer node.
   - Fixing the cause would close the class: guard `:555` with `a.Nodes.ContainsKey`, as `:485` and `:544` are, or treat a use output that resolves to a node not in `a.Nodes` as at fault. A test with an unknown-type outer node would hold it.
 
-**Outcome:** —
+**Outcome:** fixed
+
+**Fix:** the cause is guarded: `GraphValidator.Kinds` reads a source's kind only when the source is a resolved node (`a.Nodes.TryGetValue`), as `Cycles` and `Kinds`' own walk already did, so a use output resolving to an outer node left out of `a.Nodes` (an unknown type) is an input of unknown kind, and the node reading it is kept out of the order. The other lookups the collision reaches were checked: `Cycles` (guarded), `Kinds`' walk (guarded), the source resolution in `Analyse` (`nodes.TryGetValue`, an unknown-type target marks the input at fault), `Expand`'s reads (the inner analysis's own nodes), and the evaluator's (never reached, the id fault refuses evaluation). `NestedGraphTests.An_outer_node_of_any_type_with_an_expanded_id_is_faulted_not_thrown` reads the probe's shape through `ReadFile` with an outer `g/c` of every built-in type, `graph` and `nosuch`: each is faulted on `g/c` and none throws; without the fix it threw `KeyNotFoundException` for `nosuch`. RV-78's probe `p3.fsx`, rerun against this build: `unknown` gives the id fault and the unknown-type fault, the `colour` and `graphgraph` controls the single id fault as before. (T-183, claude-opus-5-5)
 
 ### A nested file that a parameter drives is charged to the node cap twice, and the fault blames its expansion
 - **Where:** `src/Patina.Graphs/GraphValidator.cs:441-445` (`NestedParameters`' `Read` charges the file's nodes) and `:330-335` (`Expand` charges the same file again). The cap's summary is at `:28-34`.
