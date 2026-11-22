@@ -27,3 +27,4 @@
 - T-179: Every finding of RV-77's `## Findings: round 2, the format, server and scenarios` is answered
 - T-180: The README's patina section describes M-28's node library, and CLAUDE.md makes keeping the README current part of every change, so a reader of the README sees what the product does now
 - T-181: The README's carve sections and its Build and test list describe what carve's server offers now, so the README is current on both servers when M-28 lands
+- T-183: Any outer node whose id collides with an id a nested graph's expansion makes is a fault on that node, whatever its type, and validation never throws on it
