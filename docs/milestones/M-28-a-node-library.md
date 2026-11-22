@@ -367,3 +367,76 @@ findings, put to the person correctly. The extra agents went on performance work
   briefs here did.
 - **Expect performance members to hand off repeatedly.** Each long measurement costs a checkpoint, so plan them as a
   research agent plus a build agent with the harness written down for the next.
+
+**After the person's go (2026-11-21 to 2026-11-22).**
+
+- **Rebase onto `main` (Opus 5.5):** M-24 and release 0.16.0 had landed (80 commits). Only `CLAUDE.md`'s `samples/` row
+  and `tests.json` conflicted, both by lines only added. Nothing broke, and all 26 suites ran and passed.
+- **Refactor pass (Opus 5.5):** six cuts with no change in behaviour:
+  - one shared bilinear sample for warp and transform;
+  - the evaluator's leftovers from T-153 and T-155;
+  - a duplicate sphere-hit cache and repo-root search in the scenario;
+  - one path helper and one own-file rule in the server;
+  - the dead `TextureGraph.DriverOf`.
+
+  Left as design changes: blur's and distance's one-pass code, which only tests call, and worked-example constants now
+  read only by tests.
+- **Review round 1, RV-76:** five Opus 5.5 reviewers, split by area (the engine; the nodes and checks; the format and
+  graph model; the server; the scenarios with a whole-diff pass).
+  - **Findings:** 36, with 2 Major, 20 Minor and 14 Nit.
+  - **The Majors:** a save into another folder broke its nested graph nodes after reporting success, and an outer
+    node could silently replace a nested one by id.
+  - **Answers:** five fix members, T-173 to T-177, all on Opus 5.5. 35 fixed, 1 no change needed (the metal sphere
+    bar the person had accepted).
+- **The person's rulings during round 1:**
+  - metallic is exempt from `one-value` in graphs;
+  - in `check`'s files, blue is read as metallic only for role `metallic_roughness`, replacing T-141's ruling;
+  - the label atlas grows to fit the outputs;
+  - the multi-port minify is fixed in M-28 (it now peaks at 991 MB at 8192);
+  - the cache cap stays tiles-only;
+  - T-175's node cap of 4096.
+- **Review round 2, RV-77:** two Opus 5.5 reviewers checking the answers.
+  - **Findings:** 14, with 6 Minor and 8 Nit.
+  - **Three RV-76 fixes had not held:** validation was still exponential through parameter drives, a colliding outer
+    `graph`-type node still threw, and the repaired metallic break could not fail on its own. The person chose to fix
+    them.
+  - **Answers:** T-178 and T-179, on Opus 5.5. 13 fixed; blur's 8192 peak (1,595 MB against 1,154 MB) was answered no
+    change needed after measuring that it is heap the collector leaves, not memory held (1,112 MB under a 900 MB heap
+    limit).
+- **The README (asked for by the person on 2026-11-22):**
+  - **T-180:** rewrote the patina section from the code, and added the working and planning rules that a change a user
+    or agent can reach updates `README.md` in the same task.
+  - **T-181:** caught up carve's sections, which the person chose to fix in M-28: parts and levels, baked maps, morph
+    targets, and every suite in Build and test.
+  - **Every worked call they added was run as written.**
+  - **Not added:** a test of the README's example. The person declined it, so `verify` lists `README.md` as uncovered.
+- **Review round 3, RV-78:** one Opus 5.5 reviewer. 2 findings:
+  - **The colliding-node fix still threw for an outer node of an unknown type.** T-183 fixed it.
+  - **A driven nested file is charged to the node cap twice.** Filed as T-182.
+- **Review round 4, RV-79:** one Opus 5.5 reviewer, checking only T-183, by the person's choice.
+  - **The fix holds:** every lookup is guarded, the test fails without it, and five further collision shapes do not
+    throw.
+  - **One Nit predating the fix:** readers of a colliding node take follow-on faults. Filed as T-186.
+- **`cairn milestone M-28 verify` (2026-11-22): VERIFY PASS.**
+  - 28 of 28 members done and merged.
+  - The review is current at RV-79.
+  - 26 suites passed, 4 ran and 22 carried.
+  - No heavy tier was triggered.
+- **Not as planned after the go:**
+  - **Sonnet ran out.** Sonnet was under its weekly usage limit from 2026-11-21, so every agent after T-172's first
+    ran on Opus.
+  - **Two subagents were refused writes outside their worktree.** T-174's outcome-line cleanup was made by the
+    orchestrator once the person allowed it. RV-79's findings were written into the review by the orchestrator.
+  - **T-174 ran `cairn lint` and `finish` in one command,** so it merged before reading lint's nine complaints about
+    its own outcome lines. Every later brief said to read lint first, as a command of its own.
+  - **An orchestrator commit (`596959c`) held only blank reservation stubs** after a script lost a backslash. The next
+    commit corrected it.
+- **Left:**
+  - T-182 and T-186, off-milestone;
+  - the worktree folders `branches/task/T-173` to `T-183`, unregistered, to delete by hand;
+  - scratch under `%TEMP%` (`m28-review*`, `m28-probe`, `t17*`, `t18*`).
+- **Next time:**
+  - **Brief every fix agent on the exact outcome form,** `fixed` alone with detail on a `**Fix:**` line.
+  - **A fix that guards one case should be checked against every type it could meet.** The colliding-node finding took
+    three rounds because each fix covered one more type.
+  - **Three of RV-76's answers did not hold.** Checking answers against the code paid off again, as in M-27.
