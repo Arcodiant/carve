@@ -101,7 +101,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - So a small hostile file still hangs `open`, which is what the answer says is now a fault. `Fan_out_past_the_node_cap_is_a_fault_not_a_hang` tests only graph-node fan-out.
   - Fix: charge the budget for each `NestedParameters` read, or cache nested files per validation. Separately, the "twice" and "already" checks could run before the read.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** `GraphValidator.NodeBudget` caches each nested file's parameter read per validation and charges a miss to the 4096 cap, through `GraphParameters.Analyse` and `WithOverrides`; past it a drive is a fault on its parameter. Tests `Fan_out_through_drives_is_bounded(2, 6)` and `A_file_read_for_a_drive_is_charged_to_the_node_cap`; shown failing without the fix (fan 6 had not finished after 20 s).
 
 ### An outer graph node whose id expansion also makes still throws, not a fault
 - **Where:** `src/Patina.Graphs/GraphValidator.cs:505-512` (`Kinds`'s `Visit` reads `a.Nodes[id]`), with `:85` (a graph node is never put in `nodes`) and `:353` (expansion now skips an id the graph has).
@@ -113,7 +114,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - `b8df3fd`'s build throws the same (`old.log`), so this is not a regression. The hole the finding named is only closed for non-graph outer nodes, though.
   - A graph node with a plain bad id (`"Bad Id"`) is faulted correctly. Only a collision throws.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** `Expand` leaves a use unexpanded when an outer `graph` node holds an id the expansion makes, so the outer node's id fault is the only one. Test `An_outer_graph_node_with_an_expanded_id_is_faulted_not_thrown` (both shapes); shown failing without the fix.
 
 ### The swapped metallic break is implied by the check it breaks, so it cannot fail while that check passes
 - **Where:** `scenarios/Carve.Scenario.Patina/SwatchStage.cs:397-400`, `MetallicReads` at `:476`.
@@ -126,7 +128,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - The self-comparison it replaces was constant in the same way, so the break still never shows the rule catching a wrong frame that the check alone would not. Round 1 suggested the swap, but it does not meet that finding's own test.
   - A real break judges metallic 0 against a different frame that is wrong but not swapped. Examples: a dielectric sphere that is darker or glossier at metallic 0, which shows the clipped-pixel half of the rule matters; or the metallic-1 material drawn with metallic dropped.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** `SwatchStage`'s break is now a darker dielectric (grey 100, metallic 0, new frame `swatch-sphere-metallic-0-dark`, approved by the person) judged as the metal: its median step passes (90.1) and only the clipped half refuses it (124 px against 261). With `MetallicReads` planted to its median half, the break failed while the metallic check passed.
 
 ### A save into a folder holding a different file of the same name changes the graph silently
 - **Where:** `src/Patina.Server/FileTools.cs:126-136`.
@@ -140,7 +143,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - The new test covers this setup, with `bricks.texgraph` copied into `materials/` and then saved, but only with an identical copy. So nothing would see a difference.
   - At least, the result should name each nested file that resolves to a different full path than it did before the save.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** `SaveTool.Changed` compares each expanded use's nested files now and from the target folder, and refuses the save naming both when a file differs as a graph; save's description says so. Test `Save_into_a_folder_holding_another_graph_of_the_same_name_is_refused_naming_both_files`; shown failing without the fix.
 
 ### The changelog still carries T-172's old line beside the corrected one
 - **Where:** `docs/changelog/UNRELEASED.md:22` (old) and `:20` (new).
@@ -150,7 +154,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - The fix added a corrected T-172 line at `:20` but left the original at `:22`. The original still says "by smaller textures where evaluation is the cost, otherwise by splitting the library stage into a suite of its own". That is the goal's wording the finding objected to, and it disagrees with line 20 (the split into two halves).
   - The changelog is what ships. The milestone (`:181`) and T-172's description (`:3`) are corrected.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** T-172's old line removed from `docs/changelog/UNRELEASED.md`.
 
 ### CLAUDE.md says the label atlas adds a page for each 16 labels; it is each 32
 - **Where:** `CLAUDE.md:73` ("a label atlas of 32 rows a page, a page more for each 16 labels past 32 (T-176)"), against `src/Patina.Server/SwatchImages.cs:154` (`Pages(labels) = ceil(labels / 32)`).
@@ -158,7 +163,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
 - **Follows:** RV-76 "A sheet of more than 15 outputs throws instead of drawing or refusing".
 - **What is wrong:** a page holds `LabelAtlas.Rows` = 32 labels, so 33 to 64 labels take two pages and 65 take three (`SwatchTests` asserts `[1, 1, 2, 2, 3]` for 0, 32, 33, 64, 65). "16" would be right only if it meant columns, at two labels each.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** `CLAUDE.md` now says a page for each 32 labels.
 
 ### CLAUDE.md's Patina scenario row does not name the new WideSheetStage
 - **Where:** `CLAUDE.md:88`, against `scenarios/Carve.Scenario.Patina/PatinaStages.cs:20` (`new WideSheetStage()`, in `base`).
@@ -168,7 +174,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - The row names each stage file and was rewritten by T-177 to add the ones it left out. T-176, in parallel, added `WideSheetStage.cs` (18 columns, the second atlas page) and its line in `PatinaStages.cs`.
   - `grep -c WideSheet CLAUDE.md` gives 0. This is the same omission the finding fixed, recreated by the parallel members.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** `CLAUDE.md`'s Patina scenario row names `WideSheetStage.cs`.
 
 ### The node cap counts the graph's own nodes only once it uses a graph
 - **Where:** `src/Patina.Graphs/GraphValidator.cs:28-33` (the summary: "the graph's own and every nested file's"), `:60` (the budget starts at the own count) and `:321` (the only check).
@@ -179,7 +186,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - So the cap is not "how many nodes one validation may take in", as its summary and the T-175 As built say. It is a cap on nesting that the graph's own size eats into.
   - Real graphs are far from it: the eight samples take in 9 to 33 nodes (old-wall 33, measured the validator's way), and T-143's acceptance graphs have 28 to 34. So 4096 costs nothing today. Either word the summary as a cap on what nesting adds, or check the own count too.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** The summary in `GraphValidator.cs` now words the cap as one on what nesting takes in, which the graph's own size eats into; behaviour unchanged.
 
 ### WideSheetStage would pass with the wrong labels on the second page, and the unit test does not exercise the paging
 - **Where:** `scenarios/Carve.Scenario.Patina/WideSheetStage.cs:48-63`, and `tests/Patina.Server.Tests/SwatchTests.cs` (`A_sheet_of_more_than_15_outputs_reads_its_labels_from_a_second_atlas_page`).
@@ -191,7 +199,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - The paging the fix added is in `SwatchRendering.cs`: `Page(p)` draws into the same surface, followed by `OffscreenFrame.ReadAsync`, which renders a frame. Only the scenario reaches it, and the scenario cannot tell the right text.
   - Comparing one label's band with the label's extent (or with the text's width, from `MeasureText`) would make the check specific.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** `WideSheetStage` gives each column a name one letter longer and judges each flat and tiled label against its backing: the text must end within 4 px of the padding, never in it, and the tiled label must begin with the flat label's pixels. It writes `wide-sheet-labels.tsv`; every label ends 4 px short of its backing, and a label a letter off is 8 px out. The unit test of `Compose` is unchanged: the paging is in `SwatchRendering`, which only the scenario reaches.
 
 ### T-175's How lines name a commit that is not on the milestone
 - **Where:** `docs/reviews/RV-76-review-of-m-28.md`, the six `**How:** 1f69cb2 (T-175, ...)` lines under `## Findings: the file format and graph model`.
@@ -200,7 +209,8 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only in `D:\Repos\carve\br
   - `git merge-base --is-ancestor 1f69cb2 HEAD` fails. The fix landed as `a1ffbd9`, which has the same `src` and `tests`.
   - Commit 622a7b6 ("the How lines name the rebased commit") changed them from `4263e7c` to `1f69cb2`. `cairn finish` then rebased again.
 
-**Outcome:** —
+**Outcome:** fixed
+**Fix:** The six How lines now name `a1ffbd9`, checked as an ancestor of the milestone.
 
 ## Summary
 
