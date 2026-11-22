@@ -317,10 +317,14 @@ public sealed class ParametersField : TexGraphField
         return new GraphParameter(value, [.. drives], min, max);
     }
 
-    /// <summary>A value: a number, a string, or an array of numbers.</summary>
+    /// <summary>
+    /// A value: a number, a string, or an array of numbers or of strings, as a node parameter's is (RV-76: a list of
+    /// strings, which edit_graph can set, loads and is faulted by kind, as a list of numbers is, rather than being a load error).
+    /// </summary>
     private static ParamValue Value(ref Utf8JsonReader reader, string where)
     {
-        var what = $"{where}: value is a number, a string or an array of numbers";
+        var what = $"{where}: value is a number, a string, or an array of numbers or of strings";
+        var mixed = $"{where}: value is an array of all numbers or all strings";
         switch (reader.TokenType)
         {
             case JsonTokenType.Number:
@@ -329,12 +333,17 @@ public sealed class ParametersField : TexGraphField
                 return ParamValue.Of(reader.GetString()!);
             case JsonTokenType.StartArray:
                 var numbers = new List<double>();
+                var texts = new List<string>();
                 while (Next(ref reader) != JsonTokenType.EndArray)
                 {
-                    if (reader.TokenType != JsonTokenType.Number || !reader.TryGetDouble(out var x) || !double.IsFinite(x)) throw new FormatException(what);
-                    numbers.Add(x);
+                    // An array is all numbers or all strings: its first item says which.
+                    if (reader.TokenType == JsonTokenType.String && numbers.Count == 0) texts.Add(reader.GetString()!);
+                    else if (texts.Count > 0) throw new FormatException(mixed);
+                    else if (reader.TokenType != JsonTokenType.Number || !reader.TryGetDouble(out var x) || !double.IsFinite(x))
+                        throw new FormatException(numbers.Count == 0 || reader.TokenType != JsonTokenType.String ? what : mixed);
+                    else numbers.Add(x);
                 }
-                return ParamValue.Of([.. numbers]);
+                return texts.Count > 0 ? ParamValue.OfTexts([.. texts]) : ParamValue.Of([.. numbers]);
             default:
                 throw new FormatException(what);
         }

@@ -212,10 +212,18 @@ public sealed class ParamSpec
                 || (value.Kind == ParamValueKind.Numbers && value.Numbers.Length == 0 && InCount(0)) ? null : wrong,
             ParamKind.Name => value.Kind == ParamValueKind.Text && GraphNames.IsValid(value.Text!) ? null : wrong,
             ParamKind.GreyOrColour => (value.Kind == ParamValueKind.Number && InRange(value.Number)) || (value.Kind == ParamValueKind.Text && TryParseColour(value.Text!, out _)) ? null : wrong,
-            ParamKind.FilePath => value.Kind == ParamValueKind.Text && value.Text!.Length > 0 ? null : wrong,
+            ParamKind.FilePath => value.Kind == ParamValueKind.Text && IsRelativePath(value.Text!) ? null : wrong,
             _ => value.Kind == ParamValueKind.Text && TryParseColour(value.Text!, out _) ? null : wrong,
         };
     }
+
+    /// <summary>
+    /// A <see cref="ParamKind.FilePath"/> is relative to the using graph's file (T-140), <c>..</c> allowed: one that is
+    /// empty or rooted (absolute, a drive's own (<c>C:x</c>), from the root (<c>/x</c>) or UNC (<c>//server/share</c>)) is
+    /// not, on any system, since a file handed on would otherwise open what it names elsewhere (RV-76).
+    /// </summary>
+    public static bool IsRelativePath(string text) =>
+        text.Length > 0 && text[0] is not ('/' or (char)92) && !(text.Length >= 2 && text[1] == ':' && char.IsAsciiLetter(text[0])) && !Path.IsPathRooted(text);
 
     /// <summary>Parses <c>"#rrggbb"</c> (lower or upper case hex).</summary>
     public static bool TryParseColour(string text, out (byte R, byte G, byte B) colour)
