@@ -23,3 +23,4 @@
 - T-174: Every finding of RV-76's `## Findings: the nodes, check rules and samples`, and the check-tool findings of the server's, is answered
 - T-176: The patina server's RV-76 findings on save, the swatch sheet, export and override wording are answered, fixed where they are defects
 - T-173: Every finding of RV-76's `## Findings: the evaluation engine` is answered, fixed where it is a defect, with outputs byte-identical
+- T-175: Every finding of RV-76's `## Findings: the file format and graph model` is answered, fixed where it is a defect
