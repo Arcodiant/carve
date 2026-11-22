@@ -17,7 +17,9 @@ Every plan, for a milestone or a task, keeps these:
   same task as the mechanic or feature it belongs to, so each milestone's
   mechanics arrive showing something. Placeholder content may stand in where the
   real thing is not ready; absent content may not. Content is never a milestone
-  of its own.
+  of its own. The README's account of what a user or an agent can reach is
+  part of that content: a planned task that changes it names the `README.md`
+  change in its scope (see Working rules).
 - **A thin slice first.** One small, complete slice of the whole is built end to
   end first; wider content and secondary systems come after it. No polish-only
   milestone while the core has a gap.
@@ -250,6 +252,10 @@ extension API is built ready for it.
 - **Keep the evidence.** Review artefacts and raw content are kept in `artifacts/`
   (ignored), where finishing a task does not delete them. Logs go to the temp
   folder (`$env:TEMP`), never into the repo.
+- **The README is kept current.** A task or bug that changes what a user or an
+  agent can reach (a tool, an argument, a node, an output, a sample, a server, a
+  run condition) updates `README.md` in the same task, and its `### As built`
+  says what changed in the README, or that nothing needed to.
 - **Stop only your own processes.** An agent stops only processes it started,
   identified by a command line inside its own worktree, never a test host,
   `dotnet` or a runtime machine-wide.
