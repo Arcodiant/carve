@@ -95,6 +95,34 @@ public class NestedGraphToolTests
     }
 
     [Fact]
+    public async Task Save_into_a_folder_holding_another_graph_of_the_same_name_is_refused_naming_both_files()
+    {
+        // RV-77: saved into materials/, the graph node would be materials/bricks.texgraph, which holds another graph (its
+        // seed changed): the saved graph would not be the one defined, so the save is refused and nothing is written. A copy
+        // of the same graph with other line endings is the same graph, and that save is written.
+        using var folder = new TempFolder();
+        CopySamples(folder.Path, "bricks.texgraph");
+        await using var patina = await PatinaHarness.StartAsync(folder.Path);
+        await patina.Ok("define_graph", DefineGraphTool.WorkedNested);
+        var bricks = File.ReadAllText(Path.Combine(folder.Path, "bricks.texgraph"));
+        Directory.CreateDirectory(Path.Combine(folder.Path, "materials"));
+        var other = Path.Combine(folder.Path, "materials", "bricks.texgraph");
+        Assert.Contains("\"seed\": 21", bricks);
+        File.WriteAllText(other, bricks.Replace("\"seed\": 21", "\"seed\": 22", StringComparison.Ordinal));
+
+        var refused = folder.Normalise(await patina.Refused("save", """{"path":"materials/wall.texgraph"}"""));
+        Assert.StartsWith("save: refused: the graph saved in <folder>/materials would use other files than it does now: graph node 'wall' would read <folder>/materials/bricks.texgraph, which differs from <folder>/bricks.texgraph, the file it reads now", refused);
+        Assert.EndsWith("Nothing was written.", refused);
+        Assert.False(File.Exists(Path.Combine(folder.Path, "materials", "wall.texgraph")));
+        Assert.Contains("paths resolved against the tool folder <folder> (the graph has never been saved)", folder.Normalise(await patina.Ok("get_graph", "{}")));
+
+        File.WriteAllText(other, bricks.ReplaceLineEndings(bricks.Contains("\r\n", StringComparison.Ordinal) ? "\n" : "\r\n"));
+        Assert.NotEqual(File.ReadAllBytes(Path.Combine(folder.Path, "bricks.texgraph")), File.ReadAllBytes(other));
+        Assert.StartsWith("save: saved wall.texgraph", await patina.Ok("save", """{"path":"materials/wall.texgraph"}"""));
+        Assert.True(File.Exists(Path.Combine(folder.Path, "materials", "wall.texgraph")));
+    }
+
+    [Fact]
     public async Task Pop_snapshot_after_a_save_into_another_folder_lists_the_faults_the_snapshot_has_there()
     {
         // RV-76: a snapshot pushed while its graph node resolved against the tool folder comes back in the saved file's
