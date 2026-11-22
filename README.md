@@ -34,10 +34,21 @@ dotnet test tests/Carve.Core.Tests --filter "Tier!=regression"
 dotnet test tests/Carve.Server.Tests --filter "Tier!=regression"
 ```
 
-Those two suites need no GPU and are what CI runs. The regression tier and the
-scenarios under `scenarios/` render for real and need a Vulkan device;
-`tests.json` lists every suite and how to run it; `scripts/verify.ps1` builds,
-runs every test project and the cube scenario.
+Those two suites need no GPU and are what CI runs. `tests.json` lists every
+suite, its tier, its command and the files it reads, and `cairn test list` prints
+them with the device each needs and about how long it takes. By tier:
+
+- unit, no GPU: `core-unit` and `server-unit` (the two above), and `patina-unit`
+  (patina's graphs and its server).
+- regression, no GPU: `patina-regression`.
+- regression, on a Vulkan device: `server-regression`, `viewer-cube`, and the
+  scenarios under `scenarios/`, each a run through the real server:
+  `scenario-cube`, `-sky`, `-rig`, `-crate`, `-uvs`, `-shed`, `-export`,
+  `-character`, `-soft`, `-materials`, `-planks`, `-cuts`, `-parts`, `-morph`,
+  `-gatehouse`, `-orcward` and `-bakes` on carve, and `scenario-patina`,
+  `scenario-patina-library-1` and `scenario-patina-library-2` on patina.
+
+`scripts/verify.ps1` builds, runs every test project and the cube scenario.
 
 ## From an empty file to a game
 
@@ -90,7 +101,7 @@ Each of these edits the mesh in place and appends new ids at the end; each examp
 - `delete` removes faces or vertices; their ids stay as `null` (tombstones) in `get_mesh`: `{"faces":[3]}`.
 - `bridge` joins two open loops of vertices with a band of faces, which closes an opening left by `delete`; on `bridge`'s own example, two unit squares facing each other, this makes a box: `{"loops":[[0,1,2,3],[4,5,6,7]]}`.
 
-A window through a wall is `knife` on the front and the back, `delete` of both pieces, then `bridge` of the two loops.
+A window through a wall is `knife` on the front and the back, `delete` of both pieces, then `bridge` of the two loops. `samples/gatehouse.carve` is a wall built by cuts alone: a cornice, a gable, a door and a see-through window.
 
 ## Several meshes, colours and smooth surfaces
 
@@ -102,6 +113,16 @@ A model holds named meshes. `define_mesh` with a `name` adds a mesh, or replaces
 - `subdivide` rounds a mesh off by Catmull-Clark, 1 to 3 levels: `{"levels":1}`. Every id stays, new ones are appended, and hard edges stay sharp.
 
 `render` and `export` draw the same normals, so a smooth mesh looks the same in the game.
+
+## Parts and levels
+
+The meshes of a model are the parts of a part tree, which places them as the game will. A named mesh is a top-level part at the origin until it is placed. `samples/rover.carve` is one: a chassis with a cab, a mast carrying a lamp, and four wheels under two empty axle parts, three of them instances of `Wheel_FL`. The examples are on it (`open` it first).
+
+- `define_part` places a part, or makes one with no geometry of its own: an empty part (a pivot or a group, such as an axle) or an instance, which shows the geometry of the part it is `instance_of`. It takes `parent`, `translation`, `rotation` (a unit quaternion), `scale`, `envelope` and `moves`, and on a part that exists it changes only what is given. This turns the mast an eighth of a turn about +Y: `{"part":"Mast","rotation":[0,0.38268343,0,0.92387953]}`. Edits take `mesh` with a part's name and work in the part's own space, so placing a part never changes its ids.
+- `get_parts` reads the tree back: each part's placement, vertex and face counts, kept levels, bounds in its own space and in the model, and warnings. An `envelope` is the box a part and everything under it should stay inside; leaving it is a warning in `get_parts` and `check`, never a refusal.
+- `keep_level` keeps the parts' geometry as a numbered level, so a blockout (level 0) stays while the parts are refined: `{"level":1}`. Edits change only the live geometry. `get_mesh` with `level` reads a level back, and `render` with `level` draws each part at its newest kept level at or below it: `{"level":0}`.
+- `render` with `part` draws that part and the parts under it, each where it is placed: `{"part":"Mast"}`.
+- `export` keeps a glTF node only for a part marked `moves`: the static parts are merged into the root node, each moving part is a child node under its nearest moving ancestor, and moving instances share one glTF mesh. `export`'s description works through the rover.
 
 ## UVs
 
@@ -125,7 +146,21 @@ A material is a named PBR look shared by the whole model; any mesh's faces may u
 
 Texture paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
 
-`samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`.
+`samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`, and `samples/barrel-planks.carve` is the same barrel with its staves from patina's planks graph.
+
+## Baked maps
+
+`bake` writes PNG maps of one mesh, worked in its UV layout, for `define_material` to take as they come back. It changes nothing in the model (no undo step, nothing to save). The faces it bakes need UVs, and no two may share a texel.
+
+- `maps` picks from `masks` (a grey mask for each face group and each material), `base_colour`, `curvature` (convex and concave edges, for wear in a texture graph), `occlusion`, `orm` (occlusion, roughness and metallic in one RGB file, as glTF reads them) and `normal` (the hard edges rounded over `bevel.width` metres, with no extra geometry). The default is `masks` and `base_colour`.
+- `surface` gives a colour, roughness and metallic per group or material, a later entry winning a face two of them name. `occlusion` needs `occlusion.reach` in metres; `curvature` and `normal` need a `width` in their `curvature` and `bevel` blocks.
+- `size` is a power of two from 64 to 4096 (default 1024) and `folder` defaults to `textures`, relative to carve's working folder. A bake always overwrites; the result gives each file's path in the form `define_material` takes, with its coverage and its range of values.
+
+On `samples/wrench.carve` (`open` it first), the bake in `bake`'s own description, then a material from it:
+
+1. `bake`: `{"mesh":"wrench","folder":"textures","size":512,"maps":["masks","base_colour","orm"],"surface":{"all":{"base_colour":"#80858A","roughness":0.4,"metallic":1},"rubber":{"base_colour":"#282A2E","roughness":0.88,"metallic":0},"red":{"base_colour":"#B02A22"}},"occlusion":{"rays":32,"reach":0.035}}`. It writes `textures/wrench.base_colour.png`, `textures/wrench.orm.png` and a mask for each group.
+2. `define_material`: `{"name":"wrench","base_colour_texture":"textures/wrench.base_colour.png","metallic_roughness_texture":"textures/wrench.orm.png","occlusion_texture":"textures/wrench.orm.png"}`, the one ORM file in both slots.
+3. `set_material`: `{"material":"wrench","group":"all"}`, the wrench's group of every face.
 
 ## Characters
 
@@ -157,6 +192,17 @@ A character is a model with a skeleton, bone weights and clips. `export` then wr
 `render_glb` draws an exported `.glb` through the engine's own loader and GPU skinning, at rest or at a `clip` and `time`: `{"path":"models/figure.glb","clip":"nod","time":0.25}`. A `render_glb` frame and a `render` frame of the same model, view, size, clip and time line up, so the two can be compared.
 
 `export` also warns when a model passes a game's limits on triangles, submeshes or height, read from the first `carve-limits.json` found in the `.glb`'s folder or a folder above it (or the one `limits` names). `write_limits: true` creates the file with starting numbers to edit. `samples/gardener.carve` is a rigged, animated character, and `samples/gardener-soft.carve` is the same character subdivided and smoothed.
+
+## Morph targets
+
+A morph target is a mesh in another shape, the same vertices moved, that a game blends in by a weight from 0 to 1. One target name is one dial across the model, so meshes that move together use the same name.
+
+- `define_target` makes one from absolute `positions`, or from a `.carve` `file` holding the same mesh edited (the same vertices and faces, moved). On `define_mesh`'s unit cube this raises the top and spreads it: `{"name":"Bulge","positions":{"2":[1.1,1.3,-0.1],"3":[-0.1,1.3,-0.1],"6":[1.1,1.3,1.1],"7":[-0.1,1.3,1.1]}}`. A name the mesh already has replaces that target.
+- `get_mesh` lists a mesh's targets, and with `target` reads one back. `delete_target` removes one: `{"name":"Bulge"}`.
+- `render` with `targets` draws the model at those weights, `{"targets":{"Bulge":1}}`, before any `pose` or `clip` skins it. `render_glb` takes the same `targets` for an exported file.
+- `export` writes each target as a glTF morph target, and its result names them in glTF target order.
+
+`samples/arm.carve` is a rigged arm with `Bulk` and `Lean` targets and a `Curl` clip; `samples/arm-lean.carve` is the arm's cage in the `Lean` shape, before subdividing, which is the file `Lean` was made from with `file` (the arm in `arm.carve` has since been subdivided, so the two no longer match).
 
 ## patina: texture graphs
 
