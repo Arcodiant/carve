@@ -44,6 +44,9 @@ public static class TexGraphFile
     private static string Write(TextureGraph graph, TexGraphFormat? format, bool showDriven)
     {
         format ??= TexGraphFormat.Current;
+        // A format without parameters cannot hold a graph's, nor the node values they drive, so it is refused rather than dropping both (RV-76).
+        if (graph.Parameters.Count > 0 && format.Field(ParametersField.Instance.Name) is null)
+            throw new ArgumentException($"the graph has exposed parameters ({string.Join(", ", graph.Parameters.Keys.Order(StringComparer.Ordinal))}), which this format does not hold", nameof(format));
         // A driven parameter's own value is ignored, so it is not written; get_graph's form names its driver instead.
         var driven = new Dictionary<(string, string), string>();
         foreach (var (name, p) in graph.Parameters.OrderBy(p => p.Key, StringComparer.Ordinal))

@@ -202,7 +202,7 @@ I checked the claims below with F# scripts run against the worktree's built `src
 - **Tests:** T-140's "renamed node clashing with a parent's id" (`tests/Patina.Graphs.Tests/NestedGraphTests.cs:129-130`) is a hand-written copy compared by pixels. Nothing tests an outer id that collides with an expanded one.
 - **Fix:** fault an outer id that is not `IsValid` before expanding, or refuse a `nodes` key that is already present.
 
-**Outcome:** —
+**Outcome:** fixed (T-175, Claude Opus 5.5): the graph's own node with an id expansion also makes stays its own, is checked with `IsValid` and faulted for its id, and the nested node is not put over it; one level down the fault comes through as `g/g/c`. Test `An_outer_node_with_an_expanded_id_is_faulted_not_put_in_the_nested_nodes_place`.
 
 ### A `graph` node's path can be absolute, drive-relative or UNC, and is opened without question
 - **Where:** `src/Patina.Graphs/GraphValidator.cs:45` (`Path.GetFullPath(Path.Combine(graph.Folder ?? ..., text))`), and `ParamSpec.FilePath`'s check in `src/Patina.Graphs/Nodes/NodeType.cs:215`, which accepts any non-empty text.
@@ -217,7 +217,7 @@ I checked the claims below with F# scripts run against the worktree's built `src
   - `..` is used on purpose and tested (`NestedGraphTests.cs:293-294`), so the issue is only rooted paths.
 - **Fix:** fault a `Path.IsPathRooted` path (drive-relative and UNC included). Nothing tests a rooted path.
 
-**Outcome:** —
+**Outcome:** fixed (T-175, Claude Opus 5.5): `ParamSpec.IsRelativePath` (the `FilePath` kind's check) faults an empty, absolute, drive-relative (`C:x`), from-the-root or UNC path on any system, and `ResolvePath` gives null for one, so nothing is opened; `..` stays allowed. Test `A_rooted_path_is_a_fault_and_is_not_opened`.
 
 ### Nested expansion has no bound but depth: fan-out makes validation exponential
 - **Where:**
@@ -239,7 +239,7 @@ I checked the claims below with F# scripts run against the worktree's built `src
   - The cost is paid again by `Uses`, by `Validate` and by the evaluator, all from open.
   - Expansion is by design (inline, so evaluation is unchanged), but a hostile or careless file should fault, not hang. A cap on total expanded nodes, as a fault, would do it. So would a per-file parse cache plus a node-count limit.
 
-**Outcome:** —
+**Outcome:** fixed (T-175, Claude Opus 5.5): `GraphValidator.MaxNodes` = 4096 (the person approved the number, round 1): one validation takes in at most that many nodes, the graph's own and each nested file's each time it is used, all levels down; a graph node that would pass it is a fault on its `path`. No parse cache was added; the cap bounds the work. Test `Fan_out_past_the_node_cap_is_a_fault_not_a_hang` (fan 2 clean, fans 4 and 10 faulted at once).
 
 ### A parameter whose value is a list of strings is written as a file that does not load
 - **Where:** `src/Patina.Graphs/GraphParameters.cs:321-340` (`ParametersField.Value` reads only numbers in an array), against `TexGraphFile.Value` (`src/Patina.Graphs/TexGraphFile.cs`, the `Texts` case), which writes one.
@@ -252,7 +252,7 @@ I checked the claims below with F# scripts run against the worktree's built `src
   - The file's own rule (TexGraphFile's summary) is that only shape errors are load errors and everything else is a `GraphFault`. A string list is valid JSON of the kind node parameters take, so it should load and be faulted ("is [...], but must be a number ..."), as a number list is.
   - Save refuses the faulted graph, so this does not reach disk through save. It does reach get_graph's text (`WriteShowingDriven`), which then does not read back.
 
-**Outcome:** —
+**Outcome:** fixed (T-175, Claude Opus 5.5): `ParametersField` reads an array of strings as `ParamValue.OfTexts`, as a node parameter's is, so the file written reads back and is faulted by kind; a mixed array stays a load error. Test `A_parameter_whose_value_is_a_list_of_strings_reads_back_and_is_faulted_by_kind`.
 
 ### `Write(graph, TexGraphFormat.Version1)` silently drops the parameters and the values they drive
 - **Where:** `src/Patina.Graphs/TexGraphFile.cs:51` (the driven set is built from `graph.Parameters` whatever the format), `:57` (fields come from the format).
@@ -263,7 +263,7 @@ I checked the claims below with F# scripts run against the worktree's built `src
   - The probe gives a version 1 file with `"c": { "type": "colour" }`: the parameter and the node's own `#123456` are both gone, with no error.
   - Only a test calls it (`ExposedParametersTests.cs:61`, with no parameters), but it is public. It should throw when the graph uses something the format cannot hold, or at least keep the node values.
 
-**Outcome:** —
+**Outcome:** fixed (T-175, Claude Opus 5.5): `TexGraphFile.Write` throws `ArgumentException` for a graph with exposed parameters in a format without the `parameters` field, rather than dropping them and the values they drive. Test `Writing_a_graph_with_parameters_as_version_1_is_refused`.
 
 ### No test has a nested file whose size differs from the outer graph's
 - **Where:** `tests/Patina.Graphs.Tests/NestedGraphTests.cs:29` and `:48` (inner and outer are both `"size": 64`). Every other nested fixture in the file is also the same size as its outer graph.
@@ -274,7 +274,7 @@ I checked the claims below with F# scripts run against the worktree's built `src
   - The size ruling holds by construction, since only nodes are taken. But no test would fail if a nested size started to leak into a node that reads the graph's size.
   - A fixture with an inner size of 32 under an outer 64, compared to the hand-written copy, would cover it.
 
-**Outcome:** —
+**Outcome:** fixed (T-175, Claude Opus 5.5): test `A_nested_file_of_another_size_takes_the_outer_graphs_size` has an inner file of size 32 under an outer one of 64, compared to the hand-written copy at 64, whole and in 16-texel tiles. No code changed.
 
 ## Findings: the patina server (claude-opus-5-5)
 
