@@ -26,7 +26,9 @@ internal sealed class WideSheetStage : IPatinaStage
             ["c"] = new JsonObject { ["type"] = "colour", ["params"] = new JsonObject { ["colour"] = "#202020" } },
             ["out"] = new JsonObject { ["type"] = "output", ["inputs"] = new JsonObject { ["in"] = "c" } },
         };
-        var names = Enumerable.Range(0, Named).Select(i => "m" + (char)('a' + i)).ToList();
+        // Each name a letter longer than the one before (RV-77), so no label's text is as wide as another's: a page drawn with
+        // another page's labels, or with its labels a row out, puts text of another width in a label's backing.
+        var names = Enumerable.Range(1, Named).Select(i => "m" + new string('x', i)).ToList();
         foreach (var name in names)
             nodes["o_" + name] = new JsonObject { ["type"] = "output", ["params"] = new JsonObject { ["name"] = name }, ["inputs"] = new JsonObject { ["in"] = "c" } };
         var graph = new JsonObject { ["version"] = 1, ["size"] = 64, ["seed"] = 0, ["nodes"] = nodes };
@@ -61,5 +63,53 @@ internal sealed class WideSheetStage : IPatinaStage
             checks.Check(Lettered(left, Title + Cell + Gutter + Padding), $"wide sheet: column {column}'s tiled label is not drawn");
         }
         checks.Check(Lettered(columns * (Cell + Gutter) + Padding, Title + 1 + Padding), "wide sheet: the sphere's label is not drawn");
+
+        // Each label's text against its backing, which is sized from the label's own measured text (RV-77): the text ends in
+        // the backing's last few pixels before its padding, never in the padding, so text of another width (another label, or
+        // one a row out) fails; and a column's tiled label ("mxx 3 x 3") begins with the flat label's text, pixel for pixel.
+        for (var column = 1; column < columns; column++)
+        {
+            var left = column * (Cell + Gutter) + Padding;
+            var flat = Fit(left, Title + Padding);
+            var tiled = Fit(left, Title + Cell + Gutter + Padding);
+            checks.Check(flat.Fits && tiled.Fits, $"wide sheet: column {column}'s labels do not end where their backing does (flat: {flat.Why}; tiled: {tiled.Why})");
+            var same = flat.Width > 0;
+            for (var y = 0; y < 16 && same; y++)
+                for (var x = 0; x < flat.Width - Padding && same; x++)
+                    same = Pixel(left + x, Title + Padding + y) == Pixel(left + x, Title + Cell + Gutter + Padding + y);
+            checks.Check(same, $"wide sheet: column {column}'s tiled label does not begin with its flat label's text");
+        }
+        File.AppendAllText(Path.Combine(driver.RunFolder, "wide-sheet-labels.tsv"), string.Join("", Enumerable.Range(1, columns - 1).Select(column =>
+        {
+            var left = column * (Cell + Gutter) + Padding;
+            var (fits, width, last, why) = Fit(left, Title + Padding);
+            return $"{column}\t{width}\t{last}\t{fits}\t{why}\n";
+        })));
+
+        (byte, byte, byte) Pixel(int x, int y)
+        {
+            var at = (y * decoded.Width + x) * 4;
+            return (decoded.Data[at], decoded.Data[at + 1], decoded.Data[at + 2]);
+        }
+
+        // A label's backing, from (left, top): the run of pixels darker than the #202020 cell along its top row, and the
+        // rightmost text pixel (red over 200) in its first 16 rows.
+        (bool Fits, int Width, int Last, string Why) Fit(int left, int top)
+        {
+            var width = 0;
+            while (width < Cell && decoded.Data[(top * decoded.Width + left + width) * 4] < 0x18) width++;
+            var last = -1;
+            for (var y = top; y < top + 16; y++)
+                for (var x = 0; x < width; x++)
+                    if (decoded.Data[(y * decoded.Width + left + x) * 4] > 200) last = Math.Max(last, x);
+            if (width == 0) return (false, 0, last, "no backing");
+            if (last < 0) return (false, width, last, "no text");
+            if (last >= width - Padding) return (false, width, last, $"text in the padding, at {last} of {width}");
+            if (last < width - Padding - TextSlack) return (false, width, last, $"text ends at {last}, short of its backing's {width}");
+            return (true, width, last, "");
+        }
     }
+
+    /// <summary>How far short of its backing's padding a label's last bright pixel may end: the last glyph's side bearing and edge.</summary>
+    private const int TextSlack = 4;
 }

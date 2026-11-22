@@ -4,7 +4,7 @@ description: >-
 ---
 # T-179 — RV-77 answers: the format, server and scenarios
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -33,3 +33,23 @@ Every finding of RV-77's `## Findings: round 2, the format, server and scenarios
 - **Answering RV-77:** for each finding, fix it or answer it `skipped: <reason>` or `no change needed: <reason>`, by filling its `**Outcome:**` line in `docs/reviews/RV-77-review-of-m-28-round-2.md` in this task's worktree. The line is exactly `**Outcome:** fixed` (or the other two forms); put any detail on a following `**Fix:**` line, since `cairn lint` accepts nothing after `fixed`. Run `cairn lint` and read its output before `finish`.
 - A fix that would change behaviour beyond the finding, loosen a check, or change a committed output or an approved frame goes to the person first.
 - Opus 5.5: Sonnet is under its weekly usage limit until 2026-11-23.
+
+### As built
+
+Two agents, both Claude Opus 5.5 (`claude-opus-5-5`; Sonnet was under its weekly limit): the first wrote the code and handed off at its call checkpoint; the second verified, ran the shown-failing checks and the frame review, and answered RV-77.
+
+RV-77's ten findings under `## Findings: round 2, the format, server and scenarios`, each `fixed`:
+- Fan-out through drives: `GraphValidator.NodeBudget` caches each nested file's parameter read per validation and charges a miss to the 4096 cap (through `GraphParameters.Analyse` and `WithOverrides`), so past it a drive is a fault on its parameter. Without the fix, fan 6 had not finished after 20 s.
+- Outer graph node with an expanded id: the use is left unexpanded and the outer node's id fault is the only one. The test failed without the fix.
+- Metallic break: a darker dielectric (grey 100, metallic 0, frame `swatch-sphere-metallic-0-dark`, approved by the person) judged as the metal; only the rule's clipped half refuses it. With `MetallicReads` planted to its median half (not committed), the break failed and the metallic check passed.
+- Save into a folder holding another file of the same name: refused, naming both files (`SaveTool.Changed`). The test failed with the check disabled.
+- Changelog: T-172's old line removed.
+- CLAUDE.md: a page for each 32 labels.
+- CLAUDE.md: the Patina row names `WideSheetStage.cs`.
+- Node cap summary: reworded as a cap on what nesting takes in; behaviour unchanged.
+- WideSheetStage: names one letter longer per column; each label is judged against its backing, and the tiled label must begin with the flat one. `wide-sheet-labels.tsv` shows each label ending 4 px short of its backing (allowed: 3 to 6), and a label a letter off is 8 px out, so no threshold was changed.
+- RV-76 How lines: `1f69cb2` to `a1ffbd9`, an ancestor of the milestone.
+
+Checked: patina-unit in full (461 + 162 passed, 6 skipped). Against job `J-20261121-184545-5c2ba5`, 65 frames are identical by SHA-256 and the only new one is `swatch-sphere-metallic-0-dark`.
+
+Surprising: backslash escapes in Python heredocs through the Bash tool became real newlines and tabs (fixed with `chr(92)`); a `cairn test artifacts` run from the container root wrote `test-artifacts/` there, which was moved to `%TEMP%`.

@@ -153,6 +153,32 @@ public sealed class NestedGraphTests : IDisposable
         Assert.Contains(GraphValidator.Validate(top), f => f.Node == "g/g/c" && f.Message.Contains("an id is", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// RV-77: the same collision where the outer node is itself a <c>graph</c> node (<c>"g/c"</c>, using another file) is a
+    /// fault on its id too, never a throw, through <see cref="TexGraphFile.ReadFile"/> (which open, define_graph and edit_graph reach).
+    /// </summary>
+    [Fact]
+    public void An_outer_graph_node_with_an_expanded_id_is_faulted_not_thrown()
+    {
+        Put("other.texgraph", """
+            { "version": 2, "size": 64, "seed": 0, "nodes": { "k": { "type": "colour", "params": { "colour": "#00ff00" } }, "o": { "type": "output", "inputs": { "in": "k" } } } }
+            """);
+        var clash = Outer.Replace("\"n\": { \"type\": \"noise\"", "\"g/c\": { \"type\": \"graph\", \"params\": { \"path\": \"other.texgraph\" } },\n    \"n\": { \"type\": \"noise\"");
+        Assert.Contains("\"g/c\"", clash);
+        var fault = Assert.Single(FaultsOf(clash).Select(f => f.Message));
+        Assert.StartsWith("node 'g/c': an id is", fault);
+
+        // RV-77's probe: the inner file's output reads the colliding node directly, so the outer output would name it.
+        Put("plain.texgraph", """
+            { "version": 2, "size": 64, "seed": 0, "nodes": { "c": { "type": "colour", "params": { "colour": "#ff0000" } }, "o": { "type": "output", "inputs": { "in": "c" } } } }
+            """);
+        var read = TexGraphFile.ReadFile(Put("probe.texgraph", """
+            { "version": 2, "size": 64, "seed": 0, "nodes": { "g": { "type": "graph", "params": { "path": "plain" } }, "g/c": { "type": "graph", "params": { "path": "other" } }, "o": { "type": "output", "inputs": { "in": "g" } } } }
+            """));
+        Assert.True(read.Loaded);
+        Assert.StartsWith("node 'g/c': an id is", Assert.Single(read.Faults.Select(f => f.Message)));
+    }
+
     /// <summary>RV-76: a graph node's path is relative to the using graph's file (T-140): absolute, drive-relative, from-the-root and UNC paths are faults, and nothing is opened for them.</summary>
     [Fact]
     public void A_rooted_path_is_a_fault_and_is_not_opened()
@@ -200,6 +226,53 @@ public sealed class NestedGraphTests : IDisposable
         if (!faulted) { Assert.Empty(faults); return; }
         Assert.NotEmpty(faults);
         Assert.Contains(faults, f => f.Parameter == "path" && f.Message.Contains($"past {GraphValidator.MaxNodes}", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// RV-77: fan-out through drives. Nine files of three nodes, each using the one below once, with <c>fan</c> parameters
+    /// each driving the nested graph's parameter of the same name. Expansion takes in a few dozen nodes, but each drive
+    /// read and analysed the file below again, all levels down (<c>fan</c>^8 reads: a fan of 4 took 39 s in RV-77's probe,
+    /// 6 did not finish). Each file is now read once for each chain of files above it, so a fan of 6 validates at once and
+    /// with no fault; without that this test stops at its time limit.
+    /// </summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(6)]
+    public async Task Fan_out_through_drives_is_bounded(int fan)
+    {
+        var names = Enumerable.Range(1, fan).Select(k => $"p{k}").ToList();
+        var f0Drives = string.Join(", ", names.Select(n => $"\"{n}\": {{ \"value\": 0.5, \"drives\": [\"m{n}.opacity\"] }}"));
+        var f0Blends = string.Join(", ", names.Select(n => $"\"m{n}\": {{ \"type\": \"blend\", \"inputs\": {{ \"a\": \"c\", \"b\": \"c\", \"mask\": \"n\" }}, \"params\": {{ \"mode\": \"mix\" }} }}"));
+        Put("f0.texgraph", $$"""
+            { "version": 2, "size": 64, "seed": 0, "parameters": { {{f0Drives}} },
+              "nodes": { "c": { "type": "colour" }, "n": { "type": "noise" }, {{f0Blends}}, "out": { "type": "output", "inputs": { "in": "mp1" } } } }
+            """);
+        var drives = string.Join(", ", names.Select(n => $"\"{n}\": {{ \"value\": 0.5, \"drives\": [\"g.{n}\"] }}"));
+        for (var i = 1; i <= 8; i++)
+            Put($"f{i}.texgraph", $$"""{ "version": 2, "size": 64, "seed": 0, "parameters": { {{drives}} }, "nodes": { "g": { "type": "graph", "params": { "path": "f{{i - 1}}" } }, "out": { "type": "output", "inputs": { "in": "g" } } } }""");
+        var top = Load(Path.Combine(_dir, "f8.texgraph"));
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var run = Task.Run(() => GraphValidator.Validate(top), TestContext.Current.CancellationToken);
+        var first = await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
+        Assert.True(first == run, $"validation had not finished after {watch.Elapsed}");
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"validation took {watch.Elapsed}");
+        Assert.Empty((await run).Select(f => f.Message));
+        Assert.Equal(names, GraphParameters.Of(top).Keys.Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>RV-77: a nested file read for a drive's range is charged to <see cref="GraphValidator.MaxNodes"/>, as an expanded one is: past it the drive is a fault on its parameter.</summary>
+    [Fact]
+    public void A_file_read_for_a_drive_is_charged_to_the_node_cap()
+    {
+        Put("inner.texgraph", Inner);
+        var own = string.Join(", ", Enumerable.Range(1, GraphValidator.MaxNodes - 3).Select(k => $"\"c{k}\": {{ \"type\": \"colour\" }}"));
+        var outer = $$"""
+            { "version": 2, "size": 64, "seed": 0, "parameters": { "p": { "value": 0.5, "drives": ["g.amount"] } },
+              "nodes": { {{own}}, "g": { "type": "graph", "inputs": { "in": "c1" }, "params": { "path": "inner.texgraph" } }, "out": { "type": "output", "inputs": { "in": "g" } } } }
+            """;
+        var faults = GraphValidator.Validate(Load(Put("outer.texgraph", outer)));
+        Assert.Contains(faults, f => f.GraphParameter == "p" && f.Message.Contains($"reading inner.texgraph for its range takes the nodes validated past {GraphValidator.MaxNodes}", StringComparison.Ordinal));
     }
 
     /// <summary>Broken copies of the expansion, each written by hand as the expansion would have made it, and what tells it from the real one.</summary>

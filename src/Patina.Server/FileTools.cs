@@ -101,7 +101,7 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
         "Writes the open graph to a .texgraph file, so the work outlives this session; open reads it back. Takes path: .texgraph is added when the path does not end in it; "
         + "a relative path resolves against patina's working directory, and the result gives the absolute path; missing folders are created; an existing file is replaced, and the result says (replaced). "
         + "The file is the graph as get_graph shows it: versioned JSON, keys in one order, one node a line, so the same graph always gives the same bytes and a diff shows what changed. "
-        + "The path becomes the graph's path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates, but for an input node with no default, which a graph using this one as a node gives. A graph node's path resolves against the file's folder, so the graph is judged there: saved into another folder, a nested file not found from it is a fault. Only the open graph is written, never a file it uses as a graph node. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. "
+        + "The path becomes the graph's path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates, but for an input node with no default, which a graph using this one as a node gives. A graph node's path resolves against the file's folder, so the graph is judged there: saved into another folder, a nested file not found from it is a fault, and one found there that differs from the file it uses now refuses the save, naming both: the saved graph is the graph defined. Only the open graph is written, never a file it uses as a graph node. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. "
         + "Also refused: no open graph, an empty path, one naming a folder or holding a character a path may not, and a write that fails (naming the path and the system's message; no partial file is left). "
         + "save changes nothing in the graph or the snapshot stack, which is never saved.\n"
         + "Worked example, after define_graph's and edit_graph's worked examples (put patina's working directory for <folder>):\n"
@@ -132,11 +132,42 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
                 var where = moved ? $" saved in {folderTo}, where its graph nodes' paths resolve," : "";
                 return Error($"save: refused: the graph{where} has {Faults(faults)}\nA saved graph evaluates; fix them with edit_graph, then save again. Nothing was written.");
             }
+            if (moved && Changed(graph, folderTo) is { } changed)
+                return Error($"save: refused: the graph saved in {folderTo} would use other files than it does now: {changed}\nA saved graph is the graph defined; save it beside the files it uses, or copy them there. Nothing was written.");
             if (!Write("save", target, TexGraphFile.Write(graph), out var replaced, out var writeError)) return Error(writeError!);
             store.Saved(target);
             return Line($"save: saved {Path.GetFileName(target)} to {target}{(replaced ? " (replaced)" : "")}: {Describe(graph)}");
         }
     }
+
+    /// <summary>
+    /// Each nested file the graph reads now that, from <paramref name="folderTo"/>, would be a different file holding another graph
+    /// (RV-77): its graph nodes would then be that file, and the saved graph not the one defined. A use that does not
+    /// resolve now (never saved, its file not in the tool folder) is not compared; one that resolves to an equal copy is the
+    /// same graph. Null when none changes.
+    /// </summary>
+    private string? Changed(TextureGraph graph, string folderTo)
+    {
+        var after = GraphValidator.Uses(graph with { Folder = folderTo }, registry).ToDictionary(u => u.Node, StringComparer.Ordinal);
+        var lines = new List<string>();
+        foreach (var now in GraphValidator.Uses(graph, registry).Where(u => u.Expanded))
+        {
+            if (!after.TryGetValue(now.Node, out var then)) continue;
+            if (then.Files.Count != now.Files.Count)
+            {
+                lines.Add($"graph node '{now.Node}' would read {string.Join(", ", then.Files)}, not {string.Join(", ", now.Files)}");
+                continue;
+            }
+            for (var i = 0; i < now.Files.Count; i++)
+                if (!string.Equals(now.Files[i], then.Files[i], StringComparison.OrdinalIgnoreCase) && !SameGraph(now.Files[i], then.Files[i]))
+                    lines.Add($"graph node '{now.Node}' would read {then.Files[i]}, which differs from {now.Files[i]}, the file it reads now");
+        }
+        return lines.Count == 0 ? null : string.Join("; ", lines);
+    }
+
+    /// <summary>Whether two nested files hold the same graph: as written, so line endings and spacing aside.</summary>
+    private static bool SameGraph(string a, string b) =>
+        TexGraphFile.ReadFile(a).Graph is { } x && TexGraphFile.ReadFile(b).Graph is { } y && TexGraphFile.Write(x) == TexGraphFile.Write(y);
 }
 
 public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder folder)

@@ -26,9 +26,11 @@ public static class GraphValidator
     public const int MaxDepth = 8;
 
     /// <summary>
-    /// How many nodes one validation may take in, the graph's own and every nested file's each time it is used, all levels
-    /// down (RV-76): a file using another many times at each level would otherwise expand exponentially and hang where a
-    /// fault is wanted. A graph node whose expansion would pass it is a fault on its <c>path</c>.
+    /// A cap on what nesting takes in (RV-76, RV-77): the graph's own nodes count toward it, but it is checked only as each
+    /// nested file is expanded or read for a drive's range, all levels down, so a graph of its own nodes alone is never
+    /// held to it. A file using another many times at each level would otherwise expand exponentially and hang where a
+    /// fault is wanted. A graph node whose expansion would pass it is a fault on its <c>path</c>; a drive whose read would,
+    /// a fault on its parameter.
     /// </summary>
     public const int MaxNodes = 4096;
 
@@ -59,10 +61,17 @@ public static class GraphValidator
 
     internal static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry) => Analyse(graph, registry, [], 0, new NodeBudget(graph.Nodes.Count));
 
-    /// <summary>The nodes taken in so far by one validation, all levels down, against <see cref="MaxNodes"/>.</summary>
-    private sealed class NodeBudget(int taken)
+    /// <summary>
+    /// The nodes taken in so far by one validation, all levels down, against <see cref="MaxNodes"/>: each nested file
+    /// expanded, and each nested file read for a drive's range (RV-77), so neither path can grow past it. A file read for
+    /// a drive is read once a validation for each chain of files above it (<see cref="NestedParameters"/>).
+    /// </summary>
+    internal sealed class NodeBudget(int taken)
     {
         public int Taken { get; set; } = taken;
+
+        /// <summary>The nested files read for drives, by the chain of files above and the file: what <see cref="NestedParameters"/> gave.</summary>
+        public Dictionary<string, NestedParameterSet?> Read { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     private static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth, NodeBudget budget)
@@ -70,7 +79,7 @@ public static class GraphValidator
         var a = new GraphAnalysis();
         var ids = string.Join(", ", graph.Nodes.Keys);
         // The exposed parameters first: what they drive takes their value, and its own value in the node is not checked.
-        var exposed = GraphParameters.Analyse(graph, registry, chain);
+        var exposed = GraphParameters.Analyse(graph, registry, chain, budget);
 
         // Each graph node expanded inline (T-140): the nodes analysed are the graph's own and, for each graph node, the
         // nested graph's nodes renamed <node>/<id>. A graph node is never one of them; a source naming it resolves to the
@@ -306,7 +315,7 @@ public static class GraphValidator
                 Fault(null, name, $"{where}: {fileName} has no such parameter; its parameters are {(nested.Parameters.Count == 0 ? "none" : string.Join(", ", nested.Parameters.Keys))}");
                 continue;
             }
-            var one = GraphParameters.WithOverrides(nested, new Dictionary<string, ParamValue> { [name] = value }, registry);
+            var one = GraphParameters.WithOverrides(nested, new Dictionary<string, ParamValue> { [name] = value }, registry, chain: [.. chain, full], budget: budget);
             if (one.Error is { } error)
             {
                 var head = GraphParameters.Where(name) + ": ";
@@ -316,7 +325,7 @@ public static class GraphValidator
         if (faults.Count > 0) return use;
         foreach (var ((driven, name), value) in exposed.Values)
             if (driven == id) overrides[name] = value;
-        var set = GraphParameters.WithOverrides(nested, overrides, registry).Graph!;
+        var set = GraphParameters.WithOverrides(nested, overrides, registry, chain: [.. chain, full], budget: budget).Graph!;
 
         if (budget.Taken + set.Nodes.Count > MaxNodes)
         {
@@ -327,7 +336,7 @@ public static class GraphValidator
         var inner = Analyse(set, registry, [.. chain, full], depth + 1, budget);
         use.Files.AddRange(inner.Files);
         a.Files.AddRange(inner.Files);
-        use.Parameters = GraphParameters.Of(set, registry);
+        use.Parameters = GraphParameters.Analyse(set, registry, [.. chain, full], budget).Exposed;
         foreach (var f in inner.Faults.Where(f => !f.OnItsOwn))
         {
             var path = f.Node is null ? id : $"{id}/{f.Node}";
@@ -347,6 +356,10 @@ public static class GraphValidator
             Fault(input.Name, null, $"node '{id}' input '{input.Name}': {fileName}'s input '{input.Name}' has no default, so a graph node using it must connect it, and it is not");
         if (faults.Count > 0) return use;
 
+        // An outer graph node with an id this expansion makes ("g/c" a graph node beside "g", RV-77) has no node of its own to
+        // stand in the nested node's place, so what named that node would name nothing: the use is left unexpanded, as a use
+        // at fault is, and the outer node's id fault is the one said.
+        if (inner.Flat().Any(n => graph.Nodes.TryGetValue($"{id}/{n.Id}", out var outer) && registry.Find(outer.Type) is NestedGraphNode)) return use;
         foreach (var (nestedId, flat) in inner.Flat())
         {
             var newId = $"{id}/{nestedId}";
@@ -400,21 +413,38 @@ public static class GraphValidator
     /// file's name, its parameters, and those not at fault with their ranges. Null when the file cannot be read, is in
     /// <paramref name="chain"/> or is too deep; the graph node's own faults say why.
     /// </summary>
-    internal static NestedParameterSet? NestedParameters(TextureGraph graph, GraphNode node, NodeRegistry registry, IReadOnlyList<string> chain)
+    internal static NestedParameterSet? NestedParameters(TextureGraph graph, GraphNode node, NodeRegistry registry, IReadOnlyList<string> chain, NodeBudget budget)
     {
         if (chain.Count >= MaxDepth || !node.Params.TryGetValue("path", out var pathValue) || ParamSpec.FilePath("path").Check(pathValue) is not null) return null;
-        if (ResolvePath(graph, pathValue.Text!) is not { } full || chain.Contains(full, StringComparer.OrdinalIgnoreCase) || !File.Exists(full)) return null;
-        string text;
-        try
+        if (ResolvePath(graph, pathValue.Text!) is not { } full || chain.Contains(full, StringComparer.OrdinalIgnoreCase)) return null;
+        // Read once a validation for each chain (RV-77): a file driven many times at each level would otherwise be read
+        // and analysed again for each drive, all levels down, which is exponential however few nodes it expands to.
+        var key = string.Join("|", chain.Append(full));
+        if (budget.Read.TryGetValue(key, out var known)) return known;
+        var set = Read(full);
+        if (set is { OverBudget: false }) budget.Read[key] = set;
+        else if (set is null) budget.Read[key] = null;
+        return set;
+
+        NestedParameterSet? Read(string full)
         {
-            text = File.ReadAllText(full);
+            if (!File.Exists(full)) return null;
+            string text;
+            try
+            {
+                text = File.ReadAllText(full);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+            if (TexGraphFile.Parse(text, null, Path.GetDirectoryName(full)).Graph is not { } nested) return null;
+            var name = Path.GetFileName(full);
+            var cost = Math.Max(1, nested.Nodes.Count);
+            if (budget.Taken + cost > MaxNodes) return new(name, [.. nested.Parameters.Keys], new Dictionary<string, ExposedParameter>(), OverBudget: true);
+            budget.Taken += cost;
+            return new(name, [.. nested.Parameters.Keys], GraphParameters.Analyse(nested, registry, [.. chain, full], budget).Exposed);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return null;
-        }
-        if (TexGraphFile.Parse(text, null, Path.GetDirectoryName(full)).Graph is not { } nested) return null;
-        return new(Path.GetFileName(full), [.. nested.Parameters.Keys], GraphParameters.Analyse(nested, registry, [.. chain, full]).Exposed);
     }
 
     private static string Missing(string full)
@@ -690,5 +720,6 @@ public sealed record NestedGraphInput(string Name, PortKind Kind, bool HasDefaul
 public sealed record NestedGraphUse(string Node, string? File, bool Expanded, IReadOnlyDictionary<string, ExposedParameter> Parameters,
     IReadOnlyList<NestedGraphInput> Inputs, IReadOnlyList<string> Outputs, IReadOnlyList<string> Files);
 
-/// <summary>A nested graph's parameters as an outer parameter driving its graph node reads them: see <see cref="GraphValidator.NestedParameters"/>.</summary>
-internal sealed record NestedParameterSet(string FileName, IReadOnlyList<string> Declared, IReadOnlyDictionary<string, ExposedParameter> Exposed);
+/// <summary>A nested graph's parameters as an outer parameter driving its graph node reads them: see <see cref="GraphValidator.NestedParameters"/>.
+/// <c>OverBudget</c>: reading it would take the nodes validated past <see cref="GraphValidator.MaxNodes"/>, so it was not analysed.</summary>
+internal sealed record NestedParameterSet(string FileName, IReadOnlyList<string> Declared, IReadOnlyDictionary<string, ExposedParameter> Exposed, bool OverBudget = false);
