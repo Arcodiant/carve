@@ -52,7 +52,7 @@ Reviewed on Claude Opus 5.5 (`claude-opus-5-5`), read only, in `D:\Repos\carve\b
   - The fault is on `path` and says "each time it is used", but the file is used once. The read for `q`'s range is what took the budget. The summary reworded for RV-77 calls it "a cap on what nesting takes in", and a driven file is taken in once.
   - Real graphs are far from the cap (9 to 33 nodes), so this costs nothing today. Either charge a drive's read only for files that are not also expanded, or say in the summary and the fault that a driven file counts twice.
 
-**Outcome:** —
+**Outcome:** skipped: filed off-milestone as T-182 by the person's ruling (2026-11-22), since real graphs use 9 to 33 nodes and it costs nothing today
 
 ## Summary
 
