@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "size": 256,
+  "seed": 7,
+  "parameters": {
+    "amount": { "value": 0.5, "drives": ["grimed.opacity"], "min": 0, "max": 1 }
+  },
+  "nodes": {
+    "dirt": { "type": "colour", "params": { "colour": "#2e2a24" } },
+    "grimed": { "type": "blend", "inputs": { "a": "in", "b": "dirt", "mask": "mask" }, "params": { "mode": "mix" } },
+    "height": { "type": "input", "params": { "default": 0.5, "kind": "grey", "name": "height" } },
+    "in": { "type": "input", "params": { "default": "#808080", "kind": "colour", "name": "in" } },
+    "low": { "type": "levels", "inputs": { "in": "height" }, "params": { "in_high": 0.9, "in_low": 0.2, "out_high": 0.45, "out_low": 1 } },
+    "mask": { "type": "blend", "inputs": { "a": "low", "b": "streaks" }, "params": { "mode": "multiply" } },
+    "out": { "type": "output", "inputs": { "in": "grimed" }, "params": { "role": "base_colour" } },
+    "streaks": { "type": "levels", "inputs": { "in": "streaks_raw" }, "params": { "in_high": 0.65, "in_low": 0.35 } },
+    "streaks_raw": { "type": "fbm", "params": { "cells": [24, 2], "gain": 0.55, "octaves": 5, "seed": 11 } }
+  }
+}

@@ -24,6 +24,8 @@ public class SwatchTests
         return patina;
     }
 
+    private static readonly IReadOnlyList<OutputRole> PlanksRoles = [OutputRole.BaseColour, OutputRole.Normal, OutputRole.Roughness, OutputRole.Occlusion];
+
     private static byte[] Texels(OutputRole role, int size)
     {
         var graph = TexGraphFile.Read(Planks, NodeRegistry.BuiltIn).Graph!;
@@ -46,7 +48,7 @@ public class SwatchTests
         await using var patina = await WithPlanksAsync(folder);
         var (png, caption) = await ImageAsync(patina, SwatchTool.Worked);
         Assert.Equal(SwatchTool.WorkedResult, caption);
-        Assert.Contains(SwatchTool.Worked + " returns an image and:\n" + SwatchTool.WorkedResult, SwatchTool.Text, StringComparison.Ordinal);
+        Assert.Contains(SwatchTool.Worked + " returns:\n" + SwatchTool.WorkedResult, SwatchTool.Text, StringComparison.Ordinal);
         var texels = Texels(OutputRole.BaseColour, 128);
         var expected = new byte[384 * 384 * 4];
         for (var y = 0; y < 384; y++)
@@ -88,13 +90,23 @@ public class SwatchTests
     [InlineData("""{"size":100}""", "swatch: size 100 is not a power of two from 32 to 2048")]
     [InlineData("""{"size":16}""", "swatch: size 16 is not a power of two from 32 to 2048")]
     [InlineData("""{"size":"big"}""", "swatch: size is a whole number, a power of two from 32 to 2048, not a string \"big\"")]
-    [InlineData("""{"view":"side"}""", "swatch: view is 'side'; give sheet, flat, tiled or sphere")]
+    [InlineData("""{"view":"side"}""", "swatch: view is 'side'; give sheet, flat, tiled, sphere or cube")]
     [InlineData("""{"output":"normal"}""", "swatch: output is for flat and tiled; the sheet shows every output")]
-    [InlineData("""{"view":"flat","angle":90}""", "swatch: angle turns the sphere, for sheet and sphere; flat has none")]
+    [InlineData("""{"view":"flat","angle":90}""", "swatch: angle turns the sphere or cube, for sheet, sphere and cube; flat has none")]
     [InlineData("""{"view":"sphere","angle":1e300}""", "swatch: angle 1e300 is out of range; angle is a number of degrees")]
-    [InlineData("""{"view":"flat","output":"emissive"}""", "swatch: output is 'emissive'; give base_colour, normal, roughness or occlusion")]
-    [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle")]
+    [InlineData("""{"view":"flat","output":"emissive"}""", "swatch: the graph has no emissive output; its outputs are base_colour, normal, roughness, occlusion")]
+    [InlineData("""{"view":"flat","output":"Edge!"}""", "swatch: output is 'Edge!'; give a role (base_colour, normal, roughness, metallic, occlusion, height) or a named output's name")]
+    [InlineData("""{"zoom":2}""", "swatch: unknown argument 'zoom'; swatch takes view, output, size, angle, tiling, parameters")]
+    [InlineData("""{"view":"flat","tiling":3}""", "swatch: tiling repeats the maps over the sphere or cube, for sheet, sphere and cube; flat has none")]
+    [InlineData("""{"view":"sphere","tiling":0}""", "swatch: tiling 0 is out of range; give a whole number from 1 to 8")]
+    [InlineData("""{"view":"sphere","tiling":9}""", "swatch: tiling 9 is out of range; give a whole number from 1 to 8")]
+    [InlineData("""{"view":"sphere","tiling":2.5}""", "swatch: tiling is a whole number from 1 to 8, not a number 2.5")]
+    [InlineData("""{"view":"sphere","tiling":"3"}""", "swatch: tiling is a whole number from 1 to 8, not a string \"3\"")]
+    [InlineData("""{"view":"cube","tiling":9}""", "swatch: tiling 9 is out of range; give a whole number from 1 to 8")]
+    [InlineData("""{"view":"cube","output":"normal"}""", "swatch: output is for flat and tiled; the cube shows every output")]
+    [InlineData("""{"view":"cube"}""", "swatch: " + PatinaHarness.NoEngine)]
     [InlineData("""{"view":"sphere"}""", "swatch: " + PatinaHarness.NoEngine)]
+    [InlineData("""{"view":"sphere","tiling":3}""", "swatch: " + PatinaHarness.NoEngine)]
     [InlineData("""{}""", "swatch: " + PatinaHarness.NoEngine)]
     public async Task Refusals_say_what_to_do(string arguments, string said)
     {
@@ -115,16 +127,42 @@ public class SwatchTests
     }
 
     [Fact]
+    public void The_sphere_cells_label_names_the_tiling_only_when_it_is_not_1()
+    {
+        Assert.Equal("sphere, Pbr, carve lights, angle 0", SwatchSheet.Labels("t", PlanksRoles, 0)[^1]);
+        Assert.Equal("sphere, Pbr, carve lights, angle 0", SwatchSheet.Labels("t", PlanksRoles, 0, 1)[^1]);
+        Assert.Equal("sphere, Pbr, carve lights, angle 90, tiling 3", SwatchSheet.Labels("t", PlanksRoles, 90, 3)[^1]);
+    }
+
+    [Fact]
+    public void The_cube_is_six_faces_each_with_uvs_0_to_1_and_outward_normals()
+    {
+        var mesh = SwatchCube.Mesh();
+        Assert.Equal(24, mesh.VertexCount);
+        Assert.Equal(36, mesh.IndexCount);
+        for (var f = 0; f < 6; f++)
+        {
+            var corners = mesh.Vertices.Skip(f * 4).Take(4).ToArray();
+            Assert.Equal([new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1), new Vector2(1, 1)], corners.Select(c => c.TexCoord));
+            // Each corner lies on the face's own plane, half an edge out along its normal.
+            Assert.All(corners, c => Assert.Equal(SwatchCube.Edge / 2, Vector3.Dot(c.Position, c.Normal), 4));
+            // Triangles wind with the engine's sphere: the cross product of the edges points into the cube.
+            var t = mesh.Indices!.Skip(f * 6).Take(3).Select(i => mesh.Vertices[(int)i].Position).ToArray();
+            Assert.True(Vector3.Dot(Vector3.Cross(t[1] - t[0], t[2] - t[0]), corners[0].Normal) < 0);
+        }
+    }
+
+    [Fact]
     public void The_sheet_lays_out_as_agreed_flat_over_tiled_with_labels_from_the_atlas()
     {
         var size = 64;
-        var images = OutputRoles.All.Select(r => Texels(r, size)).ToList();
+        var images = PlanksRoles.Select(r => Texels(r, size)).ToList();
         var sphere = new byte[512 * 512 * 4];
         Array.Fill(sphere, (byte)7);
         // An atlas whose rows are all text (coverage 1): every label box comes out white.
         var atlas = new byte[LabelAtlas.Size * LabelAtlas.Size * 4];
         Array.Fill(atlas, (byte)255);
-        var labels = SwatchSheet.Labels("planks.texgraph   64 px   seed 77", OutputRoles.All, 0);
+        var labels = SwatchSheet.Labels("planks.texgraph   64 px   seed 77", PlanksRoles, 0);
         Assert.Equal(["planks.texgraph   64 px   seed 77", "base_colour", "base_colour 3 x 3", "normal", "normal 3 x 3", "roughness", "roughness 3 x 3",
             "occlusion", "occlusion 3 x 3", "sphere, Pbr, carve lights, angle 0"], labels);
         var extents = labels.Select(_ => new Vector2(40, 12)).ToList();
@@ -146,5 +184,47 @@ public class SwatchTests
         Assert.Equal(sphere.AsSpan(0, 4).ToArray(), At(layout.SphereLeft + 300, 25 + 300));
         Assert.Equal([255, 255, 255, 255], At(5, 5));
         Assert.Equal(SwatchImages.Slate, At(1000, 10));
+    }
+
+    [Fact]
+    public void A_sheet_of_more_than_15_outputs_reads_its_labels_from_a_second_atlas_page()
+    {
+        // RV-76: 18 columns give 38 labels, past the 32 rows of a page; the pages stacked are the atlas, so row r is at r x 32.
+        Assert.Equal([1, 1, 2, 2, 3], new[] { 0, 32, 33, 64, 65 }.Select(LabelAtlas.Pages));
+        string[] outputs = ["base_colour", .. Enumerable.Range(0, 17).Select(i => "m" + (char)('a' + i))];
+        var labels = SwatchSheet.Labels("wide", outputs, 0);
+        Assert.Equal(38, labels.Count);
+        Assert.Equal(2, LabelAtlas.Pages(labels.Count));
+        var size = 32;
+        var images = outputs.Select(_ => Enumerable.Repeat((byte)32, size * size * 4).ToArray()).ToList();
+        var sphere = new byte[512 * 512 * 4];
+        // The first page is blank and the second all text, so only labels 32 to 37 come out white.
+        var atlas = new byte[LabelAtlas.Size * LabelAtlas.Size * 4 * 2];
+        Array.Fill(atlas, (byte)255, LabelAtlas.Size * LabelAtlas.Size * 4, LabelAtlas.Size * LabelAtlas.Size * 4);
+        var (pixels, layout) = SwatchSheet.Compose(images, size, sphere, atlas, [.. labels.Select(_ => new Vector2(40, 12))]);
+        byte At(int x, int y) => pixels[(y * layout.Width + x) * 4];
+        Assert.Equal(13, At(layout.ColumnLeft(15) + 3, 24 + 3)); // label 31, page one: the cell under the backing, 32 x 0.4
+        Assert.Equal(255, At(layout.ColumnLeft(15) + 3, 282 + 3)); // label 32, page two
+        Assert.Equal(255, At(layout.ColumnLeft(17) + 3, 282 + 3)); // label 36
+        Assert.Equal(255, At(layout.SphereLeft + 3, 25 + 3)); // label 37, the sphere's
+    }
+
+    [Fact]
+    public void The_tiling_is_described_with_worked_examples_the_scenario_draws()
+    {
+        // The sphere needs an engine, so the drawn example is the scenario's (literals there); the refusal runs in the harness.
+        Assert.Equal("""{"view":"sphere","tiling":3}""", SwatchTool.WorkedTiling);
+        Assert.Equal("""{"view":"cube","tiling":3}""", SwatchTool.WorkedCube);
+        Assert.Contains("swatch " + SwatchTool.WorkedCube + " returns:\n" + SwatchTool.WorkedCubeResult, SwatchTool.Text, StringComparison.Ordinal);
+        Assert.Contains("swatch " + SwatchTool.WorkedTiling + " returns:\n" + SwatchTool.WorkedTilingResult, SwatchTool.Text, StringComparison.Ordinal);
+        Assert.Contains("swatch " + SwatchTool.WorkedTilingRefused + " returns:\n" + SwatchTool.WorkedTilingRefusedResult, SwatchTool.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_worked_tiling_refusal_is_what_the_description_says()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+        await patina.Ok("define_graph", DefineGraphTool.Worked);
+        Assert.Equal(SwatchTool.WorkedTilingRefusedResult, await patina.Refused("swatch", SwatchTool.WorkedTilingRefused));
     }
 }

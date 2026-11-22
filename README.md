@@ -34,10 +34,21 @@ dotnet test tests/Carve.Core.Tests --filter "Tier!=regression"
 dotnet test tests/Carve.Server.Tests --filter "Tier!=regression"
 ```
 
-Those two suites need no GPU and are what CI runs. The regression tier and the
-scenarios under `scenarios/` render for real and need a Vulkan device;
-`tests.json` lists every suite and how to run it; `scripts/verify.ps1` builds,
-runs every test project and the cube scenario.
+Those two suites need no GPU and are what CI runs. `tests.json` lists every
+suite, its tier, its command and the files it reads, and `cairn test list` prints
+them with the device each needs and about how long it takes. By tier:
+
+- unit, no GPU: `core-unit` and `server-unit` (the two above), and `patina-unit`
+  (patina's graphs and its server).
+- regression, no GPU: `patina-regression`.
+- regression, on a Vulkan device: `server-regression`, `viewer-cube`, and the
+  scenarios under `scenarios/`, each a run through the real server:
+  `scenario-cube`, `-sky`, `-rig`, `-crate`, `-uvs`, `-shed`, `-export`,
+  `-character`, `-soft`, `-materials`, `-planks`, `-cuts`, `-parts`, `-morph`,
+  `-gatehouse`, `-orcward` and `-bakes` on carve, and `scenario-patina`,
+  `scenario-patina-library-1` and `scenario-patina-library-2` on patina.
+
+`scripts/verify.ps1` builds, runs every test project and the cube scenario.
 
 ## From an empty file to a game
 
@@ -90,7 +101,7 @@ Each of these edits the mesh in place and appends new ids at the end; each examp
 - `delete` removes faces or vertices; their ids stay as `null` (tombstones) in `get_mesh`: `{"faces":[3]}`.
 - `bridge` joins two open loops of vertices with a band of faces, which closes an opening left by `delete`; on `bridge`'s own example, two unit squares facing each other, this makes a box: `{"loops":[[0,1,2,3],[4,5,6,7]]}`.
 
-A window through a wall is `knife` on the front and the back, `delete` of both pieces, then `bridge` of the two loops.
+A window through a wall is `knife` on the front and the back, `delete` of both pieces, then `bridge` of the two loops. `samples/gatehouse.carve` is a wall built by cuts alone: a cornice, a gable, a door and a see-through window.
 
 ## Several meshes, colours and smooth surfaces
 
@@ -102,6 +113,16 @@ A model holds named meshes. `define_mesh` with a `name` adds a mesh, or replaces
 - `subdivide` rounds a mesh off by Catmull-Clark, 1 to 3 levels: `{"levels":1}`. Every id stays, new ones are appended, and hard edges stay sharp.
 
 `render` and `export` draw the same normals, so a smooth mesh looks the same in the game.
+
+## Parts and levels
+
+The meshes of a model are the parts of a part tree, which places them as the game will. A named mesh is a top-level part at the origin until it is placed. `samples/rover.carve` is one: a chassis with a cab, a mast carrying a lamp, and four wheels under two empty axle parts, three of them instances of `Wheel_FL`. The examples are on it (`open` it first).
+
+- `define_part` places a part, or makes one with no geometry of its own: an empty part (a pivot or a group, such as an axle) or an instance, which shows the geometry of the part it is `instance_of`. It takes `parent`, `translation`, `rotation` (a unit quaternion), `scale`, `envelope` and `moves`, and on a part that exists it changes only what is given. This turns the mast an eighth of a turn about +Y: `{"part":"Mast","rotation":[0,0.38268343,0,0.92387953]}`. Edits take `mesh` with a part's name and work in the part's own space, so placing a part never changes its ids.
+- `get_parts` reads the tree back: each part's placement, vertex and face counts, kept levels, bounds in its own space and in the model, and warnings. An `envelope` is the box a part and everything under it should stay inside; leaving it is a warning in `get_parts` and `check`, never a refusal.
+- `keep_level` keeps the parts' geometry as a numbered level, so a blockout (level 0) stays while the parts are refined: `{"level":1}`. Edits change only the live geometry. `get_mesh` with `level` reads a level back, and `render` with `level` draws each part at its newest kept level at or below it: `{"level":0}`.
+- `render` with `part` draws that part and the parts under it, each where it is placed: `{"part":"Mast"}`.
+- `export` keeps a glTF node only for a part marked `moves`: the static parts are merged into the root node, each moving part is a child node under its nearest moving ancestor, and moving instances share one glTF mesh. `export`'s description works through the rover.
 
 ## UVs
 
@@ -125,7 +146,21 @@ A material is a named PBR look shared by the whole model; any mesh's faces may u
 
 Texture paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
 
-`samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`.
+`samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`, and `samples/barrel-planks.carve` is the same barrel with its staves from patina's planks graph.
+
+## Baked maps
+
+`bake` writes PNG maps of one mesh, worked in its UV layout, for `define_material` to take as they come back. It changes nothing in the model (no undo step, nothing to save). The faces it bakes need UVs, and no two may share a texel.
+
+- `maps` picks from `masks` (a grey mask for each face group and each material), `base_colour`, `curvature` (convex and concave edges, for wear in a texture graph), `occlusion`, `orm` (occlusion, roughness and metallic in one RGB file, as glTF reads them) and `normal` (the hard edges rounded over `bevel.width` metres, with no extra geometry). The default is `masks` and `base_colour`.
+- `surface` gives a colour, roughness and metallic per group or material, a later entry winning a face two of them name. `occlusion` needs `occlusion.reach` in metres; `curvature` and `normal` need a `width` in their `curvature` and `bevel` blocks.
+- `size` is a power of two from 64 to 4096 (default 1024) and `folder` defaults to `textures`, relative to carve's working folder. A bake always overwrites; the result gives each file's path in the form `define_material` takes, with its coverage and its range of values.
+
+On `samples/wrench.carve` (`open` it first), the bake in `bake`'s own description, then a material from it:
+
+1. `bake`: `{"mesh":"wrench","folder":"textures","size":512,"maps":["masks","base_colour","orm"],"surface":{"all":{"base_colour":"#80858A","roughness":0.4,"metallic":1},"rubber":{"base_colour":"#282A2E","roughness":0.88,"metallic":0},"red":{"base_colour":"#B02A22"}},"occlusion":{"rays":32,"reach":0.035}}`. It writes `textures/wrench.base_colour.png`, `textures/wrench.orm.png` and a mask for each group.
+2. `define_material`: `{"name":"wrench","base_colour_texture":"textures/wrench.base_colour.png","metallic_roughness_texture":"textures/wrench.orm.png","occlusion_texture":"textures/wrench.orm.png"}`, the one ORM file in both slots.
+3. `set_material`: `{"material":"wrench","group":"all"}`, the wrench's group of every face.
 
 ## Characters
 
@@ -158,12 +193,23 @@ A character is a model with a skeleton, bone weights and clips. `export` then wr
 
 `export` also warns when a model passes a game's limits on triangles, submeshes or height, read from the first `carve-limits.json` found in the `.glb`'s folder or a folder above it (or the one `limits` names). `write_limits: true` creates the file with starting numbers to edit. `samples/gardener.carve` is a rigged, animated character, and `samples/gardener-soft.carve` is the same character subdivided and smoothed.
 
+## Morph targets
+
+A morph target is a mesh in another shape, the same vertices moved, that a game blends in by a weight from 0 to 1. One target name is one dial across the model, so meshes that move together use the same name.
+
+- `define_target` makes one from absolute `positions`, or from a `.carve` `file` holding the same mesh edited (the same vertices and faces, moved). On `define_mesh`'s unit cube this raises the top and spreads it: `{"name":"Bulge","positions":{"2":[1.1,1.3,-0.1],"3":[-0.1,1.3,-0.1],"6":[1.1,1.3,1.1],"7":[-0.1,1.3,1.1]}}`. A name the mesh already has replaces that target.
+- `get_mesh` lists a mesh's targets, and with `target` reads one back. `delete_target` removes one: `{"name":"Bulge"}`.
+- `render` with `targets` draws the model at those weights, `{"targets":{"Bulge":1}}`, before any `pose` or `clip` skins it. `render_glb` takes the same `targets` for an exported file.
+- `export` writes each target as a glTF morph target, and its result names them in glTF target order.
+
+`samples/arm.carve` is a rigged arm with `Bulk` and `Lean` targets and a `Curl` clip; `samples/arm-lean.carve` is the arm's cage in the `Lean` shape, before subdividing, which is the file `Lean` was made from with `file` (the arm in `arm.carve` has since been subdivided, so the two no longer match).
+
 ## patina: texture graphs
 
 `patina` is a second MCP server, beside carve, for texture graphs (D-7): an agent
-defines a graph of nodes (`noise`, `gradient`, `levels`, `blend`,
-`height_to_normal`, `colour`, `output`), edits it, reads it back, and saves it
-as a `.texgraph` file. Add it to the same `.mcp.json`, next to carve's entry:
+defines a graph of nodes, edits it, reads it back, looks at it, measures it, and
+saves it as a `.texgraph` file whose PNGs a carve material wears. Add it to the
+same `.mcp.json`, next to carve's entry:
 
 ```json
 {
@@ -180,29 +226,127 @@ as a `.texgraph` file. Add it to the same `.mcp.json`, next to carve's entry:
 }
 ```
 
-Its tools: `define_graph` (the whole graph, as a `.texgraph` body), `edit_graph`
-(a list of operations, all or nothing: `set_node`, `remove_node`, `connect`,
-`disconnect`, `set_params`, `set`), `get_graph`, `save`, `open`, and
-`push_snapshot` / `pop_snapshot` to try a change and go back. Every fault names
-its node and its port or parameter. A graph with faults can be opened and fixed
-with `edit_graph`, but not saved. `samples/graphs/planks.texgraph` is a whole
-material to open.
+Its tools: `define_graph` (the whole graph, as a `.texgraph` body), `nodes` (the
+node catalogue), `edit_graph` (a list of operations, all or nothing: `set_node`,
+`remove_node`, `connect`, `disconnect`, `set_params`, `set`, and
+`set_parameter`, `set_parameters`, `remove_parameter` for exposed parameters),
+`get_graph`, `save`, `open`, `push_snapshot` / `pop_snapshot` to try a change
+and go back, `swatch`, `export` and `check`. Every fault names its node and its
+port or parameter. A graph with faults can be opened and fixed with
+`edit_graph`, but not saved, swatched, exported or checked. Each tool's
+description says what it takes and returns, with worked examples; this section
+is the overview.
 
-`export` writes the open graph's outputs as `<folder>/<role>.png` at a size you
-name, a power of two from 32 to 8192 (default the graph's own), ready for a
-carve material's texture slots: `base_colour.png` for `base_colour_texture`,
-`normal.png` for `normal_texture`, `roughness.png` (a glTF metallic-roughness
-image) for `metallic_roughness_texture`, `occlusion.png` for `occlusion_texture`.
-At 8192 it works in bounded memory but takes minutes for four outputs.
+### Nodes
 
-`swatch` shows the open graph: by default a sheet with a column per output (flat
-over tiled 3 x 3, to show seams) beside a sphere wearing all of them through the
-engine's PBR material lit as Carve's `render` lights a model (its ambient light,
-fixed sky and the directional light that keeps its place beside the camera, so a
-smooth material shows a highlight); or `view` `flat`, `tiled` or
-`sphere` alone, at a `size` from 32 to 2048, the sphere turned by `angle`.
-patina needs a Vulkan device to draw the sphere and the sheet; flat and tiled
-need none.
+`nodes {}` lists every node type with its inputs, outputs, parameters (kind,
+range, default) and a worked example; `nodes {"type":"tiles"}` gives one.
+
+- Sources: `noise` (value noise), `worley` (cells), `fbm` (layered noise),
+  `gradient`, `colour`, and the patterns `tiles` (tiles and bricks, with gaps,
+  bevel and jitter), `stripes` and `shape` (a circle, square, ring, diamond or
+  polygon in each cell of a grid).
+- Filters: `levels`, `blend`, `warp` (domain warp), `blur`, `gradient_map`,
+  `transform` (offset, tile, mirror, free rotation and scale), `distance` (from
+  a mask's edge) and `height_to_normal`.
+- Structure: `output` (one per role), `input` (an image input of a graph used
+  as a node) and `graph` (another `.texgraph` used as one node).
+
+### Outputs and export
+
+An `output` node has a role: `base_colour`, `normal`, `roughness`, `metallic`,
+`occlusion`, `height`, or a name of its own (a mask, written as `<name>.png`).
+`export` writes them as `<folder>/<role>.png` at a size you name, a power of two
+from 32 to 8192 (default the graph's own), ready for a carve material's texture
+slots: `base_colour.png` for `base_colour_texture`, `normal.png` for
+`normal_texture`, `roughness.png` for `metallic_roughness_texture`,
+`occlusion.png` for `occlusion_texture`. `roughness.png` is a glTF
+metallic-roughness image: roughness in green, the graph's `metallic` in blue (0
+when it has none), so metallic has no file of its own. `height` and named
+outputs are grey (or sRGB, for a colour named output) and have no slot.
+
+### Exposed parameters and graphs as nodes
+
+A graph may declare `parameters`, each driving one or more node parameters
+(`"layout.gap"`) and taking the narrowest range of what it drives; `get_graph`
+lists them, and `edit_graph`'s `set_parameters` changes them. `swatch`, `export`
+and `check` take `parameters` for that call only, so one graph gives variants
+without being changed.
+
+A `graph` node uses another `.texgraph` by `path`, relative to the file of the
+graph that uses it (a graph never saved: patina's working directory). Its other
+parameters are the nested graph's exposed parameters by name; its inputs are
+the nested graph's `input` nodes, so a reusable graph can be a filter; its
+outputs are the nested graph's outputs (`wall.base_colour`). Graphs that use
+these are format version 2; every other file is written as version 1.
+
+### Looking: swatch
+
+`swatch` shows the open graph as an image, at a `size` from 32 to 2048, with a
+`view`:
+
+- `sheet` (the default): a column per output, flat over tiled 3 x 3 to show
+  seams, beside a sphere wearing the material;
+- `flat` or `tiled`: one `output` alone;
+- `sphere` or `cube`: the material on a lit sphere, or on a cube showing three
+  faces and their edges, turned by `angle`.
+
+`tiling` (1 to 8) repeats the maps on the sphere and cube, to judge a material
+at a texel density nearer a game's. The sphere and cube are drawn with the
+engine's PBR material, lit as carve's `render` lights a model, so patina needs a
+Vulkan device for `sheet`, `sphere` and `cube`; `flat` and `tiled` need none.
+
+### Measuring: check
+
+`check` measures outputs as numbers rather than by eye, and lists each problem
+with its share of texels, the worst texel and the fix in words. It reports and
+never refuses a graph that evaluates. It looks at the open graph (at its size,
+at most 2048, with `parameters` if given), or at PNG files given as `files`,
+each `{path, role}`; role `metallic_roughness` is a packed `roughness.png` as
+export writes it. The rules:
+
+- `base-colour-range`: base colour too dark or too bright for game lighting
+  (outside 20 to 245 sRGB, or under 120 for metal), in over 1% of texels.
+- `metallic-not-binary`: metallic between 0.1 and 0.9 in over 5% of texels.
+- `normal-not-unit`: normals not of unit length.
+- `one-value`: a greyscale output of one value, a mask that masks nothing.
+- `does-not-tile`: a seam where the texture wraps.
+
+### Samples
+
+`samples/graphs/` holds a graph per material, each with its exported PNGs and
+its swatch sheet in a folder of its name: `planks`, `cobblestones`, `bricks`
+(with mortar, tint and jitter exposed; `bricks/variants/grey/` is its grey stone
+variant), `fabric`, `painted-metal`, `floor-tiles`, `grime` (a filter graph with
+an `input`) and `old-wall` (the bricks and the grime used as `graph` nodes).
+`samples/graphs/faults/` holds two graphs that `check` finds faults in.
+
+### A worked example
+
+With patina started in the carve checkout (paths are relative to patina's
+working directory, or absolute), grey stone bricks from the bricks sample:
+
+1. `open` `{"path":"samples/graphs/bricks.texgraph"}`, then `get_graph` `{}`
+   lists its parameters `jitter`, `mortar` and `tint`.
+2. `swatch` `{"parameters":{"mortar":0.08,"tint":"#7a7a70"}}` shows the grey
+   variant's sheet.
+3. `check` `{"size":64,"parameters":{"mortar":0.08,"tint":"#7a7a70"}}` returns
+   `"ok":true` and each output's statistics.
+4. `export` `{"folder":"textures/bricks_grey","parameters":{"mortar":0.08,"tint":"#7a7a70"}}`
+   writes `base_colour.png`, `normal.png`, `roughness.png` and `occlusion.png`,
+   equal to those in `samples/graphs/bricks/variants/grey/`.
+5. In carve, started in the same folder, with UVs on the faces (above):
+   `define_material`
+   `{"name":"bricks","base_colour_texture":"textures/bricks_grey/base_colour.png","normal_texture":"textures/bricks_grey/normal.png","metallic_roughness_texture":"textures/bricks_grey/roughness.png","occlusion_texture":"textures/bricks_grey/occlusion.png"}`,
+   then `set_material` puts the bricks on them.
+
+### What is slow or bounded
+
+`export` at 8192 evaluates in tiles, one output at a time, so the process stays
+under 2 GB, but it takes minutes, not seconds: a client with a short call
+timeout should ask for one or two outputs at a time. `blur` and `distance` are
+the slowest nodes at 8192 (about 2 minutes and about 20 s); the 10 s target for
+each is T-159's, not yet met. `swatch` and `check` stop at 2048.
 
 ## License
 

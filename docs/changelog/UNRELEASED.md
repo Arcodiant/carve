@@ -1,2 +1,30 @@
 # Unreleased
 
+- T-133: Patina.Graphs evaluates in square tiles, each node naming the input rectangle it needs, under a capped tile cache, with every existing output byte-identical
+- T-136: tiles (bricks with gaps and jitter), stripes and shape nodes, and the bricks and fabric sample graphs with their PNGs
+- T-135: worley, fbm and warp nodes, and samples/graphs/cobblestones.texgraph with its PNGs
+- T-134: Texture graphs gain metallic (packed into the glTF metallic-roughness image), height and named outputs, list parameters and format version 2's machinery, with export and the swatch sheet showing them
+- T-153: A node can ask for an input's rectangle after reading another input, so warp at a large amount reads the few tiles its offsets reach rather than a box widened by the whole amount
+- T-137: blur and gradient_map nodes, and samples/graphs/painted-metal.texgraph with its PNGs
+- T-139: A graph declares named parameters that drive its node parameters, and swatch and export take overrides, so one graph gives variants; the bricks sample exposes mortar, tint and jitter
+- T-156: swatch takes a sphere tiling (whole repeats, default 1), so a material can be judged on the sphere at a texel density nearer a game's; the samples' committed sheets use 3
+- T-140: A graph node uses another .texgraph by path, its exposed parameters set by name and its input nodes as ports; grime and old-wall sample graphs
+- T-138: transform (offset, tile, mirror, rotation, scale) and distance-from-an-edge nodes on the tiled evaluator, and samples/graphs/floor-tiles.texgraph with its PNGs
+- T-157: swatch gains a cube view, with the same tiling option as the sphere, so a material can be judged on flat faces and edges as well as a curve
+- T-141: patina's check lists texture faults in the open graph's outputs or in PNG files: seams, base colour out of range, metallic not near 0 or 1, normals not of unit length, and an output of one value
+- T-155: A wide neighbourhood node runs as a cached row pass and a column pass, so blur at 8192 takes about 2 minutes, not an hour, and distance 18 s, not 474, within the memory cap (the 10 s target moved to T-159), and a free rotation stops recomputing its source
+- T-142: scenario-patina's library stage opens, swatches, checks and exports every sample material and variant, with every pixel worked from its texels, and commits each sample's swatch sheet
+- T-143: Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
+- T-171: edit_graph's set_params and set_node take list parameters (Floats, Colours) as define_graph does, so gradient_map's stops can be edited in place
+- T-170: patina's tool descriptions reach an agent whole, with the node catalogue no longer crammed into define_graph's, so a fresh agent learns the node types by reading rather than by sending wrong graphs
+- T-172: scenario-patina runs well inside run-scenario's 300 s guard again: the library stage is split into two halves, suites `scenario-patina-library-1` and `scenario-patina-library-2`, beside `scenario-patina` for the other stages, with no check and no approved frame lost
+- T-177: Every finding of RV-76's `## Findings: the scenarios and test configuration` and `## Findings: the whole diff` is answered
+- T-174: Every finding of RV-76's `## Findings: the nodes, check rules and samples`, and the check-tool findings of the server's, is answered
+- T-176: The patina server's RV-76 findings on save, the swatch sheet, export and override wording are answered, fixed where they are defects
+- T-173: Every finding of RV-76's `## Findings: the evaluation engine` is answered, fixed where it is a defect, with outputs byte-identical
+- T-175: Every finding of RV-76's `## Findings: the file format and graph model` is answered, fixed where it is a defect
+- T-178: Every finding of RV-77's `## Findings: round 2, the engine, nodes and checks` is answered
+- T-179: Every finding of RV-77's `## Findings: round 2, the format, server and scenarios` is answered
+- T-180: The README's patina section describes M-28's node library, and CLAUDE.md makes keeping the README current part of every change, so a reader of the README sees what the product does now
+- T-181: The README's carve sections and its Build and test list describe what carve's server offers now, so the README is current on both servers when M-28 lands
+- T-183: Any outer node whose id collides with an id a nested graph's expansion makes is a fault on that node, whatever its type, and validation never throws on it

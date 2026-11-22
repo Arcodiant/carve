@@ -10,7 +10,14 @@ namespace Patina.Server;
 /// What swatch asks of the frame thread: the outputs to dress the sphere in (RGBA, <paramref name="Size"/> a side, by
 /// role), its turn about y, and the labels to draw into the atlas (null for the sphere view alone).
 /// </summary>
-public sealed record SwatchSpec(IReadOnlyDictionary<OutputRole, byte[]> Images, int Size, float Angle, IReadOnlyList<string>? Labels);
+/// <summary>
+/// What the sphere wears and the sheet labels: <paramref name="Images"/> by role (base colour, normal, roughness as the
+/// packed metallic-roughness image, occlusion; a missing role takes the material's default), and <paramref name="Metallic"/>
+/// when the roughness image carries the graph's metallic in B (the material's metallic factor is then 1, else 0), and
+/// <paramref name="Tiling"/>, the whole repeats of every map in u and v over the sphere (T-156; 1 draws the sphere as it always was),
+/// and <paramref name="Cube"/>, which draws the cube (T-157) in the sphere's place, turned by <see cref="SwatchCube.Orientation"/>.
+/// </summary>
+public sealed record SwatchSpec(IReadOnlyDictionary<OutputRole, byte[]> Images, int Size, float Angle, IReadOnlyList<string>? Labels, bool Metallic = false, int Tiling = 1, bool Cube = false);
 
 /// <summary>The sphere view and, when labels were asked, the label atlas and each label's measured extent; RGBA, sRGB.</summary>
 public sealed record SwatchFrame(byte[] Sphere, byte[]? Atlas, IReadOnlyList<Vector2>? Extents);
@@ -39,7 +46,7 @@ public static class SwatchCamera
     public static Quaternion Light => RenderLights.Orientation(Eye);
 }
 
-/// <summary>patina's offscreen pipeline: the sphere's 512 target and the 512 label atlas, both on Carve's slate.</summary>
+/// <summary>patina's offscreen pipeline: the sphere's 512 target and the 1024 label atlas page, both on Carve's slate.</summary>
 internal sealed class SwatchComposition(IGraphicsResourceManager resources) : IRenderPipelineConfigurator
 {
     public const string SphereTag = "swatch-sphere";
@@ -83,6 +90,7 @@ internal sealed class SwatchSystem(
     private const string Scene = "patina";
 
     private Entity? _sphere;
+    private Entity? _cube;
     private bool _composed;
     private Texture[] _textures = [];
     private IAssetHolder? _holder;
@@ -134,6 +142,19 @@ internal sealed class SwatchSystem(
         });
         entities.AddComponent(sphere, new Transform3D { Position = Vector3.Zero, Orientation = Quaternion.Identity, Scale = Vector3.One });
         _sphere = sphere;
+
+        // The cube (T-157) waits beside the sphere on no layer; a cube request shows it and hides the sphere.
+        var cube = scenes.CreateEntity(Scene);
+        entities.AddComponent(cube, new MeshInstance
+        {
+            Mesh = resources.CreateMesh(SwatchCube.Mesh()),
+            Material = Material.Pbr(Vector4.One, 0, 1, null!, null!, null!, null!, null!, Vector3.Zero, 1, false),
+            Mode = RenderMode.Mode3D,
+            RenderLayerMask = RenderLayerMask.None,
+            CastsShadow = false,
+        });
+        entities.AddComponent(cube, new Transform3D { Position = Vector3.Zero, Orientation = Quaternion.Identity, Scale = Vector3.One });
+        _cube = cube;
     }
 
     private void Serve(SwatchRequest request)
@@ -142,14 +163,14 @@ internal sealed class SwatchSystem(
         {
             var spec = request.Spec;
             Dress(spec);
-            var instance = _sphere!.Value;
+            var instance = (spec.Cube ? _cube : _sphere)!.Value;
             // The world matrix is written too: the transform system has run this tick already, and the frame drawn below
             // would otherwise show the last request's turn.
-            var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, spec.Angle * MathF.PI / 180);
+            var turn = spec.Cube ? SwatchCube.Orientation(spec.Angle) : Quaternion.CreateFromAxisAngle(Vector3.UnitY, spec.Angle * MathF.PI / 180);
             entities.GetComponent<Transform3D>(instance).Orientation = turn;
             entities.GetOrAddComponent<WorldTransform>(instance) = new WorldTransform { Matrix = Matrix4x4.CreateFromQuaternion(turn) };
 
-            Task<RenderTargetPixels>? atlas = null;
+            List<Task<RenderTargetPixels>>? atlas = null;
             List<Vector2>? extents = null;
             if (spec.Labels is { } labels)
             {
@@ -161,36 +182,58 @@ internal sealed class SwatchSystem(
                 }
                 var surface = surfaces.Get(SwatchComposition.AtlasTag);
                 extents = [];
-                for (var row = 0; row < labels.Count && row < LabelAtlas.Rows; row++)
+                // The atlas grows a page of LabelAtlas.Rows rows at a time (RV-76): the first page is drawn in the sphere's
+                // frame, as it always was, and each further page in a frame of its own, read back after it.
+                void Page(int page)
                 {
-                    extents.Add(surface.Text.MeasureText(labels[row], 1));
-                    surface.Text.DrawText(labels[row], new Vector2(LabelAtlas.Inset, row * LabelAtlas.Pitch + LabelAtlas.Inset), Vector4.One);
+                    for (var row = page * LabelAtlas.Rows; row < labels.Count && row < (page + 1) * LabelAtlas.Rows; row++)
+                    {
+                        extents.Add(surface.Text.MeasureText(labels[row], 1));
+                        surface.Text.DrawText(labels[row], new Vector2(LabelAtlas.Inset, (row - page * LabelAtlas.Rows) * LabelAtlas.Pitch + LabelAtlas.Inset), Vector4.One);
+                    }
                 }
-                atlas = readback.ReadAsync(composition.Atlas.Resolved);
+                Page(0);
+                atlas = [readback.ReadAsync(composition.Atlas.Resolved)];
+                var sphereFirst = OffscreenFrame.ReadAsync(renderer, readback, composition.Sphere.Resolved);
+                _composed = true;
+                for (var page = 1; page < LabelAtlas.Pages(labels.Count); page++)
+                {
+                    Page(page);
+                    atlas.Add(OffscreenFrame.ReadAsync(renderer, readback, composition.Atlas.Resolved));
+                }
+                Finish(request, sphereFirst, atlas, extents);
+                return;
             }
 
             var sphere = OffscreenFrame.ReadAsync(renderer, readback, composition.Sphere.Resolved);
             _composed = true;
-            Task all = atlas is null ? sphere : Task.WhenAll(sphere, atlas);
-            _ = all.ContinueWith(
-                task =>
-                {
-                    if (task.IsCompletedSuccessfully)
-                    {
-                        request.Complete(new SwatchFrame(sphere.Result.ToDecodedImage().Pixels, atlas?.Result.ToDecodedImage().Pixels, extents));
-                    }
-                    else
-                    {
-                        request.Fail(task.Exception?.GetBaseException() ?? new TaskCanceledException());
-                    }
-                },
-                TaskScheduler.Default);
+            Finish(request, sphere, null, null);
         }
         catch (Exception e)
         {
             log.LogError(e, "swatch: the sphere render failed");
             request.Fail(e);
         }
+    }
+
+    /// <summary>Answers the request once the sphere and every atlas page are read: the pages stacked top to bottom are the atlas.</summary>
+    private static void Finish(SwatchRequest request, Task<RenderTargetPixels> sphere, List<Task<RenderTargetPixels>>? atlas, List<Vector2>? extents)
+    {
+        Task all = atlas is null ? sphere : Task.WhenAll([sphere, .. atlas]);
+        _ = all.ContinueWith(
+            task =>
+            {
+                if (task.IsCompletedSuccessfully)
+                {
+                    request.Complete(new SwatchFrame(sphere.Result.ToDecodedImage().Pixels,
+                        atlas is null ? null : [.. atlas.SelectMany(page => page.Result.ToDecodedImage().Pixels)], extents));
+                }
+                else
+                {
+                    request.Fail(task.Exception?.GetBaseException() ?? new TaskCanceledException());
+                }
+            },
+            TaskScheduler.Default);
     }
 
     /// <summary>
@@ -213,14 +256,20 @@ internal sealed class SwatchSystem(
             return texture;
         }
 
-        var material = Material.Pbr(Vector4.One, 0, 1,
+        var material = Material.Pbr(Vector4.One, spec.Metallic ? 1 : 0, 1,
             Upload(OutputRole.BaseColour, true)!, Upload(OutputRole.Roughness, false)!, Upload(OutputRole.Normal, false)!,
             null!, Upload(OutputRole.Occlusion, false)!, Vector3.Zero, 1, false);
         _textures = [.. made];
         _holder = residency.CreateHolder("patina swatch sphere");
         _holder.Hold(material);
-        ref var instance = ref entities.GetComponent<MeshInstance>(_sphere!.Value);
-        instance.Material = material;
-        instance.RenderLayerMask = RenderLayerMask.All;
+        // Tiling n repeats every map n times in u and v: the instance's atlas rect widened to n x n, the sampler repeating. At 1 it is the whole texture.
+        // The shape asked for is drawn and the other is hidden, both wearing this material.
+        foreach (var (entity, shown) in new[] { (_sphere!.Value, !spec.Cube), (_cube!.Value, spec.Cube) })
+        {
+            ref var instance = ref entities.GetComponent<MeshInstance>(entity);
+            instance.Material = material;
+            instance.AtlasRect = new UvRect(0, 0, spec.Tiling, spec.Tiling);
+            instance.RenderLayerMask = shown ? RenderLayerMask.All : RenderLayerMask.None;
+        }
     }
 }

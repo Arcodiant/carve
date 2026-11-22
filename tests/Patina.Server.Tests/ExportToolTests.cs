@@ -157,10 +157,11 @@ public class ExportToolTests
 
         await patina.Ok("define_graph", """{"graph":{"version":1,"size":64,"seed":0,"nodes":{"c":{"type":"colour"},"out":{"type":"output","inputs":{"in":"c"}}}}}""");
         Assert.Equal("export: the graph has no normal output; it has base_colour", await patina.Refused("export", """{"folder":"t","outputs":["normal"]}"""));
-        Assert.Equal("export: outputs holds \"shiny\", which is not a role; the roles are base_colour, normal, roughness, occlusion", await patina.Refused("export", """{"folder":"t","outputs":["shiny"]}"""));
+        Assert.Equal("export: the graph has no shiny output; it has base_colour", await patina.Refused("export", """{"folder":"t","outputs":["shiny"]}"""));
+        Assert.Equal("export: outputs holds \"Shiny!\", which is not a role or a name; the roles are base_colour, normal, roughness, metallic, occlusion, height, and a named output is given by its name", await patina.Refused("export", """{"folder":"t","outputs":["Shiny!"]}"""));
         Assert.StartsWith("export: outputs is empty;", await patina.Refused("export", """{"folder":"t","outputs":[]}"""));
         Assert.StartsWith("export: folder is missing;", await patina.Refused("export", "{}"));
-        Assert.Equal("export: unknown argument 'path'; export takes folder, size, outputs", await patina.Refused("export", """{"folder":"t","path":"x"}"""));
+        Assert.Equal("export: unknown argument 'path'; export takes folder, size, outputs, parameters", await patina.Refused("export", """{"folder":"t","path":"x"}"""));
         Assert.False(Directory.Exists(Path.Combine(folder.Path, "t")));
 
         var faulty = await patina.Ok("define_graph", """{"graph":{"version":1,"size":64,"seed":0,"nodes":{"c":{"type":"colour"},"out":{"type":"output","inputs":{"in":"cc"}}}}}""");

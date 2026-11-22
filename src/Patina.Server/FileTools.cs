@@ -17,7 +17,13 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
     public const string Text =
         "Reads back the open graph: a line with its nodes, size, seed, path (the file save last wrote or open read, or no path) and faults, one a line, each naming its node and port or parameter; "
         + "then the graph exactly as save would write it, a .texgraph file: version, size, seed, then one node a line in id order, inputs and params in name order, the parameters the graph gives "
-        + "(a default it leaves out is not written). Give that JSON back to define_graph as graph to start again from it. Takes nothing, and changes nothing.\n"
+        + "(a default it leaves out is not written). Give that JSON back to define_graph as graph to start again from it. Takes nothing, and changes nothing. "
+        + "A graph with exposed parameters (version 2, set with edit_graph's set_parameter) lists them between the two, a line each: its name, kind, value, range (the narrowest of the node parameters it drives) and what it drives; "
+        + "and in the file each driven node parameter shows {\"driven_by\": \"<name>\"} where its own value would be, which save leaves out and define_graph reads back. "
+        + "A graph using others as graph nodes (T-140) lists each after those, a line each: the file its path resolved to (against the graph's own file's folder, or the tool folder for a graph never saved, which the head line says), "
+        + "the nested graph's parameters with the values set on the node and their ranges, its inputs (name and kind, and whether it has a default) and its outputs as the node's ports (wall.base_colour). "
+        + "For samples/graphs/bricks.texgraph the lines are:\n" + WorkedBricksParameters + "\n"
+        + "and its layout node reads \"gap\": { \"driven_by\": \"mortar\" }.\n"
         + "Worked example, after define_graph's worked example, get_graph {} returns:\n"
         + WorkedHead + "\n"
         + "{\n  \"version\": 1,\n  \"size\": 256,\n  \"seed\": 0,\n  \"nodes\": {\n"
@@ -29,6 +35,49 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
 
     public static McpServerTool Create() => Create<GetGraphTool>("get_graph", Text, new JsonObject());
 
+    /// <summary>What get_graph lists for the bricks' parameters (samples/graphs/bricks.texgraph) after its head line, before the file.</summary>
+    public const string WorkedBricksParameters =
+        "parameters (3):\n"
+        + "- jitter: a number, 0.25, from 0 to 1; drives layout.jitter\n"
+        + "- mortar: a number, 0.1, from 0 to 0.45; drives layout.gap\n"
+        + "- tint: a colour, \"#a8452f\", any colour \"#rrggbb\"; drives clay.colour";
+
+    /// <summary>A line for each exposed parameter, its kind, value, range and drives, under a count line; nothing for a graph without. A parameter at fault says so.</summary>
+    public static string ParameterLines(TextureGraph graph, NodeRegistry registry)
+    {
+        if (graph.Parameters.Count == 0) return "";
+        var exposed = GraphParameters.Of(graph, registry);
+        var lines = graph.Parameters.Select(p => exposed.TryGetValue(p.Key, out var e)
+            ? $"- {p.Key}: {e.KindText}, {e.Value}, {Range(e)}; drives {string.Join(", ", e.Drives)}"
+            : $"- {p.Key}: at fault (see the faults), {p.Value.Value}; drives {(p.Value.Drives.Length == 0 ? "nothing" : string.Join(", ", p.Value.Drives))}");
+        return $"parameters ({graph.Parameters.Count.ToString(CultureInfo.InvariantCulture)}):\n" + string.Join("\n", lines) + "\n";
+    }
+
+    /// <summary>A line for each graph node (T-140): its resolved file, the nested graph's parameters, inputs and outputs; nothing for a graph without.</summary>
+    public static string UseLines(TextureGraph graph, NodeRegistry registry, bool neverSaved)
+    {
+        var uses = GraphValidator.Uses(graph, registry);
+        if (uses.Count == 0) return "";
+        var against = neverSaved ? $"the tool folder {graph.Folder} (the graph has never been saved)" : $"the graph's own folder {graph.Folder}";
+        var lines = uses.Select(u =>
+        {
+            var head = $"- {u.Node}: {u.File ?? "no file (see the faults)"}";
+            if (!u.Expanded) return head + "; at fault (see the faults)";
+            var parameters = u.Parameters.Count == 0 ? "none" : string.Join("; ", u.Parameters.Values.Select(e => $"{e.Name} {e.KindText}, {e.Value}, {Range(e)}"));
+            var inputs = u.Inputs.Count == 0 ? "none" : string.Join(", ", u.Inputs.Select(i => $"{i.Name} ({Patina.Graphs.Imaging.PortKinds.Name(i.Kind)}{(i.HasDefault ? ", has a default" : ", must be connected")})"));
+            return $"{head}; parameters: {parameters}; inputs: {inputs}; outputs: {string.Join(", ", u.Outputs.Select(o => u.Node + "." + o))}";
+        });
+        return $"graph nodes ({uses.Count.ToString(CultureInfo.InvariantCulture)}), paths resolved against {against}:\n" + string.Join("\n", lines) + "\n";
+    }
+
+    private static string Range(ExposedParameter e) => e.Kind switch
+    {
+        ParamKind.Float or ParamKind.Int => $"from {TexGraphFile.FormatNumber(e.Range.Min)} to {TexGraphFile.FormatNumber(e.Range.Max)}",
+        ParamKind.IntPair => $"each from {TexGraphFile.FormatNumber(e.Range.Min)} to {TexGraphFile.FormatNumber(e.Range.Max)}",
+        ParamKind.Enum => "one of " + string.Join(", ", e.Range.Choices),
+        _ => "any colour \"#rrggbb\"",
+    };
+
     public CallToolResult Run(RequestContext<CallToolRequestParams> context)
     {
         if (Unknown("get_graph", context) is { } unknown) return unknown;
@@ -36,7 +85,7 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
         {
             if (store.Graph is not { } graph) return Error("get_graph: " + NoGraph);
             var path = store.Path is { } p ? "path " + p : "no path (save gives it one)";
-            return Line($"get_graph: {Describe(graph)}; {path}; {Faults(GraphValidator.Validate(graph, registry))}\n{TexGraphFile.Write(graph).TrimEnd('\n')}");
+            return Line($"get_graph: {Describe(graph)}; {path}; {Faults(GraphValidator.Validate(graph, registry))}\n{ParameterLines(graph, registry)}{UseLines(graph, registry, store.Path is null)}{TexGraphFile.WriteShowingDriven(graph).TrimEnd('\n')}");
         }
     }
 }
@@ -52,7 +101,7 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
         "Writes the open graph to a .texgraph file, so the work outlives this session; open reads it back. Takes path: .texgraph is added when the path does not end in it; "
         + "a relative path resolves against patina's working directory, and the result gives the absolute path; missing folders are created; an existing file is replaced, and the result says (replaced). "
         + "The file is the graph as get_graph shows it: versioned JSON, keys in one order, one node a line, so the same graph always gives the same bytes and a diff shows what changed. "
-        + "The path becomes the graph's path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. "
+        + "The path becomes the graph's path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates, but for an input node with no default, which a graph using this one as a node gives. A graph node's path resolves against the file's folder, so the graph is judged there: saved into another folder, a nested file not found from it is a fault, and one found there that differs from the file it uses now refuses the save, naming both: the saved graph is the graph defined. Only the open graph is written, never a file it uses as a graph node. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. "
         + "Also refused: no open graph, an empty path, one naming a folder or holding a character a path may not, and a write that fails (naming the path and the system's message; no partial file is left). "
         + "save changes nothing in the graph or the snapshot stack, which is never saved.\n"
         + "Worked example, after define_graph's and edit_graph's worked examples (put patina's working directory for <folder>):\n"
@@ -72,14 +121,53 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
             if (store.Graph is not { } graph) return Error("save: " + NoGraph);
             var target = Resolve("save", text, folder.Directory, out var pathError);
             if (target is null) return Error(pathError!);
-            var faults = GraphValidator.Validate(graph, registry);
+            // The graph is judged where it will be: a graph node's path resolves against the file's folder (T-140), so a save into
+            // another folder is judged there, and refused when a nested file is not found from it (RV-76).
+            var folderTo = Path.GetDirectoryName(target)!;
+            var moved = !string.Equals(folderTo, store.Folder, StringComparison.OrdinalIgnoreCase);
+            // A fault that only stops the graph evaluating on its own (an input with no default, T-140) does not stop the save: a graph using it as a node gives the input.
+            var faults = GraphValidator.Validate(graph with { Folder = folderTo }, registry).Where(f => !f.OnItsOwn).ToList();
             if (faults.Count > 0)
-                return Error($"save: refused: the graph has {Faults(faults)}\nA saved graph evaluates; fix them with edit_graph, then save again. Nothing was written.");
+            {
+                var where = moved ? $" saved in {folderTo}, where its graph nodes' paths resolve," : "";
+                return Error($"save: refused: the graph{where} has {Faults(faults)}\nA saved graph evaluates; fix them with edit_graph, then save again. Nothing was written.");
+            }
+            if (moved && Changed(graph, folderTo) is { } changed)
+                return Error($"save: refused: the graph saved in {folderTo} would use other files than it does now: {changed}\nA saved graph is the graph defined; save it beside the files it uses, or copy them there. Nothing was written.");
             if (!Write("save", target, TexGraphFile.Write(graph), out var replaced, out var writeError)) return Error(writeError!);
             store.Saved(target);
             return Line($"save: saved {Path.GetFileName(target)} to {target}{(replaced ? " (replaced)" : "")}: {Describe(graph)}");
         }
     }
+
+    /// <summary>
+    /// Each nested file the graph reads now that, from <paramref name="folderTo"/>, would be a different file holding another graph
+    /// (RV-77): its graph nodes would then be that file, and the saved graph not the one defined. A use that does not
+    /// resolve now (never saved, its file not in the tool folder) is not compared; one that resolves to an equal copy is the
+    /// same graph. Null when none changes.
+    /// </summary>
+    private string? Changed(TextureGraph graph, string folderTo)
+    {
+        var after = GraphValidator.Uses(graph with { Folder = folderTo }, registry).ToDictionary(u => u.Node, StringComparer.Ordinal);
+        var lines = new List<string>();
+        foreach (var now in GraphValidator.Uses(graph, registry).Where(u => u.Expanded))
+        {
+            if (!after.TryGetValue(now.Node, out var then)) continue;
+            if (then.Files.Count != now.Files.Count)
+            {
+                lines.Add($"graph node '{now.Node}' would read {string.Join(", ", then.Files)}, not {string.Join(", ", now.Files)}");
+                continue;
+            }
+            for (var i = 0; i < now.Files.Count; i++)
+                if (!string.Equals(now.Files[i], then.Files[i], StringComparison.OrdinalIgnoreCase) && !SameGraph(now.Files[i], then.Files[i]))
+                    lines.Add($"graph node '{now.Node}' would read {then.Files[i]}, which differs from {now.Files[i]}, the file it reads now");
+        }
+        return lines.Count == 0 ? null : string.Join("; ", lines);
+    }
+
+    /// <summary>Whether two nested files hold the same graph: as written, so line endings and spacing aside.</summary>
+    private static bool SameGraph(string a, string b) =>
+        TexGraphFile.ReadFile(a).Graph is { } x && TexGraphFile.ReadFile(b).Graph is { } y && TexGraphFile.Write(x) == TexGraphFile.Write(y);
 }
 
 public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder folder)
@@ -94,7 +182,7 @@ public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder
 
     public const string Text =
         "Replaces the open graph with the one in a .texgraph file (save writes them). Takes path: .texgraph is added when the path does not end in it, and a relative path resolves against patina's working directory. "
-        + "The file's path becomes the graph's path, and the snapshot stack is cleared. "
+        + "The file's path becomes the graph's path, and the snapshot stack is cleared. A graph node's path resolves against the file's own folder; the result names each nested file it read. "
         + "A graph whose references are wrong (an input naming no node, an unknown type or parameter, a value out of range, a cycle) still opens, and the result lists its faults one a line, "
         + "each naming its node and port or parameter, so edit_graph can fix them; save refuses it until they are fixed. "
         + "Refused, leaving the open graph as it was: a missing file (the error lists the .texgraph files in its folder, so a misspelt name shows the right one); "
@@ -126,7 +214,7 @@ public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder
             return Error($"open: could not read {target}: {e.Message}");
         }
 
-        var read = TexGraphFile.Read(content, registry);
+        var read = TexGraphFile.Read(content, registry, null, Path.GetDirectoryName(target));
         if (read.Graph is null)
             return Error($"open: {target} is not a graph patina reads: {read.Error}; the open graph is unchanged");
         lock (store.Gate)
@@ -135,7 +223,9 @@ public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder
             var faults = read.Faults.Count == 0
                 ? Faults(read.Faults)
                 : Faults(read.Faults) + "\nIt is open: fix them with edit_graph (save refuses it until then).";
-            return Line($"open: opened {Path.GetFileName(target)} from {target}: {Describe(read.Graph)}; {faults}");
+            var nested = GraphValidator.Uses(store.Graph!, registry).SelectMany(u => u.Files).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var files = nested.Count == 0 ? "" : $"\nread {nested.Count.ToString(CultureInfo.InvariantCulture)} nested file{(nested.Count == 1 ? "" : "s")} for its graph nodes: {string.Join(", ", nested)}";
+            return Line($"open: opened {Path.GetFileName(target)} from {target}: {Describe(read.Graph)}; {faults}{files}");
         }
     }
 
@@ -205,7 +295,7 @@ public sealed class PopSnapshotTool(GraphStore store, NodeRegistry registry)
 
     public const string Text =
         "Restores the graph on top of the snapshot stack (push_snapshot) as the open graph, byte for byte as it was pushed, and removes it from the stack. "
-        + "Takes nothing. Returns the snapshot's label, the new depth, and the restored graph's nodes, size, seed and faults. The graph's path is kept; nothing is written to a file. "
+        + "Takes nothing. Returns the snapshot's label, the new depth, and the restored graph's nodes, size, seed and faults. The graph's path is kept, so its graph nodes resolve against that path's folder (a snapshot pushed before a save into another folder is judged there, and its faults listed); nothing is written to a file. "
         + "On an empty stack it is an error that says so, and changes nothing.\n"
         + "Worked example, after push_snapshot's: edit_graph's worked example adds the grain (6 nodes), then pop_snapshot {} returns:\n"
         + WorkedResult + "\n"
@@ -219,7 +309,7 @@ public sealed class PopSnapshotTool(GraphStore store, NodeRegistry registry)
         lock (store.Gate)
         {
             if (store.Pop() is not { } top) return Error(Empty);
-            return Line($"pop_snapshot: restored {PushSnapshotTool.Label(top.Label)}; depth {store.Depth.ToString(CultureInfo.InvariantCulture)}. The graph is {State(top.Graph, registry)}");
+            return Line($"pop_snapshot: restored {PushSnapshotTool.Label(top.Label)}; depth {store.Depth.ToString(CultureInfo.InvariantCulture)}. The graph is {State(store.Graph!, registry)}");
         }
     }
 }

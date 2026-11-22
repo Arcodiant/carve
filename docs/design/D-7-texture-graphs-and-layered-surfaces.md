@@ -74,6 +74,18 @@ A graph is saved as its own text file, which a Carve material names by path and 
 **Alternatives:** graphs embedded in the `.carve` file, which keeps a model in one file.
 **Would change if:** keeping a model and its graphs in step across two files proves a recurring fault in acceptance runs.
 
+A graph may use another as one node (T-140, version 2): a `graph` node names a `.texgraph` by a path relative to the
+using graph's file, sets the nested graph's exposed parameters by name, and takes its `input` nodes as its input ports
+and its outputs as its output ports (`wall.base_colour`). **Nested graphs are expanded inline at validation**, their
+nodes renamed `<node>/<id>` (`wall/layout`), so the evaluator, its tiles and its memory bound are unchanged, and the
+outer graph's size and seed rule. **A fault inside a nested graph is named by its path from the top and its file**
+(`nodes['wall/layout'].params['gap']: ... (bricks.texgraph)`). **A graph's `input` nodes are a nested graph's ports**:
+one lacking a default stops the graph being evaluated on its own, never its being saved or used. An exposed parameter
+of the using graph may drive a value on a graph node (`"wall.mortar"`), in the nested graph's range.
+
+**Alternatives:** evaluating a nested graph separately, as an image fed to the outer one (declined at M-28's planning:
+a second evaluator and memory bound).
+
 ### Graphs are baked to PNG on export
 
 **Certainty:** Leaning · **Strictness:** Rule
@@ -106,6 +118,11 @@ Every mask on a layer is given by exact arguments with a checkable result: a `se
 - **Mesh inputs and patina.** Answered at M-29's planning (by the person): the mesh-input nodes are in an engine-free
   project both servers reference; carve feeds them bakes and patina neutral stand-ins. A material's graph files are
   read at each render and export, and a material that reads the mesh is baked once per mesh that uses it.
+- ~~**A graph's parameters.**~~ Answered at M-28's planning (2026-11-19, by the person): a graph declares its
+  parameters in a top-level `parameters` (version 2), each driving node parameters by name (`"node.param"`) and taking
+  the narrowest range of what it drives; `swatch` and `export` take overrides for variants, and a `graph` node in
+  another graph sets them by name (T-140). `"$name"` references in node parameters and one `values` object on the
+  graph node were declined (T-139).
 - **Hosting.** Answered at M-27's planning: both servers host through a shared `Carve.Hosting` library extracted from
   `Carve.Server` (T-111), and patina loads the same extensions as carve.
 - **How quality is judged.** Value checks catch broken textures, not ugly ones. Whether swatch renders let an agent judge a texture well enough is for M-27's and M-28's acceptance runs to show.

@@ -17,6 +17,18 @@ public sealed class NodeRegistry
         new LevelsNode(),
         new BlendNode(),
         new HeightToNormalNode(),
+        new TilesNode(),
+        new StripesNode(),
+        new ShapeNode(),
+        new WorleyNode(),
+        new FbmNode(),
+        new WarpNode(),
+        new BlurNode(),
+        new GradientMapNode(),
+        new InputNode(),
+        new NestedGraphNode(),
+        new TransformNode(),
+        new DistanceNode(),
     ]);
 
     private readonly IReadOnlyDictionary<string, NodeType> _types;

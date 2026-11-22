@@ -18,7 +18,7 @@ public class GraphToolTests
         await using var patina = await PatinaHarness.StartAsync();
         var tools = (await patina.ListToolsAsync()).EnumerateArray().ToList();
 
-        Assert.Equal(["define_graph", "edit_graph", "get_graph", "save", "open", "push_snapshot", "pop_snapshot", "export", "swatch"], tools.Select(t => t.GetProperty("name").GetString()));
+        Assert.Equal(["define_graph", "nodes", "edit_graph", "get_graph", "save", "open", "push_snapshot", "pop_snapshot", "export", "swatch", "check"], tools.Select(t => t.GetProperty("name").GetString()));
         Assert.All(tools, t => Assert.False(t.GetProperty("inputSchema").GetProperty("additionalProperties").GetBoolean()));
     }
 
@@ -80,7 +80,7 @@ public class GraphToolTests
     [InlineData("""[{"op":"set_node","node":"n"}]""", "operation 1 (set_node): type is missing")]
     [InlineData("""[{"op":"set_node","node":"n","type":"colour","inputs":[]}]""", "operation 1 (set_node): inputs is an array; it is an object of port: source")]
     [InlineData("""[{"op":"set_node","node":"n","type":"colour","inputs":{"a":1}}]""", "operation 1 (set_node): input 'a' is a number; a source is a string")]
-    [InlineData("""[{"op":"set_params","node":"c","params":{"colour":true}}]""", "operation 1 (set_params): parameter 'colour' is true or false; a value is a number, a string or an array of numbers")]
+    [InlineData("""[{"op":"set_params","node":"c","params":{"colour":true}}]""", "operation 1 (set_params): parameter 'colour' is true or false; a value is a number, a string, or an array of numbers or of strings")]
     [InlineData("""[{"op":"set_params","node":"c"}]""", "operation 1 (set_params): params is missing")]
     [InlineData("""[{"op":"connect","node":"out","port":"in"}]""", "operation 1 (connect): from is missing")]
     [InlineData("""[{"op":"disconnect","node":"c","port":"in"}]""", "operation 1 (disconnect): node 'c' input 'in' is not connected; its connected inputs are none")]
@@ -230,7 +230,7 @@ public class GraphToolTests
 
     [Theory]
     [InlineData("{\n  \"version\": 1,\n  \"size\": 64\n  \"seed\": 5\n}\n", "line 4, column 3: not JSON")]
-    [InlineData("{\n  \"version\": 2,\n  \"size\": 64,\n  \"seed\": 5,\n  \"nodes\": {}\n}\n", "line 2, column 14: version 2 is not known")]
+    [InlineData("{\n  \"version\": 3,\n  \"size\": 64,\n  \"seed\": 5,\n  \"nodes\": {}\n}\n", "line 2, column 14: version 3 is not known")]
     [InlineData("{\n  \"version\": 1,\n  \"size\": 64,\n  \"seed\": 5,\n  \"nodes\": { \"a\": { \"kind\": \"colour\" } }\n}\n", "line 5, column 21: node 'a': unknown key 'kind'")]
     public async Task Open_refuses_a_file_that_does_not_parse_with_its_position(string file, string expected)
     {

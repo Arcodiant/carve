@@ -33,6 +33,8 @@ namespace Carve.Scenario.Patina;
 /// that reads lighter is the one whose texels are lighter, for every pair of staves whose tones differ by 3 % or more.</item>
 /// <item><b>Highlight</b> (T-128): a grey sphere at roughness 0 has a peak luma at least <see cref="HighlightStep"/> above the same
 /// sphere at roughness 1: the directional light's highlight, which a smooth material shows and a rough one spreads out.</item>
+/// <item><b>Metallic</b> (T-134): a grey-200 sphere at roughness 0.2 and metallic 1, against metallic 0, has a median luma inside the
+/// silhouette at least <see cref="MetallicStep"/> lower and more pixels at luma 255.</item>
 /// </list>
 /// The thresholds were probed on the planks' own colours (T-114's As built), and Dark, In band and Highlight again under carve's lights (T-128's).
 /// </remarks>
@@ -48,6 +50,8 @@ internal sealed class SwatchStage : IPatinaStage
     public const double BandHigh = 128;
     public const double ToneStep = 0.03;
     public const double HighlightStep = 40;
+    /// <summary>T-134, approved by the person: measured 65.3 (median 192.4 at metallic 0, 127.1 at 1), set at about 60 % as <see cref="HighlightStep"/> was.</summary>
+    public const double MetallicStep = 40;
     /// <summary>Carve's slate, (0.03, 0.035, 0.04) linear, through half floats and sRGB, as a frame shows it.</summary>
     private static readonly byte[] Slate = [.. new[] { 0.03f, 0.035f, 0.04f }.Select(v =>
     {
@@ -132,6 +136,10 @@ internal sealed class SwatchStage : IPatinaStage
             + string.Create(CultureInfo.InvariantCulture, $"\nhighlight\tpeak_luma_roughness_0\tpeak_luma_roughness_1\tstep\n\t{peaks[0]:0.0}\t{peaks[1]:0.0}\t{peaks[0] - peaks[1]:0.0}\n"));
         checks.Check(peaks[0] - peaks[1] >= HighlightStep,
             $"swatch: the roughness-0 sphere's peak luma {peaks[0]:0.0} is not {HighlightStep} above the roughness-1 sphere's {peaks[1]:0.0}: no highlight");
+
+        await MetalPlateAsync(driver, checks, read);
+        await BricksAsync(driver, checks);
+        await SwatchTiling.RunAsync(driver, checks);
 
         await BreaksAsync(driver, checks, sample, read, spheres, sheet, small, tiled, seam);
     }
@@ -225,7 +233,7 @@ internal sealed class SwatchStage : IPatinaStage
     private const int SheetTop = 24;
 
     /// <summary>A copy of <paramref name="frame"/> whose pixel (x, y) is the frame's at <paramref name="from"/>(x, y).</summary>
-    private static ScenarioFrame Tampered(ScenarioFrame frame, Func<int, int, (int X, int Y)> from)
+    internal static ScenarioFrame Tampered(ScenarioFrame frame, Func<int, int, (int X, int Y)> from)
     {
         var pixels = new byte[frame.Pixels.Length];
         for (var y = 0; y < frame.Height; y++)
@@ -240,7 +248,7 @@ internal sealed class SwatchStage : IPatinaStage
     }
 
     /// <summary>A copy of <paramref name="frame"/> whose pixel (x, y) is <paramref name="drawn"/>(x, y), or the frame's own where that is null.</summary>
-    private static ScenarioFrame Drawn(ScenarioFrame frame, Func<int, int, byte[]?> drawn)
+    internal static ScenarioFrame Drawn(ScenarioFrame frame, Func<int, int, byte[]?> drawn)
     {
         var pixels = (byte[])frame.Pixels.Clone();
         for (var y = 0; y < frame.Height; y++)
@@ -262,7 +270,7 @@ internal sealed class SwatchStage : IPatinaStage
     private static ScenarioFrame Rolled(ScenarioFrame frame, int shift) =>
         Tampered(frame, (x, y) => ((x + shift) % frame.Width, (y + shift) % frame.Height));
 
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(typeof(SwatchStage).Assembly.Location)!);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Carve.slnx"))) directory = directory.Parent;
@@ -299,7 +307,7 @@ internal sealed class SwatchStage : IPatinaStage
             return new Readback(images);
         }
 
-        private static byte[] Decode(string path, int size)
+        public static byte[] Decode(string path, int size)
         {
             var image = File.Exists(path) ? ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha) : null;
             return image is not null && image.Width == size && image.Height == size ? image.Data
@@ -327,11 +335,195 @@ internal sealed class SwatchStage : IPatinaStage
 
     private static byte[] Image(Readback read, string role, int size) => read.Image(role, size);
 
+    /// <summary>
+    /// The metal plate (T-134, define_graph's worked example): its sheet, a column per output in role order then by name
+    /// (base_colour, roughness, metallic, edge), each cell from the exported texels (roughness alone is roughness.png with B
+    /// 0, metallic alone is its B spread grey, edge is edge.png); its sphere, the silhouette the camera puts and the sheet's
+    /// sphere cell; then the metallic highlight: a grey-200 sphere at metallic 1 shows a highlight tinted by the base colour,
+    /// drawn as a metal it loses its diffuse light and reflects the sky (<see cref="MetallicReads"/>; a grey base cannot show a tint in hue, and both peaks clip at 255).
+    /// </summary>
+    private async Task MetalPlateAsync(ScenarioDriver driver, PatinaChecks checks, Readback planks)
+    {
+        await checks.CallAsync("define_graph", MetalPlate);
+        var folder = Path.Combine(driver.RunFolder, "swatch-plate-texels");
+        await checks.CallAsync("export", JsonSerializer.Serialize(new { folder, size = 64 }));
+        checks.Check(!File.Exists(Path.Combine(folder, "metallic.png")), "swatch: export wrote metallic.png; metallic is packed into roughness.png");
+        var files = new[] { "base_colour", "roughness", "edge" }.ToDictionary(f => f, f => Readback.Decode(Path.Combine(folder, f + ".png"), 64));
+        var columns = new (string Name, Func<int, int, byte[]> Texel)[]
+        {
+            ("base_colour", (x, y) => files["base_colour"].AsSpan((y * 64 + x) * 4, 4).ToArray()),
+            ("roughness", (x, y) => { var t = files["roughness"].AsSpan((y * 64 + x) * 4, 4).ToArray(); t[2] = 0; return t; }),
+            ("metallic", (x, y) => { var b = files["roughness"][(y * 64 + x) * 4 + 2]; return [b, b, b, 255]; }),
+            ("edge", (x, y) => files["edge"].AsSpan((y * 64 + x) * 4, 4).ToArray()),
+        };
+        var sphere = await driver.CaptureToolAsync("swatch", "swatch-plate-sphere", new { view = "sphere" });
+        var judged = Judge(planks, 256, 0);
+        var silhouette = 0;
+        for (var at = 0; at < judged.Length; at++)
+        {
+            var (x, y) = (at % SwatchSphere.Size, at / SwatchSphere.Size);
+            if (judged[at].Outside && !IsSlate(sphere, x, y)) silhouette++;
+        }
+        checks.Check(silhouette == 0, $"swatch: the plate's sphere: {silhouette} pixel(s) outside the silhouette are not the slate");
+
+        var sheet = await driver.CaptureToolAsync("swatch", "swatch-plate-sheet", new { });
+        var width = columns.Length * 258 + 512;
+        if (sheet.Width != width || sheet.Height != 538)
+        {
+            checks.Check(false, $"swatch: the plate's sheet is {sheet.Width} x {sheet.Height}, not {width} x 538");
+        }
+        else
+        {
+            for (var column = 0; column < columns.Length; column++)
+            {
+                var (name, texel) = columns[column];
+                var left = column * 258;
+                CheckRegion(checks, $"plate sheet {name} flat", sheet, left, 24, 256, 256, LabelBand, (x, y) => texel(Under(x, 256, 64), Under(y, 256, 64)));
+                CheckRegion(checks, $"plate sheet {name} tiled", sheet, left, 282, 256, 256, LabelBand, (x, y) => texel(Under(x, 256, 192) % 64, Under(y, 256, 192) % 64));
+                checks.Check(Bright(sheet, left, 24, 256, LabelBand) && Bright(sheet, left, 282, 256, LabelBand), $"swatch: plate sheet column {name} has no label text");
+            }
+            CheckRegion(checks, "plate sheet sphere cell against the sphere view", sheet, columns.Length * 258, 25, 512, 512, LabelBand,
+                (x, y) => sphere.Pixels.AsSpan((y * 512 + x) * 4, 4));
+        }
+
+        var lit = new Dictionary<int, (double Median, int Clipped)>();
+        foreach (var metallic in new[] { 0, 1 })
+        {
+            await checks.CallAsync("define_graph", MetallicSphere.Replace("METALLIC", metallic.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
+            lit[metallic] = Lit(await driver.CaptureToolAsync("swatch", $"swatch-sphere-metallic-{metallic}", new { view = "sphere" }), planks);
+        }
+        File.AppendAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), string.Create(CultureInfo.InvariantCulture,
+            $"\nmetallic\tmedian_luma_0\tmedian_luma_1\tstep\tclipped_0\tclipped_1\n\t{lit[0].Median:0.0}\t{lit[1].Median:0.0}\t{lit[0].Median - lit[1].Median:0.0}\t{lit[0].Clipped}\t{lit[1].Clipped}\n"));
+        checks.Check(MetallicReads(lit[0], lit[1]),
+            $"swatch: the metallic-1 grey-200 sphere (median luma {lit[1].Median:0.0}, {lit[1].Clipped} px at 255) does not read metallic against metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px): the rule is a median {MetallicStep} lower and more px at 255");
+        // The break, made here (RV-77): a wrong frame that is not the metal one, a darker dielectric (grey 100, metallic 0, the
+        // same roughness), judged as the metal against metallic 0, must fail the rule. Its median is far lower, as the metal's
+        // is, so only the rule's clipped-pixel half refuses it: the break can fail while the check above passes (a rule that
+        // lost that half), which the swapped frames of RV-76 could not.
+        await checks.CallAsync("define_graph", MetallicSphere.Replace("METALLIC", "0", StringComparison.Ordinal).Replace(MetallicGrey, DarkGrey, StringComparison.Ordinal));
+        var dark = Lit(await driver.CaptureToolAsync("swatch", "swatch-sphere-metallic-0-dark", new { view = "sphere" }), planks);
+        File.AppendAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), string.Create(CultureInfo.InvariantCulture,
+            $"\nmetallic_break_dark\tmedian_luma_0\tmedian_luma_dark\tstep\tclipped_0\tclipped_dark\n\t{lit[0].Median:0.0}\t{dark.Median:0.0}\t{lit[0].Median - dark.Median:0.0}\t{lit[0].Clipped}\t{dark.Clipped}\n"));
+        checks.Check(!MetallicReads(lit[0], dark), $"swatch: the metallic rule reads a darker dielectric as metal: grey 100 at metallic 0 ({dark.Median:0.0}, {dark.Clipped} px at 255) against grey 200 at metallic 0 ({lit[0].Median:0.0}, {lit[0].Clipped} px)");
+    }
+
+    /// <summary>The metallic sphere's grey, and the break's darker one (grey 100).</summary>
+    private const string MetallicGrey = "\"colour\":\"#c8c8c8\"", DarkGrey = "\"colour\":\"#646464\"";
+
+    /// <summary>
+    /// The bricks and their grey variant (T-139): <c>samples/graphs/bricks.texgraph</c> opened, exported at 256 without and with
+    /// the overrides <see cref="GreyOverrides"/>, each export equal byte for byte to the committed PNGs (the bricks' own, and
+    /// <c>bricks/variants/grey/</c>); then each drawn as a sheet, a column per output in role order, every flat and tiled cell
+    /// judged against its export's texels, and the grey sheet's caption naming the overrides. The break, made here: the grey
+    /// sheet judged against the plain bricks' texels must fail its base colour cells, so the overrides reach the picture.
+    /// </summary>
+    private static async Task BricksAsync(ScenarioDriver driver, PatinaChecks checks)
+    {
+        var samples = Path.Combine(RepoRoot(), "samples", "graphs");
+        await checks.CallAsync("open", JsonSerializer.Serialize(new { path = Path.Combine(samples, "bricks.texgraph") }));
+        var variants = new (string Name, string Committed, object? Overrides)[]
+        {
+            ("bricks", Path.Combine(samples, "bricks"), null),
+            ("bricks-grey", Path.Combine(samples, "bricks", "variants", "grey"), JsonNode.Parse(GreyOverrides)),
+        };
+        var texels = new Dictionary<string, Dictionary<string, byte[]>>();
+        var sheets = new Dictionary<string, ScenarioFrame>();
+        foreach (var (name, committed, overrides) in variants)
+        {
+            var folder = Path.Combine(driver.RunFolder, $"swatch-{name}-texels");
+            await checks.CallAsync("export", overrides is null
+                ? JsonSerializer.Serialize(new { folder, size = 256 })
+                : JsonSerializer.Serialize(new { folder, size = 256, parameters = overrides }));
+            foreach (var role in Roles)
+            {
+                var (made, kept) = (Path.Combine(folder, role + ".png"), Path.Combine(committed, role + ".png"));
+                checks.Check(File.Exists(made) && File.Exists(kept) && File.ReadAllBytes(made).AsSpan().SequenceEqual(File.ReadAllBytes(kept)),
+                    $"swatch: {name}'s exported {role}.png is not {kept} byte for byte");
+            }
+            texels[name] = Roles.ToDictionary(r => r, r => Readback.Decode(Path.Combine(folder, r + ".png"), 256));
+            var sheet = await driver.CaptureToolAsync("swatch", $"swatch-{name}-sheet", overrides is null ? (object)new { size = 256 } : new { size = 256, parameters = overrides });
+            sheets[name] = sheet;
+            CheckBricksSheet(checks, name, sheet, texels[name]);
+        }
+        var caption = sheets["bricks-grey"].Caption ?? "";
+        checks.Check(caption.Contains("parameters mortar 0.08, tint \"#7a7a70\"", StringComparison.Ordinal), "swatch: the grey bricks sheet's caption does not name the overrides: " + caption);
+        checks.Check(!(sheets["bricks"].Caption ?? "").Contains("parameters", StringComparison.Ordinal), "swatch: the plain bricks sheet's caption names parameters: " + sheets["bricks"].Caption);
+        // The title naming the overrides runs past the 512 px a cell's label may take; it must be drawn, not cut there.
+        checks.Check(Bright(sheets["bricks-grey"], 560, 0, 200, SheetTop - 2), "swatch: the grey bricks sheet's title has no text past x 560: the overrides are cut from it");
+
+        var probe = new PatinaChecks(driver);
+        CheckBricksSheet(probe, "bricks-grey", sheets["bricks-grey"], texels["bricks"]);
+        File.AppendAllText(Path.Combine(driver.RunFolder, "swatch-checks.tsv"), "\nbreak overrides-not-applied (the grey sheet against the plain bricks' texels):\n" + string.Join("\n", probe.Failures.Select(f => "  " + f)) + "\n");
+        foreach (var cell in new[] { "flat", "tiled" })
+            checks.Check(probe.Failures.Any(f => f.StartsWith($"swatch: bricks-grey sheet base_colour {cell}:", StringComparison.Ordinal)),
+                $"swatch: the break overrides-not-applied was not caught by the grey sheet's base_colour {cell} cell");
+    }
+
+    /// <summary>The grey variant's overrides (T-139): wider mortar and a grey stone tint, as <c>tools/Patina.SampleGraphs</c> writes it.</summary>
+    private const string GreyOverrides = """{"mortar":0.08,"tint":"#7a7a70"}""";
+
+    /// <summary>A bricks sheet at 256: four columns in role order, each flat cell 1:1 and each tiled cell 3 x 3 scaled into 256, then the sphere cell.</summary>
+    private static void CheckBricksSheet(PatinaChecks checks, string name, ScenarioFrame sheet, Dictionary<string, byte[]> texels)
+    {
+        var width = Roles.Length * 258 + 512;
+        if (sheet.Width != width || sheet.Height != 538)
+        {
+            checks.Check(false, $"swatch: the {name} sheet is {sheet.Width} x {sheet.Height}, not {width} x 538");
+            return;
+        }
+        for (var column = 0; column < Roles.Length; column++)
+        {
+            var image = texels[Roles[column]];
+            var left = column * 258;
+            CheckRegion(checks, $"{name} sheet {Roles[column]} flat", sheet, left, 24, 256, 256, LabelBand, (x, y) => image.AsSpan((y * 256 + x) * 4, 4));
+            CheckRegion(checks, $"{name} sheet {Roles[column]} tiled", sheet, left, 282, 256, 256, LabelBand,
+                (x, y) => image.AsSpan((Under(y, 256, 768) % 256 * 256 + Under(x, 256, 768) % 256) * 4, 4));
+            checks.Check(Bright(sheet, left, 24, 256, LabelBand) && Bright(sheet, left, 282, 256, LabelBand), $"swatch: {name} sheet column {Roles[column]} has no label text");
+        }
+    }
+
+    /// <summary>The metallic rule (T-134, approved by the person): the diffuse light goes, so the median inside luma drops by <see cref="MetallicStep"/> or more, and the highlight, the sky reflected, clips over more pixels.</summary>
+    private static bool MetallicReads((double Median, int Clipped) dielectric, (double Median, int Clipped) metal) =>
+        dielectric.Median - metal.Median >= MetallicStep && metal.Clipped > dielectric.Clipped;
+
+    /// <summary>A sphere view's median luma over the pixels the silhouette puts inside, and its count of pixels at luma 255 (254 or more).</summary>
+    private static (double Median, int Clipped) Lit(ScenarioFrame frame, Readback planks)
+    {
+        var judged = Judge(planks, 256, 0);
+        var lumas = new List<double>();
+        var clipped = 0;
+        for (var at = 0; at < judged.Length; at++)
+        {
+            var luma = Luma(frame.Pixels.AsSpan(at * 4, 4));
+            if (luma >= 254) clipped++;
+            if (judged[at].Inside) lumas.Add(luma);
+        }
+        lumas.Sort();
+        return (lumas.Count == 0 ? 0 : lumas[lumas.Count / 2], clipped);
+    }
+
+    /// <summary>define_graph's worked metal plate: base colour grey 200, roughness and metallic from a u ramp, a named edge output.</summary>
+    private const string MetalPlate = """
+        {"graph":{"version":1,"size":64,"seed":0,"nodes":{"plate":{"type":"colour","params":{"colour":"#c8c8c8"}},"ramp":{"type":"gradient"},"rough":{"type":"levels","inputs":{"in":"ramp"},"params":{"out_low":0.7,"out_high":0.3}},"band":{"type":"gradient","params":{"axis":"v","shape":"triangle"}},"out_base":{"type":"output","inputs":{"in":"plate"}},"out_rough":{"type":"output","inputs":{"in":"rough"},"params":{"role":"roughness"}},"out_metal":{"type":"output","inputs":{"in":"ramp"},"params":{"role":"metallic"}},"out_edge":{"type":"output","inputs":{"in":"band"},"params":{"name":"edge"}}}}}
+        """;
+
+    /// <summary>A grey-200 sphere at roughness 0.2 and metallic METALLIC, both constant.</summary>
+    private const string MetallicSphere = """
+        {"graph":{"version":1,"size":64,"seed":1,"nodes":{
+          "grey":{"type":"colour","params":{"colour":"#c8c8c8"}},
+          "ramp":{"type":"gradient","params":{"axis":"u","repeat":1}},
+          "flat":{"type":"levels","inputs":{"in":"ramp"},"params":{"out_low":0.2,"out_high":0.2}},
+          "metal":{"type":"levels","inputs":{"in":"ramp"},"params":{"out_low":METALLIC,"out_high":METALLIC}},
+          "base":{"type":"output","inputs":{"in":"grey"},"params":{"role":"base_colour"}},
+          "rough":{"type":"output","inputs":{"in":"flat"},"params":{"role":"roughness"}},
+          "metallic":{"type":"output","inputs":{"in":"metal"},"params":{"role":"metallic"}}}}}
+        """;
+
     private static ReadOnlySpan<byte> Texel(Readback read, string role, int size, int x, int y) =>
         Image(read, role, size).AsSpan((y * size + x) * 4, 4);
 
     /// <summary>The texel under the centre of destination pixel <paramref name="at"/> of <paramref name="to"/>, from <paramref name="from"/>.</summary>
-    private static int Under(int at, int to, int from) => (int)Math.Floor((at + 0.5) * from / to);
+    internal static int Under(int at, int to, int from) => (int)Math.Floor((at + 0.5) * from / to);
 
     /// <summary>The brightest pixel's luma: on a sphere view, the sphere's (the slate is darker than any lit face).</summary>
     private static double PeakLuma(ScenarioFrame frame)
@@ -341,7 +533,7 @@ internal sealed class SwatchStage : IPatinaStage
         return peak;
     }
 
-    private static double Luma(ReadOnlySpan<byte> p) => 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+    internal static double Luma(ReadOnlySpan<byte> p) => 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
 
     private static void CheckExact(PatinaChecks checks, string what, ScenarioFrame frame, int width, int height, Func<int, int, ReadOnlySpan<byte>> texel)
     {
@@ -354,7 +546,7 @@ internal sealed class SwatchStage : IPatinaStage
     }
 
     /// <summary>Exact over a region of the frame, leaving out its top <paramref name="skipRows"/>; reports the first difference and the count.</summary>
-    private static void CheckRegion(PatinaChecks checks, string what, ScenarioFrame frame, int left, int top, int width, int height, int skipRows,
+    internal static void CheckRegion(PatinaChecks checks, string what, ScenarioFrame frame, int left, int top, int width, int height, int skipRows,
         Func<int, int, ReadOnlySpan<byte>> texel)
     {
         var wrong = 0;
@@ -443,14 +635,14 @@ internal sealed class SwatchStage : IPatinaStage
         }
     }
 
-    private static bool IsSlate(ScenarioFrame frame, int x, int y)
+    internal static bool IsSlate(ScenarioFrame frame, int x, int y)
     {
         var at = (y * frame.Width + x) * 4;
         return Math.Abs(frame.Pixels[at] - Slate[0]) <= 1 && Math.Abs(frame.Pixels[at + 1] - Slate[1]) <= 1 && Math.Abs(frame.Pixels[at + 2] - Slate[2]) <= 1;
     }
 
     /// <summary>Whether a region holds label text: some pixel near white.</summary>
-    private static bool Bright(ScenarioFrame frame, int left, int top, int width, int height)
+    internal static bool Bright(ScenarioFrame frame, int left, int top, int width, int height)
     {
         for (var y = top; y < top + height; y++)
             for (var x = left; x < left + width; x++)

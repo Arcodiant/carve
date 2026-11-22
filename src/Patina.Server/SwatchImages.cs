@@ -122,7 +122,20 @@ public sealed record SheetLayout(int Columns)
 /// </summary>
 public static class LabelAtlas
 {
-    public const int Size = 512;
+    /// <summary>
+    /// The atlas's width, and a page's height: 32 rows, so a title, 15 columns' two labels and the sphere's. It was 512 (16
+    /// rows, 7 columns) until T-134; rows are where they were, so a sheet of 7 columns or fewer draws the same pixels. A sheet
+    /// of more columns grows the atlas a page at a time (RV-76): page p holds rows 32p to 32p + 31 and is drawn in a frame of
+    /// its own, and the pages stacked top to bottom are the atlas, so row r is still at r x <see cref="Pitch"/>; a sheet of 15
+    /// columns or fewer has one page, drawn as before.
+    /// </summary>
+    public const int Size = 1024;
+
+    /// <summary>The widest a label is drawn, its text and padding: as it was when the atlas was 512 a side.</summary>
+    public const int LabelWidth = 512 - Inset + Padding;
+
+    /// <summary>The widest the title is drawn (T-139: a title naming parameter overrides runs past <see cref="LabelWidth"/>): the atlas row's whole width. A title that fits in <see cref="LabelWidth"/> draws the same pixels.</summary>
+    public const int TitleWidth = Size - Inset + Padding;
 
     public const int Pitch = 32;
 
@@ -134,21 +147,28 @@ public static class LabelAtlas
 
     public const int Padding = 2;
 
-    /// <summary>The rows the atlas holds.</summary>
+    /// <summary>The rows a page of the atlas holds.</summary>
     public const int Rows = Size / Pitch;
+
+    /// <summary>The pages an atlas of <paramref name="labels"/> labels takes: one for 32 or fewer, and never none.</summary>
+    public static int Pages(int labels) => Math.Max(1, (labels + Rows - 1) / Rows);
 }
 
 /// <summary>Composes the sheet from the evaluated outputs, the sphere frame and the label atlas.</summary>
 public static class SwatchSheet
 {
     /// <summary>The labels in atlas order: the title, then per column the flat and the tiled cell's, then the sphere's.</summary>
-    public static IReadOnlyList<string> Labels(string title, IReadOnlyList<OutputRole> roles, float angle) =>
-        [title, .. roles.SelectMany(r => new[] { OutputRoles.Name(r), OutputRoles.Name(r) + " 3 x 3" }),
-            $"sphere, Pbr, carve lights, angle {angle.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}"];
+    public static IReadOnlyList<string> Labels(string title, IReadOnlyList<OutputRole> roles, float angle, int tiling = 1) =>
+        Labels(title, [.. roles.Select(OutputRoles.Name)], angle, tiling);
+
+    /// <summary>The labels for a sheet whose columns are <paramref name="outputs"/>, roles' names and named outputs' names, in sheet order.</summary>
+    public static IReadOnlyList<string> Labels(string title, IReadOnlyList<string> outputs, float angle, int tiling = 1) =>
+        [title, .. outputs.SelectMany(r => new[] { r, r + " 3 x 3" }),
+            $"sphere, Pbr, carve lights, angle {angle.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}{(tiling == 1 ? "" : $", tiling {tiling}")}"];
 
     /// <param name="images">Each output's RGBA, <paramref name="size"/> a side, in role order.</param>
     /// <param name="sphere">The sphere view, <see cref="SwatchImages.SphereCell"/> a side, RGBA.</param>
-    /// <param name="atlas">The label atlas, <see cref="LabelAtlas.Size"/> a side, RGBA, in <see cref="Labels"/>' order.</param>
+    /// <param name="atlas">The label atlas, RGBA, in <see cref="Labels"/>' order: <see cref="LabelAtlas.Size"/> wide and a page of <see cref="LabelAtlas.Size"/> rows high per <see cref="LabelAtlas.Rows"/> labels.</param>
     /// <param name="extents">Each label's text extent in pixels, as the font measured it.</param>
     public static (byte[] Pixels, SheetLayout Layout) Compose(IReadOnlyList<byte[]> images, int size, byte[] sphere,
         byte[] atlas, IReadOnlyList<Vector2> extents)
@@ -170,7 +190,7 @@ public static class SwatchSheet
         void Label(int row, int left, int top, bool backed)
         {
             var extent = extents[row];
-            var w = Math.Min((int)MathF.Ceiling(extent.X) + 2 * LabelAtlas.Padding, LabelAtlas.Size - LabelAtlas.Inset + LabelAtlas.Padding);
+            var w = Math.Min((int)MathF.Ceiling(extent.X) + 2 * LabelAtlas.Padding, row == 0 ? LabelAtlas.TitleWidth : LabelAtlas.LabelWidth);
             var h = Math.Min((int)MathF.Ceiling(extent.Y) + 2 * LabelAtlas.Padding, SwatchImages.LabelBand - LabelAtlas.Padding);
             for (var y = 0; y < h; y++)
             {

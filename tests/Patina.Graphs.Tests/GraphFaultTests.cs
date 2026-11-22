@@ -16,13 +16,13 @@ public class GraphFaultTests
             "c": { "type": "output", "inputs": { "in": "grain_2", "extra": "b" }, "params": { "role": "normal" } },
             "d": { "type": "output", "params": { "role": "roughness" } },
             "e": { "type": "output", "inputs": { "in": "b" }, "params": { "role": "roughness" } },
-            "f": { "type": "blur", "inputs": { "in": "g" } },
-            "g": { "type": "blur", "inputs": { "in": "f" } },
+            "f": { "type": "box5", "inputs": { "in": "g" } },
+            "g": { "type": "box5", "inputs": { "in": "f" } },
             "h": { "type": "output", "inputs": { "in": "s.x" }, "params": { "role": "occlusion" } },
             "i": { "type": "output", "inputs": { "in": "s" }, "params": { "role": "base_colour" } },
             "k": { "type": "hash", "params": { "offset": 1.5, "cells": [0, 9000] } },
             "s": { "type": "split", "inputs": { "in": "k" } },
-            "t": { "type": "blur", "inputs": { "in": "out_x" } },
+            "t": { "type": "box5", "inputs": { "in": "out_x" } },
             "out_x": { "type": "output", "inputs": { "in": "t" } }
           }
         }
@@ -51,7 +51,7 @@ public class GraphFaultTests
 
     [Fact]
     public void AnUnknownTypeListsTheTypes() =>
-        Find("a", null, null, "unknown type 'nosie'; the types are blend, blur, colour, gradient, hash, height_to_normal, levels, noise, output, split");
+        Find("a", null, null, "unknown type 'nosie'; the types are blend, blur, box5, colour, distance, fbm, gradient, gradient_map, graph, hash, height_to_normal, input, levels, noise, output, shape, split, stripes, tiles, transform, warp, worley");
 
     [Fact]
     public void AnUnknownParameterListsTheTypesParameters() => Find("b", null, "shade", "its parameters are colour");
@@ -116,13 +116,13 @@ public class GraphFaultTests
         var fault = Assert.Single(read.Faults);
         Assert.Null(fault.Node);
         Assert.Contains("no output", fault.Message);
-        Assert.Contains("base_colour, normal, roughness, occlusion", fault.Message);
+        Assert.Contains("base_colour, normal, roughness, metallic, occlusion, height", fault.Message);
     }
 
     [Fact]
     public void ASelfLoopIsACycle()
     {
-        var read = TexGraphFile.Read("""{ "version": 1, "size": 256, "seed": 7, "nodes": { "loop": { "type": "blur", "inputs": { "in": "loop" } }, "o": { "type": "output", "inputs": { "in": "loop" } } } }""", TestNodes.Registry);
+        var read = TexGraphFile.Read("""{ "version": 1, "size": 256, "seed": 7, "nodes": { "loop": { "type": "box5", "inputs": { "in": "loop" } }, "o": { "type": "output", "inputs": { "in": "loop" } } } }""", TestNodes.Registry);
         var fault = Assert.Single(read.Faults);
         Assert.Equal(("loop", "in"), (fault.Node, fault.Port));
         Assert.Contains("loop -> loop", fault.Message);

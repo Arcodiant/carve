@@ -45,7 +45,7 @@ public sealed class NoiseNode : NodeType
     /// <summary>One octave's value at texel (x, y) of an image of <paramref name="size"/>.</summary>
     public static float Octave(int x, int y, int size, int cellsX, int cellsY, bool smooth, uint seed)
     {
-        float px = (x + 0.5f) * cellsX / size, py = (Band.Wrap(y, size) + 0.5f) * cellsY / size;
+        float px = (x + 0.5f) * cellsX / size, py = (Tile.Wrap(y, size) + 0.5f) * cellsY / size;
         int ix = (int)MathF.Floor(px), iy = (int)MathF.Floor(py);
         if (!smooth) return Lattice(ix, iy, cellsX, cellsY, seed);
         float fx = px - ix, fy = py - iy;
@@ -68,15 +68,15 @@ public sealed class NoiseNode : NodeType
         var output = e.Output();
         var total = 0f;
         for (var o = 0; o < octaves; o++) total += 1f / (1 << o);
-        for (var y = e.Y0; y < e.Y0 + e.Rows; y++)
+        for (var y = e.Rect.Y; y < e.Rect.Bottom; y++)
         {
             var row = output.Row(y);
-            for (var x = 0; x < e.Size; x++)
+            for (var x = e.Rect.X; x < e.Rect.Right; x++)
             {
                 float sum = 0;
                 for (var o = 0; o < octaves; o++)
                     sum += Octave(x, y, e.Size, cx << o, cy << o, smooth, OctaveSeed(e.Seed, nodeSeed, o)) / (1 << o);
-                row[x] = sum / total;
+                row[x - e.Rect.X] = sum / total;
             }
         }
     }

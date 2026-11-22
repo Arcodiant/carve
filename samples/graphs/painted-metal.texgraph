@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "size": 256,
+  "seed": 137,
+  "nodes": {
+    "ao": { "type": "levels", "inputs": { "in": "paint_edge" }, "params": { "in_high": 1, "out_low": 0.55 } },
+    "ao_out": { "type": "output", "inputs": { "in": "ao" }, "params": { "role": "occlusion" } },
+    "base": { "type": "blend", "inputs": { "a": "paint", "b": "steel", "mask": "wear" }, "params": { "mode": "mix" } },
+    "base_out": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "base_colour" } },
+    "chip_mask": { "type": "blend", "inputs": { "a": "chip_shape", "b": "chip_pick" }, "params": { "mode": "multiply" } },
+    "chip_pick": { "type": "levels", "inputs": { "in": "chips.random" }, "params": { "in_high": 0.651, "in_low": 0.65 } },
+    "chip_shape": { "type": "levels", "inputs": { "in": "chips.f1" }, "params": { "in_high": 0.22, "in_low": 0.1, "out_high": 0, "out_low": 1 } },
+    "chips": { "type": "worley", "params": { "cells": [9, 9], "jitter": 0.9, "seed": 5 } },
+    "metal_out": { "type": "output", "inputs": { "in": "wear" }, "params": { "role": "metallic" } },
+    "mottle": { "type": "fbm", "params": { "basis": "gradient", "cells": [5, 5], "gain": 0.55, "octaves": 5, "seed": 2 } },
+    "normal": { "type": "height_to_normal", "inputs": { "height": "paint_edge" }, "params": { "strength": 0.02 } },
+    "normal_out": { "type": "output", "inputs": { "in": "normal" }, "params": { "role": "normal" } },
+    "paint": { "type": "gradient_map", "inputs": { "in": "mottle" }, "params": { "colours": ["#2f4a40", "#46604f", "#6b7d68"], "positions": [0.25, 0.5, 0.8] } },
+    "paint_edge": { "type": "blur", "inputs": { "in": "paint_mask" }, "params": { "quality": "smooth", "radius": 0.006 } },
+    "paint_mask": { "type": "levels", "inputs": { "in": "wear" }, "params": { "out_high": 0, "out_low": 1 } },
+    "rough": { "type": "blend", "inputs": { "a": "rough_paint", "b": "rough_steel", "mask": "wear" }, "params": { "mode": "mix" } },
+    "rough_out": { "type": "output", "inputs": { "in": "rough" }, "params": { "role": "roughness" } },
+    "rough_paint": { "type": "levels", "inputs": { "in": "mottle" }, "params": { "out_high": 0.85, "out_low": 0.6 } },
+    "rough_steel": { "type": "levels", "inputs": { "in": "steel_grain" }, "params": { "out_high": 0.42, "out_low": 0.22 } },
+    "score": { "type": "blend", "inputs": { "a": "wear_soft", "b": "chip_mask" }, "params": { "mode": "subtract", "opacity": 0.4 } },
+    "steel": { "type": "gradient_map", "inputs": { "in": "steel_grain" }, "params": { "colours": ["#8c9196", "#b9bec3", "#d3d7da"], "positions": [0, 0.5, 1] } },
+    "steel_grain": { "type": "fbm", "params": { "basis": "value", "cells": [48, 48], "gain": 0.6, "octaves": 3, "seed": 9 } },
+    "wear": { "type": "levels", "inputs": { "in": "score" }, "params": { "gamma": 1, "in_high": 0.42, "in_low": 0.42, "out_high": 0, "out_low": 1 } },
+    "wear_fbm": { "type": "fbm", "params": { "basis": "gradient", "cells": [3, 3], "gain": 0.5, "octaves": 5, "seed": 4 } },
+    "wear_out": { "type": "output", "inputs": { "in": "wear" }, "params": { "name": "wear" } },
+    "wear_soft": { "type": "blur", "inputs": { "in": "wear_fbm" }, "params": { "quality": "smooth", "radius": 0.012 } }
+  }
+}

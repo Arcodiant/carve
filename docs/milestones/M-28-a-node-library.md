@@ -4,7 +4,7 @@ description: >-
 ---
 # M-28 — A node library
 
-**Status:** Active
+**Status:** Done
 
 **Depends on:** M-27
 
@@ -83,6 +83,10 @@ About **7 tasks**:
   path with a moss filter graph used as a node), and fix a planted draft from check's report.
 - **Eleven tasks in one milestone** (the estimate was 7), kept by the person over splitting the milestone or merging
   tasks.
+- **The tile cache's cap stays tiles-only** (decided 2026-11-21, RV-76 and RV-77, recorded by T-178). Arrays waiting
+  for reuse and nodes' scratch are counted in `GraphEvaluator.LastHeldBytes` and documented, not put under the cap;
+  the 2 GB regression tests hold the whole process. Putting them under the cap was built and measured in T-173 (a blur
+  at 1024 in tiles of 64 under 4 MiB made 12,640 tiles against 1,840).
 
 **The check report, as agreed:**
 
@@ -133,10 +137,27 @@ check {}          (open graph, its own size; optional size<=2048,
 | 3 | T-137 blur, gradient_map + painted metal | Sonnet | T-134, T-135, T-136 | its node files and sample |
 | 3 | T-138 transform, distance + floor tiles | Opus | T-133, T-134, T-136 | its node files and sample |
 | 3 | T-139 exposed parameters + bricks variant | Opus | T-134, T-136 | `TexGraphFile.cs`, `GraphValidator.cs`, `EditGraphTool.cs`, `FileTools.cs`, swatch and export overrides |
-| 4 | T-140 graphs as nodes + grime, old wall | Opus (two agents) | T-139, T-135 | `TexGraphFile.cs`, `GraphValidator.cs`, `FileTools.cs`, `tools/Patina.SampleGraphs` |
+| 2b | T-153 data-dependent input requests (added 2026-11-20) | Opus | T-135 | `Evaluation/`, `NodeType.cs`, `WarpNode` |
+| 3b | T-155 separable passes, rotated-read locality (added 2026-11-20) | Opus | T-137, T-138 | `Evaluation/`, `NodeType.cs`, `BlurNode`, `DistanceNode` |
+| 3c | T-156 sphere tiling option on swatch (added 2026-11-20) | Sonnet | T-139 | `SwatchTool.cs`, `SwatchSphere.cs` |
+| 3d | T-157 cube view on swatch (added 2026-11-20) | Sonnet | T-156 | `SwatchTool.cs`, a cube beside `SwatchSphere.cs` |
+| 4 | T-140 graphs as nodes + grime, old wall | Opus (two agents) | T-139, T-135, T-153 | `TexGraphFile.cs`, `GraphValidator.cs`, `FileTools.cs`, `tools/Patina.SampleGraphs` |
 | 4 | T-141 check | Sonnet | T-134, T-137, T-138, T-139 | `CheckTool.cs`, `Patina.Graphs/Checks/` |
-| 5 | T-142 library stage in scenario-patina | Sonnet (+ frame review) | T-140, T-141 | `LibraryStage.cs`, `samples/graphs/*/swatch.png` |
+| 5 | T-142 library stage in scenario-patina | Sonnet (+ frame review) | T-140, T-141, T-155, T-156, T-157 | `LibraryStage.cs`, `samples/graphs/*/swatch.png` |
 | 6 | T-143 acceptance | Sonnet (inner sessions on the default, Opus) | T-142 | its round folders and checks |
+| 7 | T-170 tool descriptions read whole (added 2026-11-20) | Opus | T-143 | `DefineGraphTool.cs`, `NodeCatalogue`, any new tool |
+| 7 | T-171 edit_graph takes list parameters (added 2026-11-20) | Sonnet | T-143 | `EditGraphTool.cs` |
+| 8 | T-172 scenario-patina under its time limit (added 2026-11-20) | Sonnet | T-170, T-171 | `scenarios/Carve.Scenario.Patina/`, `tests.json`'s patina suites |
+| 9 | T-173 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 9 | T-174 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 9 | T-175 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 9 | T-176 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 9 | T-177 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 10 | T-178 RV-77 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 10 | T-179 RV-77 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 10 | T-180 the README, kept current (added 2026-11-22) | Opus | — | `README.md`, CLAUDE.md's working rules |
+| 11 | T-181 carve's README sections caught up (added 2026-11-22) | Opus | T-180 | `README.md`'s carve sections and Build and test |
+| 12 | T-183 every colliding outer node is a fault (added 2026-11-22) | Opus | — | `GraphValidator.cs` |
 
 Dependencies on a sibling's feature: T-137's gradient map needs T-134's list parameters, and its sample T-134's
 `metallic` and named outputs. T-138's floor tiles need T-136's `tiles` and T-134's `height`. T-139's content edits
@@ -160,5 +181,262 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-141](../tasks/T-141-the-check-tool.md) — patina's check lists texture faults in the open graph's outputs or in PNG files: seams, base colour out of range, metallic not near 0 or 1, normals not of unit length, and an output of one value
 - [ ] [T-142](../tasks/T-142-the-node-library-in-scenario-patina.md) — scenario-patina's library stage opens, swatches, checks and exports every sample material and variant, with every pixel worked from its texels, and commits each sample's swatch sheet
 - [ ] [T-143](../tasks/T-143-node-library-acceptance-run.md) — Fresh agents make a woven rug, rusted corrugated iron and a mossy flagstone path on patina from the tool descriptions alone, and fix what check reports on a planted graph
+- [ ] [T-153](../tasks/T-153-data-dependent-input-requests-for-warp.md) — A node can ask for an input's rectangle after reading another input, so warp at a large amount reads the few tiles its offsets reach
+- [ ] [T-155](../tasks/T-155-separable-passes-and-rotated-read-locality.md) — A wide neighbourhood node runs as a cached row pass and a column pass, so blur at 8192 takes about 2 minutes, not an hour, and distance 18 s, not 474, within the memory cap (the 10 s target moved to T-159), and a free rotation stops recomputing its source
+- [ ] [T-156](../tasks/T-156-a-sphere-tiling-option-on-swatch.md) — swatch takes a sphere tiling, default 1, so a material can be judged on the sphere at a texel density nearer a game's; the samples' sheets use 3
+- [ ] [T-157](../tasks/T-157-a-cube-view-on-swatch.md) — swatch gains a cube view, with the same tiling option as the sphere, so a material can be judged on flat faces and edges as well as a curve
+- [ ] [T-170](../tasks/T-170-tool-descriptions-an-agent-can-read-whole.md) — patina's tool descriptions reach an agent whole, with the node catalogue no longer crammed into define_graph's
+- [ ] [T-171](../tasks/T-171-edit-graph-takes-list-parameters.md) — edit_graph's set_params and set_node take list parameters as define_graph does
+- [ ] [T-172](../tasks/T-172-scenario-patina-back-under-its-time-limit.md) — scenario-patina runs well inside run-scenario's 300 s guard again: the library stage is split into two halves, suites `scenario-patina-library-1` and `scenario-patina-library-2`, beside `scenario-patina` for the other stages, with no check and no approved frame lost
+- [ ] [T-173](../tasks/T-173-rv-76-answers-the-evaluation-engine.md) — Every finding of RV-76's `## Findings: the evaluation engine` is answered, fixed where it is a defect, with outputs byte-identical
+- [ ] [T-174](../tasks/T-174-rv-76-answers-the-nodes-and-check-rules.md) — Every finding of RV-76's `## Findings: the nodes, check rules and samples`, and the check-tool findings of the server's, is answered
+- [ ] [T-175](../tasks/T-175-rv-76-answers-the-file-format-and-graph-model.md) — Every finding of RV-76's `## Findings: the file format and graph model` is answered, fixed where it is a defect
+- [ ] [T-176](../tasks/T-176-rv-76-answers-the-patina-server.md) — The patina server's RV-76 findings on save, the swatch sheet, export and override wording are answered, fixed where they are defects
+- [ ] [T-177](../tasks/T-177-rv-76-answers-the-scenarios-and-docs.md) — Every finding of RV-76's `## Findings: the scenarios and test configuration` and `## Findings: the whole diff` is answered
+- [ ] [T-178](../tasks/T-178-rv-77-answers-the-engine-nodes-and-checks.md) — Every finding of RV-77's `## Findings: round 2, the engine, nodes and checks` is answered
+- [ ] [T-179](../tasks/T-179-rv-77-answers-the-format-server-and-scenarios.md) — Every finding of RV-77's `## Findings: round 2, the format, server and scenarios` is answered
+- [ ] [T-180](../tasks/T-180-the-readme-for-the-node-library-kept-current-from-now-on.md) — The README's patina section describes M-28's node library, and CLAUDE.md makes keeping the README current part of every change
+- [ ] [T-181](../tasks/T-181-carve-s-readme-sections-caught-up.md) — The README's carve sections and its Build and test list describe what carve's server offers now
+- [ ] [T-183](../tasks/T-183-every-colliding-outer-node-is-a-fault.md) — Any outer node whose id collides with an expanded id is a fault on that node, whatever its type
 
 ## Retrospective
+
+**As planned.**
+
+- **The library is there and reachable from a plain `patina` launch.**
+  - **New nodes:** worley, fbm and warp (T-135); tiles, stripes and shape (T-136); blur and gradient_map (T-137);
+    transform and distance (T-138).
+  - **New outputs:** metallic, height and named outputs (T-134).
+  - **Variants:** exposed parameters with overrides on swatch, export and check (T-139).
+  - **Graphs as nodes,** with `input` nodes and parameters that pass through (T-140).
+  - **The check tool** (T-141).
+  - **Samples:** seven, plus a grey variant of the bricks, each look approved by the person before its task landed.
+    They are the cobblestones, bricks, fabric, painted metal, floor tiles, grime and the old wall.
+- **Tiled evaluation first (T-133) held.** Every committed PNG and frame stayed byte-identical through it, and the
+  planks at 8192 got 4% faster (187.6 s against 196.0 s, Debug, medians of five).
+- **Acceptance (T-143).** Fresh agents made all three materials from the tool descriptions alone, each with an exposed
+  parameter and a variant, and `check` clean:
+  - the woven rug in 25 calls;
+  - the rusted corrugated iron in 18;
+  - the mossy path, with a moss filter graph used as a node, in 19.
+
+  A fourth agent found all three planted faults from one `check`, kept all 14 node ids and saved it clean, in 11 calls.
+  The person approved every sheet.
+- **`cairn milestone M-28 verify`** (2026-11-21, after T-172): every check passes but `review`, which comes after the
+  person's go.
+  - 18 of 18 members done and merged.
+  - 25 suites passed, 19 ran and 6 carried, `server-regression`, `patina-regression` and every scenario among them.
+- No engine need was recorded.
+
+**Not as planned.**
+
+- **Eighteen members, not eleven.** Seven were added mid-milestone, each by the person's ruling on a stop:
+  - **T-153, data-dependent input requests.** A warp at amount 0.25 at 8192 was on course for about 55 minutes, because
+    a static input rectangle had to cover the largest offset. It now takes 26.9 s, and the cobblestones became 36 to
+    63% faster.
+  - **T-155, separable passes and rotated-read locality.**
+    - **The misses it fixed:** blur at 8192 was about an hour and distance 474 s, against the 10 s the plan set.
+    - **The other fixes:** a 30-degree turn made its source about 2.4 times over, and the strong minify needed 4.3 GB.
+    - **The figures now:** blur 90.9 s, distance 15.1 s, the turn 12.1 s with its source made 1.09 times, and the
+      minify 1.5 GB in Debug.
+    - It took five Opus agents.
+  - **T-156 and T-157, the sphere's tiling and a cube view on swatch.** Both were asked for by the person in reviews;
+    the samples' sheets are drawn at tiling 3.
+  - **T-170, descriptions an agent can read whole.** Claude Code cuts each MCP tool description at 4,096 characters.
+    `define_graph` was 17,908, so T-143's agents saw 6 of 19 node types and learned the rest by sending wrong graphs.
+    - **The fix:** a `nodes` tool, and every description held at 3,686 or under by a test.
+    - **The re-run:** the rug took 10 calls, none probing, against 25.
+  - **T-171, edit_graph takes list parameters.** T-143's fix session had to redefine a whole graph to change one
+    gradient stop.
+  - **T-172, scenario-patina under its time limit.** The milestone's first verify was stopped by run-scenario's 300 s
+    guard after T-142's library stage.
+    - **Why a split:** export and check cost about 20 s of 220; the rest is the stage's own per-pixel checking.
+    - **The suites now:** `scenario-patina`, `scenario-patina-library-1` and `scenario-patina-library-2`, at 52, 80 and
+      82 s alone.
+- **The 10 s targets for blur and distance at 8192 were not met.** Blur's own share is 120 s and distance's 17.6 s
+  (Release). The person landed T-155 without them and filed **T-159** (strip passes, off-milestone) to own them.
+- **Rules changed from planning, each by the person:**
+  - **`does-not-tile`** compared one wrap step with the mean interior step, and so flagged the committed planks, whose
+    stave edge falls on u = 0. It now judges the wrap against the 99th percentile of the interior boundaries.
+  - **T-134's metallic check.** Both spheres peak at 255 under carve's lights, so the planned peak measure could not
+    work. The check uses the median inside the silhouette and the count of pixels at 255 instead.
+  - **Transform's scale.** 1/n tiles; a whole number above 1 zooms in and does not tile. No meaning of scale lets both
+    tile.
+  - **The Debug regression tests at 8192 assert only the 2 GB peak.** The 10 s checks are measured in Release.
+- **Smaller rulings:**
+  - gradient_map allows equal stops;
+  - a graph parameter may drive an `IntPair` but not a list;
+  - ranges round inward;
+  - nested-graph faults use the `nodes['a/b'].params['c']` form;
+  - the sphere's correlation bars are 0.6, and 0.62 for metal;
+  - T-138's floor-tiles test bound was loosened, with approval.
+- **A gap between two members.** T-141 added `check` to the tool list, and scenario-patina's graph stage, which
+  checks that list exactly, then failed. T-141's `**Verify:**` named only `patina-unit`, so nothing caught it until
+  T-142 fixed it.
+- **The default model moved.** With no `--model`, `claude -p` now starts Fable 5.2, not Opus 5.5. The person had T-143's
+  sessions pinned to `claude-opus-5-5`.
+- **Interruptions:**
+  - Waystone closed twice with an agent under way (T-155 and T-143); both were resumed from what was on disk.
+  - T-172's Sonnet agent hit the weekly usage limit, and its last steps ran on Opus.
+- **Backslashes eaten in transit** spoiled an `.mcp.json` (T-143's first launch did nothing), C# string escapes
+  (T-157) and a path in T-157's As built, which the orchestrator repaired.
+- **Hand-offs** were many:
+  - T-155: four;
+  - T-133, T-138 and T-140: two each;
+  - T-134, T-137, T-139, T-141, T-157, T-170 and T-172: one each.
+
+**Never verified.**
+
+- **Frames nobody opened:**
+  - `swatch-sheet-grid-tiling-3.png` differs from T-140's job. T-172 traced the difference to work after that job;
+    T-177 (RV-76) found it: the 1,600 pixels that differ lie at x 536 to 615, y 27 to 46, inside the sphere cell's label
+    band, where T-157 (9b207c2) added ", tiling 3" to the sphere's label. The cell below the band is now judged against
+    the sphere view at tiling 3, pixel for pixel.
+  - The re-run rug's sheets (T-170).
+  - The library frames after T-172's split, which were held by hash only.
+- **Not measured after the last evaluator change** (T-155's bands of 32):
+  - the turn ratio, measured at 1.16 with bands of 16;
+  - any Debug peak, with bands of 32.
+
+  Distance's own time at 2048 was not recorded either.
+- **The metal sphere bar has 0.04 of margin** (0.661 against 0.62).
+- **Swatch's tiling relies on undocumented engine behaviour.** It uses a `UvRect` larger than 1, which Empyrean 0.129.0
+  draws as a repeat although its docs say components lie in [0, 1]. A scenario check would catch a change, but no
+  engine need was recorded.
+- **Untested since T-171:** a list given as a parameter override, now read since T-171, is expected to be refused by
+  kind, but no test holds it. T-143's fix session was not re-run after T-171.
+- **The 90-degree sphere at tiling 3** is not distinguished on T-156's stripe grid.
+- **The M-7 barrel textures fail `check`.** These are reported, not judged:
+  - iron: base colour and roughness seams in u, and metallic not binary in 8.7% of texels;
+  - staves: a small v step;
+  - end grain: the normal off unit length in 0.62% of texels.
+
+  No one has looked at those seams.
+- `ExportToolTests.Other_tools_answer_while_an_export_runs` timed out once on one runner (T-139) and passed on re-run.
+
+**Known and left.**
+
+- **T-159** (strip passes and the 10 s targets) and **T-169** (cube captures in the library stage), both off-milestone.
+- **T-130** (faster 8192 evaluation) was held for T-133 and now wants re-scoping against the tiled, banded evaluator.
+- **T-129** (a heavy tier for 8192 tests) matters more now: patina-regression ran 1,162 s in the last verify.
+- CLAUDE.md and `tools/Patina.SampleGraphs/Program.cs` are inputs of no suite (verify warns).
+- **Files for the person to delete:**
+  - the unregistered member worktree folders `branches/task/T-133` to `T-172`;
+  - an empty `D:\Users\andre\AppData\Local\Temp` made by a mistyped path (T-133);
+  - a stray `t157-review-err.log` in `G:\My Drive\artifacts\carve\M-28\T-157\`.
+
+**Models.**
+
+| Member | Model | Agents |
+|---|---|---|
+| T-133 | Opus 5.5 | 3 (research, build, finish) |
+| T-134 | Opus 5.5 | 2 |
+| T-135 | Sonnet 5.5 | 1 |
+| T-136 | Sonnet 5.5 | 1 |
+| T-137 | Sonnet 5.5 | 2 |
+| T-138 | Opus 5.5 | 3 |
+| T-139 | Opus 5.5 | 2 |
+| T-140 | Opus 5.5 | 3 |
+| T-141 | Sonnet 5.5 | 2 (a stop on the tile rule, then the build) |
+| T-142 | Sonnet 5.5 | 1 |
+| T-143 | Sonnet 5.5; inner sessions Opus 5.5 | 1 (resumed once) |
+| T-153 | Opus 5.5 | 1 |
+| T-155 | Opus 5.5 | 5 (resumed once) |
+| T-156 | Sonnet 5.5 | 1 |
+| T-157 | Sonnet 5.5 | 2 |
+| T-170 | Opus 5.5; probe and re-run Opus 5.5 | 2 |
+| T-171 | Sonnet 5.5 | 1 |
+| T-172 | Sonnet 5.5, then Opus 5.5 (usage limit) | 2 |
+
+No rework was traced to the Sonnet tier. The Sonnet members' stops (T-137's blur speed, T-141's tile rule) were real
+findings, put to the person correctly. The extra agents went on performance work on Opus, mostly T-155.
+
+**For the next plan.**
+
+- **Probe every wide node at 8192 at planning.** Do it before setting a time target: warp at its largest amount, blur
+  at its largest radius, distance, a free rotation, a strong minify. M-27's retrospective said to measure an 8192 claim
+  on the real graph; the 10 s targets here were set without a probe, and three members (T-153, T-155, T-159) came from
+  them.
+- **Hold every MCP tool description under 4,096 characters from the start,** by a test, in carve too. Check carve's
+  descriptions against the cap now.
+- **A member that changes the tool list names every suite that checks it** in its `**Verify:**` line.
+- **Size a scenario at planning.** A stage that adds many frames and per-pixel checks gets its own suite before the
+  milestone's verify finds the guard.
+- **Pin `--model` in every acceptance run's conditions,** since the default moves.
+- **Brief every agent that writes configs, docs or code through the shell about backslashes** (`chr(92)`), as later
+  briefs here did.
+- **Expect performance members to hand off repeatedly.** Each long measurement costs a checkpoint, so plan them as a
+  research agent plus a build agent with the harness written down for the next.
+
+**After the person's go (2026-11-21 to 2026-11-22).**
+
+- **Rebase onto `main` (Opus 5.5):** M-24 and release 0.16.0 had landed (80 commits). Only `CLAUDE.md`'s `samples/` row
+  and `tests.json` conflicted, both by lines only added. Nothing broke, and all 26 suites ran and passed.
+- **Refactor pass (Opus 5.5):** six cuts with no change in behaviour:
+  - one shared bilinear sample for warp and transform;
+  - the evaluator's leftovers from T-153 and T-155;
+  - a duplicate sphere-hit cache and repo-root search in the scenario;
+  - one path helper and one own-file rule in the server;
+  - the dead `TextureGraph.DriverOf`.
+
+  Left as design changes: blur's and distance's one-pass code, which only tests call, and worked-example constants now
+  read only by tests.
+- **Review round 1, RV-76:** five Opus 5.5 reviewers, split by area (the engine; the nodes and checks; the format and
+  graph model; the server; the scenarios with a whole-diff pass).
+  - **Findings:** 36, with 2 Major, 20 Minor and 14 Nit.
+  - **The Majors:** a save into another folder broke its nested graph nodes after reporting success, and an outer
+    node could silently replace a nested one by id.
+  - **Answers:** five fix members, T-173 to T-177, all on Opus 5.5. 35 fixed, 1 no change needed (the metal sphere
+    bar the person had accepted).
+- **The person's rulings during round 1:**
+  - metallic is exempt from `one-value` in graphs;
+  - in `check`'s files, blue is read as metallic only for role `metallic_roughness`, replacing T-141's ruling;
+  - the label atlas grows to fit the outputs;
+  - the multi-port minify is fixed in M-28 (it now peaks at 991 MB at 8192);
+  - the cache cap stays tiles-only;
+  - T-175's node cap of 4096.
+- **Review round 2, RV-77:** two Opus 5.5 reviewers checking the answers.
+  - **Findings:** 14, with 6 Minor and 8 Nit.
+  - **Three RV-76 fixes had not held:** validation was still exponential through parameter drives, a colliding outer
+    `graph`-type node still threw, and the repaired metallic break could not fail on its own. The person chose to fix
+    them.
+  - **Answers:** T-178 and T-179, on Opus 5.5. 13 fixed; blur's 8192 peak (1,595 MB against 1,154 MB) was answered no
+    change needed after measuring that it is heap the collector leaves, not memory held (1,112 MB under a 900 MB heap
+    limit).
+- **The README (asked for by the person on 2026-11-22):**
+  - **T-180:** rewrote the patina section from the code, and added the working and planning rules that a change a user
+    or agent can reach updates `README.md` in the same task.
+  - **T-181:** caught up carve's sections, which the person chose to fix in M-28: parts and levels, baked maps, morph
+    targets, and every suite in Build and test.
+  - **Every worked call they added was run as written.**
+  - **Not added:** a test of the README's example. The person declined it, so `verify` lists `README.md` as uncovered.
+- **Review round 3, RV-78:** one Opus 5.5 reviewer. 2 findings:
+  - **The colliding-node fix still threw for an outer node of an unknown type.** T-183 fixed it.
+  - **A driven nested file is charged to the node cap twice.** Filed as T-182.
+- **Review round 4, RV-79:** one Opus 5.5 reviewer, checking only T-183, by the person's choice.
+  - **The fix holds:** every lookup is guarded, the test fails without it, and five further collision shapes do not
+    throw.
+  - **One Nit predating the fix:** readers of a colliding node take follow-on faults. Filed as T-186.
+- **`cairn milestone M-28 verify` (2026-11-22): VERIFY PASS.**
+  - 28 of 28 members done and merged.
+  - The review is current at RV-79.
+  - 26 suites passed, 4 ran and 22 carried.
+  - No heavy tier was triggered.
+- **Not as planned after the go:**
+  - **Sonnet ran out.** Sonnet was under its weekly usage limit from 2026-11-21, so every agent after T-172's first
+    ran on Opus.
+  - **Two subagents were refused writes outside their worktree.** T-174's outcome-line cleanup was made by the
+    orchestrator once the person allowed it. RV-79's findings were written into the review by the orchestrator.
+  - **T-174 ran `cairn lint` and `finish` in one command,** so it merged before reading lint's nine complaints about
+    its own outcome lines. Every later brief said to read lint first, as a command of its own.
+  - **An orchestrator commit (`596959c`) held only blank reservation stubs** after a script lost a backslash. The next
+    commit corrected it.
+- **Left:**
+  - T-182 and T-186, off-milestone;
+  - the worktree folders `branches/task/T-173` to `T-183`, unregistered, to delete by hand;
+  - scratch under `%TEMP%` (`m28-review*`, `m28-probe`, `t17*`, `t18*`).
+- **Next time:**
+  - **Brief every fix agent on the exact outcome form,** `fixed` alone with detail on a `**Fix:**` line.
+  - **A fix that guards one case should be checked against every type it could meet.** The colliding-node finding took
+    three rounds because each fix covered one more type.
+  - **Three of RV-76's answers did not hold.** Checking answers against the code paid off again, as in M-27.

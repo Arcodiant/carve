@@ -153,11 +153,11 @@ internal static class Results
         return TextOf(result);
     }
 
-    /// <summary>The open graph's file text, from get_graph (everything after its head line).</summary>
+    /// <summary>The open graph's file text, from get_graph (everything from the file's first line, after its head line and any parameter lines).</summary>
     public static async Task<string> GraphText(this IToolCaller server)
     {
         var text = await server.Ok("get_graph", "{}");
-        return text[(text.IndexOf('\n') + 1)..];
+        return text[(text.IndexOf("\n{", StringComparison.Ordinal) + 1)..];
     }
 }
 

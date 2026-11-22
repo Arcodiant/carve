@@ -30,20 +30,43 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
     public const string DisconnectExample = """{"op":"disconnect","node":"grained","port":"b"}""";
     public const string SetExample = """{"op":"set","size":512,"seed":7}""";
 
+    /// <summary>The parameters' worked example (T-139), on samples/graphs/bricks.texgraph, whose mortar, tint and jitter are exposed: grey stone bricks.</summary>
+    public const string WorkedParameters = """{"operations":[{"op":"set_parameters","values":{"mortar":0.08,"tint":"#7a7a70"}}]}""";
+
+    public const string WorkedParametersResult =
+        "edit_graph: 1 operation applied: set parameters mortar 0.08 (was 0.1), tint \"#7a7a70\" (was \"#a8452f\"). The graph is 18 nodes, size 256, seed 21; no faults: it evaluates";
+
+    /// <summary>The other parameter operations' shapes, each run by a test on the bricks.</summary>
+    public const string SetParameterExample = """{"op":"set_parameter","name":"variation","value":0.7,"drives":["tone.out_low"],"max":0.9}""";
+    public const string RemoveParameterExample = """{"op":"remove_parameter","name":"jitter"}""";
+
+    /// <summary>The list parameters' worked example (T-171), after define_graph's gradient_map one: the middle stop moved and made lighter, in place.</summary>
+    public const string WorkedList =
+        """{"operations":[{"op":"set_params","node":"tint","params":{"positions":[0,0.4,1],"colours":["#1c2b24","#6b8f55","#b9c9a8"]}}]}""";
+
+    public const string WorkedListResult = "edit_graph: 1 operation applied: set 'tint' positions [0, 0.4, 1], colours [\"#1c2b24\", \"#6b8f55\", \"#b9c9a8\"]. The graph is 4 nodes, size 256, seed 0; no faults: it evaluates";
+
     public const string Text =
         "Edits the open graph by a list of operations, applied in order and all or nothing: when any operation cannot be applied, or the list would leave a fault the graph did not have, "
         + "nothing changes and the result says why (the operation by number, or the new faults, each naming its node and port or parameter). "
         + "Faults the graph already had (an opened file's, say) do not stop an edit, so they can be fixed one list at a time; the result lists those left. "
         + "operations is an array of objects, each with op and its own keys:\n"
-        + "- set_node {node, type, inputs, params}: adds the node with that id, or replaces it whole (inputs and params optional, as in define_graph).\n"
+        + "- set_node {node, type, inputs, params}: adds the node, or replaces it whole (inputs and params optional, as in define_graph).\n"
         + "- remove_node {node}: removes it; disconnect or reconnect what reads it in the same list, or that is a new fault.\n"
-        + "- connect {node, port, from}: sets node's input port to read from (an id, or \"id.port\"), replacing what it read before.\n"
+        + "- connect {node, port, from}: sets node's input port to read from (an id, or \"id.port\"), replacing what it read.\n"
         + "- disconnect {node, port}: leaves the input unconnected (a fault unless the port is optional).\n"
         + "- set_params {node, params}: merges params into the node's, replacing those it names and keeping the rest.\n"
         + "- set {size, seed}: the graph's size or seed or both.\n"
-        + "For example " + SetParamsExample + " gives tone another seed, " + DisconnectExample + " on its own is refused (a blend's b is required, so leaving it open is a new fault), and " + SetExample + " doubles the size and changes the seed. "
+        + "- set_parameter {name, value, drives, min, max}: adds the exposed parameter name, or changes the keys given. drives is a list of node parameters, each \"node.param\", all of one kind (a number, a whole number, a choice, two whole numbers or a colour; not a list); "
+        + "the parameter takes the narrowest range of them (the intersection, or an enum's common choices), narrowed again by min and max (numbers; null clears one), and every driven parameter takes its value, its own value in its node left out. "
+        + "A new parameter needs value and drives. A node parameter a parameter stops driving keeps the parameter's value as its own.\n"
+        + "- remove_parameter {name}: removes it; the parameters it drove keep its value as their own.\n"
+        + "- set_parameters {values}: sets parameters' values by name, such as {\"mortar\": 0.08}.\n"
+        + "A value out of a parameter's range is a new fault (parameters['mortar']: is 0.5, but must be a number from 0 to 0.45), so the list is refused. get_graph lists the parameters; swatch and export take them for one call without editing the graph.\n"
+        + "For example " + SetParamsExample + " gives tone another seed, " + DisconnectExample + " on its own is refused (a blend's b is required), and " + SetExample + " doubles the size and changes the seed. "
+        + "A list parameter (a gradient_map's positions or colours) is given whole, an array of numbers or of strings as define_graph reads it, and replaces the list; when the count changes, give both lists in one operation. "
         + "Types, ports and parameters are define_graph's. Returns one line: what each operation did, then the graph's nodes, size, seed and faults.\n"
-        + "Worked example, after define_graph's worked example: a grain running along v, multiplied in at 0.3:\n"
+        + "Worked example, on define_graph's worked graph: a grain along v, multiplied in at 0.3:\n"
         + "edit_graph " + Worked + "\n"
         + "returns: " + WorkedResult + "\n"
         + "Then edit_graph " + WorkedRefused + " changes nothing and returns:\n" + WorkedRefusedResult;
@@ -53,7 +76,7 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
         ["operations"] = new JsonObject
         {
             ["type"] = "array",
-            ["description"] = "The operations, applied in order, all or nothing: each an object with op (set_node, remove_node, connect, disconnect, set_params or set) and its keys.",
+            ["description"] = "The operations, applied in order, all or nothing: each an object with op (set_node, remove_node, connect, disconnect, set_params, set, set_parameter, remove_parameter or set_parameters) and its keys.",
             ["items"] = new JsonObject { ["type"] = "object" },
         },
     }, "operations");
@@ -66,6 +89,9 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
         ["disconnect"] = ["node", "port"],
         ["set_params"] = ["node", "params"],
         ["set"] = ["size", "seed"],
+        ["set_parameter"] = ["name", "value", "drives", "min", "max"],
+        ["remove_parameter"] = ["name"],
+        ["set_parameters"] = ["values"],
     };
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? operations = null)
@@ -103,7 +129,7 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
     }
 
     /// <summary>A fault's place, which a new fault does not share with an old one: its node, port and parameter (the message may name ids an edit added).</summary>
-    private static (string?, string?, string?) Key(GraphFault fault) => (fault.Node, fault.Port, fault.Parameter);
+    private static (string?, string?, string?, string?) Key(GraphFault fault) => (fault.Node, fault.Port, fault.Parameter, fault.GraphParameter);
 
     /// <summary>Applies one operation to <paramref name="graph"/>: what it did, or null with <paramref name="problem"/> (starting "(op): ").</summary>
     private static string? Apply(JsonElement operation, ref TextureGraph graph, out string problem)
@@ -141,6 +167,8 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
                     return Fail($"unknown key '{property.Name}'; {op} takes {string.Join(", ", keys)}");
 
             if (op == "set") return Set(operation, ref g, Fail);
+            if (op == "set_parameters") return SetParameters(operation, ref g, Fail);
+            if (op is "set_parameter" or "remove_parameter") return Parameter(op, operation, ref g, Fail);
 
             if (!TryString(operation, "node", out var id)) return Fail("node is missing; give the node's id, as a string");
             var existing = g.Nodes.GetValueOrDefault(id);
@@ -212,6 +240,94 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
         return said.Count == 0 ? fail("give size, seed or both") : "set " + string.Join(", ", said);
     }
 
+    private static string Names(TextureGraph graph) => graph.Parameters.Count == 0 ? "none" : string.Join(", ", graph.Parameters.Keys);
+
+    private static string? SetParameters(JsonElement operation, ref TextureGraph graph, Func<string, string?> fail)
+    {
+        if (!operation.TryGetProperty("values", out var values) || values.ValueKind != JsonValueKind.Object)
+            return fail("values is missing; give an object of the parameters' names to values, such as {\"mortar\": 0.08}");
+        var said = new List<string>();
+        foreach (var p in values.EnumerateObject())
+        {
+            if (!graph.Parameters.TryGetValue(p.Name, out var existing))
+                return fail($"there is no parameter '{p.Name}'; the parameters are {Names(graph)}");
+            if (ParameterOverrides.Read(p.Value) is not { } value)
+                return fail($"parameter '{p.Name}'" + ParameterOverrides.WhyNot(p.Value));
+            said.Add($"{p.Name} {value} (was {existing.Value})");
+            graph = graph.WithParameter(p.Name, existing with { Value = value });
+        }
+        return said.Count == 0 ? fail("values is empty; give at least one parameter") : "set parameters " + string.Join(", ", said);
+    }
+
+    private static string? Parameter(string op, JsonElement operation, ref TextureGraph graph, Func<string, string?> fail)
+    {
+        if (!TryString(operation, "name", out var name)) return fail("name is missing; give the parameter's name, as a string");
+        var existing = graph.Parameters.GetValueOrDefault(name);
+        if (op == "remove_parameter")
+        {
+            if (existing is null) return fail($"there is no parameter '{name}'; the parameters are {Names(graph)}");
+            graph = graph.WithoutParameter(name);
+            var kept = Release(ref graph, existing.Drives, existing.Value);
+            return $"removed parameter '{name}'" + (kept.Count == 0 ? "" : $"; {string.Join(", ", kept)} keep{(kept.Count == 1 ? "s" : "")} {existing.Value}");
+        }
+
+        var said = new List<string>();
+        var parameter = existing ?? new GraphParameter(ParamValue.Of(0), []);
+        if (operation.TryGetProperty("value", out var valueArg))
+        {
+            if (ParameterOverrides.Read(valueArg) is not { } value) return fail("value" + ParameterOverrides.WhyNot(valueArg));
+            said.Add($"value {value}" + (existing is null ? "" : $" (was {existing.Value})"));
+            parameter = parameter with { Value = value };
+        }
+        else if (existing is null) return fail("value is missing; a new parameter needs value and drives");
+        if (operation.TryGetProperty("drives", out var drivesArg))
+        {
+            if (drivesArg.ValueKind != JsonValueKind.Array || drivesArg.EnumerateArray().Any(e => e.ValueKind != JsonValueKind.String))
+                return fail($"drives is {Kind(drivesArg)}; it is an array of node parameters, each \"node.param\", such as [\"layout.gap\"]");
+            parameter = parameter with { Drives = [.. drivesArg.EnumerateArray().Select(e => e.GetString()!)] };
+            said.Add($"drives {string.Join(", ", parameter.Drives)}" + (existing is null ? "" : $" (was {string.Join(", ", existing.Drives)})"));
+        }
+        else if (existing is null) return fail("drives is missing; a new parameter needs value and drives");
+        foreach (var key in new[] { "min", "max" })
+        {
+            if (!operation.TryGetProperty(key, out var bound)) continue;
+            if (bound.ValueKind == JsonValueKind.Null)
+            {
+                parameter = key == "min" ? parameter with { Min = null } : parameter with { Max = null };
+                said.Add($"{key} cleared");
+                continue;
+            }
+            if (bound.ValueKind != JsonValueKind.Number || !double.IsFinite(bound.GetDouble()))
+                return fail($"{key} is {Kind(bound)}; it is a number, or null to clear it");
+            var n = bound.GetDouble();
+            parameter = key == "min" ? parameter with { Min = n } : parameter with { Max = n };
+            said.Add($"{key} {TexGraphFile.FormatNumber(n)}");
+        }
+        if (said.Count == 0) return fail("give value, drives, min or max to change");
+
+        // What it stops driving keeps the old value as its own; what it starts driving drops its own.
+        if (existing is not null) Release(ref graph, [.. existing.Drives.Where(d => !parameter.Drives.Contains(d))], existing.Value);
+        foreach (var drive in parameter.Drives)
+            if (GraphParameter.TryParseDrive(drive, out var id, out var param) && graph.Nodes.TryGetValue(id, out var node) && node.Params.ContainsKey(param))
+                graph = graph.WithNode(id, node with { Params = node.Params.Remove(param) });
+        graph = graph.WithParameter(name, parameter);
+        return (existing is null ? $"added parameter '{name}' " : $"set parameter '{name}' ") + string.Join(", ", said);
+    }
+
+    /// <summary>Gives each of <paramref name="drives"/> that names a node <paramref name="value"/> as its own; the drives so kept.</summary>
+    private static List<string> Release(ref TextureGraph graph, IEnumerable<string> drives, ParamValue value)
+    {
+        var kept = new List<string>();
+        foreach (var drive in drives)
+            if (GraphParameter.TryParseDrive(drive, out var id, out var param) && graph.Nodes.TryGetValue(id, out var node))
+            {
+                graph = graph.WithNode(id, node.WithParam(param, value));
+                kept.Add(drive);
+            }
+        return kept;
+    }
+
+
     private static bool TryString(JsonElement operation, string key, out string text)
     {
         text = "";
@@ -243,16 +359,8 @@ public sealed class EditGraphTool(GraphStore store, NodeRegistry registry)
             return $"params is {Kind(value)}; it is an object of name: value, such as {{\"seed\": 3}}";
         foreach (var parameter in value.EnumerateObject())
         {
-            var v = parameter.Value;
-            ParamValue? read = v.ValueKind switch
-            {
-                JsonValueKind.Number when double.IsFinite(v.GetDouble()) => ParamValue.Of(v.GetDouble()),
-                JsonValueKind.String => ParamValue.Of(v.GetString()!),
-                JsonValueKind.Array when v.EnumerateArray().All(e => e.ValueKind == JsonValueKind.Number) =>
-                    ParamValue.Of([.. v.EnumerateArray().Select(e => e.GetDouble())]),
-                _ => null,
-            };
-            if (read is null) return $"parameter '{parameter.Name}' is {Kind(v)}; a value is a number, a string or an array of numbers";
+            if (ParameterOverrides.Read(parameter.Value) is not { } read)
+                return $"parameter '{parameter.Name}'" + ParameterOverrides.WhyNot(parameter.Value);
             parameters = parameters.SetItem(parameter.Name, read);
         }
         return null;

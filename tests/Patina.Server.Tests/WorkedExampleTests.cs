@@ -17,6 +17,46 @@ public class WorkedExampleTests
     }
 
     [Fact]
+    public async Task Define_graph_takes_the_brick_layout_as_written()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+
+        Assert.Equal(DefineGraphTool.WorkedTilesResult, await patina.Ok("define_graph", DefineGraphTool.WorkedTiles));
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedTiles + "\nreturns: " + DefineGraphTool.WorkedTilesResult, NodeCatalogue.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Define_graph_takes_the_turned_stripes_and_says_they_do_not_tile()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+
+        Assert.Equal(DefineGraphTool.WorkedTurnResult, await patina.Ok("define_graph", DefineGraphTool.WorkedTurn));
+        var text = NodeCatalogue.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn);
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedTurn + "\nreturns: " + DefineGraphTool.WorkedTurnResult, text, StringComparison.Ordinal);
+        Assert.Contains("a turn that is not a quarter turn does not tile", text, StringComparison.Ordinal);
+        Assert.Contains("- transform: ", text, StringComparison.Ordinal);
+        Assert.Contains("- distance: ", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Define_graph_takes_the_tone_per_stone_from_worleys_random_output()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+
+        Assert.Equal(DefineGraphTool.WorkedResult, await patina.Ok("define_graph", DefineGraphTool.WorkedStones));
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedStones + "\nreturns: " + DefineGraphTool.WorkedResult, NodeCatalogue.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn));
+    }
+
+    [Fact]
+    public async Task Define_graph_takes_the_blur_and_gradient_map_example_as_written()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+
+        Assert.Equal(DefineGraphTool.WorkedMapResult, await patina.Ok("define_graph", DefineGraphTool.WorkedMap));
+        Assert.Contains("define_graph " + DefineGraphTool.WorkedMap + "\nreturns: " + DefineGraphTool.WorkedMapResult, NodeCatalogue.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn));
+    }
+
+    [Fact]
     public async Task Get_graph_after_define_graph_returns_the_description_s_text()
     {
         await using var patina = await PatinaHarness.StartAsync();
@@ -88,20 +128,20 @@ public class WorkedExampleTests
     [Fact]
     public void Every_description_has_a_worked_example()
     {
-        foreach (var text in new[] { DefineGraphTool.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn), EditGraphTool.Text, GetGraphTool.Text, SaveTool.Text, OpenTool.Text, PushSnapshotTool.Text, PopSnapshotTool.Text, ExportTool.Text })
+        foreach (var text in new[] { DefineGraphTool.Text(Patina.Graphs.Nodes.NodeRegistry.BuiltIn), EditGraphTool.Text, GetGraphTool.Text, SaveTool.Text, OpenTool.Text, PushSnapshotTool.Text, PopSnapshotTool.Text, ExportTool.Text, CheckTool.Text, NodeTool.Description(Patina.Graphs.Nodes.NodeRegistry.BuiltIn) })
             Assert.Contains("Worked example", text);
     }
 
     [Fact]
-    public void Define_graph_lists_every_registered_type_with_its_ports_and_parameters()
+    public void Nodes_lists_every_registered_type_with_its_ports_and_parameters()
     {
         var registry = Patina.Graphs.Nodes.NodeRegistry.BuiltIn;
-        var text = DefineGraphTool.Text(registry);
+        var text = NodeCatalogue.Text(registry);
         foreach (var name in registry.Names)
         {
             var type = registry.Find(name)!;
             Assert.Contains($"- {name}", text);
-            foreach (var p in type.Parameters) Assert.Contains($"{p.Name}: {p.Describe()}, default {p.Default}", text);
+            foreach (var p in type.Parameters) Assert.Contains($"{p.Name}: {p.Describe()}, " + (p.Optional ? "optional, no default" : $"default {p.Default}"), text);
         }
     }
 }
