@@ -25,3 +25,4 @@
 - T-175: Every finding of RV-76's `## Findings: the file format and graph model` is answered, fixed where it is a defect
 - T-178: Every finding of RV-77's `## Findings: round 2, the engine, nodes and checks` is answered
 - T-179: Every finding of RV-77's `## Findings: round 2, the format, server and scenarios` is answered
+- T-180: The README's patina section describes M-28's node library, and CLAUDE.md makes keeping the README current part of every change, so a reader of the README sees what the product does now
