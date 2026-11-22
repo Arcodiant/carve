@@ -123,6 +123,85 @@ public sealed class NestedGraphTests : IDisposable
         Assert.Equal(["base_colour", "roughness"], new GraphEvaluator(outer).Outputs);
     }
 
+    /// <summary>RV-76: the outer graph's size rules, not the nested file's: an inner graph of 32 under an outer one of 64 equals the hand-written copy at 64.</summary>
+    [Fact]
+    public void A_nested_file_of_another_size_takes_the_outer_graphs_size()
+    {
+        Put("inner.texgraph", Inner.Replace("\"size\": 64", "\"size\": 32"));
+        var outer = Load(Put("outer.texgraph", Outer));
+        Assert.Empty(GraphValidator.Validate(outer));
+        var hand = Text(ByHand());
+        Assert.Equal(Image(hand, "base_colour"), Image(outer, "base_colour"));
+        Assert.Equal(Image(hand, "base_colour", 16), Image(outer, "base_colour", 16));
+    }
+
+    /// <summary>RV-76: an outer node whose id is one expansion also makes (<c>g/c</c> beside graph node <c>g</c>, whose file has <c>c</c>) is faulted for its id, not put in the nested node's place; so is the same one level down.</summary>
+    [Fact]
+    public void An_outer_node_with_an_expanded_id_is_faulted_not_put_in_the_nested_nodes_place()
+    {
+        var clash = Outer.Replace("\"n\": { \"type\": \"noise\"", "\"g/c\": { \"type\": \"colour\", \"params\": { \"colour\": \"#ffffff\" } },\n    \"n\": { \"type\": \"noise\"");
+        Assert.Contains("\"g/c\"", clash);
+        var faults = FaultsOf(clash);
+        var fault = Assert.Single(faults);
+        Assert.Equal("g/c", fault.Node);
+        Assert.StartsWith("node 'g/c': an id is", fault.Message);
+
+        // One level down: the inner file holds the clash, and the outer graph using it is faulted through it.
+        Put("inner.texgraph", Inner);
+        Put("middle.texgraph", clash.Replace("\"seed\": 5,", "\"seed\": 5,"));
+        var top = Load(Put("top.texgraph", Outer.Replace("\"path\": \"inner.texgraph\"", "\"path\": \"middle.texgraph\"").Replace("\"amount\": 0.3, ", "")));
+        Assert.Contains(GraphValidator.Validate(top), f => f.Node == "g/g/c" && f.Message.Contains("an id is", StringComparison.Ordinal));
+    }
+
+    /// <summary>RV-76: a graph node's path is relative to the using graph's file (T-140): absolute, drive-relative, from-the-root and UNC paths are faults, and nothing is opened for them.</summary>
+    [Fact]
+    public void A_rooted_path_is_a_fault_and_is_not_opened()
+    {
+        var b = ((char)92).ToString();
+        var innerFull = Put("inner.texgraph", Inner);
+        string[] rooted = [innerFull, "C:inner", "/inner", b + "inner", b + b + "server" + b + "share" + b + "x", "//server/share/x"];
+        foreach (var path in rooted)
+        {
+            Assert.False(ParamSpec.IsRelativePath(path), path);
+            Assert.Null(GraphValidator.ResolvePath(Load(Put("outer.texgraph", Outer)), path));
+            var json = path.Replace(b, b + b);
+            var faults = GraphValidator.Validate(Load(Put("outer.texgraph", Outer.Replace("\"inner.texgraph\"", "\"" + json + "\""))));
+            var fault = Assert.Single(faults);
+            Assert.Equal(("g", "path"), (fault.Node, fault.Parameter));
+            Assert.Contains("relative to this graph's file", fault.Message);
+            Assert.DoesNotContain("no file at", fault.Message);
+        }
+        Assert.True(ParamSpec.IsRelativePath(".." + b + "x"));
+        Assert.True(ParamSpec.IsRelativePath("sub/x.texgraph"));
+    }
+
+    /// <summary>
+    /// RV-76: nine files each using the one below <c>fan</c> times. A fan of 2 (about 1,500 nodes) validates; a fan of 4
+    /// would take in 4^8 uses, so it is a fault naming <see cref="GraphValidator.MaxNodes"/>, found at once rather than hanging.
+    /// </summary>
+    [Theory]
+    [InlineData(2, false)]
+    [InlineData(4, true)]
+    [InlineData(10, true)]
+    public void Fan_out_past_the_node_cap_is_a_fault_not_a_hang(int fan, bool faulted)
+    {
+        Put("f0.texgraph", """
+            { "version": 1, "size": 64, "seed": 0, "nodes": { "c": { "type": "colour" }, "out": { "type": "output", "inputs": { "in": "c" } } } }
+            """);
+        for (var i = 1; i <= 8; i++)
+        {
+            var uses = string.Join(", ", Enumerable.Range(1, fan).Select(k => $"\"u{k}\": {{ \"type\": \"graph\", \"params\": {{ \"path\": \"f{i - 1}\" }} }}"));
+            Put($"f{i}.texgraph", $$"""{ "version": 2, "size": 64, "seed": 0, "nodes": { {{uses}}, "out": { "type": "output", "inputs": { "in": "u1" } } } }""");
+        }
+        var top = Load(Path.Combine(_dir, "f8.texgraph"));
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var faults = GraphValidator.Validate(top);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), $"validation took {watch.Elapsed}");
+        if (!faulted) { Assert.Empty(faults); return; }
+        Assert.NotEmpty(faults);
+        Assert.Contains(faults, f => f.Parameter == "path" && f.Message.Contains($"past {GraphValidator.MaxNodes}", StringComparison.Ordinal));
+    }
+
     /// <summary>Broken copies of the expansion, each written by hand as the expansion would have made it, and what tells it from the real one.</summary>
     public static TheoryData<string, string> BrokenCopies => new()
     {

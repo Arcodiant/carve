@@ -25,6 +25,13 @@ public static class GraphValidator
     /// <summary>How deep graphs used as nodes may nest: a graph using one using one ... 8 files down.</summary>
     public const int MaxDepth = 8;
 
+    /// <summary>
+    /// How many nodes one validation may take in, the graph's own and every nested file's each time it is used, all levels
+    /// down (RV-76): a file using another many times at each level would otherwise expand exponentially and hang where a
+    /// fault is wanted. A graph node whose expansion would pass it is a fault on its <c>path</c>.
+    /// </summary>
+    public const int MaxNodes = 4096;
+
     public static IReadOnlyList<GraphFault> Validate(TextureGraph graph, NodeRegistry? registry = null) =>
         Analyse(graph, registry ?? NodeRegistry.BuiltIn).Faults;
 
@@ -35,10 +42,10 @@ public static class GraphValidator
     public static IReadOnlyList<NestedGraphUse> Uses(TextureGraph graph, NodeRegistry? registry = null) =>
         [.. Analyse(graph, registry ?? NodeRegistry.BuiltIn).Uses.OrderBy(u => u.Key, StringComparer.Ordinal).Select(u => u.Value.Public)];
 
-    /// <summary>The absolute path a <c>graph</c> node's <paramref name="path"/> names: against <see cref="TextureGraph.Folder"/> (the working directory when null), <c>.texgraph</c> added when missing; null for a path that is not one.</summary>
+    /// <summary>The absolute path a <c>graph</c> node's <paramref name="path"/> names: against <see cref="TextureGraph.Folder"/> (the working directory when null), <c>.texgraph</c> added when missing; null for a path that is not one, or is not relative (<see cref="ParamSpec.IsRelativePath"/>).</summary>
     public static string? ResolvePath(TextureGraph graph, string path)
     {
-        if (path.Length == 0) return null;
+        if (!ParamSpec.IsRelativePath(path)) return null;
         var text = path.EndsWith(TexGraphFile.Extension, StringComparison.OrdinalIgnoreCase) ? path : path + TexGraphFile.Extension;
         try
         {
@@ -50,9 +57,15 @@ public static class GraphValidator
         }
     }
 
-    internal static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry) => Analyse(graph, registry, [], 0);
+    internal static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry) => Analyse(graph, registry, [], 0, new NodeBudget(graph.Nodes.Count));
 
-    private static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth)
+    /// <summary>The nodes taken in so far by one validation, all levels down, against <see cref="MaxNodes"/>.</summary>
+    private sealed class NodeBudget(int taken)
+    {
+        public int Taken { get; set; } = taken;
+    }
+
+    private static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth, NodeBudget budget)
     {
         var a = new GraphAnalysis();
         var ids = string.Join(", ", graph.Nodes.Keys);
@@ -67,16 +80,18 @@ public static class GraphValidator
         var wiredHere = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (id, node) in graph.Nodes)
         {
+            // The graph's own node with an id expansion also makes (an outer "g/c" beside graph node "g" whose file has "c",
+            // RV-76) stays the graph's own, so its id is checked as one, and the nested node is not put over it.
             if (registry.Find(node.Type) is not NestedGraphNode) { nodes[id] = node; continue; }
             var faults = useFaults[id] = [];
-            a.Uses[id] = Expand(id, node, graph, registry, chain, depth, faults, nodes, a, wiredHere, exposed);
+            a.Uses[id] = Expand(id, node, graph, registry, chain, depth, budget, faults, nodes, a, wiredHere, exposed);
         }
 
         foreach (var id in nodes.Keys.Concat(useFaults.Keys).Order(StringComparer.Ordinal))
         {
             if (useFaults.TryGetValue(id, out var fromUse)) { a.Faults.AddRange(fromUse); continue; }
             var node = nodes[id];
-            var isExpanded = a.Expanded.Contains(id);
+            var isExpanded = a.Expanded.Contains(id) && !graph.Nodes.ContainsKey(id);
             if (!(isExpanded ? GraphNames.IsValidPath(id) : GraphNames.IsValid(id)))
                 a.Fault(id, null, null, $"node '{id}': an id is {GraphNames.Pattern} (lower case letters, digits and _, starting with a letter)");
             var type = registry.Find(node.Type);
@@ -223,7 +238,7 @@ public static class GraphValidator
     /// sources resolved and driven parameters set. Faults go to <paramref name="faults"/>; a use with any is
     /// <see cref="GraphUse.Failed"/>, and nothing of it is added.
     /// </summary>
-    private static GraphUse Expand(string id, GraphNode node, TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth,
+    private static GraphUse Expand(string id, GraphNode node, TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth, NodeBudget budget,
         List<GraphFault> faults, SortedDictionary<string, GraphNode> nodes, GraphAnalysis a, HashSet<string> wiredHere, ParameterAnalysis exposed)
     {
         var use = new GraphUse(id);
@@ -303,7 +318,13 @@ public static class GraphValidator
             if (driven == id) overrides[name] = value;
         var set = GraphParameters.WithOverrides(nested, overrides, registry).Graph!;
 
-        var inner = Analyse(set, registry, [.. chain, full], depth + 1);
+        if (budget.Taken + set.Nodes.Count > MaxNodes)
+        {
+            Fault(null, "path", $"node '{id}' parameter 'path': uses {fileName}, which takes the nodes validated past {MaxNodes} (the graph's own and each nested file's each time it is used, all levels down)");
+            return use;
+        }
+        budget.Taken += set.Nodes.Count;
+        var inner = Analyse(set, registry, [.. chain, full], depth + 1, budget);
         use.Files.AddRange(inner.Files);
         a.Files.AddRange(inner.Files);
         use.Parameters = GraphParameters.Of(set, registry);
@@ -329,6 +350,7 @@ public static class GraphValidator
         foreach (var (nestedId, flat) in inner.Flat())
         {
             var newId = $"{id}/{nestedId}";
+            if (graph.Nodes.ContainsKey(newId)) continue; // the graph's own node of that id is kept, and faulted for its id
             var flatInputs = flat.Inputs.Select(p => KeyValuePair.Create(p.Key, $"{id}/{p.Value}")).ToList();
             if (inner.Nodes[nestedId].Type is InputNode && !inner.Expanded.Contains(nestedId)
                 && InputNode.PortName(inner.Nodes[nestedId].Parameters) is { } name && node.Inputs.TryGetValue(name, out var given))

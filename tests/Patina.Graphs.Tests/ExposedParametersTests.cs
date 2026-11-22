@@ -269,6 +269,36 @@ public class ExposedParametersTests
         bool VariantMatches(TextureGraph variant) => FourRoles.All(r => Rgba(variant, r).SequenceEqual(Committed(Path.Combine("bricks", "variants", "grey"), r)));
     }
 
+    /// <summary>RV-76: a parameter whose value is a list of strings (edit_graph's <c>["#000000", "#ffffff"]</c>) is written, reads back and is faulted by kind, as a list of numbers is; a mixed list stays a load error.</summary>
+    [Fact]
+    public void A_parameter_whose_value_is_a_list_of_strings_reads_back_and_is_faulted_by_kind()
+    {
+        var g = Small(("p", GraphParameter.Of(ParamValue.OfTexts(["#000000", "#ffffff"]), "paint.colour")));
+        var text = TexGraphFile.Write(g);
+        Assert.Contains("\"value\": [\"#000000\", \"#ffffff\"]", text);
+        var read = TexGraphFile.Read(text);
+        Assert.True(read.Loaded, read.Error?.ToString());
+        Assert.Equal(text, TexGraphFile.Write(read.Graph!));
+        var numbers = TexGraphFile.Read(TexGraphFile.Write(Small(("p", GraphParameter.Of(ParamValue.Of(0.0, 1.0), "paint.colour"))))).Graph!;
+        Assert.NotEmpty(GraphValidator.Validate(numbers));
+        var faults = GraphValidator.Validate(read.Graph!);
+        Assert.Contains(faults, f => f.Message.StartsWith("parameters['p']", StringComparison.Ordinal));
+        Assert.Equal(text, TexGraphFile.Read(TexGraphFile.WriteShowingDriven(g)).Graph is { } shown ? TexGraphFile.Write(shown) : null);
+        var mixed = TexGraphFile.Read(text.Replace("[\"#000000\", \"#ffffff\"]", "[\"#000000\", 1]"));
+        Assert.False(mixed.Loaded);
+        Assert.Contains("all numbers or all strings", mixed.Error!.ToString());
+    }
+
+    /// <summary>RV-76: version 1 has no parameters, so writing a graph that has them in it is refused, not written with them and the node values they drive dropped.</summary>
+    [Fact]
+    public void Writing_a_graph_with_parameters_as_version_1_is_refused()
+    {
+        var g = Small(("c", GraphParameter.Of(ParamValue.Of("#123456"), "paint.colour")));
+        var e = Assert.Throws<ArgumentException>(() => TexGraphFile.Write(g, TexGraphFormat.Version1));
+        Assert.Contains("exposed parameters (c)", e.Message);
+        Assert.StartsWith("{\n  \"version\": 2,", TexGraphFile.Write(g));
+    }
+
     private static byte[] Rgba(TextureGraph g, OutputRole role) => OutputImage.Rgba8(new GraphEvaluator(g), role, g.Size);
 
     private static byte[] Committed(string folder, OutputRole role) =>
