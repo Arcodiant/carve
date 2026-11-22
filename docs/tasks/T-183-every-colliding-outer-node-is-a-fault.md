@@ -4,7 +4,7 @@ description: >-
 ---
 # T-183 — Every colliding outer node is a fault
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
