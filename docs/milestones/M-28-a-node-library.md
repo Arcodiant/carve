@@ -149,6 +149,8 @@ check {}          (open graph, its own size; optional size<=2048,
 | 9 | T-175 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
 | 9 | T-176 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
 | 9 | T-177 RV-76 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 10 | T-178 RV-77 answers (added 2026-11-21) | Opus | — | see its Notes |
+| 10 | T-179 RV-77 answers (added 2026-11-21) | Opus | — | see its Notes |
 
 Dependencies on a sibling's feature: T-137's gradient map needs T-134's list parameters, and its sample T-134's
 `metallic` and named outputs. T-138's floor tiles need T-136's `tiles` and T-134's `height`. T-139's content edits
@@ -184,6 +186,8 @@ reached from a plain `patina` launch, through its MCP tools.
 - [ ] [T-175](../tasks/T-175-rv-76-answers-the-file-format-and-graph-model.md) — Every finding of RV-76's `## Findings: the file format and graph model` is answered, fixed where it is a defect
 - [ ] [T-176](../tasks/T-176-rv-76-answers-the-patina-server.md) — The patina server's RV-76 findings on save, the swatch sheet, export and override wording are answered, fixed where they are defects
 - [ ] [T-177](../tasks/T-177-rv-76-answers-the-scenarios-and-docs.md) — Every finding of RV-76's `## Findings: the scenarios and test configuration` and `## Findings: the whole diff` is answered
+- [ ] [T-178](../tasks/T-178-rv-77-answers-the-engine-nodes-and-checks.md) — Every finding of RV-77's `## Findings: round 2, the engine, nodes and checks` is answered
+- [ ] [T-179](../tasks/T-179-rv-77-answers-the-format-server-and-scenarios.md) — Every finding of RV-77's `## Findings: round 2, the format, server and scenarios` is answered
 
 ## Retrospective
 
