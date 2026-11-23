@@ -127,3 +127,126 @@ byte-for-byte checks fail between the two; T-189 measures. T-188 and T-189 both 
 - [ ] [T-189](../tasks/T-189-export-s-8192-numbers-measured-again.md) — export's description, the README and T-115's record carry the 8192 times, PNG sizes and peak memory measured with the new encoder, in Release and Debug
 
 ## Retrospective
+
+Written 2026-11-23, before the person's go. The rebase onto `main`, the refactor pass and the review are still to come.
+
+**As planned.**
+
+- **The claim holds on what was measured.** The planks at 8192, four outputs, .NET 10.0.15, through the new writer:
+
+  | | Whole call | Encode, four outputs | Peak | Slot |
+  |---|---|---|---|---|
+  | Release, run 1 | 27.8 s | 1.13 s | 711 MB | shared |
+  | Release, run 2 | 31.3 s | 0.59 s | 665 MB | shared |
+  | Debug, run 1 | 233.1 s | 1.40 s | 683 MB | shared |
+  | Debug, run 2 | 248.4 s | 1.37 s | 684 MB | shared |
+  | Debug, once | 168.0 s | not measured apart | 703 MB | exclusive |
+
+  - **One output** encodes in 0.09 to 0.51 s in Release and 0.23 to 0.46 s in Debug, against about 6 s before.
+  - **Before:** Release was 19.6 s of evaluation and 24.2 s of encode; Debug was 154.7 s and 1,565 MB (T-115).
+  - **Each PNG** is 0.28 to 0.97 MB, the same bytes in every run, against 2.6 to 3.2 MB.
+  - Evaluation is now nearly all of the call, and is M-40's.
+- **The members, one at a time in the planned order,** each by one agent with no hand-off:
+  - **T-187**, `PngWriter` with its tests and the canary, called by nothing. Every existing byte check stayed green.
+  - **T-188**, `Png.Encode` and `export` moved onto it, `Patina.Graphs` left with no package, and the samples remade.
+    All 43 PNGs under `samples/graphs/` (35 outputs and 8 swatches) decode to the RGBA they had. Their total fell
+    from 8,183,231 to 6,072,404 bytes. No byte check had its rule changed and no digest was taken again.
+  - **T-189**, the figures above in `export`'s description, the README and T-115's record.
+- **The format was not changed** from the one decided at planning.
+- **M-29 had not landed,** so the re-encode covered the eight samples of the plan and nothing else.
+- **`cairn milestone M-33 verify`** (2026-11-23, at `6e3e655`): every check passes but `review`, which comes after the
+  person's go. 3 of 3 members done and merged; 26 suites passed, 21 ran and 5 carried, `server-regression`,
+  `patina-regression` and every scenario among them.
+- No engine need was recorded. Nothing was drawn, and no frame was opened by anyone.
+
+**Not as planned.**
+
+- **The writer is slower than the planning bench.** The bench gave 0.15 s for four outputs; the writer took 0.59 to
+  1.16 s. In T-187's one run the bench's own encoder took 0.71 s in the same process, so the writer was about 1.6
+  times it. T-187 puts the gap down to the format's batches of 32 bands (the pool waits for the slowest band of each)
+  and one copy of each batch's rows, since a span cannot go to a pool thread. That is inference, not measured.
+- **Every time was taken on a loaded machine.** Other repos' test hosts held it at 85 to 100% CPU throughout. The
+  figures are upper bounds, with a run-to-run spread of 12% in Release and 7% in Debug.
+- **An exclusive run, asked for by the person mid-milestone.** T-189 ran `patina-regression`'s command once under the
+  `exclusive` slot class with `cairn test submit --command ... --resources exclusive --wait`, with no change to
+  `tests.json`'s class. It passed in 1,236.9 s after about 35 minutes queued. The machine was still not quiet: CPU
+  averaged 58%, and other repos' jobs showed as running at times.
+- **`patina-regression`'s time follows the machine's load.** 3,505 s in T-188's verify, 1,920 and 1,852 s in T-189's
+  shared runs, 1,237 s exclusive, 1,162 s at the end of M-28. `tests.json`'s `est-seconds` went from 200 to 1,240.
+- **`ZLibStream` does not notice a missing final block.** It inflated such a stream and threw nothing. T-187's stream
+  check therefore also checks that the stream ends in `03 00` and four bytes.
+- **One suite failed once and passed on a fresh run.** `scenario-patina-library-2` failed at startup in T-188's first
+  verify with "Method 'initialize' is not available on protocol version '2026-07-28'", before any stage, while
+  `patina-regression` ran beside it. It did not recur in T-189's runs or in the milestone's verify. The cause is not
+  known.
+- **Seven byte-comparing checks were not in T-188's list:** `CobblestonesGraphTests`, `PlanksGraphTests`,
+  `PaintedMetalTests`, `NestedSamplesTests` (line 59), `AcceptanceRoundTests`, `ExposedParameterToolTests` and
+  `MetalPlateTests` (line 55). All pass on the new files as written.
+- **Smaller slips:**
+  - T-187 put `InternalsVisibleTo` in `PngWriter.cs`, the csproj being T-188's. The broken copies its tests use are an
+    internal enum and an internal `Write` overload in the product assembly.
+  - T-188's first sample commit did not build (a nullable warning in its new guard test), fixed in a commit of its own.
+  - T-189's first wording of `export`'s description was 48 characters over `NodeToolTests`' limit and failed a verify.
+  - T-189 made 77 tool calls against the checkpoint of about 60, and did not hand off.
+  - The `waystone` MCP server did not connect in the orchestrator's session. No review was needed.
+
+**Never verified.**
+
+- **The canary on another machine, runtime or runner.** Every run was on Xellotath on .NET 10.0.15. Planning named
+  the canary's first run on the runners as that test; it has not happened.
+- **Any time on an idle machine,** in either build.
+- **The encode inside `export`'s own streamed path.** The encode figures come from a harness that times
+  `PngWriter.Write` to a file apart from evaluation. The whole-call figures are the real `patina`'s.
+- **The cause of the gap to the bench.**
+- **T-188's two new tests** (export at 256 equal to `Png.Encode`; no package assembly referenced) were not seen
+  failing on a deliberate break. T-187's checks each were.
+- **Test images** wider than 300 or taller than 4,200 rows. 8192 was covered by T-187's measurement, which decoded
+  each PNG, and not by a test.
+- **`Write` to a stream that cannot seek.**
+- **Peak memory in Release** is the process's peak working set read by the harness, not the test's own reading.
+
+**Known and left.**
+
+- **T-190**, off-milestone: carve's own writers (`bake`, `render`'s frames, `tools/Carve.SampleTextures`) stay on
+  `StbImageWriteSharp`.
+- **T-129** (a heavy tier for the 8192 tests) and **M-40** (evaluation), as before. The test report makes T-129's
+  case again.
+- `CLAUDE.md` and `README.md` are inputs of no suite (verify warns), as in M-27 and M-28.
+- **After it lands,** the published `patina` MCP copy wants refreshing.
+- **Files for the person to delete:** the unregistered worktree folders `branches/task/T-187`, `T-188` and `T-189`,
+  and scratch under `%TEMP%` (`t187-*`, `t188-*`, `t189-*`).
+- **Kept under `branches/main/artifacts/M-33/`** (ignored): T-187's measurement and hand-break log, T-188's
+  `reencode.tsv`, and T-189's two harnesses with `HOWTO.txt` and their results.
+
+**Models.**
+
+| Member | Model | Agents |
+|---|---|---|
+| T-187 | Opus 5.5 | 1 |
+| T-188 | Sonnet 5.5 | 1 |
+| T-189 | Sonnet 5.5 | 1 |
+
+The orchestrator ran on Fable 5.2. No rework was traced to a tier. T-187 was put on Opus and not the session's own
+model because the format was decided in full at planning and a working copy existed.
+
+**Test report** (`cairn test report --since 2d`, 2026-11-23):
+
+- **`patina-regression` is most of the slot time:** 14,894 slot-seconds in the window, about 52,000 a week at this
+  rate, ahead of `patina-unit` at 4,099. Almost all of it is the 8192 tests, which T-129 already owns. Nothing new was
+  filed.
+- **`scenario-patina-library-2`:** one flake, the `initialize` failure above. Not filed; put to the person.
+- **`patina-unit`:** one failure, from a member's own work in progress and fixed in the same task.
+- The exclusive run shows as `adhoc`, 1,237 s after 2,106 s waiting.
+
+**For the next plan.**
+
+- **Bench the format that will be built, not one near it.** The planning bench held the whole stream and wrote one
+  `IDAT`; the format batches 32 bands to an `IDAT`, and planning named the streamed form as not probed. The 0.15 s
+  figure was for the first.
+- **Take a time on a machine that is known to be quiet, or say that none was.** A slot class keeps cairn's own jobs
+  off and nothing else. A measuring task should record the load beside each figure from its first brief, as T-189's
+  did, and plan the wait for an exclusive slot.
+- **A member that needs a test seam and may not touch the csproj** should have the seam's place named in its scope.
+- **List the byte-comparing checks by a search at planning,** not from memory: seven were missed.
+- **A serial milestone of three concrete members ran with one agent each.** The split into a writer nothing calls,
+  then the switch with the samples, kept every check green between members.
