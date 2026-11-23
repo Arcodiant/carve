@@ -61,7 +61,7 @@
         "samples/graphs/**"
       ],
       "resources": "cpu",
-      "est-seconds": 200
+      "est-seconds": 1240
     },
     {
       "id": "server-unit",
