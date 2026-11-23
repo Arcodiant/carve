@@ -1,5 +1,6 @@
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Xml.Linq;
 using Xunit;
 
 namespace Patina.Graphs.Tests;
@@ -18,6 +19,38 @@ public class PatinaGraphsIsEngineFreeTests
                         || name.Name!.StartsWith("Arcodiant", StringComparison.OrdinalIgnoreCase));
 
         Assert.Empty(engine);
+    }
+
+    /// <summary>T-188: no package at all; the PNGs are <c>PngWriter</c>'s, on the runtime's zlib. Every reference is a framework assembly.</summary>
+    [Fact]
+    public void ReferencesNoPackageAssembly()
+    {
+        var framework = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var packages = Package.GetReferencedAssemblies()
+            .Where(name => !File.Exists(Path.Combine(framework, name.Name + ".dll")))
+            .Select(name => name.Name!)
+            .ToArray();
+
+        Assert.Equal([], packages);
+    }
+
+    /// <summary>
+    /// RV-80: the project file declares no package either. A package referenced but not used leaves no trace in the
+    /// assembly's references, so <see cref="ReferencesNoPackageAssembly"/> cannot see it; as Carve's product-reference
+    /// guard does, this holds the project file as well as the built assembly.
+    /// </summary>
+    [Fact]
+    public void TheProjectFileDeclaresNoPackage()
+    {
+        var root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "Carve.slnx"))) root = Path.GetDirectoryName(root) ?? throw new DirectoryNotFoundException("Carve.slnx not found above the test folder");
+        var project = XDocument.Load(Path.Combine(root, "src", "Patina.Graphs", "Patina.Graphs.csproj"));
+        var packages = project.Descendants()
+            .Where(e => e.Name.LocalName == "PackageReference")
+            .Select(e => (string?)e.Attribute("Include") ?? (string?)e.Attribute("Update") ?? e.ToString())
+            .ToArray();
+
+        Assert.Equal([], packages);
     }
 
     [Fact]

@@ -4,7 +4,7 @@ description: >-
 ---
 # T-187 — A PNG writer on .NET's zlib in Patina.Graphs
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -89,3 +89,94 @@ byte-for-byte check still green.
   and the runtime it was taken on; the measured time.
 - Paths and C# strings written through a shell lose backslashes. Write files with the file tools, and check any
   backslash that matters.
+
+### As built
+
+Built by Claude Opus 5.5 (2026-11-22).
+
+- **`src/Patina.Graphs/Imaging/PngWriter.cs`**, a public static `PngWriter`, to the format list as written (nothing in
+  it changed). Signatures, for T-188:
+  - `public static byte[] Encode(ReadOnlySpan<byte> rgba, int width, int height)` (a `Write` into a `MemoryStream`).
+  - `public static void Write(Stream target, ReadOnlySpan<byte> rgba, int width, int height, int maxDegreeOfParallelism = -1)`.
+  - `public const int BandRows = 64`, `public const int BandsPerBatch = 32`.
+  - It refuses a length other than `width * height * 4` with `ArgumentException("an RGBA8 image is four bytes a
+    texel", "rgba")`, as `Png.Encode` does; also a width or height under 1, and a thread limit of 0 or under -1.
+- **A thread limit exists:** `Write`'s optional `maxDegreeOfParallelism` (-1, the default, leaves it to the pool), passed
+  to `Parallel.For`'s `ParallelOptions`. It never changes the bytes; `Encode` has none.
+- **How it holds memory.** A span cannot reach the pool's threads, so each batch's rows (up to 2048) are copied into one
+  array after the row above the batch (zeros above row 0), and each band is filtered from that copy into a pooled
+  buffer on the thread that deflates it. So `Write` holds one batch's raw rows (64 MB at 8192) and its compressed
+  bands, never the whole PNG.
+- **Faults for the table of broken copies** are an `internal enum PngWriterFault` and an internal six-argument `Write`
+  overload; the file carries `[assembly: InternalsVisibleTo("Patina.Graphs.Tests")]`, since the csproj is T-188's.
+  - *Since the refactor pass (`8b5eba1`, 2026-11-23, recorded for RV-80):* `PngWriter.cs` no longer carries the
+    attribute; `InternalsVisibleTo Include="Patina.Graphs.Tests"` is an item of an `ItemGroup` in
+    `src/Patina.Graphs/Patina.Graphs.csproj`. `AdlerCombine` is `private` (it was `internal`; nothing outside the writer
+    calls it). The running Adler-32 starts at 1, the empty run's, and every band, the first included, is combined onto
+    it, so the first band's special case is gone; the bytes did not change (the canary and the sample checks passed).
+- *Added for RV-80 (2026-11-23):* `Write` refuses, before a byte is written, a size it cannot encode, worked in `long`:
+  a batch copy (its rows and the row above them) larger than `Array.MaxLength`, or an `IDAT` whose bound (zlib's
+  `deflateBound` a band, plus the sync flush) is over PNG's 2^31 - 1, each with an `ArgumentOutOfRangeException` naming
+  the limit. The size is checked before `rgba`'s length, so the refusal needs no image of that size. An image that
+  passes is written exactly as before (the canary passed). The `IDAT` bound cannot be reached while the batch copy fits:
+  its largest value there is 2,147,092,584 bytes (262,016 x 2048), under 2^31 - 1, so no test reaches that refusal. A
+  chunk the runtime's zlib still wrote past 2^31 - 1 would throw `InvalidOperationException` before its length is
+  written, where it had been a `checked` cast to `uint`.
+- **`tests/Patina.Graphs.Tests/PngWriterTests.cs`** (`unit`), and which break each check caught:
+  - *Decodes to its texels* (`StbImageSharp`; 1 x 1, 1 x 300, 300 x 1, 64 x 63, 64 x 64, 64 x 65, 97 x 211, zeros,
+    hash noise, 5 x 2100 with two `IDAT`s): caught `FilterByteNone` (filter byte 0 on `up` data) and
+    `BandStartAgainstZeros` (a band's first row filtered against zeros). `StbImageSharp` also refused `NoFinalBlock`
+    ("bad huffman code") and accepted the wrong Adler and the wrong CRCs, as the plan said.
+  - *The stream is sound* (the same images; chunk walk, a bitwise CRC-32 written in the test, the `IHDR` bytes, one
+    `IDAT` a batch, `78 01`, a tail of `03 00` and four bytes, then `ZLibStream` inflating to the test's own filtered
+    rows): caught `WrongCrc` (each CRC worked without the chunk type) by its CRC, `WrongAdlerCombine` by `ZLibStream`
+    (an `InvalidDataException`, whose message wrongly says "an unsupported compression method"), and `NoFinalBlock` by
+    the tail check and the rows' comparison. **`ZLibStream` does not notice a missing final block**: it inflated the
+    stream with two bytes of garbage after the rows and threw nothing, so the tail check is not redundant.
+  - *Two `IDAT` chunks* past 2048 rows.
+    - *Shown failing for RV-80 (2026-11-23):* in a scratch copy under `%TEMP%` with `BandsPerBatch = 64`, it failed
+      (`["IHDR", "IDAT", "IEND"]`, not two `IDAT`s), and so did *the stream is sound* at 5 x 2100; nothing else.
+  - *Added for RV-80 (2026-11-23):*
+    - *The Adler combine past its modulus* (`TheAdlerCombineHoldsBandsLongerThanItsModulus`, 1024 x 130, bands of
+      262,208 filtered bytes, checked as *the stream is sound*): caught, in a scratch copy, `% Base` removed from
+      `AdlerCombine` (`InvalidDataException` from `ZLibStream`); nothing else failed. Before it, the widest image with
+      more than one band was 97 x 211, whose bands are under 65521 bytes.
+    - *The refusal of a size it cannot encode* (`RefusesASizeItCannotEncodeBeforeWritingAByte`, 262,144 x 2047 with an
+      empty `rgba`: refused, nothing written; 262,144 x 2046 goes on to the length check): caught, in a scratch copy,
+      the size check commented out (`ArgumentException` for the length, not `ArgumentOutOfRangeException`).
+    - *The table of broken copies* now asserts, a row, the exception's type and a fragment of its message:
+      `TrueException` "the PNG does not decode to its texels" (`FilterByteNone`, `BandStartAgainstZeros`),
+      `InvalidDataException` (`WrongAdlerCombine`, thrown only by `ZLibStream`'s inflate; its message names no cause,
+      so none is asserted), "does not end in an empty final block" (`NoFinalBlock`) and "the IHDR chunk's CRC is wrong"
+      (`WrongCrc`). Each row passed so, which shows each break failing for its named reason in this test, not only in
+      the measurement program.
+  - *The same bytes* from `Encode`, a `Write` into a `FileStream` (a temp file, deleted), a second call, and `Write` at
+    1, 2, 5, 16 and the core count's threads: caught, by hand, a copy whose level depended on the thread limit
+    (`Fastest` at 1 thread): "the bytes at 1 threads differ".
+  - *The refusal* (15, 17 and 8 bytes): caught, by hand, a copy with the length check removed (17 bytes went through).
+  - *The canary*: caught, by hand, the same broken copy (`SmallestSize` at the default limit, hash `c7c032bf...`).
+  - *The table of broken copies* (`EachBrokenCopyFailsACheck`): each of the five faults fails the check named beside
+    it, and the unbroken writer passes that check on the same 64 x 130 image first.
+  - The hand breaks were one run of `patina-unit` (three failures, the three named above, nothing else), then
+    reverted; its log is kept as `artifacts/M-33/T-187/hand-break-patina-unit.log` in the container's `branches/main`.
+    Which part of the stream check tripped on each fault was read from the measurement program below.
+- **The canary:** the SHA-256 of the PNG of `Smooth(96, 200)` (four bands; texels from integers in the test) is
+  `d0024f48b23b60430272f726cb94afb7cdf80bc443630555ab3859e912380dc4`, taken on **.NET 10.0.15** (`Environment.Version`),
+  this machine (Windows 10, 16 cores). Not yet run on another runtime or a runner.
+- **Measured** `Encode` on the planks at 8192, Release, .NET 10.0.15, once, beside the bench's `Fast.Encode` (parallel,
+  `Optimal`) in the same process: **1.16 s for the four outputs** (base colour 428 ms, normal 253, roughness 248,
+  occlusion 229), against **0.71 s** for the bench's encoder in that same run, and the bench's recorded **0.15 s**
+  (0.28 s in its second run). The machine was at 100% CPU from other processes throughout (a `patina-unit` run took
+  288 s against its ~15 s), so the absolute figures are high; the ratio to the bench's encoder (about 1.6x) is the
+  figure to read. The difference is the format's: a batch boundary every 32 bands, where the pool waits for the
+  slowest band, and a serial copy of each batch's rows (filtering on the calling thread instead measured no faster).
+  Every PNG decoded to its texels and was 36 bytes larger than the bench's (three more `IDAT` headers). Kept:
+  `artifacts/M-33/T-187/measure-8192.txt` and `measure-Program.cs` in the container's `branches/main`. T-189 measures
+  the whole export.
+- `PatinaGraphsIsEngineFreeTests` passes: `System.IO.Compression` and `Parallel` are the runtime's.
+- **`README.md` needed no change**: nothing a user or an agent can reach changes; nothing calls the writer yet.
+- **Not checked:** the canary on another machine, runtime or a runner (its first run there is the test); the time on
+  an idle machine; a Debug-build time; images wider than 300 or taller than 4200 in the tests (8192 only in the
+  measurement, through `StbImageSharp`); a `Write` to a stream that cannot seek.
+  - *For RV-80 (2026-11-23):* the tests now hold a 1024-wide image of three bands through `ZLibStream` (above). Still not
+    checked: an image near 2 GiB written (the refusal is tested by size alone).

@@ -263,7 +263,10 @@ slots: `base_colour.png` for `base_colour_texture`, `normal.png` for
 `occlusion.png` for `occlusion_texture`. `roughness.png` is a glTF
 metallic-roughness image: roughness in green, the graph's `metallic` in blue (0
 when it has none), so metallic has no file of its own. `height` and named
-outputs are grey (or sRGB, for a colour named output) and have no slot.
+outputs are grey (or sRGB, for a colour named output) and have no slot. The same
+graph at the same size always exports the same bytes on one runtime, and those
+bytes are the ones .NET 10's zlib writes: another runtime version may write other
+bytes for the same texels (the texels do not change).
 
 ### Exposed parameters and graphs as nodes
 
@@ -343,8 +346,14 @@ working directory, or absolute), grey stone bricks from the bricks sample:
 ### What is slow or bounded
 
 `export` at 8192 evaluates in tiles, one output at a time, so the process stays
-under 2 GB, but it takes minutes, not seconds: a client with a short call
-timeout should ask for one or two outputs at a time. `blur` and `distance` are
+under 2 GB (the planks' four outputs peaked at about 0.7 GB), but it is slow,
+and most of that is evaluating the graph: the planks' four outputs took 28 to
+31 s in a release build and 2.8 to 4.1 minutes in a debug build (168, 233 and
+248 s on a busy machine), with each PNG 0.3 to 1 MB. The encode was timed apart
+from the call, by a harness that times `PngWriter.Write` of each output to a
+file: 0.6 to 1.1 s for all four in a release build, 1.4 s in a debug one, so it
+is the encoder's cost, not a share measured inside `export`. A client with a
+short call timeout should ask for one or two outputs at a time. `blur` and `distance` are
 the slowest nodes at 8192 (about 2 minutes and about 20 s); the 10 s target for
 each is T-159's, not yet met. `swatch` and `check` stop at 2048.
 
