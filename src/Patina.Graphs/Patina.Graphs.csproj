@@ -6,8 +6,4 @@
     <RootNamespace>Patina.Graphs</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="StbImageWriteSharp" Version="$(StbImageWriteSharpVersion)" />
-  </ItemGroup>
-
 </Project>
