@@ -4,7 +4,7 @@ description: >-
 ---
 # T-187 — A PNG writer on .NET's zlib in Patina.Graphs
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
