@@ -4,7 +4,7 @@ description: >-
 ---
 # M-33 — Fast PNG encoding
 
-**Status:** Active
+**Status:** Done
 
 **Depends on:** M-28
 
