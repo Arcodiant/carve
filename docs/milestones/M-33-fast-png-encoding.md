@@ -77,8 +77,53 @@ The benchmark and its results are kept in `artifacts/png-bench/` (ignored): `Pro
   committed PNGs; it has landed, so the re-encode covers its samples too. M-29 adds two more sample graphs; whichever
   of the two lands second re-encodes or adds to the other's.
 
+**Decided at planning (2026-11-22).**
+
+Every decision here is the person's, on a question put with the probe results below.
+
+- **A PNG's bytes may depend on the .NET runtime, held by a canary.** Every byte-for-byte check stays as it is, and
+  the committed PNGs become .NET 10's bytes. A unit test pins the hash of one small fixed image, so a runtime or a
+  runner whose zlib writes other bytes fails there, with a message that says to stop and ask. A move to another .NET
+  major means running `tools/Patina.SampleGraphs` again. No managed deflate.
+- **RGBA stays.** No output carries alpha today, and the files stay ready for one that does. Fewer channels is not
+  planned.
+- **Bands deflated in parallel.** The person chose the fastest variant over the serial one the plan leaned to: bands
+  of 64 rows, each deflated apart at `CompressionLevel.Optimal` and stitched. T-187's Scope has the whole format.
+- **T-130 does not join M-33.** Evaluation is M-40's, and what becomes of T-130 is open there. T-130's note now
+  carries the Release figures.
+- **Carve's writers stay on `StbImageWriteSharp`.** `bake`, `render`'s frames and `tools/Carve.SampleTextures` are
+  not touched. T-190, off-milestone, holds moving them and the question of where a shared writer lives.
+- **M-33 runs before M-29.** M-29's sample graphs are then written by the new encoder. If M-29 lands first after
+  all, T-188 remakes its PNGs with the rest; whichever lands second runs the sample tool again in its rebase.
+
+**Probed at planning** (2026-11-22, this machine, `artifacts/m33-probe/`, ignored):
+
+- **Runtimes.** The zlib stream of 15 images (the planks, painted metal and cobblestones at 256, and two made from
+  integers at 2048 and 4096), at three levels:
+  - identical on 10.0.13 and 10.0.15, on 9.0.12 and 9.0.21, and on 8.0.23 and 8.0.32;
+  - .NET 8 against 9 or 10: every image differs at `Optimal` and `Fastest`, 13 of 15 at `SmallestSize`;
+  - .NET 9 against 10: 7 of 15 differ at `Optimal`, none at `Fastest` or `SmallestSize`.
+- **Feeding.** One `Write` a row and one `Write` of every row give different streams at `Optimal` and `Fastest`, on
+  .NET 9 and 10. So how the writer feeds the stream is part of the format.
+- **`SmallestSize`** took 4.7 s for the planks' four outputs at 8192, against 0.8 s at `Optimal`. Not chosen.
+- **Bands.** The banded form gave the same bytes at 1, 5 and 16 threads and on 10.0.13 and 10.0.15, for 16 images,
+  and each stream inflated to its filtered rows.
+- **Not probed:** another machine, a 1-channel PNG through the engine's loader, the encode in a Debug build, and the
+  banded writer streaming one `IDAT` a batch (the bench held the whole stream).
+
+**Nothing is drawn or laid out,** so there is no sketch. `swatch`'s images change their PNG bytes and no pixel.
+
+**Order.** One task at a time: T-187, then T-188, then T-189. T-187 lands the writer with nothing calling it, so
+every existing check stays green; T-188 switches patina to it and remakes the samples in one step, since the
+byte-for-byte checks fail between the two; T-189 measures. T-188 and T-189 both edit `ExportTool.cs`.
+
+**After it lands,** the published `carve` and `patina` MCP copies want refreshing
+(`%LOCALAPPDATA%\carve-mcp\update.ps1 -Server patina`).
+
 ## Required tasks
 
-Not planned yet.
+- [ ] [T-187](../tasks/T-187-a-png-writer-on-net-s-zlib-in-patina-graphs.md) — Patina.Graphs gains PngWriter: RGBA8 PNGs with the up filter, bands of 64 rows deflated in parallel on .NET's zlib and stitched, the same bytes at any thread count, with a canary test that pins them to .NET 10's zlib
+- [ ] [T-188](../tasks/T-188-patina-s-pngs-through-the-new-writer-and-the-samples-written-again.md) — Png.Encode and export write through PngWriter, so an 8192 output encodes in well under a second; every sample PNG under samples/graphs/ is written again with its texels unchanged, and Patina.Graphs drops StbImageWriteSharp
+- [ ] [T-189](../tasks/T-189-export-s-8192-numbers-measured-again.md) — export's description, the README and T-115's record carry the 8192 times, PNG sizes and peak memory measured with the new encoder, in Release and Debug
 
 ## Retrospective
