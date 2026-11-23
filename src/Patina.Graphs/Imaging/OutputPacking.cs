@@ -1,5 +1,3 @@
-using StbImageWriteSharp;
-
 namespace Patina.Graphs.Imaging;
 
 /// <summary>What an output image is for, in role order (the order a swatch sheet's columns take).</summary>
@@ -126,14 +124,12 @@ public static class OutputPacking
     }
 }
 
-/// <summary>PNG bytes of an RGBA8 image through <c>StbImageWriteSharp</c>'s <c>ImageWriter</c>, which writes the same bytes every time (probed at M-27's planning at 2048 and 8192).</summary>
+/// <summary>PNG bytes of an RGBA8 image through <see cref="PngWriter"/>, which writes the same bytes every time on one runtime (those of .NET's zlib; another runtime version may write other bytes for the same texels).</summary>
 public static class Png
 {
     public static byte[] Encode(byte[] rgba, int width, int height)
     {
         if (rgba.LongLength != (long)width * height * 4) throw new ArgumentException("an RGBA8 image is four bytes a texel", nameof(rgba));
-        using var stream = new MemoryStream();
-        new ImageWriter().WritePng(rgba, width, height, ColorComponents.RedGreenBlueAlpha, stream);
-        return stream.ToArray();
+        return PngWriter.Encode(rgba, width, height);
     }
 }

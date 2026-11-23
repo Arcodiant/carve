@@ -263,7 +263,10 @@ slots: `base_colour.png` for `base_colour_texture`, `normal.png` for
 `occlusion.png` for `occlusion_texture`. `roughness.png` is a glTF
 metallic-roughness image: roughness in green, the graph's `metallic` in blue (0
 when it has none), so metallic has no file of its own. `height` and named
-outputs are grey (or sRGB, for a colour named output) and have no slot.
+outputs are grey (or sRGB, for a colour named output) and have no slot. The same
+graph at the same size always exports the same bytes on one runtime, and those
+bytes are the ones .NET 10's zlib writes: another runtime version may write other
+bytes for the same texels (the texels do not change).
 
 ### Exposed parameters and graphs as nodes
 
