@@ -85,10 +85,19 @@ Built by Claude Sonnet 5.5 (2026-11-23).
   with `PngWriter.Write(stream, rgba, pixels, pixels)` into the same temporary `FileStream`, the forced collections, the
   temporary file and the move untouched; `Patina.Graphs.csproj` has no `ItemGroup` and no package (`Directory.Build.props`
   keeps the pin for carve). Nothing under `src/Carve.*`, `tools/Carve.SampleTextures` or a carve scenario changed.
+  - *Since the refactor pass (`8b5eba1`, 2026-11-23, recorded for RV-80):* `Patina.Graphs.csproj` now has one
+    `ItemGroup`, holding `InternalsVisibleTo` for `Patina.Graphs.Tests` (moved there from `PngWriter.cs`), and still no
+    package. `Png.Encode`'s own length guard was removed, because `PngWriter.Encode` repeats it with the same message;
+    `Png.Encode` is now `PngWriter.Encode`. The bytes did not change.
 - **Tests added:** `Export_at_256_and_Png_Encode_give_the_same_bytes_for_the_same_texels` (`ExportToolTests`: export's four
   planks files against `Png.Encode` of `OutputImage.FileRgba8` at 256) and `ReferencesNoPackageAssembly`
   (`PatinaGraphsIsEngineFreeTests`: every assembly `Patina.Graphs` references is a file in the runtime's folder). Neither
   was seen to fail on a deliberate break (not done; the guard's first run only proved it compiles and passes).
+  - *For RV-80 (2026-11-23):* RV-80's reviewer saw `ReferencesNoPackageAssembly` fail on a used `StbImageWriteSharp`
+    and pass on one referenced but not used. `TheProjectFileDeclaresNoPackage` (`PatinaGraphsIsEngineFreeTests`) was
+    added: no `PackageReference` in `Patina.Graphs.csproj`. In a scratch copy under `%TEMP%` with an unused
+    `<PackageReference Include="StbImageWriteSharp" .../>` added, it failed (`["StbImageWriteSharp"]`) while
+    `ReferencesNoPackageAssembly` passed.
 - **Samples.** `dotnet run --project tools/Patina.SampleGraphs` remade the 35 output PNGs. Each of the 43 PNGs under
   `samples/graphs/` (35 outputs and 8 swatches) was decoded from `git show ef319d7:<path>` (the start commit) and from the
   working file (Pillow, RGBA, size included) and compared byte for byte: **43 of 43 equal, no texel differs.** No byte of

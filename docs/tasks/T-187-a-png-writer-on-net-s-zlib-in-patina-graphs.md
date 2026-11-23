@@ -109,6 +109,19 @@ Built by Claude Opus 5.5 (2026-11-22).
   bands, never the whole PNG.
 - **Faults for the table of broken copies** are an `internal enum PngWriterFault` and an internal six-argument `Write`
   overload; the file carries `[assembly: InternalsVisibleTo("Patina.Graphs.Tests")]`, since the csproj is T-188's.
+  - *Since the refactor pass (`8b5eba1`, 2026-11-23, recorded for RV-80):* `PngWriter.cs` no longer carries the
+    attribute; `InternalsVisibleTo Include="Patina.Graphs.Tests"` is an item of an `ItemGroup` in
+    `src/Patina.Graphs/Patina.Graphs.csproj`. `AdlerCombine` is `private` (it was `internal`; nothing outside the writer
+    calls it). The running Adler-32 starts at 1, the empty run's, and every band, the first included, is combined onto
+    it, so the first band's special case is gone; the bytes did not change (the canary and the sample checks passed).
+- *Added for RV-80 (2026-11-23):* `Write` refuses, before a byte is written, a size it cannot encode, worked in `long`:
+  a batch copy (its rows and the row above them) larger than `Array.MaxLength`, or an `IDAT` whose bound (zlib's
+  `deflateBound` a band, plus the sync flush) is over PNG's 2^31 - 1, each with an `ArgumentOutOfRangeException` naming
+  the limit. The size is checked before `rgba`'s length, so the refusal needs no image of that size. An image that
+  passes is written exactly as before (the canary passed). The `IDAT` bound cannot be reached while the batch copy fits:
+  its largest value there is 2,147,092,584 bytes (262,016 x 2048), under 2^31 - 1, so no test reaches that refusal. A
+  chunk the runtime's zlib still wrote past 2^31 - 1 would throw `InvalidOperationException` before its length is
+  written, where it had been a `checked` cast to `uint`.
 - **`tests/Patina.Graphs.Tests/PngWriterTests.cs`** (`unit`), and which break each check caught:
   - *Decodes to its texels* (`StbImageSharp`; 1 x 1, 1 x 300, 300 x 1, 64 x 63, 64 x 64, 64 x 65, 97 x 211, zeros,
     hash noise, 5 x 2100 with two `IDAT`s): caught `FilterByteNone` (filter byte 0 on `up` data) and
@@ -121,6 +134,22 @@ Built by Claude Opus 5.5 (2026-11-22).
     the tail check and the rows' comparison. **`ZLibStream` does not notice a missing final block**: it inflated the
     stream with two bytes of garbage after the rows and threw nothing, so the tail check is not redundant.
   - *Two `IDAT` chunks* past 2048 rows.
+    - *Shown failing for RV-80 (2026-11-23):* in a scratch copy under `%TEMP%` with `BandsPerBatch = 64`, it failed
+      (`["IHDR", "IDAT", "IEND"]`, not two `IDAT`s), and so did *the stream is sound* at 5 x 2100; nothing else.
+  - *Added for RV-80 (2026-11-23):*
+    - *The Adler combine past its modulus* (`TheAdlerCombineHoldsBandsLongerThanItsModulus`, 1024 x 130, bands of
+      262,208 filtered bytes, checked as *the stream is sound*): caught, in a scratch copy, `% Base` removed from
+      `AdlerCombine` (`InvalidDataException` from `ZLibStream`); nothing else failed. Before it, the widest image with
+      more than one band was 97 x 211, whose bands are under 65521 bytes.
+    - *The refusal of a size it cannot encode* (`RefusesASizeItCannotEncodeBeforeWritingAByte`, 262,144 x 2047 with an
+      empty `rgba`: refused, nothing written; 262,144 x 2046 goes on to the length check): caught, in a scratch copy,
+      the size check commented out (`ArgumentException` for the length, not `ArgumentOutOfRangeException`).
+    - *The table of broken copies* now asserts, a row, the exception's type and a fragment of its message:
+      `TrueException` "the PNG does not decode to its texels" (`FilterByteNone`, `BandStartAgainstZeros`),
+      `InvalidDataException` (`WrongAdlerCombine`, thrown only by `ZLibStream`'s inflate; its message names no cause,
+      so none is asserted), "does not end in an empty final block" (`NoFinalBlock`) and "the IHDR chunk's CRC is wrong"
+      (`WrongCrc`). Each row passed so, which shows each break failing for its named reason in this test, not only in
+      the measurement program.
   - *The same bytes* from `Encode`, a `Write` into a `FileStream` (a temp file, deleted), a second call, and `Write` at
     1, 2, 5, 16 and the core count's threads: caught, by hand, a copy whose level depended on the thread limit
     (`Fastest` at 1 thread): "the bytes at 1 threads differ".
@@ -149,3 +178,5 @@ Built by Claude Opus 5.5 (2026-11-22).
 - **Not checked:** the canary on another machine, runtime or a runner (its first run there is the test); the time on
   an idle machine; a Debug-build time; images wider than 300 or taller than 4200 in the tests (8192 only in the
   measurement, through `StbImageSharp`); a `Write` to a stream that cannot seek.
+  - *For RV-80 (2026-11-23):* the tests now hold a 1024-wide image of three bands through `ZLibStream` (above). Still not
+    checked: an image near 2 GiB written (the refusal is tested by size alone).

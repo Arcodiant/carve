@@ -99,6 +99,11 @@ beside the measurement; "exclusive" means it ran as a cairn `ad-hoc` job with `-
   limit after trimming). `README.md` ("What is slow or bounded"): the same figures plus the encode's 0.6 to 1.4 s. T-115: a dated line
   under "Measured at 8192"; the old one stays. `tests.json`: `est-seconds` only. `ExportBoundedMemoryTests` and `CLAUDE.md`: no
   figure in them was wrong, so no change.
+  - *Corrected for RV-80 (2026-11-23):* "3 to 4 min in debug" left out two of the three Debug runs (2.8 to 4.1 min), so
+    `ExportTool.Text` now says "about 3 to 4 min in debug" (3,679 characters, under 3,686) and the README gives 2.8 to
+    4.1 minutes with the three figures. The README and T-115's dated line now say the encode was timed apart from the
+    call, by the `share/` harness's `PngWriter.Write` to a file, so it reads as the encoder's cost. The comment in
+    `ExportTool.Run` that an export takes "minutes at 8192" now says so of a debug build only.
 - **Not checked:** the encode's share inside the export tool's own streamed path (the share harness writes a whole in-memory
   image with the same writer, so it is the writer's time, not the tool's); either build on an idle machine; the first Release
   run's 1.13 s encode (second 0.59 s) is load; no sibling runs; no frame was opened.
