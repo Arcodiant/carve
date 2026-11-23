@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-81 — Review of M-33, checking RV-80's answers
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-33
 
@@ -32,21 +32,21 @@ description: >-
 - **Severity:** Nit
 - **What is wrong:** The test matches `e.Name.LocalName == "PackageReference"`, which is case-sensitive, but MSBuild item types are not case-sensitive. In a `git archive HEAD` copy under `%TEMP%` I added `<packagereference Include="StbImageWriteSharp" Version="$(StbImageWriteSharpVersion)" />` to `Patina.Graphs.csproj`. Restore took it up (`StbImageWriteSharp/1.16.7` is in `src/Patina.Graphs/obj/project.assets.json`), and all 38 tests in `PngWriterTests` and `PatinaGraphsIsEngineFreeTests` passed, this test included. The test also reads only the csproj, so it would not see a `PackageReference` that a `Directory.Build.props` or `.targets` adds (inferred; I did not test that case). RV-80 finding 9 asked for a guard on any package declared, referenced but not used. The fix catches only the exact spelling in the one file. Comparing names case-insensitively, or reading the restored `project.assets.json` (the project's resolved dependencies), would catch both cases. Rubric 2. Tested (lower case); inferred (imported file).
 
-**Outcome:** —
+**Outcome:** skipped: filed off-milestone as T-196 by the person's choice (2026-11-23); nothing ships wrong
 
 ### The size-refusal test does not check the `Array.MaxLength` limit it claims
 - **Where:** `tests/Patina.Graphs.Tests/PngWriterTests.cs:141-157` (against `src/Patina.Graphs/Imaging/PngWriter.cs:156-161`)
 - **Severity:** Nit
 - **What is wrong:** The refusal's limit is `Array.MaxLength` (2,147,483,591). The test's refused size is 262,144 x 2047, whose batch copy is 2^31 bytes, past `int.MaxValue` as well. In a scratch copy I changed the limit to `if (copy > int.MaxValue)` and every test in `PngWriterTests` and `PatinaGraphsIsEngineFreeTests` still passed. With that change, a size whose copy falls between the two limits would get past the refusal. One example is 268,435,455 x 1, whose copy is 2,147,483,640 bytes. `Write` would then write the signature and `IHDR`, and `AllocateUninitializedArray` would throw. That leaves the partial PNG RV-80 finding 5 was about. A refused case just past `Array.MaxLength`, with one just under it that goes on to the length check, would pin the limit. Rubric 2. Tested (the change to the limit); inferred (what an image of that size would do).
 
-**Outcome:** —
+**Outcome:** skipped: filed off-milestone as T-196 by the person's choice (2026-11-23); nothing ships wrong
 
 ### The `IDAT` bound is given as zlib's `deflateBound`, but the runtime's zlib is zlib-ng
 - **Where:** `src/Patina.Graphs/Imaging/PngWriter.cs:147-172`, `docs/tasks/T-187-a-png-writer-on-net-s-zlib-in-patina-graphs.md` (the "Added for RV-80" line)
 - **Severity:** Nit
 - **What is wrong:** The refusal limits each band to `n + (n >> 12) + (n >> 14) + (n >> 25) + 7`. That is madler zlib's tight `deflateBound` for its default parameters. .NET 10.0.15's `System.IO.Compression.Native.dll` contains the strings "zlib-ng 2.2.5", and zlib-ng's `deflateBound` is not this formula: it allows for `deflate_quick`'s 9-bit literals, about n/8. So the code comment and T-187's As built call this "zlib's deflateBound", but it is not a bound the runtime's zlib promises. The writer is still safe, because the new runtime check throws `InvalidOperationException` before an oversize length is written. But that check runs after the signature, the `IHDR` and any earlier `IDAT`s are on the stream, and the "refused before a byte is written" guarantee rests on this bound. Saying that the bound is zlib's formula, assumed for zlib-ng at level 6, and not the runtime's own, would make the text accurate. Rubric 1 and 7. Tested that the runtime bundles zlib-ng; zlib-ng's formula is from its source, inferred.
 
-**Outcome:** —
+**Outcome:** skipped: filed off-milestone as T-196 by the person's choice (2026-11-23); nothing ships wrong
 
 ## Summary
 

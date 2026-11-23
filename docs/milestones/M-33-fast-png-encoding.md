@@ -250,3 +250,53 @@ model because the format was decided in full at planning and a working copy exis
 - **List the byte-comparing checks by a search at planning,** not from memory: seven were missed.
 - **A serial milestone of three concrete members ran with one agent each.** The split into a writer nothing calls,
   then the switch with the samples, kept every check green between members.
+
+**After the person's go (2026-11-23).**
+
+- **Rebase onto `main` (Opus 5.5):** `origin/main` had not moved, and there were no conflicts. The rebase still
+  rewrote the branch: a plain rebase dropped the three `Merge task/T-18x` commits and left a straight line, with the
+  same tree (`git diff ORIG_HEAD HEAD` empty). The local branch then read ahead of and behind
+  `origin/milestone/M-33`. The agent tried `git reset --keep` to put the merges back; a hook refused it, and it was
+  left.
+- **Refactor pass (the same agent, `8b5eba1`):** three cuts, with the canary and every byte check passing:
+  - `InternalsVisibleTo` moved from `PngWriter.cs` into the csproj;
+  - `AdlerCombine` made private, and the running Adler-32 started at 1 so the first band is no special case;
+  - `Png.Encode`'s length guard removed, `PngWriter.Encode` repeating it with the same message.
+
+  Named and not made: the CRC runs a byte at a time over the compressed data on the writing thread.
+- **Review round 1, RV-80:** two Opus 5.5 reviewers, split by concern (`PngWriter` and its tests; the whole diff).
+  - **Findings:** 9, with 5 Minor and 4 Nit.
+  - **What held:** the writer on every image run in a scratch copy, up to 8192 wide and 6,200 rows, on a stream that
+    cannot seek, and at one thread; all 43 sample PNGs decoding to the RGBA they had on `main`, by the reviewer's own
+    decoder; no byte check, tolerance or digest changed.
+  - **The Minors:** no test reached the Adler-32 combine at a band of 65,521 bytes or more, which every image from
+    256 wide has; "3 to 4 min" in Debug left out the 168 s run; the encode's time read as measured inside `export`;
+    and two As built lines were stale after the refactor pass.
+  - **Answers (one Opus 5.5 agent, `f9f1ec4` and `71075cc`):** all 9 fixed. `PngWriter.Write` now refuses a size it
+    cannot encode before a byte is written, where it threw `OverflowException` after the header.
+- **Review round 2, RV-81:** one Opus 5.5 reviewer checking the answers against the code.
+  - **All nine hold.** The writer at `8b5eba1` and after the fixes gave the same bytes for 26 images, 8192 square
+    among them.
+  - **Findings:** 3 Nits: the no-package guard misses a lower-case or imported `PackageReference`; the refusal's test
+    does not pin `Array.MaxLength`; and the `IDAT` bound is called zlib's `deflateBound` though .NET 10.0.15 bundles
+    zlib-ng 2.2.5.
+  - **The person chose to file them and finish.** They are **T-196**, off-milestone, and each is answered `skipped`.
+- **The person's other rulings:**
+  - **The two startup failures are not filed.** The second came in the refactor agent's verify: `scenario-patina`
+    crashed once with an access violation in Vulkan's `CreateGraphicsPipeline` during the engine's own start
+    (`EnvironmentBaker.BuildBrdfLut`), with `patina-regression` running beside it, and passed on the next run. Like
+    the `initialize` failure it came before any patina or PNG code. Neither recurred in the two verifies after.
+  - **`finish` does not wait for the canary on a second machine.** It has still run only on Xellotath.
+- **`patina-regression` ran in 1,095 s** in the verify after the fixes, with little else running.
+- **Not as planned after the go:**
+  - The reviewers' sections were written to files in the temp folder and put into the review items by the
+    orchestrator, so two reviewers never wrote one file at once.
+  - The fix agent made 76 tool calls against the checkpoint of about 60, and did not hand off.
+  - The whole-diff reviewer wrote that the only verify had run before the refactor. One had passed at `8b5eba1`.
+- **Left:** T-196; scratch under `%TEMP%` (`m33-*`); and ignored build output a probe left in
+  `src/Patina.Server/bin` and `obj` of the milestone's worktree.
+- **Next time:**
+  - **Tell the rebase agent what a no-op looks like.** With `main` unmoved, the brief said to expect nothing, and the
+    rebase still flattened the merges. That is what `finish` does as well, so the brief should say to leave it.
+  - **Checking answers against the code found nothing broken this time,** and three small gaps in the fixes' own
+    tests. A fix's new test wants the same "shown failing at its boundary" as the first ones.
