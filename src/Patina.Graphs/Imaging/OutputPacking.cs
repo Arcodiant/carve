@@ -127,9 +127,6 @@ public static class OutputPacking
 /// <summary>PNG bytes of an RGBA8 image through <see cref="PngWriter"/>, which writes the same bytes every time on one runtime (those of .NET's zlib; another runtime version may write other bytes for the same texels).</summary>
 public static class Png
 {
-    public static byte[] Encode(byte[] rgba, int width, int height)
-    {
-        if (rgba.LongLength != (long)width * height * 4) throw new ArgumentException("an RGBA8 image is four bytes a texel", nameof(rgba));
-        return PngWriter.Encode(rgba, width, height);
-    }
+    /// <summary><see cref="PngWriter.Encode"/>, which refuses a length that is not four bytes a texel.</summary>
+    public static byte[] Encode(byte[] rgba, int width, int height) => PngWriter.Encode(rgba, width, height);
 }

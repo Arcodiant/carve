@@ -2,9 +2,6 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-
-[assembly: InternalsVisibleTo("Patina.Graphs.Tests")]
 
 namespace Patina.Graphs.Imaging;
 
@@ -101,8 +98,7 @@ public static class PngWriter
             for (var b = 0; b < count; b++)
             {
                 var length = (long)Math.Min(BandRows, y1 - y0 - b * BandRows) * rowBytes;
-                adler = isFirst && b == 0 ? adlers[0]
-                    : AdlerCombine(adler, adlers[b], fault == PngWriterFault.WrongAdlerCombine ? 0 : length);
+                adler = AdlerCombine(adler, adlers[b], fault == PngWriterFault.WrongAdlerCombine ? 0 : length);
             }
 
             long chunkLength = isFirst ? 2 : 0;
@@ -205,8 +201,8 @@ public static class PngWriter
         return (b << 16) | a;
     }
 
-    /// <summary>The Adler-32 of two runs of bytes joined, from each run's and the second's length, as zlib's <c>adler32_combine</c>.</summary>
-    internal static uint AdlerCombine(uint adler1, uint adler2, long length2)
+    /// <summary>The Adler-32 of two runs of bytes joined, from each run's and the second's length, as zlib's <c>adler32_combine</c>. The empty run's Adler-32 is 1, so the first band combines onto it unchanged.</summary>
+    private static uint AdlerCombine(uint adler1, uint adler2, long length2)
     {
         const uint Base = 65521;
         var rem = (uint)(length2 % Base);

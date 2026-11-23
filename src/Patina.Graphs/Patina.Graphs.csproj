@@ -6,4 +6,9 @@
     <RootNamespace>Patina.Graphs</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- PngWriterTests' table of broken copies reaches PngWriter's internal Write overload and PngWriterFault (T-187). -->
+    <InternalsVisibleTo Include="Patina.Graphs.Tests" />
+  </ItemGroup>
+
 </Project>
