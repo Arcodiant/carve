@@ -4,7 +4,7 @@ description: >-
 ---
 # T-189 — export's 8192 numbers measured again
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
