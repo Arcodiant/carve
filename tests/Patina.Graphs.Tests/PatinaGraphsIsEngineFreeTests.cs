@@ -27,7 +27,7 @@ public class PatinaGraphsIsEngineFreeTests
         var framework = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
         var packages = Package.GetReferencedAssemblies()
             .Where(name => !File.Exists(Path.Combine(framework, name.Name + ".dll")))
-            .Select(name => name.Name)
+            .Select(name => name.Name!)
             .ToArray();
 
         Assert.Equal([], packages);
