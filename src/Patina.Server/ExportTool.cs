@@ -45,7 +45,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
         + "a named output is grey if greyscale, sRGB if colour. "
         + "The result lists each file with its size, its bytes and the Carve material slot it belongs in: base_colour in base_colour_texture, normal in normal_texture, roughness in metallic_roughness_texture, occlusion in occlusion_texture; height and named outputs have no slot. "
         + "Exporting the graph at its own size gives the same bytes every time, and equals the PNGs beside samples/graphs/planks.texgraph. "
-        + "Outputs are evaluated and written one at a time, in tiles, so memory stays bounded at 8192 (the planks peaked at 0.7 GB), but 8192 is slow, mostly evaluation: the planks' four outputs took 28 to 31 s in a release build, 4 min in a debug build, each PNG 0.3 to 1 MB. A client with a short call timeout should ask for one or two outputs at a time. "
+        + "Outputs are evaluated and written one at a time, in tiles, so memory stays bounded at 8192 (the planks peaked at 0.7 GB), but 8192 is slow, mostly evaluation: the planks' four outputs took 28 to 31 s in release, 3 to 4 min in debug, each PNG 0.3 to 1 MB. A client with a short call timeout should ask for one or two outputs at a time. "
         + "To look at a graph, use swatch (at 2048 or below); export is for files. "
         + "Refused, writing nothing, while the graph has a fault (the error lists them; fix them with edit_graph); no open graph; a size that is not a power of two from 32 to 8192; an output the graph has not; metallic named alone; "
         + "and a folder that cannot be written (the error names the folder and the system's reason).\n"
