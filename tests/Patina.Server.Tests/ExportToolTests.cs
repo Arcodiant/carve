@@ -48,6 +48,24 @@ public class ExportToolTests
         }
     }
 
+    /// <summary>T-188: export's file and <c>Png.Encode</c> of the same texels are one byte string (both go through <c>PngWriter</c>).</summary>
+    [Fact]
+    public async Task Export_at_256_and_Png_Encode_give_the_same_bytes_for_the_same_texels()
+    {
+        using var folder = new TempFolder();
+        await using var patina = await OpenPlanks(folder.Path);
+        await patina.Ok("export", """{"folder":"out/same"}""");
+        var read = Patina.Graphs.TexGraphFile.ReadFile(Planks);
+        Assert.True(read.Loaded, read.Error?.ToString());
+        var evaluator = new Patina.Graphs.Evaluation.GraphEvaluator(read.Graph!);
+
+        foreach (var role in Roles)
+        {
+            var texels = Patina.Graphs.Evaluation.OutputImage.FileRgba8(evaluator, role, 256);
+            Assert.Equal(Patina.Graphs.Imaging.Png.Encode(texels, 256, 256), File.ReadAllBytes(Path.Combine(folder.Path, "out", "same", role + ".png")));
+        }
+    }
+
     [Fact]
     public async Task Export_names_a_size_and_roles_writes_only_those_and_marks_a_replaced_file()
     {

@@ -20,6 +20,19 @@ public class PatinaGraphsIsEngineFreeTests
         Assert.Empty(engine);
     }
 
+    /// <summary>T-188: no package at all; the PNGs are <c>PngWriter</c>'s, on the runtime's zlib. Every reference is a framework assembly.</summary>
+    [Fact]
+    public void ReferencesNoPackageAssembly()
+    {
+        var framework = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var packages = Package.GetReferencedAssemblies()
+            .Where(name => !File.Exists(Path.Combine(framework, name.Name + ".dll")))
+            .Select(name => name.Name!)
+            .ToArray();
+
+        Assert.Equal([], packages);
+    }
+
     [Fact]
     public void UsesNoRandomAndNoClock()
     {

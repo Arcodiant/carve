@@ -191,7 +191,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                     GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
                     using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
-                        new StbImageWriteSharp.ImageWriter().WritePng(rgba, pixels, pixels, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, stream);
+                        PngWriter.Write(stream, rgba, pixels, pixels);
                         length = stream.Length;
                     }
                     File.Move(temporary, path, overwrite: true);
