@@ -41,3 +41,8 @@ whole widened window. Every output stays byte-identical.
 - T-155's `### As built` has the figures, the harness and the cause: each tile's running sum runs over its whole widened
   window (2,586 texels for a 128-texel tile at radius 0.05), and the band makes blur's source about 4.3 times over.
 - Opus: it changes an API M-29's mesh nodes may build on.
+- **M-40 (planned 2026-11-23) evaluates an output in parallel strips of tile rows** (T-191, T-192), which is a
+  different thing from this task's strip passes and changes the same evaluator. Whichever lands second reads its
+  scope against the other. M-40's planning probe measured the same blur at 8192 at 125 s on one thread and 44 s on 8
+  strips, and distance at 20 s and 5.5 s (`artifacts/m40-probe/` under the container's `branches/main`), so measure
+  this task's targets again on what has landed.
