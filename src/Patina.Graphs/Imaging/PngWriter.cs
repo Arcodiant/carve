@@ -52,6 +52,7 @@ public static class PngWriter
         ArgumentNullException.ThrowIfNull(target);
         ArgumentOutOfRangeException.ThrowIfLessThan(width, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(height, 1);
+        RefuseASizeItCannotEncode(width, height); // before the length check, so the refusal needs no image of that size
         if (rgba.Length != (long)width * height * 4) throw new ArgumentException("an RGBA8 image is four bytes a texel", nameof(rgba));
         if (maxDegreeOfParallelism == 0 || maxDegreeOfParallelism < -1)
             throw new ArgumentOutOfRangeException(nameof(maxDegreeOfParallelism), "a thread limit is -1 or at least 1");
@@ -105,7 +106,10 @@ public static class PngWriter
             for (var b = 0; b < count; b++) chunkLength += parts[b].Length;
             if (isLast) chunkLength += fault == PngWriterFault.NoFinalBlock ? 4 : 6;
 
-            BinaryPrimitives.WriteUInt32BigEndian(word, checked((uint)chunkLength));
+            // RefuseASizeItCannotEncode bounds this by zlib's deflateBound; a zlib that wrote past it would end here.
+            if (chunkLength > int.MaxValue)
+                throw new InvalidOperationException($"an IDAT chunk of {chunkLength} bytes is more than PNG's 2^31 - 1 ({int.MaxValue}); the zlib wrote past its bound");
+            BinaryPrimitives.WriteUInt32BigEndian(word, (uint)chunkLength);
             target.Write(word);
             target.Write("IDAT"u8);
             var crc = fault == PngWriterFault.WrongCrc ? 0xFFFFFFFF : Crc(0xFFFFFFFF, "IDAT"u8);
@@ -138,6 +142,33 @@ public static class PngWriter
         }
 
         WriteChunk(target, "IEND"u8, [], fault);
+    }
+
+    /// <summary>
+    /// Refuses, before a byte is written, a <paramref name="width"/> x <paramref name="height"/> image the writer cannot
+    /// encode (RV-80): one whose batch copy (up to <see cref="BandRows"/> x <see cref="BandsPerBatch"/> rows and the row
+    /// above them) is more than an array holds, or one whose largest <c>IDAT</c> could be more than PNG's 2^31 - 1 bytes,
+    /// bounded per band by zlib's <c>deflateBound</c> and the sync flush's five bytes. The sizes are worked in
+    /// <see cref="long"/>. An image that passes is written exactly as without this check.
+    /// </summary>
+    private static void RefuseASizeItCannotEncode(int width, int height)
+    {
+        var stride = width * 4L;
+        long batchRows = Math.Min(height, BandRows * BandsPerBatch);
+        var copy = (batchRows + 1) * stride;
+        if (copy > Array.MaxLength)
+            throw new ArgumentOutOfRangeException(nameof(width),
+                $"a {width} x {height} image is too large to encode: a batch of {batchRows} rows and the row above them is {copy} bytes, more than an array holds ({Array.MaxLength})");
+
+        long idat = 2 + 2 + 4; // 78 01, the empty final block and the Adler-32
+        for (var rows = batchRows; rows > 0; rows -= BandRows)
+        {
+            var n = Math.Min(BandRows, rows) * (stride + 1);
+            idat += n + (n >> 12) + (n >> 14) + (n >> 25) + 7 + 5;
+        }
+        if (idat > int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(width),
+                $"a {width} x {height} image is too large to encode: an IDAT chunk of its rows could be {idat} bytes, more than PNG's 2^31 - 1 ({int.MaxValue})");
     }
 
     /// <summary>A row filtered <c>up</c> into <paramref name="row"/>: its filter byte, then each byte of <paramref name="src"/> less the byte of <paramref name="above"/>.</summary>

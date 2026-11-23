@@ -81,6 +81,19 @@ public class PngWriterTests
         CheckSound(PngWriter.Encode(rgba, width, height), rgba, width, height);
     }
 
+    /// <summary>
+    /// RV-80: a band of a 1024-wide image is 64 x 4097 = 262,208 filtered bytes, past the Adler-32's modulus 65521, so the
+    /// combine's reduction of the band's length is reached (the images above have bands of at most 24,896 bytes).
+    /// <see cref="ZLibStream"/> checks the combined Adler-32 when it inflates the stream to the filtered rows.
+    /// </summary>
+    [Fact]
+    public void TheAdlerCombineHoldsBandsLongerThanItsModulus()
+    {
+        const int width = 1024, height = 130; // three bands, the last of two rows
+        var rgba = Smooth(width, height);
+        CheckSound(PngWriter.Encode(rgba, width, height), rgba, width, height);
+    }
+
     [Fact]
     public void AnImageOfMoreThan2048RowsIsTwoIdatChunks()
     {
@@ -125,6 +138,24 @@ public class PngWriterTests
         Assert.ThrowsAny<ArgumentException>(() => PngWriter.Encode(new byte[length], width, height));
     }
 
+    /// <summary>
+    /// RV-80: 262,144 x 2047 is 2047 MiB of RGBA, but a batch's copy with the row above it is 2^31 bytes, so it is
+    /// refused, naming the limit, before a byte is written. The size is checked before the length, so no image of that
+    /// size is needed. One row fewer fits, and goes on to the length check.
+    /// </summary>
+    [Fact]
+    public void RefusesASizeItCannotEncodeBeforeWritingAByte()
+    {
+        using var stream = new MemoryStream();
+        var refused = Assert.Throws<ArgumentOutOfRangeException>(() => PngWriter.Write(stream, [], 262_144, 2047));
+        Assert.Contains("more than an array holds", refused.Message);
+        Assert.Equal(0, stream.Length);
+
+        var length = Assert.Throws<ArgumentException>(() => PngWriter.Write(stream, [], 262_144, 2046));
+        Assert.Contains("four bytes a texel", length.Message);
+        Assert.Equal(0, stream.Length);
+    }
+
     /// <summary>The SHA-256 of <see cref="CanaryImage"/>'s PNG on .NET 10.0.15 (T-187).</summary>
     private const string CanaryHash = "d0024f48b23b60430272f726cb94afb7cdf80bc443630555ab3859e912380dc4";
 
@@ -139,18 +170,24 @@ public class PngWriterTests
             $"the canary's SHA-256 is {hash}, not {CanaryHash}. Do not pin the hash again: stop and ask the person (M-33).");
     }
 
-    public static TheoryData<string, string> BrokenCopies => new()
+    /// <summary>
+    /// Each break, the check that catches it, and how that check fails (RV-80): the exception's type and a fragment of its
+    /// message. <c>TrueException</c> is a named assertion in the check; <c>InvalidDataException</c> is thrown only by
+    /// <see cref="ZLibStream"/> inflating the joined <c>IDAT</c> data, which checks the Adler-32 (its message does not
+    /// say so, so no fragment is asserted).
+    /// </summary>
+    public static TheoryData<string, string, string, string> BrokenCopies => new()
     {
-        { "FilterByteNone", "decodes" },
-        { "BandStartAgainstZeros", "decodes" },
-        { "WrongAdlerCombine", "sound" },
-        { "NoFinalBlock", "sound" },
-        { "WrongCrc", "sound" },
+        { "FilterByteNone", "decodes", "TrueException", "the PNG does not decode to its texels" },
+        { "BandStartAgainstZeros", "decodes", "TrueException", "the PNG does not decode to its texels" },
+        { "WrongAdlerCombine", "sound", "InvalidDataException", "" },
+        { "NoFinalBlock", "sound", "TrueException", "does not end in an empty final block" },
+        { "WrongCrc", "sound", "TrueException", "the IHDR chunk's CRC is wrong" },
     };
 
     [Theory]
     [MemberData(nameof(BrokenCopies))]
-    public void EachBrokenCopyFailsACheck(string fault, string check)
+    public void EachBrokenCopyFailsACheck(string fault, string check, string exception, string message)
     {
         const int width = 64, height = 130; // three bands
         var rgba = Smooth(width, height);
@@ -163,7 +200,10 @@ public class PngWriterTests
 
         run(Encode(rgba, width, height, PngWriterFault.None));
         var broken = Encode(rgba, width, height, Enum.Parse<PngWriterFault>(fault));
-        Assert.ThrowsAny<Exception>(() => run(broken));
+        var thrown = Record.Exception(() => run(broken));
+        Assert.NotNull(thrown);
+        Assert.True(thrown.GetType().Name == exception, $"{fault} failed {check} with {thrown.GetType().Name}, not {exception}: {thrown.Message}");
+        Assert.Contains(message, thrown.Message);
     }
 
     private static byte[] Encode(byte[] rgba, int width, int height, PngWriterFault fault)
