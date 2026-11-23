@@ -346,7 +346,10 @@ working directory, or absolute), grey stone bricks from the bricks sample:
 ### What is slow or bounded
 
 `export` at 8192 evaluates in tiles, one output at a time, so the process stays
-under 2 GB, but it takes minutes, not seconds: a client with a short call
+under 2 GB (the planks' four outputs peaked at about 0.7 GB), but it is slow,
+and most of that is evaluating the graph: the planks' four outputs took 28 to
+31 s in a release build and 3 to 4 minutes in a debug build, with each PNG
+0.3 to 1 MB and the encode 0.6 to 1.4 s of that in all four. A client with a short call
 timeout should ask for one or two outputs at a time. `blur` and `distance` are
 the slowest nodes at 8192 (about 2 minutes and about 20 s); the 10 s target for
 each is T-159's, not yet met. `swatch` and `check` stop at 2048.
