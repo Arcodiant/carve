@@ -4,7 +4,7 @@ description: >-
 ---
 # T-188 — patina's PNGs through the new writer, and the samples written again
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
