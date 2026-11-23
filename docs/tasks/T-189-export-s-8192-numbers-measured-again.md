@@ -90,7 +90,7 @@ beside the measurement; "exclusive" means it ran as a cairn `ad-hoc` job with `-
   minutes queued while the runner drained. It also wrote the 168.0 s export figure above. Machine CPU averaged 58% (max 100%)
   over its window, so other, non-cairn load was there; and the status list still showed other repos' jobs running at times, so
   I do not claim the machine was quiet. `est-seconds` for `patina-regression` is set from it: **200 to 1240**. For comparison, the
-  suite took 1920 s as a shared `verify` job of this task (CPU 100% at its start) and 3,505 s in T-188's.
+  suite took 1920 s and 1852 s as shared `verify` jobs of this task (machine near 100% CPU) and 3,505 s in T-188's.
 - **Release harness**, in `artifacts/M-33/T-189/` of the container's `branches/main`: `harness/` (stdio client, the test's three
   calls against a Release `patina.dll`), `share/` (evaluation vs `PngWriter.Write` timed apart, Release or Debug), `HOWTO.txt`
   (how to run), and the results `release-runs.txt`, `release-share.txt`, `debug-share.txt`, `debug-runs.txt`.
