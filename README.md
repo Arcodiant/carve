@@ -157,6 +157,7 @@ Texture and graph paths are relative to carve's working folder, or absolute; the
 - `maps` picks from `masks` (a grey mask for each face group and each material), `base_colour`, `curvature` (convex and concave edges, for wear in a texture graph), `occlusion`, `orm` (occlusion, roughness and metallic in one RGB file, as glTF reads them) and `normal` (the hard edges rounded over `bevel.width` metres, with no extra geometry). The default is `masks` and `base_colour`.
 - `surface` gives a colour, roughness and metallic per group or material, a later entry winning a face two of them name. `occlusion` needs `occlusion.reach` in metres; `curvature` and `normal` need a `width` in their `curvature` and `bevel` blocks.
 - `size` is a power of two from 64 to 4096 (default 1024) and `folder` defaults to `textures`, relative to carve's working folder. A bake always overwrites; the result gives each file's path in the form `define_material` takes, with its coverage and its range of values.
+- Beyond the padding, where no island reaches, a mask and `occlusion` hold white and `curvature` 128, the values the mesh graph nodes read there, so a node and its bake are one image; `base_colour`, `orm` and `normal` hold black.
 
 On `samples/wrench.carve` (`open` it first), the bake in `bake`'s own description, then a material from it:
 

@@ -266,6 +266,24 @@ public class BakeLayoutTests
         _ = Bake.Pad(image, layout, 32);
     }
 
+    [Fact]
+    public void Filling_the_uncovered_texels_sets_every_channel_there_and_leaves_the_islands()
+    {
+        var mesh = TestMeshes.Cube().WithUvs(MeshUvs.None.WithFace(1, [new(0.1f, 0.4f), new(0.3f, 0.4f), new(0.3f, 0.2f), new(0.1f, 0.2f)]));
+        var layout = Lay(mesh, 64);
+        var image = layout.NewImage(2);
+        foreach (var t in layout.Texels()) { image[t.X, t.Y, 0] = 0.25f; image[t.X, t.Y, 1] = 0.75f; }
+
+        Assert.Same(image, Bake.FillUncovered(image, layout, 0.5f));
+        for (var y = 0; y < 64; y++)
+        for (var x = 0; x < 64; x++)
+        {
+            var covered = layout.IsCovered(x, y);
+            Assert.Equal(covered ? 0.25f : 0.5f, image[x, y, 0]);
+            Assert.Equal(covered ? 0.75f : 0.5f, image[x, y, 1]);
+        }
+    }
+
     /// <summary>
     /// T-120's probe restated: on the +Z face of a unit box with u = x and v = 1 − y (MaterialRenderTests.FrontUvs), the
     /// engine leans the normal toward world +x for red and world +y for green. The cotangent formula as written runs its

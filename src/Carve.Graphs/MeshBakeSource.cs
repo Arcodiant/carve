@@ -124,11 +124,6 @@ public sealed class MeshBakeSource : IMeshMaps
     }
 
     /// <summary>Uncovered texels set to <paramref name="neutral"/>, then padded: so padding takes the islands' values and what lies beyond it reads neutral.</summary>
-    internal static BakeImage Finish(BakeImage image, BakeLayout layout, float neutral)
-    {
-        for (var y = 0; y < layout.Size; y++)
-            for (var x = 0; x < layout.Size; x++)
-                if (!layout.IsCovered(x, y)) image.Texel(x, y).Fill(neutral);
-        return Bake.Pad(image, layout, Padding);
-    }
+    internal static BakeImage Finish(BakeImage image, BakeLayout layout, float neutral) =>
+        Bake.Pad(Bake.FillUncovered(image, layout, neutral), layout, Padding);
 }
