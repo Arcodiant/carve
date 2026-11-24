@@ -4,7 +4,7 @@ description: >-
 ---
 # T-207 — carve's tool descriptions under Claude Code's cut
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
