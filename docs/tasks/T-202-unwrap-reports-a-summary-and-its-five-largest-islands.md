@@ -1,0 +1,52 @@
+---
+description: >-
+  unwrap returns the island count, worst stretch, flipped total and five largest islands, and every island only at verbosity full
+---
+# T-202 — unwrap reports a summary and its five largest islands
+
+**Status:** Open
+
+**Pri:** P1
+
+**Milestone:** M-23
+
+**Batch:** — (standalone)
+
+**Depends on:** T-200
+
+**Verify:** full
+
+**Perf:** skip: Carve declares no heavy suites
+
+## Goal
+
+`unwrap` answers with a summary and its five largest islands, so a tool with 135 islands costs about 800 characters, not 16,000.
+
+## Scope
+
+- **The result at `summary`** (the default), agreed sketch:
+  ```
+  {"mesh": "toolkit",
+   "islands": 135,
+   "single_face_islands": 118,
+   "fill": 0.71, "scale": 2.4,
+   "stretch": {"worst": 1.38, "lowest_face": 14},
+   "flipped": 0,
+   "largest": [
+     {"faces": 12, "lowest_face": 0, "rect": [0.016, 0.016, 0.383, 0.271], "stretch": 1.0, "flipped": 0},
+     ... 4 more ...]}
+  ```
+  `islands` is the count; `stretch` names the island with the largest stretch by its lowest face; `flipped` is the total over all islands; `largest` is up to five islands by face count, ties to the lowest face, each entry in today's form. (The numbers in the sketch are illustrative.)
+- **`verbosity`** by T-200's helper: `silent` is `{"ok":true}`; `full` is `summary` plus `all`, every island in today's entry form, in today's order. This replaces the `islands: "all"` argument of the agreed sketch (the planner's change, since `verbosity` came after it: confirm with the person before landing).
+- **Readers**: search every caller of `unwrap` in `scenarios/` and `tests/` (`scenario-uvs`' three islands, `UnwrapToolTests`, `UnwrapToolDefinitionTests`, the wrench and bakes) and move each to `largest` or to `verbosity: "full"`, asserting what it asserted. The worked example in `unwrap`'s description shows the new result and is run as written; the description does not grow.
+- **Tests** (`unit`): the barrel's three islands; a mesh with more than five islands (order, ties, `single_face_islands`, the worst stretch's island, the `flipped` total against `full`'s entries); `full` equal entry for entry to the result before this task; in `DenseMeshBudgetTests`, `unwrap` on `samples/wrench.carve`, `cutter-src.carve`, `toolkit-src.carve` and `scanner-src.carve` (39, 95, 135 and 67 islands; 4,778, 11,371, 16,086 and 8,089 characters at planning) each `Budget` or less.
+- Remove `unwrap` from T-200's guard table. **`README.md`**: `## UVs` says what `unwrap` returns.
+
+## Notes
+
+- Owns `UnwrapTool.cs` in its wave; T-205 trims the description after it.
+- `get_mesh` still reads every UV, and `render mode=uvs` shows the layout; neither changes.
+- **Read M-23's *Decided at planning (2026-11-24)* first**: the person's rulings and the agreed sketches are there and bind this task.
+- **Ask, don't land.** A rule neither this file nor the milestone settles, a changed number (the 3, the 2,000, the 3,686), or a check that would be loosened goes back to the person. An assertion that moves keeps asserting the same thing; say in `### As built` which moved where.
+- Search for what reads the thing you change (`grep` over `tests/` and `scenarios/`) before changing it; do not list the readers from memory. Show each changed or new check failing on a wrong input, as a table in `### As built`.
+- Run `finish` from inside the worktree and leave the folder.

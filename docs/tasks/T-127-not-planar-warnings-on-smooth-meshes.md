@@ -36,3 +36,4 @@ warning is not lost among them.
   `select faces where non_planar` in T-106, and to file the rule as this task, outside M-21.
 - Same flood as M-18's soft gardener (T-44, RV-27) and M-19's T-72.
 - **Open rules: stop and ask.** The rule itself is the person's.
+- **Taken into M-23 (2026-11-24)** as T-198, on the person's ruling at M-23's planning: on a smooth mesh a not-planar face is a note in `check` and no warning. Close this when T-198 lands.
