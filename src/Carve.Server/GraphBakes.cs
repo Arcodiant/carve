@@ -90,7 +90,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
             }
             catch (Exception e) when (GraphSlotProblem.IsCause(e))
             {
-                throw new GraphSlotProblemException(GraphSlotProblem.Of(m.Name, field, e), e);
+                throw GraphSlotProblem.Failed(m.Name, field, e);
             }
         }
 
@@ -114,7 +114,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
                 }
                 catch (Exception e) when (GraphSlotProblem.IsCause(e))
                 {
-                    throw new GraphSlotProblemException(GraphSlotProblem.Of(m.Name, field, e), e);
+                    throw GraphSlotProblem.Failed(m.Name, field, e);
                 }
                 var (node, nodeMs) = timed.Costliest(f);
                 baked.Add(new(m.Name, f.ReadsMesh ? label : null, field, g.Size, _clock() - start, node, nodeMs, label));
@@ -189,7 +189,8 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
     [
         .. baked.GroupBy(b => (b.Material, b.On)).Where(g => g.Sum(b => b.Ms) > WarnMs).Select(g =>
         {
-            var worst = g.MaxBy(b => b.Ms)!;
+            // The node that cost most, in the slot that made its map: a mesh's maps are shared within a bake, so a later slot that reads one is charged nothing for it.
+            var worst = g.Any(b => b.NodeMs > 0) ? g.MaxBy(b => b.NodeMs)! : g.MaxBy(b => b.Ms)!;
             var on = g.Key.On is { } mesh ? $" on '{mesh}'" : "";
             var node = worst.Node is { } n ? $": {n} {Seconds(worst.NodeMs)} s" : "";
             return $"material '{g.Key.Material}'{on} took {Seconds(g.Sum(b => b.Ms))} s to bake ({worst.Slot} {worst.Size}{node}); lower its size or the node's rays";

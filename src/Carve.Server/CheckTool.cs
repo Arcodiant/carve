@@ -37,6 +37,7 @@ public sealed class CheckTool(ModelStore store)
         + "\"UVs of zero area, so the face is one smeared texel\": its UV area is below 1e-9 times the square of its UV bounds' diagonal, as a zero-area face in space is; project_uvs or unwrap it, or set_uvs corners that span an area. A smeared face is not also called flipped. "
         + "\"UVs overlap faces[m], so the two faces show the same texels\": two faces' UV triangles share more than 1e-6 of UV area (about a fifteenth of a texel of the 256 checker), so painting one paints the other. Each pair is listed once, under the lower id; sharing an edge is not an overlap. A pair is not warned of when both faces have a material and the two materials differ, even when the two materials use the same PNG and so show the same texels; the same material, or a face with a colour only or nothing, is warned of as before. Mirrored halves sharing a texture area are deliberate and still warned of, so read the pair before moving anything; otherwise unwrap, which separates islands, or put a seam where islands collide and unwrap again. "
         + "Material warning, by material (materials['wood']): \"occlusion is 0.5 but the material has no occlusion_texture, so it has no effect (glTF scales only the map)\": a material the mesh uses has an occlusion strength other than 1 and no occlusion map, and glTF scales only the map, so render and export ignore it; give an occlusion_texture with define_material or leave occlusion at 1. "
+        + "Graph material warnings, by material (materials['iron'].base_colour_texture): each graph slot of a material the mesh uses that cannot be baked as the model is now, in the words render gives: a graph file that is missing (the .texgraph files in its folder are listed), a fault in the graph (every one, naming its node), an output the graph lacks or the slot cannot take; and for a graph that reads the mesh, no UVs, UVs that overlap, a mesh_mask naming a group or material the mesh lacks, and \"faces[2, 3] of 'barrel' are unmapped, so 'iron' bakes nothing onto them\". Fix the graph file or define_material again, or give the mesh UVs (unwrap, project_uvs, set_uvs) that do not overlap. check casts no rays and evaluates no graph, so it is quick. "
         + PartTexts.Check
         + "There is no delete yet, so removing a vertex or a face means define_mesh with the lists you want, and the ids after it close up. "
         + "Notes. 1 unit = 1 m, so size is the model's size in metres. A prop stands on y = 0, so the base note says where this one stands. The origin is where a game places the model, so it belongs inside the bounds (on them counts). More than one shell is noted because a model is usually one, though a detached part may be meant. "
@@ -50,6 +51,15 @@ public sealed class CheckTool(ModelStore store)
         ["type"] = "object",
         ["properties"] = new JsonObject { ["targets"] = TargetWeightsArgument.Schema() },
     }));
+
+    /// <summary>The warnings of the graph materials <paramref name="target"/> uses (T-166): what stops each slot baking, then what stops it on this mesh. No ray is cast and no graph evaluated.</summary>
+    private static IEnumerable<string> GraphMaterialWarnings(Model model, PolygonMesh target)
+    {
+        var name = model.Meshes.FirstOrDefault(n => ReferenceEquals(n.Mesh, target))?.Name;
+        foreach (var m in Model.MaterialsUsedBy(target).Select(model.FindMaterial).OfType<Material>().Where(m => m.HasGraph))
+            foreach (var w in GraphSlotProblem.Slots(m).Concat(name is null ? [] : GraphSlotProblem.OnMesh(model, m, name)))
+                yield return w;
+    }
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? targets = null)
     {
@@ -78,7 +88,7 @@ public sealed class CheckTool(ModelStore store)
             ["area"] = stats.Area,
             ["volume"] = stats.Volume,
         };
-        var envelope = model.EnvelopeWarnings().Select(w => w.Message).ToArray();
+        var envelope = model.EnvelopeWarnings().Select(w => w.Message).Concat(GraphMaterialWarnings(model, target)).ToArray();
         if (stats.Uvs is { } uvs) shown["uvs"] = new { mapped = uvs.Mapped, unmapped = uvs.Unmapped };
         return Ok(new
         {
