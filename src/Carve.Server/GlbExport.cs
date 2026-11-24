@@ -96,11 +96,11 @@ public static class GlbExport
             .WithDoubleSide(m.DoubleSided);
         var emissive = FaceStyle.ToLinear(m.Emissive);
         if (emissive.X != 0f || emissive.Y != 0f || emissive.Z != 0f) builder.WithEmissive(new Vector3(emissive.X, emissive.Y, emissive.Z));
-        if (m.BaseColourTexture is { } baseColour) builder.WithChannelImage(KnownChannel.BaseColor, images.Of(baseColour));
-        if (m.MetallicRoughnessTexture is { } metallicRoughness) builder.WithChannelImage(KnownChannel.MetallicRoughness, images.Of(metallicRoughness));
-        if (m.NormalTexture is { } normal) builder.WithChannelImage(KnownChannel.Normal, images.Of(normal));
-        if (m.EmissiveTexture is { } emissiveTexture) builder.WithChannelImage(KnownChannel.Emissive, images.Of(emissiveTexture));
-        if (m.OcclusionTexture is { } occlusion)
+        if (m.BaseColourTexture is MaterialTexture baseColour) builder.WithChannelImage(KnownChannel.BaseColor, images.Of(baseColour));
+        if (m.MetallicRoughnessTexture is MaterialTexture metallicRoughness) builder.WithChannelImage(KnownChannel.MetallicRoughness, images.Of(metallicRoughness));
+        if (m.NormalTexture is MaterialTexture normal) builder.WithChannelImage(KnownChannel.Normal, images.Of(normal));
+        if (m.EmissiveTexture is MaterialTexture emissiveTexture) builder.WithChannelImage(KnownChannel.Emissive, images.Of(emissiveTexture));
+        if (m.OcclusionTexture is MaterialTexture occlusion)
         {
             builder.WithChannelImage(KnownChannel.Occlusion, images.Of(occlusion));
             builder.UseChannel(KnownChannel.Occlusion).Parameters[KnownProperty.OcclusionStrength] = m.Occlusion;

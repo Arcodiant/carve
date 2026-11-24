@@ -405,6 +405,12 @@ internal static class RenderTool
             return Failed("render", [partRefused]);
         }
 
+        // Interim until T-163 draws graph materials (M-29's branch only).
+        if (MaterialJson.GraphsNotDrawn("render", store.Current.Model) is { } notDrawn)
+        {
+            return Error(notDrawn);
+        }
+
         var projected = projection == "orthographic" ? Projection.Orthographic : Projection.Perspective;
         var look = mode switch { "wireframe" => Look.Wireframe, "normals" => Look.Normals, "checker" => Look.Checker, _ => Look.Shaded };
         if (weights is not null) look = Look.Weights;

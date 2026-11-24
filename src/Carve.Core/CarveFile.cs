@@ -23,7 +23,7 @@ public sealed class CarveFileResult
     /// <summary>The model the file holds, every mesh, vertex, face, bone and clip in its place, or null when the file was refused.</summary>
     public Model? Model { get; }
 
-    /// <summary>The version the file was read as, 1 to 9, or 0 when the file was refused.</summary>
+    /// <summary>The version the file was read as, 1 to 10, or 0 when the file was refused.</summary>
     public int Version { get; }
 
     /// <summary>The model's only mesh, or null when the file was refused or holds several.</summary>
@@ -75,6 +75,10 @@ public sealed class CarveFileResult
 /// last key of a mesh (after <c>targets</c> when it has any), each kept level holding the keys of a version 8 mesh but its
 /// name, so a level keeps its targets (the person's ruling, 2026-11-18). It adds no key of its own, and is written only when
 /// the model has both a part tree (<see cref="HasPartTree"/>) and a morph target on a mesh or a kept level.
+/// Version 10 (T-160) is version 9 with graph slots: a material's texture slot may be
+/// <c>{"graph": "graphs/iron.texgraph", "output": "base_colour", "size": 1024}</c>, the path relative to the file's folder with
+/// <c>/</c> separators and <c>size</c> always written. It is written for every model with a graph slot, whatever else it has,
+/// and for no other. Reading does not open the graph file (the Core holds no graph content): a missing one is the tools' warning.
 /// Version 3 (T-42) added, after <c>weights</c> in every mesh, <c>shading</c> (<c>"flat"</c> or <c>"smooth"</c>) and
 /// <c>hard_edges</c> (vertex-id pairs, lower id first, in order).
 /// Version 2: the keys <c>carve</c>, <c>meshes</c>, <c>skeleton</c>
@@ -82,7 +86,7 @@ public sealed class CarveFileResult
 /// <c>weights</c>; two-space indent, one vertex, face, colour, group, weighted vertex, bone or clip key per line, <c>\n</c>
 /// line ends and a newline at the end. Each float is the shortest text that reads back to the same <see cref="float"/>,
 /// each weight the shortest that reads back to the same <see cref="double"/>.</para>
-/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2 to 9, keys in any order and
+/// <para>Reading takes version 1 (one mesh, named <see cref="Model.DefaultName"/>) and versions 2 to 10, keys in any order and
 /// any whitespace, and holds the file to exactly what the tools accept: geometry to <see cref="PolygonMesh.Create"/>, bones
 /// to <see cref="Skeleton.Create"/>, weights to <see cref="VertexWeights.Raw"/>, clips to <see cref="Clip.Create"/>, the
 /// whole to <see cref="Model.Create"/>. An unknown key or another version is refused, so a newer file is never half-read.
@@ -97,7 +101,10 @@ public static class CarveFile
     public const int Version = 8;
 
     /// <summary>The versions <see cref="Read(string)"/> reads.</summary>
-    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    public static IReadOnlyList<int> ReadableVersions { get; } = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    /// <summary>The version that holds graph slots: version 9 with a slot naming a <c>.texgraph</c> output (M-29, T-160).</summary>
+    public const int GraphSlotsVersion = 10;
 
     /// <summary>The version that holds a part tree and kept levels (M-9, T-92).</summary>
     public const int PartTreeVersion = 7;
@@ -105,8 +112,8 @@ public static class CarveFile
     /// <summary>The version that holds a part tree and kept levels beside morph targets (M-9, T-132).</summary>
     public const int PartsAndTargetsVersion = 9;
 
-    /// <summary>Whether <paramref name="version"/> holds <c>parts</c> and <c>levels</c>: 7 and 9.</summary>
-    private static bool HoldsParts(int version) => version is PartTreeVersion or PartsAndTargetsVersion;
+    /// <summary>Whether <paramref name="version"/> holds <c>parts</c> and <c>levels</c>: 7, 9 and 10.</summary>
+    private static bool HoldsParts(int version) => version is PartTreeVersion or PartsAndTargetsVersion or GraphSlotsVersion;
 
     private const string VersionKey = "carve";
     private const string VerticesKey = "vertices";
@@ -133,6 +140,7 @@ public static class CarveFile
     private static readonly string[] PartRecordKeys = ["name", "parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves"];
     private static readonly string[] EnvelopeKeys = ["min", "max"];
     private static readonly string[] TargetKeys = ["name", "deltas"];
+    private static readonly string[] GraphSlotKeys = ["graph", "output", "size"];
     private static readonly string[] MaterialUseKeys = ["material", "faces"];
     private static readonly string[] MaterialFactorKeys = ["base_colour", "metallic", "roughness", "emissive", "occlusion", "double_sided"];
     private static readonly string[] MaterialKeys = ["name", .. MaterialFactorKeys, .. new Material("m").Textures.Select(t => t.Field)];
@@ -157,7 +165,7 @@ public static class CarveFile
         return Write(Model.Of(Model.DefaultName, mesh));
     }
 
-    /// <summary>The file's text for a model, version 2 to 9 as the remarks say. The same model always gives the same text.</summary>
+    /// <summary>The file's text for a model, version 2 to 10 as the remarks say. The same model always gives the same text.</summary>
     /// <exception cref="ArgumentException">A material has a texture, whose path needs the file's folder: use <see cref="Write(Model, string)"/>.</exception>
     public static string Write(Model model)
     {
@@ -191,7 +199,10 @@ public static class CarveFile
         for (var i = 0; i < model.Materials.Count; i++)
             foreach (var (field, texture) in model.Materials[i].Textures)
                 if (texture is not null && RelativePath(folder, texture.Path) is null)
-                    return Invariant($"materials[{i}].{field}: the texture '{texture.Path}' of the material '{model.Materials[i].Name}' has no path relative to '{Path.GetFullPath(folder)}' (it is on another drive); save the file on the texture's drive, or copy the texture there and define the material again");
+                {
+                    var kind = texture is MaterialGraph ? "graph" : "texture";
+                    return Invariant($"materials[{i}].{field}: the {kind} '{texture.Path}' of the material '{model.Materials[i].Name}' has no path relative to '{Path.GetFullPath(folder)}' (it is on another drive); save the file on the {kind}'s drive, or copy the {kind} there and define the material again");
+                }
         return null;
     }
 
@@ -215,7 +226,9 @@ public static class CarveFile
         // or the parts are not the meshes in mesh order: an empty part, or plain parts in another order (RV-71).
         // Version 9 only when the model needs both: a part tree and a morph target, on a mesh or a kept level (T-132).
         var targeted = model.Meshes.Any(m => m.Mesh.Targets is not null) || model.Parts.Any(p => p.Levels.Any(l => l.Mesh.Targets is not null));
-        var version = HasPartTree(model) ? targeted ? PartsAndTargetsVersion : PartTreeVersion
+        // Version 10 for any model with a graph slot, whatever else it has (T-160).
+        var version = model.Materials.Any(m => m.HasGraph) ? GraphSlotsVersion
+            : HasPartTree(model) ? targeted ? PartsAndTargetsVersion : PartTreeVersion
             : targeted ? Version
             : model.Materials.Count > 0 ? 6
             : model.Meshes.Any(m => m.Mesh.Uvs is not null) ? 5
@@ -367,7 +380,9 @@ public static class CarveFile
         if (!SameBits(m.Occlusion, Material.DefaultOcclusion)) parts.Add($"\"occlusion\": {Number(m.Occlusion)}");
         if (m.DoubleSided) parts.Add("\"double_sided\": true");
         foreach (var (field, texture) in m.Textures)
-            if (texture is not null) parts.Add($"\"{field}\": {Text(RelativePath(folder!, texture.Path)!)}");
+            if (texture is MaterialGraph g)
+                parts.Add($"\"{field}\": {{\"graph\": {Text(RelativePath(folder!, g.Path)!)}, \"output\": {Text(g.Output)}, \"size\": {g.Size.ToString(CultureInfo.InvariantCulture)}}}");
+            else if (texture is not null) parts.Add($"\"{field}\": {Text(RelativePath(folder!, texture.Path)!)}");
         return "{" + string.Join(", ", parts) + "}";
     }
 
@@ -505,7 +520,7 @@ public static class CarveFile
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
                 return Refused(new MeshError("file", $"the file is a JSON {Kind(root)}; a Carve file is a JSON object"));
-            return VersionOf(root) is (2 or 3 or 4 or 5 or 6 or 7 or 8 or 9) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
+            return VersionOf(root) is (2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10) and { } version ? ReadVersion2(root, version, folder, mesh) : ReadVersion1(root);
         }
     }
 
@@ -615,7 +630,7 @@ public static class CarveFile
                     if (!materialNames.Contains(other)) materialNames.Add(other);
                     i++;
                 }
-                else if (ReadMaterial(item, Invariant($"materials[{i++}]"), folder, loaded, materialNames, errors) is { } material) materials.Add(material);
+                else if (ReadMaterial(item, Invariant($"materials[{i++}]"), version, folder, loaded, materialNames, errors) is { } material) materials.Add(material);
         }
 
         // The skeleton is read first, since weights and clips name its bones; its problems are listed after the meshes'.
@@ -729,7 +744,7 @@ public static class CarveFile
     /// each texture read from the folder, each absolute path once per read. Its name, when it is a usable one, joins
     /// <paramref name="names"/> even when the rest is refused, so faces naming it are not refused as well.
     /// </summary>
-    private static Material? ReadMaterial(JsonElement item, string at, string? folder,
+    private static Material? ReadMaterial(JsonElement item, string at, int version, string? folder,
         Dictionary<string, (MaterialTexture? Texture, string? Problem)> loaded, List<string> names, List<MeshError> errors)
     {
         var before = errors.Count;
@@ -737,7 +752,7 @@ public static class CarveFile
         var name = Required(f, at, "name", "a material", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         if (name is not null)
         {
-            if (Material.NameProblem(name) is { } bad) errors.Add(new MeshError($"{at}.name", bad));
+            if (Material.NameProblem(name, existing: true) is { } bad) errors.Add(new MeshError($"{at}.name", bad));
             else if (names.Contains(name)) errors.Add(new MeshError($"{at}.name", $"a material named '{name}' comes earlier; material names must be unique"));
             else names.Add(name);
         }
@@ -756,10 +771,17 @@ public static class CarveFile
             if (ds.ValueKind is JsonValueKind.True or JsonValueKind.False) doubleSided = ds.GetBoolean();
             else errors.Add(new MeshError($"{at}.double_sided", $"double_sided is {Describe(ds)}, not true or false"));
         }
-        var textures = new Dictionary<string, MaterialTexture>();
+        var textures = new Dictionary<string, MaterialSlot>();
         foreach (var field in MaterialKeys.Skip(1 + MaterialFactorKeys.Length))
         {
-            if (!f.TryGetValue(field, out var t) || Str(t, $"{at}.{field}", errors) is not { } given) continue;
+            if (!f.TryGetValue(field, out var t)) continue;
+            // Version 10 (T-160): a graph slot; its file is not read here (open warns of a missing or broken one).
+            if (version >= GraphSlotsVersion && t.ValueKind == JsonValueKind.Object)
+            {
+                if (ReadGraphSlot(t, $"{at}.{field}", folder, errors) is { } graph) textures[field] = graph;
+                continue;
+            }
+            if (Str(t, $"{at}.{field}", errors, version >= GraphSlotsVersion ? "a string or a graph slot object" : "a string") is not { } given) continue;
             if (folder is null)
             {
                 errors.Add(new MeshError($"{at}.{field}", "a texture needs the file's folder, since its path is relative to it"));
@@ -791,12 +813,38 @@ public static class CarveFile
         return problems.Length > 0 ? null : material;
     }
 
+    /// <summary>A version 10 graph slot (T-160): <c>graph</c>, resolved against the folder, <c>output</c> and <c>size</c>, each required; its shape is checked by <see cref="Material.Problems"/>.</summary>
+    private static MaterialGraph? ReadGraphSlot(JsonElement item, string at, string? folder, List<MeshError> errors)
+    {
+        var before = errors.Count;
+        if (Fields(item, at, "a graph slot", GraphSlotKeys, errors) is not { } f) return null;
+        var given = Required(f, at, "graph", "a graph slot", errors) is { } g ? Str(g, $"{at}.graph", errors) : null;
+        var output = Required(f, at, "output", "a graph slot", errors) is { } o ? Str(o, $"{at}.output", errors) : null;
+        var size = Required(f, at, "size", "a graph slot", errors) is { } z ? Int(z, $"{at}.size", "size", errors) : null;
+        if (errors.Count > before) return null;
+        if (folder is null)
+        {
+            errors.Add(new MeshError($"{at}.graph", "a graph needs the file's folder, since its path is relative to it"));
+            return null;
+        }
+        try
+        {
+            var full = given!.Length == 0 ? throw new ArgumentException("the path is empty") : Path.GetFullPath(Path.Combine(folder, given));
+            return new MaterialGraph(full, output!, size!.Value);
+        }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            errors.Add(new MeshError($"{at}.graph", $"cannot read '{given}': {e.Message}"));
+            return null;
+        }
+    }
+
     private static NamedMesh? ReadMesh(JsonElement item, string at, Skeleton? skeleton, bool skeletonGood, int version, List<string> materialNames, List<MeshError> errors,
         Dictionary<string, PartLevel[]>? levels = null, bool level = false)
     {
         var before = errors.Count;
-        if (Fields(item, at, level ? "a level" : "a mesh", level ? version == PartsAndTargetsVersion ? LevelKeysV9 : LevelKeys
-            : version == PartsAndTargetsVersion ? MeshKeysV9 : version == PartTreeVersion ? MeshKeysV7 : version >= 8 ? MeshKeysV8 : version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
+        if (Fields(item, at, level ? "a level" : "a mesh", level ? version >= PartsAndTargetsVersion ? LevelKeysV9 : LevelKeys
+            : version >= PartsAndTargetsVersion ? MeshKeysV9 : version == PartTreeVersion ? MeshKeysV7 : version >= 8 ? MeshKeysV8 : version >= 6 ? MeshKeysV6 : version >= 5 ? MeshKeysV5 : version >= 3 ? MeshKeysV3 : MeshKeys, errors) is not { } f) return null;
         var name = level ? "" : Required(f, at, "name", "a mesh", errors) is { } n ? Str(n, $"{at}.name", errors) : null;
         f.TryGetValue(VerticesKey, out var vs);
         f.TryGetValue(FacesKey, out var fs);

@@ -105,3 +105,44 @@ output and a size. `define_material` takes it, `get_mesh` reports it, and the Ca
   CLAUDE.md conflicts only add: keep both sides.
 - **Stop and ask:** a rule the spec does not settle (a slot kind the description cannot explain, a version question),
   or any check that would have to loosen.
+
+### Hand-off
+
+Ran on Opus 5.5 (claude-opus-5-5). Stopped at the 60-call checkpoint; code and tests committed, `verify` not yet run.
+
+**Done.**
+- Core (`Material.cs`): `abstract record MaterialSlot(string Path)`; `MaterialTexture : MaterialSlot` (otherwise unchanged) and
+  `MaterialGraph(string Path, string Output, int Size) : MaterialSlot` (equal by value; `Extension`, `MinSize`,
+  `SizeProblem`, `OutputProblem`, `Problem()`). A slot is told apart by type (`slot is MaterialGraph`). The five slot
+  properties are `MaterialSlot?`; `Textures`, `HasTexture`, `OcclusionHasNoEffect` and `Problems` cover both; new
+  `HasGraph`. `NameProblem(name, existing = false)` refuses '@' only for a new name; `Problems`, `FaceStyle.WithMaterial`
+  and the file reader use `existing: true`, so a file with '@' still opens.
+- `CarveFile.cs`: `GraphSlotsVersion = 10`, readable; written for any model with a graph slot, laid out as version 9
+  (`HoldsParts(10)`, mesh keys V9). Slot written `{"graph": rel, "output", "size"}`; read by `ReadGraphSlot` (all three
+  required, unknown key refused, path resolved against the folder, graph file not read). An object slot in v<10 is
+  refused as "not a string". `TextureProblem` says "graph" for a graph on another drive.
+- Server: `Carve.Server` references `Patina.Graphs`. `define_material` takes a string or an object per slot
+  (`LoadGraph`; `ReadGraph(fullPath, out graph)` is the shared read: missing / load error / IO, validation faults ignored;
+  `Missing(target, extension)` generalised). Size default the graph's own clamped to 64..4096. Description, schema
+  (`anyOf` string or object) and a second worked example. `MaterialJson.Of` reports `{graph, output, size}`;
+  `MaterialJson.BrokenGraphs` gives open's `material_warnings`; `MaterialJson.GraphsNotDrawn` is the interim refusal,
+  called in `RenderTool` (after the part check) and `ExportTool` (after the no-mesh check) — T-163 removes both calls.
+  get_mesh, save and open descriptions gained a sentence each. `SaveTool.MissingTextures` and the glb/PBR builders
+  take PNG slots only.
+- Tests: `tests/Carve.Core.Tests/GraphSlotFileTests.cs` (slot, Problems, '@', v10 write/read/round trip, the fixture
+  `Fixtures/graph-slots-v10.carve`, other drive, malformed slots, v9 refusal, every sample byte for byte, and v2..v9
+  models pinned by SHA-256 taken from main's writer with T-160's Core changes stashed — the same hashes with them);
+  `tests/Carve.Server.Tests/GraphSlotToolTests.cs` (worked example, mix and emissive, every refusal, missing listing,
+  load error, '@', undo, save/open, open warnings, render/export refusal). Version-list pins updated (9 -> "9 and 10",
+  the "unknown version" probes moved from 10 to 11) in `CarveFileTests` and `SaveOpenToolTests`; `.Png` casts in the
+  materials, planks and export tests. Both new classes pass; core-unit passed in full before the server work.
+
+**Left.**
+- `PartToolsListTests.Before` (tools/list digest) must be re-taken: changed by define_material's, get_mesh's, save's
+  and open's own text and define_material's schema, all this task's.
+- Check every tool description stays under 4,096 characters (define_material, open and save all grew).
+- Run `cairn task T-160 verify`; then CLAUDE.md's version list ("10 graph slots, version 9 with a slot naming a
+  `.texgraph` output, T-160") and README (define_material's slot form, version 10) — not yet edited; As built; lint; finish.
+
+**Surprising.** carve has no redo, so the spec's "undo and redo of a define" is tested as undo of a define and of a
+replace. The graph's size when left out is clamped but a graph with a size outside 64..4096 was not tried.

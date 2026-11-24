@@ -112,11 +112,11 @@ public class MaterialExportTests
         Assert.Equal(new Vector3(emissive.X, emissive.Y, emissive.Z), wood.EmissiveColor);
         Assert.Equal(0.8f, wood.Occlusion);
         Assert.True(wood.DoubleSided);
-        Assert.Equal(Wood.BaseColourTexture!.Png.ToArray(), wood.TextureBytes);
-        Assert.Equal(Wood.MetallicRoughnessTexture!.Png.ToArray(), wood.MetallicRoughnessTexture!.Bytes);
-        Assert.Equal(Wood.NormalTexture!.Png.ToArray(), wood.NormalTexture!.Bytes);
-        Assert.Equal(Wood.EmissiveTexture!.Png.ToArray(), wood.EmissiveTexture!.Bytes);
-        Assert.Equal(Wood.OcclusionTexture!.Png.ToArray(), wood.OcclusionTexture!.Bytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Wood.BaseColourTexture!).Png.ToArray(), wood.TextureBytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Wood.MetallicRoughnessTexture!).Png.ToArray(), wood.MetallicRoughnessTexture!.Bytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Wood.NormalTexture!).Png.ToArray(), wood.NormalTexture!.Bytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Wood.EmissiveTexture!).Png.ToArray(), wood.EmissiveTexture!.Bytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Wood.OcclusionTexture!).Png.ToArray(), wood.OcclusionTexture!.Bytes);
 
         var steel = parsed.SubmeshMaterials[3]!;
         Assert.Equal(1f, steel.Metallic);
@@ -179,7 +179,7 @@ public class MaterialExportTests
         Assert.False(MaterialJson(glb, "wood").TryGetProperty("emissiveFactor", out _));
         var wood = Parse(glb).SubmeshMaterials[2]!;
         Assert.Equal(Vector3.Zero, wood.EmissiveColor); // glTF multiplies the texture by the factor, so it glows only when the factor is set
-        Assert.Equal(Wood.EmissiveTexture!.Png.ToArray(), wood.EmissiveTexture!.Bytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Wood.EmissiveTexture!).Png.ToArray(), wood.EmissiveTexture!.Bytes);
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public class MaterialExportTests
         Assert.Equal(6, Json(glb).GetProperty("images").GetArrayLength());
         var parsed = Parse(glb);
         Assert.Same(parsed.SubmeshMaterials[2]!.TextureBytes, parsed.SubmeshMaterials[3]!.TextureBytes);
-        Assert.Equal(Steel.BaseColourTexture!.Png.ToArray(), parsed.SubmeshMaterials[3]!.TextureBytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Steel.BaseColourTexture!).Png.ToArray(), parsed.SubmeshMaterials[3]!.TextureBytes);
     }
 
     [Fact]
@@ -262,8 +262,8 @@ public class MaterialExportTests
         Assert.Equal(FaceStyle.ToLinear("#C8A06E"), wood.BaseColor);
         Assert.Equal(0.8f, wood.Occlusion);
         Assert.True(wood.DoubleSided);
-        Assert.Equal(Wood.OcclusionTexture!.Png.ToArray(), wood.OcclusionTexture!.Bytes);
-        Assert.Equal(Wood.BaseColourTexture!.Png.ToArray(), wood.TextureBytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Wood.OcclusionTexture!).Png.ToArray(), wood.OcclusionTexture!.Bytes);
+        Assert.Equal(((Carve.Core.MaterialTexture)Wood.BaseColourTexture!).Png.ToArray(), wood.TextureBytes);
         Assert.Contains("TEXCOORD_0", Json(glb.Bytes).GetRawText()); // no face has UVs, yet a used material has a texture
     }
 

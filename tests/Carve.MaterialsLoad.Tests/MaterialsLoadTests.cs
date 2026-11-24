@@ -72,7 +72,7 @@ public class MaterialsLoadTests
             && Bytes(want.OcclusionTexture, got.OcclusionTexture?.Bytes);
     }
 
-    private static bool Bytes(CarveTexture? want, byte[]? got) => want is null ? got is null : got is not null && want.Png.ToArray().SequenceEqual(got);
+    private static bool Bytes(Carve.Core.MaterialSlot? want, byte[]? got) => want is null ? got is null : got is not null && ((CarveTexture)want).Png.ToArray().SequenceEqual(got);
 
     /// <summary>A file read with its texture paths resolved against its own folder.</summary>
     private static Carve.Core.Model Read(string path)
@@ -114,7 +114,7 @@ public class MaterialsLoadTests
         float[] Floats(string key) => [.. m.GetProperty(key).EnumerateArray().Select(n => n.GetSingle())];
         var colour = FaceStyle.ToLinear(want.BaseColour);
         var emissive = FaceStyle.ToLinear(want.Emissive);
-        bool Slot(string slot, CarveTexture? texture)
+        bool Slot(string slot, Carve.Core.MaterialSlot? texture)
         {
             var s = m.GetProperty("textures").GetProperty(slot);
             return s.GetProperty("set").GetBoolean() == (texture is not null)

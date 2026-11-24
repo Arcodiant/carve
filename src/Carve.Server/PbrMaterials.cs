@@ -93,7 +93,8 @@ internal sealed class PbrMaterials(IGraphicsResourceManager resources, ITextureL
     /// </summary>
     internal static Material Build(CarveMaterial m, Func<MaterialTexture, bool, Texture> texture)
     {
-        Texture? Of(MaterialTexture? t, bool srgb) => t is null ? null : texture(t, srgb);
+        // A graph slot never reaches here: render refuses graph materials until they are drawn (T-160, T-163).
+        Texture? Of(MaterialSlot? t, bool srgb) => t is MaterialTexture png ? texture(png, srgb) : null;
         var emissive = FaceStyle.ToLinear(m.Emissive);
         return Material.Pbr(FaceStyle.ToLinear(m.BaseColour), m.Metallic, m.Roughness,
             Of(m.BaseColourTexture, true)!, Of(m.MetallicRoughnessTexture, false)!, Of(m.NormalTexture, false)!,
