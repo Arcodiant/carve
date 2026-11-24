@@ -86,10 +86,55 @@ under the layout.
 - **Write down for T-167** (As built): the argument's shape, the caption, and how its frames were checked.
 - **Stop and ask:** an existing `uvs` frame that changes; a byte-identity check that fails.
 
-### Hand-off
+### As built
 
-Model: Opus 5.5 (`claude-opus-5-5`), fourth agent, after Sonnet 5.5 built it and Opus 5.5 diagnosed it and applied the
-fill ruling. Stopped at the checkpoint: code committed and `verify` passing, the frame review left.
+**Models:** Sonnet 5.5 built the member. Opus 5.5 (`claude-opus-5-5`) diagnosed the byte-identity failure and applied the fill
+ruling. A later Opus 5.5 agent rebased onto T-166 and added the `image` wording; that is how far the hand-off goes. The
+frame review, the person's approval, this write-up and `finish` were done by a final Opus 5.5 agent.
+
+**Built:**
+- `render mode=uvs` takes `image` as a PNG path, as before, or as `{graph, output, size}`. `size` defaults to the graph's
+  own, a power of two from 64 to 4096. The output is baked for the mesh the look shows, through T-163's call and cache,
+  and drawn by T-121's path unchanged.
+- `roughness` is drawn as its own grey values and `normal` as its colours.
+- The caption is a text line, not drawn in the image: `image weathered-iron.texgraph wear 256 px`. The text carries
+  `baked` on first use only.
+- The description's worked example, run by its test:
+  `{"mode":"uvs","image":{"graph":"weathered-iron.texgraph","output":"wear","size":256}}`.
+- `GraphImageStage.cs` in scenario-bakes, on the wrench. Its three byte-identity checks and the position frame's block
+  rule are described below.
+- CLAUDE.md's Bakes scenario row.
+- **README.md:** one sentence in Baked maps on the neutral fill beyond the padding.
+
+**For T-167 and T-207:**
+- T-167 builds on the argument's shape `{graph, output, size}`, the caption above, and how the frames were checked:
+  - Each graph frame is byte-equal to the bake-PNG frame of the same map at 1024 with padding 8. This holds over the
+    whole frame, because the caption is not drawn in the image.
+  - The position frame is held to T-121's block rule inside the islands only.
+- T-207 builds on the description lengths: `render` went from 19122 to 19954 characters and `bake` from 8410 to 8684.
+  Both were already over 4,096 before this member.
+
+**Frame review (final agent, Opus 5.5):**
+- Frames are from `verify`'s run J-20261124-094654-73b501, against the base run J-20261124-085554-4d6a68, compared by hash.
+  Exactly the new and moved frames listed below differ. Each graph frame equals its PNG frame and its moved bake frame,
+  with 0 differing pixels.
+- Six side-by-side views were opened, scaled to 1400 wide:
+  - the graph curvature and steel frames;
+  - the graph occlusion and position frames;
+  - before and after for the wrench's occlusion, the L-block's curvature, and the jaw and steel-padding 4x crops.
+- What the frames show:
+  - Inside the islands each output reads right on this mesh. Curvature has bright convex rims on mid grey. Occlusion has
+    dark contact areas and whole black faces where parts meet. The steel islands are white and the rest black. Position
+    is a smooth colour gradient.
+  - Edges are white and seams yellow.
+  - On curvature and position, the padding still reads as a fringe: a lighter grey on the dark-grey area beyond it. It
+    has less contrast than against the old black.
+- **Reads worse:** the steel mask and occlusion have a neutral value of 1, so beyond the padding is now 128 grey. That is
+  the same grey as the padding around a white island (all steel, or unoccluded). In the steel-padding 4x crop, the steel
+  strip's fringe can no longer be told from the area beyond it. Its pixels at 128 went from 21504 to 53040, and those at 0
+  from 68976 to 37440. Only the black fringe of the non-steel islands still shows.
+- The person was told this and approved the set in round 1 (`G:\My Drive\artifacts\carve\M-29\T-165\round-1`, 19 files),
+  with no notes.
 
 - **The person's ruling (2026-11-24):** `bake` writes each map's neutral value in the texels no island or padding covers,
   so the node and the bake are one computation over the whole image. Declined: comparing islands and padding only, and
@@ -140,7 +185,10 @@ fill ruling. Stopped at the checkpoint: code committed and `verify` passing, the
   a bake the stage writes.
 - **Not explained:** this agent's first `cairn test run server-unit` printed nothing and was stopped at the 30-minute
   background limit, with no job in the queue. `verify` straight after ran `server-unit` in 59 s. Not looked into.
-- **Left:** the frame review (open the new graph frames and the moved bake frames, crops scaled up; the person approves
-  the set through `mcp__waystone__review`, files to `G:\My Drive\artifacts\carve\M-29\T-165\round-N`), then
-  `### As built` (fold this section in; T-167's notes: the argument's shape, the caption, how the frames were checked),
-  `cairn lint`, `finish`.
+- **Known and left with the person:** what `base_colour`, `normal` and the ORM hold beyond the padding. Also left: the
+  steel and occlusion padding fringe that can no longer be seen around white islands (see the frame review).
+- **Not checked:**
+  - The caption's text in a scenario run (it is held by the server-unit tests).
+  - `wrench-uvs-curvature` and `wrench-uvs-steel` were not opened side by side as before and after. They equal the
+    graph frames, which were opened, and their old copies differ only in texels that are 0 on the base run's all-mask.
+  - The unexplained silent `server-unit` run above.
