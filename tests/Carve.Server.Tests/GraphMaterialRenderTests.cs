@@ -86,6 +86,7 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
         await BarrelAsync(carve, 1024);
         var caption = Caption(await carve.CallToolAsync("render", """{"view":"front","size":256}"""));
         File.WriteAllText(Path.Combine(Frames, "barrel-1024-baked.txt"), caption);
+        TestContext.Current.TestOutputHelper?.WriteLine(caption); // the bake times in the test log, which a runner returns
         Assert.True(caption.Split("\"size\":1024").Length - 1 == 6, caption);
     }
 
@@ -100,6 +101,7 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
         var drawn = Frame(first, "barrel-graph");
         var caption = Caption(first);
         File.WriteAllText(Path.Combine(Frames, "barrel-512-baked.txt"), caption);
+        TestContext.Current.TestOutputHelper?.WriteLine(caption); // the bake times in the test log, which a runner returns
         foreach (var (material, _, slots) in Weathered)
             foreach (var (field, _) in slots)
                 Assert.Contains($$"""{"material":"{{material}}","mesh":"mesh","slot":"{{field}}","size":512,"ms":""", caption);
