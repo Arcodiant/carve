@@ -280,3 +280,16 @@ run and is left out of the count):
 | `no-rebake` | stage 3's baked check: `after wear_amount 0: expected nothing baked, render said baked: [...]` | 1 |
 
 Stage 3's bottom-hoop check is not reached by `mirror`, because the end grain fails the run first. The runs took 122 to 147 s.
+
+### Rulings on agent 2's three questions (2026-11-24, by the person, each asked with the measured figures)
+
+1. **Stage 3's unwrap.** D-6's frame rule is applied to the front's pixels that show staves and caps (whose UVs do not change), worked
+   from `get_mesh`'s geometry and clear of the hoops' silhouette by a stated margin; and the hoops are held to threshold (1) again (rim at
+   least 8 luma brighter than the hoop-top middle), beside what already passes (it bakes again, the `uvs` look differs). If D-6 does not
+   hold on those pixels, stop and report the numbers. Declined: dropping D-6 for the step; a UV change that keeps the texels.
+2. **The clean colours of stage 2.** M-7's relations on each set's mean colour (lit at `Pool.T` or over; the wood warm by `Pool.M`, the iron
+   not) stand in place of the Scope's `ColourRule` match. Declined: widening `ColourRule` first. No exact lit colour is predicted for a
+   metal: `ColourRule` predicts a dielectric at roughness 1 only, and the iron is metallic 1 and the staves carry a roughness map.
+3. **"Read darker" after the move.** The close on the stave's mean luma over the staves beside the moved hoop must fall by **at least 4**
+   (measured 7.9: 80.0 to 72.1). The front view is not held to it: the raised hoop hides those stave pixels there (its mean rose 77.5 to
+   80.6 over a different set of points). Declined: any decrease with no margin; a texel rule in place of the shaded check.
