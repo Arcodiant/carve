@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-160, T-161
 
-**Verify:** core-unit, server-unit, server-regression, scenario-materials, scenario-planks
+**Verify:** core-unit, graphs-unit, server-unit, server-regression, scenario-materials, scenario-planks
 
 ## Goal
 
