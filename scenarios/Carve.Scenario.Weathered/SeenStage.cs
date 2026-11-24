@@ -30,7 +30,8 @@ internal sealed class SeenStage(params int[] sizes) : IWeatheredStage
         Vector3 Out(Vector3 p) => Vector3.Normalize(new Vector3(p.X, 0, p.Z));
         // The rim close as the research measured it (the threshold's close): the rim texel facing the front most, seen from 0.3 above its point's
         // horizontal offset from the axis, not normalised first.
-        var rim = sets[Rim].MaxBy(t => Vector3.Dot(Out(t.P), toFront)).P;
+        // The top hoop's: unfiltered, the tie between the two hoops fell to the bottom one at 256 and 1024.
+        var rim = sets[Rim].Where(t => t.Top).MaxBy(t => Vector3.Dot(Out(t.P), toFront)).P;
         var stave = sets[Beside].Where(t => t.Top).MaxBy(t => Vector3.Dot(Out(t.P), toFront)).P;
         var side = Vector3.Cross(Vector3.UnitY, Out(rim));
         return (new Camera(Vector3.Normalize(new Vector3(rim.X, 0, rim.Z) + new Vector3(0, 0.3f, 0)), Zoom: 4, Target: rim),
@@ -64,7 +65,7 @@ internal sealed class SeenStage(params int[] sizes) : IWeatheredStage
             var sets = Of(mesh, size);
             run.Log.Add($"{at}: texels {string.Join(", ", Names.Select(n => $"{n} {sets[n].Length}"))}");
 
-            // The uvs looks: the ruled texel thresholds (3) and (4), and a 4x crop of each about the top hoop's rim facing the front.
+            // The uvs looks: the ruled texel thresholds (3) and (4), and a 4x crop of each facing the front.
             var values = new Dictionary<string, Dictionary<string, double[]>>();
             foreach (var (graph, output) in new[] { ("weathered-iron", "wear"), ("weathered-staves", "grime") })
             {
@@ -72,7 +73,8 @@ internal sealed class SeenStage(params int[] sizes) : IWeatheredStage
                 var uvs = await run.CaptureAsync($"w{size}-uvs-{output}", new { mode = "uvs", image, size = UvFrame });
                 values[output] = Names.ToDictionary(n => n, n => Values(uvs, sets[n]));
                 foreach (var n in Names) run.Log.Add($"{at} {output} {n}: mean {F(values[output][n].DefaultIfEmpty().Average())} max {F(values[output][n].DefaultIfEmpty().Max())}");
-                var centre = sets[Rim].Where(t => t.Top).MaxBy(t => Vector3.Dot(Vector3.Normalize(new Vector3(t.P.X, 0, t.P.Z)), Vector3.Normalize(new Vector3(Front.X, 0, Front.Z))));
+                // Each crop where its map matters: the wear on the top hoop's rim, the grime on the stave below it.
+                var centre = sets[output == "wear" ? Rim : Beside].Where(t => t.Top).MaxBy(t => Vector3.Dot(Vector3.Normalize(new Vector3(t.P.X, 0, t.P.Z)), Vector3.Normalize(new Vector3(Front.X, 0, Front.Z))));
                 Crop(uvs, centre.Px, centre.Py, Path.Combine(driver.RunFolder, "frames", $"w{size}-uvs-{output}-crop4.png"));
             }
 
