@@ -64,6 +64,25 @@ public sealed class GraphImageToolTests() : FileToolTests("carve-graph-image")
     }
 
     [Fact]
+    public async Task A_graph_that_cannot_be_baked_is_named_by_image_not_by_a_material()
+    {
+        Files();
+        File.WriteAllText(Path.Combine(Root, "faulty.texgraph"), """{ "version": 2, "size": 64, "seed": 1, "nodes": { "o": { "type": "output", "params": { "name": "wear" } } } }""");
+        var (carve, _) = await StartAsync(mesh: null);
+        using var _ = carve;
+        Ok(await carve.CallToolAsync("define_mesh", BakeToolTests.Strip));
+        Ok(await carve.CallToolAsync("set_uvs", BakeToolTests.StripUvs()));
+        var bakes = new GraphBakes();
+        var model = carve.Store.Current.Model;
+        string Message(string file, string output) => Assert.Throws<GraphSlotProblemException>(() =>
+            bakes.Image(model, "strip", new MaterialGraph(Path.Combine(Root, file), output, 64), TestContext.Current.CancellationToken)).Message;
+
+        Assert.Equal($"image: no file at {Path.Combine(Root, "gone.texgraph")}; the .texgraph files in {Root} (3) are: faulty.texgraph, notgraph.texgraph, weathered-iron.texgraph", Message("gone.texgraph", "wear"));
+        Assert.Equal("image: the graph has faults: node 'o' input 'in': output needs it connected, and it is not", Message("faulty.texgraph", "wear"));
+        Assert.Equal("image: the graph has no output 'nothing'; its outputs are wear", Message("weathered-iron.texgraph", "nothing"));
+    }
+
+    [Fact]
     [Trait("Tier", "regression")]
     public async Task The_worked_example_draws_through_the_process_and_names_the_output()
     {

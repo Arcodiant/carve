@@ -17,6 +17,9 @@ internal static class GraphSlotProblem
     /// <summary>The wording of every graph slot problem: <c>materials['iron'].base_colour_texture: &lt;cause&gt;</c>, the cause as <see cref="Cause"/> words it.</summary>
     public static string Of(string material, string slot, Exception cause) => $"materials['{material}'].{slot}: {Cause(cause)}";
 
+    /// <summary>A graph problem of a tool argument that belongs to no material (render's <c>uvs</c> <c>image</c>, T-165): <c>image: &lt;cause&gt;</c>.</summary>
+    public static string Of(string argument, Exception cause) => $"{argument}: {Cause(cause)}";
+
     /// <summary>A cause's message: a missing file lists the .texgraph files beside it, a mesh's layout error names the mesh, the rest are the cause's own.</summary>
     public static string Cause(Exception cause) => cause switch
     {
