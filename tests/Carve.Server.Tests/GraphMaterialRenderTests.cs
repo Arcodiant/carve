@@ -120,6 +120,39 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
         File.AppendAllText(Path.Combine(Frames, "barrel-512-baked.txt"), $"\nagainst PNGs: {measured}\ncontrol: {controlled}\n");
     }
 
+    /// <summary>T-164: the barrel exported at 512 and drawn by render_glb agrees with render, front and three-quarter; the file exported with the graphs' wear and grime at 0 does not.</summary>
+    [Fact]
+    public async Task The_exported_barrel_is_drawn_by_render_glb_as_render_draws_it()
+    {
+        var (process, _) = await StartProcessAsync(mesh: null);
+        using var carve = process;
+        await BarrelAsync(carve, 512);
+        string[] views = ["""{"view":"front","size":512}""", """{"direction":[1,0.6,1],"size":512}"""];
+        var drawn = views.Select((v, i) => Frame(carve.CallToolAsync("render", v).GetAwaiter().GetResult(), $"barrel-export-render-{i}")).ToArray();
+
+        var exported = TextOf(await carve.CallToolAsync("export", """{"path":"barrel.glb"}"""));
+        TestContext.Current.TestOutputHelper?.WriteLine(exported);
+        Assert.DoesNotContain("baked:", exported); // the renders above baked every slot already
+        Assert.DoesNotContain("@", exported); // one mesh, so no copies
+        for (var i = 0; i < views.Length; i++)
+        {
+            var glb = Frame(await carve.CallToolAsync("render_glb", views[i].Replace("{", "{\"path\":\"barrel.glb\",")), $"barrel-export-glb-{i}");
+            Assert.True(Passes(drawn[i], glb, out var measured), $"render_glb against render, view {i}: {measured}");
+        }
+
+        // The control: the graphs copied with wear_amount and grime_amount at 0, the same model exported through them.
+        foreach (var (material, graph, slots) in Weathered)
+        {
+            var text = File.ReadAllText(Path.Combine(Root, graph)).Replace("\"wear_amount\": { \"value\": 1", "\"wear_amount\": { \"value\": 0").Replace("\"grime_amount\": { \"value\": 1", "\"grime_amount\": { \"value\": 0");
+            Assert.NotEqual(File.ReadAllText(Path.Combine(Root, graph)), text);
+            File.WriteAllText(Path.Combine(Root, "neutral-" + graph), text);
+            Ok(await carve.CallToolAsync("define_material", Graphs(material, "neutral-" + graph, slots)));
+        }
+        Ok(await carve.CallToolAsync("export", """{"path":"control.glb"}"""));
+        var control = Frame(await carve.CallToolAsync("render_glb", """{"path":"control.glb","view":"front","size":512}"""), "barrel-export-control");
+        Assert.False(Passes(drawn[0], control, out var controlled), $"the control (wear and grime at 0) must fail: {controlled}");
+    }
+
     [Fact]
     public async Task A_fine_graph_texture_is_drawn_as_its_bake_named_as_a_png_is()
     {

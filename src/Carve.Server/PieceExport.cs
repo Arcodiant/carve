@@ -31,7 +31,7 @@ public static class PieceExport
     /// <summary>The model of just the named meshes (in the model's order), with the whole skeleton and no clips; call after <see cref="Refusal"/>.</summary>
     public static Model Select(Model model, IReadOnlyList<string> meshes)
     {
-        var (piece, errors) = Model.Create([.. model.Meshes.Where(m => meshes.Contains(m.Name))], model.Skeleton, []);
+        var (piece, errors) = Model.Create([.. model.Meshes.Where(m => meshes.Contains(m.Name))], model.Skeleton, [], model.Materials);
         return piece ?? throw new ArgumentException(string.Join("; ", errors.Select(e => e.ToString())), nameof(meshes));
     }
 

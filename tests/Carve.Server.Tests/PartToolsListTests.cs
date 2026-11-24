@@ -18,12 +18,14 @@ namespace Carve.Server.Tests;
 /// T-124 (Opus 5.5) adds render_glb's sentence on texture sampling (mip maps, as render's); it is taken out with T-94's additions.
 /// Taken again for T-160 (Opus 5.5), whose define_material text and schema take graph slots and whose get_mesh, save and open
 /// texts name them; the diff of src/Carve.Server against origin/milestone/M-29 changes no other tool's text or schema (was 1697322B...).
+/// Taken again for T-164 (Sonnet 5.5), whose export text gains the paragraph on graph materials and whose define_material sentence
+/// says export writes them; only those two descriptions moved it (was D5334566...).
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "D533456632C9A323AF5BA5E04D34B8357B06400D6B6EA0F975FDA0CFEEEDA596";
+    private const string Before = "9DFF83594F018F57FD3CF237B029D4F37667A09938EF02A53E2F6CE1814435D6";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "displace"];
 
