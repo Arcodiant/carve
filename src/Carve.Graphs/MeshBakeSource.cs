@@ -111,12 +111,16 @@ public sealed class MeshBakeSource : IMeshMaps
         }
     }
 
-    private BakeLayout Layout(int size)
+    /// <summary>The mesh's UV layout at <paramref name="size"/>, made once (T-163 pads a slot's bake with it); throws <see cref="MeshLayoutException"/>.</summary>
+    public BakeLayout Layout(int size)
     {
-        if (_layouts.TryGetValue(size, out var layout)) return layout;
-        var result = BakeLayout.Create(_mesh, size);
-        if (result.Layout is null) throw new MeshLayoutException(MeshName, size, result.Error!);
-        return _layouts[size] = result.Layout;
+        lock (_maps)
+        {
+            if (_layouts.TryGetValue(size, out var layout)) return layout;
+            var result = BakeLayout.Create(_mesh, size);
+            if (result.Layout is null) throw new MeshLayoutException(MeshName, size, result.Error!);
+            return _layouts[size] = result.Layout;
+        }
     }
 
     /// <summary>Uncovered texels set to <paramref name="neutral"/>, then padded: so padding takes the islands' values and what lies beyond it reads neutral.</summary>
