@@ -157,4 +157,46 @@ public class GraphMaterialErrorsTests : FileToolTests
         Assert.Empty(warnings);
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(1), watch.Elapsed.ToString());
     }
+
+    [Fact]
+    public async Task export_fails_with_the_words_render_uses_when_the_graph_has_gone()
+    {
+        var path = Write("good.texgraph", Good);
+        await using var carve = await StartStripAsync(uvs: true);
+        Ok(await carve.CallToolAsync("define_material", $$"""{"name":"m","base_colour_texture":{{Slot("good.texgraph", "base_colour")}}}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"m","faces":[0,1,2,3]}"""));
+        File.Delete(path);
+        var message = Refused(await carve.CallToolAsync("export", """{"path":"out.glb"}""")).Replace(Root, "<root>");
+        Assert.Equal(
+            "materials['m'].base_colour_texture: no file at <root>\\good.texgraph; there are no .texgraph files in <root>"
+            + "; the model is unchanged: define the material again with a graph that bakes, or restore the file", message);
+        Assert.False(File.Exists(Path.Combine(Root, "out.glb")));
+    }
+
+    [Fact]
+    public async Task check_is_silent_on_every_committed_sample_and_fast_on_the_barrel_wearing_a_mesh_graph()
+    {
+        await using var carve = await StartStripAsync(uvs: false);
+        foreach (var sample in Directory.GetFiles(Path.Combine(Paths.RepoRoot, "samples"), "*.carve"))
+        {
+            Ok(await carve.CallToolAsync("open", JsonSerializer.Serialize(new { path = sample, drop_targets = true })));
+            var result = await carve.CallToolAsync("check", "{}");
+            // a model of several meshes names them in its refusal; check each
+            var meshes = IsError(result) ? System.Text.RegularExpressions.Regex.Matches(TextOf(result).Split("meshes:")[1], "'([^']+)'").Select(m => (string?)m.Groups[1].Value).ToArray() : [null];
+            foreach (var mesh in meshes)
+                Assert.DoesNotContain(Lines(Ok(mesh is null ? result : await carve.CallToolAsync("check", JsonSerializer.Serialize(new { mesh }))), "warnings"), w => w.Contains("graph"));
+        }
+
+        File.Copy(Path.Combine(Paths.RepoRoot, "samples", "barrel.carve"), Path.Combine(Root, "barrel.carve"));
+        File.Copy(Path.Combine(Paths.RepoRoot, "samples", "graphs", "weathered-iron.texgraph"), Path.Combine(Root, "weathered-iron.texgraph"));
+        Ok(await carve.CallToolAsync("open", """{"path":"barrel.carve","drop_targets":true}"""));
+        Ok(await carve.CallToolAsync("unwrap", "{}"));
+        Ok(await carve.CallToolAsync("define_material", $$"""{"name":"iron","base_colour_texture":{{Slot("weathered-iron.texgraph", "base_colour")}}}"""));
+        var faces = JsonDocument.Parse(Ok(await carve.CallToolAsync("get_mesh", "{}"))).RootElement.GetProperty("faces").GetArrayLength();
+        Ok(await carve.CallToolAsync("set_material", $$"""{"material":"iron","faces":[{{string.Join(",", Enumerable.Range(0, faces))}}]}"""));
+        var watch = Stopwatch.StartNew();
+        var warnings = Lines(Ok(await carve.CallToolAsync("check", "{}")), "warnings").Where(w => w.Contains("materials['iron']")).ToArray();
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(1), watch.Elapsed.ToString());
+        Assert.Empty(warnings);
+    }
 }

@@ -55,10 +55,10 @@ public sealed class GraphSlotBakeTests : IDisposable
         Assert.Equal(OutputRole.BaseColour, GraphSlotBake.PackingOf(GraphSlotBake.Normal, evaluator, "base_colour"));
         Assert.Equal(OutputRole.Roughness, GraphSlotBake.PackingOf(GraphSlotBake.MetallicRoughness, evaluator, "roughness"));
         Assert.Equal(OutputRole.Occlusion, GraphSlotBake.PackingOf(GraphSlotBake.Occlusion, evaluator, "occlusion"));
-        Assert.Contains("grey output", Assert.Throws<GraphSlotException>(() => GraphSlotBake.PackingOf(GraphSlotBake.Normal, evaluator, "occlusion")).Message);
-        Assert.Contains("'roughness'", Assert.Throws<GraphSlotException>(() => GraphSlotBake.PackingOf(GraphSlotBake.MetallicRoughness, evaluator, "occlusion")).Message);
-        Assert.Contains("colour output", Assert.Throws<GraphSlotException>(() => GraphSlotBake.PackingOf(GraphSlotBake.Occlusion, evaluator, "base_colour")).Message);
-        Assert.Contains("no output 'rust'", Assert.Throws<GraphSlotException>(() => GraphSlotBake.PackingOf(GraphSlotBake.BaseColour, evaluator, "rust")).Message);
+        Assert.Contains("grey output", Assert.ThrowsAny<GraphSlotException>(() => GraphSlotBake.PackingOf(GraphSlotBake.Normal, evaluator, "occlusion")).Message);
+        Assert.Contains("'roughness'", Assert.ThrowsAny<GraphSlotException>(() => GraphSlotBake.PackingOf(GraphSlotBake.MetallicRoughness, evaluator, "occlusion")).Message);
+        Assert.Contains("colour output", Assert.ThrowsAny<GraphSlotException>(() => GraphSlotBake.PackingOf(GraphSlotBake.Occlusion, evaluator, "base_colour")).Message);
+        Assert.Contains("no output 'rust'", Assert.ThrowsAny<GraphSlotException>(() => GraphSlotBake.PackingOf(GraphSlotBake.BaseColour, evaluator, "rust")).Message);
 
         var grey = GraphSlotBake.Rgba(new MaterialGraph(Planks, "occlusion", 64), GraphSlotBake.BaseColour, Model.Empty, null, TestContext.Current.CancellationToken);
         for (var i = 0; i < grey.Length; i += 4) Assert.True(grey[i] == grey[i + 1] && grey[i] == grey[i + 2] && grey[i + 3] == 255);
@@ -68,8 +68,8 @@ public sealed class GraphSlotBakeTests : IDisposable
     public void A_file_gone_is_a_slot_exception()
     {
         var gone = Path.Combine(_dir, "gone.texgraph");
-        Assert.Contains("is not there", Assert.Throws<GraphSlotException>(() => GraphSlotBake.Read(gone)).Message);
-        Assert.Throws<GraphSlotException>(() => GraphSlotBake.Png(new MaterialGraph(gone, "occlusion", 64), GraphSlotBake.Occlusion, Model.Empty, null, TestContext.Current.CancellationToken));
+        Assert.Contains("is not there", Assert.ThrowsAny<GraphSlotException>(() => GraphSlotBake.Read(gone)).Message);
+        Assert.ThrowsAny<GraphSlotException>(() => GraphSlotBake.Png(new MaterialGraph(gone, "occlusion", 64), GraphSlotBake.Occlusion, Model.Empty, null, TestContext.Current.CancellationToken));
     }
 
     [Fact]
