@@ -166,7 +166,8 @@ render {mode:"uvs", mesh:"barrel",
 | 3 | T-165 a graph output in the `uvs` look | Sonnet (+ frame review) | T-163 | `RenderTool.cs`'s `uvs` path, `RenderQueue.cs`, `GraphImageStage.cs` in the Bakes scenario |
 | 3 | T-166 errors and `check` | Sonnet | T-163 | `GraphSlotProblem`, `MaterialTools.cs`, `CheckTool.cs`, `MeshHealth.cs`, `OpenTool.cs` |
 | 4 | T-167 the weathered barrel's scenario | Opus (three agents) | T-162, T-164, T-165, T-166 | `scenarios/Carve.Scenario.Weathered`, its load tests, script and sample |
-| 5 | T-168 acceptance | Sonnet (inner sessions on the default, Opus) | T-167 | its round folders, prompt and checks |
+| 4 | T-207 carve's descriptions under the cut (added 2026-11-24) | Opus to plan, then by its scope | T-165, T-166 | the description strings of carve's tools, any new tool, the length test |
+| 5 | T-168 acceptance | Sonnet (inner sessions on the default, Opus) | T-167, T-207 | its round folders, prompt and checks |
 
 Content comes with its mechanic: T-161's tests bake the wrench and the raised-hoop barrel; the two weathered graphs
 land with patina's side in wave 2, beside the bake that draws them; T-163's and T-164's regression classes draw and
@@ -192,5 +193,24 @@ is reached from a plain launch of `carve` and `patina`, through their MCP tools.
 - [ ] [T-166](../tasks/T-166-graph-material-errors-and-check.md) — A missing graph file lists the .texgraph files in its folder, a graph fault names its node, an unknown output lists the outputs, and check warns of every graph material that cannot be baked
 - [ ] [T-167](../tasks/T-167-the-weathered-barrel-and-its-scenario.md) — samples/barrel-weathered.carve: the barrel with raised hoops, edge wear on the hoop rims from curvature and grime beside the hoops from occlusion, in suite scenario-weathered with re-bakes after mesh, UV and graph edits
 - [ ] [T-168](../tasks/T-168-graphs-on-a-mesh-acceptance-run.md) — Fresh agents weather the wrench with carve and patina from the tool descriptions alone, and recover from a planted wrong graph path
+- [ ] [T-207](../tasks/T-207-carve-s-tool-descriptions-under-claude-code-s-cut.md) — Every carve tool description fits Claude Code's 4,096-character cut, held by a test, with the detail that was cut still reachable by an agent
+
+## Decided while it ran
+
+By the person (2026-11-24), each put with a recommendation:
+
+- **`bake` writes each map's neutral value outside the islands and their padding** (curvature 0.5, occlusion 1, a mask
+  1), as the mesh nodes do, so that T-165's whole-frame check of a graph output against the matching bake holds as
+  written. The bake held 0 there. This moves M-24's bake PNGs and `scenario-bakes`' frames in those texels. Declined:
+  comparing islands and padding only (the orchestrator's recommendation), and making the mesh nodes fill 0. Not asked:
+  what base colour, the normal and the ORM hold there.
+- **carve's over-long tool descriptions are cut down inside M-29, before T-168,** as the new member T-207. Declined:
+  filing it off-milestone, and leaving them.
+
+By the orchestrator:
+
+- **Export's interim refusal of a graph material stayed until T-164,** T-163 narrowing its wording to export.
+- **T-166 also makes the slow-bake warning name the slot and node that cost most:** T-163's named a node that cost
+  0.0 s when a shared map had been charged to an earlier slot.
 
 ## Retrospective
