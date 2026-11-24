@@ -90,7 +90,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             // The model's own checks are not this request's: it draws the file, not the store.
             if (next.Spec.Glb is not null)
             {
-            if (next.Spec != _spec || !_viewApplied)
+                if (next.Spec != _spec || !_viewApplied)
                 {
                     ChangeView(next);
                     return;

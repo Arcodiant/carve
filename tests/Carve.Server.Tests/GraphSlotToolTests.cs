@@ -34,7 +34,7 @@ public class GraphSlotToolTests : FileToolTests
     {
         var (carve, tools) = await StartAsync();
         using var scope = carve;
-        // save's and open's were over the cut on main before T-160 (about 6,060 and 5,370), so are not held here.
+        // save's and open's were over the cut on main before T-160 (about 6,060 and 5,370), and render's (about 18,600 before T-163), so are not held here.
         foreach (var name in new[] { "define_material", "get_mesh" })
             Assert.True(Description(tools, name).Length < 4096, $"{name}: {Description(tools, name).Length} characters");
     }
@@ -205,7 +205,7 @@ public class GraphSlotToolTests : FileToolTests
     }
 
     [Fact]
-    public async Task Render_and_export_refuse_a_model_with_a_graph_slot_until_graph_materials_are_drawn()
+    public async Task Export_refuses_a_model_with_a_graph_slot_until_it_writes_graph_materials()
     {
         WriteGraph();
         var (carve, _) = await StartAsync();
@@ -213,7 +213,6 @@ public class GraphSlotToolTests : FileToolTests
         Ok(await carve.CallToolAsync("define_material", Iron));
         const string line = "graph materials are not drawn yet: the material 'iron' has a graph in base_colour_texture";
         Assert.Equal("export: " + line, Refused(await carve.CallToolAsync("export", """{"path":"iron.glb"}""")));
-        Assert.Equal("render: " + line, Refused(await carve.CallToolAsync("render", "{}")));
         Assert.False(File.Exists(Path.Combine(Root, "iron.glb")));
     }
 }
