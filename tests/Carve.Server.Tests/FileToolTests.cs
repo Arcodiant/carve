@@ -19,8 +19,11 @@ internal static class ToolList
     }
 
     /// <summary>The example calls in a description, in order: the rest of each line that starts with "Example: ".</summary>
-    public static string[] Examples(JsonElement tools, string name) =>
-        Description(tools, name).Split('\n').Where(l => l.StartsWith("Example: ", StringComparison.Ordinal)).Select(l => l["Example: ".Length..]).ToArray();
+    public static string[] Examples(JsonElement tools, string name) => Examples(Description(tools, name));
+
+    /// <summary>The example calls in a text, such as a <c>help</c> entry's (T-207): the rest of each line that starts with "Example: ".</summary>
+    public static string[] Examples(string text) =>
+        text.Split('\n').Where(l => l.StartsWith("Example: ", StringComparison.Ordinal)).Select(l => l["Example: ".Length..]).ToArray();
 }
 
 /// <summary>A test class with a temp folder of its own for each test, removed after it.</summary>

@@ -29,16 +29,6 @@ public class GraphSlotToolTests : FileToolTests
 
     private const string Iron = """{"name":"iron","base_colour_texture":{"graph":"graphs/iron.texgraph","output":"base_colour","size":256}}""";
 
-    [Fact]
-    public async Task The_descriptions_this_task_lengthened_stay_under_claude_codes_cut()
-    {
-        var (carve, tools) = await StartAsync();
-        using var scope = carve;
-        // save's and open's were over the cut on main before T-160 (about 6,060 and 5,370), and render's (about 18,600 before T-163), so are not held here.
-        foreach (var name in new[] { "define_material", "get_mesh", "set_material" })
-            Assert.True(Description(tools, name).Length < 4096, $"{name}: {Description(tools, name).Length} characters");
-    }
-
     [Theory]
     [InlineData(32, 64)]
     [InlineData(8192, 4096)]

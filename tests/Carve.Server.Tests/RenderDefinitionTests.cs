@@ -17,7 +17,7 @@ public class RenderDefinitionTests
         var tools = await carve.ListToolsAsync();
         var render = tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "render");
 
-        var description = render.GetProperty("description").GetString()!;
+        var description = HelpToolTests.WithReference(render.GetProperty("description").GetString()!, "render");
         Assert.Contains("front", description);
         Assert.Contains("back", description);
         Assert.Contains("MISSING", description);
@@ -46,8 +46,8 @@ public class RenderDefinitionTests
     {
         using var carve = new ToolHarness();
         await carve.InitializeAsync();
-        var description = (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "render")
-            .GetProperty("description").GetString()!;
+        var description = HelpToolTests.WithReference((await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "render")
+            .GetProperty("description").GetString()!, "render");
 
         foreach (var words in new[]
         {
@@ -69,7 +69,7 @@ public class RenderDefinitionTests
         var tools = await carve.ListToolsAsync();
         var render = tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "render");
 
-        var description = render.GetProperty("description").GetString()!;
+        var description = HelpToolTests.WithReference(render.GetProperty("description").GetString()!, "render");
         foreach (var part in new[] { "wireframe", "normals", "highlight", "hidden-line", "(normal + 1) / 2", "spike", "a mode other than", "a highlight that is not an object" })
         {
             Assert.Contains(part, description);
