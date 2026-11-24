@@ -144,7 +144,9 @@ A material is a named PBR look shared by the whole model; any mesh's faces may u
 2. `define_material` with `base_colour`, `metallic`, `roughness`, `emissive`, `occlusion`, `double_sided` and up to five PNG textures (`base_colour_texture`, `metallic_roughness_texture`, `normal_texture`, `emissive_texture`, `occlusion_texture`): `{"name":"crate","roughness":0.8,"base_colour_texture":"textures/crate.png"}`. Anything left out takes its default, so a bare name is matte white.
 3. `set_material` puts it on faces or a group: `{"material":"crate","faces":[1,3]}`.
 
-Texture paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
+Any texture slot may instead name a texture graph's output, `{"graph":"graphs/iron.texgraph","output":"base_colour","size":1024}` (`size` a power of two from 64 to 4096, default the graph's own). A graph is read again at every render and export, where a PNG is read once; a model with one is saved as `.carve` version 10. Graph materials are not drawn yet: `render` and `export` refuse a model that has one.
+
+Texture and graph paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
 
 `samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`, and `samples/barrel-planks.carve` is the same barrel with its staves from patina's planks graph.
 
