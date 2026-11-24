@@ -279,6 +279,7 @@ internal static class RenderTool
         EngineStatus status,
         ModelStore store,
         RenderQueue queue,
+        GraphBakes bakes,
         [Description("Where to look from: the corner 'front' (the default when no direction is given) or 'back', or head-on along an axis: '+x', '-x', '+y', '-y', '+z', '-z'. Not with direction."), AllowedValues("front", "back", "+x", "-x", "+y", "-y", "+z", "-z")] string? view = null,
         [Description("[x, y, z]: from the point looked at toward the eye. Up is +Y, or -Z within 1 degree of vertical. Not with view.")] double[]? direction = null,
         [Description("1 to 8: how far to zoom in about the target. The default 1 frames the whole mesh.")] double zoom = 1,
@@ -405,12 +406,6 @@ internal static class RenderTool
             return Failed("render", [partRefused]);
         }
 
-        // Interim until T-163 draws graph materials (M-29's branch only).
-        if (MaterialJson.GraphsNotDrawn("render", store.Current.Model) is { } notDrawn)
-        {
-            return Error(notDrawn);
-        }
-
         var projected = projection == "orthographic" ? Projection.Orthographic : Projection.Perspective;
         var look = mode switch { "wireframe" => Look.Wireframe, "normals" => Look.Normals, "checker" => Look.Checker, _ => Look.Shaded };
         if (weights is not null) look = Look.Weights;
@@ -533,8 +528,19 @@ internal static class RenderTool
             listed.Vertices.Select(v => v + offset.Vertices),
             listed.Edges.Select(e => (e.A + offset.Vertices, e.B + offset.Vertices)),
             listed.Faces.Select(f => f + offset.Faces));
+        var baked = new List<GraphBakes.Baked>();
         async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
+            // Graph slots are baked here, off the frame thread, before the frame is queued (T-163); the frame thread finds them cached.
+            try
+            {
+                baked.AddRange((await Task.Run(() => bakes.Resolve(store.Current.Model, cancellationToken), cancellationToken)).Baked);
+            }
+            catch (GraphSlotProblemException e)
+            {
+                return (null, e.Message);
+            }
+
             var rendering = Task.WhenAll(tiles
                 .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Targets = morph, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton, Weights = weights, Part = part, Level = level })));
 
@@ -570,7 +576,7 @@ internal static class RenderTool
                 Content =
                 [
                     ImageContentBlock.FromBytes(EncodePng(composed.Pixels, composed.Width, composed.Height), "image/png"),
-                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton, weights, noUvs, part, level) },
+                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton, weights, noUvs, part, level) + GraphBakes.Text(baked) },
                 ],
             };
         }
@@ -582,7 +588,7 @@ internal static class RenderTool
             Content =
             [
                 ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
-                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs, part, level) },
+                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs, part, level) + GraphBakes.Text(baked) },
             ],
         };
     }

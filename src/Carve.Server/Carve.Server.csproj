@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="../Carve.Core/Carve.Core.csproj" />
     <ProjectReference Include="../Patina.Graphs/Patina.Graphs.csproj" />
+    <ProjectReference Include="../Carve.Graphs/Carve.Graphs.csproj" />
     <ProjectReference Include="../Carve.Extensibility/Carve.Extensibility.csproj" />
     <ProjectReference Include="../Carve.Hosting/Carve.Hosting.csproj" />
     <!-- T-223: displace evaluates a texture graph's greyscale output, as patina does (D-7). -->
