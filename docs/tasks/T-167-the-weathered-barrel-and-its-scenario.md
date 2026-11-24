@@ -339,3 +339,49 @@ top, the three closes and the sheet at 512, the `uvs` crops, and the two `good-*
 
 **Surprising:** the `move` bakes every slot of both materials again, not only the staves'; the caps' UVs sit at u 0 to 0.60, v 0.34 to 0.65,
 so the re-unwrapped hoops go into v 0.646 to 1 (a different texel density, which is what the ruling asks to differ).
+
+### Hand-off (2026-11-24, agent 4, Opus 5.5 `claude-opus-5-5`; at the checkpoint: code committed and verified, the capture review to come)
+
+**Done and committed:**
+- Rebased onto `origin/milestone/M-29` after T-207 (the `help` tool, trimmed descriptions) landed: no conflict, nothing to fix.
+- **The breaks run again** on the rebased code, all five failing in `scenario-weathered`, each first by the check it is there to prove:
+  the table under agent 2's Hand-off is rewritten from these runs (28, 2, 19, 1, 1). `mirror` now has a count, because the run goes on
+  past the end-grain failure.
+- `CLAUDE.md`: a Layout row for `scenarios/Carve.Scenario.Weathered` (the stages, the two suites and `--Weathered:Stages=`, the load
+  tests, `scripts/run-weathered-scenario.ps1`, the breaks), as planks has one row for all of these, and `barrel-weathered.carve` in the
+  `samples/` row. `README.md`: `-weathered` and `-weathered-sizes` in Build and test, and the sample under Materials and textures (what
+  it is, and the `uvs` look of `wear` to see a map).
+
+**For the person: the unwrap step is not the one the ruling's wording assumed.** The ruling said D-6 holds on "the pixels that show
+staves and caps, whose UVs did not change". The step as first written unwrapped the hoops *and the caps* (all of `Barrel.Rest`), so the
+caps' UVs did change. It now leaves the caps alone. As tool calls:
+- stage 1 (unchanged): `unwrap {"faces": <Barrel.Rest: hoops, their walls and the caps>, "into": [0, 0.34, 1, 1]}` (default margin);
+- stage 3's step: `unwrap {"faces": <the hoops and their walls only, the "hoops" group's faces>, "into": [0.000, 0.646, 1.000, 1.000],
+  "margin": 0.03}`: the widest part of the rest band clear of the caps' UVs (u 0 to 0.602, v 0.340 to 0.646, widened by 0.01), because
+  unwrapping the hoops over the caps' texels made the bake refuse with T-166's overlap message. Then `render`; then `undo`.
+What it no longer exercises: a change to the caps' UVs (the end grain is never re-baked into a new layout in stage 3), and a re-unwrap into
+the same band with only the margin changed: the hoops move into a smaller band at another texel density as well as another margin. D-6
+over the stave and cap pixels therefore holds by construction of the step (51,443 pixels, 0 differ); the hoops are held to threshold (1).
+
+**Checked:** `cairn task T-167 verify`: VERIFY PASS on commit `0d770af` (8 suites ran; `CLAUDE.md` and `README.md` are in no suite, a
+WARN only). The clean runs: `scenario-weathered` J-20261124-192551-565eeb (160 s with the load tests), `scenario-weathered-sizes`
+J-20261124-192556-65c2cb (163 s; both slower than agent 3's 70 and 96 s because verify ran eight suites at once). No frame was opened.
+
+**Frames** (`cairn test artifacts <job> --out <somewhere outside the repo>`, under `weathered/`):
+- From J-20261124-192551-565eeb (`scenario-weathered`, bake size 512): `frames/w512-front`, `-back`, `-three-quarter`, `-top`,
+  `-close-rim`, `-close-rim-side`, `-close-stave`, `-sheet`, `-uvs-wear` and `-uvs-wear-crop4`, `-uvs-grime` and `-uvs-grime-crop4`; each
+  of those but the crops again as `-reopened` (byte-identical, checked); `w512-front-glb`, `w512-three-quarter-glb`; stage 3's `rebake-again`,
+  `rebake-moved`, `rebake-moved-close-stave`, `rebake-moved-uvs-grime`, `rebake-undone`, `rebake-uvs-before`, `rebake-uvs-after`,
+  `rebake-unwrapped`, `rebake-no-wear`, `rebake-restored`; `compare/rebake-unwrapped.png`, `compare/good-front.png`,
+  `compare/good-three-quarter.png` (the `render_glb` triptychs).
+- From J-20261124-192556-65c2cb (`scenario-weathered-sizes`): `frames/w256-*` and `frames/w1024-*`, the same twelve frames each (no `-reopened`, `-glb` or stage 3 frames).
+- **For the person:** at 512 the front, back, three-quarter and top; the rim closes (`w512-close-rim`, `w512-close-rim-side`) and the
+  stave close (`w512-close-stave`); `w512-uvs-wear` and `w512-uvs-grime` with their `-crop4`; `w512-sheet`; `w256-front` and
+  `w1024-front`; `rebake-moved` (and `rebake-moved-close-stave`), `rebake-unwrapped` (with `compare/rebake-unwrapped.png`), `rebake-no-wear`;
+  `w512-front-glb` and `w512-three-quarter-glb` with `compare/good-front.png` and `compare/good-three-quarter.png`.
+
+**Left:** the frame review (an agent opens each frame above itself, cropped or scaled where the detail is small, and reports), the
+person's approval in one set (a `levels` retune asked for there goes in `samples/graphs/` with T-162's tests re-run), `### As built`,
+`cairn lint`, `finish`.
+
+**Surprising:** nothing new; the rebase was clean.
