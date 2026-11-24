@@ -4,7 +4,7 @@ description: >-
 ---
 # T-160 — Graph slots in materials and the Carve file
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
