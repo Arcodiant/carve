@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Carve.Core;
 using Carve.Core.Baking;
+using Carve.Graphs;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using StbImageWriteSharp;
@@ -59,6 +60,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "path is relative to carve's working folder with '/' separators, the form define_material takes: an absolute folder comes back relative too, with '..' for one outside the working folder (absolute only on another drive). replaced is true when a file of that name was there and was overwritten: bake always overwrites. "
         + "ms is the time the file took to bake and write, in milliseconds; work two files share (the masks, the occlusion the orm reads) is counted in the first of them. "
         + "coverage is the fraction of the image's texels the faces cover, before padding. min, max and mean are over those covered texels, from 0 to 1; for base_colour each is [r, g, b]. "
+        + "Beyond the padding, where no island reaches, a mask and occlusion hold white (255) and curvature 128, the values the mesh_mask, mesh_occlusion and mesh_curvature graph nodes read there, so a node and its bake are one image; base_colour, orm and normal hold black (0) there. "
         + "Errors, all listed at once, each a tool error that writes nothing: an unknown mesh (the error lists the meshes); a mesh with no UVs; faces that share a texel (the layout overlaps; the error names the faces); a size that is not a power of two from 64 to 4096; padding outside 0 to size/2; an unknown map (the error lists the maps) or an empty maps; a curvature map with no curvature width, or a width that is not above 0; occlusion or orm with no occlusion.reach, a reach not over 0, rays outside 1 to 1024, an unknown or empty occluders (the error lists the meshes); 'normal' without bevel, or a bevel width that is not a number more than 0; a surface entry naming a group or material the mesh does not have (the error lists the names there are), a bad colour, or a roughness or metallic outside 0 to 1; "
         + "a mesh, group or material name that a file name cannot hold; a folder that cannot be a path (said once, as folder). "
         + "A file that cannot be written (held open by another program, a full disk) stops the bake there: the error names the files written before it, which replaced any file of their name, and those not written. "
@@ -225,6 +227,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         var layout = result.Layout!;
         var mapped = named.Mesh;
 
+        // The maps a mesh node reads hold that node's neutral value beyond the padding, so node and bake are one image (T-165).
         // Each job works its image when it is written, so its time is its own; work two files share (the masks, worked together,
         // and the occlusion the ORM reads) is counted in the first file that needs it.
         var jobs = new List<(string Map, string? Name, string File, Func<BakeImage> Image, bool Colour)>();
@@ -237,16 +240,16 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
             foreach (var mask in masks)
             {
                 var infix = mask.Source == MaskSource.Group ? "mask" : "material";
-                jobs.Add((MasksMap, mask.Name, $"{named.Name}.{infix}.{mask.Name}.png", () => mask.Image, false));
+                jobs.Add((MasksMap, mask.Name, $"{named.Name}.{infix}.{mask.Name}.png", () => Bake.FillUncovered(mask.Image, layout, MeshMaskNode.Neutral), false));
             }
         }
         if (wanted.Contains(BaseColourMap)) jobs.Add((BaseColourMap, null, $"{named.Name}.{BaseColourMap}.png", () => BaseColour(layout, model, mapped, entries), true));
         if (wanted.Contains(CurvatureMap) && curvatureWidth is { } width)
-            jobs.Add((CurvatureMap, null, $"{named.Name}.{CurvatureMap}.png", () => Bake.Curvature(layout, width), false));
+            jobs.Add((CurvatureMap, null, $"{named.Name}.{CurvatureMap}.png", () => Bake.FillUncovered(Bake.Curvature(layout, width), layout, MeshCurvatureNode.Neutral), false));
         OcclusionBake? occluded = null;
         BakeImage Occluded() => (occluded ??= Bake.Occlusion(layout, new RayCaster(cast!.Meshes.Select(m => m.Mesh).ToList()),
             cast.Meshes.FindIndex(m => m.Name == named.Name), cast.Rays, cast.Reach)).Image;
-        if (wanted.Contains(OcclusionMap)) jobs.Add((OcclusionMap, null, $"{named.Name}.{OcclusionMap}.png", Occluded, false));
+        if (wanted.Contains(OcclusionMap)) jobs.Add((OcclusionMap, null, $"{named.Name}.{OcclusionMap}.png", () => Bake.FillUncovered(Occluded(), layout, MeshOcclusionNode.Neutral), false));
         if (wanted.Contains(OrmMap))
             jobs.Add((OrmMap, null, $"{named.Name}.{OrmMap}.png", () => { var (r, m) = Factors(model, mapped, entries); return Bake.Orm(layout, Occluded(), r, m); }, true));
         if (wanted.Contains(NormalMap)) jobs.Add((NormalMap, null, $"{named.Name}.{NormalMap}.png", () => Bake.BevelNormal(layout, bevelWidth!.Value), true));
