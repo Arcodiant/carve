@@ -102,3 +102,121 @@ when its mesh, its UVs or a graph change, saved, reopened and exported.
   the rest: a missing linked input has been a review Major four times).
 - **Stop and ask:** every threshold (step 2); a layout that cannot be had; a frame the checks cannot tell from a broken
   one; any check that would have to loosen.
+
+### Research (2026-11-24, Opus 5.5 `claude-opus-5-5`, through the tools in run J-20261124-144517-60af7a)
+
+Measured by `ResearchStage.cs` in suite `scenario-weathered`, written to the run's `research.txt` (a copy in the
+worktree's ignored `artifacts/T-167/`). Everything below comes from `get_mesh`, `check` and `render` answers.
+
+**The mesh after `extrude` of faces 0 to 7 and 24 to 31 by 0.015:** 98 faces, 104 vertices, closed, one shell. `extrude`
+moves each face along its own normal, so every hoop face gets four walls of its own (64 in all, ids 34 to 97). Two kinds:
+the rim walls toward the stave or the cap, and thin wedge walls at the octagon's corners between neighbouring hoop
+faces. The base drops to y = -0.0027, because the hoop faces' normals lean 0.18 downward. `check` gives that as a note.
+
+**1. The UVs. The preferred layout is had, and taken.** The tool calls:
+- `project_uvs {method: cylindrical, faces: 8..23, into: [0, 0, 1, 0.34]}`;
+- `unwrap {faces: every face but 8..23, into: [0, 0.34, 1, 1]}`.
+
+What it gives:
+- 3 islands.
+- Every stave face is exactly 0.1250 wide in u, at k/8 to (k+1)/8. Faces 8 to 15 and 16 to 23 share the same u columns.
+- The staves take v 0.0081 to 0.3319. The projection keeps their aspect, so a band taller than 0.34 only wastes room;
+  the first try at 0.625 left v 0.15 to 0.47 used.
+- `check`: `ok`, no problems, no warnings, 98 of 98 faces mapped.
+
+The plain `unwrap` of every face gives the same answer from `check` (no overlap, no warning) and also 3 islands. Its stave
+faces are 0.1222 to 0.1367 wide in u and drift off k/8 (for example stave 8 at u 0.7446 to 0.8746), as planning found.
+
+`define_material` warns on each graph slot that "the graph reads the mesh, so it is baked onto each mesh". That is
+expected, and stage 1 fails on any other warning.
+
+**2. The numbers, at 512 on that layout.**
+
+The texel sets:
+- The texels are read from `render mode=uvs image={graph, output, size: 512}` at frame size 1024, the largest `render`
+  takes. A 512 texel is 1.75 px there. A texel is used only if its centre lies at least 2 px from its face's UV edges,
+  which the look draws.
+- **hoop rim:** a hoop face (0 to 7, 24 to 31) within the outer 15% of its height, which is within 0.015 m of its two rim
+  edges.
+- **hoop top middle:** the middle 20% of a hoop face's height.
+- **stave beside hoop:** a stave texel within 0.02 m in y of the staves' ends.
+- **stave middle:** a stave texel within 0.03 m of the staves' mid-height.
+
+The texel values (0 to 1):
+
+| set | n | wear min / mean / max | grime min / mean / max |
+|---|---|---|---|
+| hoop rim | 5014 | 0.000 / 0.459 / 1.000 (p5 0, p95 0.976) | 0 / 0 / 0 |
+| hoop top middle | 4779 | 0.000 / 0.040 / 1.000 (p95 0.404) | 0 / 0 / 0 |
+| stave beside hoop | 2976 | 0 / 0.001 / 0.153 | 0.055 / 0.327 / 0.565 (p5 0.165) |
+| stave middle | 4960 | 0 / 0.009 / 0.478 | 0 / 0 / 0 |
+| all stave texels | 80352 | — | mean 0.019, p95 0.110; 14.7% above 0.02, **6.3% above 0.1** |
+
+The lit colour of each set: the set's points projected into shaded 512 frames. Only points facing the camera and in
+sight are used, every third one. The table gives the mean RGB, then the mean luma (Rec. 709).
+
+| set | front | back | close (zoom 4 on the rim facing front) |
+|---|---|---|---|
+| hoop rim | (105,111,120), 110.6 | (92,112,140), 109.6 | (102,106,113), 105.9 |
+| hoop top middle | (84,90,99), 89.3 | (79,95,119), 93.1 | (82,86,94), 85.8 |
+| stave beside hoop | (97,75,60), 78.4 | (103,80,66), 83.8 | (103,76,56), 80.5 (n 62) |
+| stave middle | (120,88,65), 93.1 | (128,95,75), 100.7 | (129,94,66), 99.2 (n 34) |
+
+Per-set minimum luma reaches 27 to 30 on the staves. Those are the planks graph's dark gaps. A check on a minimum would
+catch the gaps, not the grime, so the statistic proposed below is the mean.
+
+**Grime, as planning expected.** Grime is a thin line by each hoop: 6.3% of stave texels have grime above 0.1, all
+within about 0.02 m of a hoop. It is nothing at a stave's middle. In the shaded frames the staves beside a hoop are still
+14.7 (front), 16.9 (back) and 18.7 (close) luma darker than the staves' middles, so the front frame does show it,
+narrowly. Neither `reach` nor the graph was changed.
+
+**3.** The barrel has no stave-gap geometry, so no check needs mesh-made grime in a gap. Grime on the hoops is exactly 0.
+
+**Proposed thresholds, for the person to rule (not yet ruled).** Each is `a - b` of means, over the sets named:
+1. **Shaded rim:** mean luma of the visible hoop-rim points minus that of the hoop-top-middle points, in each of front,
+   back and close, **at least 8**. Measured 21.3 / 16.5 / 20.1; 8 is half the smallest.
+2. **Shaded grime:** mean luma of the stave-middle points minus that of the stave-beside-hoop points, in each of front,
+   back and close, **at least 7**. Measured 14.7 / 16.9 / 18.7.
+3. **Wear texels:** mean `wear` of the hoop-rim texels minus that of the hoop-top-middle texels, in the 512 `uvs` look,
+   **at least 0.2**. Measured 0.419.
+4. **Grime texels:** mean `grime` of the stave-beside-hoop texels minus that of the stave-middle texels, **at least
+   0.15**. Measured 0.327. Also, the stave-middle and hoop texels' `grime` max **at most 0.02**; measured 0.000.
+5. **Stage 3's `wear_amount = 0`:** "no brighter" taken as the shaded rim minus hoop-top-middle mean luma **at most 2**.
+   Not yet measured, so this one is a proposal of form only.
+
+Alternatives: a margin of 0.75 of the smallest measured gap (12 / 11 / 0.31 / 0.25) is tighter. A test on p95 instead of
+the mean would be noisier on the rim, whose p5 is 0 because of the `breakup` mask.
+
+### Hand-off (2026-11-24, agent 1 of 3, Opus 5.5 `claude-opus-5-5`)
+
+**Done:**
+- The scenario's skeleton: `scenarios/Carve.Scenario.Weathered` (`WeatheredScenario.cs` with `WeatheredRun`,
+  `WeatheredStages.cs`, `BuildStage.cs`, `ResearchStage.cs`).
+- Suite `scenario-weathered` in `tests.json`, with every linked file among its inputs, and in `Carve.slnx`.
+- `scripts/run-weathered-scenario.ps1`, scenario step only. The load-test step, as in `run-planks-scenario.ps1`, comes
+  with `tests/Carve.WeatheredLoad.Tests` in stage 5, and that project goes into the suite's inputs then.
+- The `**Verify:**` line.
+- Stage 1: open, extrude, the layout above (`Barrel.StaveBand` and `Barrel.RestBand`), the groups `hoops` (every
+  non-stave, non-cap face, walls included) and `staves`, and the three materials at 512 with the graphs copied into the
+  run folder's `graphs/`. The end grain is on the caps. `check` is silent and stage 1 holds it.
+- The research above.
+
+**Checked:** `cairn test run scenario-weathered` passes, in 25.7 s including the research. No frame was opened, and no
+`verify` was run.
+
+**Left:**
+- The threshold ruling: the question above, which this agent could not ask itself (no `AskUserQuestion`). Record it here
+  with its date.
+- Stages 2 to 5, the breaks table, `tests/Carve.WeatheredLoad.Tests`, the sample, the README and CLAUDE.md rows, the
+  frame review and the person's approval.
+- `ResearchStage` checks nothing. Fold its set code into stage 2's checks, or drop it once stage 2 measures the same
+  sets. Its last step does a plain `unwrap` and then `undo`s it.
+
+**Surprising:**
+- The per-face extrude's corner wedge walls (32 of them). They may read as thin vertical lines in the wear, since
+  curvature finds those corners. Look for this in the close rim frames.
+- The 1024 uvs frame is render's largest size. 2048 is refused.
+
+**Sizing:** the run takes 25.7 s now, with bakes of 0.4 s (wear) and 1.0 s (grime) at 512. The 1024 frames add two
+materials' bakes at about 6 to 7 s each, both drawing the slow-bake warning, on top of every frame of stage 2 at three
+sizes. Expect about 90 to 150 s in all, so splitting stage 2's 1024 frames into their own suite may be needed.
