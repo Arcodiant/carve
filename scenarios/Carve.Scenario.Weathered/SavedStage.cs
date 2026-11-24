@@ -22,7 +22,7 @@ internal sealed class SavedStage : IWeatheredStage
         await CallTextAsync(driver, "save", new { path = carve });
 
         var saved = JsonDocument.Parse(File.ReadAllText(carve)).RootElement;
-        if (!saved.TryGetProperty("version", out var version) || version.GetInt32() != 10) run.Note($"save: the file's version is {(saved.TryGetProperty("version", out var v) ? v.ToString() : "absent")}, not 10");
+        if (!saved.TryGetProperty("carve", out var version) || version.GetInt32() != 10) run.Note($"save: the file's version (\"carve\") is {(saved.TryGetProperty("carve", out var v) ? v.ToString() : "absent")}, not 10");
         var graphs = Graphs(saved).ToArray();
         run.Log.Add($"save: graph paths {string.Join(", ", graphs.Distinct())}");
         if (graphs.Length == 0 || graphs.Any(g => !g.StartsWith("graphs/", StringComparison.Ordinal))) run.Note($"save: graph paths [{string.Join(", ", graphs)}], not all graphs/…");
