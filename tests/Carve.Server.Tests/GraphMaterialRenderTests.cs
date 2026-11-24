@@ -86,7 +86,7 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
         await BarrelAsync(carve, 1024);
         var caption = Caption(await carve.CallToolAsync("render", """{"view":"front","size":256}"""));
         File.WriteAllText(Path.Combine(Frames, "barrel-1024-baked.txt"), caption);
-        Assert.Equal(6, caption.Split("\"size\":1024").Length - 1);
+        Assert.True(caption.Split("\"size\":1024").Length - 1 == 6, caption);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
 
         foreach (var (material, graph, slots) in Weathered) Ok(await carve.CallToolAsync("define_material", Pngs(model, "mesh", material, graph, slots, "baked")));
         var png = Frame(await carve.CallToolAsync("render", """{"view":"front","size":512}"""), "barrel-png");
-        Assert.True(Passes(drawn, png, out var measured), $"the graph materials against their bakes as PNGs: {measured}");
+        Assert.True(Passes(drawn, png, out var measured), $"the graph materials against their bakes as PNGs: {measured}; {caption}");
 
         foreach (var (material, graph, slots) in Weathered) Ok(await carve.CallToolAsync("define_material", Pngs(model, null, material, graph, slots, "neutral")));
         var control = Frame(await carve.CallToolAsync("render", """{"view":"front","size":512}"""), "barrel-neutral");

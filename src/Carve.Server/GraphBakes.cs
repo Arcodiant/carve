@@ -45,11 +45,28 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
     /// <summary>The model last resolved for <paramref name="model"/>, or null: never reads or bakes (the frame thread's check).</summary>
     public Model? Peek(Model model) => _drawn.TryGetValue(model, out var d) ? d.Model : null;
 
-    /// <summary>The model to draw for <paramref name="model"/>: itself without graph slots, else the one <see cref="Resolve"/> gave it.</summary>
-    public Model DrawnOf(Model model) =>
-        !model.Materials.Any(m => m.HasGraph) ? model
-        // shortcut: a model render did not resolve (another tool's edit between the bake and the frame) is baked here, on the frame thread; rare.
-        : Peek(model) ?? Resolve(model, CancellationToken.None).Model;
+    /// <summary>
+    /// The model to draw for <paramref name="model"/> (the frame thread's; never bakes): itself without graph slots, else the
+    /// one <see cref="Resolve"/> gave it, else, not yet resolved (an edit shown before any render baked it), its graph slots
+    /// left empty. No render draws that: render resolves before it queues, and the pump puts the mesh in again once
+    /// <see cref="Peek"/> changes.
+    /// </summary>
+    public Model DrawnOf(Model model)
+    {
+        if (!model.Materials.Any(m => m.HasGraph)) return model;
+        if (Peek(model) is { } drawn) return drawn;
+        static MaterialSlot? Png(MaterialSlot? slot) => slot is MaterialGraph ? null : slot;
+        foreach (var m in model.Materials.Where(m => m.HasGraph))
+            model = model.WithMaterial(m with
+            {
+                BaseColourTexture = Png(m.BaseColourTexture),
+                MetallicRoughnessTexture = Png(m.MetallicRoughnessTexture),
+                NormalTexture = Png(m.NormalTexture),
+                EmissiveTexture = Png(m.EmissiveTexture),
+                OcclusionTexture = Png(m.OcclusionTexture),
+            });
+        return model;
+    }
 
     /// <summary>Reads every graph file again and bakes what the cache lacks. Throws <see cref="GraphSlotProblemException"/> or <see cref="OperationCanceledException"/>.</summary>
     public Drawn Resolve(Model model, CancellationToken cancel)
