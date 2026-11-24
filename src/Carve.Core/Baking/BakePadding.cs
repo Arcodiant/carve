@@ -92,6 +92,21 @@ public static partial class Bake
     }
 
     /// <summary>
+    /// Sets every channel of each texel <paramref name="layout"/> leaves uncovered to <paramref name="value"/>, in place, and
+    /// returns <paramref name="image"/>. Before <see cref="Pad"/>, it is what lies beyond the padding: a map's neutral value
+    /// there, so a bake and the mesh node that reads it hold the same image over the whole square (T-165).
+    /// </summary>
+    public static BakeImage FillUncovered(BakeImage image, BakeLayout layout, float value)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ArgumentNullException.ThrowIfNull(layout);
+        for (var y = 0; y < layout.Size; y++)
+            for (var x = 0; x < layout.Size; x++)
+                if (!layout.IsCovered(x, y)) image.Texel(x, y).Fill(value);
+        return image;
+    }
+
+    /// <summary>
     /// The first column x along row <paramref name="y"/> at which column <paramref name="q"/>'s nearest covered texel beats
     /// column <paramref name="p"/>'s (p &lt; q): nearer, or as near with the lower row-major index.
     /// </summary>

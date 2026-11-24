@@ -92,8 +92,9 @@ public class BakeToolTests : FileToolTests
             else if (d0 == d1) continue; // a tie goes to the lowest texel index, not worked here
             else
             {
-                Assert.Equal(d0 <= 64 && d0 < d1 ? 255 : 0, l.Data[y * 64 + x]);
-                Assert.Equal(d1 <= 64 && d1 < d0 ? 255 : 0, r.Data[y * 64 + x]);
+                var beyond = d0 > 64 && d1 > 64; // no island within the padding: mesh_mask's neutral, white (T-165)
+                Assert.Equal(beyond || (d0 <= 64 && d0 < d1) ? 255 : 0, l.Data[y * 64 + x]);
+                Assert.Equal(beyond || (d1 <= 64 && d1 < d0) ? 255 : 0, r.Data[y * 64 + x]);
             }
         }
 
