@@ -196,7 +196,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
         }
         catch (Exception e) when (GraphSlotProblem.IsCause(e))
         {
-            throw new GraphSlotProblemException(GraphSlotProblem.Of(name, "image", e), e);
+            throw new GraphSlotProblemException(GraphSlotProblem.Of("image", e), e);
         }
     }
 
