@@ -54,7 +54,8 @@ them with the device each needs and about how long it takes. By tier:
   scenarios under `scenarios/`, each a run through the real server:
   `scenario-cube`, `-sky`, `-rig`, `-crate`, `-uvs`, `-shed`, `-export`,
   `-character`, `-soft`, `-materials`, `-planks`, `-cuts`, `-parts`, `-morph`,
-  `-gatehouse`, `-orcward` and `-bakes` on carve, and `scenario-patina`,
+  `-gatehouse`, `-orcward`, `-bakes`, `-weathered` and `-weathered-sizes` on
+  carve, and `scenario-patina`,
   `scenario-patina-library-1` and `scenario-patina-library-2` on patina.
 
 `scripts/verify.ps1` builds, runs every test project and the cube scenario.
@@ -158,7 +159,7 @@ Any texture slot may instead name a texture graph's output, `{"graph":"graphs/ir
 
 Texture and graph paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
 
-`samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`, and `samples/barrel-planks.carve` is the same barrel with its staves from patina's planks graph.
+`samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`, and `samples/barrel-planks.carve` is the same barrel with its staves from patina's planks graph. `samples/barrel-weathered.carve` is the barrel with raised hoops and two materials that read the mesh, `samples/graphs/weathered-iron.texgraph` on the hoops (worn bright on their rims, from `mesh_curvature`) and `samples/graphs/weathered-staves.texgraph` on the staves (grime beside the hoops, from `mesh_occlusion`); open it and `render` to see the bake, or `render` `{"mode":"uvs","image":{"graph":"samples/graphs/weathered-iron.texgraph","output":"wear"}}` (from the repo root) to see the wear map in the layout.
 
 ## Baked maps
 
