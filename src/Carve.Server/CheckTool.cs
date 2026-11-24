@@ -11,9 +11,26 @@ public sealed class CheckTool(ModelStore store)
 {
     public const string Text =
         "Checks the current mesh's health: what is wrong by element id, what it measures, and what a game will make of it. Call it before you export or call a model done. "
-        + "Takes the optional argument mesh, the name of the mesh to check, which may be left out while the model has one mesh, and the optional targets; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
-        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume, uvs:{mapped, unmapped}}}. "
+        + "Takes the optional argument mesh (the name of the mesh to check, which may be left out while the model has one mesh) and the optional targets; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
+        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{...}}, the stats as the example shows. "
         + "ok is true when there are no problems and no warnings; notes never make it false. "
+        + """Problems, each with its fix: inside-out (a closed shell wound the wrong way round, so a game culls it and it is invisible: reverse every face loop of that shell and call define_mesh again), coincident-vertices (two vertices at exactly the same position, so they z-fight: call define_mesh again with one vertex), duplicate-face (two faces with the same vertices, which z-fight: call define_mesh again without the extra face). With morph targets it is also checked at weight 1 against the rest mesh: target-flips-face, target-collapses-face, target-opens-mesh. """
+        + "The optional targets, an object of target name to weight 0 to 1 as render takes, checks the mesh morphed to those weights. "
+        + """Warnings, the same ones define_mesh and the edits report: "edge belongs to only one face" (a hole; collision breaks later), "edge is shared by N faces" (non-manifold: call define_mesh again without the extra face), "two faces cross this edge in the same direction" (inconsistent winding: reverse that face's loop and call define_mesh again), "face is not planar" (move the vertex back with move), "no face uses this vertex" (call define_mesh again without it). """
+        + """UV warnings, only for a mesh that has UVs on some face, each by face id: "no UVs, so the face samples the texture's corner" (project_uvs, unwrap or set_uvs it), "UVs flipped" (set_uvs, or project_uvs again), "UVs of zero area" (project_uvs or unwrap it), "UVs overlap faces[m]" (two faces show the same texels: unwrap). """
+        + "Model warnings: an occlusion strength other than 1 with no occlusion_texture does nothing (give the texture or leave it at 1); a part leaving its envelope (move the part or widen the envelope with define_part). "
+        + """Graph material warnings, by material (materials['iron'].base_colour_texture): each graph slot of a material the mesh uses that cannot be baked as the model is now, in the words render gives (a missing graph file, a fault in the graph naming its node, an output the graph lacks or the slot cannot take), and for a graph that reads the mesh, no UVs, UVs that overlap, a mesh_mask naming a group or material the mesh lacks, and "faces[2, 3] of 'barrel' are unmapped, so 'iron' bakes nothing onto them". Fix the graph file or define_material again, or give the mesh UVs that do not overlap. check casts no rays and evaluates no graph, so it is quick. """
+        + "There is no delete yet, so removing a vertex or a face means define_mesh with the lists you want. "
+        + "Notes: size in metres (1 unit = 1 m), the base (a prop stands on y = 0), the origin, more than one shell. "
+        + "Worked example on define_mesh's unit cube:\n"
+        + ExampleMarker + "{}\n"
+        + """Output: {"ok":true,"problems":[],"warnings":[],"notes":["size 1 x 1 x 1 m","base at y = 0","origin inside the bounds"],"stats":{"vertices":8,"faces":6,"edges":12,"triangles":12,"shells":1,"closed":true,"bounds":{"min":[0,0,0],"max":[1,1,1]},"size":[1,1,1],"area":6,"volume":1}}""" + "\n"
+        + """More: help {"tool":"check"} gives the thresholds, the target and UV rules, every warning in full, the notes and the stats.""";
+
+    /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"check"}</c> gives it.</summary>
+    public const string Reference =
+        "Takes the optional argument mesh, the name of the mesh to check, which may be left out while the model has one mesh, and the optional targets; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
+        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume, uvs:{mapped, unmapped}}}. "
         + "A shell is a set of faces joined by shared edges; shells[k] counts from the shell with the lowest face id. "
         + "Problems, with what each means for a game and the fix. "
         + "inside-out: a closed shell wound the wrong way round, so a game culls its faces and it is invisible. It is reported when the shell's signed volume is below -1e-6 times the cube of its bounds' diagonal, so a flat two-sided sheet, whose volume is rounding noise of either sign, is not. Reverse every face loop of that shell and call define_mesh again. "
@@ -41,10 +58,7 @@ public sealed class CheckTool(ModelStore store)
         + PartTexts.Check
         + "There is no delete yet, so removing a vertex or a face means define_mesh with the lists you want, and the ids after it close up. "
         + "Notes. 1 unit = 1 m, so size is the model's size in metres. A prop stands on y = 0, so the base note says where this one stands. The origin is where a game places the model, so it belongs inside the bounds (on them counts). More than one shell is noted because a model is usually one, though a detached part may be meant. "
-        + "Stats. bounds and size are of the vertices faces use, closed is true when every edge has exactly two faces, triangles are what a game draws, area is the sum of the face areas in square metres, and volume is in cubic metres: the sum of the shells' signed volumes, null unless every shell is closed and consistently wound, and an inside-out shell's counts as negative. "
-        + "Worked example on define_mesh's unit cube:\n"
-        + ExampleMarker + "{}\n"
-        + """Output: {"ok":true,"problems":[],"warnings":[],"notes":["size 1 x 1 x 1 m","base at y = 0","origin inside the bounds"],"stats":{"vertices":8,"faces":6,"edges":12,"triangles":12,"shells":1,"closed":true,"bounds":{"min":[0,0,0],"max":[1,1,1]},"size":[1,1,1],"area":6,"volume":1}}""";
+        + "Stats. bounds and size are of the vertices faces use, closed is true when every edge has exactly two faces, triangles are what a game draws, area is the sum of the face areas in square metres, and volume is in cubic metres: the sum of the shells' signed volumes, null unless every shell is closed and consistently wound, and an inside-out shell's counts as negative. ";
 
     public static McpServerTool Create() => MeshToolSupport.Create<CheckTool>("check", Text, WithMesh(new JsonObject
     {

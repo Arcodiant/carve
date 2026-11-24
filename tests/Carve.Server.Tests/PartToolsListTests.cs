@@ -27,7 +27,7 @@ public class PartToolsListTests
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
     // T-207 retakes the digest as each of its agents changes descriptions (render by agent A; the last retake is the one that counts):
     // render, and the new help tool, are the descriptions it has changed so far.
-    private const string Before = "227B54FDC86153074970F7A74D93718BB4B562915DBB57CEF5779B22CA520604";
+    private const string Before = "6A017E9FE7AE4B7BD147BA93690807911C29C55FC0116A034E629573B392BE67";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "help"];
 
@@ -95,7 +95,7 @@ public class PartToolsListTests
             Assert.True(Count(text, carve::Carve.Server.PartTexts.PartSpace) == (partSpace.Contains(name) ? 1 : 0), $"{name}: PartSpace sentence count");
             Assert.True(Count(text, carve::Carve.Server.PartTexts.PartTarget) == (partTarget.Contains(name) ? 1 : 0), $"{name}: PartTarget sentence count");
             Assert.True(Count(text, carve::Carve.Server.PartTexts.DefineMesh) == (name == "define_mesh" ? 1 : 0), $"{name}: DefineMesh sentence count");
-            Assert.True(Count(text, carve::Carve.Server.PartTexts.Check) == (name == "check" ? 1 : 0), $"{name}: Check sentence count");
+            Assert.True(Count(name == "check" ? HelpToolTests.WithReference(text, name) : text, carve::Carve.Server.PartTexts.Check) == (name == "check" ? 1 : 0), $"{name}: Check sentence count");
         }
     }
 
