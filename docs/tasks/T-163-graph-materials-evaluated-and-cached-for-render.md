@@ -4,7 +4,7 @@ description: >-
 ---
 # T-163 — Graph materials evaluated and cached for render
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
