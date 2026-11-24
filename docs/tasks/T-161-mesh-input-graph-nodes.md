@@ -103,35 +103,60 @@ evaluates in patina.
 - **Stop and ask:** a change to `Carve.Core.Baking`'s behaviour or to any M-24 number; a second change to
   `Patina.Graphs`; a threshold that would have to loosen.
 
-### Hand-off
+### As built
 
-First agent, Claude Opus 5.5 (`claude-opus-5-5`), stopped at the 60-call checkpoint with the code built and committed and no test run yet.
+Built by Claude Opus 5.5 (`claude-opus-5-5`), in two agents (the first handed off at its 60-call checkpoint).
 
-**Done (built, Debug, 0 warnings; not yet run):**
-- `Patina.Graphs`: `ParamKind.Text` and `ParamSpec.Text(name)` (optional free text, not empty) in `Nodes/NodeType.cs`, its
-  `KindText` line in `GraphParameters.cs`. `TexGraphFile.cs` needed no change: it reads and writes any text value already.
-- `src/Carve.Graphs` (new, in `Carve.slnx`): `IMeshMaps` (`Curvature(size, width)`, `Occlusion(size, rays, reach)`,
-  `Mask(size, MaskSource, name)`, `Position(size)`, each a whole padded image); `MeshBakeSource(Model, mesh)` (layout once
-  per size, each map once per size and settings, a lock around both; `Padding = 8`; uncovered texels set neutral, then
-  `Bake.Pad`; `Groups`, `Materials`, `Unmapped`, `Warnings`); `MeshNodes.Register(registry, source)` and `TypeNames`;
-  the four node files with `TypeName` and `Neutral`; `MeshLayoutException` (Message is the Core's, plus `Mesh`, `Size`),
-  `MeshMaskException` (`Kind`, `Name`, `Groups`, `Materials`), `MeshParameterException` (width or reach 0, a mask naming
-  both or neither: the file's float ranges start at 0, so "above 0" is refused at evaluation, with or without a source).
-  An unknown mesh name is an `ArgumentException` listing the meshes.
-- `tests/Carve.Graphs.Tests` (links `tests/Carve.Core.Tests/TestMeshes.cs`): `CarveGraphsIsEngineFreeTests`,
-  `MeshNodesTests` (equality at 256 and 1024 at tiles 16, 64, 256 and cap 0; mask faces; M-24's jaw edges, flat handle
-  and drive crevice; the raised-hoop barrel; plain barrel exactly 1; neutral; determinism; refusals; a timing test that
-  writes `%TEMP%/carve-graphs-times.txt`).
-- Suite `graphs-unit` in `tests.json`, and on this file's Verify line.
+**`src/Carve.Graphs`** (new, engine-free: `Carve.Core` and `Patina.Graphs` only, held by `CarveGraphsIsEngineFreeTests`;
+in `Carve.slnx`):
+- **Registration:** `MeshNodes.Register(NodeRegistry registry, IMeshMaps? source)` returns `registry.With(...)` the four
+  types bound to `source`; `MeshNodes.TypeNames` lists them. Each type is one file with `TypeName` and `Neutral`:
+  `MeshCurvatureNode` (`mesh_curvature`, `width` default 0.01, neutral 0.5), `MeshOcclusionNode` (`mesh_occlusion`,
+  `rays` default 32, `reach` default 0.1, neutral 1), `MeshMaskNode` (`mesh_mask`, `group` or `material`, neutral 1),
+  `MeshPositionNode` (`mesh_position`, colour, neutral #808080). Output port `out`. Each node copies `e.Rect` out of the
+  source's whole image; with `source` null it fills the neutral value.
+- **`IMeshMaps`:** `Curvature(size, width)`, `Occlusion(size, rays, reach)`, `Mask(size, MaskSource, name)`,
+  `Position(size)`, each a whole `size` x `size` `BakeImage`, padded and neutral outside the padding.
+- **`MeshBakeSource(Model model, string mesh)`:** the real source. `BakeLayout.Create` once per size; each map once per
+  size and settings, kept for the source's lifetime, under a lock (safe to share). Occlusion casts against every mesh of
+  the model at its stored positions. Position is each axis 0 to 1 over the bounding box of the live faces' corners.
+  Also `MeshName`, `Groups`, `Materials` (those the live faces use), `Unmapped` (live faces with no UVs) and `Warnings`
+  (one line naming them), and `Padding = 8`.
+- **Padding and neutral rule:** the bake's uncovered texels are set to the node's neutral value, then `Bake.Pad(image,
+  layout, 8)`: the 8 texels past each island take the island's values, beyond that reads neutral.
+- **Typed exceptions** (all `MeshMapsException`, thrown out of the evaluation): `MeshLayoutException` (Message is the
+  Core's own: no UVs, overlapping UVs naming the faces, a bad size; plus `Mesh`, `Size`); `MeshMaskException` (a group
+  or material the mesh lacks; `Mesh`, `Kind`, `Name`, `Groups`, `Materials`, all listed in the message);
+  `MeshParameterException` (`width` or `reach` 0, a mask naming both or neither: the file's float ranges start at 0, so
+  "above 0" is refused at evaluation, with or without a source). An unknown mesh name is an `ArgumentException` from the
+  constructor listing the model's meshes. Ranges the file holds (`width` over 1, `rays` 0 or 1025, `reach` over 10, an
+  empty name) are ordinary graph faults.
+- **Worked use** (what T-162 and T-163 call):
+  `var registry = MeshNodes.Register(NodeRegistry.BuiltIn, new MeshBakeSource(model, "wrench"));` then
+  `TexGraphFile.Read(text, registry)` and `new GraphEvaluator(graph, registry)` as for any graph; patina passes `null`.
+- **Times** through the source on the wrench, Debug, at the defaults (layout + position, curvature 0.01, occlusion 32
+  rays 0.1, mask `steel`): 512: 178, 209, 2190, 201 ms; 1024: 690, 760, 7351, 766 ms (one run; an earlier run on a
+  busier machine gave 3806, 1719, 13744, 960 ms at 1024).
 
-**Left:**
-- Run `cairn task T-161 verify`; fix what fails. Untested guesses: that extrude keeps faces 0 to 7 and 24 to 31 as the hoop
-  tops (the walls are 34 on); the 95th percentile as the "hoop rims read 0.9 or more" statistic; the crevice as socket top
-  (face 118) only. If a planning threshold misses, stop and report the numbers, as the Notes say.
-- At 1024 the occlusion equality casts 4 rays, not 32, to keep the suite short (say so in As built, or ask).
-- Not written yet: the `Text` kind's round-trip test in `tests/Patina.Graphs.Tests` (a test node with a text parameter,
-  a name with a space, a quote and a non-ASCII letter, read, written, read again); the broken-copies table (a test
-  `IMeshMaps` wrapping `MeshBakeSource` that inverts the mask, returns curvature for occlusion, flips position's y, or
-  drops the padding, each shown caught by `FirstDifference` and, where cheap, by `MaskCheck` and `AllOpen`).
-- CLAUDE.md: Layout rows for `src/Carve.Graphs` and `tests/Carve.Graphs.Tests`, the architecture rule line.
-- README: likely nothing (no tool changes); check. Then As built (with the times file's numbers), `cairn lint`, finish.
+**`Patina.Graphs`**: its one change, `ParamKind.Text` and `ParamSpec.Text(name)` (optional free text, not empty), with its
+line in `GraphParameters`. `TexGraphFile` needed no change. Round trip in `tests/Patina.Graphs.Tests/TextParamTests.cs`
+(a space, a quote and a non-ASCII letter read, written, read again; empty text and a number refused).
+
+**Tests** (`tests/Carve.Graphs.Tests`, suite `graphs-unit`): each node equal byte for byte to its `Bake` call at 256 and
+1024 at tiles 16, 64, 256 and cap 0 (occlusion 32 rays, reach 0.035); the steel mask's faces; M-24's numbers (every convex
+jaw edge at least 218 and the flat handle exactly 128 at width 0.003, 1024; the drive crevice at least 50 below the open
+grip, 32 rays, reach 0.035, at 512); the raised-hoop barrel at 512 (the hoop tops' 95th percentile, planning's statistic,
+0.9 or more; staves' minimum 0.55 or less and mean 0.95 or more); the plain barrel exactly 1; neutral; determinism; every
+refusal. Broken copies (`BrokenCopiesTests.cs`, a source wrapping `MeshBakeSource`):
+
+| Broken copy | Caught by |
+|---|---|
+| the mask inverted | the comparison with `Bake.Masks`; `MaskCheck` |
+| curvature read as occlusion | the comparison with `Bake.Occlusion`; `AllOpen` on the plain barrel |
+| position's y flipped | the comparison with the layout's texel positions |
+| the padding left out | the comparison with the padded `Bake.Curvature` |
+
+**Not checked:** occlusion between parts moved by a part tree (occluders use each mesh's stored positions, as M-24 left
+it); a bake at 4096; the raised-hoop and crevice numbers at 1024 (run at 512).
+
+**README:** nothing needed; no tool reaches the nodes until T-162 and T-163.

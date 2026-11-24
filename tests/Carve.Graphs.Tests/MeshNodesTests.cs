@@ -94,8 +94,7 @@ public class MeshNodesTests
         var mesh = model.Meshes[0].Mesh;
         var source = new MeshBakeSource(model, model.Meshes[0].Name);
         var layout = BakeLayout.Create(mesh, size).Layout!;
-        // Occlusion at 1024 casts 4 rays, not 32, so the test stays near a second (planning: 1024 at 32 rays is 7 to 9 s in Debug).
-        var rays = size == 1024 ? 4 : 32;
+        const int rays = 32;
         var cases = new (string Node, int Channels, Func<byte[]> Expected)[]
         {
             (Node(MeshCurvatureNode.TypeName, "\"width\": 0.003"), 1, () => Expected(Bake.Curvature(layout, 0.003), layout, 0.5f)),
