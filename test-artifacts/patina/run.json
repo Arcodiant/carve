@@ -1,0 +1,4625 @@
+{
+  "scenario": "patina",
+  "seed": 1,
+  "audio": "none",
+  "outcome": "passed",
+  "calls": [
+    {
+      "method": "tools/list",
+      "result": [
+        {
+          "name": "define_graph",
+          "description": "Replaces the open texture graph with a whole new one: graph is the body of a .texgraph file, as JSON (patina holds one graph per session). It clears the snapshot stack (push_snapshot) and the graph\u0027s path (save gives it one). A graph with faults is still taken, so edit_graph can fix it; save refuses it until it has none. A graph is {\u0022version\u0022: 1, \u0022size\u0022: S, \u0022seed\u0022: N, \u0022nodes\u0022: {id: node}}: version 1, or 2 for exposed parameters and input and graph nodes; size is the size the images are evaluated at, a power of two from 32 to 8192 (32, 64, 128, 256, 512, 1024, 2048, 4096 or 8192); seed, 0 to 4294967295, is added to every noise\u0027s own seed, so the same graph gives the same pixels on every run. Ids and port names are [a-z][a-z0-9_]*. A node is {\u0022type\u0022: T, \u0022inputs\u0022: {port: source}, \u0022params\u0022: {name: value}}, inputs and params left out when empty; a source is another node\u0027s id (\u0022id.port\u0022 for a type with several outputs); a parameter left out takes its default. A value is a number, a string, or a list of numbers or of colours ([0, 0.5, 1], [\u0022#202020\u0022, \u0022#c0a080\u0022]). Everything is image-relative and tiles. The images are the output nodes\u0027, at least one: one per role (base_colour, normal, roughness, metallic, occlusion, height), or a name ([a-z][a-z0-9_]*) in place of a role for an extra image \u003Cname\u003E.png, such as a mask. metallic is packed into roughness.png\u0027s blue channel, so it needs a roughness output too. A fault names the node and the port or parameter it is on, and what would be right (the types, the ids, the range). The node types (nodes gives each one\u0027s inputs, outputs, parameters with ranges and defaults, and a worked example; nodes {\u0022type\u0022: \u0022tiles\u0022} gives one): blend (combine two by a mode); blur (a wrapping blur); colour (a flat colour); distance (distance to a mask\u0027s edge); fbm (fractal noise); gradient (a ramp); gradient_map (colour a greyscale through stops); graph (another .texgraph as a node); height_to_normal (a normal from a height); input (an image input of this graph); levels (remap a range); mesh_curvature (curvature of the mesh (stand-in)); mesh_mask (a mesh group or material (stand-in)); mesh_occlusion (occlusion of the mesh (stand-in)); mesh_position (position on the mesh (stand-in)); noise (value noise); output (one of the material\u0027s images); shape (a shape per cell); stripes (stripes); tiles (tiles or bricks); transform (move, repeat, mirror, turn, scale); warp (bend by another image); worley (cells and their edges).\nA graph that is not a .texgraph body (a missing or unknown key, a value of the wrong kind, a version other than 1 or 2, a bad size or seed) is refused, naming what is wrong, and the open graph is unchanged. Returns one line: the open graph\u0027s nodes, size and seed, then its faults, one a line.\nWorked example, a tone per stave (eight staves across u, one random grey each) on a wood colour:\ndefine_graph {\u0022graph\u0022:{\u0022version\u0022:1,\u0022size\u0022:256,\u0022seed\u0022:0,\u0022nodes\u0022:{\u0022wood\u0022:{\u0022type\u0022:\u0022colour\u0022,\u0022params\u0022:{\u0022colour\u0022:\u0022#aa7040\u0022}},\u0022tone\u0022:{\u0022type\u0022:\u0022noise\u0022,\u0022params\u0022:{\u0022cells\u0022:[8,1],\u0022interpolation\u0022:\u0022step\u0022}},\u0022base\u0022:{\u0022type\u0022:\u0022blend\u0022,\u0022inputs\u0022:{\u0022a\u0022:\u0022wood\u0022,\u0022b\u0022:\u0022tone\u0022},\u0022params\u0022:{\u0022mode\u0022:\u0022multiply\u0022}},\u0022out\u0022:{\u0022type\u0022:\u0022output\u0022,\u0022inputs\u0022:{\u0022in\u0022:\u0022base\u0022},\u0022params\u0022:{\u0022role\u0022:\u0022base_colour\u0022}}}}}\nreturns: define_graph: the open graph is now 4 nodes, size 256, seed 0; no faults: it evaluates\nThe same with out\u0027s input misspelt as \u0022bsae\u0022 is taken, and returns:\ndefine_graph: the open graph is now 4 nodes, size 256, seed 0; 1 fault:\n- node \u0027out\u0027 input \u0027in\u0027: names \u0027bsae\u0027, which is not a node; the nodes are base, out, tone, wood\nNext: edit_graph to change it, get_graph to read it back, save to keep it.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "graph": {
+                "type": "object",
+                "description": "The whole graph, as a .texgraph file holds it: {\u0022version\u0022: 1, \u0022size\u0022: 256, \u0022seed\u0022: 0, \u0022nodes\u0022: {id: {\u0022type\u0022: ..., \u0022inputs\u0022: {...}, \u0022params\u0022: {...}}}}."
+              }
+            },
+            "required": [
+              "graph"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "nodes",
+          "description": "Lists patina\u0027s node types, the parts of a texture graph: for each, what it does, its inputs (optional ones marked), its outputs when it has several (a source names one as \u0022id.port\u0022), every parameter with its kind, range and default, and a worked define_graph example, run as written by patina\u0027s tests. Takes type (optional): one type\u0027s name for its entry alone; without it, every type\u0027s, in the order define_graph\u0027s description lists them. Changes nothing, and needs no open graph. Refused: a type patina has not (the error lists the types). Read it before writing a graph: define_graph\u0027s description carries only the types\u0027 names.\nWorked example: nodes {\u0022type\u0022:\u0022stripes\u0022} returns:\n- stripes: greyscale stripes, 1 on a stripe: count whole stripes across the image, axis u (upright stripes), v (lying stripes) or diagonal (count along each axis), width a part of a period, softness the edge ramp\u0027s reach each side of the edge as a part of a period (the ramp is twice it); a stripe is centred on each multiple of 1/count. Inputs: none. Params: count: a whole number from 1 to 4096, default 8; axis: one of u, v, diagonal, default \u0022u\u0022; width: a number from 0 to 1, default 0.5; softness: a number from 0 to 0.5, default 0.\nWorked example, 16 soft lying stripes:\ndefine_graph {\u0022graph\u0022:{\u0022version\u0022:1,\u0022size\u0022:256,\u0022seed\u0022:0,\u0022nodes\u0022:{\u0022weft\u0022:{\u0022type\u0022:\u0022stripes\u0022,\u0022params\u0022:{\u0022count\u0022:16,\u0022axis\u0022:\u0022v\u0022,\u0022width\u0022:0.4,\u0022softness\u0022:0.2}},\u0022out\u0022:{\u0022type\u0022:\u0022output\u0022,\u0022inputs\u0022:{\u0022in\u0022:\u0022weft\u0022},\u0022params\u0022:{\u0022role\u0022:\u0022base_colour\u0022}}}}}\nreturns: define_graph: the open graph is now 2 nodes, size 256, seed 0; no faults: it evaluates",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "One node type\u0027s name, such as tiles; leave it out for every type."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "edit_graph",
+          "description": "Edits the open graph by a list of operations, applied in order and all or nothing: when any operation cannot be applied, or the list would leave a fault the graph did not have, nothing changes and the result says why (the operation by number, or the new faults, each naming its node and port or parameter). Faults the graph already had (an opened file\u0027s, say) do not stop an edit, so they can be fixed one list at a time; the result lists those left. operations is an array of objects, each with op and its own keys:\n- set_node {node, type, inputs, params}: adds the node, or replaces it whole (inputs and params optional, as in define_graph).\n- remove_node {node}: removes it; disconnect or reconnect what reads it in the same list, or that is a new fault.\n- connect {node, port, from}: sets node\u0027s input port to read from (an id, or \u0022id.port\u0022), replacing what it read.\n- disconnect {node, port}: leaves the input unconnected (a fault unless the port is optional).\n- set_params {node, params}: merges params into the node\u0027s, replacing those it names and keeping the rest.\n- set {size, seed}: the graph\u0027s size or seed or both.\n- set_parameter {name, value, drives, min, max}: adds the exposed parameter name, or changes the keys given. drives is a list of node parameters, each \u0022node.param\u0022, all of one kind (a number, a whole number, a choice, two whole numbers or a colour; not a list); the parameter takes the narrowest range of them (the intersection, or an enum\u0027s common choices), narrowed again by min and max (numbers; null clears one), and every driven parameter takes its value, its own value in its node left out. A new parameter needs value and drives. A node parameter a parameter stops driving keeps the parameter\u0027s value as its own.\n- remove_parameter {name}: removes it; the parameters it drove keep its value as their own.\n- set_parameters {values}: sets parameters\u0027 values by name, such as {\u0022mortar\u0022: 0.08}.\nA value out of a parameter\u0027s range is a new fault (parameters[\u0027mortar\u0027]: is 0.5, but must be a number from 0 to 0.45), so the list is refused. get_graph lists the parameters; swatch and export take them for one call without editing the graph.\nFor example {\u0022op\u0022:\u0022set_params\u0022,\u0022node\u0022:\u0022tone\u0022,\u0022params\u0022:{\u0022seed\u0022:3}} gives tone another seed, {\u0022op\u0022:\u0022disconnect\u0022,\u0022node\u0022:\u0022grained\u0022,\u0022port\u0022:\u0022b\u0022} on its own is refused (a blend\u0027s b is required), and {\u0022op\u0022:\u0022set\u0022,\u0022size\u0022:512,\u0022seed\u0022:7} doubles the size and changes the seed. A list parameter (a gradient_map\u0027s positions or colours) is given whole, an array of numbers or of strings as define_graph reads it, and replaces the list; when the count changes, give both lists in one operation. Types, ports and parameters are define_graph\u0027s. Returns one line: what each operation did, then the graph\u0027s nodes, size, seed and faults.\nWorked example, on define_graph\u0027s worked graph: a grain along v, multiplied in at 0.3:\nedit_graph {\u0022operations\u0022:[{\u0022op\u0022:\u0022set_node\u0022,\u0022node\u0022:\u0022grain\u0022,\u0022type\u0022:\u0022noise\u0022,\u0022params\u0022:{\u0022cells\u0022:[64,2],\u0022octaves\u0022:2}},{\u0022op\u0022:\u0022set_node\u0022,\u0022node\u0022:\u0022grained\u0022,\u0022type\u0022:\u0022blend\u0022,\u0022inputs\u0022:{\u0022a\u0022:\u0022base\u0022,\u0022b\u0022:\u0022grain\u0022},\u0022params\u0022:{\u0022mode\u0022:\u0022multiply\u0022,\u0022opacity\u0022:0.3}},{\u0022op\u0022:\u0022connect\u0022,\u0022node\u0022:\u0022out\u0022,\u0022port\u0022:\u0022in\u0022,\u0022from\u0022:\u0022grained\u0022}]}\nreturns: edit_graph: 3 operations applied: added \u0027grain\u0027 (noise); added \u0027grained\u0027 (blend); connected \u0027out\u0027 input \u0027in\u0027 to \u0027grained\u0027 (was \u0027base\u0027). The graph is 6 nodes, size 256, seed 0; no faults: it evaluates\nThen edit_graph {\u0022operations\u0022:[{\u0022op\u0022:\u0022remove_node\u0022,\u0022node\u0022:\u0022tone\u0022}]} changes nothing and returns:\nedit_graph: nothing changed: the operations would leave 1 new fault:\n- node \u0027base\u0027 input \u0027b\u0027: names \u0027tone\u0027, which is not a node; the nodes are base, grain, grained, out, wood",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "operations": {
+                "type": "array",
+                "description": "The operations, applied in order, all or nothing: each an object with op (set_node, remove_node, connect, disconnect, set_params, set, set_parameter, remove_parameter or set_parameters) and its keys.",
+                "items": {
+                  "type": "object"
+                }
+              }
+            },
+            "required": [
+              "operations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "get_graph",
+          "description": "Reads back the open graph: a line with its nodes, size, seed, path (the file save last wrote or open read, or no path) and faults, one a line, each naming its node and port or parameter; then the graph exactly as save would write it, a .texgraph file: version, size, seed, then one node a line in id order, inputs and params in name order, the parameters the graph gives (a default it leaves out is not written). Give that JSON back to define_graph as graph to start again from it. Takes nothing, and changes nothing. A graph with exposed parameters (version 2, set with edit_graph\u0027s set_parameter) lists them between the two, a line each: its name, kind, value, range (the narrowest of the node parameters it drives) and what it drives; and in the file each driven node parameter shows {\u0022driven_by\u0022: \u0022\u003Cname\u003E\u0022} where its own value would be, which save leaves out and define_graph reads back. A graph using others as graph nodes (T-140) lists each after those, a line each: the file its path resolved to (against the graph\u0027s own file\u0027s folder, or the tool folder for a graph never saved, which the head line says), the nested graph\u0027s parameters with the values set on the node and their ranges, its inputs (name and kind, and whether it has a default) and its outputs as the node\u0027s ports (wall.base_colour). For samples/graphs/bricks.texgraph the lines are:\nparameters (3):\n- jitter: a number, 0.25, from 0 to 1; drives layout.jitter\n- mortar: a number, 0.1, from 0 to 0.45; drives layout.gap\n- tint: a colour, \u0022#a8452f\u0022, any colour \u0022#rrggbb\u0022; drives clay.colour\nand its layout node reads \u0022gap\u0022: { \u0022driven_by\u0022: \u0022mortar\u0022 }.\nWorked example, after define_graph\u0027s worked example, get_graph {} returns:\nget_graph: 4 nodes, size 256, seed 0; no path (save gives it one); no faults: it evaluates\n{\n  \u0022version\u0022: 1,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 0,\n  \u0022nodes\u0022: {\n    \u0022base\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022wood\u0022, \u0022b\u0022: \u0022tone\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022base\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022tone\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [8, 1], \u0022interpolation\u0022: \u0022step\u0022 } },\n    \u0022wood\u0022: { \u0022type\u0022: \u0022colour\u0022, \u0022params\u0022: { \u0022colour\u0022: \u0022#aa7040\u0022 } }\n  }\n}",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "save",
+          "description": "Writes the open graph to a .texgraph file, so the work outlives this session; open reads it back. Takes path: .texgraph is added when the path does not end in it; a relative path resolves against patina\u0027s working directory, and the result gives the absolute path; missing folders are created; an existing file is replaced, and the result says (replaced). The file is the graph as get_graph shows it: versioned JSON, keys in one order, one node a line, so the same graph always gives the same bytes and a diff shows what changed. The path becomes the graph\u0027s path. Refused, writing nothing, while the graph has a fault: a saved graph always evaluates, but for an input node with no default, which a graph using this one as a node gives. A graph node\u0027s path resolves against the file\u0027s folder, so the graph is judged there: saved into another folder, a nested file not found from it is a fault, and one found there that differs from the file it uses now refuses the save, naming both: the saved graph is the graph defined. Only the open graph is written, never a file it uses as a graph node. The error lists the faults, each naming its node and port or parameter; fix them with edit_graph. Also refused: no open graph, an empty path, one naming a folder or holding a character a path may not, and a write that fails (naming the path and the system\u0027s message; no partial file is left). save changes nothing in the graph or the snapshot stack, which is never saved.\nWorked example, after define_graph\u0027s and edit_graph\u0027s worked examples (put patina\u0027s working directory for \u003Cfolder\u003E):\nsave {\u0022path\u0022:\u0022planks\u0022}\nreturns: save: saved planks.texgraph to \u003Cfolder\u003E/planks.texgraph: 6 nodes, size 256, seed 0",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "The file to write, absolute or relative to patina\u0027s working directory; .texgraph is added if missing."
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "open",
+          "description": "Replaces the open graph with the one in a .texgraph file (save writes them). Takes path: .texgraph is added when the path does not end in it, and a relative path resolves against patina\u0027s working directory. The file\u0027s path becomes the graph\u0027s path, and the snapshot stack is cleared. A graph node\u0027s path resolves against the file\u0027s own folder; the result names each nested file it read. A graph whose references are wrong (an input naming no node, an unknown type or parameter, a value out of range, a cycle) still opens, and the result lists its faults one a line, each naming its node and port or parameter, so edit_graph can fix them; save refuses it until they are fixed. Refused, leaving the open graph as it was: a missing file (the error lists the .texgraph files in its folder, so a misspelt name shows the right one); a file that is not a graph (not JSON, a missing or unknown key, a version other than 1, a bad size or seed), giving the line and column; an empty path, or one naming a folder.\nWorked example, after save\u0027s worked example (put patina\u0027s working directory for \u003Cfolder\u003E):\nopen {\u0022path\u0022:\u0022planks.texgraph\u0022}\nreturns: open: opened planks.texgraph from \u003Cfolder\u003E/planks.texgraph: 6 nodes, size 256, seed 0; no faults: it evaluates\nopen {\u0022path\u0022:\u0022plank\u0022} is refused: open: no file at \u003Cfolder\u003E/plank.texgraph; the .texgraph files in \u003Cfolder\u003E (1) are: planks.texgraph",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "The .texgraph file to read, absolute or relative to patina\u0027s working directory; .texgraph is added if missing."
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "push_snapshot",
+          "description": "Copies the open graph onto a stack of snapshots, to try a change and come back: push, edit freely, then pop_snapshot restores the graph exactly as it was pushed. Takes label, optional, a name for the snapshot that pop_snapshot gives back. Returns the stack\u0027s depth. The stack lives in this session only: it is never saved, and define_graph and open clear it. The open graph and its path are unchanged. Refused when there is no open graph.\nWorked example, after define_graph\u0027s worked example:\npush_snapshot {\u0022label\u0022:\u0022before grain\u0022}\nreturns: push_snapshot: pushed \u0027before grain\u0027; depth 1\nthen edit_graph\u0027s worked example adds the grain, and pop_snapshot {} takes the graph back to before it.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Optional: a name for the snapshot, given back by pop_snapshot."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "pop_snapshot",
+          "description": "Restores the graph on top of the snapshot stack (push_snapshot) as the open graph, byte for byte as it was pushed, and removes it from the stack. Takes nothing. Returns the snapshot\u0027s label, the new depth, and the restored graph\u0027s nodes, size, seed and faults. The graph\u0027s path is kept, so its graph nodes resolve against that path\u0027s folder (a snapshot pushed before a save into another folder is judged there, and its faults listed); nothing is written to a file. On an empty stack it is an error that says so, and changes nothing.\nWorked example, after push_snapshot\u0027s: edit_graph\u0027s worked example adds the grain (6 nodes), then pop_snapshot {} returns:\npop_snapshot: restored \u0027before grain\u0027; depth 0. The graph is 4 nodes, size 256, seed 0; no faults: it evaluates\nand pop_snapshot {} again is refused: pop_snapshot: the snapshot stack is empty; push_snapshot first, before the change to come back from",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "export",
+          "description": "Writes the open graph\u0027s outputs as PNG files, ready for a Carve material\u0027s texture slots. Takes folder (required; absolute or relative to patina\u0027s working directory; created if missing), size (a power of two from 32 to 8192; default the graph\u0027s own size) and outputs (a list of roles from base_colour, normal, roughness, occlusion, height, and named outputs by their names; default every output the graph has). Each file is \u003Cfolder\u003E/\u003Crole\u003E.png or \u003Cfolder\u003E/\u003Cname\u003E.png, overwriting a file of that name (the result says replaced), written as the graph\u0027s outputs are packed for glTF: base_colour is sRGB; normal is tangent space, green up; roughness is a glTF metallic-roughness image (R 255, roughness in G, the graph\u0027s metallic in B, 0 when it has none), so define_material\u0027s metallic_roughness_texture takes it as it is; metallic has no file of its own (name roughness to write it); occlusion and height are grey; a named output is grey if greyscale, sRGB if colour. The result lists each file with its size, its bytes and the Carve material slot it belongs in: base_colour in base_colour_texture, normal in normal_texture, roughness in metallic_roughness_texture, occlusion in occlusion_texture; height and named outputs have no slot. Exporting the graph at its own size gives the same bytes every time, and equals the PNGs beside samples/graphs/planks.texgraph. Outputs are evaluated and written one at a time, in tiles, so memory stays bounded at 8192 (the planks peaked at 0.7 GB), but 8192 is slow, mostly evaluation: the planks\u0027 four outputs took 28 to 31 s in release, about 3 to 4 min in debug, each PNG 0.3 to 1 MB. A client with a short call timeout should ask for one or two outputs at a time. To look at a graph, use swatch (at 2048 or below); export is for files. Refused, writing nothing, while the graph has a fault (the error lists them; fix them with edit_graph); no open graph; a size that is not a power of two from 32 to 8192; an output the graph has not; metallic named alone; and a folder that cannot be written (the error names the folder and the system\u0027s reason).\nWorked example, after open of samples/graphs/planks.texgraph (\u003Cfolder\u003E is the absolute path of textures/planks under patina\u0027s working directory):\nexport {\u0022folder\u0022:\u0022textures/planks\u0022,\u0022size\u0022:1024,\u0022outputs\u0022:[\u0022base_colour\u0022,\u0022normal\u0022]}\nreturns, a line for each file:\nexport: wrote 2 files to \u003Cfolder\u003E at size 1024\n- base_colour.png: 1024x1024, \u003Cbytes\u003E bytes, slot base_colour_texture\n- normal.png: 1024x1024, \u003Cbytes\u003E bytes, slot normal_texture\nparameters: the graph\u0027s exposed parameters to set for this export only, by name (get_graph lists them and their ranges); the graph is not changed, the first line names them, and a value out of range is refused naming the parameter and its range, writing nothing. The files equal those of the same values set in the graph with edit_graph\u0027s set_parameters, byte for byte.\nWorked example, after open of samples/graphs/bricks.texgraph: export {\u0022folder\u0022:\u0022textures/bricks_grey\u0022,\u0022parameters\u0022:{\u0022mortar\u0022:0.08,\u0022tint\u0022:\u0022#7a7a70\u0022}} writes its four outputs as grey stone bricks (equal to samples/graphs/bricks/variants/grey/) and its first line is:\nexport: wrote 4 files to \u003Cfolder\u003E at size 256, parameters mortar 0.08, tint \u0022#7a7a70\u0022\nWorked example, after define_graph of the metal plate (nodes\u0027 output example) (\u003Cfolder\u003E is the absolute path of textures/plate):\nexport {\u0022folder\u0022:\u0022textures/plate\u0022}\nreturns:\nexport: wrote 3 files to \u003Cfolder\u003E at size 64\n- base_colour.png: 64x64, \u003Cbytes\u003E bytes, slot base_colour_texture\n- roughness.png: 64x64, \u003Cbytes\u003E bytes, slot metallic_roughness_texture, metallic in B\n- edge.png: 64x64, \u003Cbytes\u003E bytes, no Carve slot (a named output)",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "folder": {
+                "type": "string",
+                "description": "The folder to write \u003Crole\u003E.png and \u003Cname\u003E.png files into, absolute or relative to patina\u0027s working directory; created if missing."
+              },
+              "size": {
+                "type": "integer",
+                "description": "A power of two from 32 to 8192; default the graph\u0027s own size."
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The outputs to write, each a role (base_colour, normal, roughness, occlusion, height; metallic is written in roughness.png) or a named output\u0027s name; default every output the graph has."
+              },
+              "parameters": {
+                "type": "object",
+                "description": "Optional: the graph\u0027s exposed parameters to set for this call, by name, such as {\u0022mortar\u0022: 0.08, \u0022tint\u0022: \u0022#7a7a70\u0022}; the graph is not changed. get_graph lists them with their ranges."
+              }
+            },
+            "required": [
+              "folder"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "swatch",
+          "description": "Shows the open graph\u0027s outputs as images. view: sheet (default) is one image: a column per output, the roles in role order (base_colour, normal, roughness, metallic, occlusion, height; a role the graph lacks has no column) and then the named outputs a to z, each output flat on top and tiled 3 x 3 below in 256 px cells, beside a 512 px sphere wearing base colour, normal, roughness with metallic, and occlusion (height and named outputs are shown, not worn), under a title strip with the file, size and seed. flat is one output\u0027s texels exactly, size px a side; tiled is its 3 x 3 repeat (3 x size, scaled down to at most 1536 px), to show seams; sphere is the engine\u0027s UV sphere (u once around, v from the top pole) drawn with a PBR material made of the outputs (base colour sRGB, roughness as the metallic-roughness image with the graph\u0027s metallic in B and the material\u0027s metallic factor 1, or metallic 0 when the graph has none, normal and occlusion linear, mipmaps on; a missing role uses the material\u0027s default), lit as Carve\u0027s render lights a model, on Carve\u0027s dark slate, from a fixed camera, 512 px. metallic, height and greyscale named outputs are drawn grey; roughness\u0027s column is roughness alone. output: a role or a named output\u0027s name, for flat and tiled (default the first role the graph has). size: the evaluation size, a power of two from 32 to 2048 (default the graph\u0027s size, at most 2048; for larger PNGs use export). cube is a lit cube (edge 0.7, each face its own UVs 0 to 1, u to the right and v down as the face is seen) wearing the same material, turned so the front, the left and the top show, to judge a material on flat faces and the edges between them; lit and framed as the sphere is, 512 px. tiling: a whole number from 1 to 8 (default 1), for sheet, sphere and cube: the sphere or cube wears every map repeated that many times in u and v, to judge a material at a texel density nearer a game\u0027s; the sheet\u0027s title and the result name it when it is not 1. angle: the sphere\u0027s or cube\u0027s turn about y in degrees, for sheet, sphere and cube (default 0; counter-clockwise seen from above). parameters: the graph\u0027s exposed parameters to set for this call only, by name (get_graph lists them and their ranges); the graph is not changed, a value out of range is refused, and the sheet\u0027s title and the result name them. Refused while the graph has a fault. Changes nothing.\nWorked examples, with samples/graphs/planks.texgraph open, each returning an image and a line: swatch {\u0022view\u0022:\u0022tiled\u0022,\u0022output\u0022:\u0022base_colour\u0022,\u0022size\u0022:128} returns:\nswatch tiled: base_colour of planks.texgraph, 3 x 3 of 128 px, 384 x 384 px, exact texels\nswatch {\u0022view\u0022:\u0022cube\u0022,\u0022tiling\u0022:3} returns:\nswatch cube: planks.texgraph at 256 px on a cube, each face 0 to 1 in u and v, angle 0, tiling 3, 512 x 512 px\nswatch {\u0022view\u0022:\u0022sphere\u0022,\u0022tiling\u0022:3} returns:\nswatch sphere: planks.texgraph at 256 px on the engine\u0027s UV sphere, angle 0, tiling 3, 512 x 512 px\nAfter define_graph of the metal plate (nodes\u0027 output example): swatch {\u0022view\u0022:\u0022flat\u0022,\u0022output\u0022:\u0022edge\u0022} returns an image and:\nswatch flat: edge of the open graph, 64 x 64 px, exact texels\nWith samples/graphs/bricks.texgraph open: swatch {\u0022view\u0022:\u0022flat\u0022,\u0022output\u0022:\u0022base_colour\u0022,\u0022parameters\u0022:{\u0022mortar\u0022:0.08,\u0022tint\u0022:\u0022#7a7a70\u0022}} shows grey stone bricks\u0027 base colour and returns:\nswatch flat: base_colour of bricks.texgraph, 256 x 256 px, exact texels; parameters mortar 0.08, tint \u0022#7a7a70\u0022\nand swatch {\u0022parameters\u0022:{\u0022mortar\u0022:0.5}} returns:\nswatch: parameters[\u0027mortar\u0027]: is 0.5, but must be a number from 0 to 0.45\nand swatch {\u0022view\u0022:\u0022sphere\u0022,\u0022tiling\u0022:9} returns:\nswatch: tiling 9 is out of range; give a whole number from 1 to 8",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "view": {
+                "type": "string",
+                "enum": [
+                  "sheet",
+                  "flat",
+                  "tiled",
+                  "sphere",
+                  "cube"
+                ]
+              },
+              "output": {
+                "type": "string",
+                "description": "A role (base_colour, normal, roughness, metallic, occlusion, height) or a named output\u0027s name, for flat and tiled."
+              },
+              "size": {
+                "type": "integer"
+              },
+              "angle": {
+                "type": "number"
+              },
+              "tiling": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8,
+                "description": "Whole repeats of every map over the sphere or cube in u and v, 1 to 8 (default 1), for sheet, sphere and cube."
+              },
+              "parameters": {
+                "type": "object",
+                "description": "Optional: the graph\u0027s exposed parameters to set for this call, by name, such as {\u0022mortar\u0022: 0.08, \u0022tint\u0022: \u0022#7a7a70\u0022}; the graph is not changed. get_graph lists them with their ranges."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "check",
+          "description": "Measures the open graph\u0027s outputs as numbers, rather than judging by a render, and lists what is wrong with each, with the fix in words. Changes nothing, and never refuses a graph that evaluates: a fault is a problem in the list. Takes size (a power of two from 32 to 2048; default the graph\u0027s own, at most 2048), parameters (the graph\u0027s exposed parameters, for this call only) and files (a list of {path, role} of PNGs, the path absolute or relative to patina\u0027s working directory; only those are checked, no graph is needed, and size and parameters are not used). Role metallic_roughness is a packed image as export writes roughness.png (G roughness, B metallic); role roughness is roughness only. The rules, each with its thresholds and what it means for a game:\n- base-colour-range: base colour\u0027s brightest channel, in sRGB levels 0 to 255, should be 20 to 245 for a non-metal texel (metallic below 0.5, or no metallic) and 120 or more for a metal texel (metallic 0.5 or more); near black is a hole under game lighting, near white blows out, and dark metal, which takes its colour from reflection, shows almost nothing. A fault when over 1% of texels are out. Fix: pull the darks up and the lights in with a levels or gradient_map node.\n- metallic-not-binary: metallic should be 0 or 1, with a sharp edge between (a half-metal is not a real surface and renders as dull chrome). A fault when over 5% of texels are from 0.1 to 0.9. Fix: push the mask to 0 and 1 (a levels node with in_low equal to in_high is a step), or set a constant.\n- normal-not-unit: a normal is a unit vector. A fault when over 0.1% of texels\u0027 length differs from 1 by more than 0.02 (0.03 for a PNG, for the 8-bit rounding). Fix: make it with height_to_normal, which normalises, and do not mix a normal\u0027s components as colours.\n- one-value: a greyscale output (roughness, occlusion, height, a greyscale named output; not metallic) whose texels all pack to one byte; a mask of one value masks nothing. Fix: widen its levels, or drive it from a noise or pattern, or drop the output.\n- does-not-tile: the mean step between neighbouring columns (and rows, for v), in packed levels over the channels, is measured at every column boundary, the wrap\u0027s between the last and first included; the wrap is a fault when its step is more than twice the 99th percentile of the steps inside, plus 2 levels, so the texture shows a seam when it repeats (a pattern\u0027s own hard edge that falls on the wrap is not one). Fix: whole-number frequencies and counts and quarter turns; swatch\u0027s tiled view shows where.\nResult: {ok, problems:[{check, output, message}], notes, stats}. ok is true when there are no problems; each message gives the share, the worst texel and the fix; notes say how the texels were read (the share of metal texels, a metallic read from a packed file); stats gives each output\u0027s min, max and mean per channel, in packed levels 0 to 255 (a normal\u0027s too: 127.5 is zero), at stats.size (mixed-size files: each output\u0027s width and height). Errors, writing nothing: no open graph (when no files are given), a graph with a fault (the error lists them; fix them with edit_graph), a size that is not allowed, a parameter that is refused, and a file that is missing or not a PNG.\nWorked example, with samples/graphs/bricks.texgraph open: check {\u0022size\u0022:64} returns, clean:\n{\u0022ok\u0022:true,\u0022problems\u0022:[],\u0022notes\u0022:[],\u0022stats\u0022:{\u0022size\u0022:64,\u0022outputs\u0022:{\u0022base_colour\u0022:{\u0022min\u0022:[108,45,30],\u0022max\u0022:[194,186,169],\u0022mean\u0022:[160.3,104.4,86.5]},\u0022normal\u0022:{\u0022min\u0022:[72,72,242],\u0022max\u0022:[183,183,255],\u0022mean\u0022:[127.9,127.7,250.3]},\u0022roughness\u0022:{\u0022min\u0022:[167],\u0022max\u0022:[255],\u0022mean\u0022:[202.6]},\u0022occlusion\u0022:{\u0022min\u0022:[115],\u0022max\u0022:[255],\u0022mean\u0022:[183.6]}}}}",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "integer",
+                "description": "A power of two from 32 to 2048; default the graph\u0027s own size (at most 2048)."
+              },
+              "parameters": {
+                "type": "object",
+                "description": "Optional: the graph\u0027s exposed parameters to set for this call, by name, such as {\u0022mortar\u0022: 0.08, \u0022tint\u0022: \u0022#7a7a70\u0022}; the graph is not changed. get_graph lists them with their ranges."
+              },
+              "files": {
+                "type": "array",
+                "description": "PNG files to check instead of the open graph, each {path, role}: the role is base_colour, normal, roughness (roughness only), metallic_roughness (a packed image: G roughness, B metallic, as export writes roughness.png), metallic, occlusion, height, or a named output\u0027s name.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "role"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 256,
+          "seed": 0,
+          "nodes": {
+            "wood": {
+              "type": "colour",
+              "params": {
+                "colour": "#aa7040"
+              }
+            },
+            "tone": {
+              "type": "noise",
+              "params": {
+                "cells": [
+                  8,
+                  1
+                ],
+                "interpolation": "step"
+              }
+            },
+            "base": {
+              "type": "blend",
+              "inputs": {
+                "a": "wood",
+                "b": "tone"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "out": {
+              "type": "output",
+              "inputs": {
+                "in": "base"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 4 nodes, size 256, seed 0; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "edit_graph",
+      "arguments": {
+        "operations": [
+          {
+            "op": "set_node",
+            "node": "grain",
+            "type": "noise",
+            "params": {
+              "cells": [
+                64,
+                2
+              ],
+              "octaves": 2
+            }
+          },
+          {
+            "op": "set_node",
+            "node": "grained",
+            "type": "blend",
+            "inputs": {
+              "a": "base",
+              "b": "grain"
+            },
+            "params": {
+              "mode": "multiply",
+              "opacity": 0.3
+            }
+          },
+          {
+            "op": "connect",
+            "node": "out",
+            "port": "in",
+            "from": "grained"
+          }
+        ]
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "edit_graph: 3 operations applied: added \u0027grain\u0027 (noise); added \u0027grained\u0027 (blend); connected \u0027out\u0027 input \u0027in\u0027 to \u0027grained\u0027 (was \u0027base\u0027). The graph is 6 nodes, size 256, seed 0; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "get_graph",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "get_graph: 6 nodes, size 256, seed 0; no path (save gives it one); no faults: it evaluates\n{\n  \u0022version\u0022: 1,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 0,\n  \u0022nodes\u0022: {\n    \u0022base\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022wood\u0022, \u0022b\u0022: \u0022tone\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022grain\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [64, 2], \u0022octaves\u0022: 2 } },\n    \u0022grained\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022base\u0022, \u0022b\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022, \u0022opacity\u0022: 0.3 } },\n    \u0022out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grained\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022tone\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [8, 1], \u0022interpolation\u0022: \u0022step\u0022 } },\n    \u0022wood\u0022: { \u0022type\u0022: \u0022colour\u0022, \u0022params\u0022: { \u0022colour\u0022: \u0022#aa7040\u0022 } }\n  }\n}"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "push_snapshot",
+      "arguments": {
+        "label": "grained"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "push_snapshot: pushed \u0027grained\u0027; depth 1"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "edit_graph",
+      "arguments": {
+        "operations": [
+          {
+            "op": "set_params",
+            "node": "wood",
+            "params": {
+              "colour": "#00ff00"
+            }
+          },
+          {
+            "op": "set_params",
+            "node": "tone",
+            "params": {
+              "interpolation": "smooth"
+            }
+          }
+        ]
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "edit_graph: 2 operations applied: set \u0027wood\u0027 colour \u0022#00ff00\u0022; set \u0027tone\u0027 interpolation \u0022smooth\u0022. The graph is 6 nodes, size 256, seed 0; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "get_graph",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "get_graph: 6 nodes, size 256, seed 0; no path (save gives it one); no faults: it evaluates\n{\n  \u0022version\u0022: 1,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 0,\n  \u0022nodes\u0022: {\n    \u0022base\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022wood\u0022, \u0022b\u0022: \u0022tone\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022grain\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [64, 2], \u0022octaves\u0022: 2 } },\n    \u0022grained\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022base\u0022, \u0022b\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022, \u0022opacity\u0022: 0.3 } },\n    \u0022out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grained\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022tone\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [8, 1], \u0022interpolation\u0022: \u0022smooth\u0022 } },\n    \u0022wood\u0022: { \u0022type\u0022: \u0022colour\u0022, \u0022params\u0022: { \u0022colour\u0022: \u0022#00ff00\u0022 } }\n  }\n}"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "edit_graph",
+      "arguments": {
+        "operations": [
+          {
+            "op": "remove_node",
+            "node": "tone"
+          }
+        ]
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "edit_graph: nothing changed: the operations would leave 1 new fault:\n- node \u0027base\u0027 input \u0027b\u0027: names \u0027tone\u0027, which is not a node; the nodes are base, grain, grained, out, wood"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "pop_snapshot",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "pop_snapshot: restored \u0027grained\u0027; depth 0. The graph is 6 nodes, size 256, seed 0; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "get_graph",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "get_graph: 6 nodes, size 256, seed 0; no path (save gives it one); no faults: it evaluates\n{\n  \u0022version\u0022: 1,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 0,\n  \u0022nodes\u0022: {\n    \u0022base\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022wood\u0022, \u0022b\u0022: \u0022tone\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022grain\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [64, 2], \u0022octaves\u0022: 2 } },\n    \u0022grained\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022base\u0022, \u0022b\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022, \u0022opacity\u0022: 0.3 } },\n    \u0022out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grained\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022tone\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [8, 1], \u0022interpolation\u0022: \u0022step\u0022 } },\n    \u0022wood\u0022: { \u0022type\u0022: \u0022colour\u0022, \u0022params\u0022: { \u0022colour\u0022: \u0022#aa7040\u0022 } }\n  }\n}"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "pop_snapshot",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "pop_snapshot: the snapshot stack is empty; push_snapshot first, before the change to come back from"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "save",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\graph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "save: saved graph.texgraph to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\graph.texgraph: 6 nodes, size 256, seed 0"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 32,
+          "seed": 0,
+          "nodes": {}
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 0 nodes, size 32, seed 0; 1 fault:\n- the graph has no output: add an output node with a role (base_colour, normal, roughness, metallic, occlusion, height)"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "open",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\graph.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "open: opened graph.texgraph from C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\graph.texgraph: 6 nodes, size 256, seed 0; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "get_graph",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "get_graph: 6 nodes, size 256, seed 0; path C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\graph.texgraph; no faults: it evaluates\n{\n  \u0022version\u0022: 1,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 0,\n  \u0022nodes\u0022: {\n    \u0022base\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022wood\u0022, \u0022b\u0022: \u0022tone\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022grain\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [64, 2], \u0022octaves\u0022: 2 } },\n    \u0022grained\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022base\u0022, \u0022b\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022, \u0022opacity\u0022: 0.3 } },\n    \u0022out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grained\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022tone\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [8, 1], \u0022interpolation\u0022: \u0022step\u0022 } },\n    \u0022wood\u0022: { \u0022type\u0022: \u0022colour\u0022, \u0022params\u0022: { \u0022colour\u0022: \u0022#aa7040\u0022 } }\n  }\n}"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "open",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\planted.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "open: opened planted.texgraph from C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\planted.texgraph: 2 nodes, size 256, seed 0; 1 fault:\n- node \u0027out\u0027 input \u0027in\u0027: names \u0027bsae\u0027, which is not a node; the nodes are out, wood\nIt is open: fix them with edit_graph (save refuses it until then)."
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "save",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\planted.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "save: refused: the graph has 1 fault:\n- node \u0027out\u0027 input \u0027in\u0027: names \u0027bsae\u0027, which is not a node; the nodes are out, wood\nA saved graph evaluates; fix them with edit_graph, then save again. Nothing was written."
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "edit_graph",
+      "arguments": {
+        "operations": [
+          {
+            "op": "connect",
+            "node": "out",
+            "port": "in",
+            "from": "wood"
+          }
+        ]
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "edit_graph: 1 operation applied: connected \u0027out\u0027 input \u0027in\u0027 to \u0027wood\u0027 (was \u0027bsae\u0027). The graph is 2 nodes, size 256, seed 0; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "open",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\planks.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "open: opened planks.texgraph from C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\planks.texgraph: 18 nodes, size 256, seed 77; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-256"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 4 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-256 at size 256\n- base_colour.png: 256x256, 7906 bytes, slot base_colour_texture\n- normal.png: 256x256, 988 bytes, slot normal_texture\n- roughness.png: 256x256, 12095 bytes, slot metallic_roughness_texture\n- occlusion.png: 256x256, 966 bytes, slot occlusion_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-1024",
+        "size": 1024,
+        "outputs": [
+          "base_colour",
+          "normal",
+          "occlusion"
+        ]
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 3 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-1024 at size 1024\n- base_colour.png: 1024x1024, 41354 bytes, slot base_colour_texture\n- normal.png: 1024x1024, 6965 bytes, slot normal_texture\n- occlusion.png: 1024x1024, 6997 bytes, slot occlusion_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-1024",
+        "size": 1024,
+        "outputs": [
+          "roughness"
+        ]
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 1 file to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-1024 at size 1024\n- roughness.png: 1024x1024, 70513 bytes, slot metallic_roughness_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-odd",
+        "size": 300
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: size 300 is not allowed; size is a power of two from 32 to 8192 (32, 64, 128, 256, 512, 1024, 2048, 4096 or 8192)"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-256",
+        "size": 16384
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: size 16384 is not allowed; size is a power of two from 32 to 8192 (32, 64, 128, 256, 512, 1024, 2048, 4096 or 8192)"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-256",
+        "outputs": [
+          "metallic"
+        ]
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: the graph has no metallic output; it has base_colour, normal, roughness, occlusion"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\taken\\inside",
+        "size": 32
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: could not write to folder C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\taken\\inside: Cannot create \u0027C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\taken\u0027 because a file or directory with the same name already exists."
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 256,
+          "seed": 77,
+          "nodes": {
+            "base": {
+              "type": "blend",
+              "inputs": {
+                "a": "grained",
+                "b": "gap"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "base_out": {
+              "type": "output",
+              "inputs": {
+                "in": "base"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "bevel": {
+              "type": "gradient",
+              "params": {
+                "axis": "u",
+                "repeat": 8,
+                "shape": "triangle"
+              }
+            },
+            "gap": {
+              "type": "levels",
+              "inputs": {
+                "in": "bevel"
+              },
+              "params": {
+                "in_high": 0.25,
+                "in_low": 0.15,
+                "out_low": 0.16
+              }
+            },
+            "grain": {
+              "type": "levels",
+              "inputs": {
+                "in": "grain_raw"
+              },
+              "params": {
+                "out_high": 1.05,
+                "out_low": 0.95
+              }
+            },
+            "grain_raw": {
+              "type": "noise",
+              "params": {
+                "cells": [
+                  64,
+                  2
+                ],
+                "interpolation": "smooth",
+                "octaves": 2,
+                "seed": 1
+              }
+            },
+            "grained": {
+              "type": "blend",
+              "inputs": {
+                "a": "toned",
+                "b": "grain"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "normal": {
+              "type": "height_to_normal",
+              "inputs": {
+                "height": "slope"
+              },
+              "params": {
+                "strength": 0.01
+              }
+            },
+            "normal_out": {
+              "type": "output",
+              "inputs": {
+                "in": "normal"
+              },
+              "params": {
+                "role": "normal"
+              }
+            },
+            "occlusion": {
+              "type": "levels",
+              "inputs": {
+                "in": "bevel"
+              },
+              "params": {
+                "in_high": 0.25,
+                "out_low": 0.55
+              }
+            },
+            "occlusion_out": {
+              "type": "output",
+              "inputs": {
+                "in": "occlusion"
+              },
+              "params": {
+                "role": "occlusion"
+              }
+            },
+            "roughness": {
+              "type": "levels",
+              "inputs": {
+                "in": "grain_raw"
+              },
+              "params": {
+                "out_high": 0.8,
+                "out_low": 0.55
+              }
+            },
+            "roughness_out": {
+              "type": "output",
+              "inputs": {
+                "in": "roughness"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            },
+            "slope": {
+              "type": "levels",
+              "inputs": {
+                "in": "bevel"
+              },
+              "params": {
+                "in_high": 0.25
+              }
+            },
+            "tone": {
+              "type": "levels",
+              "inputs": {
+                "in": "tone_raw"
+              },
+              "params": {
+                "out_high": 1.12,
+                "out_low": 0.86
+              }
+            },
+            "tone_raw": {
+              "type": "noise",
+              "params": {
+                "cells": [
+                  8,
+                  1
+                ],
+                "interpolation": "step",
+                "seed": 11
+              }
+            },
+            "toned": {
+              "type": "blend",
+              "inputs": {
+                "a": "wood",
+                "b": "tone"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "wood": {
+              "type": "colour",
+              "params": {
+                "colour": "#aa7040"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 18 nodes, size 256, seed 77; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "save",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\planks"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "save: saved planks.texgraph to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\planks.texgraph: 18 nodes, size 256, seed 77"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "get_graph",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "get_graph: 18 nodes, size 256, seed 77; path C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\planks.texgraph; no faults: it evaluates\n{\n  \u0022version\u0022: 1,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 77,\n  \u0022nodes\u0022: {\n    \u0022base\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022grained\u0022, \u0022b\u0022: \u0022gap\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022base_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022base\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022bevel\u0022: { \u0022type\u0022: \u0022gradient\u0022, \u0022params\u0022: { \u0022axis\u0022: \u0022u\u0022, \u0022repeat\u0022: 8, \u0022shape\u0022: \u0022triangle\u0022 } },\n    \u0022gap\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022bevel\u0022 }, \u0022params\u0022: { \u0022in_high\u0022: 0.25, \u0022in_low\u0022: 0.15, \u0022out_low\u0022: 0.16 } },\n    \u0022grain\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grain_raw\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 1.05, \u0022out_low\u0022: 0.95 } },\n    \u0022grain_raw\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [64, 2], \u0022interpolation\u0022: \u0022smooth\u0022, \u0022octaves\u0022: 2, \u0022seed\u0022: 1 } },\n    \u0022grained\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022toned\u0022, \u0022b\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022normal\u0022: { \u0022type\u0022: \u0022height_to_normal\u0022, \u0022inputs\u0022: { \u0022height\u0022: \u0022slope\u0022 }, \u0022params\u0022: { \u0022strength\u0022: 0.01 } },\n    \u0022normal_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022normal\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022normal\u0022 } },\n    \u0022occlusion\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022bevel\u0022 }, \u0022params\u0022: { \u0022in_high\u0022: 0.25, \u0022out_low\u0022: 0.55 } },\n    \u0022occlusion_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022occlusion\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022occlusion\u0022 } },\n    \u0022roughness\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grain_raw\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 0.8, \u0022out_low\u0022: 0.55 } },\n    \u0022roughness_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022roughness\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022roughness\u0022 } },\n    \u0022slope\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022bevel\u0022 }, \u0022params\u0022: { \u0022in_high\u0022: 0.25 } },\n    \u0022tone\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022tone_raw\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 1.12, \u0022out_low\u0022: 0.86 } },\n    \u0022tone_raw\u0022: { \u0022type\u0022: \u0022noise\u0022, \u0022params\u0022: { \u0022cells\u0022: [8, 1], \u0022interpolation\u0022: \u0022step\u0022, \u0022seed\u0022: 11 } },\n    \u0022toned\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022wood\u0022, \u0022b\u0022: \u0022tone\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022wood\u0022: { \u0022type\u0022: \u0022colour\u0022, \u0022params\u0022: { \u0022colour\u0022: \u0022#aa7040\u0022 } }\n  }\n}"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-texels-64",
+        "size": 64
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 4 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-texels-64 at size 64\n- base_colour.png: 64x64, 1590 bytes, slot base_colour_texture\n- normal.png: 64x64, 205 bytes, slot normal_texture\n- roughness.png: 64x64, 1834 bytes, slot metallic_roughness_texture\n- occlusion.png: 64x64, 195 bytes, slot occlusion_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-texels-128",
+        "size": 128
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 4 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-texels-128 at size 128\n- base_colour.png: 128x128, 3371 bytes, slot base_colour_texture\n- normal.png: 128x128, 459 bytes, slot normal_texture\n- roughness.png: 128x128, 4531 bytes, slot metallic_roughness_texture\n- occlusion.png: 128x128, 437 bytes, slot occlusion_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "size": 4096
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "swatch: size 4096 is above 2048, the largest swatch draws; use export for larger PNGs"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "size": 100
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "swatch: size 100 is not a power of two from 32 to 2048"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sheet",
+        "output": "normal"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "swatch: output is for flat and tiled; the sheet shows every output"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "flat",
+        "output": "normal",
+        "size": 256
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 988,
+            "sha256": "c6ce6178deda17e1c03cfb19759beda81addc923c88a66baf92f21345780ea48"
+          },
+          {
+            "type": "text",
+            "text": "swatch flat: normal of planks.texgraph, 256 x 256 px, exact texels"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-flat-normal-256.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "tiled",
+        "output": "base_colour",
+        "size": 128
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 14727,
+            "sha256": "56bdcac8e8cbae2af6dd9608b14fcbea8bb65bbfe7cb07566fe5b422ed1f5f8d"
+          },
+          {
+            "type": "text",
+            "text": "swatch tiled: base_colour of planks.texgraph, 3 x 3 of 128 px, 384 x 384 px, exact texels"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-tiled-base-128.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 0
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 81281,
+            "sha256": "22e7aaf6256f4f0c4880620932217eaee31cf146421b90677fed87e70e733aad"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: planks.texgraph at 256 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-0.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 90
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 79597,
+            "sha256": "1d374e53d4c400dfbaa33fa36b18177271b83bbdaa3f9fae59d965a4443cfd99"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: planks.texgraph at 256 px on the engine\u0027s UV sphere, angle 90, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-90.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 200
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 85227,
+            "sha256": "3bf196fe753bad0818158117fe43a1382e595c3a1213d1e0805f2d8d8d32acc4"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: planks.texgraph at 256 px on the engine\u0027s UV sphere, angle 200, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-200.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 161547,
+            "sha256": "bc858a0bd01ad8206f2158f2e0dab041a434767c3dc700235214dcb245e7ce4e"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: planks.texgraph, 256 px, seed 77; columns base_colour, normal, roughness, occlusion, flat over tiled 3 x 3; sphere at angle 0; 1544 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sheet-256.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "size": 64
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 127251,
+            "sha256": "decd48edb2ad59be1d90f86673014446dc11bf8852cb1a7960880646289e13ac"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: planks.texgraph, 64 px, seed 77; columns base_colour, normal, roughness, occlusion, flat over tiled 3 x 3; sphere at angle 0; 1544 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sheet-64.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 128,
+          "seed": 3,
+          "nodes": {
+            "n": {
+              "type": "noise",
+              "params": {
+                "cells": [
+                  8,
+                  8
+                ]
+              }
+            },
+            "ramp": {
+              "type": "gradient",
+              "params": {
+                "axis": "u",
+                "repeat": 1
+              }
+            },
+            "mixed": {
+              "type": "blend",
+              "inputs": {
+                "a": "n",
+                "b": "ramp"
+              },
+              "params": {
+                "mode": "mix",
+                "opacity": 0.7
+              }
+            },
+            "out": {
+              "type": "output",
+              "inputs": {
+                "in": "mixed"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 4 nodes, size 128, seed 3; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "tiled",
+        "output": "base_colour"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 21403,
+            "sha256": "d34c36c37ce4ce4a4718fb24a04b562dd28727e15ddf95f6473057bd594bbecc"
+          },
+          {
+            "type": "text",
+            "text": "swatch tiled: base_colour of the open graph, 3 x 3 of 128 px, 384 x 384 px, exact texels"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-tiled-seam.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 1,
+          "nodes": {
+            "grey": {
+              "type": "colour",
+              "params": {
+                "colour": "#808080"
+              }
+            },
+            "ramp": {
+              "type": "gradient",
+              "params": {
+                "axis": "u",
+                "repeat": 1
+              }
+            },
+            "flat": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 0,
+                "out_high": 0
+              }
+            },
+            "base": {
+              "type": "output",
+              "inputs": {
+                "in": "grey"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "rough": {
+              "type": "output",
+              "inputs": {
+                "in": "flat"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 5 nodes, size 64, seed 1; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 53371,
+            "sha256": "53897ad4c6f7ffa9c8e79eb8eecd7ebfdc4caa1b69143cf0fccc11a864df0365"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-roughness-0.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 1,
+          "nodes": {
+            "grey": {
+              "type": "colour",
+              "params": {
+                "colour": "#808080"
+              }
+            },
+            "ramp": {
+              "type": "gradient",
+              "params": {
+                "axis": "u",
+                "repeat": 1
+              }
+            },
+            "flat": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 1,
+                "out_high": 1
+              }
+            },
+            "base": {
+              "type": "output",
+              "inputs": {
+                "in": "grey"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "rough": {
+              "type": "output",
+              "inputs": {
+                "in": "flat"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 5 nodes, size 64, seed 1; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 26933,
+            "sha256": "ca089dbb7d7443f32e516650ab303e8da5a7c0a73bb1740d4d211b1e946c7d47"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-roughness-1.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 0,
+          "nodes": {
+            "plate": {
+              "type": "colour",
+              "params": {
+                "colour": "#c8c8c8"
+              }
+            },
+            "ramp": {
+              "type": "gradient"
+            },
+            "rough": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 0.7,
+                "out_high": 0.3
+              }
+            },
+            "band": {
+              "type": "gradient",
+              "params": {
+                "axis": "v",
+                "shape": "triangle"
+              }
+            },
+            "out_base": {
+              "type": "output",
+              "inputs": {
+                "in": "plate"
+              }
+            },
+            "out_rough": {
+              "type": "output",
+              "inputs": {
+                "in": "rough"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            },
+            "out_metal": {
+              "type": "output",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "role": "metallic"
+              }
+            },
+            "out_edge": {
+              "type": "output",
+              "inputs": {
+                "in": "band"
+              },
+              "params": {
+                "name": "edge"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 8 nodes, size 64, seed 0; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-plate-texels",
+        "size": 64
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 3 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-plate-texels at size 64\n- base_colour.png: 64x64, 190 bytes, slot base_colour_texture\n- roughness.png: 64x64, 436 bytes, slot metallic_roughness_texture, metallic in B\n- edge.png: 64x64, 270 bytes, no Carve slot (a named output)"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 44827,
+            "sha256": "3b81bd8223491aed57f8338db70800c1b8ac013d23c8776b5de50b7eddc13649"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-plate-sphere.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 60903,
+            "sha256": "f297ca524ebf219442b095665aef02ff8101c83c52266b25b0199c7da71673b9"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: the open graph, 64 px, seed 0; columns base_colour, roughness, metallic, edge, flat over tiled 3 x 3; sphere at angle 0; 1544 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-plate-sheet.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 1,
+          "nodes": {
+            "grey": {
+              "type": "colour",
+              "params": {
+                "colour": "#c8c8c8"
+              }
+            },
+            "ramp": {
+              "type": "gradient",
+              "params": {
+                "axis": "u",
+                "repeat": 1
+              }
+            },
+            "flat": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 0.2,
+                "out_high": 0.2
+              }
+            },
+            "metal": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 0,
+                "out_high": 0
+              }
+            },
+            "base": {
+              "type": "output",
+              "inputs": {
+                "in": "grey"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "rough": {
+              "type": "output",
+              "inputs": {
+                "in": "flat"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            },
+            "metallic": {
+              "type": "output",
+              "inputs": {
+                "in": "metal"
+              },
+              "params": {
+                "role": "metallic"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 7 nodes, size 64, seed 1; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 48534,
+            "sha256": "74541b1e80ad525b09bfcd6014a5f528f43973aba8efc04d9c4b5eac249e4780"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-metallic-0.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 1,
+          "nodes": {
+            "grey": {
+              "type": "colour",
+              "params": {
+                "colour": "#c8c8c8"
+              }
+            },
+            "ramp": {
+              "type": "gradient",
+              "params": {
+                "axis": "u",
+                "repeat": 1
+              }
+            },
+            "flat": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 0.2,
+                "out_high": 0.2
+              }
+            },
+            "metal": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 1,
+                "out_high": 1
+              }
+            },
+            "base": {
+              "type": "output",
+              "inputs": {
+                "in": "grey"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "rough": {
+              "type": "output",
+              "inputs": {
+                "in": "flat"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            },
+            "metallic": {
+              "type": "output",
+              "inputs": {
+                "in": "metal"
+              },
+              "params": {
+                "role": "metallic"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 7 nodes, size 64, seed 1; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 65042,
+            "sha256": "311a56e002262f6f6b344d0783252696e21090fcf17f48cfacb9c877f56cca18"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-metallic-1.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 1,
+          "nodes": {
+            "grey": {
+              "type": "colour",
+              "params": {
+                "colour": "#646464"
+              }
+            },
+            "ramp": {
+              "type": "gradient",
+              "params": {
+                "axis": "u",
+                "repeat": 1
+              }
+            },
+            "flat": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 0.2,
+                "out_high": 0.2
+              }
+            },
+            "metal": {
+              "type": "levels",
+              "inputs": {
+                "in": "ramp"
+              },
+              "params": {
+                "out_low": 0,
+                "out_high": 0
+              }
+            },
+            "base": {
+              "type": "output",
+              "inputs": {
+                "in": "grey"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "rough": {
+              "type": "output",
+              "inputs": {
+                "in": "flat"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            },
+            "metallic": {
+              "type": "output",
+              "inputs": {
+                "in": "metal"
+              },
+              "params": {
+                "role": "metallic"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 7 nodes, size 64, seed 1; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 52341,
+            "sha256": "1ef76c9870104c4ce8bb91761b14a448799710d5a2bedaf0078e149ec1d6b259"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-metallic-0-dark.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "open",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\bricks.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "open: opened bricks.texgraph from C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\bricks.texgraph: 18 nodes, size 256, seed 21; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-bricks-texels",
+        "size": 256
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 4 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-bricks-texels at size 256\n- base_colour.png: 256x256, 74615 bytes, slot base_colour_texture\n- normal.png: 256x256, 8924 bytes, slot normal_texture\n- roughness.png: 256x256, 42802 bytes, slot metallic_roughness_texture\n- occlusion.png: 256x256, 3939 bytes, slot occlusion_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "size": 256
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 531699,
+            "sha256": "e980d53c9669952a24b0ec15dbe956e03833699a7498605030debfc0d02ac089"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: bricks.texgraph, 256 px, seed 21; columns base_colour, normal, roughness, occlusion, flat over tiled 3 x 3; sphere at angle 0; 1544 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-bricks-sheet.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-bricks-grey-texels",
+        "size": 256,
+        "parameters": {
+          "mortar": 0.08,
+          "tint": "#7a7a70"
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 4 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-bricks-grey-texels at size 256, parameters mortar 0.08, tint \u0022#7a7a70\u0022\n- base_colour.png: 256x256, 62991 bytes, slot base_colour_texture\n- normal.png: 256x256, 9056 bytes, slot normal_texture\n- roughness.png: 256x256, 42727 bytes, slot metallic_roughness_texture\n- occlusion.png: 256x256, 3948 bytes, slot occlusion_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "size": 256,
+        "parameters": {
+          "mortar": 0.08,
+          "tint": "#7a7a70"
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 487266,
+            "sha256": "c4bc1fa4073a43869202ec56bd4a2a3346dbe7dea43b3509c21dcc03d88af8aa"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: bricks.texgraph, 256 px, seed 21, parameters mortar 0.08, tint \u0022#7a7a70\u0022; columns base_colour, normal, roughness, occlusion, flat over tiled 3 x 3; sphere at angle 0; 1544 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-bricks-grey-sheet.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 1,
+          "nodes": {
+            "across": {
+              "type": "stripes",
+              "params": {
+                "count": 4,
+                "axis": "u",
+                "width": 0.5
+              }
+            },
+            "down": {
+              "type": "stripes",
+              "params": {
+                "count": 2,
+                "axis": "v",
+                "width": 0.5
+              }
+            },
+            "both": {
+              "type": "blend",
+              "inputs": {
+                "a": "across",
+                "b": "down"
+              },
+              "params": {
+                "mode": "multiply",
+                "opacity": 1
+              }
+            },
+            "out": {
+              "type": "output",
+              "inputs": {
+                "in": "both"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 4 nodes, size 64, seed 1; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-grid-texels",
+        "size": 64
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 1 file to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-grid-texels at size 64\n- base_colour.png: 64x64, 222 bytes, slot base_colour_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 0,
+        "tiling": 1
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 54613,
+            "sha256": "3affd7df703d581bdc06e4e106210104f84f449275ec98acad244c02c2b3e218"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-grid-0-tiling-1.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 0,
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 75725,
+            "sha256": "3b37b8e33efeeb9d9d8092ad8f8f30fffe495d7dc3289a47481ac2acbd7953ef"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, tiling 3, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-grid-0-tiling-3.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 90,
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 75709,
+            "sha256": "163bec01eca450ec08d67b8094bfa5357bafc7a1948e639533f374983b4d2fe8"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 90, tiling 3, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-grid-90-tiling-3.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 0,
+        "tiling": 8
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 109753,
+            "sha256": "4ac5f0ef9ec7d1349f92f49bbffa113d8c4a267682bb570e7f70fb58dccd8362"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, tiling 8, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-grid-0-tiling-8.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 54613,
+            "sha256": "3affd7df703d581bdc06e4e106210104f84f449275ec98acad244c02c2b3e218"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-grid-0-default.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 80368,
+            "sha256": "60e16ef3cd481c6ce748bc6041696da73f4357a18577ec1fceac6ae569a9c67c"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: the open graph, 64 px, seed 1; columns base_colour, flat over tiled 3 x 3; sphere at angle 0, tiling 3; 770 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sheet-grid-tiling-3.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 80368,
+            "sha256": "60e16ef3cd481c6ce748bc6041696da73f4357a18577ec1fceac6ae569a9c67c"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: the open graph, 64 px, seed 1; columns base_colour, flat over tiled 3 x 3; sphere at angle 0, tiling 3; 770 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 59209,
+            "sha256": "4d4b6703ecd365013c33362f3ae21c4b08bf6f15fe756c32ece598c5b49273da"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: the open graph, 64 px, seed 1; columns base_colour, flat over tiled 3 x 3; sphere at angle 0; 770 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 75725,
+            "sha256": "3b37b8e33efeeb9d9d8092ad8f8f30fffe495d7dc3289a47481ac2acbd7953ef"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, tiling 3, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "tiling": 9
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "swatch: tiling 9 is out of range; give a whole number from 1 to 8"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "flat",
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "swatch: tiling repeats the maps over the sphere or cube, for sheet, sphere and cube; flat has none"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 1,
+          "nodes": {
+            "across": {
+              "type": "stripes",
+              "params": {
+                "count": 4,
+                "axis": "u",
+                "width": 0.5
+              }
+            },
+            "slant": {
+              "type": "stripes",
+              "params": {
+                "count": 2,
+                "axis": "diagonal",
+                "width": 0.5
+              }
+            },
+            "both": {
+              "type": "blend",
+              "inputs": {
+                "a": "across",
+                "b": "slant"
+              },
+              "params": {
+                "mode": "multiply",
+                "opacity": 1
+              }
+            },
+            "out": {
+              "type": "output",
+              "inputs": {
+                "in": "both"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 4 nodes, size 64, seed 1; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-cube-texels",
+        "size": 64
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 1 file to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\swatch-cube-texels at size 64\n- base_colour.png: 64x64, 332 bytes, slot base_colour_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "cube",
+        "tiling": 1
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 65898,
+            "sha256": "3f890c2b6f754ae87d141d2cab73ecefce828a624dba8e104fe2959c7cb6cda6"
+          },
+          {
+            "type": "text",
+            "text": "swatch cube: the open graph at 64 px on a cube, each face 0 to 1 in u and v, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-cube-grid-tiling-1.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "cube",
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 129516,
+            "sha256": "f8639b6a59b9eca7b2a07141346d36834a2ab4e5ee2421926a2ab87b421b282d"
+          },
+          {
+            "type": "text",
+            "text": "swatch cube: the open graph at 64 px on a cube, each face 0 to 1 in u and v, angle 0, tiling 3, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-cube-grid-tiling-3.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "cube",
+        "tiling": 3,
+        "angle": 20
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 131094,
+            "sha256": "90f3469efe62bb8e54e52779f7cd383577bd3f7a2f1c2fe746c45adeadab4bbc"
+          },
+          {
+            "type": "text",
+            "text": "swatch cube: the open graph at 64 px on a cube, each face 0 to 1 in u and v, angle 20, tiling 3, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-cube-grid-angle-20-tiling-3.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "cube"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 65898,
+            "sha256": "3f890c2b6f754ae87d141d2cab73ecefce828a624dba8e104fe2959c7cb6cda6"
+          },
+          {
+            "type": "text",
+            "text": "swatch cube: the open graph at 64 px on a cube, each face 0 to 1 in u and v, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-cube-grid-default.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "cube",
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 129516,
+            "sha256": "f8639b6a59b9eca7b2a07141346d36834a2ab4e5ee2421926a2ab87b421b282d"
+          },
+          {
+            "type": "text",
+            "text": "swatch cube: the open graph at 64 px on a cube, each face 0 to 1 in u and v, angle 0, tiling 3, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "cube",
+        "tiling": 9
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "swatch: tiling 9 is out of range; give a whole number from 1 to 8"
+          }
+        ],
+        "isError": true,
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "tiling": 3
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 91028,
+            "sha256": "b1c4d82a2af945fdf8374822f523445fc03a20538ae92cf0cc92164c01365ca2"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 64 px on the engine\u0027s UV sphere, angle 0, tiling 3, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/swatch-sphere-grid-after-cube.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 256,
+          "seed": 77,
+          "nodes": {
+            "base": {
+              "type": "blend",
+              "inputs": {
+                "a": "grained",
+                "b": "gap"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "base_out": {
+              "type": "output",
+              "inputs": {
+                "in": "roughness"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "bevel": {
+              "type": "gradient",
+              "params": {
+                "axis": "u",
+                "repeat": 8,
+                "shape": "triangle"
+              }
+            },
+            "gap": {
+              "type": "levels",
+              "inputs": {
+                "in": "bevel"
+              },
+              "params": {
+                "in_high": 0.25,
+                "in_low": 0.15,
+                "out_low": 0.16
+              }
+            },
+            "grain": {
+              "type": "levels",
+              "inputs": {
+                "in": "grain_raw"
+              },
+              "params": {
+                "out_high": 1.05,
+                "out_low": 0.95
+              }
+            },
+            "grain_raw": {
+              "type": "noise",
+              "params": {
+                "cells": [
+                  64,
+                  2
+                ],
+                "interpolation": "smooth",
+                "octaves": 2,
+                "seed": 1
+              }
+            },
+            "grained": {
+              "type": "blend",
+              "inputs": {
+                "a": "toned",
+                "b": "grain"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "normal": {
+              "type": "height_to_normal",
+              "inputs": {
+                "height": "slope"
+              },
+              "params": {
+                "strength": 0.01
+              }
+            },
+            "normal_out": {
+              "type": "output",
+              "inputs": {
+                "in": "normal"
+              },
+              "params": {
+                "role": "normal"
+              }
+            },
+            "occlusion": {
+              "type": "levels",
+              "inputs": {
+                "in": "bevel"
+              },
+              "params": {
+                "in_high": 0.25,
+                "out_low": 0.55
+              }
+            },
+            "occlusion_out": {
+              "type": "output",
+              "inputs": {
+                "in": "occlusion"
+              },
+              "params": {
+                "role": "occlusion"
+              }
+            },
+            "roughness": {
+              "type": "levels",
+              "inputs": {
+                "in": "grain_raw"
+              },
+              "params": {
+                "out_high": 0.8,
+                "out_low": 0.55
+              }
+            },
+            "roughness_out": {
+              "type": "output",
+              "inputs": {
+                "in": "roughness"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            },
+            "slope": {
+              "type": "levels",
+              "inputs": {
+                "in": "bevel"
+              },
+              "params": {
+                "in_high": 0.25
+              }
+            },
+            "tone": {
+              "type": "levels",
+              "inputs": {
+                "in": "tone_raw"
+              },
+              "params": {
+                "out_high": 1.12,
+                "out_low": 0.86
+              }
+            },
+            "tone_raw": {
+              "type": "noise",
+              "params": {
+                "cells": [
+                  8,
+                  1
+                ],
+                "interpolation": "step",
+                "seed": 11
+              }
+            },
+            "toned": {
+              "type": "blend",
+              "inputs": {
+                "a": "wood",
+                "b": "tone"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "wood": {
+              "type": "colour",
+              "params": {
+                "colour": "#aa7040"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 18 nodes, size 256, seed 77; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 0
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 95303,
+            "sha256": "28ec27c0a99e3fa8cdef08277f36130a86465216d2c576c69947989e0210b840"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 256 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 90
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 95148,
+            "sha256": "cb17fddb0cd5deba62860ab3829ca55b10876520631bae6a2a0353613bc8b460"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 256 px on the engine\u0027s UV sphere, angle 90, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere",
+        "angle": 200
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 98814,
+            "sha256": "400fc900d32086d985872ee1d7e6ef03c83c09433996581eb41c26367f8cc4db"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 256 px on the engine\u0027s UV sphere, angle 200, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "open",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\old-wall.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "open: opened old-wall.texgraph from C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\old-wall.texgraph: 6 nodes, size 256, seed 21; no faults: it evaluates\nread 2 nested files for its graph nodes: C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\grime.texgraph, C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\bricks.texgraph"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-old-wall"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 4 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-old-wall at size 256\n- base_colour.png: 256x256, 76708 bytes, slot base_colour_texture\n- normal.png: 256x256, 9034 bytes, slot normal_texture\n- roughness.png: 256x256, 42564 bytes, slot metallic_roughness_texture\n- occlusion.png: 256x256, 3993 bytes, slot occlusion_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "get_graph",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "get_graph: 6 nodes, size 256, seed 21; path C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\old-wall.texgraph; no faults: it evaluates\ngraph nodes (2), paths resolved against the graph\u0027s own folder C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs:\n- dirt: C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\grime.texgraph; parameters: amount a number, 0.6, from 0 to 1; inputs: height (greyscale, has a default), in (colour, has a default); outputs: dirt.base_colour\n- wall: C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\bricks.texgraph; parameters: jitter a number, 0.25, from 0 to 1; mortar a number, 0.06, from 0 to 0.45; tint a colour, \u0022#a8452f\u0022, any colour \u0022#rrggbb\u0022; inputs: none; outputs: wall.base_colour, wall.normal, wall.roughness, wall.occlusion\n{\n  \u0022version\u0022: 2,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 21,\n  \u0022nodes\u0022: {\n    \u0022base_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022dirt\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022dirt\u0022: { \u0022type\u0022: \u0022graph\u0022, \u0022inputs\u0022: { \u0022height\u0022: \u0022wall.occlusion\u0022, \u0022in\u0022: \u0022wall.base_colour\u0022 }, \u0022params\u0022: { \u0022amount\u0022: 0.6, \u0022path\u0022: \u0022grime.texgraph\u0022 } },\n    \u0022normal_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022wall.normal\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022normal\u0022 } },\n    \u0022occlusion_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022wall.occlusion\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022occlusion\u0022 } },\n    \u0022roughness_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022wall.roughness\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022roughness\u0022 } },\n    \u0022wall\u0022: { \u0022type\u0022: \u0022graph\u0022, \u0022params\u0022: { \u0022mortar\u0022: 0.06, \u0022path\u0022: \u0022bricks.texgraph\u0022 } }\n  }\n}"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sheet"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 535198,
+            "sha256": "b9c15a09c8aaf5a7ecdc0d42962e525719afa3d634cfb622efd0dcb40bc9ae68"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: old-wall.texgraph, 256 px, seed 21; columns base_colour, normal, roughness, occlusion, flat over tiled 3 x 3; sphere at angle 0; 1544 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/nested-old-wall-sheet.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 128412,
+            "sha256": "f4e30817560a55ddd745d799e0d6adae7180261b2ae87798a21ef7eb19017f4c"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: old-wall.texgraph at 256 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/nested-old-wall-sphere.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "open",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\grime.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "open: opened grime.texgraph from C:\\Users\\andre\\AppData\\Local\\cairn\\work\\carve-070e33612b22\\samples\\graphs\\grime.texgraph: 9 nodes, size 256, seed 7; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-grime"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 1 file to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\export-grime at size 256\n- base_colour.png: 256x256, 35873 bytes, slot base_colour_texture"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sheet"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 175384,
+            "sha256": "f2137c268916dad6338f13005c9721402c718eed09a2577f2566595f0a1277ce"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: grime.texgraph, 256 px, seed 7; columns base_colour, flat over tiled 3 x 3; sphere at angle 0; 770 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/nested-grime-sheet.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 76789,
+            "sha256": "8496237093065548d09491911f9d10998aab4fd1153ea7213aae55b23f91f580"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: grime.texgraph at 256 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/nested-grime-sphere.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 1,
+          "size": 64,
+          "seed": 0,
+          "nodes": {
+            "c": {
+              "type": "colour",
+              "params": {
+                "colour": "#202020"
+              }
+            },
+            "out": {
+              "type": "output",
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mx": {
+              "type": "output",
+              "params": {
+                "name": "mx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxx": {
+              "type": "output",
+              "params": {
+                "name": "mxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            },
+            "o_mxxxxxxxxxxxxxxxxx": {
+              "type": "output",
+              "params": {
+                "name": "mxxxxxxxxxxxxxxxxx"
+              },
+              "inputs": {
+                "in": "c"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 19 nodes, size 64, seed 0; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sheet"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 44729,
+            "sha256": "3a77fc51ccd959ff8fb21d80d121a2848871b1782840348c6bfd816a70759551"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: the open graph, 64 px, seed 0; columns base_colour, mx, mxx, mxxx, mxxxx, mxxxxx, mxxxxxx, mxxxxxxx, mxxxxxxxx, mxxxxxxxxx, mxxxxxxxxxx, mxxxxxxxxxxx, mxxxxxxxxxxxx, mxxxxxxxxxxxxx, mxxxxxxxxxxxxxx, mxxxxxxxxxxxxxxx, mxxxxxxxxxxxxxxxx, mxxxxxxxxxxxxxxxxx, flat over tiled 3 x 3; sphere at angle 0; 5156 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 2,
+          "size": 256,
+          "seed": 41,
+          "parameters": {
+            "wear_amount": {
+              "value": 1,
+              "drives": [
+                "base.opacity",
+                "rough.opacity"
+              ]
+            }
+          },
+          "nodes": {
+            "base": {
+              "type": "blend",
+              "inputs": {
+                "a": "iron",
+                "b": "steel",
+                "mask": "wear"
+              },
+              "params": {
+                "mode": "mix"
+              }
+            },
+            "base_out": {
+              "type": "output",
+              "inputs": {
+                "in": "base"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "breakup": {
+              "type": "levels",
+              "inputs": {
+                "in": "chips"
+              },
+              "params": {
+                "in_high": 0.6,
+                "in_low": 0.3,
+                "out_low": 0.35
+              }
+            },
+            "chips": {
+              "type": "fbm",
+              "params": {
+                "basis": "gradient",
+                "cells": [
+                  16,
+                  16
+                ],
+                "octaves": 4,
+                "seed": 5
+              }
+            },
+            "curv": {
+              "type": "mesh_curvature",
+              "params": {
+                "width": 0.02
+              }
+            },
+            "grain": {
+              "type": "fbm",
+              "params": {
+                "basis": "gradient",
+                "cells": [
+                  6,
+                  6
+                ],
+                "octaves": 4,
+                "seed": 3
+              }
+            },
+            "iron": {
+              "type": "gradient_map",
+              "inputs": {
+                "in": "grain"
+              },
+              "params": {
+                "colours": [
+                  "#787c82",
+                  "#8e9298"
+                ],
+                "positions": [
+                  0,
+                  1
+                ]
+              }
+            },
+            "metal": {
+              "type": "levels",
+              "inputs": {
+                "in": "grain"
+              },
+              "params": {
+                "out_high": 1,
+                "out_low": 1
+              }
+            },
+            "metal_out": {
+              "type": "output",
+              "inputs": {
+                "in": "metal"
+              },
+              "params": {
+                "role": "metallic"
+              }
+            },
+            "rim": {
+              "type": "levels",
+              "inputs": {
+                "in": "curv"
+              },
+              "params": {
+                "in_high": 0.85,
+                "in_low": 0.6
+              }
+            },
+            "rough": {
+              "type": "blend",
+              "inputs": {
+                "a": "rough_iron",
+                "b": "rough_steel",
+                "mask": "wear"
+              },
+              "params": {
+                "mode": "mix"
+              }
+            },
+            "rough_iron": {
+              "type": "levels",
+              "inputs": {
+                "in": "grain"
+              },
+              "params": {
+                "out_high": 0.5,
+                "out_low": 0.4
+              }
+            },
+            "rough_out": {
+              "type": "output",
+              "inputs": {
+                "in": "rough"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            },
+            "rough_steel": {
+              "type": "levels",
+              "inputs": {
+                "in": "steel_grain"
+              },
+              "params": {
+                "out_high": 0.3,
+                "out_low": 0.2
+              }
+            },
+            "steel": {
+              "type": "gradient_map",
+              "inputs": {
+                "in": "steel_grain"
+              },
+              "params": {
+                "colours": [
+                  "#b4b9be",
+                  "#dde0e3"
+                ],
+                "positions": [
+                  0,
+                  1
+                ]
+              }
+            },
+            "steel_grain": {
+              "type": "fbm",
+              "params": {
+                "basis": "value",
+                "cells": [
+                  48,
+                  48
+                ],
+                "octaves": 3,
+                "seed": 9
+              }
+            },
+            "wear": {
+              "type": "blend",
+              "inputs": {
+                "a": "rim",
+                "b": "breakup"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "wear_out": {
+              "type": "output",
+              "inputs": {
+                "in": "wear"
+              },
+              "params": {
+                "name": "wear"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 18 nodes, size 256, seed 41; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "flat",
+        "output": "wear",
+        "size": 64
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 187,
+            "sha256": "549f1fb02dd41ce0fb0115730c4b367e09f5b0dc71985dbe3d6418a0976d17dc"
+          },
+          {
+            "type": "text",
+            "text": "swatch flat: wear of the open graph, 64 x 64 px, exact texels; mesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sheet"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 164275,
+            "sha256": "5706f0eece1e8025f000c7cc5dbe45b05b5c942814fbceab7732b306fb82e6ac"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: the open graph, 256 px, seed 41; columns base_colour, roughness, metallic, wear, flat over tiled 3 x 3; sphere at angle 0; 1544 x 538 px; mesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/mesh-nodes-iron-sheet.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sphere"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 70408,
+            "sha256": "1809bd3697cc5e218a1a0253cec529f87ddd429c31c0104ce061e9ee4685807e"
+          },
+          {
+            "type": "text",
+            "text": "swatch sphere: the open graph at 256 px on the engine\u0027s UV sphere, angle 0, 512 x 512 px; mesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/mesh-nodes-iron-sphere.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "edit_graph",
+      "arguments": {
+        "operations": [
+          {
+            "op": "set_node",
+            "node": "curv",
+            "type": "gradient"
+          }
+        ]
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "edit_graph: 1 operation applied: replaced \u0027curv\u0027 (gradient). The graph is 18 nodes, size 256, seed 41; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "flat",
+        "output": "wear",
+        "size": 64
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 3226,
+            "sha256": "87b85dfa46b684be7a8b4cfea8b2b9e5b9f9289960209923703d18f7fd260379"
+          },
+          {
+            "type": "text",
+            "text": "swatch flat: wear of the open graph, 64 x 64 px, exact texels"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "swatch",
+      "arguments": {
+        "view": "sheet"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "image",
+            "mimeType": "image/png",
+            "bytes": 354864,
+            "sha256": "e3d1b6a1d1544f18359634a1ab0b6e028558f9542e28b723dc783b58257c1f6a"
+          },
+          {
+            "type": "text",
+            "text": "swatch sheet: the open graph, 256 px, seed 41; columns base_colour, roughness, metallic, wear, flat over tiled 3 x 3; sphere at angle 0; 1544 x 538 px"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      },
+      "frame": "frames/mesh-nodes-plain-sheet.png"
+    },
+    {
+      "method": "tools/call",
+      "tool": "define_graph",
+      "arguments": {
+        "graph": {
+          "version": 2,
+          "size": 256,
+          "seed": 41,
+          "parameters": {
+            "wear_amount": {
+              "value": 1,
+              "drives": [
+                "base.opacity",
+                "rough.opacity"
+              ]
+            }
+          },
+          "nodes": {
+            "base": {
+              "type": "blend",
+              "inputs": {
+                "a": "iron",
+                "b": "steel",
+                "mask": "wear"
+              },
+              "params": {
+                "mode": "mix"
+              }
+            },
+            "base_out": {
+              "type": "output",
+              "inputs": {
+                "in": "base"
+              },
+              "params": {
+                "role": "base_colour"
+              }
+            },
+            "breakup": {
+              "type": "levels",
+              "inputs": {
+                "in": "chips"
+              },
+              "params": {
+                "in_high": 0.6,
+                "in_low": 0.3,
+                "out_low": 0.35
+              }
+            },
+            "chips": {
+              "type": "fbm",
+              "params": {
+                "basis": "gradient",
+                "cells": [
+                  16,
+                  16
+                ],
+                "octaves": 4,
+                "seed": 5
+              }
+            },
+            "curv": {
+              "type": "mesh_curvature",
+              "params": {
+                "width": 0.02
+              }
+            },
+            "grain": {
+              "type": "fbm",
+              "params": {
+                "basis": "gradient",
+                "cells": [
+                  6,
+                  6
+                ],
+                "octaves": 4,
+                "seed": 3
+              }
+            },
+            "iron": {
+              "type": "gradient_map",
+              "inputs": {
+                "in": "grain"
+              },
+              "params": {
+                "colours": [
+                  "#787c82",
+                  "#8e9298"
+                ],
+                "positions": [
+                  0,
+                  1
+                ]
+              }
+            },
+            "metal": {
+              "type": "levels",
+              "inputs": {
+                "in": "grain"
+              },
+              "params": {
+                "out_high": 1,
+                "out_low": 1
+              }
+            },
+            "metal_out": {
+              "type": "output",
+              "inputs": {
+                "in": "metal"
+              },
+              "params": {
+                "role": "metallic"
+              }
+            },
+            "rim": {
+              "type": "levels",
+              "inputs": {
+                "in": "curv"
+              },
+              "params": {
+                "in_high": 0.85,
+                "in_low": 0.6
+              }
+            },
+            "rough": {
+              "type": "blend",
+              "inputs": {
+                "a": "rough_iron",
+                "b": "rough_steel",
+                "mask": "wear"
+              },
+              "params": {
+                "mode": "mix"
+              }
+            },
+            "rough_iron": {
+              "type": "levels",
+              "inputs": {
+                "in": "grain"
+              },
+              "params": {
+                "out_high": 0.5,
+                "out_low": 0.4
+              }
+            },
+            "rough_out": {
+              "type": "output",
+              "inputs": {
+                "in": "rough"
+              },
+              "params": {
+                "role": "roughness"
+              }
+            },
+            "rough_steel": {
+              "type": "levels",
+              "inputs": {
+                "in": "steel_grain"
+              },
+              "params": {
+                "out_high": 0.3,
+                "out_low": 0.2
+              }
+            },
+            "steel": {
+              "type": "gradient_map",
+              "inputs": {
+                "in": "steel_grain"
+              },
+              "params": {
+                "colours": [
+                  "#b4b9be",
+                  "#dde0e3"
+                ],
+                "positions": [
+                  0,
+                  1
+                ]
+              }
+            },
+            "steel_grain": {
+              "type": "fbm",
+              "params": {
+                "basis": "value",
+                "cells": [
+                  48,
+                  48
+                ],
+                "octaves": 3,
+                "seed": 9
+              }
+            },
+            "wear": {
+              "type": "blend",
+              "inputs": {
+                "a": "rim",
+                "b": "breakup"
+              },
+              "params": {
+                "mode": "multiply"
+              }
+            },
+            "wear_out": {
+              "type": "output",
+              "inputs": {
+                "in": "wear"
+              },
+              "params": {
+                "name": "wear"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "define_graph: the open graph is now 18 nodes, size 256, seed 41; no faults: it evaluates"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\mesh-nodes-export"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 3 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\mesh-nodes-export at size 256\n- base_colour.png: 256x256, 13762 bytes, slot base_colour_texture\n- roughness.png: 256x256, 14627 bytes, slot metallic_roughness_texture, metallic in B\n- wear.png: 256x256, 938 bytes, no Carve slot (a named output)\nmesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\mesh-nodes-clean-iron",
+        "outputs": [
+          "base_colour"
+        ],
+        "parameters": {
+          "wear_amount": 0
+        }
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 1 file to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\mesh-nodes-clean-iron at size 256, parameters wear_amount 0\n- base_colour.png: 256x256, 13762 bytes, slot base_colour_texture\nmesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "get_graph",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "get_graph: 18 nodes, size 256, seed 41; no path (save gives it one); no faults: it evaluates\nparameters (1):\n- wear_amount: a number, 1, from 0 to 1; drives base.opacity, rough.opacity\nmesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph\n{\n  \u0022version\u0022: 2,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 41,\n  \u0022parameters\u0022: {\n    \u0022wear_amount\u0022: { \u0022value\u0022: 1, \u0022drives\u0022: [\u0022base.opacity\u0022, \u0022rough.opacity\u0022] }\n  },\n  \u0022nodes\u0022: {\n    \u0022base\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022iron\u0022, \u0022b\u0022: \u0022steel\u0022, \u0022mask\u0022: \u0022wear\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022mix\u0022, \u0022opacity\u0022: { \u0022driven_by\u0022: \u0022wear_amount\u0022 } } },\n    \u0022base_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022base\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022breakup\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022chips\u0022 }, \u0022params\u0022: { \u0022in_high\u0022: 0.6, \u0022in_low\u0022: 0.3, \u0022out_low\u0022: 0.35 } },\n    \u0022chips\u0022: { \u0022type\u0022: \u0022fbm\u0022, \u0022params\u0022: { \u0022basis\u0022: \u0022gradient\u0022, \u0022cells\u0022: [16, 16], \u0022octaves\u0022: 4, \u0022seed\u0022: 5 } },\n    \u0022curv\u0022: { \u0022type\u0022: \u0022mesh_curvature\u0022, \u0022params\u0022: { \u0022width\u0022: 0.02 } },\n    \u0022grain\u0022: { \u0022type\u0022: \u0022fbm\u0022, \u0022params\u0022: { \u0022basis\u0022: \u0022gradient\u0022, \u0022cells\u0022: [6, 6], \u0022octaves\u0022: 4, \u0022seed\u0022: 3 } },\n    \u0022iron\u0022: { \u0022type\u0022: \u0022gradient_map\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022colours\u0022: [\u0022#787c82\u0022, \u0022#8e9298\u0022], \u0022positions\u0022: [0, 1] } },\n    \u0022metal\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 1, \u0022out_low\u0022: 1 } },\n    \u0022metal_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022metal\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022metallic\u0022 } },\n    \u0022rim\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022curv\u0022 }, \u0022params\u0022: { \u0022in_high\u0022: 0.85, \u0022in_low\u0022: 0.6 } },\n    \u0022rough\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022rough_iron\u0022, \u0022b\u0022: \u0022rough_steel\u0022, \u0022mask\u0022: \u0022wear\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022mix\u0022, \u0022opacity\u0022: { \u0022driven_by\u0022: \u0022wear_amount\u0022 } } },\n    \u0022rough_iron\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 0.5, \u0022out_low\u0022: 0.4 } },\n    \u0022rough_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022rough\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022roughness\u0022 } },\n    \u0022rough_steel\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022steel_grain\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 0.3, \u0022out_low\u0022: 0.2 } },\n    \u0022steel\u0022: { \u0022type\u0022: \u0022gradient_map\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022steel_grain\u0022 }, \u0022params\u0022: { \u0022colours\u0022: [\u0022#b4b9be\u0022, \u0022#dde0e3\u0022], \u0022positions\u0022: [0, 1] } },\n    \u0022steel_grain\u0022: { \u0022type\u0022: \u0022fbm\u0022, \u0022params\u0022: { \u0022basis\u0022: \u0022value\u0022, \u0022cells\u0022: [48, 48], \u0022octaves\u0022: 3, \u0022seed\u0022: 9 } },\n    \u0022wear\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022rim\u0022, \u0022b\u0022: \u0022breakup\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022wear_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022wear\u0022 }, \u0022params\u0022: { \u0022name\u0022: \u0022wear\u0022 } }\n  }\n}"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "save",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\weathered-iron.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "save: saved weathered-iron.texgraph to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\weathered-iron.texgraph: 18 nodes, size 256, seed 41"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "open",
+      "arguments": {
+        "path": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\weathered-iron.texgraph"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "open: opened weathered-iron.texgraph from C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\weathered-iron.texgraph: 18 nodes, size 256, seed 41; no faults: it evaluates\nmesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "get_graph",
+      "arguments": {},
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "get_graph: 18 nodes, size 256, seed 41; path C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\weathered-iron.texgraph; no faults: it evaluates\nparameters (1):\n- wear_amount: a number, 1, from 0 to 1; drives base.opacity, rough.opacity\nmesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph\n{\n  \u0022version\u0022: 2,\n  \u0022size\u0022: 256,\n  \u0022seed\u0022: 41,\n  \u0022parameters\u0022: {\n    \u0022wear_amount\u0022: { \u0022value\u0022: 1, \u0022drives\u0022: [\u0022base.opacity\u0022, \u0022rough.opacity\u0022] }\n  },\n  \u0022nodes\u0022: {\n    \u0022base\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022iron\u0022, \u0022b\u0022: \u0022steel\u0022, \u0022mask\u0022: \u0022wear\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022mix\u0022, \u0022opacity\u0022: { \u0022driven_by\u0022: \u0022wear_amount\u0022 } } },\n    \u0022base_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022base\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022base_colour\u0022 } },\n    \u0022breakup\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022chips\u0022 }, \u0022params\u0022: { \u0022in_high\u0022: 0.6, \u0022in_low\u0022: 0.3, \u0022out_low\u0022: 0.35 } },\n    \u0022chips\u0022: { \u0022type\u0022: \u0022fbm\u0022, \u0022params\u0022: { \u0022basis\u0022: \u0022gradient\u0022, \u0022cells\u0022: [16, 16], \u0022octaves\u0022: 4, \u0022seed\u0022: 5 } },\n    \u0022curv\u0022: { \u0022type\u0022: \u0022mesh_curvature\u0022, \u0022params\u0022: { \u0022width\u0022: 0.02 } },\n    \u0022grain\u0022: { \u0022type\u0022: \u0022fbm\u0022, \u0022params\u0022: { \u0022basis\u0022: \u0022gradient\u0022, \u0022cells\u0022: [6, 6], \u0022octaves\u0022: 4, \u0022seed\u0022: 3 } },\n    \u0022iron\u0022: { \u0022type\u0022: \u0022gradient_map\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022colours\u0022: [\u0022#787c82\u0022, \u0022#8e9298\u0022], \u0022positions\u0022: [0, 1] } },\n    \u0022metal\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 1, \u0022out_low\u0022: 1 } },\n    \u0022metal_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022metal\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022metallic\u0022 } },\n    \u0022rim\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022curv\u0022 }, \u0022params\u0022: { \u0022in_high\u0022: 0.85, \u0022in_low\u0022: 0.6 } },\n    \u0022rough\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022rough_iron\u0022, \u0022b\u0022: \u0022rough_steel\u0022, \u0022mask\u0022: \u0022wear\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022mix\u0022, \u0022opacity\u0022: { \u0022driven_by\u0022: \u0022wear_amount\u0022 } } },\n    \u0022rough_iron\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022grain\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 0.5, \u0022out_low\u0022: 0.4 } },\n    \u0022rough_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022rough\u0022 }, \u0022params\u0022: { \u0022role\u0022: \u0022roughness\u0022 } },\n    \u0022rough_steel\u0022: { \u0022type\u0022: \u0022levels\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022steel_grain\u0022 }, \u0022params\u0022: { \u0022out_high\u0022: 0.3, \u0022out_low\u0022: 0.2 } },\n    \u0022steel\u0022: { \u0022type\u0022: \u0022gradient_map\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022steel_grain\u0022 }, \u0022params\u0022: { \u0022colours\u0022: [\u0022#b4b9be\u0022, \u0022#dde0e3\u0022], \u0022positions\u0022: [0, 1] } },\n    \u0022steel_grain\u0022: { \u0022type\u0022: \u0022fbm\u0022, \u0022params\u0022: { \u0022basis\u0022: \u0022value\u0022, \u0022cells\u0022: [48, 48], \u0022octaves\u0022: 3, \u0022seed\u0022: 9 } },\n    \u0022wear\u0022: { \u0022type\u0022: \u0022blend\u0022, \u0022inputs\u0022: { \u0022a\u0022: \u0022rim\u0022, \u0022b\u0022: \u0022breakup\u0022 }, \u0022params\u0022: { \u0022mode\u0022: \u0022multiply\u0022 } },\n    \u0022wear_out\u0022: { \u0022type\u0022: \u0022output\u0022, \u0022inputs\u0022: { \u0022in\u0022: \u0022wear\u0022 }, \u0022params\u0022: { \u0022name\u0022: \u0022wear\u0022 } }\n  }\n}"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    },
+    {
+      "method": "tools/call",
+      "tool": "export",
+      "arguments": {
+        "folder": "C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\mesh-nodes-export-opened"
+      },
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "export: wrote 3 files to C:\\Users\\andre\\AppData\\Local\\Temp\\cairn-J-20261124-055221-1ac6da-5wms95x9\\artifacts\\patina\\mesh-nodes-export-opened at size 256\n- base_colour.png: 256x256, 13762 bytes, slot base_colour_texture\n- roughness.png: 256x256, 14627 bytes, slot metallic_roughness_texture, metallic in B\n- wear.png: 256x256, 938 bytes, no Carve slot (a named output)\nmesh inputs neutral: curv (mesh_curvature); the real maps come from the mesh when a carve material names the graph"
+          }
+        ],
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "patina",
+            "version": "1.0.0.0"
+          }
+        },
+        "resultType": "complete"
+      }
+    }
+  ]
+}

@@ -84,7 +84,7 @@ says so. The two graphs the weathered barrel uses are committed with it.
 
 ### As built
 
-Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`). Frame review not yet done (see Hand-off).
+Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`). Frame review by Claude Sonnet 5.5 (`claude-sonnet-5-5`), a separate agent.
 
 - **patina:** `Patina.Server` references `Carve.Graphs`; `Program.Registry` is the one registry (built-in nodes plus
   `MeshNodes.Register(NodeRegistry.BuiltIn, null)`), used by `AddTools` and so by every tool. `ToolSupport.MeshNote(graph)`
@@ -107,6 +107,4 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`). Frame review not yet done (see
 - **README:** the Samples paragraph of the patina section names the two graphs and the neutral rule. CLAUDE.md: rows for `src/Patina.Server`, `tools/Patina.SampleGraphs` and the Patina scenario.
 - **Not checked:** the frames by eye (the reviewing agent's); `swatch` of `weathered-staves` (no scenario frame, only its PNGs); a mesh node inside a nested graph file's note; the exact text of the title in pixels.
 
-### Hand-off
-
-Code committed and `cairn task T-162 verify` passes (patina-unit, server-unit, scenario-patina). Left: frame review by a separate agent, then the person's approval through `mcp__waystone__review`, then `cairn task T-162 finish`. Frames (from the verify run, `cairn test artifacts scenario-patina`, in `D:\Repos\carve\branches\task\T-162\test-artifacts\patina\frames\`): `mesh-nodes-iron-sheet.png`, `mesh-nodes-iron-sphere.png`, `mesh-nodes-plain-sheet.png`; and the committed PNGs `samples/graphs/weathered-iron/{base_colour,roughness,wear}.png`, `samples/graphs/weathered-staves/{base_colour,roughness,normal,occlusion,grime}.png`. Look for: the title strip's note legible and not cut off on the iron sheet, the iron dark and even with no bright rim, the staves like the planks. Nothing surprising.
+- **Frame review (3 frames and a scaled montage of the 8 committed PNGs opened):** iron sheet title reads `unsaved graph 256 px seed 41 mesh inputs neutral`, legible and not cut off; base_colour even mid-grey iron with soft mottling, roughness (packed channels, so orange), metallic white, wear black; the sphere is plain metal reflecting the environment with no bright rim. Staves PNGs are the planks' brown staves, normal and occlusion, grime black. The person approved the set (round-1 in `G:\My Drivertifacts\carve\M-29\T-162ound-1`) with no notes.

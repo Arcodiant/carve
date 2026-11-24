@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "size": 256,
+  "seed": 0,
+  "nodes": {
+    "wood": { "type": "colour", "params": { "colour": "#aa7040" } },
+    "out": { "type": "output", "inputs": { "in": "bsae" }, "params": { "role": "base_colour" } }
+  }
+}
