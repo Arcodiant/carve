@@ -32,7 +32,7 @@ public class MaterialToolDefinitionTests : FileToolTests
         var (carve, tools) = await StartAsync();
         using var scope = carve;
 
-        var defined = Body(Ok(await carve.CallToolAsync("define_material", Examples(tools, "define_material").Single())));
+        var defined = Body(Ok(await carve.CallToolAsync("define_material", Examples(tools, "define_material")[0])));
         Assert.False(defined.GetProperty("replaced").GetBoolean());
         var texture = defined.GetProperty("material").GetProperty("base_colour_texture");
         Assert.Equal(Path.Combine(Root, "textures", "crate.png"), texture.GetProperty("path").GetString());

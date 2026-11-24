@@ -45,16 +45,16 @@ public class PlanksLoadTests
         foreach (var name in new[] { "staves", "rune-stave" })
         {
             var m = sample.Materials.Single(x => x.Name == name);
-            Assert.Equal(Planks("base_colour.png"), m.BaseColourTexture!.Png.ToArray());
-            Assert.Equal(Planks("normal.png"), m.NormalTexture!.Png.ToArray());
-            Assert.Equal(Planks("occlusion.png"), m.OcclusionTexture!.Png.ToArray());
-            Assert.Equal(Planks("roughness.png"), m.MetallicRoughnessTexture!.Png.ToArray());
+            Assert.Equal(Planks("base_colour.png"), ((Carve.Core.MaterialTexture)m.BaseColourTexture!).Png.ToArray());
+            Assert.Equal(Planks("normal.png"), ((Carve.Core.MaterialTexture)m.NormalTexture!).Png.ToArray());
+            Assert.Equal(Planks("occlusion.png"), ((Carve.Core.MaterialTexture)m.OcclusionTexture!).Png.ToArray());
+            Assert.Equal(Planks("roughness.png"), ((Carve.Core.MaterialTexture)m.MetallicRoughnessTexture!).Png.ToArray());
         }
 
-        Assert.Equal(File.ReadAllBytes(RunContent.SamplePath("textures/rune-emissive.png")), sample.Materials.Single(x => x.Name == "rune-stave").EmissiveTexture!.Png.ToArray());
+        Assert.Equal(File.ReadAllBytes(RunContent.SamplePath("textures/rune-emissive.png")), (sample.Materials.Single(x => x.Name == "rune-stave").EmissiveTexture as Carve.Core.MaterialTexture)!.Png.ToArray());
         var iron = sample.Materials.Single(x => x.Name == "iron");
-        Assert.Equal(File.ReadAllBytes(RunContent.SamplePath("textures/iron-mr.png")), iron.MetallicRoughnessTexture!.Png.ToArray());
-        Assert.Equal(File.ReadAllBytes(RunContent.SamplePath("textures/end-grain-base.png")), sample.Materials.Single(x => x.Name == "end-grain").BaseColourTexture!.Png.ToArray());
+        Assert.Equal(File.ReadAllBytes(RunContent.SamplePath("textures/iron-mr.png")), ((Carve.Core.MaterialTexture)iron.MetallicRoughnessTexture!).Png.ToArray());
+        Assert.Equal(File.ReadAllBytes(RunContent.SamplePath("textures/end-grain-base.png")), (sample.Materials.Single(x => x.Name == "end-grain").BaseColourTexture as Carve.Core.MaterialTexture)!.Png.ToArray());
     }
 
     [SkippableOrRun]
