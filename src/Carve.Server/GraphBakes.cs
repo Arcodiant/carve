@@ -28,8 +28,11 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
     private readonly Lock _lock = new();
     private long _bytes;
 
-    /// <summary>One slot baked in a call: <paramref name="Mesh"/> null for a slot that does not read the mesh; the mesh map that cost most, if any.</summary>
-    internal sealed record Baked(string Material, string? Mesh, string Slot, int Size, double Ms, string? Node, double NodeMs);
+    /// <summary>
+    /// One slot baked in a call: <paramref name="Mesh"/> null for a slot that does not read the mesh; the mesh map that cost most,
+    /// if any; <paramref name="On"/> the mesh of the material's copy its time counts toward (null for a material that does not read the mesh).
+    /// </summary>
+    internal sealed record Baked(string Material, string? Mesh, string Slot, int Size, double Ms, string? Node, double NodeMs, string? On = null);
 
     /// <summary>The model to draw, the key of every bake it uses, what this call baked, and a warning per material over <see cref="WarnMs"/>.</summary>
     internal sealed record Drawn(Model Model, string Key, IReadOnlyList<Baked> Baked, IReadOnlyList<string> Warnings);
@@ -95,7 +98,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
                     throw new GraphSlotProblemException(GraphSlotProblem.Of(m.Name, field, e), e);
                 }
                 var (node, nodeMs) = timed.Costliest(f);
-                baked.Add(new(m.Name, f.ReadsMesh ? label : null, field, g.Size, _clock() - start, node, nodeMs));
+                baked.Add(new(m.Name, f.ReadsMesh ? label : null, field, g.Size, _clock() - start, node, nodeMs, label));
                 Put(key, png, g.Size);
             }
             return new MaterialTexture(g.Path, [.. png], g.Size, g.Size);
@@ -165,10 +168,10 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
 
     internal static List<string> Warnings(IReadOnlyList<Baked> baked) =>
     [
-        .. baked.GroupBy(b => (b.Material, b.Mesh)).Where(g => g.Sum(b => b.Ms) > WarnMs).Select(g =>
+        .. baked.GroupBy(b => (b.Material, b.On)).Where(g => g.Sum(b => b.Ms) > WarnMs).Select(g =>
         {
             var worst = g.MaxBy(b => b.Ms)!;
-            var on = g.Key.Mesh is { } mesh ? $" on '{mesh}'" : "";
+            var on = g.Key.On is { } mesh ? $" on '{mesh}'" : "";
             var node = worst.Node is { } n ? $": {n} {Seconds(worst.NodeMs)} s" : "";
             return $"material '{g.Key.Material}'{on} took {Seconds(g.Sum(b => b.Ms))} s to bake ({worst.Slot} {worst.Size}{node}); lower its size or the node's rays";
         }),
