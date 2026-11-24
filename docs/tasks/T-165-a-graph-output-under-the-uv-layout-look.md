@@ -99,6 +99,16 @@ Model: Sonnet 5.5 (`claude-sonnet-5-5`). Stopped at the checkpoint on a stop-and
 - verify: server-unit PASS, scenario-materials PASS, scenario-bakes FAIL: the curvature, occlusion and steel-mask frames each
   differ from the bake-PNG frame in 303229 pixels (x 64..959, y 64..959, the whole unit-square window). Identical count for three different maps.
   Frames of that run are gone with the runner; not diagnosed further. Not turned into a tolerance.
-- Left: find why (likely suspects: the graph's baked PNG vs `bake`'s PNG differ uniformly, e.g. channel packing or an alpha/sRGB
+- **Diagnosed** (second agent, Opus 5.5 `claude-opus-5-5`, from that run's artifacts via `cairn test artifacts scenario-bakes`; scripts measured, no frame opened):
+  the three pairs differ in the same 303229 pixels, all of them where the look samples a texel **beyond the 8-texel padding**
+  (outside `wrench.mask.all.png`'s cover; 586 of the 592 that a pixel-to-texel mapping puts inside the cover sit on its edge,
+  the rest are overlay pixels there). Inside islands and padding: no pixel differs. There the bake PNG holds 0 (frame 0) and the
+  graph output holds the node's neutral, as T-163's `MeshBakeSource` documents ("a texel no island or padding covers holds the
+  node's neutral value"): curvature 0.5 (frame 64), occlusion 1 and mask 1 (frame 128), each half brightness as the look draws
+  outside islands. 299647 pixels differ by 64/128/128; 3582 more are overlay pixels blended over that ground (deltas 1 to 36).
+  The look's packing, sampling and padding are right; the two images differ by their own fill rules. Stopped as a spec question:
+  the scope's byte identity does not hold against T-163's landed rule. Not changed: no tolerance, no narrowed comparison.
+  The position frame ran in that run and raised no note; the breaks have not run.
+- Left: the person's answer (compare islands and padding only, or change one fill rule, or else), then (old suspects: the graph's baked PNG vs `bake`'s PNG differ uniformly, e.g. channel packing or an alpha/sRGB
   difference, or the uvs path draws a graph-baked MaterialTexture differently from a loaded one), then position frame, breaks,
   the frame review, `### As built`, lint, finish. The position check and breaks have not run (the stage fails first at the identity checks only; position did not report).
