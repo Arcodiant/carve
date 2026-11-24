@@ -6,7 +6,7 @@ namespace Carve.Server.Tests;
 /// <summary>
 /// T-166: what is wrong with a graph material, in words an agent with no file tools can act on, from define_material, set_material,
 /// open, check and the bake render and export run (here <see cref="GraphBakes.Resolve"/>, which they call). The table of causes
-/// and messages is held whole.
+/// and messages is held whole, here and in GraphSlotToolTests.
 /// </summary>
 [Trait("Tier", "unit")]
 public class GraphMaterialErrorsTests : FileToolTests
