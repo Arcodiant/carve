@@ -36,9 +36,11 @@
   <Project Path="src/Carve.Extensibility/Carve.Extensibility.csproj" />
   <Project Path="src/Carve.Hosting/Carve.Hosting.csproj" />
   <Project Path="src/Carve.Server/Carve.Server.csproj" />
+  <Project Path="src/Carve.Graphs/Carve.Graphs.csproj" />
   <Project Path="src/Patina.Graphs/Patina.Graphs.csproj" />
   <Project Path="src/Patina.Server/Patina.Server.csproj" />
   <Project Path="tests/Carve.Core.Tests/Carve.Core.Tests.csproj" />
+  <Project Path="tests/Carve.Graphs.Tests/Carve.Graphs.Tests.csproj" />
   <Project Path="tests/Carve.ExportViewer.Tests/Carve.ExportViewer.Tests.csproj" />
   <Project Path="tests/Carve.ModelViewer.Tests/Carve.ModelViewer.Tests.csproj" />
   <Project Path="tests/Carve.Scenario.Tiny/Carve.Scenario.Tiny.csproj" />

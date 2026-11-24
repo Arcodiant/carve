@@ -99,6 +99,7 @@ public static class GraphParameters
         ParamKind.Colours => "a list of colours",
         ParamKind.GreyOrColour => "a grey value or a colour",
         ParamKind.FilePath => "a path",
+        ParamKind.Text => "text",
         _ => "a name",
     };
 

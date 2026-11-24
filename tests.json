@@ -29,6 +29,25 @@
       "est-seconds": 30
     },
     {
+      "id": "graphs-unit",
+      "tier": "unit",
+      "build": "solution",
+      "run": "dotnet test tests/Carve.Graphs.Tests/Carve.Graphs.Tests.csproj -c Debug --no-build --filter Tier!=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Carve.Graphs.Tests/Carve.Graphs.Tests.csproj"
+        },
+        "src/Carve.Graphs/**",
+        "src/Carve.Core/**",
+        "src/Patina.Graphs/**",
+        "tests/Carve.Graphs.Tests/**",
+        "tests/Carve.Core.Tests/TestMeshes.cs",
+        "samples/wrench.carve"
+      ],
+      "resources": "cpu",
+      "est-seconds": 40
+    },
+    {
       "id": "patina-unit",
       "tier": "unit",
       "build": "solution",
