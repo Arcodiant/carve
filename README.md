@@ -26,6 +26,15 @@ nuget.org, so the first `dotnet run` restores everything. There is no window;
 every look is an offscreen render. If no device is found the server stays up
 and the `render` tool says so.
 
+Each tool's description is complete enough to use the tool and stays under
+Claude Code's cut of a tool description (4,096 characters; carve holds each to
+3,686). What does not fit is in the `help` tool: `help {"tool":"render"}` gives
+render's full reference (every look, caption and error), and likewise `export`
+(what is written, the limits file), `bake`, `check`, `save`, `open` (the .carve
+format and the part tree), `select` (every error) and `define_material`;
+`help {}` lists the entries. A description ends with `More: help ...` when it
+has one.
+
 ## Build and test
 
 ```
