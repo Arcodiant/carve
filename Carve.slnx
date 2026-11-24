@@ -6,6 +6,7 @@
   <Project Path="scenarios/Carve.Scenario.Uvs/Carve.Scenario.Uvs.csproj" />
   <Project Path="scenarios/Carve.Scenario.Materials/Carve.Scenario.Materials.csproj" />
   <Project Path="scenarios/Carve.Scenario.Planks/Carve.Scenario.Planks.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Weathered/Carve.Scenario.Weathered.csproj" />
   <Project Path="scenarios/Carve.Scenario.Export/Carve.Scenario.Export.csproj" />
   <Project Path="scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj" />
   <Project Path="scenarios/Carve.Scenario.Character/Carve.Scenario.Character.csproj" />
