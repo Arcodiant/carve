@@ -23,6 +23,7 @@ public sealed class HelpTool
         ("export", "what is written (nodes, materials, UVs), parts and skinned detail, piece and clips modes, the limits file and its format, the result line, the errors and worked examples", ExportTool.Reference),
         ("save", "the file format with the unit cube's file, the part tree and its example, every version's detail, the errors and the missing-texture warning", SaveTool.Reference),
         ("open", "the version 1 detail, the part tree and its example, every error, and which file to keep working in", OpenTool.Reference),
+        ("bake", "each map's channels and rules, the surface entries, the curvature block, the result fields and every error", BakeTool.Reference),
     ];
 
     /// <summary>The names of the entries, in the order <c>help {}</c> lists them.</summary>
