@@ -48,19 +48,6 @@ internal static class MaterialJson
     }
 
     /// <summary>
-    /// The interim refusal of <paramref name="tool"/> (export) for a model with a graph slot, or null: render draws graph
-    /// materials (T-163), export does not until T-164, which removes this. It never reaches main.
-    /// </summary>
-    public static string? GraphsNotDrawn(string tool, Model model)
-    {
-        foreach (var m in model.Materials)
-            foreach (var (field, slot) in m.Textures)
-                if (slot is MaterialGraph)
-                    return $"{tool}: graph materials are not drawn yet: the material '{m.Name}' has a graph in {field}";
-        return null;
-    }
-
-    /// <summary>
     /// The warnings for <paramref name="model"/>'s graph slots whose file is missing or is not a texture graph (T-160): open
     /// keeps the slot and says so, naming the material, the slot and the path, so the material can be defined again.
     /// </summary>
@@ -94,7 +81,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         + "A texture is a PNG path, relative to carve's working folder or absolute, read when you call this: a later change to the file does not reach the model until you define the material again. "
         + "base_colour_texture and emissive_texture are sRGB colour. normal_texture is a tangent-space normal map and is linear: its pixels are directions, not colours. "
         + "metallic_roughness_texture is linear with roughness in the green channel and metallic in the blue channel (red is unused). occlusion_texture is linear with occlusion in the red channel. "
-        + "Any slot may instead be a texture graph's output, {graph, output, size}: graph a .texgraph path resolved as a PNG's is, output its name, size a power of two from 64 to 4096 (default the graph's own, clamped). Unlike a PNG, a graph is read again at every render and export, so a change saved to it shows there, and one removed or broken later fails them. render draws a graph material; export refuses a model with one until it writes them. "
+        + "Any slot may instead be a texture graph's output, {graph, output, size}: graph a .texgraph path resolved as a PNG's is, output its name, size a power of two from 64 to 4096 (default the graph's own, clamped). Unlike a PNG, a graph is read again at every render and export, so a change saved to it shows there, and one removed or broken later fails them. render draws a graph material, and export bakes it and writes the baked PNGs. "
         + "A texture is drawn only on faces that have UVs (project_uvs, unwrap or set_uvs); check warns of a textured face without them. Materials are opaque: there is no transparency. "
         + "A face has either a colour (set_colour) or a material, and giving it one clears the other. One undo step. "
         + "Returns JSON {replaced: bool, material:{name and every other field above, as taken}, warnings:[]}, "

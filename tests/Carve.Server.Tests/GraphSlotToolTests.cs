@@ -5,7 +5,7 @@ namespace Carve.Server.Tests;
 /// <summary>
 /// T-160: define_material's graph slots ({graph, output, size} in place of a PNG path) on the in-process harness: the worked
 /// example as written, every refusal in its words, get_mesh, save and open (version 10, and the warning for a missing or
-/// broken graph), undo and redo, and the interim refusal of render and export until T-163 draws graph materials.
+/// broken graph), undo and redo.
 /// </summary>
 [Trait("Tier", "unit")]
 public class GraphSlotToolTests : FileToolTests
@@ -202,17 +202,5 @@ public class GraphSlotToolTests : FileToolTests
         File.WriteAllText(graph, "{");
         var broken = Body(Ok(await carve.CallToolAsync("open", """{"path":"iron.carve"}""")));
         Assert.StartsWith($"materials['iron'].base_colour_texture: the graph {graph} is not a texture graph: line ", broken.GetProperty("material_warnings").EnumerateArray().Single().GetString());
-    }
-
-    [Fact]
-    public async Task Export_refuses_a_model_with_a_graph_slot_until_it_writes_graph_materials()
-    {
-        WriteGraph();
-        var (carve, _) = await StartAsync();
-        using var scope = carve;
-        Ok(await carve.CallToolAsync("define_material", Iron));
-        const string line = "graph materials are not drawn yet: the material 'iron' has a graph in base_colour_texture";
-        Assert.Equal("export: " + line, Refused(await carve.CallToolAsync("export", """{"path":"iron.glb"}""")));
-        Assert.False(File.Exists(Path.Combine(Root, "iron.glb")));
     }
 }
