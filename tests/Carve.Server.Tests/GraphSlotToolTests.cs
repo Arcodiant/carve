@@ -30,6 +30,27 @@ public class GraphSlotToolTests : FileToolTests
     private const string Iron = """{"name":"iron","base_colour_texture":{"graph":"graphs/iron.texgraph","output":"base_colour","size":256}}""";
 
     [Fact]
+    public async Task The_descriptions_this_task_lengthened_stay_under_claude_codes_cut()
+    {
+        var (carve, tools) = await StartAsync();
+        using var scope = carve;
+        foreach (var name in new[] { "define_material", "get_mesh", "save", "open" })
+            Assert.True(Description(tools, name).Length < 4096, $"{name}: {Description(tools, name).Length} characters");
+    }
+
+    [Theory]
+    [InlineData(32, 64)]
+    [InlineData(8192, 4096)]
+    public async Task A_graphs_own_size_outside_the_range_is_clamped_into_it(int own, int taken)
+    {
+        WriteGraph(size: own);
+        var (carve, _) = await StartAsync();
+        using var scope = carve;
+        var result = Body(Ok(await carve.CallToolAsync("define_material", """{"name":"iron","base_colour_texture":{"graph":"graphs/iron.texgraph","output":"base_colour"}}""")));
+        Assert.Equal(taken, Slot(result.GetProperty("material"), "base_colour_texture").GetProperty("size").GetInt32());
+    }
+
+    [Fact]
     public async Task The_worked_example_defines_two_graph_slots_and_get_mesh_lists_them_the_same_way()
     {
         var graph = WriteGraph();
