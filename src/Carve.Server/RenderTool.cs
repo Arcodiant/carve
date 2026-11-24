@@ -268,11 +268,12 @@ internal static class RenderTool
         + "left out while there are several and they are asked for, the call is a tool error that lists the names. In mode 'uvs', the one mesh drawn, required when there are several.";
 
     /// <summary>The sentences render's description gains for <c>image</c> (T-121), kept apart so the unchanged-tools digest can take them out.</summary>
-    internal const string ImageLookText = "With image (a PNG path), the PNG is drawn under the layout to show a bake or a texture where it lands on the mesh: it covers the unit square, u right and v down, drawn as stored inside the islands (where the checker is bright) and at half brightness outside them, each channel halved, so padding shows as a fringe of island colour on a darker ground; beyond the unit square the dim checker stays. It is sampled nearest, unlit, with no colour conversion (a grey or single-channel PNG shows as grey), and the edges, seams, labels and highlight are drawn over it. The caption names it: 'image wrench.occlusion.png 1024 x 1024'. A PNG that is missing (the folder's PNGs are listed), is not a PNG or is over 4096 is refused as define_material refuses a texture. ";
+    internal const string ImageLookText = "With image (a PNG path), the PNG is drawn under the layout to show a bake or a texture where it lands on the mesh: it covers the unit square, u right and v down, drawn as stored inside the islands (where the checker is bright) and at half brightness outside them, each channel halved, so padding shows as a fringe of island colour on a darker ground; beyond the unit square the dim checker stays. It is sampled nearest, unlit, with no colour conversion (a grey or single-channel PNG shows as grey), and the edges, seams, labels and highlight are drawn over it. The caption names it: 'image wrench.occlusion.png 1024 x 1024'. A PNG that is missing (the folder's PNGs are listed), is not a PNG or is over 4096 is refused as define_material refuses a texture. "
+        + "image may instead be a graph output, {graph, output, size}: the output is evaluated on this mesh, with its real curvature, occlusion, masks and position, and drawn the same way, so a mesh mask can be seen where it lands. Any role or named output may be named: a grey one is drawn grey, roughness as its own grey values (not the packed image) and normal as its colours. size defaults to the graph's own, a power of two from 64 to 4096. Example: {\"mode\":\"uvs\",\"image\":{\"graph\":\"weathered-iron.texgraph\",\"output\":\"wear\",\"size\":256}}. The caption names the file, the output and the size: 'image weathered-iron.texgraph wear 256 px', and the text carries baked, as render's does, on the first use. An output the graph lacks, a graph that cannot be baked for this mesh, or a key other than graph, output and size is refused naming image. ";
 
     /// <summary>The text of render's <c>image</c> (T-121).</summary>
     internal const string ImageArgumentText =
-        "A PNG path, mode 'uvs' only (refused with any other mode): draws that image under the layout, to see a bake or a texture where it lands on the mesh's UVs. "
+        "A PNG path, or a graph output {graph, output, size} evaluated on the mesh; mode 'uvs' only (refused with any other mode): draws that image under the layout, to see a bake or a texture where it lands on the mesh's UVs. "
         + "Resolved as define_material's texture paths are (relative to the working directory) and read under its rules: a PNG of 1 to 4096 pixels on each side. A missing file lists the .png files in its folder.";
 
     [McpServerTool(Name = "render"), Description(Text)]
@@ -303,7 +304,7 @@ internal static class RenderTool
         [Description("A bone's name: draws the model unlit with that bone's weight at each vertex, dark blue at 0 through green (0.5) to red at 1; a vertex with no weight at all is magenta and needs fixing (set_weights or weigh). Needs a skeleton; follows pose or clip; not with mode wireframe, normals or checker.")] string? weights = null,
         [Description(PartArgumentText)] string? part = null,
         [Description(LevelArgumentText)] int? level = null,
-        [Description(ImageArgumentText)] string? image = null,
+        [Description(ImageArgumentText)] JsonElement? image = null,
         ToolFolder? toolFolder = null,
         CancellationToken cancellationToken = default)
     {
@@ -314,11 +315,11 @@ internal static class RenderTool
 
         if (mode == "uvs")
         {
-            return await RunUvs(context, status, store, queue, size, labels, highlight, mesh, image, toolFolder?.Directory, cancellationToken);
+            return await RunUvs(context, status, store, queue, bakes, size, labels, highlight, mesh, image, toolFolder?.Directory, cancellationToken);
         }
 
         // RV-74: the image's refusal is listed with the call's other problems, in its own words, and alone when it is the only one.
-        var imageProblem = image is null ? null : $"image: not with mode '{mode ?? "shaded"}'; it is the picture drawn under the layout of mode 'uvs'.";
+        var imageProblem = Absent(image) ? null : $"image: not with mode '{mode ?? "shaded"}'; it is the picture drawn under the layout of mode 'uvs'.";
         CallToolResult Refuse(string problem) => imageProblem is null ? Error(problem) : Failed("render", [imageProblem, problem]);
 
         var sheet = !Absent(views);
@@ -621,8 +622,8 @@ internal static class RenderTool
     /// then the mesh is picked (required among several) and must have a mapped face.
     /// </summary>
     private static async Task<CallToolResult> RunUvs(
-        RequestContext<CallToolRequestParams> context, EngineStatus status, ModelStore store, RenderQueue queue,
-        double size, string? labels, JsonElement? highlight, JsonElement? mesh, string? image, string? baseDirectory, CancellationToken cancellationToken)
+        RequestContext<CallToolRequestParams> context, EngineStatus status, ModelStore store, RenderQueue queue, GraphBakes bakes,
+        double size, string? labels, JsonElement? highlight, JsonElement? mesh, JsonElement? image, string? baseDirectory, CancellationToken cancellationToken)
     {
         var given = context.Params?.Arguments;
         bool Given(string name) =>
@@ -651,9 +652,24 @@ internal static class RenderTool
         }
 
         MaterialTexture? picture = null;
-        if (image is not null && !DefineMaterialTool.LoadTexture("render", "image", image, baseDirectory, out picture, out var imageProblem))
+        MaterialGraph? graphImage = null;
+        if (Absent(image))
         {
-            problems.Add(imageProblem!);
+        }
+        else if (image!.Value.ValueKind == JsonValueKind.String)
+        {
+            if (!DefineMaterialTool.LoadTexture("render", "image", image.Value.GetString()!, baseDirectory, out picture, out var imageProblem))
+            {
+                problems.Add(imageProblem!);
+            }
+        }
+        else if (image.Value.ValueKind == JsonValueKind.Object)
+        {
+            graphImage = LoadGraphImage(image.Value, baseDirectory, problems);
+        }
+        else
+        {
+            problems.Add($"image: expected a PNG path or {{graph, output, size}}, got {Describe(image.Value)}");
         }
 
         if (problems.Count > 0)
@@ -686,6 +702,21 @@ internal static class RenderTool
         if (MeshEdits.UnknownElements(named.Mesh, [], [], listed.Faces) is { Count: > 0 } missing)
         {
             return Failed("render", missing.Select(e => e.ToString()));
+        }
+
+        var baked = new List<GraphBakes.Baked>();
+        if (graphImage is not null)
+        {
+            try
+            {
+                var (texture, bake) = await Task.Run(() => bakes.Image(current.Model, named.Name, graphImage, cancellationToken), cancellationToken);
+                picture = texture;
+                if (bake is not null) baked.Add(bake);
+            }
+            catch (GraphSlotProblemException e)
+            {
+                return Error(e.Message);
+            }
         }
 
         var offset = current.Model.OffsetOf(named.Name)!.Value;
@@ -721,16 +752,56 @@ internal static class RenderTool
             Content =
             [
                 ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
-                new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount, picture) },
+                new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount, picture, graphImage?.Output) + GraphBakes.Text(baked) },
             ],
         };
     }
 
-    /// <summary>The <c>uvs</c> caption: <c>512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 8 vertices, 6 faces</c>, the named mesh's counts.</summary>
-    internal static string UvCaption(int size, string mesh, LabelSet labels, Highlight highlight, int unmapped, int vertices, int faces, MaterialTexture? image = null)
+    private static readonly string[] ImageGraphKeys = ["graph", "output", "size"];
+
+    /// <summary>render's <c>image</c> as <c>{graph, output, size}</c> (T-165), T-160's rules for each field; null with each problem, named by <c>image</c>, in <paramref name="problems"/>.</summary>
+    private static MaterialGraph? LoadGraphImage(JsonElement image, string? baseDirectory, List<string> problems)
+    {
+        var before = problems.Count;
+        foreach (var key in image.EnumerateObject().Select(p => p.Name).Where(k => !ImageGraphKeys.Contains(k)))
+            problems.Add($"image.{key}: an image graph takes only graph, output and size");
+        string? Text(string key)
+        {
+            if (!image.TryGetProperty(key, out var v)) problems.Add($"image: a graph image needs {key}");
+            else if (v.ValueKind == JsonValueKind.String) return v.GetString();
+            else problems.Add($"image.{key}: expected a string, got {Describe(v)}");
+            return null;
+        }
+        var path = Text("graph");
+        var output = Text("output");
+        int? size = null;
+        if (image.TryGetProperty("size", out var s))
+        {
+            if (s.ValueKind == JsonValueKind.Number && s.TryGetInt32(out var n)) size = n;
+            else problems.Add($"image.size: expected an integer, got {Describe(s)}");
+        }
+        if (problems.Count > before) return null;
+
+        var target = ToolPaths.Resolve("render", path, MaterialGraph.Extension, out var pathError, baseDirectory, verb: "reads");
+        if (target is null) problems.Add("image.graph: " + pathError!["render: ".Length..]);
+        else if (Directory.Exists(target.FullPath)) problems.Add($"image.graph: {target.FullPath} is a folder, not a file");
+        else if (!File.Exists(target.FullPath)) problems.Add($"image.graph: {DefineMaterialTool.Missing(target, MaterialGraph.Extension)}");
+        else if (DefineMaterialTool.ReadGraph(target.FullPath, out var graph) is { } bad) problems.Add($"image.graph: {target.FullPath} {bad}");
+        else
+        {
+            var made = new MaterialGraph(target.FullPath, output!, size ?? Math.Clamp(graph!.Size, MaterialGraph.MinSize, MaterialTexture.MaxSize));
+            if (made.Problem() is { } shape) problems.Add($"image: {shape}");
+            else return made;
+        }
+        return null;
+    }
+
+    /// <summary>The <c>uvs</c> caption:<c>512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 8 vertices, 6 faces</c>, the named mesh's counts.</summary>
+    internal static string UvCaption(int size, string mesh, LabelSet labels, Highlight highlight, int unmapped, int vertices, int faces, MaterialTexture? image = null, string? graphOutput = null)
     {
         var parts = new List<string> { $"{size}x{size}", $"uvs {mesh}" };
-        if (image is not null) parts.Add($"image {Path.GetFileName(image.Path)} {image.Width} x {image.Height}");
+        if (image is not null && graphOutput is not null) parts.Add($"image {Path.GetFileName(image.Path)} {graphOutput} {image.Width} px");
+        else if (image is not null) parts.Add($"image {Path.GetFileName(image.Path)} {image.Width} x {image.Height}");
         if (labels == LabelSet.Faces) parts.Add("labels faces");
         if (!highlight.IsEmpty) parts.Add($"highlight {highlight.Counts()}");
         if (unmapped > 0) parts.Add(unmapped == 1 ? "1 face unmapped" : $"{unmapped} faces unmapped");

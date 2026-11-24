@@ -172,6 +172,34 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
         return drawn;
     }
 
+    /// <summary>
+    /// One graph output as a picture for render's <c>uvs</c> look (T-165): evaluated on <paramref name="mesh"/> as a base colour slot
+    /// takes it (a grey output as grey, <c>roughness</c> as its own grey, <c>normal</c> as its colours), through the same cache.
+    /// Throws <see cref="GraphSlotProblemException"/> or <see cref="OperationCanceledException"/>.
+    /// </summary>
+    public (MaterialTexture Texture, Baked? Baked) Image(Model model, string mesh, MaterialGraph g, CancellationToken cancel)
+    {
+        var name = Path.GetFileName(g.Path);
+        try
+        {
+            var f = GraphSlotBake.Read(g.Path);
+            var on = f.ReadsMesh ? mesh : null;
+            // The key has no slot, and this look packs differently from a metallic-roughness slot, so it is told apart.
+            var key = GraphSlotBake.Key(f, g.Output, g.Size, model, on) + ":image";
+            if (Get(key) is { } hit) return (new MaterialTexture(g.Path, [.. hit], g.Size, g.Size), null);
+            var timed = new TimedMaps(_clock);
+            var start = _clock();
+            var png = GraphSlotBake.Png(g, GraphSlotBake.BaseColour, model, on, cancel, s => timed.Over(s));
+            var (node, nodeMs) = timed.Costliest(f);
+            Put(key, png, g.Size);
+            return (new MaterialTexture(g.Path, [.. png], g.Size, g.Size), new Baked(name, f.ReadsMesh ? mesh : null, "image", g.Size, _clock() - start, node, nodeMs));
+        }
+        catch (Exception e) when (GraphSlotProblem.IsCause(e))
+        {
+            throw new GraphSlotProblemException(GraphSlotProblem.Of(name, "image", e), e);
+        }
+    }
+
     private static PolygonMesh Renamed(PolygonMesh mesh, IReadOnlyDictionary<string, string> copies)
     {
         var style = mesh.Style!;
