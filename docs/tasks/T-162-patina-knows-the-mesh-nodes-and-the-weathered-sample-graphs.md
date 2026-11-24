@@ -4,7 +4,7 @@ description: >-
 ---
 # T-162 — patina knows the mesh nodes, and the weathered sample graphs
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
@@ -107,4 +107,5 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`). Frame review by Claude Sonnet 
 - **README:** the Samples paragraph of the patina section names the two graphs and the neutral rule. CLAUDE.md: rows for `src/Patina.Server`, `tools/Patina.SampleGraphs` and the Patina scenario.
 - **Not checked:** the frames by eye (the reviewing agent's); `swatch` of `weathered-staves` (no scenario frame, only its PNGs); a mesh node inside a nested graph file's note; the exact text of the title in pixels.
 
-- **Frame review (3 frames and a scaled montage of the 8 committed PNGs opened):** iron sheet title reads `unsaved graph 256 px seed 41 mesh inputs neutral`, legible and not cut off; base_colour even mid-grey iron with soft mottling, roughness (packed channels, so orange), metallic white, wear black; the sphere is plain metal reflecting the environment with no bright rim. Staves PNGs are the planks' brown staves, normal and occlusion, grime black. The person approved the set (round-1 in `G:\My Drivertifacts\carve\M-29\T-162ound-1`) with no notes.
+- **Frame review (3 frames and a scaled montage of the 8 committed PNGs opened):** iron sheet title reads `unsaved graph 256 px seed 41 mesh inputs neutral`, legible and not cut off; base_colour even mid-grey iron with soft mottling, roughness (packed channels, so orange), metallic white, wear black; the sphere is plain metal reflecting the environment with no bright rim. Staves PNGs are the planks' brown staves, normal and occlusion, grime black. The person approved the set (round-1 in `G:\My Drivertifacts\carve\M-29\T-162
+ound-1`) with no notes.
