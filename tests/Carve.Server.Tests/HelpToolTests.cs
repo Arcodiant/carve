@@ -6,7 +6,7 @@ namespace Carve.Server.Tests;
 /// <summary>
 /// T-207: every carve tool description fits Claude Code's cut, and what was cut from a description is served by <c>help</c>.
 /// Adding an entry: a line in <c>HelpTool</c>'s table, a <c>Reference</c> on the tool's class, the tool's description ending
-/// with <c>More: help {"tool":"name"} gives ...</c>, and the tool leaves <see cref="Pending"/>.
+/// with <c>More: help {"tool":"name"} gives ...</c>.
 /// </summary>
 [Trait("Tier", "unit")]
 public class HelpToolTests : FileToolTests
@@ -21,13 +21,6 @@ public class HelpToolTests : FileToolTests
     public const int Limit = ClientCut * 9 / 10;
 
     /// <summary>
-    /// T-207's to-do: the tools still over <see cref="Limit"/> that the members after the first have yet to trim, each
-    /// removed from here as it is. Nothing else is exempt, and a name listed here that is already under fails, so the
-    /// list shrinks to nothing.
-    /// </summary>
-    private static readonly string[] Pending = [];
-
-    /// <summary>
     /// A description and its tool's help entry as one text, for a test that pins a sentence or an example that moved from the
     /// description to the entry (T-207): the pin keeps holding, wherever the sentence now is.
     /// </summary>
@@ -38,17 +31,15 @@ public class HelpToolTests : FileToolTests
     }
 
     [Fact]
-    public async Task Every_description_is_under_the_limit_but_the_tools_still_to_trim()
+    public async Task Every_description_is_under_the_limit_with_no_tool_exempt()
     {
         var (carve, tools) = await StartAsync(mesh: null);
         using var _ = carve;
         var lengths = tools.EnumerateArray().Select(t => (Name: t.GetProperty("name").GetString()!, Length: t.GetProperty("description").GetString()!.Length)).ToList();
 
         Assert.Contains(lengths, t => t.Name == "help");
-        var over = lengths.Where(t => t.Length > Limit && !Pending.Contains(t.Name)).Select(t => $"{t.Name} {t.Length}").ToList();
+        var over = lengths.Where(t => t.Length > Limit).Select(t => $"{t.Name} {t.Length}").ToList();
         Assert.True(over.Count == 0, $"over {Limit} characters (Claude Code cuts at {ClientCut}): {string.Join(", ", over)}");
-        var already = Pending.Where(p => lengths.Single(t => t.Name == p).Length <= Limit).ToList();
-        Assert.True(already.Count == 0, $"already under {Limit}, so no longer pending: {string.Join(", ", already)}");
     }
 
     [Fact]
