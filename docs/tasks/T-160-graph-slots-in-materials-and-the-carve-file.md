@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** — (none)
 
-**Verify:** core-unit, server-unit
+**Verify:** core-unit, server-unit, scenario-materials, scenario-planks
 
 ## Goal
 
