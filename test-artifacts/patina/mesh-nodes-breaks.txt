@@ -1,2 +1,0 @@
-== the note left out of the expected title
-  mesh nodes: the sheet's title runs to x 433, 175 px past the title with no note
