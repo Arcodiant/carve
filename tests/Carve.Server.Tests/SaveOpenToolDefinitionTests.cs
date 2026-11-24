@@ -21,7 +21,7 @@ public sealed class SaveOpenToolDefinitionTests() : FileToolTests("carve-saveope
     {
         var (carve, tools) = await StartAsync(mesh: null);
         using var _carve = carve;
-        var save = Description(tools, "save");
+        var save = HelpToolTests.WithReference(Description(tools, "save"), "save");
         Assert.Contains("models.LoadModel(new ContentPath(\"models/crate.glb\"))", save);
         // The cube's file text is what the writer gives, with LF line ends on any checkout.
         Assert.Contains(CarveFile.Write(TestMeshes.Cube()), save);

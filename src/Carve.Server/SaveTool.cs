@@ -61,8 +61,26 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         + "A skeleton and clips with no mesh (a clip library) are saved too, as \"meshes\": []. "
         + "The .carve file is the one to keep working in: it holds the polygons exactly, every vertex and face in its id order and every number to the bit, so after open the ids you used before still name the same vertices and faces. "
         + "It does not hold the undo history (open starts from the file as one step), a current file name (carve remembers none: give the path every time) or any render setting. "
-        + "The .glb that export writes is only for the game, and has no faces to edit. "
         + "Materials (define_material) are saved too, as a version 6 file's materials list and each mesh's face materials; a model with none is written as it always was. A texture is saved as a path relative to the .carve file's folder, so keep the PNG files with the file or below it; save does not copy them, and open reads them again from those paths. "
+        + "A model with a graph slot (define_material's {graph, output, size}) is saved as a version 10 file, version 9 with graph slots, whatever else it has; the graph's path is relative to the .carve file's folder, as a texture's is, and a graph on another drive is refused as a texture there is. "
+        + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
+        + "an existing file is replaced and the result says (replaced); the path must end in .carve, in any case. "
+        + "save changes nothing: not the model, its ids, or what undo steps back to. "
+        + "Returns one line: saved <file> to <absolute path> (replaced, when it was): <n> vertices, <n> faces, then the meshes when there are several, and the bones and clips when there is a skeleton, then a warning for each texture whose PNG has moved since it was read. "
+        + "Files are versioned JSON, one key per line: version 2 holds meshes, colours, groups, weights, the skeleton and clips; 6 adds materials, 7 the part tree and levels, 8 morph targets, 9 both, 10 graph slots. "
+        + "Errors, each a tool error that writes nothing and names itself: no mesh yet, an unknown mesh name, a bad path or extension, a failed write. "
+        + "Worked example, from an empty file to a game's content folder (put the game's folder for <game>); each numbered line is a call, and the game then loads the model as "
+        + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
+        + "1. define_mesh with the cube from its description.\n"
+        + "2. Edit it: move and extrude.\n"
+        + "3. save " + WorkedFile + "\n"
+        + "4. In a later session, open " + WorkedFile + "\n"
+        + "5. export " + WorkedExport + "\n"
+        + """More: help {"tool":"save"} gives the file format with the unit cube's file, the part tree and its example, every version's detail, the errors and the missing-texture warning.""";
+
+    /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"save"}</c> returns it.</summary>
+    public const string Reference =
+        "The .glb that export writes is only for the game, and has no faces to edit. "
         + "Morph targets are saved too, each mesh's as a version 8 file's targets (sparse deltas by vertex id, read back bit-exact); with mesh, that mesh's targets; a model with none is written as it always was. "
         + "With mesh, only the materials that mesh's faces use are written. A texture that has no relative path from the file's folder (on another drive) refuses the save, naming the material and the field. "
         + "The file is versioned JSON (version 2), keys always in one order, one vertex, face, colour, group, weighted vertex, bone or clip key per line, so the same model always gives the same bytes and a diff shows what changed: "
@@ -76,24 +94,12 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         + "With mesh on a part tree, save writes a piece: that part's own geometry and kept levels, as a top-level part at the origin, without its parent, transform, envelope, children or instances. "
         + "mesh naming an instance or an empty is a tool error that says which it is (save the source part an instance shows). "
         + "A model with both a part tree and morph targets is saved as a version 9 file: version 8's targets with version 7's parts and levels, each kept level keeping its own targets; with mesh, a piece of a part with targets keeps its targets and levels. "
-        + "A model with a graph slot (define_material's {graph, output, size}) is saved as a version 10 file, version 9 with graph slots, whatever else it has; the graph's path is relative to the .carve file's folder, as a texture's is, and a graph on another drive is refused as a texture there is. "
         + "Part tree example: with a rover whose Wheel_FL sits under Axle_F at (0, 0, 0.72) and is kept at levels 0 and 1, save {\"path\":\"rover.carve\"} keeps the whole tree, "
         + "and save {\"path\":\"wheel.carve\",\"mesh\":\"Wheel_FL\"} writes Wheel_FL's polygons and its levels 0 and 1 at the origin, with no Axle_F and no instances; mesh Wheel_FR, an instance of Wheel_FL, is refused. "
-        + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
-        + "an existing file is replaced and the result says (replaced); the path must end in .carve, in any case. "
         + "Errors, each a tool error that writes nothing: no mesh and no skeleton yet (call define_mesh or open first); a mesh name the model does not have; an empty path; a path holding a character a file path may not; "
         + "a path naming a folder; any extension but .carve; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
-        + "save changes nothing: not the model, its ids, or what undo steps back to. "
-        + "Returns one line: saved <file> to <absolute path> (replaced, when it was): <n> vertices, <n> faces, then the meshes when there are several, and the bones and clips when there is a skeleton; "
-        + "then a line \"warning: the texture '<path>' (<where it is used>) is no longer at its path; ...\" for each texture whose PNG has been moved or deleted since define_material or open read it, since open reads the PNG again and refuses the file until it is back (save still writes the file).\n"
-        + "Worked example, from an empty file to a game's content folder (put the game's folder for <game>); each numbered line is a call, and the game then loads the model as "
-        + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
-        + "1. define_mesh with the cube from its description.\n"
-        + "2. Edit it: move and extrude.\n"
-        + "3. save " + WorkedFile + "\n"
-        + "4. In a later session, open " + WorkedFile + "\n"
-        + "5. export " + WorkedExport;
+        + "The result line, after the bones and clips, then has a line \"warning: the texture '<path>' (<where it is used>) is no longer at its path; ...\" for each texture whose PNG has been moved or deleted since define_material or open read it, since open reads the PNG again and refuses the file until it is back (save still writes the file).\n";
 
     public static McpServerTool Create() => MeshToolSupport.Create<SaveTool>("save", Text, WithMesh(PathSchema("The .carve file to write, absolute or relative to carve's working directory; replaced if it exists."),
         "The one mesh to write, by name, with the skeleton and clips when it has weights; of a part tree, that part's own geometry and kept levels at the origin (not an instance or an empty). Left out, the whole model is written."));
