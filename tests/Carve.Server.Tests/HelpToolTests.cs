@@ -25,7 +25,7 @@ public class HelpToolTests : FileToolTests
     /// removed from here as it is. Nothing else is exempt, and a name listed here that is already under fails, so the
     /// list shrinks to nothing.
     /// </summary>
-    private static readonly string[] Pending = ["define_material", "project_uvs"];
+    private static readonly string[] Pending = ["define_material"];
 
     /// <summary>
     /// A description and its tool's help entry as one text, for a test that pins a sentence or an example that moved from the
