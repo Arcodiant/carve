@@ -105,3 +105,45 @@ long it took.
 - **Stop and ask:** an existing frame or export hash that changes; a determinism rule that would have to bend (a
   parallel evaluator, a wall-clock read in an engine-free project); a mismatch with the PNG path under D-6's rule that
   is not explained.
+
+### Hand-off
+
+First agent (Opus 5.5, `claude-opus-5-5`), at its ~60-call checkpoint. Builds; `graphs-unit` passes (40); nothing else run.
+
+**Done.**
+- `src/Carve.Graphs/GraphSlotBake.cs` (new): `GraphSlotFiles(Path, Files, Hash, ReadsMesh)`, `GraphSlotException`,
+  `GraphSlotBake.Read(path)` (root + `GraphValidator.Uses(...).Files`, SHA-256 of path+bytes; `ReadsMesh` from mesh node types
+  in the root and every nested file), `Key(files, output, size, model, mesh)` (the listed mesh fields; occluders' vertices and
+  faces), `Png`/`Rgba(MaterialGraph, slot, model, mesh?, cancel, wrap?)` (cancel checked per tile; padding with `Bake.Pad` 8
+  when `mesh` is given), `PackingOf(slot, evaluator, output)` (the slot table). `MeshBakeSource.Layout(size)` made public (locked).
+- `tests/Carve.Graphs.Tests/GraphSlotBakeTests.cs`: planks' four outputs at 256 byte-equal to `samples/graphs/planks/*.png`,
+  slot table, padding (fbm with a stray mesh node == `Bake.Pad` of the tiled one), nested reads_mesh, key per edit, nested
+  one-byte change, mesh-independent key unmoved.
+- `src/Carve.Server/GraphBakes.cs` (new, DI singleton in `CarveServer.AddTools`): LRU cache by key, 512 MB of PNG + size²·4;
+  `Resolve(model, cancel)` returns `Drawn(Model, Key, Baked, Warnings)`: graph slots become `MaterialTexture`s of the bake;
+  a mesh-reading material becomes `<m>@<mesh>` per mesh (kept level `<m>@<part>@<level>`, baked on `model.With(part, levelMesh)`)
+  with faces renamed; memo by `Model` reference (`ConditionalWeakTable`), same reference kept when every key is unchanged.
+  `Peek`, `DrawnOf` (frame thread; bakes only on a race, `shortcut:` comment). `TimedMaps` wraps the source to name the
+  costliest mesh node. `Text(baked)` gives `\nbaked: [...]` and `\nwarning: ...` lines. Clock injectable (`Func<double>` ms).
+- `src/Carve.Server/GraphSlotProblem.cs` (new): `Of(material, slot, cause)`, `IsCause`, `GraphSlotProblemException`.
+- `RenderPump(queue, store, scene, GraphBakes? bakes)`: draws `bakes.DrawnOf(snapshot.Model)`; re-shows the mesh when
+  `Peek` of the shown model changes (`_bakedFor`/`_shownBakes`, set on the fault path too, so no loop). `RenderSystem` takes
+  `GraphBakes`. `RenderTool.Run` takes `GraphBakes bakes`, resolves inside `RenderTiles` (Task.Run, before posting), returns a
+  `GraphSlotProblemException` as the error, appends `GraphBakes.Text(baked)` to both captions. Render's interim refusal removed.
+
+**Left.**
+- Export's interim refusal (`ExportTool.cs:146`) left in place on purpose: export is T-164's and would otherwise drop graph
+  slots silently. Decide/ask; if it stays, `MaterialJson.GraphsNotDrawn` stays and `GraphSlotToolTests` line ~214 keeps
+  only export's half (render's half of that test must now change).
+- define_material's sentence "Until graph materials are drawn, ..." (MaterialTools.cs ~84) and README's interim sentence;
+  render's description paragraph (keep < 4,096; retake `PartToolsListTests.Before` digest and say so); `reads_mesh` per slot
+  in `define_material` and `get_mesh` (`MaterialJson.Of`), using `GraphSlotBake.Read(path).ReadsMesh` (catch for a missing file).
+- server-unit tests of `GraphBakes` (no engine in `ToolHarness`: drive the model through tools, call `Resolve` directly):
+  baked then absent, move/unwrap/file/nested rewritten bake again, undo a hit, 5 s warning by injected clock, 512 MB cap.
+- server-regression class (raised-hoop barrel at 512, baked vs PNG-named frame under D-6, neutral-graph control, a
+  sampling test), first on test graphs, then T-162's `weathered-iron`/`weathered-staves` once on `origin/milestone/M-29`.
+- CLAUDE.md rows and architecture rule; `**Verify:**` gains graphs-unit (and any suite checking tool text); measured times
+  of T-162's graphs at 512 and 1024; `### As built`.
+
+**Not checked.** No render run at all yet; frames of scenario-materials/planks not compared (models without graph
+materials take the old path unchanged: `DrawnOf` returns the model itself, `Peek` null).

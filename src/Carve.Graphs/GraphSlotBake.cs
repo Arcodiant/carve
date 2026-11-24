@@ -94,14 +94,14 @@ public static class GraphSlotBake
     /// is padded past its islands. Throws <see cref="GraphSlotException"/> (the file, or an output the slot cannot take),
     /// <see cref="GraphFaultException"/>, <see cref="MeshMapsException"/>, or <see cref="OperationCanceledException"/> between tiles.
     /// </summary>
-    public static byte[] Png(MaterialGraph graph, string slot, Model model, string? mesh, CancellationToken cancel = default) =>
-        Patina.Graphs.Imaging.Png.Encode(Rgba(graph, slot, model, mesh, cancel), graph.Size, graph.Size);
+    public static byte[] Png(MaterialGraph graph, string slot, Model model, string? mesh, CancellationToken cancel = default, Func<IMeshMaps, IMeshMaps>? wrap = null) =>
+        Patina.Graphs.Imaging.Png.Encode(Rgba(graph, slot, model, mesh, cancel, wrap), graph.Size, graph.Size);
 
-    /// <summary>As <see cref="Png"/>, the RGBA8 bytes before encoding.</summary>
-    public static byte[] Rgba(MaterialGraph graph, string slot, Model model, string? mesh, CancellationToken cancel = default)
+    /// <summary>As <see cref="Png"/>, the RGBA8 bytes before encoding. <paramref name="wrap"/> may stand a source of its own over the mesh's (the server times the maps through it).</summary>
+    public static byte[] Rgba(MaterialGraph graph, string slot, Model model, string? mesh, CancellationToken cancel = default, Func<IMeshMaps, IMeshMaps>? wrap = null)
     {
         var source = mesh is null ? null : new MeshBakeSource(model, mesh);
-        var registry = MeshNodes.Register(NodeRegistry.BuiltIn, source);
+        var registry = MeshNodes.Register(NodeRegistry.BuiltIn, source is null ? null : wrap?.Invoke(source) ?? source);
         var evaluator = new GraphEvaluator(Load(graph.Path, registry), registry);
         var role = PackingOf(slot, evaluator, graph.Output);
         var size = graph.Size;
