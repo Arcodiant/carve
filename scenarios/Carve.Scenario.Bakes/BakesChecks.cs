@@ -43,7 +43,7 @@ internal static class BakesChecks
     /// the right colours); <c>faint</c> bakes <c>steel</c> a dimmer grey and <c>red</c> a duller red, under the ruled steel margin
     /// and red lead but still grey and still red-leading; <c>mirror</c> works every render sample through a camera mirrored left to right;
     /// <c>curvature</c> reads the curvature map inverted; <c>reach</c> bakes occlusion with a reach of 0.0001; <c>dark</c> reads the occlusion map inverted; <c>metal</c> bakes
-    /// <c>steel</c>'s metallic as 0; <c>bevel-g</c> puts the bevel normal map on the material with its green inverted; <c>bevel-wide</c> bakes it 20 times as wide.
+    /// <c>steel</c>'s metallic as 0; <c>bevel-g</c> puts the bevel normal map on the material with its green inverted; <c>bevel-wide</c> bakes it 20 times as wide; <c>graph-width</c> doubles the width of the graph the look is given, <c>graph-mask</c> names <c>rubber</c> in the mask graph and <c>graph-pos</c> swaps x and z in the position prediction (T-165).
     /// </summary>
     public static string? Break { get; } = Environment.GetEnvironmentVariable("CARVE_BAKES_BREAK");
 
@@ -80,7 +80,7 @@ internal static class BakesChecks
     /// the wrong colours fails even though the frame shows the PNG faithfully. With <paramref name="blend"/> above 0 an inside pixel may also show a blend of the texels around its own (for a ramp steeper than a pixel, each channel read on its own). Returns the counts (inside, outside).
     /// </para>
     /// </summary>
-    public static (int Inside, int Outside) CheckUvImage(string what, ScenarioFrame frame, SceneMesh mesh, Texels png, Func<int, (int R, int G, int B)>? worked = null, int blend = 0)
+    public static (int Inside, int Outside) CheckUvImage(string what, ScenarioFrame frame, SceneMesh mesh, Texels png, Func<int, (int R, int G, int B)>? worked = null, int blend = 0, bool insideOnly = false)
     {
         var size = frame.Width;
         double origin = size / 16.0, side = size * 7 / 8.0;
@@ -119,7 +119,7 @@ internal static class BakesChecks
                     if (!Near(got, texel, 2) && !(blend > 0 && Blended(got, png, (int)Math.Floor(u * png.Width), (int)Math.Floor(v * png.Height), blend))) (problem, kind) = ($"inside face {face}, the frame shows {got} but the PNG's texel is {texel}", "inside-png");
                     else if (worked is not null && !Near(got, worked(face), 2)) (problem, kind) = ($"inside face {face}, the frame shows {got} but the face's colour, worked from its groups, is {worked(face)}", "inside-worked");
                 }
-                else
+                else if (!insideOnly)
                 {
                     outside++;
                     var half = ((texel.R + 1) / 2, (texel.G + 1) / 2, (texel.B + 1) / 2);
@@ -133,7 +133,7 @@ internal static class BakesChecks
         }
 
         if (wrong > 8) Note($"{what}: {wrong} pixels in all break the block rule ({string.Join(", ", kinds.Select(k => $"{k.Value} {k.Key}"))})");
-        if (inside < 2000 || outside < 500) Note($"{what}: only {inside} pixels inside islands and {outside} outside could be placed");
+        if (inside < 2000 || (!insideOnly && outside < 500)) Note($"{what}: only {inside} pixels inside islands and {outside} outside could be placed");
         return (inside, outside);
     }
 
