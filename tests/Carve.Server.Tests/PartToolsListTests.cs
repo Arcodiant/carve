@@ -27,7 +27,7 @@ public class PartToolsListTests
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
     // T-207 retakes the digest as each of its agents changes descriptions (render by agent A; the last retake is the one that counts):
     // render, and the new help tool, are the descriptions it has changed so far.
-    private const string Before = "6A017E9FE7AE4B7BD147BA93690807911C29C55FC0116A034E629573B392BE67";
+    private const string Before = "78C60003F0FA33DF217338ECCBEB0F77E2BA1EF9F9CD4F70CC72AE6DCFE672F0";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "displace", "help"];
 
