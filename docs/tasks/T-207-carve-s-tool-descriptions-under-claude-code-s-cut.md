@@ -271,3 +271,7 @@ if the person declines it.
 5. **Re-measure the cut before building?** Recommended: no separate probe; the 10% margin covers a small change, and
    T-168's first round records whether any description arrived cut. If you want it measured: one `claude -p` probe as
    T-170's (quote the last 150 characters of each carve description, no tool call), about one session's cost.
+
+**Decided (2026-11-24).** By the person: carve gains the tool, named `help`. By the orchestrator, following patina's
+T-170: the 10% margin (3,686), the five descriptions near the cut trimmed in this task, a `help` entry holding only
+what left its description, and no separate probe of the cut before T-168's first round.
