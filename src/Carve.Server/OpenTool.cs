@@ -25,6 +25,7 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         + "A version 1 file (one mesh, from before skeletons) opens as one mesh named mesh, or, with mesh given, as that one mesh under the name given, any name define_mesh takes (not empty, no ':'). "
         + "Either way open is one step like any other, so undo takes it back to the model before it. The first change a process has cannot be undone, whichever tool made it, so undo straight after an open that gave the process its first model is a tool error (the model stays), while a process that had a mesh before the open can undo it; and only the last 100 changes are kept, so once 100 changes have followed an open, the open itself can no longer be undone. Takes path, the file to read. "
         + "A file's materials come with it: each texture is read again from its path relative to the .carve file's folder, so a texture that is missing or is not a PNG refuses the open, naming materials[i].<field>. With mesh, only the materials that mesh's faces use come with it and are read, so a missing texture on another material does not refuse it: one the model lacks is added, one the model already defines identically is kept, and one the model defines differently refuses the open, naming the material (define one of them again under another name, or open the whole file). "
+        + "A version 10 file's graph slots come back as saved: a graph file that is missing or is not a texture graph does not refuse the open, which keeps the slot and adds material_warnings:[...] to the result, naming the material, the slot and the path, so define_material can name another. "
         + "The file holds the polygons exactly, with the ids they were saved with: vertex 0 is the file's first vertex and face 0 its first face, "
         + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so the file brings no older states with it, "
         + "and carve keeps no current file: give the path to open and to save every time. "
@@ -113,6 +114,8 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
             body["bones"] = skeleton.Bones.Count;
             body["clips"] = model.Clips.Select(c => c.Name).ToArray();
         }
+        // A missing or broken graph does not refuse the open (T-160): the slot is kept so define_material can fix it.
+        if (MaterialJson.BrokenGraphs(file).ToArray() is { Length: > 0 } broken) body["material_warnings"] = broken;
         return Ok(body);
     }
 

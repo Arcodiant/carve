@@ -143,6 +143,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         var model = store.Current.Model;
         var mesh = model.Combined;
         if (mesh is null && !clips) return Error("export: " + NoMesh); // clips mode needs no mesh (the person, 2026-11-09)
+        if (MaterialJson.GraphsNotDrawn("export", model) is { } notDrawn) return Error(notDrawn); // Interim until T-163 draws graph materials.
 
         var target = ToolPaths.Resolve("export", text, Extension, out var pathError, toolFolder.Directory);
         if (target is null) return Error(pathError!);

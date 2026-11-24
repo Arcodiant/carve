@@ -76,6 +76,7 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         + "With mesh on a part tree, save writes a piece: that part's own geometry and kept levels, as a top-level part at the origin, without its parent, transform, envelope, children or instances. "
         + "mesh naming an instance or an empty is a tool error that says which it is (save the source part an instance shows). "
         + "A model with both a part tree and morph targets is saved as a version 9 file: version 8's targets with version 7's parts and levels, each kept level keeping its own targets; with mesh, a piece of a part with targets keeps its targets and levels. "
+        + "A model with a graph slot (define_material's {graph, output, size}) is saved as a version 10 file, version 9 with graph slots, whatever else it has; the graph's path is relative to the .carve file's folder, as a texture's is, and a graph on another drive is refused as a texture there is. "
         + "Part tree example: with a rover whose Wheel_FL sits under Axle_F at (0, 0, 0.72) and is kept at levels 0 and 1, save {\"path\":\"rover.carve\"} keeps the whole tree, "
         + "and save {\"path\":\"wheel.carve\",\"mesh\":\"Wheel_FL\"} writes Wheel_FL's polygons and its levels 0 and 1 at the origin, with no Axle_F and no instances; mesh Wheel_FR, an instance of Wheel_FL, is refused. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
@@ -135,8 +136,8 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
     {
         var uses = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         for (var i = 0; i < model.Materials.Count; i++)
-            foreach (var (field, texture) in model.Materials[i].Textures)
-                if (texture is not null)
+            foreach (var (field, slot) in model.Materials[i].Textures)
+                if (slot is MaterialTexture texture)
                 {
                     if (!uses.TryGetValue(texture.Path, out var at)) uses[texture.Path] = at = [];
                     at.Add(string.Create(CultureInfo.InvariantCulture, $"materials[{i}].{field} of '{model.Materials[i].Name}'"));
