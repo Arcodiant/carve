@@ -29,7 +29,9 @@ public class CheckSamplesTests(ITestOutputHelper output)
     {
         var data = new TheoryData<string>();
         foreach (var file in Directory.GetFiles(Samples.Folder, "*.texgraph").Order(StringComparer.Ordinal))
-            data.Add(Path.GetFileNameWithoutExtension(file));
+            // The weathered graphs (T-162) read the mesh nodes, which Patina.Graphs does not know; tests/Patina.Server.Tests holds them to check.
+            if (!Path.GetFileName(file).StartsWith("weathered-", StringComparison.Ordinal))
+                data.Add(Path.GetFileNameWithoutExtension(file));
         return data;
     }
 

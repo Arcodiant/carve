@@ -15,6 +15,7 @@ internal static partial class ProductReferenceGuard
         "Carve.Core",
         "Carve.Extensibility",
         "Carve.Hosting", // The shared engine host (T-111), product code, itself checked by the guard's tests.
+        "Carve.Graphs", // The engine-free mesh-input nodes (T-161), product code patina reaches (T-162); CarveGraphsIsEngineFreeTests holds it.
     };
 
     [GeneratedRegex(@"Carve\.Debug|Carve\.Scenario|Carve\.ModelViewer|(^|[\\/])(extensions|scenarios|spikes)[\\/]", RegexOptions.IgnoreCase)]
