@@ -177,8 +177,27 @@ internal static class RenderTool
     }
 
     private const string Text =
-        "Renders the current mesh, as set by define_mesh or open and changed by the edits (move, extrude, subdivide, delete, merge_faces, bridge, plane_cut, loop_cut, knife) or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
-        + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
+        "Renders the current mesh, as set by define_mesh or open and changed by the edits (move, extrude, subdivide, delete, merge_faces, bridge, plane_cut, loop_cut, knife) or undo (with several meshes, every mesh together; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line. "
+        + "'view' is 'front' (the default, from the +X +Y +Z corner), 'back', or head-on '+x', '-x', '+y', '-y', '+z', '-z'; or give 'direction', [x, y, z] from the point looked at toward the eye, any length. "
+        + "'zoom' (1 to 8) narrows the view about 'target', a point [x, y, z] in model space inside the bounds of what is drawn (default: the centre); 'projection' is 'perspective' (the default, what a game shows) or 'orthographic' (true proportions, for reading dimensions); 'size' is 256, 512 (the default) or 1024. "
+        + "'mode' is the look: 'shaded' (the default), 'wireframe', 'normals', 'checker' or 'uvs'. "
+        + "In 'shaded', a face with a material (define_material, set_material) is drawn as the game's PBR shading draws it, its textures sampled at the face's UVs, lit by Carve's light and a fixed sky; every other look ignores materials, as it ignores colours. "
+        + "A slot that names a graph output (define_material) is evaluated for each mesh that wears it, on that mesh's UVs and bakes when the graph reads the mesh, on the first render that draws it and again after an edit to the mesh, its UVs or a graph file; otherwise it comes from memory. "
+        + "The text then gains baked: [{material, mesh, slot, size, ms}], one entry per slot baked in this call (mesh null for a graph that does not read the mesh), and a warning when one material took over 5 s (lower its size or the node's rays). A slot that cannot be baked fails the render. "
+        + "'wireframe' draws the edges over dark faces (hidden-line); 'normals' colours each face by its facing, with a spike along its normal, to find a face pointing the wrong way; 'checker' draws a checker at each face's UVs, to read stretch and mirroring; 'uvs' draws one mesh's UV layout flat, with 'image' (a PNG path, or a graph output {graph, output, size} evaluated on the mesh) drawn under it, e.g.\n"
+        + ExampleMarker + "{\"mode\":\"uvs\",\"image\":{\"graph\":\"weathered-iron.texgraph\",\"output\":\"wear\",\"size\":256}}\n"
+        + "'highlight' ({\"vertices\":[ids],\"edges\":[[a,b]],\"faces\":[ids]}) draws what a select picked in orange; 'labels' ('faces', 'vertices' or 'both') writes element ids. "
+        + "'views' (2 to 6 view names or {view or direction, zoom, target}; 'columns' 1 to 3) draws a contact sheet in one image: the six axis views are {\"views\": [\"+x\", \"-x\", \"+y\", \"-y\", \"+z\", \"-z\"], \"projection\": \"orthographic\", \"size\": 256}. "
+        + "Faces wound the wrong way (clockwise seen from outside) show as MISSING: you see through them. An EMPTY result, an image of only the dark background with no error, means no face points at the camera: the faces are wound the wrong way, or the mesh is an open surface seen from behind. Try the other view, or fix the winding and call define_mesh again (move and extrude keep each face's winding). "
+        + "'pose', 'clip' with 'time', 'targets', 'bones' and 'weights' draw the model posed, morphed, with its skeleton or a bone's weights; 'part' and 'level' draw one part or kept level of the placed model. "
+        + "Tool errors leave the mesh untouched; so do no mesh and a machine with no Vulkan device. "
+        + "More: help {\"tool\":\"render\"} gives the caption formats, the normals and checker colour codes, the uvs look's rules, labels, sheets, pose, targets, bones and weights, parts and levels, and every error.";
+
+    /// <summary>What left render's description (T-207), served by help {"tool":"render"}: the same sentences, and the part and level paragraph last.</summary>
+    public const string Reference =
+        "The detail that left render's description, in its own words: caption formats, the colour and hue tables, each look and argument in full, and every error.\n"
+        + "Renders the current mesh, as set by define_mesh or open and changed by the edits (move, extrude, subdivide, delete, merge_faces, bridge, plane_cut, loop_cut, knife) or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line. Neither wireframe nor normals depends on the light. "
+        + "The caption reads e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh, and the look's lines and spikes, the highlight's orange lines and stars, and the labels and tile captions you ask for: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
         + "'back' looks from the opposite corner, -X -Y -Z, upward from below, showing its underside, -Z side and -X side. "
@@ -199,10 +218,8 @@ internal static class RenderTool
         + "The caption says so after the view: '512x512, view +x, orthographic, 8 vertices, 6 faces'. "
         + "'size' is the image's width and height: 256 for a quick look or a sheet tile, 512 (the default), 1024 for a dense mesh with labels. "
         + "The caption opens with it: '256x256, view front, 8 vertices, 6 faces'. "
-        + "'mode' is the look: 'shaded' (the default), 'wireframe', 'normals', 'checker' or 'uvs'. Neither wireframe nor normals depends on the light. "
         + "In 'shaded', a face with a material (define_material, set_material) is drawn as the game's PBR shading draws it, its textures sampled at the face's UVs (a face with no UVs samples the texture's corner at (0, 0), as the game does), "
         + "lit by Carve's light and a fixed sky so that metal reads; a game's own lighting will differ. Only material faces take the sky's light, so a matte white material face is brighter and bluer on top than an uncoloured or coloured face. Every other look ignores materials, as it ignores colours. "
-        + "A slot that names a graph output (define_material) is evaluated for each mesh that wears it, on that mesh's UVs and bakes when the graph reads the mesh, on the first render that draws it and again after an edit to the mesh, its UVs or a graph file; otherwise it comes from memory. "
         + "The text then gains baked: [{material, mesh, slot, size, ms}], one entry per slot baked in this call (mesh null for a graph that does not read the mesh), and a warning when one material took over 5 s to bake: lower its size or the node's rays. A slot that cannot be baked fails the render. "
         + "'wireframe' draws every edge in light grey over faces filled near black: use it to count and place edges and see the face loops. It is hidden-line, not see-through: "
         + "an edge behind a face is hidden, so look from another side to see it. "
@@ -224,8 +241,6 @@ internal static class RenderTool
         + "A sheet's caption gives columns by rows, the tile size, the parts a single caption has, and every tile's caption: '2x2 tiles of 512x512, wireframe, labels faces, views front, (2, 1, 1), +x, -z, 72 vertices, 70 faces'. "
         + "The light turns with the view, and faces turned different ways show as different brightnesses. "
         + "Faces wound the wrong way (clockwise seen from outside) show as MISSING: you see through them to whatever is behind. "
-        + "An EMPTY result, an image of only the dark background with no error, means no face points at the camera: "
-        + "the faces are wound the wrong way, or the mesh is an open surface seen from behind. "
         + "Try the other view, or fix the winding and call define_mesh again (move and extrude keep each face's winding, so they cannot fix it). "
         + "'checker' draws the model lit with a 256x256 checker of 8x8 cells at each face's corner UVs (set_uvs, project_uvs, unwrap), with the same normals as shaded. "
         + "Each column has its own hue, red at u = 0 through orange, yellow, green, cyan, blue and indigo to violet at u = 1; light and dark cells alternate, and the cell at uv (0,0), the texture's top-left, is white. "

@@ -25,9 +25,12 @@ namespace Carve.Server.Tests;
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "58132D064D4026FF34495FDBE9340051F73F1E704B6D5A3844FCED76463FC1D5";
+    // Taken again, once, from the final text, for T-207 (Sonnet 5.5), which holds every description under Claude Code's cut: the new help
+    // tool joins NewTools, and the descriptions of render, export, save, open, check, select, define_mesh, get_mesh, define_material,
+    // project_uvs and unwrap moved it (bake is not among the tools this digest covers); no schema and no other tool did.
+    private const string Before = "9DE9FEB846DAE5AA0E36C6825CB88610677B5CFA4412468E6C75C32E374F674B";
 
-    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake"];
+    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "help"];
 
     /// <summary>The sentences T-93 adds to existing descriptions, each removed before the digest.</summary>
     private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check,
@@ -93,7 +96,7 @@ public class PartToolsListTests
             Assert.True(Count(text, carve::Carve.Server.PartTexts.PartSpace) == (partSpace.Contains(name) ? 1 : 0), $"{name}: PartSpace sentence count");
             Assert.True(Count(text, carve::Carve.Server.PartTexts.PartTarget) == (partTarget.Contains(name) ? 1 : 0), $"{name}: PartTarget sentence count");
             Assert.True(Count(text, carve::Carve.Server.PartTexts.DefineMesh) == (name == "define_mesh" ? 1 : 0), $"{name}: DefineMesh sentence count");
-            Assert.True(Count(text, carve::Carve.Server.PartTexts.Check) == (name == "check" ? 1 : 0), $"{name}: Check sentence count");
+            Assert.True(Count(name == "check" ? HelpToolTests.WithReference(text, name) : text, carve::Carve.Server.PartTexts.Check) == (name == "check" ? 1 : 0), $"{name}: Check sentence count");
         }
     }
 
@@ -106,9 +109,16 @@ public class PartToolsListTests
         foreach (var tool in (await carve.ListToolsAsync()).EnumerateArray())
         {
             var (name, text) = (tool.GetProperty("name").GetString()!, tool.GetProperty("description").GetString()!);
-            Assert.True(Count(text, carve::Carve.Server.RenderPartTexts.Parts) == (name == "render" ? 1 : 0), $"{name}: render's part and level paragraph count");
+            // T-207: render's paragraph moved to its help entry, so it is in no description and once in that entry.
+            Assert.True(Count(text, carve::Carve.Server.RenderPartTexts.Parts) == 0, $"{name}: render's part and level paragraph count");
             Assert.True(Count(text, carve::Carve.Server.GetMeshTool.PlacementText) == (name == "get_mesh" ? 1 : 0), $"{name}: get_mesh's placement paragraph count");
         }
+    }
+
+    [Fact]
+    public void Renders_part_and_level_paragraph_is_in_its_help_entry_once()
+    {
+        Assert.Equal(1, Count(carve::Carve.Server.HelpTool.Entry("render")!, carve::Carve.Server.RenderPartTexts.Parts));
     }
 
     private static int Count(string text, string sentence)

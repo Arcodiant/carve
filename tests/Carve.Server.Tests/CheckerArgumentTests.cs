@@ -190,7 +190,7 @@ public sealed class CheckerArgumentTests() : FileToolTests("carve-checker-args")
     {
         var (carve, tools) = await StartProcessAsync();
         using var _ = carve;
-        var text = Description(tools, "render");
+        var text = HelpToolTests.WithReference(Description(tools, "render"), "render");
         var start = text.IndexOf("Example: on define_mesh's unit cube, face 1 is [4,5,6,7]", StringComparison.Ordinal);
         Assert.True(start >= 0, "render's checker example is missing");
         var sentence = text[start..text.IndexOf("The caption names the mode", start, StringComparison.Ordinal)];

@@ -15,7 +15,26 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
 
     public const string Text =
         "Writes the current mesh to a .glb file (binary glTF 2.0) that a game on the Empyrean engine loads as it is. Takes path, the file to write, and overwrite (default false), which must be true to replace a file that is already there, in either mode. "
-        + "What is written: one mesh on one node, both named after the file name without its extension (crate.glb gives crate), the node's transform the identity; "
+        + "mode: 'model' (the default) writes the meshes, and with a skeleton the skin and its clips; 'clips' writes the armature and the animations with no mesh, one file of clips for every character that shares the skeleton (it needs no mesh); 'piece' with meshes writes just those meshes with the whole skeleton and no animations, a costume piece swapped at runtime. "
+        + "Colours (set_colour) and materials (set_material) are written as glTF primitives and materials, UVs as Carve holds them, morph targets (define_target) as glTF morph targets, one mesh on one node with flat normals. "
+        + "Parts (define_part): the .glb keeps a node only where a part moves; parts marked moves are child nodes, the static ones are merged into the root's mesh. "
+        + "With a skeleton (define_skeleton) the file is skinned, one mesh with JOINTS_0 and WEIGHTS_0 from set_weights, an 'Armature' node and one animation per clip (define_clip); a vertex with no weight is refused unless allow_unweighted: true. "
+        + "Game limits: export warns, and still writes, past the limits in carve-limits.json (found above the .glb, or named by limits); write_limits: true creates it. "
+        + "Axes and units are the mesh's own:+Y up, +Z front, 1 unit = 1 m, the origin where you authored it. Nothing is scaled, turned, recentred or converted, "
+        + "so build the model at the size and place the game wants it. "
+        + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
+        + "an existing file is refused unless overwrite: true is given, and then it is replaced and the result says (replaced); the path must end in .glb, in any case. "
+        + "A graph material (define_material with a texture graph's output in a slot) is baked at export from the graph files as they are on disk then, at each slot's size, and written as ordinary PNG textures, so the game never evaluates a graph; the result gains the baked list and the 5 s warning as render's does, and nothing is baked again after a render of the same model. A graph that reads the mesh and is used by several meshes is written once per mesh as <material>@<mesh>, named in a warning; one used by a single mesh keeps its name. "
+        + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
+        + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
+        + "Returns one line: exported <file> to <absolute path>, then the triangles, the materials, the size and bounds, where the limits came from and any warnings. A mesh with warnings still exports and the result repeats them. export changes nothing and is not an undo step. Every error writes nothing and names itself. "
+        + "Worked example, a crate into a game's content folder (put the game's folder for <game>):\n"
+        + ExampleMarker + SaveTool.WorkedExport + "\n"
+        + """More: help {"tool":"export"} gives what is written (nodes, materials, UVs), the parts and skinned detail, the piece and clips modes, the limits file and its format, the result line, the errors and the worked examples.""";
+
+    /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"export"}</c> returns it.</summary>
+    public const string Reference =
+        "What is written: one mesh on one node, both named after the file name without its extension (crate.glb gives crate), the node's transform the identity; "
         + "the triangles render draws, with flat normals: each face keeps its own normal, so every edge is hard; "
         + "one matte grey material named 'carve' (base colour 0.72, 0.72, 0.70, metallic 0, roughness 1, single-sided), and for faces coloured with set_colour one more opaque matte material per colour, named 'carve #RRGGBB', its baseColorFactor the linear form of the colour (metallic 0, roughness 1), a primitive for each; "
         + "faces given a material with set_material (define_material) are written as glTF pbrMetallicRoughness, one primitive per material under the material's own name, after the colours' primitives, in order of first use by face: "
@@ -24,10 +43,6 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         + "An emissive_texture shows only with a non-black emissive, which multiplies it. No alpha fields and no sampler are written: materials are opaque, and the engine uses its own sampling. "
         + "positions and normals, and when any face has UVs, or any material in use has a texture, a TEXCOORD_0 holding each corner's UV exactly as Carve holds it (no conversion: glTF's axes, (0, 0) at the image's top-left), a vertex split wherever its UV or normal differ; "
         + "a model with no UVs and no textured material in use has no TEXCOORD_0; the corners of a face without UVs are written as (0, 0), and the result warns '<mesh>: N faces have no UVs; their corners are written as (0, 0)' with the first face ids, and for faces of a textured material \"material 'wood' has a texture, but N faces using it have no UVs; their corners are written as (0, 0) (<mesh> faces ...)\" in place of that warning for those faces; no vertex colours. "
-        + "Axes and units are the mesh's own: +Y up, +Z front, 1 unit = 1 m, the origin where you authored it. Nothing is scaled, turned, recentred or converted, "
-        + "so build the model at the size and place the game wants it. "
-        + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
-        + "an existing file is refused unless overwrite: true is given, and then it is replaced and the result says (replaced); the path must end in .glb, in any case. "
         + "Errors, each a tool error that writes nothing: an existing file without overwrite: true (the error names the path and overwrite, and the file is unchanged); no mesh yet (call define_mesh or open first; clips mode needs none); an empty path; a path holding a character a file path may not; "
         + "a path naming a folder; any extension but .glb; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
@@ -63,13 +78,9 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         + "It is refused, writing nothing, for an empty or missing meshes list, a name that is not a mesh (the error lists the model's mesh names) and a model with no skeleton; a vertex with no weight in a chosen mesh is refused as in the model mode, and allow_unweighted: true applies. "
         + "A piece warns on the game's max_triangles and max_submeshes as the model mode does, not on height, and reads and writes the limits file as model mode does. "
         + "A model with morph targets (define_target) writes each as a glTF morph target, and the result line names them in glTF target order, for example \"2 morph target(s) 'Girth', 'Slim' in glTF target order\"; a model with none says nothing of targets. "
-        + "A graph material (define_material with a texture graph's output in a slot) is baked at export from the graph files as they are on disk then, at each slot's size, and written as ordinary PNG textures, so the game never evaluates a graph; the result gains the baked list and the 5 s warning as render's does, and nothing is baked again after a render of the same model. A graph that reads the mesh and is used by several meshes is written once per mesh as <material>@<mesh>, named in a warning; one used by a single mesh keeps its name. "
-        + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
-        + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
         + "Worked example of a material: define_material {name: 'wood', base_colour: '#C8A06E', roughness: 0.6, base_colour_texture: 'wood.png'}, project_uvs, set_material {faces: [0, 1], material: 'wood'}, then export: the .glb holds primitives 'carve' and 'wood', 'wood' with baseColorTexture holding wood.png's bytes, the result line says 2 materials 'carve', 'wood', and the game's loader reads 'wood' back as that material. "
         + "Worked example, writing into a game's content folder (put the game's folder for <game>; the first export for a game can add limits: \"<game>/Content\" and write_limits: true to start <game>/Content/carve-limits.json); the game then loads it as "
-        + "models.LoadModel(new ContentPath(\"models/crate.glb\")):\n"
-        + ExampleMarker + SaveTool.WorkedExport;
+        + "models.LoadModel(new ContentPath(\"models/crate.glb\")); the Example line in the description is that export.";
 
     public static McpServerTool Create()
     {

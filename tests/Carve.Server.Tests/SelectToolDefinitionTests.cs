@@ -50,11 +50,11 @@ public class SelectToolDefinitionTests
         using var _ = carve;
         var lines = ToolList.Description(tools, "select").Split('\n');
         var examples = ToolList.Examples(tools, "select");
-        Assert.Equal(5, examples.Length);
+        Assert.Equal(4, examples.Length);
 
         var pairs = lines.Zip(lines.Skip(1)).Where(p => p.First.StartsWith(Example, StringComparison.Ordinal) && p.Second.StartsWith(Result, StringComparison.Ordinal))
             .Select(p => (Call: p.First[Example.Length..], Written: p.Second[Result.Length..])).ToArray();
-        Assert.Equal(examples[..4], pairs.Select(p => p.Call));
+        Assert.Equal(examples[..3], pairs.Select(p => p.Call));
 
         Assert.Equal("""{"kind":"faces","faces":[3],"count":1,"of":6}""", pairs[0].Written);
         Assert.Equal("""{"kind":"vertices","vertices":[3,7],"count":2,"of":8}""", pairs[1].Written);
@@ -69,9 +69,9 @@ public class SelectToolDefinitionTests
         using var _ = carve;
         var examples = ToolList.Examples(tools, "select");
 
-        var selected = await OkAsync(carve, "select", examples[3]);
-        Assert.Equal($$"""{"faces":{{List(selected, "faces")}},"by":[0,0.5,0]}""", examples[4]);
-        var moved = await OkAsync(carve, "move", examples[4]);
+        var selected = await OkAsync(carve, "select", examples[0]);
+        Assert.Equal($$"""{"faces":{{List(selected, "faces")}},"by":[0,0.5,0]}""", examples[3]);
+        var moved = await OkAsync(carve, "move", examples[3]);
 
         Assert.Equal(Ints(await OkAsync(carve, "select", Select("vertices", "y == 1.5")), "vertices"), Ints(moved, "moved"));
         Assert.Equal([2, 3, 6, 7], Ints(moved, "moved"));
@@ -95,7 +95,7 @@ public class SelectToolDefinitionTests
     {
         var (carve, tools) = await StartAsync(define: false);
         using var _ = carve;
-        var text = ToolList.Description(tools, "select");
+        var text = HelpToolTests.WithReference(ToolList.Description(tools, "select"), "select");
 
         string[] said =
         [
