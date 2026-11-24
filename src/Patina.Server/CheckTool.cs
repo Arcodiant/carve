@@ -117,6 +117,7 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
                     return Error($"check: size {given.GetRawText()} is not allowed; size is a power of two from 32 to {MaxSize} (32, 64, 128, 256, 512, 1024 or 2048)");
             }
             set = CheckSet.OfGraph(new GraphEvaluator(graph, registry), side);
+            if (MeshNote(graph) is { Length: > 0 } meshNote) set = new(set.Source, set.Outputs, [.. set.Notes, meshNote]);
             pixels = side;
         }
         return Line(Report(set, pixels).ToJsonString());
