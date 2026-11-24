@@ -69,16 +69,9 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
     public const string Text =
         "Defines a named material, the PBR look of a surface: define_material(name, and any of base_colour, metallic, roughness, emissive, occlusion, double_sided and five texture slots). "
         + "Every field you leave out is the default, so a bare name is matte white; defining a name that exists replaces that material whole (fields left out go back to their defaults) and says so. Faces get a material with set_material. "
-        + "How the game's PBR shading reads each field: "
-        + "base_colour is the surface colour, sRGB hex #RRGGBB, default #FFFFFF, multiplied with base_colour_texture when there is one. "
-        + "metallic, 0 to 1, default 0: 1 is a metal (no diffuse colour: it shows by reflecting its surroundings); 0 is a dielectric such as wood or plastic. "
-        + "roughness, 0 to 1, default 1: 1 is matte, 0 is a mirror. "
-        + "emissive is light the surface gives off, sRGB hex, default #000000 (none); it is not lit or shaded. The glow is emissive times emissive_texture, so with an emissive_texture and no emissive, emissive becomes #FFFFFF; one you give, even #000000, is kept. "
-        + "occlusion, 0 to 1, default 1, is how strongly the occlusion map darkens crevices; with no occlusion_texture it has no effect and the result warns of that. "
-        + "double_sided, default false, draws the back of a face too; leave it false for a closed solid. "
+        + "Fields: base_colour (sRGB hex #RRGGBB, default #FFFFFF, multiplied with base_colour_texture), metallic (0 to 1, default 0), roughness (0 to 1, default 1: matte, 0 a mirror), emissive (sRGB hex, default #000000: none; with an emissive_texture and no emissive it becomes #FFFFFF), occlusion (0 to 1, default 1; with no occlusion_texture it has no effect and the result warns of that), double_sided (default false; leave it false for a closed solid). "
         + "A texture is a PNG path, relative to carve's working folder or absolute, read when you call this: a later change to the file does not reach the model until you define the material again. "
-        + "base_colour_texture and emissive_texture are sRGB colour. normal_texture is a tangent-space normal map and is linear: its pixels are directions, not colours. "
-        + "metallic_roughness_texture is linear with roughness in the green channel and metallic in the blue channel (red is unused). occlusion_texture is linear with occlusion in the red channel. "
+        + "base_colour_texture and emissive_texture are sRGB colour; normal_texture is a linear tangent-space normal map; metallic_roughness_texture is linear, roughness in green and metallic in blue; occlusion_texture is linear, occlusion in red. "
         + "Any slot may instead be a texture graph's output, {graph, output, size}: graph a .texgraph path resolved as a PNG's is, output its name, size a power of two from 64 to 4096 (default the graph's own, clamped). Unlike a PNG, a graph is read again at every render and export, so a change saved to it shows there, and one removed or broken later fails them. render draws a graph material, and export bakes it and writes the baked PNGs. "
         + "A texture is drawn only on faces that have UVs (project_uvs, unwrap or set_uvs); check warns of a textured face without them. Materials are opaque: there is no transparency. "
         + "A face has either a colour (set_colour) or a material, and giving it one clears the other. One undo step. "
@@ -88,7 +81,21 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         + "Worked example, a rough wooden material with a texture (set_material's own example puts it on faces):\n"
         + ExampleMarker + """{"name":"crate","roughness":0.8,"base_colour_texture":"textures/crate.png"}"""
         + "\nWorked example of graph slots, graphs/iron.texgraph a graph of size 512 with base_colour and roughness outputs:\n"
-        + ExampleMarker + """{"name":"weathered-iron","base_colour_texture":{"graph":"graphs/iron.texgraph","output":"base_colour","size":256},"metallic_roughness_texture":{"graph":"graphs/iron.texgraph","output":"roughness"}}""";
+        + ExampleMarker + """{"name":"weathered-iron","base_colour_texture":{"graph":"graphs/iron.texgraph","output":"base_colour","size":256},"metallic_roughness_texture":{"graph":"graphs/iron.texgraph","output":"roughness"}}"""
+        + "\n"
+        + """More: help {"tool":"define_material"} gives how the game's shading reads each field, the glow and occlusion rules, and each texture's colour space and channels.""";
+
+    /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"define_material"}</c> gives it.</summary>
+    public const string Reference =
+        "How the game's PBR shading reads each field: "
+        + "base_colour is the surface colour, sRGB hex #RRGGBB, default #FFFFFF, multiplied with base_colour_texture when there is one. "
+        + "metallic, 0 to 1, default 0: 1 is a metal (no diffuse colour: it shows by reflecting its surroundings); 0 is a dielectric such as wood or plastic. "
+        + "roughness, 0 to 1, default 1: 1 is matte, 0 is a mirror. "
+        + "emissive is light the surface gives off, sRGB hex, default #000000 (none); it is not lit or shaded. The glow is emissive times emissive_texture, so with an emissive_texture and no emissive, emissive becomes #FFFFFF; one you give, even #000000, is kept. "
+        + "occlusion, 0 to 1, default 1, is how strongly the occlusion map darkens crevices; with no occlusion_texture it has no effect and the result warns of that. "
+        + "double_sided, default false, draws the back of a face too; leave it false for a closed solid. "
+        + "base_colour_texture and emissive_texture are sRGB colour. normal_texture is a tangent-space normal map and is linear: its pixels are directions, not colours. "
+        + "metallic_roughness_texture is linear with roughness in the green channel and metallic in the blue channel (red is unused). occlusion_texture is linear with occlusion in the red channel. ";
 
     private static readonly string[] Known =
     [

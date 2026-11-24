@@ -25,6 +25,7 @@ public sealed class HelpTool
         ("open", "the version 1 detail, the part tree and its example, every error, and which file to keep working in", OpenTool.Reference),
         ("bake", "each map's channels and rules, the surface entries, the curvature block, the result fields and every error", BakeTool.Reference),
         ("select", "the float detail, the stale-selection rule and every error", SelectTool.Reference),
+        ("define_material", "how the game's shading reads each field, the glow and occlusion rules, and each texture's colour space and channels", DefineMaterialTool.Reference),
         ("check", "the thresholds, the morph-target and UV-warning rules, every warning's full wording, the envelope warnings, the notes and the stats", CheckTool.Reference),
     ];
 
