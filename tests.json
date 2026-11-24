@@ -520,7 +520,7 @@
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 120
+      "est-seconds": 90
     },
     {
       "id": "scenario-weathered-sizes",
@@ -555,7 +555,7 @@
       "requires": [
         "vulkan"
       ],
-      "est-seconds": 120
+      "est-seconds": 110
     },
     {
       "id": "scenario-cuts",

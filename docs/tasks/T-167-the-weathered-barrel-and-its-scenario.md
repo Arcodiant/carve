@@ -293,3 +293,47 @@ Stage 3's bottom-hoop check is not reached by `mirror`, because the end grain fa
 3. **"Read darker" after the move.** The close on the stave's mean luma over the staves beside the moved hoop must fall by **at least 4**
    (measured 7.9: 80.0 to 72.1). The front view is not held to it: the raised hoop hides those stave pixels there (its mean rose 77.5 to
    80.6 over a different set of points). Declined: any decrease with no margin; a texel rule in place of the shaded check.
+
+### Hand-off (2026-11-24, agent 3, Opus 5.5 `claude-opus-5-5`; stopped at the 60-call checkpoint, before `verify`)
+
+**Done and committed:**
+- **The three rulings in code** (`RebakeStage.cs`):
+  1. The unwrap step now unwraps the hoops and their walls only (not the caps), into the widest part of the rest band clear of the caps'
+     UVs, margin 0.03: unwrapping the hoops over the caps' UVs made the bake refuse with T-166's overlap message. D-6's rule is applied to the
+     front's pixels whose ray meets a stave or a cap first (a ray test over `get_mesh`'s faces through M-7's `Shot`) with no hoop pixel
+     within **3 px** (rule P2's clearance at 512): **51,443 pixels, 0 differ, largest patch 0.** The whole frame: 3,598 differ, patch 468
+     (logged, not checked). Threshold (1) on the new layout: 109.715 - 89.291 = **20.4** (at least 8). It bakes again and the `uvs` look differs.
+  2. No code change: M-7's relations on set means stand (stage 2 already did this).
+  3. The close on the stave: **80.014 - 72.116 = 7.9** (at least 4), over the 54 points seen before and after.
+- **Stage 4** (`ErrorsStage.cs`): the run's `weathered-iron.texgraph` renamed `weathered-iron-renamed.texgraph`; `render` and `export` refuse
+  with exactly `materials['weathered-iron'].base_colour_texture: no file at <graphs>\weathered-iron.texgraph; the .texgraph files in <graphs> (3)
+  are: planks.texgraph, weathered-iron-renamed.texgraph, weathered-staves.texgraph` + the "after the fact" tail; `check` warns with that line
+  for both slots (no tail). Renamed back, all three succeed and `check` is silent. T-166's table matches (the file names carry `.texgraph`).
+- **Stage 5** (`SavedStage.cs`): saved (`"carve": 10`, graph paths `graphs/weathered-iron.texgraph`, `graphs/weathered-staves.texgraph`),
+  reopened with `get_mesh` the same and every 512 frame of stage 2 byte-identical, exported clean to `game/Content/models/barrel-weathered.glb`;
+  `render_glb` front and three-quarter: 0 of 262,144 differ each; control (three-quarter glb against front) 59,662 differ, fails as it must.
+- `samples/barrel-weathered.carve` (copied from run J-20261124-190908-c44476's save), `tests/Carve.WeatheredLoad.Tests` (the saved file is the
+  sample by content; the `.glb` loads 3 materials, no warning, every texture byte-equal to `GraphSlotBake.Png` of the saved file, or the PNG),
+  the run script's load step (as planks'), the project in `Carve.slnx`.
+- **The split** (as T-172 did for patina): `--Weathered:Stages=main` (suite `scenario-weathered`: stage 2 at 512 and stages 3 to 5, with the
+  load tests) and `=sizes` (suite `scenario-weathered-sizes`, via `run-scenario.ps1`: stage 2 at 256 and 1024). Unset runs all. Measured
+  69.7 s and 95.8 s; `est-seconds` 90 and 110 (neighbours 90 to 120). Both in the `**Verify:**` line and in `tests.json` with their inputs (the
+  main one gains the load tests' closure, `RunContent.cs` and the sample).
+- The run writes `failures.txt` (the count and every failure) even when a check of M-7's fails the driver, which should give the `mirror`
+  break a count: not yet run.
+
+**Checked:** `cairn test run scenario-weathered scenario-weathered-sizes`: both PASS (J-20261124-191302-315574, 69.7 s, load tests 2 passed;
+J-20261124-191428-7fd3e6, 95.8 s). No frame opened. **`verify` not run.**
+
+**Left:** the breaks re-run with `--fresh` and their counts (the table above is agent 2's, before the split: `neutral` and `swap` counts
+will drop in `scenario-weathered`, which sees 512 only; `stale` is now caught by the ruled 4-luma check); `CLAUDE.md` Layout rows (scenario,
+load tests, script, sample) and `README.md`; `cairn task T-167 verify`; then the frame review, the person's approval, `### As built`,
+`cairn lint`, `finish`.
+
+**Frames** (`cairn test artifacts <job> --out ...`): 512 and the stage 3 to 5 frames from J-20261124-191302-315574 (`frames/w512-*`,
+`rebake-*`, `*-reopened`, `*-glb`, `compare/rebake-unwrapped.png`, `compare/good-front.png`, `compare/good-three-quarter.png`); 256 and
+1024 from J-20261124-191428-7fd3e6 (`frames/w256-*`, `frames/w1024-*`, the `-crop4` PNGs). For the person: the front, back, three-quarter,
+top, the three closes and the sheet at 512, the `uvs` crops, and the two `good-*` triptychs.
+
+**Surprising:** the `move` bakes every slot of both materials again, not only the staves'; the caps' UVs sit at u 0 to 0.60, v 0.34 to 0.65,
+so the re-unwrapped hoops go into v 0.646 to 1 (a different texel density, which is what the ruling asks to differ).
