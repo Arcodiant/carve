@@ -25,9 +25,11 @@ namespace Carve.Server.Tests;
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "58132D064D4026FF34495FDBE9340051F73F1E704B6D5A3844FCED76463FC1D5";
+    // T-207 retakes the digest as each of its agents changes descriptions (render by agent A; the last retake is the one that counts):
+    // render, and the new help tool, are the descriptions it has changed so far.
+    private const string Before = "A48706DB90CD2646C84B7C3F7ED441D9F1D091ABB94949564780AB870D3EF0CA";
 
-    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake"];
+    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "help"];
 
     /// <summary>The sentences T-93 adds to existing descriptions, each removed before the digest.</summary>
     private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check,
@@ -106,9 +108,16 @@ public class PartToolsListTests
         foreach (var tool in (await carve.ListToolsAsync()).EnumerateArray())
         {
             var (name, text) = (tool.GetProperty("name").GetString()!, tool.GetProperty("description").GetString()!);
-            Assert.True(Count(text, carve::Carve.Server.RenderPartTexts.Parts) == (name == "render" ? 1 : 0), $"{name}: render's part and level paragraph count");
+            // T-207: render's paragraph moved to its help entry, so it is in no description and once in that entry.
+            Assert.True(Count(text, carve::Carve.Server.RenderPartTexts.Parts) == 0, $"{name}: render's part and level paragraph count");
             Assert.True(Count(text, carve::Carve.Server.GetMeshTool.PlacementText) == (name == "get_mesh" ? 1 : 0), $"{name}: get_mesh's placement paragraph count");
         }
+    }
+
+    [Fact]
+    public void Renders_part_and_level_paragraph_is_in_its_help_entry_once()
+    {
+        Assert.Equal(1, Count(carve::Carve.Server.HelpTool.Entry("render")!, carve::Carve.Server.RenderPartTexts.Parts));
     }
 
     private static int Count(string text, string sentence)

@@ -275,3 +275,43 @@ if the person declines it.
 **Decided (2026-11-24).** By the person: carve gains the tool, named `help`. By the orchestrator, following patina's
 T-170: the 10% margin (3,686), the five descriptions near the cut trimmed in this task, a `help` entry holding only
 what left its description, and no separate probe of the cut before T-168's first round.
+
+### Hand-off
+
+Agent A, on Claude Sonnet 5.5 (`claude-sonnet-5-5`). Done: `help` tool (`src/Carve.Server/HelpTool.cs`, registered after `bake`),
+`render` trimmed (3,564 characters, was 19,122) with `RenderTool.Reference` (20,126 characters), `HelpToolTests`, the
+`FileToolTests.ToolList.Examples(string)` overload, the pins that followed render's text (`CheckerArgumentTests`,
+`RenderDefinitionTests` read `HelpToolTests.WithReference(description, "render")`; `PartToolsListTests` pins render's
+`Parts` paragraph once in the entry), `GraphSlotToolTests`' superseded length test removed, tool count 43. `server-unit` passes.
+
+- **Add an entry (B, C):** (1) on the tool's class `public const string Reference = ...` holding the sentences that
+  leave the description, word for word (move whole source lines; do not retype); (2) one line in `HelpTool.Entries`
+  (tool, what it covers, the Reference): `help {}` and the tool's own description list from that table; (3) end the
+  trimmed description with `More: help {"tool":"<name>"} gives <what moved>.`; (4) delete the tool from
+  `HelpToolTests.Pending`. The test `Every_description_is_under_the_limit_but_the_tools_still_to_trim` then holds it
+  at 3,686 and fails if a pending tool is already under. A tool that needs a Reference must be reached through
+  `carve::Carve.Server.HelpTool.Entry(name)` in tests (the test project aliases the server as `carve`).
+- **Tests that read moved text:** read `HelpToolTests.WithReference(Description(tools, name), name)` (description plus
+  entry) so every pin keeps holding wherever the sentence is; a worked example in an entry is a line starting
+  `Example: `, run with `ToolList.Examples(string)`. Pins to `PartTexts.*` that move: check `PartToolsListTests`.
+- **Digest:** `PartToolsListTests.Before` was retaken now (render and `help`, which joins `NewTools`) because
+  `server-unit` must pass at each commit; the Scope's "once, last" is not possible with three agents. B and C each
+  retake it for their tools (run the test, copy the printed digest), the closer takes the final one and the comment.
+- **Measured now (`tools/list` as served, after T-165/T-166):** render 3,564 (done); over 3,686 and in `Pending`: bake 8,684,
+  check 8,310, export 14,015, save 6,286, open 5,676, select 5,571, define_mesh 4,032, get_mesh 3,983, define_material
+  4,059, project_uvs 3,809, unwrap 3,720. help is under 1,000.
+- **Render sentence check:** a script (`%TEMP%\t207_diff.py`) parsed the old and new string literals and split into 263
+  sentences: every old sentence is word for word in `Reference` (two reported misses were splitter artefacts: the
+  opening sentence's tail and a sentence joined to the next without a space; both are in the entry). Kept in the
+  description, the graph-material sentences: the slot's evaluation sentence word for word, the `baked:` sentence with
+  "to bake: lower" shortened to "(lower ...)", and T-165's graph `image` as the shortened clause plus the
+  `Example: {"mode":"uvs","image":{"graph":...}}` line (which `GraphImageToolTests` still finds). The entry restates
+  the opening sentence and `mode` list whole, so the first sentence names every edit as `EditToolDefinitionTests` reads.
+- **Result size:** a 20,126-character reply is about 5,000 tokens; as I recall, Claude Code warns at 10,000 tokens and
+  caps an MCP result at 25,000 by default (`MAX_MCP_OUTPUT_TOKENS`). Not checked against the docs in this run, so no
+  entry is split by topic. The entry is whole-description-sized, not trimmed, in the sense that lines kept verbatim in the
+  description are not repeated, but the tightened ones are kept in full.
+- **Left for B:** export, save, open, bake. **For C:** check, select, define_mesh, get_mesh, define_material, project_uvs,
+  unwrap. **For the close:** `README.md` (Use paragraph and the sections that speak of moved detail), `CLAUDE.md` (the
+  Working rule and the Layout rows naming `HelpTool` and `HelpToolTests`), the final digest, `verify`, `### As built`.
+  Not done by A: README and CLAUDE.md edits.
