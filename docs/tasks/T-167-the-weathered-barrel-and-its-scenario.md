@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-162, T-164, T-165, T-166
 
-**Verify:** server-unit, scenario-materials, scenario-planks
+**Verify:** server-unit, scenario-materials, scenario-planks, scenario-weathered
 
 ## Goal
 
