@@ -113,7 +113,7 @@ public sealed record SeparablePasses(int RowReach, int ColumnReach);
 /// <summary>An input port: its name, what it takes, and whether a graph must connect it.</summary>
 public sealed record InputPort(string Name, PortKind Kind, bool Required = true);
 
-public enum ParamKind { Int, Float, Enum, IntPair, Colour, Floats, Colours, Name, GreyOrColour, FilePath }
+public enum ParamKind { Int, Float, Enum, IntPair, Colour, Floats, Colours, Name, GreyOrColour, FilePath, Text }
 
 /// <summary>
 /// A parameter: its name, kind, range or choices, and default. <see cref="Check"/> says what is wrong with a value in
@@ -180,6 +180,9 @@ public sealed class ParamSpec
     /// <summary>A path to a <c>.texgraph</c> file (a <c>graph</c> node's <c>path</c>, T-140), with no default.</summary>
     public static ParamSpec FilePath(string name) => new(name, ParamKind.FilePath, 0, 0, [], ParamValue.Of(""), optional: true);
 
+    /// <summary>Optional free text, not empty, with no default (a carve group or material name, M-29's <c>mesh_mask</c>, T-161).</summary>
+    public static ParamSpec Text(string name) => new(name, ParamKind.Text, 0, 0, [], ParamValue.Of(""), optional: true);
+
     /// <summary>What a value must be, for a message: "a whole number from 1 to 4".</summary>
     public string Describe() => Kind switch
     {
@@ -192,6 +195,7 @@ public sealed class ParamSpec
         ParamKind.Name => $"a name, {GraphNames.Pattern} (lower case letters, digits and _, starting with a letter)",
         ParamKind.GreyOrColour => $"a number from {N(Min)} to {N(Max)} for a grey input, or a colour \"#rrggbb\" for a colour one",
         ParamKind.FilePath => "a path to a .texgraph file, relative to this graph's file",
+        ParamKind.Text => "text, not empty",
         _ => "a colour \"#rrggbb\"",
     };
 
@@ -213,6 +217,7 @@ public sealed class ParamSpec
             ParamKind.Name => value.Kind == ParamValueKind.Text && GraphNames.IsValid(value.Text!) ? null : wrong,
             ParamKind.GreyOrColour => (value.Kind == ParamValueKind.Number && InRange(value.Number)) || (value.Kind == ParamValueKind.Text && TryParseColour(value.Text!, out _)) ? null : wrong,
             ParamKind.FilePath => value.Kind == ParamValueKind.Text && IsRelativePath(value.Text!) ? null : wrong,
+            ParamKind.Text => value.Kind == ParamValueKind.Text && value.Text!.Length > 0 ? null : wrong,
             _ => value.Kind == ParamValueKind.Text && TryParseColour(value.Text!, out _) ? null : wrong,
         };
     }

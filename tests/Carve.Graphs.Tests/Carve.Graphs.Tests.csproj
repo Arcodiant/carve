@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Carve.Graphs.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
+    <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Carve.Graphs/Carve.Graphs.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The barrel and its seams, as the Core's tests build it. -->
+    <Compile Include="../Carve.Core.Tests/TestMeshes.cs" Link="TestMeshes.cs" />
+  </ItemGroup>
+
+</Project>
