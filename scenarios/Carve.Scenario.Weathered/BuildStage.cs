@@ -11,11 +11,14 @@ internal static class Barrel
     public static readonly int[] Caps = [32, 33];
     public const float Raise = 0.015f;
 
-    /// <summary>The staves' band of the square: projected as M-7 does, so each of the eight facets is one plank (u = k/8 to (k+1)/8).</summary>
-    public static readonly float[] StaveBand = [0, 0, 1, 0.625f];
+    /// <summary>
+    /// The staves' band of the square: projected as M-7 does, so each of the eight facets is one plank (u = k/8 to (k+1)/8). The projection
+    /// keeps the staves' aspect (v spans 0.324 of the square at full width), so the band is just that tall and the iron gets the rest.
+    /// </summary>
+    public static readonly float[] StaveBand = [0, 0, 1, 0.34f];
 
     /// <summary>The rest (hoop tops, their walls, the caps) unwrapped below the band.</summary>
-    public static readonly float[] RestBand = [0, 0.625f, 1, 1];
+    public static readonly float[] RestBand = [0, 0.34f, 1, 1];
 
     /// <summary>Every face but the staves, once extrude has added the hoops' walls.</summary>
     public static int[] Rest(int faceCount) => [.. Enumerable.Range(0, faceCount).Where(f => !Staves.Contains(f))];
@@ -59,7 +62,9 @@ internal sealed class BuildStage : IWeatheredStage
         foreach (var (name, args) in Barrel.Materials(run))
         {
             var defined = await CallJsonAsync(driver, "define_material", args);
-            if (defined.TryGetProperty("warnings", out var w) && w.GetArrayLength() != 0) run.Note($"define_material {name}: warnings {w}");
+            // A graph that reads the mesh is reported as such (it bakes per mesh); anything else is a fault of the build.
+            var others = defined.TryGetProperty("warnings", out var w) ? w.EnumerateArray().Select(e => e.GetString()!).Where(e => !e.Contains("the graph reads the mesh, so it is baked onto each mesh", StringComparison.Ordinal)).ToArray() : [];
+            if (others.Length != 0) run.Note($"define_material {name}: warnings {string.Join("; ", others)}");
         }
 
         var iron = Barrel.Rest(faceCount).Where(f => !Barrel.Caps.Contains(f)).ToArray();
