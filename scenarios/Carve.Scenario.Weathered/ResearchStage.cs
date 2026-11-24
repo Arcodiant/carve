@@ -13,7 +13,7 @@ namespace Carve.Scenario.Weathered;
 /// </summary>
 internal sealed class ResearchStage : IWeatheredStage
 {
-    private const int UvFrame = 2048, Shaded = 512;
+    private const int UvFrame = 1024, Shaded = 512;
     private static readonly Vector3 Front = new(1.6f, 1.2f, 2.2f), Back = -Front;
     private readonly StringBuilder log = new();
 
