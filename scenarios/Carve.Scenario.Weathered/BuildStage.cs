@@ -25,9 +25,9 @@ internal static class Barrel
 
     public static string Graph(WeatheredRun run, string name) => run.InRun(Path.Combine("graphs", name + ".texgraph"));
 
-    public static (string Name, object Args)[] Materials(WeatheredRun run)
+    public static (string Name, object Args)[] Materials(WeatheredRun run, int size = WeatheredRun.BakeSize)
     {
-        object G(string graph, string output) => new { graph = Graph(run, graph), output, size = WeatheredRun.BakeSize };
+        object G(string graph, string output) => new { graph = Graph(run, graph), output, size };
         string T(string file) => run.InRun(Path.Combine("textures", file));
         return
         [
@@ -68,7 +68,9 @@ internal sealed class BuildStage : IWeatheredStage
         }
 
         var iron = Barrel.Rest(faceCount).Where(f => !Barrel.Caps.Contains(f)).ToArray();
-        foreach (var (material, faces) in new[] { ("weathered-iron", iron), ("weathered-staves", Barrel.Staves), ("end-grain", Barrel.Caps) })
+        // The swap break: the two graphs' materials exchanged, the iron's on the staves and the staves' on the iron.
+        var (onIron, onStaves) = WeatheredRun.Break == "swap" ? ("weathered-staves", "weathered-iron") : ("weathered-iron", "weathered-staves");
+        foreach (var (material, faces) in new[] { (onIron, iron), (onStaves, Barrel.Staves), ("end-grain", Barrel.Caps) })
         {
             var set = await CallJsonAsync(driver, "set_material", new { material, faces });
             if (set.TryGetProperty("warnings", out var w) && w.GetArrayLength() != 0) run.Note($"set_material {material}: warnings {w}");

@@ -494,6 +494,7 @@
         {
           "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
         },
+        "scenarios/Carve.Scenario.Orcward/ComparisonPng.cs",
         "scenarios/Carve.Scenario.Materials/MaterialsSampler.cs",
         "scenarios/Carve.Scenario.Materials/MaterialsChecks.cs",
         "scenarios/Carve.Scenario.Uvs/UvsScene.cs",
