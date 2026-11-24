@@ -324,6 +324,12 @@ its swatch sheet in a folder of its name: `planks`, `cobblestones`, `bricks`
 (with mortar, tint and jitter exposed; `bricks/variants/grey/` is its grey stone
 variant), `fabric`, `painted-metal`, `floor-tiles`, `grime` (a filter graph with
 an `input`) and `old-wall` (the bricks and the grime used as `graph` nodes).
+`weathered-iron` and `weathered-staves` read the mesh (`mesh_curvature`, `mesh_occlusion`,
+`mesh_mask`, `mesh_position`): patina has no mesh, so it evaluates those nodes on neutral
+stand-ins (curvature 0.5, occlusion 1, mask 1, position `#808080`) and says so in `get_graph`,
+`open`, `swatch`, `export` and `check`; the real maps come from the mesh when a carve
+material names the graph. Their PNGs are the neutral ones (`wear` and `grime` are black),
+so `check` reports `one-value` on those two outputs and nothing else.
 `samples/graphs/faults/` holds two graphs that `check` finds faults in.
 
 ### A worked example

@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-161
 
-**Verify:** patina-unit, scenario-patina
+**Verify:** patina-unit, scenario-patina, server-unit
 
 ## Goal
 
@@ -81,3 +81,32 @@ says so. The two graphs the weathered barrel uses are committed with it.
 - **Write down for T-163 and T-167** (As built): the graphs' node ids and parameter values, the measured ranges of
   each neutral output, and the commands that remake the PNGs.
 - **Stop and ask:** a planks PNG or an existing swatch frame that changes; a `check` threshold that would have to move.
+
+### As built
+
+Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`). Frame review not yet done (see Hand-off).
+
+- **patina:** `Patina.Server` references `Carve.Graphs`; `Program.Registry` is the one registry (built-in nodes plus
+  `MeshNodes.Register(NodeRegistry.BuiltIn, null)`), used by `AddTools` and so by every tool. `ToolSupport.MeshNote(graph)`
+  gives `mesh inputs neutral: <id> (<type>), ...; the real maps come from the mesh when a carve material names the graph`
+  (empty for a graph without a direct mesh node, so planks answers are unchanged; a mesh node inside a nested `graph` file is
+  not looked into). It is added to `get_graph` (own line before the file), `open` (last line), `export` (last line), `check`
+  (a `notes` entry) and `swatch` (every result caption; the sheet's title strip gets `mesh inputs neutral`).
+  `NodeCatalogue` describes the four types (metres, stand-in sentence) with a worked example for each; they are in the
+  `nodes` tool, and `define_graph`'s description carries the index only (T-170's cut: the spec's worked example in
+  `define_graph`'s own text would have taken it past 3,686, so it sits in `nodes`, run by `Every_types_worked_examples_run_as_written`).
+  Tool lengths are held by `NodeToolTests` and pass; `nodes`' text and the define_graph index gained the four types.
+- **`tools/Patina.SampleGraphs`** registers the same neutral registry and prints `(mesh inputs neutral)` on the line of a graph that has a mesh node.
+- **Graphs** (`samples/graphs/`, size 256, PNGs in `<name>/`, remake with `dotnet run --project tools/Patina.SampleGraphs`; do not pass `--canonical` for all, it rewrites the other graphs' whitespace):
+  - `weathered-iron.texgraph` (version 2, seed 41): `curv` = `mesh_curvature` width 0.02 -> `rim` = `levels` in 0.6..0.85 -> `wear` = `blend` multiply of `rim` and `breakup` (`levels` 0.3..0.6 to 0.35..1 of `chips`, `fbm` gradient 16x16); `base` = `blend` mix of `iron` (`gradient_map` of `grain`, `#787c82` to `#8e9298`) and `steel` (`#b4b9be` to `#dde0e3`) masked by `wear`; `rough` likewise (iron 0.4..0.5, steel 0.2..0.3); `metal` = 1. Outputs `base_colour`, `roughness`, `metallic` (packed in roughness.png), `wear`. Exposed `wear_amount` 0..1 (default 1) drives `base.opacity` and `rough.opacity`. Iron is `#787c82` or brighter because `check` requires a metal texel's brightest channel at 120 or more. PNGs: base_colour 13762 B, roughness 14627 B, wear 938 B.
+  - `weathered-staves.texgraph` (version 2, seed 77, which must equal planks' seed since the outer seed rules): `staves` = `graph` node on `planks.texgraph`; `occ` = `mesh_occlusion` rays 32 reach 0.15 -> `grime` = `levels` in 0.45..1, out 1..0; `base` = mix of `staves.base_colour` and `dirt` (`#3a2a1c`), `rough` = mix of `staves.roughness` and 0.95, both masked by `grime`. Outputs `base_colour`, `roughness`, `normal`, `occlusion`, `grime`. Exposed `grime_amount` 0..1 (default 1) drives the two opacities. PNGs: base_colour 7906, roughness 12095, normal 988, occlusion 966, grime 938 bytes.
+  - Neutral: `wear` and `grime` are 0 on every texel; `check` reports exactly `one-value` on each of those two and nothing else; weathered-staves' base_colour, roughness, normal and occlusion are byte-equal to planks' (all in `tests/Patina.Server.Tests/MeshNodeToolTests.cs`). Other neutral output ranges were not measured beyond that.
+- **Tests:** `MeshNodeToolTests` (every tool with a mesh graph and the notes, planks unchanged, PNGs equal the graphs, check's problems, staves = planks, exposed amounts); `NodeToolTests` use `Program.Registry`; `CheckSamplesTests` (Patina.Graphs.Tests) skips `weathered-*`, which need the mesh registry and are held by the above; `ProductReferenceGuard`'s allowed list gained `Carve.Graphs`, a shared line that only adds (carve's own tests link the file, so `server-unit` is in the Verify line).
+- **Scenario:** `MeshNodesStage.cs` and one line in `PatinaStages.cs` (in the `base` selection, so suite `scenario-patina`); it judges the title's note by the title running at least 80 px past the same graph's with no mesh node (text is not decoded). The break (the note left out of the expected title) failed, in `mesh-nodes-breaks.txt`. Frames: `mesh-nodes-iron-sheet`, `mesh-nodes-iron-sphere`, `mesh-nodes-plain-sheet`.
+- **publish folder:** patina's output gained `Carve.Graphs.dll` (and `Carve.Core.dll` if not already there); no engine or extension.
+- **README:** the Samples paragraph of the patina section names the two graphs and the neutral rule. CLAUDE.md: rows for `src/Patina.Server`, `tools/Patina.SampleGraphs` and the Patina scenario.
+- **Not checked:** the frames by eye (the reviewing agent's); `swatch` of `weathered-staves` (no scenario frame, only its PNGs); a mesh node inside a nested graph file's note; the exact text of the title in pixels.
+
+### Hand-off
+
+Code committed and `cairn task T-162 verify` passes (patina-unit, server-unit, scenario-patina). Left: frame review by a separate agent, then the person's approval through `mcp__waystone__review`, then `cairn task T-162 finish`. Frames (from the verify run, `cairn test artifacts scenario-patina`, in `D:\Repos\carve\branches\task\T-162\test-artifacts\patina\frames\`): `mesh-nodes-iron-sheet.png`, `mesh-nodes-iron-sphere.png`, `mesh-nodes-plain-sheet.png`; and the committed PNGs `samples/graphs/weathered-iron/{base_colour,roughness,wear}.png`, `samples/graphs/weathered-staves/{base_colour,roughness,normal,occlusion,grime}.png`. Look for: the title strip's note legible and not cut off on the iron sheet, the iron dark and even with no bright rim, the staves like the planks. Nothing surprising.
