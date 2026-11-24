@@ -22,17 +22,24 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         "Reads a .carve file (written by save). With mesh left out it REPLACES THE WHOLE MODEL with the file's: its meshes, colours, groups, weights, skeleton and clips, and nothing of the model before is kept. "
         + "With mesh, it takes only that mesh from the file (with its colours, groups and weights) and puts it in the model, replacing the mesh of that name or adding it; the model's skeleton and clips stay, "
         + "and the mesh's weights are matched to the model's skeleton by bone name, so it is refused when they name a bone the model's skeleton does not have. "
-        + "A version 1 file (one mesh, from before skeletons) opens as one mesh named mesh, or, with mesh given, as that one mesh under the name given, any name define_mesh takes (not empty, no ':'). "
         + "Either way open is one step like any other, so undo takes it back to the model before it. The first change a process has cannot be undone, whichever tool made it, so undo straight after an open that gave the process its first model is a tool error (the model stays), while a process that had a mesh before the open can undo it; and only the last 100 changes are kept, so once 100 changes have followed an open, the open itself can no longer be undone. Takes path, the file to read. "
         + "A file's materials come with it: each texture is read again from its path relative to the .carve file's folder, so a texture that is missing or is not a PNG refuses the open, naming materials[i].<field>. With mesh, only the materials that mesh's faces use come with it and are read, so a missing texture on another material does not refuse it: one the model lacks is added, one the model already defines identically is kept, and one the model defines differently refuses the open, naming the material (define one of them again under another name, or open the whole file). "
         + "A version 10 file's graph slots come back as saved: a graph that cannot be baked (a file missing or not a texture graph, a fault in it, an output it lacks) does not refuse the open, which keeps the slot and adds material_warnings:[...] to the result, each naming the material, the slot and what is wrong, so define_material can name another. "
         + "The file holds the polygons exactly, with the ids they were saved with: vertex 0 is the file's first vertex and face 0 its first face, "
-        + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so the file brings no older states with it, "
-        + "and carve keeps no current file: give the path to open and to save every time. "
-        + "The .carve file is the one to keep working in; the .glb that export writes is only for the game and cannot be opened. "
+        + "so the ids you used before the save still name the same vertices and faces. It does not hold the undo history, so the file brings no older states with it. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; the path must end in .carve, in any case. "
+        + "Errors, each a tool error that leaves the model, its ids and undo as they were, and names itself. A version 7 or 9 file brings back its part tree; with mesh on a part tree open takes that part as a piece. "
         + "Returns define_mesh's JSON report ({vertices, faces, edges, closed, bounds, warnings}) preceded by path, the absolute path read; when the whole model has several meshes, {meshes:[{name, and that report}]} instead, and meshes:[] for a file of a skeleton and clips with no mesh (a clip library); "
         + "and when the model now has a skeleton, bones (how many) and clips (their names). "
+        + "The whole sequence from an empty file to a game is the worked example in save's description.\n"
+        + ExampleMarker + SaveTool.WorkedFile + "\n"
+        + """More: help {"tool":"open"} gives the version 1 detail, the part tree and its example, every error, and which file to keep working in.""";
+
+    /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"open"}</c> returns it.</summary>
+    public const string Reference =
+        "A version 1 file (one mesh, from before skeletons) opens as one mesh named mesh, or, with mesh given, as that one mesh under the name given, any name define_mesh takes (not empty, no ':'). "
+        + "And carve keeps no current file: give the path to open and to save every time. "
+        + "The .carve file is the one to keep working in; the .glb that export writes is only for the game and cannot be opened. "
         + "Errors, each a tool error that leaves the model, its ids and undo as they were: an empty path; a path holding a character a file path may not; "
         + "a path naming a folder; any extension but .carve; a file that does not exist, which names the absolute path looked for and lists the .carve files in that folder "
         + "(at most 20, sorted, and a count of the rest), or says there are none or that the folder does not exist, so correct the path from that list; "
@@ -44,9 +51,7 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         + "With mesh on a part tree, open takes that part's own geometry and kept levels as a piece and nothing of its place in the file: it replaces the geometry and levels of the model's part of that name, which keeps its parent, transform, envelope, children and moves mark, "
         + "or adds it as a new top-level part at the origin. mesh naming an instance or an empty, in the file or in the model, is a tool error that says which it is and names the source part an instance shows. "
         + "Part tree example: with the rover open, open {\"path\":\"wheel.carve\",\"mesh\":\"Wheel_FL\"} replaces Wheel_FL's polygons and levels with the file's; Wheel_FL stays at (0, 0, 0.72) under Axle_F, "
-        + "and its instances Wheel_FR, Wheel_RL and Wheel_RR show the new wheel; mesh Wheel_FR is refused, since it is an instance of Wheel_FL. "
-        + "The whole sequence from an empty file to a game is the worked example in save's description.\n"
-        + ExampleMarker + SaveTool.WorkedFile;
+        + "and its instances Wheel_FR, Wheel_RL and Wheel_RR show the new wheel; mesh Wheel_FR is refused, since it is an instance of Wheel_FL. ";
 
     private const string DropTargetsText =
         "true to replace a mesh that has morph targets, dropping them (undo brings them back). Left out or false, an open that would replace a mesh with targets is refused, naming them.";
