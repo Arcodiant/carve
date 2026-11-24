@@ -106,3 +106,53 @@ output and a size. `define_material` takes it, `get_mesh` reports it, and the Ca
 - **Stop and ask:** a rule the spec does not settle (a slot kind the description cannot explain, a version question),
   or any check that would have to loosen.
 
+### As built
+
+Ran on Opus 5.5 (claude-opus-5-5), in two agents (the first handed off at its checkpoint).
+
+**For T-163, T-164, T-165, T-166.**
+- **Core types** (`src/Carve.Core/Material.cs`): `abstract record MaterialSlot(string Path)` with two kinds,
+  `MaterialTexture : MaterialSlot` (the PNG, unchanged) and `MaterialGraph(string Path, string Output, int Size) :
+  MaterialSlot` (equal by value; `Extension`, `MinSize`, `SizeProblem`, `OutputProblem`, `Problem()`). A slot is told
+  apart by type (`slot is MaterialGraph`). The five slot properties are `MaterialSlot?`; `Textures`, `HasTexture`,
+  `OcclusionHasNoEffect` and `Problems` cover both kinds; `HasGraph` is new. `NameProblem(name, existing = false)`
+  refuses '@' only for a new name (`Problems`, `FaceStyle.WithMaterial` and the file reader pass `existing: true`).
+- **The file** (`src/Carve.Core/CarveFile.cs`): `GraphSlotsVersion = 10`, written for any model with a graph slot and
+  laid out as version 9; a slot is `{"graph": <relative, '/'>, "output", "size"}`, read by `ReadGraphSlot` (all three
+  required, unknown key refused, path resolved against the file's folder, the graph file not read). An object slot in
+  a file below 10 is refused as "not a string". `TextureProblem` says "graph" for a graph on another drive. Fixture
+  `tests/Carve.Core.Tests/Fixtures/graph-slots-v10.carve`.
+- **The tools** (`src/Carve.Server/MaterialTools.cs`): `Carve.Server` references `Patina.Graphs`.
+  `DefineMaterialTool.LoadGraph` takes the object form; `DefineMaterialTool.ReadGraph(fullPath, out graph)` is the
+  shared read that refuses a missing (`Missing(target, extension)` lists the `.texgraph` files in the folder),
+  unreadable or non-graph file, ignoring the graph's validation faults. `MaterialJson.Of` reports `{graph, output,
+  size}` (the absolute path); `MaterialJson.BrokenGraphs` gives open's `material_warnings`.
+- **The interim refusal T-163 removes**: `MaterialJson.GraphsNotDrawn`, called in `RenderTool` (after the part check)
+  and `ExportTool` (after the no-mesh check); define_material's sentence "Until graph materials are drawn, render and
+  export refuse a model with one."; README's "Graph materials are not drawn yet: ..." sentence; and the test in
+  `GraphSlotToolTests` holding the refusal. `SaveTool.MissingTextures` and the glb/PBR builders take PNG slots only.
+
+**Tests.** `tests/Carve.Core.Tests/GraphSlotFileTests.cs` (slot, Problems, '@' and a file with '@' still opening, v10
+write/read/round trip, the fixture, another drive, malformed slots, v9 refusal of an object slot, every committed
+sample byte for byte, and v2..v9 models pinned by SHA-256 taken from main's writer).
+`tests/Carve.Server.Tests/GraphSlotToolTests.cs` (the worked example as written, PNG and graph mixed, emissive default,
+every refusal, the missing listing, a load error, '@', undo of a define and of a replace, save/open, open's warnings
+for a missing and a broken graph, the render/export refusal, a graph's own size of 32 and 8192 clamped to 64 and 4096,
+and define_material's and get_mesh's descriptions held under 4,096 characters).
+
+**Pins retaken, this task's own text only.** `PartToolsListTests.Before` (tools/list digest, now 9D2C371B...): the diff
+of `src/Carve.Server` against `origin/milestone/M-29` changes only define_material's text and schema and get_mesh's,
+save's and open's texts. The version-list pins in `CarveFileTests` and `SaveOpenToolTests` ("9" to "9 and 10"; the
+unknown-version probes moved from 10 to 11). No frame or export hash moved.
+
+**Description lengths.** define_material went over the cut (4,697) with the graph form and was tightened to 3,959,
+partly in its existing text (the PNG and emissive sentences, the result's field list, the first example's lead-in);
+get_mesh to 3,983. **save (6,286) and open (5,617) were already over 4,096 on main before this task** (about 6,060 and
+5,370); trimming them is outside this member, so no test holds them, and save's new sentence starts at character
+4,069, past the cut. Raised to the orchestrator.
+
+**Not checked.** carve has no redo, so "undo and redo of a define" is undo only. No render of a graph material (T-163).
+
+**README.** The materials section gains the slot's object form, the read-at-every-render rule, version 10 and the
+interim refusal. CLAUDE.md's version list gains version 10. The member's **Verify** gained scenario-materials and
+scenario-planks, whose tests the `.Png` casts touch.
