@@ -24,6 +24,7 @@ public sealed class HelpTool
         ("save", "the file format with the unit cube's file, the part tree and its example, every version's detail, the errors and the missing-texture warning", SaveTool.Reference),
         ("open", "the version 1 detail, the part tree and its example, every error, and which file to keep working in", OpenTool.Reference),
         ("bake", "each map's channels and rules, the surface entries, the curvature block, the result fields and every error", BakeTool.Reference),
+        ("check", "the thresholds, the morph-target and UV-warning rules, every warning's full wording, the envelope warnings, the notes and the stats", CheckTool.Reference),
     ];
 
     /// <summary>The names of the entries, in the order <c>help {}</c> lists them.</summary>
