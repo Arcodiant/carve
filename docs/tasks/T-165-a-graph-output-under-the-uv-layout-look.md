@@ -122,6 +122,12 @@ checkpoint: code committed and `verify` passing, the frame review left.
   the new stage adds about 18 s.
 - **Descriptions** (characters, `origin/milestone/M-29` then this member): `render` 19122 to 19954, `bake` 8410 to
   8684; both were over 4,096 before. `PartToolsListTests`' digest did not move.
+- **Left, before the frame review (from the coordinator, after this `verify`):** T-166 has landed on
+  `origin/milestone/M-29`. Rebase (expect `PartToolsListTests.Before` to conflict: keep both sides' descriptions,
+  rebuild, retake the digest). T-166 words a graph problem `materials['<name>'].<slot>: <cause>`, so the look's
+  `GraphSlotProblem.Of(<graph file>, "image", e)` in `RenderTool.cs` would read `materials['<file>'].image: ...`, wrong for
+  an image that belongs to no material: add an `Of` overload with no material, naming the `image` argument and the cause
+  (T-166's `### As built` has the table of causes), with a `server-unit` test holding the whole message; then `verify`.
 - **Left:** the frame review (open the new graph frames and the moved bake frames, crops scaled up; the person approves
   the set through `mcp__waystone__review`, files to `G:\My Drive\artifacts\carve\M-29\T-165\round-N`), then
   `### As built` (fold this section in; T-167's notes: the argument's shape, the caption, how the frames were checked),
