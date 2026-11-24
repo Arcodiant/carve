@@ -120,6 +120,21 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
         File.AppendAllText(Path.Combine(Frames, "barrel-512-baked.txt"), $"\nagainst PNGs: {measured}\ncontrol: {controlled}\n");
     }
 
+    /// <summary>T-164: export's own time on the barrel at 512 and 1024 with nothing baked before it, in the test log for T-167 and T-168.</summary>
+    [Theory]
+    [InlineData(512)]
+    [InlineData(1024)]
+    public async Task The_barrel_export_bakes_and_says_how_long_it_took(int size)
+    {
+        var (process, _) = await StartProcessAsync(mesh: null);
+        using var carve = process;
+        await BarrelAsync(carve, size);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var line = TextOf(await carve.CallToolAsync("export", $$"""{"path":"barrel-{{size}}.glb"}"""));
+        TestContext.Current.TestOutputHelper?.WriteLine($"export at {size}: {clock.ElapsedMilliseconds} ms; {line}");
+        Assert.Equal(6, line.Split($"\"size\":{size}").Length - 1);
+    }
+
     /// <summary>T-164: the barrel exported at 512 and drawn by render_glb agrees with render, front and three-quarter; the file exported with the graphs' wear and grime at 0 does not.</summary>
     [Fact]
     public async Task The_exported_barrel_is_drawn_by_render_glb_as_render_draws_it()
