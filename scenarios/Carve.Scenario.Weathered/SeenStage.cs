@@ -16,9 +16,10 @@ namespace Carve.Scenario.Weathered;
 /// warm or not), and the caps M-7's end grain (<see cref="Pool.Rings"/>, which also catches the <c>mirror</c> break: a mirrored top view sees the
 /// bottom cap).
 /// </summary>
-internal sealed class SeenStage : IWeatheredStage
+internal sealed class SeenStage(params int[] sizes) : IWeatheredStage
 {
-    public static readonly int[] Sizes = [256, 1024, WeatheredRun.BakeSize];
+    /// <summary>The bake sizes this run sees, in order; 512 (if there) last, so the stages after it start from it.</summary>
+    public int[] Sizes { get; } = sizes;
     public static readonly Vector3 Front = new(1.6f, 1.2f, 2.2f), Back = -Front, ThreeQuarter = new(-2.2f, 0.8f, 1.6f);
     private const int Tile = 256, Gutter = 2;
 
@@ -68,7 +69,7 @@ internal sealed class SeenStage : IWeatheredStage
             foreach (var (graph, output) in new[] { ("weathered-iron", "wear"), ("weathered-staves", "grime") })
             {
                 object image = WeatheredRun.Break == "neutral" ? neutral : new { graph = Barrel.Graph(run, graph), output, size };
-                var uvs = run.Frames[$"w{size}-uvs-{output}"] = await driver.CaptureAsync($"w{size}-uvs-{output}", new { mode = "uvs", image, size = UvFrame });
+                var uvs = await run.CaptureAsync($"w{size}-uvs-{output}", new { mode = "uvs", image, size = UvFrame });
                 values[output] = Names.ToDictionary(n => n, n => Values(uvs, sets[n]));
                 foreach (var n in Names) run.Log.Add($"{at} {output} {n}: mean {F(values[output][n].DefaultIfEmpty().Average())} max {F(values[output][n].DefaultIfEmpty().Max())}");
                 var centre = sets[Rim].Where(t => t.Top).MaxBy(t => Vector3.Dot(Vector3.Normalize(new Vector3(t.P.X, 0, t.P.Z)), Vector3.Normalize(new Vector3(Front.X, 0, Front.Z))));
@@ -94,17 +95,17 @@ internal sealed class SeenStage : IWeatheredStage
             })
             {
                 var name = $"w{size}-{view}";
-                var frame = run.Frames[name] = await driver.CaptureAsync(name, camera.Args());
+                var frame = await run.CaptureAsync(name, camera.Args());
                 ShadedChecks(run, $"{name}", frame, scene, mesh, camera, sets, ruled);
             }
 
-            var topFrame = run.Frames[$"w{size}-top"] = await driver.CaptureAsync($"w{size}-top", new { view = "+y", size = Shaded, mode = "shaded" });
+            var topFrame = await run.CaptureAsync($"w{size}-top", new { view = "+y", size = Shaded, mode = "shaded" });
             var topCamera = new Camera(Vector3.UnitY).Predicted(min, max);
             run.Try(() => new Pool(driver, topFrame, new Shot(faces, min, max, topCamera.Direction, Shaded), $"top {at}", caps, new HashSet<int>()).Rings(33));
 
             // The six-view sheet, each tile its own camera.
             (string View, Vector3 Direction)[] views = [("front", Front), ("back", Back), ("+x", Vector3.UnitX), ("-x", -Vector3.UnitX), ("+y", Vector3.UnitY), ("-y", -Vector3.UnitY)];
-            var sheet = run.Frames[$"w{size}-sheet"] = await driver.CaptureAsync($"w{size}-sheet", new { views = views.Select(v => v.View).ToArray(), columns = 3, size = Tile, mode = "shaded" });
+            var sheet = await run.CaptureAsync($"w{size}-sheet", new { views = views.Select(v => v.View).ToArray(), columns = 3, size = Tile, mode = "shaded" });
             for (var k = 0; k < views.Length; k++)
             {
                 var camera = new Camera(views[k].Direction, Tile, Left: k % 3 * (Tile + Gutter), Top: k / 3 * (Tile + Gutter));
