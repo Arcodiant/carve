@@ -16,12 +16,14 @@ namespace Carve.Server.Tests;
 /// Taken again for RV-71 (Opus 5.5), whose project_uvs text says planar sees the mesh's own axes and whose export text says a piece of an
 /// instance or an empty is refused as save's is: with those two changes stripped the digest was the one before (DCE3D7BA...).
 /// T-124 (Opus 5.5) adds render_glb's sentence on texture sampling (mip maps, as render's); it is taken out with T-94's additions.
+/// Taken again for T-160 (Opus 5.5), whose define_material text and schema take graph slots and whose get_mesh, save and open
+/// texts name them; the diff of src/Carve.Server against origin/milestone/M-29 changes no other tool's text or schema (was 1697322B...).
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "1697322BAD754E9F549E58F829ACB3038B71EA812D27C0FEA8C1782F06D46820";
+    private const string Before = "9D2C371B30ADE20E8D71AFD51D64D75D176A507DB7B25589FB92233288C53CDA";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "displace"];
 
