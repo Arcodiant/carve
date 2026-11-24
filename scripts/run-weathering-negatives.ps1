@@ -32,7 +32,7 @@ function New-Round($name, $graph, $graphPath) {
     $lines = @(
         @{ type = 'system'; subtype = 'init'; model = 'claude-opus-5-5' },
         @{ type = 'assistant'; message = @{ content = @(@{ type = 'tool_use'; name = 'mcp__carve__render'; input = @{} }) } },
-        @{ type = 'user'; message = @{ content = @(@{ type = 'tool_result'; content = "the graph file 'graphs/steel-worn.texgraph' is not there" }) } },
+        @{ type = 'user'; message = @{ content = @(@{ type = 'tool_result'; content = "no file at graphs/steel-worn.texgraph; the .texgraph files in graphs (1) are: worn-steel.texgraph" }) } },
         @{ type = 'assistant'; message = @{ content = @(@{ type = 'tool_use'; name = 'mcp__carve__define_material'; input = @{ name = 'steel'; base_colour_texture = @{ graph = 'graphs/steel.texgraph'; output = 'base_colour' } } }) } })
     ($lines | ForEach-Object { $_ | ConvertTo-Json -Depth 10 -Compress }) | Set-Content (Join-Path $dir 'transcript.jsonl') -Encoding utf8NoBOM
     $dir

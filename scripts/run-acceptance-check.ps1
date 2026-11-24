@@ -5,7 +5,7 @@
     -Round is the folder holding character.carve and game/Content/models (the agent's scratch folder). Runs scenario
     Carve.Scenario.Acceptance with CARVE_ACCEPTANCE_RUN set to it (it writes <Round>/acceptance/differences.tsv and compare/),
     then the xunit checks in tests/Carve.AcceptanceLoad.Tests on the same folder (built first unless -NoBuild, stopped after
-    -ChecksTimeoutSeconds with exit 124). It fails if a step does or a check is skipped. The scenario's run folder is the last
+    -ChecksTimeoutSeconds with exit 124). -Weathering: T-168's round (CARVE_WEATHERING_RUN, tests/Carve.WeatheringAcceptance.Tests) in place of T-49's. It fails if a step does or a check is skipped. The scenario's run folder is the last
     thing on stdout; everything else goes to stderr. Not a suite: the round folder is an input only an acceptance run makes.
 #>
 [CmdletBinding()]
@@ -13,6 +13,7 @@ param(
     [Parameter(Mandatory)][string]$Round,
     [string]$Configuration = 'Debug',
     [switch]$NoBuild,
+    [switch]$Weathering,
     [int]$ChecksTimeoutSeconds = 180
 )
 
@@ -20,7 +21,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'bounded-run.ps1')
 
-$env:CARVE_ACCEPTANCE_RUN = (Resolve-Path $Round).Path
+if ($Weathering) { $env:CARVE_WEATHERING_RUN = (Resolve-Path $Round).Path } else { $env:CARVE_ACCEPTANCE_RUN = (Resolve-Path $Round).Path }
 $extra = @{}
 if ($NoBuild) { $extra.NoBuild = $true }
 
@@ -33,7 +34,7 @@ if ($code -ne 0 -or -not $folder) {
 }
 $folder = @($folder)[-1]
 
-$tests = Join-Path $root 'tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj'
+$tests = if ($Weathering) { Join-Path $root 'tests/Carve.WeatheringAcceptance.Tests/Carve.WeatheringAcceptance.Tests.csproj' } else { Join-Path $root 'tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj' }
 if (-not $NoBuild) {
     dotnet build $tests -c $Configuration --nologo -v q 2>&1 | ForEach-Object { Write-Err $_ }
     if ($LASTEXITCODE -ne 0) { Write-Output $folder; exit $LASTEXITCODE }
