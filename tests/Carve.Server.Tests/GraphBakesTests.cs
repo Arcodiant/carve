@@ -50,6 +50,10 @@ public class GraphBakesTests : FileToolTests
         var cancel = TestContext.Current.CancellationToken;
         GraphBakes.Drawn Resolve() => bakes.Resolve(carve.Store.Current.Model, cancel);
 
+        // Before any render resolves it, the frame thread draws the graph slots empty and bakes nothing.
+        Assert.Null(bakes.DrawnOf(carve.Store.Current.Model).FindMaterial("m")!.BaseColourTexture);
+        Assert.Equal(0, bakes.Count);
+
         var first = Resolve();
         Assert.Equal(["m//base_colour_texture/64", "m/strip/occlusion_texture/64"], Slots(first).Order());
         Assert.StartsWith("""
