@@ -106,49 +106,85 @@ long it took.
   parallel evaluator, a wall-clock read in an engine-free project); a mismatch with the PNG path under D-6's rule that
   is not explained.
 
-### Hand-off
+### As built
 
-First agent (Opus 5.5, `claude-opus-5-5`) built the bake, the cache and render's path (see its list in git history, commit
-`f190ec6`). Second agent (Opus 5.5, `claude-opus-5-5`), at its checkpoint (past 60 calls), after rebasing onto T-162's landing.
+Three agents, all Opus 5.5 (`claude-opus-5-5`): the first built the bake, the cache and render's path (`f190ec6`), the
+second the regression class, the rebase onto T-162 and the `DrawnOf` fix, the third the clean measurement, the frame
+check, this write-up and `finish`.
 
-**Done (both agents).**
-- `GraphSlotBake` (`src/Carve.Graphs`): `Read(path)` -> `GraphSlotFiles(Path, Files, Hash, ReadsMesh)`, `Key(files, output, size,
-  model, mesh?)`, `Png`/`Rgba(MaterialGraph, slot, model, mesh?, cancel, wrap?)`, `PackingOf(slot, evaluator, output)`,
-  `GraphSlotException`. `MeshBakeSource.Layout(size)` made public (T-161's API change).
-- `GraphBakes` (`src/Carve.Server`, DI singleton): `Resolve(model, cancel)` -> `Drawn(Model, Key, Baked, Warnings)`; `Peek`;
-  `DrawnOf` (frame thread, **never bakes**: an unresolved model is drawn with its graph slots empty, and the pump re-shows when
-  `Peek` changes; fixed by the second agent, since the pump shows every store change and so baked on the frame thread before
-  render did, racing it and leaving `baked` short); `Text(baked)`; one `MeshBakeSource` shared per drawn mesh within a
-  `Resolve` (staves' occlusion was evaluated once per slot); the warning counts a material's copy whole (mesh-independent
-  slots of a mesh-reading material included). `GraphSlotProblem.Of/IsCause`, `GraphSlotProblemException`.
+**The bake (`src/Carve.Graphs`, engine-free).** `GraphSlotBake`:
+- `Read(path)` -> `GraphSlotFiles(Path, Files, Hash, ReadsMesh)`: the graph read with `TexGraphFile.ReadFile`, every
+  nested file (`GraphValidator.Uses(...).Files`) hashed with it; `ReadsMesh` is true when the expanded graph has a mesh node.
+- `Key(files, output, size, model, mesh?)`: the cache key. A slot that does not read the mesh: the files' hash, output and
+  size (one entry serves every mesh). One that does adds the mesh's vertices, faces, UVs, seams, groups, face materials,
+  shading and hard edges, and the vertices and faces of every other mesh (occluders).
+- `Png(...)` / `Rgba(MaterialGraph, slot, model, mesh?, cancel, wrap?)`: **the call that gives a slot's PNG for a mesh**.
+  `PackingOf(slot, evaluator, output)` is the slot table (base colour and emissive a colour output, grey written as grey
+  RGB; normal the `normal` role or a colour; metallic-roughness `roughness` in G, `metallic` in B when there is one;
+  occlusion a grey in R). The bytes are `Patina.Graphs`' `OutputImage`'s, so a graph without a mesh node gives patina's
+  `export` PNG byte for byte (planks at 256, held in graphs-unit). Mesh-reading outputs are padded 8 texels (`Bake.Pad`).
+- `GraphSlotException` for a file gone, unreadable, or an output the slot cannot take. `MeshBakeSource.Layout(size)` was
+  made public (a change to T-161's API).
+
+**The cache (`src/Carve.Server`).** `GraphBakes`, a DI singleton, in memory only: `CapBytes` 512 MB of PNG and decoded
+bytes, least recently used dropped first; `WarnMs` 5000.
+- `Resolve(model, cancel)` -> `Drawn(Model, Key, Baked, Warnings)`: reads and hashes every graph file, bakes what the
+  cache lacks (off the frame thread, cancellation between tiles and maps) with one `MeshBakeSource` shared per drawn mesh
+  within a call, and gives the model with its graph slots replaced by the baked PNG textures; a mesh-reading material
+  worn by two meshes becomes one material copy per mesh. `Baked` is `[{material, mesh, slot, size, ms}]` (`mesh: null`
+  for a mesh-independent slot), timed through an injected clock; `Text(baked)` writes render's `baked:` line, empty when
+  everything came from the cache. The warning sums a material copy's slots (its mesh-independent slots included) and
+  names the costliest slot and node.
+- `Peek(model)` and `DrawnOf(model)` belong to the frame thread. `DrawnOf` **never bakes**: an unresolved model draws its
+  graph slots empty, and the pump re-shows when `Peek` changes. (The first version baked there, racing render and
+  leaving `baked` short.)
+- `GraphSlotProblem.Of(material, slot, cause)` (`material 'x', slot: <cause>`) and `IsCause(e)`. The causes it carries:
+  `GraphSlotException` (file gone or unreadable, an output the slot cannot take), `GraphFaultException` (a fault in the
+  graph), `MeshMapsException` (no UVs, overlapping UVs, a bad size, a missing group or material), `ArgumentException`
+  (no such mesh) and `IOException`. Anything else is let through as carve's own fault. `GraphSlotProblemException`
+  carries the message and the cause.
 - `reads_mesh` per graph slot in `MaterialJson.Of` (define_material, get_mesh; null when the file cannot be read).
-- Interim wording narrowed to export (orchestrator's answer): `define_material`'s sentence, README, `MaterialJson.GraphsNotDrawn`
-  doc; `GraphSlotToolTests.Export_refuses_a_model_with_a_graph_slot_until_it_writes_graph_materials` holds export's refusal.
-  **T-164 must clear:** `ExportTool.cs:146` (the refusal), `MaterialJson.GraphsNotDrawn`, that test, `define_material`'s
-  sentence "export refuses a model with one until it writes them", the README's "`export` does not write one yet ...".
-- render's description gained the paragraph (render's text was ~18,600 characters before this task, far over the 4,096 cut,
-  like save's and open's; not held by the length test, and **a question for the person**). tools/list digest
-  (`PartToolsListTests.Before`) retaken to `D533456632C9A323AF5BA5E04D34B8357B06400D6B6EA0F975FDA0CFEEEDA596`; only
-  define_material's sentence and render's paragraph changed against the milestone.
-- `ProductReferenceGuard`'s allowed list has `Carve.Graphs` (merged with T-162's same line on rebase).
-- Tests: `GraphBakesTests` (server-unit: unresolved draws empty and bakes nothing, baked then a hit, move/unwrap/root file/nested
-  file bake again, undo a hit, the per-mesh copy, 5 s warning by injected clock, a missing file's problem, reads_mesh);
-  `GraphMaterialRenderTests` (server-regression, on T-162's committed graphs: iron on the hoops, staves elsewhere, 512, against
-  the bakes as PNGs and the neutral control; a fine fbm 1024 sampling test on a box face; a 1024 bake of both, which asserts all
-  6 slots are baked by render). The graph frame and the PNG frame were byte-identical (frames tsv, run before the DrawnOf fix).
-- `scenario-materials` (24 PNGs) and `scenario-planks` (17) byte-identical by hash: jobs J-20261124-063731-0ce200 /
-  J-20261124-063729-38333b (this task) against J-20261124-065300-1481c6 / J-20261124-065301-20fd62 (origin/milestone/M-29),
-  all on Mantorok (before the rebase onto T-162 and the DrawnOf fix; models without graphs take the old path).
-- CLAUDE.md rows and the architecture rule; `**Verify:**` gained graphs-unit.
-- Last local runs (uncommitted then, now committed): server-regression PASS (245), server-unit PASS.
+- render: `PbrMaterials` draws the baked PNGs where a `MaterialTexture`'s bytes stand, and `Keep` releases them; every
+  look takes `Resolve`'s model. render's description gained the graph-materials paragraph, and T-160's refusal left it.
 
-**Left.**
-- Measured times for As built: the only 1024 numbers are from a run *before* the DrawnOf fix (frame thread baking concurrently,
-  so inflated): iron 14.6 s (base_colour 8.6 s, mesh_curvature 1.4 s), staves 13.7 s (base_colour 11.5 s, mesh_occlusion 8.9 s);
-  512 before the source sharing: iron 2.8 s, staves 5.8 s. Take clean ones: the regression test writes the captions to
-  `artifacts/graph-material-render-tests/barrel-{512,1024}-baked.txt` (not collected by the runner's artifacts, which take
-  PNGs only), so read them from a failing assert message or a local run's artifacts folder.
-- `cairn task T-163 verify`, `### As built` (fold this section in), commit, `cairn lint`, `finish`.
+**Where T-164 has to clear the interim export refusal:** `ExportTool.cs:146` (its comment now names T-164);
+`MaterialJson.GraphsNotDrawn` (`MaterialTools.cs`);
+`GraphSlotToolTests.Export_refuses_a_model_with_a_graph_slot_until_it_writes_graph_materials`; define_material's
+sentence "export refuses a model with one until it writes them"; and the README's "`export` does not write one yet ...".
+T-165 and T-166 reach a bake through `GraphBakes.Resolve` and `GraphSlotProblem`.
 
-**Not checked.** The 512 MB cap's eviction (no test); a kept level or part tree drawn with a graph material; cancellation
-mid-bake; frames by eye.
+**Measured bake times.** These are Debug times on the raised-hoop barrel (one mesh: iron on the hoops, staves
+elsewhere), taken through render. `GraphMaterialRenderTests` ran alone as ad-hoc job J-20261124-075028-b43d21 on Mantorok.
+Empyrean's Ui.Tests, Xr.OpenXr.Tests, Samples.Host.Tests and Docs.RecipeTests were running on the same runner, so these
+are not idle-machine times. The test now also writes its captions to the test log, where a runner's job log returns them.
+
+| size | iron base_colour | iron metallic_roughness | staves base_colour | staves metallic_roughness | staves normal | staves occlusion | per material |
+|---|---|---|---|---|---|---|---|
+| 512 | 774 ms | 693 ms | 1401 ms | 211 ms | 144 ms | 87 ms | iron 1.5 s, staves 1.8 s |
+| 1024 | 2722 ms | 3877 ms | 4471 ms | 816 ms | 666 ms | 371 ms | iron 6.6 s, staves 6.3 s |
+
+Neither sample warns at 512. Both warn at 1024, as planning expected: staves "took 6.3 s to bake (base_colour_texture
+1024: mesh_occlusion 'occ' 2.7 s)" and iron "took 6.6 s to bake (metallic_roughness_texture 1024: mesh_curvature 'curv'
+0.0 s)". The iron warning names a node that cost 0.0 s: its curvature was evaluated in base_colour's slot (the shared
+source), so the slot's 3.9 s went to the graph's own nodes, and the node the warning names is not the one that cost.
+It is left as it is, as a wording matter for T-166.
+
+**Checked.** verify PASS (core-unit, graphs-unit, patina-unit, server-unit, server-regression, scenario-materials,
+scenario-planks). The barrel's graph frame equals its bakes named as PNGs under D-6's rule, and the neutral control
+fails. scenario-materials (24 PNGs) and scenario-planks (17) are byte-identical by hash after the last code change:
+this task's verify jobs J-20261124-074311-b1bc90 (materials, Mantorok) and J-20261124-074308-952ae9 (planks, Xellotath)
+against origin/milestone/M-29 (02bbb31), J-20261124-074932-730e1c (materials, Xellotath) and J-20261124-074933-3a6bad
+(planks, Mantorok). The queue put each pair on different runners, and the hashes still matched. The tools/list digest
+(`PartToolsListTests.Before`) was retaken to `D533456632C9A323AF5BA5E04D34B8357B06400D6B6EA0F975FDA0CFEEEDA596`; only
+define_material's sentence and render's paragraph moved it.
+
+**Not checked.** The 512 MB cap's eviction (no test); a kept level or part tree drawn with a graph material;
+cancellation mid-bake; frames by eye; times on an idle machine.
+
+**Question for the person.** render's description was about 18,600 characters before this task, far past the 4,096 cut
+(as save's and open's are), and this task's paragraph adds to it; the length test does not hold it.
+
+**README.md:** the interim sentence on graph slots narrowed to export ("`export` does not write one yet ..."), nothing
+else. **CLAUDE.md:** the `src/Carve.Graphs` and `src/Carve.Server` rows and the architecture rule (a graph slot's bake is
+made in `Carve.Graphs`, cached by content in the server and never stored in the Carve file). `ProductReferenceGuard`
+allows `Carve.Graphs`.
