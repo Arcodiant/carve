@@ -25,7 +25,7 @@ namespace Carve.Server.Tests;
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "9DFF83594F018F57FD3CF237B029D4F37667A09938EF02A53E2F6CE1814435D6";
+    private const string Before = "58132D064D4026FF34495FDBE9340051F73F1E704B6D5A3844FCED76463FC1D5";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake"];
 

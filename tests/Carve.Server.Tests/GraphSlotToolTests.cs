@@ -35,7 +35,7 @@ public class GraphSlotToolTests : FileToolTests
         var (carve, tools) = await StartAsync();
         using var scope = carve;
         // save's and open's were over the cut on main before T-160 (about 6,060 and 5,370), and render's (about 18,600 before T-163), so are not held here.
-        foreach (var name in new[] { "define_material", "get_mesh" })
+        foreach (var name in new[] { "define_material", "get_mesh", "set_material" })
             Assert.True(Description(tools, name).Length < 4096, $"{name}: {Description(tools, name).Length} characters");
     }
 
@@ -195,12 +195,12 @@ public class GraphSlotToolTests : FileToolTests
         File.Delete(graph);
         var opened = Body(Ok(await carve.CallToolAsync("open", """{"path":"iron.carve"}""")));
         var warning = opened.GetProperty("material_warnings").EnumerateArray().Single().GetString();
-        Assert.Equal($"materials['iron'].base_colour_texture: the graph {graph} is missing; the slot is kept, and render and export fail on it until the file is there or define_material names another", warning);
+        Assert.Equal($"materials['iron'].base_colour_texture: no file at {graph}; there are no .texgraph files in {Path.GetDirectoryName(graph)}; the slot is kept, and render and export fail on it until the file is there and right, or define_material names another", warning);
         var listed = Body(Ok(await carve.CallToolAsync("get_mesh", "{}"))).GetProperty("materials").EnumerateArray().Single();
         Assert.Equal(graph, Slot(listed, "base_colour_texture").GetProperty("graph").GetString());
 
         File.WriteAllText(graph, "{");
         var broken = Body(Ok(await carve.CallToolAsync("open", """{"path":"iron.carve"}""")));
-        Assert.StartsWith($"materials['iron'].base_colour_texture: the graph {graph} is not a texture graph: line ", broken.GetProperty("material_warnings").EnumerateArray().Single().GetString());
+        Assert.StartsWith($"materials['iron'].base_colour_texture: the graph file '{graph}' cannot be read: line ", broken.GetProperty("material_warnings").EnumerateArray().Single().GetString());
     }
 }

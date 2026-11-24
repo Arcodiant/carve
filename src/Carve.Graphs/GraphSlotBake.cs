@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using Carve.Core;
@@ -13,7 +14,16 @@ namespace Carve.Graphs;
 public sealed record GraphSlotFiles(string Path, IReadOnlyList<string> Files, string Hash, bool ReadsMesh);
 
 /// <summary>A graph slot that cannot be baked for a reason of its own: the file gone or unreadable, or an output the slot cannot take.</summary>
-public sealed class GraphSlotException(string message) : Exception(message);
+public class GraphSlotException(string message) : Exception(message);
+
+/// <summary>The graph file is not there (<see cref="Path"/>); the server words it with the .texgraph files beside it (T-166).</summary>
+public sealed class GraphMissingException(string path) : GraphSlotException($"the graph file '{path}' is not there")
+{
+    public string Path { get; } = path;
+}
+
+/// <summary>An output the graph does not have, or one the slot cannot take (T-166); its message says which, and what would be right.</summary>
+public sealed class GraphOutputException(string message) : GraphSlotException(message);
 
 /// <summary>
 /// The bake of a material's graph slot (M-29, T-163), engine-free: <see cref="Read"/> reads and hashes the graph's files,
@@ -129,25 +139,49 @@ public static class GraphSlotBake
     public static OutputRole PackingOf(string slot, GraphEvaluator evaluator, string output)
     {
         if (!evaluator.Has(output))
-            throw new GraphSlotException($"the graph has no output '{output}'; its outputs are {string.Join(", ", evaluator.Outputs.Select(o => $"'{o}'"))}");
+            throw new GraphOutputException($"the graph has no output '{output}'; its outputs are {string.Join(", ", evaluator.Outputs)}");
         var grey = evaluator.KindOf(output) == PortKind.Grey;
         var roughness = OutputRoles.Name(OutputRole.Roughness);
         return slot switch
         {
             BaseColour or Emissive => grey ? OutputRole.Occlusion : OutputRoles.PackedAs(output),
             Normal when !grey => OutputRoles.PackedAs(output),
-            Normal => throw new GraphSlotException($"'{output}' is a grey output; {Normal} takes the 'normal' output or a colour one"),
+            Normal => throw new GraphOutputException($"'{output}' is a grey output; {Normal} takes the 'normal' output or a colour one"),
             MetallicRoughness when output == roughness => OutputRole.Roughness,
-            MetallicRoughness => throw new GraphSlotException($"{MetallicRoughness} takes the 'roughness' output (with 'metallic' packed in B), not '{output}'"),
+            MetallicRoughness => throw new GraphOutputException($"{MetallicRoughness} takes the 'roughness' output (with 'metallic' packed in B), not '{output}'"),
             Occlusion when grey => OutputRole.Occlusion,
-            Occlusion => throw new GraphSlotException($"'{output}' is a colour output; {Occlusion} takes a grey one"),
+            Occlusion => throw new GraphOutputException($"'{output}' is a colour output; {Occlusion} takes a grey one"),
             _ => throw new ArgumentException($"'{slot}' is not a texture slot", nameof(slot)),
         };
     }
 
+    /// <summary>
+    /// Everything that makes <paramref name="graph"/> unbakeable into <paramref name="slot"/> before a mesh is in it (T-166): a file gone
+    /// or unreadable, every fault of the graph, an output it lacks or the slot cannot take. Evaluates nothing. Throws as <see cref="Png"/> does.
+    /// </summary>
+    public static void Validate(MaterialGraph graph, string slot)
+    {
+        var registry = Unbound;
+        PackingOf(slot, new GraphEvaluator(Load(graph.Path, registry), registry), graph.Output);
+    }
+
+    /// <summary>The <c>mesh_mask</c> nodes of the graph and its nested files that name a group or material: (node id, source, name).</summary>
+    public static IReadOnlyList<(string Node, MaskSource Source, string Name)> MaskNames(GraphSlotFiles files)
+    {
+        var names = new List<(string, MaskSource, string)>();
+        foreach (var file in files.Files.Prepend(files.Path))
+            foreach (var (id, node) in TexGraphFile.ReadFile(file, Unbound).Graph?.Nodes ?? ImmutableSortedDictionary<string, GraphNode>.Empty)
+            {
+                if (node.Type != MeshMaskNode.TypeName) continue;
+                if (node.Params.TryGetValue("group", out var g) && !string.IsNullOrEmpty(g.Text)) names.Add((id, MaskSource.Group, g.Text));
+                else if (node.Params.TryGetValue("material", out var m) && !string.IsNullOrEmpty(m.Text)) names.Add((id, MaskSource.Material, m.Text));
+            }
+        return names;
+    }
+
     private static TextureGraph Load(string path, NodeRegistry registry)
     {
-        if (!File.Exists(path)) throw new GraphSlotException($"the graph file '{path}' is not there");
+        if (!File.Exists(path)) throw new GraphMissingException(path);
         var read = TexGraphFile.ReadFile(path, registry);
         return read.Graph ?? throw new GraphSlotException($"the graph file '{path}' cannot be read: {read.Error}");
     }
