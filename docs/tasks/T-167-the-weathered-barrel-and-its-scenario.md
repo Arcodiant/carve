@@ -269,17 +269,19 @@ inputs, `samples/barrel-weathered.carve`, the CLAUDE.md Layout rows and README, 
 
 **Checked:** only `cairn test run scenario-weathered`: it fails on question 1 alone. No frame was opened. No `verify` was run.
 
-**Breaks** (`CARVE_WEATHERED_BREAK`, each run with `cairn test run --fresh scenario-weathered`; the unwrap failure of question 1 is in every
-run and is left out of the count):
-| break | caught by | count |
-|---|---|---|
-| `swap` | (1), (2) and the clean relations in every view, e.g. `w256-front: shaded, hoop rim minus hoop top middle: 93.625 - 93.580 = 0.045, under the ruled 8` | 77 |
-| `neutral` | (3) and (4) at each size, e.g. `at 256: wear, hoop rim minus hoop top middle: 0.000 - 0.000 = 0.000, under the ruled 0.2` | 6 |
-| `mirror` | the caps' end grain (`Pool.Rings`, which fails through the driver, so the run reports this first failure and no count): `w256-top: top at 256: end grain sample at (250, 84) is on face 32, not the cap 33 in sight` | 1 or more |
-| `stale` | stage 3's darker check: `after the move: the 54 seen staves beside the moved hoop read 80.773 luma, not darker than stage 2's 80.014` | 1 |
-| `no-rebake` | stage 3's baked check: `after wear_amount 0: expected nothing baked, render said baked: [...]` | 1 |
+**Breaks** (rewritten 2026-11-24 by agent 4 from its own runs on the code after the split, the three rulings and the rebase onto T-207;
+agent 2's table, made before those, is gone). Each run with `CARVE_WEATHERED_BREAK=<break> cairn test run --fresh scenario-weathered`
+(stage 2 at 512 and stages 3 to 5); the count is the first line of the run folder's `failures.txt`, and with no break the suite passes
+(clean runs: see agent 4's Hand-off). All five are caught in `scenario-weathered`, so none needed `scenario-weathered-sizes`.
+| break | caught by (the check it is there to prove first) | count | run folder |
+|---|---|---|---|
+| `swap` | (1) and (2) in front, back and close-rim, e.g. `w512-front: shaded, hoop rim minus hoop top middle: 92.981 - 93.137 = -0.156, under the ruled 8`; also the clean relations in every view (`stave middle reads (82, 86, 92) on the mean, not ordered R > G > B by 12 as wood is`), stage 3's darker check and the unwrap's threshold (1) | 28 | `weathered/12` |
+| `neutral` | (3) and (4) in the `uvs` looks: `at 512: wear, hoop rim minus hoop top middle: 0.000 - 0.000 = 0.000, under the ruled 0.2` and `at 512: grime, stave beside hoop minus stave middle: 0.000 - 0.000 = 0.000, under the ruled 0.15`, nothing else | 2 | `weathered/13` |
+| `mirror` | the caps' end grain (`Pool.Rings`): `w512-top: top at 512: end grain sample at (250, 84) is on face 32, not the cap 33 in sight` and the sheet's +y and -y tiles; also (1), (2) and the clean relations, stage 3's darker check (`only 0 staves beside the moved hoop seen both before and after, at least 8 needed`), the unwrap's D-6 over the stave and cap pixels (2227 of 51443 differ, patch 468) and its threshold (1). Now counted: the run goes on past the end-grain failure to the end | 19 | `weathered/14` |
+| `stale` | stage 3's ruled darker check alone: `after the move: close on the stave, staves beside the moved hoop, stage 2's minus now: 80.014 - 80.773 = -0.760, under the ruled 4` | 1 | `weathered/15` |
+| `no-rebake` | stage 3's baked check alone: `after wear_amount 0: expected nothing baked, render said baked: [{"material":"weathered-iron",...,"slot":"base_colour_texture",...}, {...,"slot":"metallic_roughness_texture",...}]` | 1 | `weathered/16` |
 
-Stage 3's bottom-hoop check is not reached by `mirror`, because the end grain fails the run first. The runs took 122 to 147 s.
+The run folders are under the worktree's ignored `artifacts/scenarios/` (not committed); each run took 60 to 67 s.
 
 ### Rulings on agent 2's three questions (2026-11-24, by the person, each asked with the measured figures)
 
