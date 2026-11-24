@@ -25,9 +25,10 @@ namespace Carve.Server.Tests;
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    // T-207 retakes the digest as each of its agents changes descriptions (render by agent A; the last retake is the one that counts):
-    // render, and the new help tool, are the descriptions it has changed so far.
-    private const string Before = "2AB7DE1E4F3284ED37CE045A0EAAD08B1571A60E2AA34BF034A649E8B3FF04ED";
+    // Taken again, once, from the final text, for T-207 (Sonnet 5.5), which holds every description under Claude Code's cut: the new help
+    // tool joins NewTools, and the descriptions of render, export, save, open, check, select, define_mesh, get_mesh, define_material,
+    // project_uvs and unwrap moved it (bake is not among the tools this digest covers); no schema and no other tool did.
+    private const string Before = "9DE9FEB846DAE5AA0E36C6825CB88610677B5CFA4412468E6C75C32E374F674B";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "help"];
 
