@@ -221,6 +221,62 @@ the mean would be noisier on the rim, whose p5 is 0 because of the `breakup` mas
   curvature finds those corners. Look for this in the close rim frames.
 - The 1024 uvs frame is render's largest size. 2048 is refused.
 
-**Sizing:** the run takes 25.7 s now, with bakes of 0.4 s (wear) and 1.0 s (grime) at 512. The 1024 frames add two
+**Sizing (agent 1):** the run takes 25.7 s now, with bakes of 0.4 s (wear) and 1.0 s (grime) at 512. The 1024 frames add two
 materials' bakes at about 6 to 7 s each, both drawing the slow-bake warning, on top of every frame of stage 2 at three
 sizes. Expect about 90 to 150 s in all, so splitting stage 2's 1024 frames into their own suite may be needed.
+
+### Hand-off (2026-11-24, agent 2 of 3, Opus 5.5 `claude-opus-5-5`)
+
+**The ruling** is recorded above, under the proposed thresholds.
+
+**Done and committed:**
+- `ResearchStage` is gone. Its set code is now `WeatheredSets.cs`, and stage 2's checks use it, with `Camera` (the checks' camera, and the
+  `mirror` break). The numbers each check measures go to the run's `sets.txt`.
+- **Stage 2** (`SeenStage.cs`) **passes.** It runs at bake sizes 256, 1024 and 512, in that order, so the stages after it start at 512. Each
+  size has front, back, three-quarter, top, close on a rim (the research's camera), close on the rim from the side, close on the stave below the
+  top hoop, the `uvs` looks of `wear` and `grime` with a 4x crop of each (written by the scenario into `frames/`), and a six-view sheet. The
+  checks:
+  - The five ruled thresholds. (1) and (2) are checked in front, back and close-rim, (3) and (4) in the `uvs` looks, at every size. At 512 the
+    measured values are the research's: 21.3 / 16.5 / 20.1 and 14.7 / 16.8 / 18.6 luma, 0.419, 0.327.
+  - In every view, the clean iron and wood as M-7's relations on each set's mean colour: lit at `Pool.T` or over, and the wood warm by `Pool.M`
+    where the iron is not.
+  - The caps' end grain through `Pool.Rings` on the top view and on the sheet's +y and -y tiles.
+- **Stage 3** (`RebakeStage.cs`) is written. All of it passes except the unwrap's D-6 check (question 1). Each step checks the `baked:` line.
+  - The same render again: nothing baked, byte-identical.
+  - The top hoop's eight faces moved outward 0.01, one `move` each: baked. The staves beside the moved hoop read 80.0 then 72.1 luma, in the
+    close on the stave and over points seen both before and after. The bottom hoop's 1318 points are unchanged. The bounds are unchanged.
+  - `undo` x8: nothing baked, byte-identical.
+  - `unwrap` of the rest with margin 0.03: baked, and the `uvs` look differs.
+  - `wear_amount` 0: baked. Rim minus hoop-top middle is **0.031 luma, so ruled threshold (5) holds.**
+  - The graph restored: nothing baked (a cache hit), byte-identical.
+- Breaks: see the table below.
+
+**Questions for the person (not decided here):**
+1. **Stage 3's unwrap fails D-6's rule.** The front differs from stage 2's in 10344 of 262144 pixels (3.9%), largest patch 8407. The limit is
+   0.5% or a patch of 50. The cause: the iron graph's noise (`chips`, `breakup`, `grain`) is laid out in UV space, so a new layout moves the
+   wear's breakup and the grain. No change to the UVs avoids that. The triptych is the run's `compare/rebake-unwrapped.png`. Possible answers:
+   D-6 over the staves only (their UVs do not change); D-6 dropped for this step; another UV change. The check stays as written and fails, so
+   `verify` cannot pass until this is ruled.
+2. **"Match the lit colour of the clean outputs".** `ColourRule` predicts a dielectric at roughness 1. The iron is metallic 1 and the staves
+   carry a roughness map, so it cannot predict either one. Stage 2 checks M-7's relations on set means instead (above). The person should say
+   whether that stands.
+3. **"Read darker" after the move** is taken as a lower mean luma, with no margin. It is checked in the close on the stave because in the front
+   view the moved hoop hides the stave pixels next to it, and the mean there rose from 77.5 to 80.6. The grime texels rose 0.333 -> 0.508.
+
+**Left:** stage 4 (errors), stage 5 (save, sample, export, `render_glb`), `tests/Carve.WeatheredLoad.Tests` with the script's load step and its
+inputs, `samples/barrel-weathered.carve`, the CLAUDE.md Layout rows and README, `est-seconds` (now 120; a run takes 121 s, so expect about
+150 s with stages 4 and 5; no split yet), `verify`, the frame review.
+
+**Checked:** only `cairn test run scenario-weathered`: it fails on question 1 alone. No frame was opened. No `verify` was run.
+
+**Breaks** (`CARVE_WEATHERED_BREAK`, each run with `cairn test run --fresh scenario-weathered`; the unwrap failure of question 1 is in every
+run and is left out of the count):
+| break | caught by | count |
+|---|---|---|
+| `swap` | (1), (2) and the clean relations in every view, e.g. `w256-front: shaded, hoop rim minus hoop top middle: 93.625 - 93.580 = 0.045, under the ruled 8` | 77 |
+| `neutral` | (3) and (4) at each size, e.g. `at 256: wear, hoop rim minus hoop top middle: 0.000 - 0.000 = 0.000, under the ruled 0.2` | 6 |
+| `mirror` | the caps' end grain (`Pool.Rings`, which fails through the driver, so the run reports this first failure and no count): `w256-top: top at 256: end grain sample at (250, 84) is on face 32, not the cap 33 in sight` | 1 or more |
+| `stale` | stage 3's darker check: `after the move: the 54 seen staves beside the moved hoop read 80.773 luma, not darker than stage 2's 80.014` | 1 |
+| `no-rebake` | stage 3's baked check: `after wear_amount 0: expected nothing baked, render said baked: [...]` | 1 |
+
+Stage 3's bottom-hoop check is not reached by `mirror`, because the end grain fails the run first. The runs took 122 to 147 s.
