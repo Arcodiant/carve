@@ -4,7 +4,7 @@ description: >-
 ---
 # T-167 — The weathered barrel and its scenario
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
