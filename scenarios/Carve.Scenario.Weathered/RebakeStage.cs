@@ -76,7 +76,14 @@ internal sealed class RebakeStage : IWeatheredStage
         // The UVs changed: the hoops and their walls (not the caps, whose UVs stay with the staves') unwrapped again with another margin.
         var uvsBefore = await driver.CaptureAsync("rebake-uvs-before", new { mode = "uvs", size = Shaded });
         var hoops = Barrel.Rest(mesh.Faces.Length).Where(f => !Barrel.Caps.Contains(f)).ToArray();
-        await CallJsonAsync(driver, "unwrap", new { faces = hoops, into = Barrel.RestBand, margin = 0.03 });
+        // Into the widest part of the rest band clear of the caps' UVs, since the bake refuses a hoop texel that also shows a cap.
+        var capUvs = Barrel.Caps.SelectMany(f => mesh.Uvs[f]).ToArray();
+        var (c0, c1) = (capUvs.Aggregate(Vector2.Min) - new Vector2(0.01f), capUvs.Aggregate(Vector2.Max) + new Vector2(0.01f));
+        var (r0, r1) = (new Vector2(Barrel.RestBand[0], Barrel.RestBand[1]), new Vector2(Barrel.RestBand[2], Barrel.RestBand[3]));
+        var into = new[] { new[] { r0.X, r0.Y, c0.X, r1.Y }, [c1.X, r0.Y, r1.X, r1.Y], [r0.X, r0.Y, r1.X, c0.Y], [r0.X, c1.Y, r1.X, r1.Y] }
+            .MaxBy(b => Math.Max(0, b[2] - b[0]) * Math.Max(0, b[3] - b[1]))!;
+        run.Log.Add($"the unwrap: caps' UVs {c0}..{c1}, the hoops into [{string.Join(", ", into.Select(v => F(v)))}]");
+        await CallJsonAsync(driver, "unwrap", new { faces = hoops, into, margin = 0.03 });
         var uvsAfter = await driver.CaptureAsync("rebake-uvs-after", new { mode = "uvs", size = Shaded });
         if (uvsBefore.Pixels.AsSpan().SequenceEqual(uvsAfter.Pixels)) run.Note("the unwrap with another margin left the uvs look unchanged");
         var unwrapped = await driver.CaptureAsync("rebake-unwrapped", front.Args());
