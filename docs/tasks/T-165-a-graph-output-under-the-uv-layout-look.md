@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-163
 
-**Verify:** server-unit, scenario-bakes, scenario-materials
+**Verify:** core-unit, graphs-unit, server-unit, scenario-bakes, scenario-materials
 
 ## Goal
 
@@ -88,27 +88,41 @@ under the layout.
 
 ### Hand-off
 
-Model: Sonnet 5.5 (`claude-sonnet-5-5`). Stopped at the checkpoint on a stop-and-ask condition: the byte-identity check fails.
+Model: Opus 5.5 (`claude-opus-5-5`), third agent, after Sonnet 5.5 built it and Opus 5.5 diagnosed it. Stopped at the
+checkpoint: code committed and `verify` passing, the frame review left.
 
-- Done and committed: `GraphBakes.Image` (src/Carve.Server/GraphBakes.cs; bakes the output as a base_colour slot, own cache key
-  `+":image"`), render's `image` as `JsonElement` taking a path or `{graph, output, size}` (`RenderTool.cs`: `LoadGraphImage`,
-  `RunUvs`, caption `image <file> <output> <size> px`, `baked` line), description text, `GraphImageToolTests` (unit refusals,
-  first/second bake, regression through the process; all pass), `GraphImageStage.cs` + one line in `BakesStages.cs`, `insideOnly`
-  on `CheckUvImage`, the three breaks in `BakesChecks.Break`'s doc, CLAUDE.md's Bakes row. `PartToolsListTests` still passes
-  unchanged (the image sentences are outside the digest). `MaterialTools.cs` untouched (T-166's); the graph argument parser is a copy in `RenderTool.cs`.
-- verify: server-unit PASS, scenario-materials PASS, scenario-bakes FAIL: the curvature, occlusion and steel-mask frames each
-  differ from the bake-PNG frame in 303229 pixels (x 64..959, y 64..959, the whole unit-square window). Identical count for three different maps.
-  Frames of that run are gone with the runner; not diagnosed further. Not turned into a tolerance.
-- **Diagnosed** (second agent, Opus 5.5 `claude-opus-5-5`, from that run's artifacts via `cairn test artifacts scenario-bakes`; scripts measured, no frame opened):
-  the three pairs differ in the same 303229 pixels, all of them where the look samples a texel **beyond the 8-texel padding**
-  (outside `wrench.mask.all.png`'s cover; 586 of the 592 that a pixel-to-texel mapping puts inside the cover sit on its edge,
-  the rest are overlay pixels there). Inside islands and padding: no pixel differs. There the bake PNG holds 0 (frame 0) and the
-  graph output holds the node's neutral, as T-163's `MeshBakeSource` documents ("a texel no island or padding covers holds the
-  node's neutral value"): curvature 0.5 (frame 64), occlusion 1 and mask 1 (frame 128), each half brightness as the look draws
-  outside islands. 299647 pixels differ by 64/128/128; 3582 more are overlay pixels blended over that ground (deltas 1 to 36).
-  The look's packing, sampling and padding are right; the two images differ by their own fill rules. Stopped as a spec question:
-  the scope's byte identity does not hold against T-163's landed rule. Not changed: no tolerance, no narrowed comparison.
-  The position frame ran in that run and raised no note; the breaks have not run.
-- Left: the person's answer (compare islands and padding only, or change one fill rule, or else), then (old suspects: the graph's baked PNG vs `bake`'s PNG differ uniformly, e.g. channel packing or an alpha/sRGB
-  difference, or the uvs path draws a graph-baked MaterialTexture differently from a loaded one), then position frame, breaks,
-  the frame review, `### As built`, lint, finish. The position check and breaks have not run (the stage fails first at the identity checks only; position did not report).
+- **The person's ruling (2026-11-24):** `bake` writes each map's neutral value in the texels no island or padding covers,
+  so the node and the bake are one computation over the whole image. Declined: comparing islands and padding only, and
+  making the mesh nodes fill 0. Done: `Bake.FillUncovered` (`src/Carve.Core/Baking/BakePadding.cs`), used by
+  `MeshBakeSource.Finish` and by `BakeTool` for masks, `curvature` and `occlusion`, each with its node's `Neutral` constant
+  (`MeshMaskNode`, `MeshCurvatureNode`, `MeshOcclusionNode`; not written twice); the fill comes before `Pad`, so padding
+  is unchanged. One sentence in `bake`'s description and in README's Baked maps. A core-unit test of the fill.
+- **Not asked, left as they are:** `base_colour`, `orm` and `normal` hold black (0, 0, 0) beyond the padding, as before.
+  The ORM's R (occlusion) is now 0 there while `occlusion.png` is 255: they disagree beyond the padding (inside islands
+  and padding they agree). Not decided.
+- **Numbers written down that moved, only because of those texels:** `BakeToolTests` (the 64 x 64 box's left and right
+  masks): a texel beyond both islands' padding was predicted 0 in both masks, now 255 in both.
+- **Measured against a run of `origin/milestone/M-29`** (jobs J-20261124-085554-4d6a68 and -085556-0bb89a, frames
+  compared by hash, none opened): changed, all `uvs` frames: `wrench-uvs-curvature`, `wrench-uvs-steel`,
+  `wrench-orm-uvs-occlusion` (303229 pixels each), `lblock-uvs-curvature` (500186), and the crops cut from them,
+  `wrench-uvs-curvature-jaw-4x` and `wrench-uvs-steel-padding-4x` (`lblock-uvs-curvature-inner-4x` did not move). No
+  `render`, `render_glb` or export frame moved. In the PNGs, each wrench map changed in 396290 texels, exactly the texels
+  `wrench.mask.all.png` holds 0 in on the base run (beyond the padding), 0 to 128 for curvature, 0 to 255 for masks and
+  occlusion; `lblock.curvature.png` in 653450 texels, all 0 to 128. Every changed pixel samples a changed texel by the
+  block rule's pixel-to-texel mapping, but for 592 (wrench) and 420 (L-block) whose centres lie within 0.01 texel of a
+  texel boundary next to a changed texel (one at 0.14, an edge-overlay pixel). New frames: `wrench-uvs-graph-curvature`,
+  `-graph-occlusion`, `-graph-steel`, `-graph-position` and the bake-PNG frames they equal, `wrench-uvs-curvature-png`,
+  `-occlusion-png`, `-steel-png`, all in `frames/` of a `scenario-bakes` run (`cairn test artifacts scenario-bakes`).
+- **Checked:** `verify` passes (below); the three identity checks and the position frame pass; each break fails as it
+  should, on its own check only (ad-hoc runs with `CARVE_BAKES_BREAK`): `graph-width` "graph image curvature: 169958
+  pixels differ", `graph-mask` "graph image steel: 362288 pixels differ", `graph-pos` 22256 pixels breaking the block
+  rule on `wrench-uvs-graph-position`. The position frame is held to the block rule inside islands only (`insideOnly`),
+  as the first agent wrote it: the padding's texels are not predicted from `get_mesh`.
+- **Run time:** `scenario-bakes` 50.7 s on `origin/milestone/M-29`, 68.4 s with this member, one run each on one runner:
+  the new stage adds about 18 s.
+- **Descriptions** (characters, `origin/milestone/M-29` then this member): `render` 19122 to 19954, `bake` 8410 to
+  8684; both were over 4,096 before. `PartToolsListTests`' digest did not move.
+- **Left:** the frame review (open the new graph frames and the moved bake frames, crops scaled up; the person approves
+  the set through `mcp__waystone__review`, files to `G:\My Drive\artifacts\carve\M-29\T-165\round-N`), then
+  `### As built` (fold this section in; T-167's notes: the argument's shape, the caption, how the frames were checked),
+  `cairn lint`, `finish`.
