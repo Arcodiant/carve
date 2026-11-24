@@ -1,0 +1,38 @@
+== role-order, sheet 256
+  swatch: sheet 256 base_colour flat: 59904 pixel(s) are not their texel; first (0, 22) is 155,155,155, not 27,18,10
+  swatch: sheet 256 base_colour tiled: 59904 pixel(s) are not their texel; first (0, 22) is 183,183,183, not 27,18,10
+  swatch: sheet 256 normal flat: 59904 pixel(s) are not their texel; first (0, 22) is 255,156,0, not 89,128,249
+  swatch: sheet 256 normal tiled: 59904 pixel(s) are not their texel; first (0, 22) is 255,152,0, not 59,128,235
+  swatch: sheet 256 roughness flat: 59904 pixel(s) are not their texel; first (0, 22) is 89,128,249, not 255,156,0
+  swatch: sheet 256 roughness tiled: 59904 pixel(s) are not their texel; first (0, 22) is 59,128,235, not 255,152,0
+  swatch: sheet 256 occlusion flat: 59904 pixel(s) are not their texel; first (0, 22) is 27,18,10, not 155,155,155
+  swatch: sheet 256 occlusion tiled: 59904 pixel(s) are not their texel; first (0, 22) is 27,18,10, not 183,183,183
+== role-order, sheet 64
+  swatch: sheet 64 base_colour flat: 59904 pixel(s) are not their texel; first (0, 22) is 198,198,198, not 27,18,10
+  swatch: sheet 64 base_colour tiled: 59904 pixel(s) are not their texel; first (0, 22) is 198,198,198, not 27,18,10
+  swatch: sheet 64 normal flat: 59904 pixel(s) are not their texel; first (0, 22) is 255,152,0, not 107,128,253
+  swatch: sheet 64 normal tiled: 59904 pixel(s) are not their texel; first (0, 22) is 255,153,0, not 107,128,253
+  swatch: sheet 64 roughness flat: 59904 pixel(s) are not their texel; first (0, 22) is 107,128,253, not 255,152,0
+  swatch: sheet 64 roughness tiled: 59904 pixel(s) are not their texel; first (0, 22) is 107,128,253, not 255,153,0
+  swatch: sheet 64 occlusion flat: 59904 pixel(s) are not their texel; first (0, 22) is 27,18,10, not 198,198,198
+  swatch: sheet 64 occlusion tiled: 59904 pixel(s) are not their texel; first (0, 22) is 27,18,10, not 198,198,198
+== u-flip
+  swatch: stave order 0 against 200: 1 of 3 stave pairs read the wrong way round; first stave 1 at 0 reads 105.7 and stave 6 at 200 reads 107.3, but their texels are 108.9 and 104.8
+  swatch: stave order 90 against 200: 2 of 3 stave pairs read the wrong way round; first stave 3 at 90 reads 104.3 and stave 6 at 200 reads 107.3, but their texels are 110.5 and 104.8
+== tiled-shift
+  swatch: tiled base_colour 128: 146016 pixel(s) are not their texel; first (0, 0) is 25,17,10, not 27,18,10
+  swatch: the seam graph: the mean step across tile boundaries is 0.72 against 2.17 inside, so the tiled check passed; it must fail on a seam
+  swatch: sheet 256 base_colour tiled: 59276 pixel(s) are not their texel; first (0, 22) is 25,16,9, not 27,18,10
+  swatch: sheet 256 roughness tiled: 57883 pixel(s) are not their texel; first (0, 22) is 255,178,0, not 255,152,0
+  swatch: sheet 64 base_colour tiled: 58976 pixel(s) are not their texel; first (0, 22) is 25,16,9, not 27,18,10
+  swatch: sheet 64 roughness tiled: 58040 pixel(s) are not their texel; first (0, 22) is 255,179,0, not 255,153,0
+  (sheet 256: blind to a half-tile shift, the image unchanged by it: normal, occlusion)
+  (sheet 64: blind to a half-tile shift, the image unchanged by it: normal, occlusion)
+== roughness-as-base
+  swatch: sphere 0: 6292 of 6292 gap pixels are not dark (luma up to 150.2, the rule 66)
+  swatch: sphere 0: 70920 of 70920 stave pixels are out of band (luma 132.1 to 189.0, the band 80 to 128)
+  swatch: sphere 90: 6292 of 6292 gap pixels are not dark (luma up to 165.5, the rule 66)
+  swatch: sphere 90: 67770 of 67770 stave pixels are out of band (luma 139.7 to 193.0, the band 80 to 128)
+  swatch: sphere 200: 6933 of 6933 gap pixels are not dark (luma up to 157.2, the rule 66)
+  swatch: sphere 200: 64911 of 64911 stave pixels are out of band (luma 133.7 to 187.9, the band 80 to 128)
+  swatch: stave order 0 against 200: 2 of 4 stave pairs read the wrong way round; first stave 2 at 0 reads 159.6 and stave 6 at 200 reads 170.9, but their texels are 118.3 and 108.9

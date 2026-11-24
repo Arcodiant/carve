@@ -1,0 +1,731 @@
+job J-20261124-055221-1ac6da scenario-patina carve@070e33612b22175c96ea53e940c81cd5243e571d on Xellotath
+
+=== build 'solution' already ran at this commit: exit 0
+
+=== C:\Program Files\PowerShell\7\pwsh.EXE -NoProfile -File scripts/run-scenario.ps1 patina -Server patina -NoBuild -CarveArguments:--Patina:Stages=base
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\andre\AppData\Local\cairn\work\carve-070e33612b22\src\Patina.Server\bin\Debug\net10.0\
+carve-debug: run folder C:\Users\andre\AppData\Local\Temp\cairn-J-20261124-055221-1ac6da-5wms95x9\artifacts\patina
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'server/discover' request handler called.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'server/discover' request handler completed in 17.8454ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/list' request handler called.
+info: Empyrean.VulkanDeviceManager[2004]
+      Starting Vulkan
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/list' request handler completed in 16.6158ms.
+info: Empyrean.VulkanDeviceManager[2005]
+      Vulkan version: 1.4.363
+info: Empyrean.VulkanDeviceManager[2006]
+      Required instance extensions: 
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 139.0436ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "edit_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 14.8595ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "get_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 25.3708ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "push_snapshot" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1.212ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "edit_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 2.3645ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "get_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1.3192ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "edit_graph" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 7.2346ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "pop_snapshot" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1.0355ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "get_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.4868ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "pop_snapshot" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.5637ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "save" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 11.906ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.7888ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "open" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 2.2291ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "get_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.7623ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "open" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1.4974ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "save" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1.2822ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "edit_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 2.5434ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "open" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 3.7166ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: Empyrean.VulkanDeviceManager[2010]
+      Physical device: NVIDIA GeForce RTX 5070 Ti (DiscreteGpu, 15995 MiB device-local)
+info: Empyrean.VulkanDeviceManager[2139]
+      Selected physical device: NVIDIA GeForce RTX 5070 Ti (DiscreteGpu)
+info: Empyrean.VulkanDeviceManager[2066]
+      Device maxBoundDescriptorSets = 32. Pipeline creation asserts every pipeline's declared descriptor-set count against this (T-644).
+info: Empyrean.VulkanDeviceManager[2022]
+      Required device extensions: VK_EXT_extended_dynamic_state3
+info: Empyrean.VulkanDeviceManager[2038]
+      Anisotropic filtering is available; samplerAnisotropy enabled with a device maximum of 16x.
+info: Empyrean.VulkanDeviceManager[2041]
+      Descriptor indexing enabled - the bindless texture table and material indices are available.
+info: Empyrean.VulkanDeviceManager[2054]
+      Ray-tracing pipelines are available; shader binding tables use a 32-byte group handle at 32-byte record alignment and 64-byte region alignment, with a maximum ray recursion depth of 31.
+info: Empyrean.VulkanDeviceManager[2043]
+      Optional device extensions enabled: VK_KHR_acceleration_structure, VK_KHR_deferred_host_operations, VK_KHR_ray_query, VK_KHR_ray_tracing_pipeline
+info: Empyrean.AccelerationStructureManager[2048]
+      Acceleration structures are available; bottom-level structures will be built per mesh on first use, with a scratch offset alignment of 128 bytes.
+info: Empyrean.AccelerationStructureManager[2109]
+      Traced position formats this device builds an acceleration structure from directly: Float3, Byte4Unorm, Byte4Snorm, Short4Snorm, Half4. A mesh whose TracedPosition uses one of them is built from its packed vertices through a decode transform, with no Float3 copy.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 348.6424ms.
+info: Empyrean.GraphicsResourceManager[2067]
+      Device maxDescriptorSetUpdateAfterBindSampledImages = 1048576. The bindless heap's combined budget across all four shapes (2D + cube + 3D + array) is asserted against this at startup (T-648).
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: Carve.Hosting.EngineThread[0]
+      Engine ready
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 6575.4544ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 960.251ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1.0003ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.6546ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.917ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 5.275ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.9716ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "save" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 2.5058ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "get_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.9002ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 55.1568ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 140.8286ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 7.8909ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1.2428ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.1804ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 56.0169ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 73.333ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1418.7472ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 280.3226ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 448.5564ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 456.1322ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 202.4399ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.5845ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 19.2646ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.5251ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 40.7693ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.6672ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 38.8312ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.4821ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 257.038ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 45.5699ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 149.9173ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.5256ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 38.156ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.4891ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 42.1581ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.3791ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 42.4999ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "open" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 10.2087ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 784.8885ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 625.6465ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 747.026ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 614.3901ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.7415ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 80.018ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 42.3082ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 38.8792ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 40.5189ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 38.9573ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 36.1394ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 131.4933ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 126.2569ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 130.4128ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 57.0172ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.2843ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.1967ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.327ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 91.1665ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 41.3026ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 40.3362ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 38.7794ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 40.4802ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 38.7874ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = True.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.2771ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 53.5245ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.5017ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 165.8421ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 157.285ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 167.6689ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "open" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 24.2275ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 691.3964ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "get_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 6.5553ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 724.3586ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 598.2199ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "open" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.8133ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 166.6765ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 257.6019ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 165.7713ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.7339ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 310.1449ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 4.855ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 8.8389ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1145.5487ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1045.6724ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "edit_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.6749ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 7.0784ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "swatch" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 1204.0184ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "define_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.6827ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 775.8361ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 271.1472ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "get_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 3.0147ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "save" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 2.2342ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "open" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.775ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "get_graph" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 0.5101ms.
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler called.
+info: ModelContextProtocol.Server.McpServer[2065726448]
+      "export" completed. IsError = False.
+info: ModelContextProtocol.Server.McpServer[1867955179]
+      Server (patina 1.0.0.0), Client (patina 1.0.0.0) method 'tools/call' request handler completed in 776.5044ms.
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+C:\Users\andre\AppData\Local\Temp\cairn-J-20261124-055221-1ac6da-5wms95x9\artifacts\patina
