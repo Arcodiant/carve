@@ -55,7 +55,9 @@ internal sealed class RebakeStage : IWeatheredStage
         var was = Seen(closeBefore, scene, mesh, stave, sets[Beside].Where(t => t.Top && kept.Contains(t)));
         double M((Texel, (byte R, byte G, byte B, byte A) P)[] s) => s.Select(e => Luma(e.P)).DefaultIfEmpty(double.NaN).Average();
         run.Log.Add($"after the move: {Beside} of the top hoop in the close, {was.Length} seen, luma {F(M(was))} before and {F(M(now))} after");
-        if (was.Length < 8 || !(M(now) < M(was))) run.Note($"after the move: the {was.Length} seen staves beside the moved hoop read {F(M(now))} luma, not darker than stage 2's {F(M(was))} (at least 8 seen)");
+        // Ruled 2026-11-24: darker by at least 4 luma in this close (measured 7.9). The front is not held to it: the raised hoop hides those pixels there.
+        if (was.Length < 8) run.Note($"after the move: only {was.Length} staves beside the moved hoop seen both before and after, at least 8 needed");
+        run.AtLeast("after the move: close on the stave, staves beside the moved hoop, stage 2's minus now", M(was), M(now), 4);
         // The grime texels beside the moved hoop, before (stage 2's look) and after, to tell the bake from the shading.
         var grimeAfter = await driver.CaptureAsync("rebake-moved-uvs-grime", new { mode = "uvs", image = new { graph = Barrel.Graph(run, "weathered-staves"), output = "grime", size = WeatheredRun.BakeSize }, size = UvFrame });
         var besideTop = sets[Beside].Where(t => t.Top).ToArray();
@@ -71,18 +73,24 @@ internal sealed class RebakeStage : IWeatheredStage
         Baked(run, "after undo", undone, false);
         Same(run, "after undo", stage2, undone);
 
-        // The UVs changed: the hoops, their walls and the caps unwrapped again with another margin.
+        // The UVs changed: the hoops and their walls (not the caps, whose UVs stay with the staves') unwrapped again with another margin.
         var uvsBefore = await driver.CaptureAsync("rebake-uvs-before", new { mode = "uvs", size = Shaded });
-        await CallJsonAsync(driver, "unwrap", new { faces = Barrel.Rest(mesh.Faces.Length), into = Barrel.RestBand, margin = 0.03 });
+        var hoops = Barrel.Rest(mesh.Faces.Length).Where(f => !Barrel.Caps.Contains(f)).ToArray();
+        await CallJsonAsync(driver, "unwrap", new { faces = hoops, into = Barrel.RestBand, margin = 0.03 });
         var uvsAfter = await driver.CaptureAsync("rebake-uvs-after", new { mode = "uvs", size = Shaded });
         if (uvsBefore.Pixels.AsSpan().SequenceEqual(uvsAfter.Pixels)) run.Note("the unwrap with another margin left the uvs look unchanged");
         var unwrapped = await driver.CaptureAsync("rebake-unwrapped", front.Args());
         Baked(run, "after the unwrap", unwrapped, true);
-        var rule = Comparison.Measure("rebake-unwrapped", "good", stage2, unwrapped);
-        run.Log.Add($"after the unwrap: {rule.Differing} of {rule.Total} pixels differ from stage 2's front, largest patch {rule.LargestPatch}");
-        Directory.CreateDirectory(run.InRun("compare"));
+        var whole = Comparison.Measure("rebake-unwrapped", "good", stage2, unwrapped);
+        run.Log.Add($"after the unwrap: {whole.Differing} of {whole.Total} pixels differ from stage 2's front, largest patch {whole.LargestPatch} (the hoops' noise is laid out in UV space)");
         Comparison.WriteTriptych(run.InRun(Path.Combine("compare", "rebake-unwrapped.png")), stage2, unwrapped);
-        if (rule.Fails) run.Note($"after the unwrap: the front differs from stage 2's in {rule.Differing} of {rule.Total} pixels, largest patch {rule.LargestPatch} (D-6's rule: 0.5 % or a patch of {Comparison.PatchLimit})");
+        // Ruled 2026-11-24: D-6's rule over the pixels that show a stave or a cap (their UVs did not change), clear of the hoops by HoopClear px.
+        var mask = StavesAndCaps(mesh, front.Predicted(mesh.BoundsMin, mesh.BoundsMax));
+        var (differing, total, patch) = Masked(stage2, unwrapped, mask);
+        run.Log.Add($"after the unwrap: on the {total} stave and cap pixels {HoopClear} px clear of the hoops, {differing} differ, largest patch {patch}");
+        if (total < 1000 || (long)differing * 200 > total || patch > Comparison.PatchLimit) run.Note($"after the unwrap: the front's {total} stave and cap pixels differ from stage 2's in {differing}, largest patch {patch} (D-6's rule: 0.5 % or a patch of {Comparison.PatchLimit}; at least 1000 pixels)");
+        // And the hoops held to the ruled threshold (1) again on the new layout.
+        run.AtLeast("after the unwrap: front, shaded, hoop rim minus hoop top middle", M(Seen(unwrapped, scene, mesh, front, sets[Rim])), M(Seen(unwrapped, scene, mesh, front, sets[HoopMiddle])), 8);
         await CallJsonAsync(driver, "undo", new { });
 
         // The run folder's iron graph given wear_amount 0, written here; the product is not told.
@@ -109,6 +117,50 @@ internal sealed class RebakeStage : IWeatheredStage
         var line = frame.Caption?.Split('\n').FirstOrDefault(l => l.StartsWith("baked: ", StringComparison.Ordinal));
         run.Log.Add($"{what}: {line ?? "nothing baked"}");
         if ((line is not null) != expected) run.Note($"{what}: expected {(expected ? "a bake" : "nothing baked")}, render said {line ?? "nothing baked"}");
+    }
+
+    /// <summary>The margin, in pixels of the 512 front, by which a stave or cap pixel must be clear of every pixel showing a hoop face: rule P2's 3 px at 512.</summary>
+    public const int HoopClear = 3;
+
+    /// <summary>
+    /// The pixels of a 512 frame whose centre's ray meets a stave or a cap first (a ray test over every face of <c>get_mesh</c>'s geometry), with no
+    /// pixel showing a hoop face (a hoop top or wall) within <see cref="HoopClear"/> px.
+    /// </summary>
+    public static bool[] StavesAndCaps(SceneMesh mesh, Camera camera)
+    {
+        var faces = Enumerable.Range(0, mesh.Faces.Length).Select(f => new Carve.Scenario.Materials.FaceGeo(f, mesh.Faces[f].Select(v => mesh.Vertices[v]).ToArray(), mesh.Uvs.TryGetValue(f, out var uv) ? uv : null)).ToArray();
+        var shot = new Carve.Scenario.Materials.Shot(faces, mesh.BoundsMin, mesh.BoundsMax, camera.Direction, camera.Size);
+        var n = camera.Size;
+        var face = new int[n * n];
+        for (var y = 0; y < n; y++)
+        for (var x = 0; x < n; x++)
+            face[y * n + x] = shot.At(x, y)?.Face.Face ?? -1;
+
+        bool Kept(int f) => Barrel.Staves.Contains(f) || Barrel.Caps.Contains(f);
+        var mask = face.Select(Kept).ToArray();
+        for (var p = 0; p < face.Length; p++)
+        {
+            if (face[p] < 0 || Kept(face[p])) continue;
+            int px = p % n, py = p / n;
+            for (var dy = -HoopClear; dy <= HoopClear; dy++)
+            for (var dx = -HoopClear; dx <= HoopClear; dx++)
+            {
+                int qx = px + dx, qy = py + dy;
+                if (qx >= 0 && qy >= 0 && qx < n && qy < n && dx * dx + dy * dy <= HoopClear * HoopClear) mask[qy * n + qx] = false;
+            }
+        }
+
+        return mask;
+    }
+
+    /// <summary>D-6's measure over the masked pixels only: how many differ, of how many, and the largest 8-connected patch of them.</summary>
+    public static (int Differing, int Total, int Patch) Masked(ScenarioFrame a, ScenarioFrame b, bool[] mask)
+    {
+        var differs = new bool[mask.Length];
+        var count = 0;
+        for (var p = 0; p < mask.Length; p++)
+            if (mask[p] && Comparison.Differs(a, b, p * 4)) (differs[p], count) = (true, count + 1);
+        return (count, mask.Count(m => m), Comparison.LargestPatchOf(differs, a.Width, a.Height));
     }
 
     public static void Same(WeatheredRun run, string what, ScenarioFrame expected, ScenarioFrame actual)

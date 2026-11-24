@@ -485,7 +485,48 @@
       "id": "scenario-weathered",
       "tier": "regression",
       "build": "solution",
-      "run": "pwsh -NoProfile -File scripts/run-weathered-scenario.ps1 -NoBuild",
+      "run": "pwsh -NoProfile -File scripts/run-weathered-scenario.ps1 -NoBuild -CarveArguments:--Weathered:Stages=main",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Weathered/Carve.Scenario.Weathered.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        {
+          "dotnet-closure": "tests/Carve.WeatheredLoad.Tests/Carve.WeatheredLoad.Tests.csproj"
+        },
+        "scenarios/Carve.Scenario.Orcward/ComparisonPng.cs",
+        "scenarios/Carve.Scenario.Materials/MaterialsSampler.cs",
+        "scenarios/Carve.Scenario.Materials/MaterialsChecks.cs",
+        "scenarios/Carve.Scenario.Uvs/UvsScene.cs",
+        "scenarios/Carve.Scenario.Crate/CrateBuild.cs",
+        "scenarios/Carve.Scenario.Crate/CameraPixels.cs",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "tools/Carve.SampleTextures/TextureSet.cs",
+        "tools/Carve.SampleTextures/Png.cs",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
+        "samples/barrel.carve",
+        "samples/barrel-weathered.carve",
+        "samples/textures/end-grain-*.png",
+        "samples/graphs/weathered-iron.texgraph",
+        "samples/graphs/weathered-staves.texgraph",
+        "samples/graphs/planks.texgraph",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1",
+        "scripts/run-weathered-scenario.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 120
+    },
+    {
+      "id": "scenario-weathered-sizes",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 weathered -NoBuild -CarveArguments:--Weathered:Stages=sizes",
       "inputs": [
         {
           "dotnet-closure": "scenarios/Carve.Scenario.Weathered/Carve.Scenario.Weathered.csproj"
@@ -508,8 +549,7 @@
         "samples/graphs/weathered-staves.texgraph",
         "samples/graphs/planks.texgraph",
         "scripts/run-scenario.ps1",
-        "scripts/bounded-run.ps1",
-        "scripts/run-weathered-scenario.ps1"
+        "scripts/bounded-run.ps1"
       ],
       "resources": "gpu",
       "requires": [

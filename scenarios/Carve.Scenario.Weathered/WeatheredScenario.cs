@@ -1,5 +1,6 @@
 using Carve.Debug;
 using Carve.Extensibility;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Carve.Scenario.Weathered;
@@ -19,17 +20,24 @@ public sealed class WeatheredExtension : ICarveExtension
 /// check is noted and the run goes on; the run fails at its end with every failure. <c>CARVE_WEATHERED_BREAK</c> makes it wrong on purpose
 /// (<see cref="WeatheredRun.Break"/>), and it must then fail.
 /// </summary>
-public sealed class WeatheredScenario : IScenario
+public sealed class WeatheredScenario(IConfiguration configuration) : IScenario
 {
     public async Task RunAsync(ScenarioDriver driver)
     {
         var run = new WeatheredRun(driver);
-        foreach (var stage in WeatheredStages.All)
+        try
         {
-            await stage.RunAsync(run);
+            foreach (var stage in WeatheredStages.For(configuration[WeatheredStages.SelectionKey]))
+            {
+                await stage.RunAsync(run);
+            }
         }
-
-        File.WriteAllLines(run.InRun("sets.txt"), run.Log);
+        finally
+        {
+            // Every failure noted, counted, even when a check of M-7's failed the driver first and stopped the run (the mirror break's end grain).
+            File.WriteAllLines(run.InRun("sets.txt"), run.Log);
+            File.WriteAllLines(run.InRun("failures.txt"), [$"{run.Failures.Count} check(s) failed", .. run.Failures]);
+        }
 
         if (run.Failures.Count > 0)
         {
@@ -64,6 +72,16 @@ internal sealed class WeatheredRun(ScenarioDriver driver)
 
     /// <summary>The frames of stage 2 (and later), by name, for the stages after it to compare with.</summary>
     public Dictionary<string, ScenarioFrame> Frames { get; } = [];
+
+    /// <summary>The arguments of <c>render</c> each of <see cref="Frames"/> was drawn with, so stage 5 can draw them again.</summary>
+    public Dictionary<string, object> Shots { get; } = [];
+
+    /// <summary>A frame drawn and kept, with its arguments, under its name.</summary>
+    public async Task<ScenarioFrame> CaptureAsync(string name, object args)
+    {
+        Shots[name] = args;
+        return Frames[name] = await Driver.CaptureAsync(name, args);
+    }
 
     /// <summary>The numbers every check measured, written to <c>sets.txt</c> at the end.</summary>
     public List<string> Log { get; } = [];
