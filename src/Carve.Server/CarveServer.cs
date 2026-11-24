@@ -23,6 +23,7 @@ public static class CarveServer
         services.AddSingleton<EngineStatus>();
         services.AddSingleton<ModelStore>();
         services.AddSingleton<RenderQueue>();
+        services.AddSingleton(new GraphBakes());
         services.AddSingleton(new ToolFolder(baseDirectory));
     }
 }

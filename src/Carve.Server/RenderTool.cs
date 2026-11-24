@@ -202,6 +202,8 @@ internal static class RenderTool
         + "'mode' is the look: 'shaded' (the default), 'wireframe', 'normals', 'checker' or 'uvs'. Neither wireframe nor normals depends on the light. "
         + "In 'shaded', a face with a material (define_material, set_material) is drawn as the game's PBR shading draws it, its textures sampled at the face's UVs (a face with no UVs samples the texture's corner at (0, 0), as the game does), "
         + "lit by Carve's light and a fixed sky so that metal reads; a game's own lighting will differ. Only material faces take the sky's light, so a matte white material face is brighter and bluer on top than an uncoloured or coloured face. Every other look ignores materials, as it ignores colours. "
+        + "A slot that names a graph output (define_material) is evaluated for each mesh that wears it, on that mesh's UVs and bakes when the graph reads the mesh, on the first render that draws it and again after an edit to the mesh, its UVs or a graph file; otherwise it comes from memory. "
+        + "The text then gains baked: [{material, mesh, slot, size, ms}], one entry per slot baked in this call (mesh null for a graph that does not read the mesh), and a warning when one material took over 5 s to bake: lower its size or the node's rays. A slot that cannot be baked fails the render. "
         + "'wireframe' draws every edge in light grey over faces filled near black: use it to count and place edges and see the face loops. It is hidden-line, not see-through: "
         + "an edge behind a face is hidden, so look from another side to see it. "
         + "'normals' colours each face by the way it faces and stands a light grey spike on it along its normal, at its centre, or for a face with holes at a point on the face clear of the holes: use it to find a face pointing the wrong way, or a non-planar face, whose spike is off. On a smooth mesh (set_shading) it shows the corner normals instead: the colour blends across a soft edge and breaks at a hard one, and a spike stands on each corner along its normal. "
@@ -279,6 +281,7 @@ internal static class RenderTool
         EngineStatus status,
         ModelStore store,
         RenderQueue queue,
+        GraphBakes bakes,
         [Description("Where to look from: the corner 'front' (the default when no direction is given) or 'back', or head-on along an axis: '+x', '-x', '+y', '-y', '+z', '-z'. Not with direction."), AllowedValues("front", "back", "+x", "-x", "+y", "-y", "+z", "-z")] string? view = null,
         [Description("[x, y, z]: from the point looked at toward the eye. Up is +Y, or -Z within 1 degree of vertical. Not with view.")] double[]? direction = null,
         [Description("1 to 8: how far to zoom in about the target. The default 1 frames the whole mesh.")] double zoom = 1,
@@ -405,12 +408,6 @@ internal static class RenderTool
             return Failed("render", [partRefused]);
         }
 
-        // Interim until T-163 draws graph materials (M-29's branch only).
-        if (MaterialJson.GraphsNotDrawn("render", store.Current.Model) is { } notDrawn)
-        {
-            return Error(notDrawn);
-        }
-
         var projected = projection == "orthographic" ? Projection.Orthographic : Projection.Perspective;
         var look = mode switch { "wireframe" => Look.Wireframe, "normals" => Look.Normals, "checker" => Look.Checker, _ => Look.Shaded };
         if (weights is not null) look = Look.Weights;
@@ -533,8 +530,19 @@ internal static class RenderTool
             listed.Vertices.Select(v => v + offset.Vertices),
             listed.Edges.Select(e => (e.A + offset.Vertices, e.B + offset.Vertices)),
             listed.Faces.Select(f => f + offset.Faces));
+        var baked = new List<GraphBakes.Baked>();
         async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
         {
+            // Graph slots are baked here, off the frame thread, before the frame is queued (T-163); the frame thread finds them cached.
+            try
+            {
+                baked.AddRange((await Task.Run(() => bakes.Resolve(store.Current.Model, cancellationToken), cancellationToken)).Baked);
+            }
+            catch (GraphSlotProblemException e)
+            {
+                return (null, e.Message);
+            }
+
             var rendering = Task.WhenAll(tiles
                 .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Targets = morph, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton, Weights = weights, Part = part, Level = level })));
 
@@ -570,7 +578,7 @@ internal static class RenderTool
                 Content =
                 [
                     ImageContentBlock.FromBytes(EncodePng(composed.Pixels, composed.Width, composed.Height), "image/png"),
-                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton, weights, noUvs, part, level) },
+                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton, weights, noUvs, part, level) + GraphBakes.Text(baked) },
                 ],
             };
         }
@@ -582,7 +590,7 @@ internal static class RenderTool
             Content =
             [
                 ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
-                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs, part, level) },
+                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs, part, level) + GraphBakes.Text(baked) },
             ],
         };
     }

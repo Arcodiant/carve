@@ -41,11 +41,14 @@
   <!-- The pure parts compile the product's file rather than linking the product; the bridge needs the engine's vertex types. -->
   <ItemGroup>
     <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
+    <ProjectReference Include="../../src/Carve.Graphs/Carve.Graphs.csproj" />
     <Compile Include="../../src/Carve.Server/ModelStore.cs" Link="ModelStore.cs" />
     <Compile Include="../../src/Carve.Server/MeshBridge.cs" Link="MeshBridge.cs" />
     <Compile Include="../../src/Carve.Server/ViewFraming.cs" Link="ViewFraming.cs" />
     <Compile Include="../../src/Carve.Server/RenderQueue.cs" Link="RenderQueue.cs" />
     <Compile Include="../../src/Carve.Server/RenderPump.cs" Link="RenderPump.cs" />
+    <Compile Include="../../src/Carve.Server/GraphBakes.cs" Link="GraphBakes.cs" />
+    <Compile Include="../../src/Carve.Server/GraphSlotProblem.cs" Link="GraphSlotProblem.cs" />
     <Compile Include="../../src/Carve.Server/TargetWeights.cs" Link="TargetWeights.cs" />
     <Compile Include="../../src/Carve.Server/WeightHeat.cs" Link="WeightHeat.cs" />
     <Compile Include="../../src/Carve.Server/LookMeshes.cs" Link="LookMeshes.cs" />

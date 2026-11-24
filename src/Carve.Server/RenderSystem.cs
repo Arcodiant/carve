@@ -24,6 +24,7 @@ internal sealed class RenderSystem(
     IModelLoader models,
     RenderQueue queue,
     ModelStore store,
+    GraphBakes bakes,
     ILogger<RenderSystem> log) : ISystem, IRenderScene, LookHolder<Mesh>.IParts
 {
     private const string Scene = "carve";
@@ -136,7 +137,7 @@ internal sealed class RenderSystem(
         if (_pump is null)
         {
             BuildScene();
-            _pump = new RenderPump(queue, store, this);
+            _pump = new RenderPump(queue, store, this, bakes);
             return;
         }
 
