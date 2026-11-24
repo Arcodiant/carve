@@ -21,7 +21,7 @@ public sealed class ExportToolDefinitionTests() : FileToolTests("carve-export")
         using var _carve = carve;
         var example = Assert.Single(Examples(tools, "export"));
         Assert.Contains("<game>", example);
-        Assert.Contains("models.LoadModel(new ContentPath(\"models/crate.glb\"))", Description(tools, "export"));
+        Assert.Contains("models.LoadModel(new ContentPath(\"models/crate.glb\"))", HelpToolTests.WithReference(Description(tools, "export"), "export"));
 
         var game = Path.Combine(Root, "game");
         var line = Line(await carve.CallToolAsync("export", example.Replace("<game>", game.Replace('\\', '/'))));

@@ -131,7 +131,7 @@ public sealed class ExportPartsToolTests() : FileToolTests("carve-export-parts")
     {
         var (carve, tools) = await StartAsync(mesh: null);
         using var _carve = carve;
-        var text = Description(tools, "export");
+        var text = HelpToolTests.WithReference(Description(tools, "export"), "export");
         Assert.Contains("the .glb keeps a node only where a part moves", text);
         Assert.Contains("root 'rover' holds the Chassis and the Cab merged", text);
         Assert.Contains("the four wheels sharing one mesh", text);

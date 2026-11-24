@@ -20,6 +20,7 @@ public sealed class HelpTool
     private static readonly (string Tool, string Covers, string Reference)[] Entries =
     [
         ("render", "caption formats, the normals and checker colour codes, the uvs look, labels, sheets, bones, weights, parts and every error", RenderTool.Reference),
+        ("export", "what is written (nodes, materials, UVs), parts and skinned detail, piece and clips modes, the limits file and its format, the result line, the errors and worked examples", ExportTool.Reference),
     ];
 
     /// <summary>The names of the entries, in the order <c>help {}</c> lists them.</summary>
