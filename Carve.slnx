@@ -6,6 +6,7 @@
   <Project Path="scenarios/Carve.Scenario.Uvs/Carve.Scenario.Uvs.csproj" />
   <Project Path="scenarios/Carve.Scenario.Materials/Carve.Scenario.Materials.csproj" />
   <Project Path="scenarios/Carve.Scenario.Planks/Carve.Scenario.Planks.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Weathered/Carve.Scenario.Weathered.csproj" />
   <Project Path="scenarios/Carve.Scenario.Export/Carve.Scenario.Export.csproj" />
   <Project Path="scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj" />
   <Project Path="scenarios/Carve.Scenario.Character/Carve.Scenario.Character.csproj" />
@@ -26,6 +27,7 @@
   <Project Path="tests/Carve.PartsLoad.Tests/Carve.PartsLoad.Tests.csproj" />
   <Project Path="tests/Carve.PartsAcceptance.Tests/Carve.PartsAcceptance.Tests.csproj" />
   <Project Path="tests/Carve.PlanksLoad.Tests/Carve.PlanksLoad.Tests.csproj" />
+  <Project Path="tests/Carve.WeatheredLoad.Tests/Carve.WeatheredLoad.Tests.csproj" />
   <Project Path="tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj" />
   <Project Path="tests/Carve.GatehouseLoad.Tests/Carve.GatehouseLoad.Tests.csproj" />
   <Project Path="tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj" />
