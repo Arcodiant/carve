@@ -61,6 +61,8 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
         var next = model;
         var renamed = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal); // mesh -> material -> copy
         var levels = new Dictionary<(string Part, int Level), Dictionary<string, string>>();
+        // One mesh source per drawn mesh in this call, so its maps (each once per size) serve every slot that reads them.
+        var sources = new Dictionary<string, IMeshMaps>(StringComparer.Ordinal);
 
         GraphSlotFiles FilesOf(Material m, string field, MaterialGraph g)
         {
@@ -91,7 +93,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
                 var start = _clock();
                 try
                 {
-                    png = GraphSlotBake.Png(g, field, source, on, cancel, s => timed.Over(s));
+                    png = GraphSlotBake.Png(g, field, source, on, cancel, s => timed.Over(sources.TryGetValue(label!, out var shared) ? shared : sources[label!] = s));
                 }
                 catch (Exception e) when (GraphSlotProblem.IsCause(e))
                 {

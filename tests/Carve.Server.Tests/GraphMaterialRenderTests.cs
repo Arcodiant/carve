@@ -6,23 +6,24 @@ using StbImageSharp;
 namespace Carve.Server.Tests;
 
 /// <summary>
-/// T-163 on the real process: a graph material on the raised-hoop barrel (samples/barrel.carve, both hoop bands extruded 0.015
-/// and unwrapped through the tools) drawn at 512 equals, under D-6's frame rule, the same model with the bake's PNGs named as
-/// ordinary PNG textures, and the PNGs of a neutral graph instead must fail it; render answers with <c>baked</c> once and
-/// not again. A fine graph texture on a box face is drawn as its own PNG is (the baked upload, mipmaps and sampler).
+/// T-163 on the real process: T-162's weathered-iron on the hoops and weathered-staves on the staves of the raised-hoop barrel
+/// (samples/barrel.carve, both hoop bands extruded 0.015 and unwrapped through the tools) drawn at 512 equal, under D-6's frame
+/// rule, the same model with the bakes' PNGs named as ordinary PNG textures, and the PNGs of the neutral graphs (the mesh nodes
+/// unbound) instead must fail it; render answers with <c>baked</c> once and not again. A fine graph texture on a box face is
+/// drawn as its own PNG is (the baked upload, mipmaps and sampler).
 /// </summary>
-/// <remarks>shortcut: graphs of this test's own until T-162's weathered-iron and weathered-staves land on the milestone; then switch.</remarks>
 [Trait("Tier", "regression")]
 public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-material-render")
 {
     private static readonly string Frames =
         Directory.CreateDirectory(Path.Combine(Paths.RepoRoot, "artifacts", "graph-material-render-tests")).FullName;
 
-    /// <summary>Position as base colour and occlusion from the mesh: both slots read the mesh.</summary>
-    private const string Weathered = """{ "version": 2, "size": 512, "seed": 1, "nodes": { "p": { "type": "mesh_position" }, "c": { "type": "output", "inputs": { "in": "p" }, "params": { "role": "base_colour" } }, "a": { "type": "mesh_occlusion" }, "o": { "type": "output", "inputs": { "in": "a" }, "params": { "role": "occlusion" } } } }""";
-
-    /// <summary>The neutral graph, for the control: mid grey and no occlusion, read from nothing.</summary>
-    private const string Neutral = """{ "version": 2, "size": 512, "seed": 1, "nodes": { "g": { "type": "colour", "params": { "colour": "#808080" } }, "c": { "type": "output", "inputs": { "in": "g" }, "params": { "role": "base_colour" } }, "w": { "type": "colour", "params": { "colour": "#FFFFFF" } }, "o": { "type": "output", "inputs": { "in": "w" }, "params": { "role": "occlusion" } } } }""";
+    /// <summary>Each material's slots: the graph, and per slot field the output it takes (T-162's As built).</summary>
+    private static readonly (string Material, string Graph, (string Field, string Output)[] Slots)[] Weathered =
+    [
+        ("iron", "weathered-iron.texgraph", [(GraphSlotBake.BaseColour, "base_colour"), (GraphSlotBake.MetallicRoughness, "roughness")]),
+        ("staves", "weathered-staves.texgraph", [(GraphSlotBake.BaseColour, "base_colour"), (GraphSlotBake.MetallicRoughness, "roughness"), (GraphSlotBake.Normal, "normal"), (GraphSlotBake.Occlusion, "occlusion")]),
+    ];
 
     private static ImageResult Frame(JsonElement result, string keepAs)
     {
@@ -42,50 +43,79 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
         return differing <= a.Width * a.Height * 0.005 && patch <= 50;
     }
 
-    /// <summary>Bakes <paramref name="graph"/>'s slots for the saved model and writes them beside it, as the PNG material names them.</summary>
-    private string BakeToPngs(Model model, string mesh, string graph, string prefix)
+    private static string Graphs(string material, string graph, (string Field, string Output)[] slots, int size = 512) =>
+        $$"""{"name":"{{material}}",{{string.Join(",", slots.Select(s => $$"""
+            "{{s.Field}}":{"graph":"{{graph}}","output":"{{s.Output}}","size":{{size}}}
+            """))}}}""";
+
+    /// <summary>Bakes each slot for the saved model (on <paramref name="mesh"/>, or neutral when null) and names the PNGs as a PNG material does.</summary>
+    private string Pngs(Model model, string? mesh, string material, string graph, (string Field, string Output)[] slots, string prefix)
     {
-        var cancel = TestContext.Current.CancellationToken;
         var path = Path.Combine(Root, graph);
-        var reads = GraphSlotBake.Read(path).ReadsMesh ? mesh : null;
-        File.WriteAllBytes(Path.Combine(Root, prefix + ".base.png"), GraphSlotBake.Png(new MaterialGraph(path, "base_colour", 512), GraphSlotBake.BaseColour, model, reads, cancel));
-        File.WriteAllBytes(Path.Combine(Root, prefix + ".occlusion.png"), GraphSlotBake.Png(new MaterialGraph(path, "occlusion", 512), GraphSlotBake.Occlusion, model, reads, cancel));
-        return $$"""{"name":"w","base_colour_texture":"{{prefix}}.base.png","occlusion_texture":"{{prefix}}.occlusion.png"}""";
+        foreach (var (field, output) in slots)
+            File.WriteAllBytes(Path.Combine(Root, $"{prefix}.{material}.{field}.png"), GraphSlotBake.Png(new MaterialGraph(path, output, 512), field, model, mesh, TestContext.Current.CancellationToken));
+        return $$"""{"name":"{{material}}",{{string.Join(",", slots.Select(s => $$"""
+            "{{s.Field}}":"{{prefix}}.{{material}}.{{s.Field}}.png"
+            """))}}}""";
+    }
+
+    /// <summary>The raised-hoop barrel built through the tools, iron on the hoops and staves on the rest, each slot at <paramref name="size"/>.</summary>
+    private async Task BarrelAsync(CarveProcess carve, int size)
+    {
+        File.Copy(Path.Combine(Paths.RepoRoot, "samples", "barrel.carve"), Path.Combine(Root, "barrel.carve"));
+        foreach (var graph in new[] { "weathered-iron", "weathered-staves", "planks" })
+            File.Copy(Path.Combine(Paths.RepoRoot, "samples", "graphs", graph + ".texgraph"), Path.Combine(Root, graph + ".texgraph"));
+        Ok(await carve.CallToolAsync("open", """{"path":"barrel.carve"}"""));
+        int[] bands = [.. Enumerable.Range(0, 8), .. Enumerable.Range(24, 8)];
+        Ok(await carve.CallToolAsync("extrude", $$"""{"faces":[{{string.Join(",", bands)}}],"distance":0.015}"""));
+        Ok(await carve.CallToolAsync("unwrap", "{}"));
+        var faces = JsonDocument.Parse(TextOf(await carve.CallToolAsync("get_mesh", "{}"))).RootElement.GetProperty("faces").GetArrayLength();
+        int[] hoops = [.. bands, .. Enumerable.Range(34, faces - 34)];
+        int[] staves = [.. Enumerable.Range(0, faces).Except(hoops)];
+        foreach (var (material, graph, slots) in Weathered) Ok(await carve.CallToolAsync("define_material", Graphs(material, graph, slots, size)));
+        Ok(await carve.CallToolAsync("set_material", $$"""{"material":"iron","faces":[{{string.Join(",", hoops)}}]}"""));
+        Ok(await carve.CallToolAsync("set_material", $$"""{"material":"staves","faces":[{{string.Join(",", staves)}}]}"""));
+    }
+
+    /// <summary>The bake times of T-162's graphs at 1024 (planning's warning size), kept beside the frames for the record; the 512 ones are the test below's.</summary>
+    [Fact]
+    public async Task Weathered_graphs_bake_on_the_barrel_at_1024()
+    {
+        var (process, _) = await StartProcessAsync(mesh: null);
+        using var carve = process;
+        await BarrelAsync(carve, 1024);
+        var caption = Caption(await carve.CallToolAsync("render", """{"view":"front","size":256}"""));
+        File.WriteAllText(Path.Combine(Frames, "barrel-1024-baked.txt"), caption);
+        Assert.Equal(6, caption.Split("\"size\":1024").Length - 1);
     }
 
     [Fact]
-    public async Task A_graph_material_on_the_raised_hoop_barrel_draws_as_its_bakes_named_as_pngs()
+    public async Task Weathered_graphs_on_the_raised_hoop_barrel_draw_as_their_bakes_named_as_pngs()
     {
-        File.Copy(Path.Combine(Paths.RepoRoot, "samples", "barrel.carve"), Path.Combine(Root, "barrel.carve"));
-        File.WriteAllText(Path.Combine(Root, "weathered.texgraph"), Weathered);
-        File.WriteAllText(Path.Combine(Root, "neutral.texgraph"), Neutral);
         var (process, _) = await StartProcessAsync(mesh: null);
         using var carve = process;
-        Ok(await carve.CallToolAsync("open", """{"path":"barrel.carve"}"""));
-        Ok(await carve.CallToolAsync("extrude", $$"""{"faces":[{{string.Join(",", Enumerable.Range(0, 8).Concat(Enumerable.Range(24, 8)))}}],"distance":0.015}"""));
-        Ok(await carve.CallToolAsync("unwrap", "{}"));
-        Ok(await carve.CallToolAsync("define_material", """{"name":"w","base_colour_texture":{"graph":"weathered.texgraph","output":"base_colour","size":512},"occlusion_texture":{"graph":"weathered.texgraph","output":"occlusion","size":512}}"""));
-        Ok(await carve.CallToolAsync("set_material", """{"material":"w","group":"all"}"""));
+        await BarrelAsync(carve, 512);
 
         var first = await carve.CallToolAsync("render", """{"view":"front","size":512}""");
-        var graph = Frame(first, "barrel-graph");
+        var drawn = Frame(first, "barrel-graph");
         var caption = Caption(first);
-        TestContext.Current.TestOutputHelper?.WriteLine(caption);
-        Assert.Contains("""baked: [{"material":"w","mesh":"mesh","slot":"base_colour_texture","size":512,"ms":""", caption);
-        Assert.Contains("""{"material":"w","mesh":"mesh","slot":"occlusion_texture","size":512,"ms":""", caption);
-        var again = await carve.CallToolAsync("render", """{"view":"front","size":512}""");
-        Assert.DoesNotContain("baked:", Caption(again));
+        File.WriteAllText(Path.Combine(Frames, "barrel-512-baked.txt"), caption);
+        foreach (var (material, _, slots) in Weathered)
+            foreach (var (field, _) in slots)
+                Assert.Contains($$"""{"material":"{{material}}","mesh":"mesh","slot":"{{field}}","size":512,"ms":""", caption);
+        Assert.DoesNotContain("baked:", Caption(await carve.CallToolAsync("render", """{"view":"front","size":512}""")));
 
         Ok(await carve.CallToolAsync("save", """{"path":"weathered.carve"}"""));
-        var model = CarveFile.Read(File.ReadAllText(Path.Combine(Root, "weathered.carve"))).Model!;
+        var model = CarveFile.Read(File.ReadAllText(Path.Combine(Root, "weathered.carve")), Root).Model!;
 
-        Ok(await carve.CallToolAsync("define_material", BakeToPngs(model, "mesh", "weathered.texgraph", "weathered")));
+        foreach (var (material, graph, slots) in Weathered) Ok(await carve.CallToolAsync("define_material", Pngs(model, "mesh", material, graph, slots, "baked")));
         var png = Frame(await carve.CallToolAsync("render", """{"view":"front","size":512}"""), "barrel-png");
-        Assert.True(Passes(graph, png, out var measured), $"the graph material against its bakes as PNGs: {measured}");
+        Assert.True(Passes(drawn, png, out var measured), $"the graph materials against their bakes as PNGs: {measured}");
 
-        Ok(await carve.CallToolAsync("define_material", BakeToPngs(model, "mesh", "neutral.texgraph", "neutral")));
+        foreach (var (material, graph, slots) in Weathered) Ok(await carve.CallToolAsync("define_material", Pngs(model, null, material, graph, slots, "neutral")));
         var control = Frame(await carve.CallToolAsync("render", """{"view":"front","size":512}"""), "barrel-neutral");
-        Assert.False(Passes(graph, control, out var controlled), $"the control (the neutral graph's PNGs) must fail: {controlled}");
+        Assert.False(Passes(drawn, control, out var controlled), $"the control (the neutral graphs' PNGs) must fail: {controlled}");
+        File.AppendAllText(Path.Combine(Frames, "barrel-512-baked.txt"), $"\nagainst PNGs: {measured}\ncontrol: {controlled}\n");
     }
 
     [Fact]
