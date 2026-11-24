@@ -33,7 +33,7 @@ public class NodeToolTests
     [Fact]
     public void Define_graph_names_every_type_and_points_at_nodes()
     {
-        var registry = NodeRegistry.BuiltIn;
+        var registry = Program.Registry;
         var text = DefineGraphTool.Text(registry);
         Assert.Contains("(nodes gives each one's inputs, outputs, parameters with ranges and defaults, and a worked example", text, StringComparison.Ordinal);
         foreach (var name in registry.Names) Assert.Contains(name + " (", text, StringComparison.Ordinal);
@@ -43,7 +43,7 @@ public class NodeToolTests
     [Fact]
     public void Every_type_has_a_worked_example()
     {
-        foreach (var name in NodeRegistry.BuiltIn.Names) Assert.NotEmpty(NodeCatalogue.Examples(name));
+        foreach (var name in Program.Registry.Names) Assert.NotEmpty(NodeCatalogue.Examples(name));
     }
 
     [Fact]
@@ -52,12 +52,12 @@ public class NodeToolTests
         using var folder = new TempFolder();
         File.Copy(Path.Combine(Paths.RepoRoot, "samples", "graphs", "bricks.texgraph"), Path.Combine(folder.Path, "bricks.texgraph"));
         await using var patina = await PatinaHarness.StartAsync(folder.Path);
-        foreach (var name in NodeRegistry.BuiltIn.Names)
+        foreach (var name in Program.Registry.Names)
             foreach (var (_, graph, returns) in NodeCatalogue.Examples(name))
             {
                 Assert.Equal(returns, await patina.Ok("define_graph", graph));
                 Assert.Contains($"\"type\":\"{name}\"", graph, StringComparison.Ordinal);
-                Assert.Contains("define_graph " + graph + "\nreturns: " + returns + "\n", NodeCatalogue.Entry(NodeRegistry.BuiltIn, name), StringComparison.Ordinal);
+                Assert.Contains("define_graph " + graph + "\nreturns: " + returns + "\n", NodeCatalogue.Entry(Program.Registry, name), StringComparison.Ordinal);
             }
     }
 
@@ -65,7 +65,7 @@ public class NodeToolTests
     public async Task Nodes_returns_one_type_or_every_type_and_refuses_an_unknown_one()
     {
         await using var patina = await PatinaHarness.StartAsync();
-        var registry = NodeRegistry.BuiltIn;
+        var registry = Program.Registry;
 
         var one = await patina.Ok("nodes", NodeTool.Worked);
         Assert.Equal(NodeCatalogue.Entry(registry, "stripes").TrimEnd('\n'), one);

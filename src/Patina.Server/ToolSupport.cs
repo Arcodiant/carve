@@ -80,6 +80,16 @@ public static class ToolSupport
     public static string State(TextureGraph graph, NodeRegistry registry) =>
         Describe(graph) + "; " + Faults(GraphValidator.Validate(graph, registry));
 
+    /// <summary>
+    /// What a graph with mesh-input nodes (T-162) is told: patina has no mesh, so each reads its neutral stand-in. Empty
+    /// for a graph without any, so its answers stay as they were. Nodes of a graph used as a graph node are not looked into.
+    /// </summary>
+    public static string MeshNote(TextureGraph graph)
+    {
+        var nodes = graph.Nodes.Where(n => Carve.Graphs.MeshNodes.TypeNames.Contains(n.Value.Type)).Select(n => $"{n.Key} ({n.Value.Type})").ToList();
+        return nodes.Count == 0 ? "" : "mesh inputs neutral: " + string.Join(", ", nodes) + "; the real maps come from the mesh when a carve material names the graph";
+    }
+
     public static string Count(int n, string what) => $"{n.ToString(CultureInfo.InvariantCulture)} {what}{(n == 1 ? "" : "s")}";
 
     /// <summary>
