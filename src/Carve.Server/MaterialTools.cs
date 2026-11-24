@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Carve.Core;
+using Carve.Graphs;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Patina.Graphs;
@@ -35,7 +36,7 @@ internal static class MaterialJson
     }
 
     /// <summary>Whether the graph at <paramref name="path"/> reads the mesh (a mesh node in it or a nested file), or null when it cannot be read now.</summary>
-    private static bool? ReadsMesh(string path)
+    internal static bool? ReadsMesh(string path)
     {
         try
         {
@@ -48,16 +49,13 @@ internal static class MaterialJson
     }
 
     /// <summary>
-    /// The warnings for <paramref name="model"/>'s graph slots whose file is missing or is not a texture graph (T-160): open
-    /// keeps the slot and says so, naming the material, the slot and the path, so the material can be defined again.
+    /// The warnings for <paramref name="model"/>'s graph slots that cannot be baked (T-160, T-166): a file gone or not a texture graph,
+    /// a fault in the graph, an output it lacks or the slot cannot take. open keeps the slot and says so, in <see cref="GraphSlotProblem"/>'s
+    /// words, so the material can be defined again.
     /// </summary>
-    public static IEnumerable<string> BrokenGraphs(Model model)
-    {
-        foreach (var m in model.Materials)
-            foreach (var (field, slot) in m.Textures)
-                if (slot is MaterialGraph graph && DefineMaterialTool.ReadGraph(graph.Path, out _) is { } problem)
-                    yield return $"materials['{m.Name}'].{field}: the graph {graph.Path} {problem}; the slot is kept, and render and export fail on it until the file is there or define_material names another";
-    }
+    public static IEnumerable<string> BrokenGraphs(Model model) =>
+        model.Materials.SelectMany(GraphSlotProblem.Slots)
+            .Select(p => p + "; the slot is kept, and render and export fail on it until the file is there and right, or define_material names another");
 
     /// <summary>The warning for a material with an occlusion strength and no occlusion map, or null: glTF scales only the map.</summary>
     public static string? OcclusionWarning(Material m) =>
@@ -86,7 +84,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         + "A face has either a colour (set_colour) or a material, and giving it one clears the other. One undo step. "
         + "Returns JSON {replaced: bool, material:{name and every other field above, as taken}, warnings:[]}, "
         + "each texture null, {path, width, height} for a PNG or {graph, output, size (the one taken)} for a graph, paths absolute. get_mesh lists materials the same way. "
-        + "Errors, each a tool error naming the argument, that changes nothing: an empty name, one with ':', '#' or '@', or exactly 'carve'; a colour that is not #RRGGBB; metallic, roughness or occlusion outside 0 to 1; a texture path that does not end in .png, names a folder or does not exist (the .png files in its folder are listed); a texture that is not a PNG or is outside 1 to 4096 pixels a side; a graph slot with another key, or without graph or output; a graph that does not end in .texgraph, does not exist (the .texgraph files in its folder are listed) or is not a texture graph; an output not [a-z][a-z0-9_]*; any other size; an argument define_material does not take. "
+        + "Errors, each a tool error naming the argument, that changes nothing: an empty name, one with ':', '#' or '@', or exactly 'carve'; a colour that is not #RRGGBB; metallic, roughness or occlusion outside 0 to 1; a texture path that does not end in .png, names a folder or does not exist (the .png files in its folder are listed); a texture that is not a PNG or is outside 1 to 4096 pixels a side; a graph slot with another key, or without graph or output; a graph that does not end in .texgraph, does not exist (the .texgraph files in its folder are listed), is not a texture graph or has faults (all named); an output not [a-z][a-z0-9_]*, one the graph lacks (its outputs are listed) or one the slot cannot take; any other size; an argument define_material does not take. "
         + "Worked example, a rough wooden material with a texture (set_material's own example puts it on faces):\n"
         + ExampleMarker + """{"name":"crate","roughness":0.8,"base_colour_texture":"textures/crate.png"}"""
         + "\nWorked example of graph slots, graphs/iron.texgraph a graph of size 512 with base_colour and roughness outputs:\n"
@@ -197,6 +195,9 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
 
         var warnings = new List<string>();
         if (MaterialJson.OcclusionWarning(material) is { } warning) warnings.Add(warning);
+        foreach (var (field, slot) in material.Textures)
+            if (slot is MaterialGraph { } g && MaterialJson.ReadsMesh(g.Path) == true)
+                warnings.Add($"{field}: the graph reads the mesh, so it is baked onto each mesh that wears '{material.Name}' (its UVs, its groups and materials); set_material it on a mesh with UVs that do not overlap, and check lists what stops it");
         return Ok(new { replaced, material = MaterialJson.Of(material), warnings });
     }
 
@@ -278,7 +279,18 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
             errors.Add($"{field}.graph: {target.FullPath} {problem}");
             return null;
         }
-        return new MaterialGraph(target.FullPath, output!, size ?? Math.Clamp(graph!.Size, MaterialGraph.MinSize, MaterialTexture.MaxSize));
+        var made = new MaterialGraph(target.FullPath, output!, size ?? Math.Clamp(graph!.Size, MaterialGraph.MinSize, MaterialTexture.MaxSize));
+        // The faults, the output and the slot table, here rather than at the first render (T-166); a malformed output name is Material.Problems' to report.
+        try
+        {
+            if (MaterialGraph.OutputProblem(output) is null) GraphSlotBake.Validate(made, field);
+        }
+        catch (Exception e) when (GraphSlotProblem.IsCause(e))
+        {
+            errors.Add($"{field}.{(e is GraphOutputException ? "output" : "graph")}: {GraphSlotProblem.Cause(e)}");
+            return null;
+        }
+        return made;
     }
 
     /// <summary>
@@ -302,30 +314,9 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
     }
 
     /// <summary>The missing-file error: the resolved path and the files with <paramref name="extension"/> that are in its folder.</summary>
-    internal static string Missing(ToolPath target, string extension = ".png")
-    {
-        var folder = Path.GetDirectoryName(target.FullPath)!;
-        var head = $"no file at {target.FullPath}; ";
-        if (!Directory.Exists(folder)) return head + $"the folder {folder} does not exist";
+    internal static string Missing(ToolPath target, string extension = ".png") => Missing(target.FullPath, extension);
 
-        List<string> names;
-        try
-        {
-            names = Directory.EnumerateFiles(folder).Select(f => Path.GetFileName(f)!)
-                .Where(n => n.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(n => n, StringComparer.Ordinal).ToList();
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return head + $"the folder {folder} could not be listed: {e.Message}";
-        }
-
-        var inv = CultureInfo.InvariantCulture;
-        if (names.Count == 0) return head + $"there are no {extension} files in {folder}";
-        var shown = string.Join(", ", names.Take(OpenTool.ListLimit));
-        var rest = names.Count > OpenTool.ListLimit ? $", and {(names.Count - OpenTool.ListLimit).ToString(inv)} more" : "";
-        return head + $"the {extension} files in {folder} ({names.Count.ToString(inv)}) are: {shown}{rest}";
-    }
+    internal static string Missing(string fullPath, string extension) => GraphSlotProblem.Missing(fullPath, extension);
 }
 
 public sealed class SetMaterialTool(ModelStore store)
@@ -334,7 +325,7 @@ public sealed class SetMaterialTool(ModelStore store)
         "Gives faces of a mesh a material from define_material: set_material(material, and either faces or group). "
         + "Give exactly one of faces (face ids) or group (a name from define_group). A face has one material or one colour, never both: this clears the faces' colours, and set_colour clears a face's material. The last call wins. "
         + "Materials belong to the model, not to a mesh, so any mesh's faces may use any material. Faces keep their material through every edit (an extrude's walls take the material of the face they came from) and through undo, save and open. "
-        + "A texture is drawn only on faces that have UVs, so give the faces UVs first with project_uvs, unwrap or set_uvs; the result warns of faces that have none, and check does too. "
+        + "A texture is drawn only on faces that have UVs, so give the faces UVs first with project_uvs, unwrap or set_uvs; the result warns of faces that have none, and check does too. A material whose graph reads the mesh also warns when this mesh cannot feed it: no UVs, overlapping UVs, a mesh_mask naming a group or material the mesh lacks. "
         + PartTargetText
         + "Returns JSON {mesh, material, faces:[ids given the material], warnings:[] (only when there are some)}. "
         + "Errors, each a tool error naming the argument, that changes nothing: no mesh yet, a material that is not defined (the defined names are listed), both or neither of faces and group, an unknown group, a face id the mesh does not have, an unknown mesh, an argument set_material does not take. "
@@ -402,6 +393,8 @@ public sealed class SetMaterialTool(ModelStore store)
         if (snapshot is null) return Error("set_material: " + NoMesh);
 
         var name = snapshot.Model.Target(meshName, out _)!.Name;
+        if (snapshot.Model.FindMaterial(materialName!) is { HasGraph: true } worn)
+            warnings.AddRange(GraphSlotProblem.OnMesh(snapshot.Model, worn, name));
         return warnings.Count == 0
             ? Ok(new { mesh = name, material = materialName, faces = given })
             : Ok(new { mesh = name, material = materialName, faces = given, warnings });

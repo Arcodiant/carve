@@ -43,6 +43,18 @@ public class GraphBakesTests : FileToolTests
     private static string[] Slots(GraphBakes.Drawn drawn) => [.. drawn.Baked.Select(b => $"{b.Material}/{b.Mesh}/{b.Slot}/{b.Size}")];
 
     [Fact]
+    public void The_warning_names_the_slot_and_node_that_cost_most_not_a_later_slot_that_shared_the_map()
+    {
+        // base_colour made the shared curvature map (0.9 s of its 2 s); metallic_roughness, 4 s of its own nodes, asked for it again at no cost.
+        GraphBakes.Baked[] baked =
+        [
+            new("iron", "barrel", "base_colour_texture", 1024, 2000, "mesh_curvature 'curv'", 900, "barrel"),
+            new("iron", "barrel", "metallic_roughness_texture", 1024, 4000, "mesh_curvature 'curv'", 0, "barrel"),
+        ];
+        Assert.Equal(["material 'iron' on 'barrel' took 6.0 s to bake (base_colour_texture 1024: mesh_curvature 'curv' 0.9 s); lower its size or the node's rays"], GraphBakes.Warnings(baked));
+    }
+
+    [Fact]
     public async Task A_slot_is_baked_once_and_again_only_after_an_edit_it_depends_on()
     {
         await using var carve = await StartStripAsync();
@@ -103,7 +115,7 @@ public class GraphBakesTests : FileToolTests
         await using var carve = await StartStripAsync();
         File.Delete(Path.Combine(Root, "curv.texgraph"));
         var e = Assert.Throws<GraphSlotProblemException>(() => new GraphBakes().Resolve(carve.Store.Current.Model, TestContext.Current.CancellationToken));
-        Assert.StartsWith("material 'm', occlusion_texture: ", e.Message);
+        Assert.Equal($"materials['m'].occlusion_texture: no file at {Path.Combine(Root, "curv.texgraph")}; the .texgraph files in {Root} (2) are: flat.texgraph, inner.texgraph; the model is unchanged: define the material again with a graph that bakes, or restore the file", e.Message);
     }
 
     [Fact]
