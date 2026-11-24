@@ -206,6 +206,8 @@ By the person (2026-11-24), each put with a recommendation:
   what base colour, the normal and the ORM hold there.
 - **carve's over-long tool descriptions are cut down inside M-29, before T-168,** as the new member T-207. Declined:
   filing it off-milestone, and leaving them.
+- **carve gains a `help` tool** (T-207): `help {tool}` returns what was moved out of that tool's description, as
+  patina's `nodes` does. Declined: another name, and cutting by shorter writing alone.
 
 By the orchestrator:
 
