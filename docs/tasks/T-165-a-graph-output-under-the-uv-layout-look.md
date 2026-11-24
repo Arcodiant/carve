@@ -88,8 +88,8 @@ under the layout.
 
 ### Hand-off
 
-Model: Opus 5.5 (`claude-opus-5-5`), third agent, after Sonnet 5.5 built it and Opus 5.5 diagnosed it. Stopped at the
-checkpoint: code committed and `verify` passing, the frame review left.
+Model: Opus 5.5 (`claude-opus-5-5`), fourth agent, after Sonnet 5.5 built it and Opus 5.5 diagnosed it and applied the
+fill ruling. Stopped at the checkpoint: code committed and `verify` passing, the frame review left.
 
 - **The person's ruling (2026-11-24):** `bake` writes each map's neutral value in the texels no island or padding covers,
   so the node and the bake are one computation over the whole image. Declined: comparing islands and padding only, and
@@ -122,12 +122,24 @@ checkpoint: code committed and `verify` passing, the frame review left.
   the new stage adds about 18 s.
 - **Descriptions** (characters, `origin/milestone/M-29` then this member): `render` 19122 to 19954, `bake` 8410 to
   8684; both were over 4,096 before. `PartToolsListTests`' digest did not move.
-- **Left, before the frame review (from the coordinator, after this `verify`):** T-166 has landed on
-  `origin/milestone/M-29`. Rebase (expect `PartToolsListTests.Before` to conflict: keep both sides' descriptions,
-  rebuild, retake the digest). T-166 words a graph problem `materials['<name>'].<slot>: <cause>`, so the look's
-  `GraphSlotProblem.Of(<graph file>, "image", e)` in `RenderTool.cs` would read `materials['<file>'].image: ...`, wrong for
-  an image that belongs to no material: add an `Of` overload with no material, naming the `image` argument and the cause
-  (T-166's `### As built` has the table of causes), with a `server-unit` test holding the whole message; then `verify`.
+- **Rebased onto T-166 (`origin/milestone/M-29` at 53734e2):** no conflict at all, `PartToolsListTests.Before` included;
+  this member never touched that file and the digest did not move (`server-unit` passes on it).
+- **The `image` wording:** `GraphSlotProblem.Of(argument, cause)` gives `image: <cause>`, the cause in T-166's words
+  (`Cause`, unchanged); `GraphBakes.Image` uses it, so the look's error no longer reads `materials['<file>'].image`.
+  T-166's material wording is untouched. `GraphImageToolTests.A_graph_that_cannot_be_baked_is_named_by_image_not_by_a_material`
+  holds the whole message for a missing file (`image: no file at <root>\gone.texgraph; the .texgraph files in <root> (3)
+  are: ...`), a graph fault (`image: the graph has faults: node 'o' input 'in': output needs it connected, and it is not`)
+  and an unknown output (`image: the graph has no output 'nothing'; its outputs are wear`). Note: the parse-time refusals
+  in `RenderTool.LoadGraphImage` still say `image.graph: ...` (a missing or unreadable file seen before any bake), as
+  before; the bake-time ones say `image: ...`.
+- **Frames after the rebase, by hash** (`verify`'s jobs J-20261124-094654-73b501 scenario-bakes and -094657-64871f
+  scenario-materials): identical to this member's previous runs (scenario-bakes J-20261124-085556-0bb89a and
+  -090639-7f519f, scenario-materials -090643-b92aa2), 74 and 24 frames, none moved. Against the base run
+  J-20261124-085554-4d6a68, the changed and new frames are exactly the ones listed above. The bake-PNG identity checks
+  pass in the stage itself. The one other new file is not a frame: `bakes/graph-image/wrench.material.wrench-bevel.png`,
+  a bake the stage writes.
+- **Not explained:** this agent's first `cairn test run server-unit` printed nothing and was stopped at the 30-minute
+  background limit, with no job in the queue. `verify` straight after ran `server-unit` in 59 s. Not looked into.
 - **Left:** the frame review (open the new graph frames and the moved bake frames, crops scaled up; the person approves
   the set through `mcp__waystone__review`, files to `G:\My Drive\artifacts\carve\M-29\T-165\round-N`), then
   `### As built` (fold this section in; T-167's notes: the argument's shape, the caption, how the frames were checked),
