@@ -85,3 +85,20 @@ under the layout.
 - The wrench has no concave edge and no jaw opening (M-24's retrospective); write no check that needs one.
 - **Write down for T-167** (As built): the argument's shape, the caption, and how its frames were checked.
 - **Stop and ask:** an existing `uvs` frame that changes; a byte-identity check that fails.
+
+### Hand-off
+
+Model: Sonnet 5.5 (`claude-sonnet-5-5`). Stopped at the checkpoint on a stop-and-ask condition: the byte-identity check fails.
+
+- Done and committed: `GraphBakes.Image` (src/Carve.Server/GraphBakes.cs; bakes the output as a base_colour slot, own cache key
+  `+":image"`), render's `image` as `JsonElement` taking a path or `{graph, output, size}` (`RenderTool.cs`: `LoadGraphImage`,
+  `RunUvs`, caption `image <file> <output> <size> px`, `baked` line), description text, `GraphImageToolTests` (unit refusals,
+  first/second bake, regression through the process; all pass), `GraphImageStage.cs` + one line in `BakesStages.cs`, `insideOnly`
+  on `CheckUvImage`, the three breaks in `BakesChecks.Break`'s doc, CLAUDE.md's Bakes row. `PartToolsListTests` still passes
+  unchanged (the image sentences are outside the digest). `MaterialTools.cs` untouched (T-166's); the graph argument parser is a copy in `RenderTool.cs`.
+- verify: server-unit PASS, scenario-materials PASS, scenario-bakes FAIL: the curvature, occlusion and steel-mask frames each
+  differ from the bake-PNG frame in 303229 pixels (x 64..959, y 64..959, the whole unit-square window). Identical count for three different maps.
+  Frames of that run are gone with the runner; not diagnosed further. Not turned into a tolerance.
+- Left: find why (likely suspects: the graph's baked PNG vs `bake`'s PNG differ uniformly, e.g. channel packing or an alpha/sRGB
+  difference, or the uvs path draws a graph-baked MaterialTexture differently from a loaded one), then position frame, breaks,
+  the frame review, `### As built`, lint, finish. The position check and breaks have not run (the stage fails first at the identity checks only; position did not report).
