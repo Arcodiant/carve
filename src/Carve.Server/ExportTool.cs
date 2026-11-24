@@ -9,7 +9,7 @@ using static Carve.Server.MeshToolSupport;
 
 namespace Carve.Server;
 
-public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
+internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphBakes bakes)
 {
     public const string Extension = ".glb";
 
@@ -63,6 +63,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         + "It is refused, writing nothing, for an empty or missing meshes list, a name that is not a mesh (the error lists the model's mesh names) and a model with no skeleton; a vertex with no weight in a chosen mesh is refused as in the model mode, and allow_unweighted: true applies. "
         + "A piece warns on the game's max_triangles and max_submeshes as the model mode does, not on height, and reads and writes the limits file as model mode does. "
         + "A model with morph targets (define_target) writes each as a glTF morph target, and the result line names them in glTF target order, for example \"2 morph target(s) 'Girth', 'Slim' in glTF target order\"; a model with none says nothing of targets. "
+        + "A graph material (define_material with a texture graph's output in a slot) is baked at export from the graph files as they are on disk then, at each slot's size, and written as ordinary PNG textures, so the game never evaluates a graph; the result gains the baked list and the 5 s warning as render's does, and nothing is baked again after a render of the same model. A graph that reads the mesh and is used by several meshes is written once per mesh as <material>@<mesh>, named in a warning; one used by a single mesh keeps its name. "
         + "The .glb is for the game: it keeps no faces, only triangles, so the .carve file is the one to keep working in. "
         + "The whole sequence from an empty file to a game, with save and open, is the worked example in save's description. "
         + "Worked example of a material: define_material {name: 'wood', base_colour: '#C8A06E', roughness: 0.6, base_colour_texture: 'wood.png'}, project_uvs, set_material {faces: [0, 1], material: 'wood'}, then export: the .glb holds primitives 'carve' and 'wood', 'wood' with baseColorTexture holding wood.png's bytes, the result line says 2 materials 'carve', 'wood', and the game's loader reads 'wood' back as that material. "
@@ -141,9 +142,26 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         if (errors.Count > 0) return Failed("export", errors);
 
         var model = store.Current.Model;
+        if (model.Combined is null && !clips) return Error("export: " + NoMesh); // clips mode needs no mesh (the person, 2026-11-09)
+
+        // T-164: each graph slot is baked (or found cached, as render's bake) and written as an ordinary PNG; clips mode writes no material.
+        var baked = new List<GraphBakes.Baked>();
+        string? copies = null;
+        if (!clips && model.Materials.Any(m => m.HasGraph))
+        {
+            try
+            {
+                var drawn = bakes.Resolve(model, CancellationToken.None);
+                baked.AddRange(drawn.Baked);
+                model = drawn.Model;
+            }
+            catch (GraphSlotProblemException e)
+            {
+                return Error(e.Message);
+            }
+            if (kind != "piece") (model, copies) = Copies(model); // a piece names its copies over the meshes it writes
+        }
         var mesh = model.Combined;
-        if (mesh is null && !clips) return Error("export: " + NoMesh); // clips mode needs no mesh (the person, 2026-11-09)
-        if (MaterialJson.GraphsNotDrawn("export", model) is { } notDrawn) return Error(notDrawn); // Interim until T-164 writes graph materials.
 
         var target = ToolPaths.Resolve("export", text, Extension, out var pathError, toolFolder.Directory);
         if (target is null) return Error(pathError!);
@@ -154,33 +172,35 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
 
         var written = clips ? Clips(model, target, replace, source)
             : kind == "piece" ? Piece(model, pieceMeshes ?? [], target, allowUnweighted, replace, source)
-            : model.Skeleton is not null ? Skinned(model, target, allowUnweighted, replace, source)
-            : Static(model, mesh!, target, replace, source);
-        if (written.IsError == true || !source.NeedsWrite) return written;
+            : model.Skeleton is not null ? Skinned(model, target, allowUnweighted, replace, source, copies: copies)
+            : Static(model, mesh!, target, replace, source, copies);
+        if (written.IsError == true) return written;
+        var bakedText = GraphBakes.Text(baked);
+        if (!source.NeedsWrite) return Line(TextOf(written) + bakedText);
 
         // The .glb is written; the limits file follows it, so a refused export writes neither.
         if (!source.Write("export", out var writeLimitsError))
             return Error($"{writeLimitsError} The .glb was written: {TextOf(written)}");
-        return Line(TextOf(written).Replace(source.Describe(written: false), source.Describe(written: true), StringComparison.Ordinal));
+        return Line(TextOf(written).Replace(source.Describe(written: false), source.Describe(written: true), StringComparison.Ordinal) + bakedText);
     }
 
     private static string TextOf(CallToolResult result) => ((TextContentBlock)result.Content[0]).Text;
 
     /// <summary>A model with no skeleton: every mesh merged into one, as T-30 writes it, warned on the game's limits.</summary>
-    private static CallToolResult Static(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source)
+    private static CallToolResult Static(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source, string? copies)
     {
-        if (GlbParts.HasMoving(model)) return Tree(model, mesh, target, overwrite, source);
+        if (GlbParts.HasMoving(model)) return Tree(model, mesh, target, overwrite, source, copies);
         var triangles = Shading.Triangles(mesh);
         var bytes = GlbExport.Write(mesh, triangles, target.Stem, model.Materials);
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
         var warnings = source.Limits.Warnings(model, triangles.Count, GlbExport.MaterialNames(mesh, model.Materials).Length);
         return Line(Summary(mesh, GlbExport.MaterialNames(mesh, model.Materials), target, replaced, triangles.Count, TargetsPart(model) + source.Describe(written: false), warnings,
-            [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model)]));
+            [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model), .. Copy(copies)]));
     }
 
     /// <summary>T-95: a model with parts marked moves, a node per moving part (<see cref="GlbParts"/>), counted on the game's limits as drawn.</summary>
-    private static CallToolResult Tree(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source)
+    private static CallToolResult Tree(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source, string? copies)
     {
         if (GlbParts.Plan(model, target.Stem, out var refusal) is not { } layout) return Error($"export: {refusal}. Nothing was written.");
         var bytes = GlbParts.Write(model, layout);
@@ -189,7 +209,7 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         var triangles = Shading.Triangles(mesh).Count;
         var names = GlbExport.MaterialNames(mesh, model.Materials);
         var warnings = source.Limits.Warnings(model, triangles, names.Length);
-        List<string> more = [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model)];
+        List<string> more = [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model), .. Copy(copies)];
         if (model.TargetNames.Count > 0)
             more.Add("the file has morph targets and moving parts: a split load (ModelParseOptions SplitParts) refuses a file with morph targets, so a game reads this one with the merged load");
         return Line(Summary(mesh, names, target, replaced, triangles, GlbParts.Describe(layout) + TargetsPart(model) + source.Describe(written: false), warnings, more));
@@ -215,11 +235,12 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
     private static CallToolResult Piece(Model model, List<string> meshes, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source)
     {
         if (PieceExport.Refusal(model, meshes) is { } refusal) return Error($"export: mode piece: {refusal}. Nothing was written.");
-        return Skinned(PieceExport.Select(model, meshes), target, allowUnweighted, overwrite, source, asPiece: true);
+        var (piece, copies) = Copies(PieceExport.Select(model, meshes));
+        return Skinned(piece, target, allowUnweighted, overwrite, source, asPiece: true, copies: copies);
     }
 
     /// <summary>A model with a skeleton: the skinned file, or a refusal listing unweighted vertices that writes nothing.</summary>
-    private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source, bool asPiece = false)
+    private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source, bool asPiece = false, string? copies = null)
     {
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
         // T-95: the parts baked into placed meshes, instances copied; moves has no effect, said in one warning.
@@ -256,11 +277,40 @@ public sealed class ExportTool(ModelStore store, ToolFolder toolFolder)
         var warnings = source.Limits.Warnings(model, glb.Triangles, glb.Primitives, wholeBody: !asPiece).ToList();
         warnings.AddRange(GlbExport.UvWarnings(model));
         warnings.AddRange(GlbExport.MaterialUvWarnings(model));
+        warnings.AddRange(Copy(copies));
         warnings.AddRange(ClipChecks.Check(model));
         if (movesWarning is not null) warnings.Add(movesWarning);
         foreach (var piece in model.Meshes)
             warnings.AddRange(MeshWarningFold.Lines(MeshReport.Create(piece.Mesh).Warnings).Select(w => $"mesh '{piece.Name}': " + w.ReplaceLineEndings(" ")));
         return Line(line + WarningsSuffix(warnings));
+    }
+
+    private static string[] Copy(string? copies) => copies is null ? [] : [copies];
+
+    /// <summary>
+    /// T-164: <see cref="GraphBakes.Resolve"/> gives a mesh-reading graph material one copy per mesh (<c>m@mesh</c>) beside the
+    /// original, which stays in the model with its graph slots and unused. A material that one mesh uses (among the meshes written)
+    /// goes back to its plain name; one that several use keeps its copies, and the warning names them.
+    /// </summary>
+    private static (Model Model, string? Warning) Copies(Model model)
+    {
+        var copies = model.Materials.Where(m => m.Name.IndexOf('@') is > 0 && model.Materials.Any(o => o.HasGraph && m.Name.StartsWith(o.Name + "@", StringComparison.Ordinal))).Select(m => m.Name).ToHashSet();
+        var users = model.Meshes.SelectMany(n => Model.MaterialsUsedBy(n.Mesh).Where(copies.Contains).Select(c => (Base: c[..c.IndexOf('@')], Copy: c, Mesh: n.Name))).ToList();
+        var several = new List<string>();
+        foreach (var g in users.GroupBy(u => u.Base))
+        {
+            if (g.Select(u => u.Mesh).Distinct().Count() > 1)
+            {
+                several.Add($"material '{g.Key}' reads the mesh and is used by several meshes, so it is written once per mesh as {NameList.Quoted(g.Select(u => u.Copy).Distinct())}");
+                continue;
+            }
+            var (plain, copy, name) = g.First();
+            model = model.WithMaterial(model.Materials.First(m => m.Name == copy) with { Name = plain });
+            var mesh = model.Find(name)!;
+            var style = mesh.Style!.WithMaterial(mesh.Style.Materials.Where(p => p.Value == copy).Select(p => p.Key), plain);
+            model = model.With(name, mesh.WithStyle(style));
+        }
+        return (model, several.Count == 0 ? null : string.Join("; ", several));
     }
 
     /// <summary>T-107: the morph targets written, by name in glTF target order; empty (nothing added to the result) for a model with none.</summary>
