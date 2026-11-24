@@ -62,6 +62,14 @@ names a graph that is not there.
 - A product fault found by a round (not a description fault) is filed as a bug on the milestone and fixed before the
   next round.
 
+### The prompt (fixed before round 1; the copy the rounds use is `scripts/weathering-round/prompt.txt`)
+
+```text
+Open wrench-start.carve and get it rendering. Then make the steel look used: worn bright along its edges and dirty where the square drive meets the socket. Leave the rubber grip clean. Show me the wear mask laid out flat on the UV layout, look at your result with renders, and when you are happy save it as wrench-weathered.carve and export it to game/Content/models/wrench.glb. Tell me briefly what you did.
+```
+
+Worked against the wrench before round 1 (agent 1, Sonnet 5.5): every request is reachable. Steel edges are all hard and convex, so "worn bright along its edges" has texels on every steel face; "where the square drive meets the socket" is the drive (faces 100 to 105, z -0.042 to -0.020) standing between the dark ring under the head (face 99) and the dark socket top (face 118), the wrench's one crevice (M-24). "Leave the rubber grip clean" is reachable by masking the wear to the steel group. The prompt names no graph path, node, parameter or value. No clash; the plant is `graphs/steel-worn.texgraph` against the folder's `graphs/worn-steel.texgraph` (curvature wear only: the dirt and the grip are the agent's to add).
+
 ## Notes
 
 - **From the milestone:** fresh agents weather a model and recover from a planted wrong graph path.

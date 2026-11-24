@@ -83,8 +83,8 @@ public class WeatheringAcceptanceTests
     public void The_missing_graph_message_came_and_the_next_steel_material_names_a_graph_that_exists()
     {
         var (_, calls, results) = Transcript();
-        var message = results.FirstOrDefault(r => r.Text.Contains("is not there", StringComparison.Ordinal));
-        Assert.True(message.Text is not null, "no tool result said a graph file is not there");
+        var message = results.FirstOrDefault(r => r.Text.Contains("no file at", StringComparison.Ordinal) && r.Text.Contains(".texgraph files in", StringComparison.Ordinal));
+        Assert.True(message.Text is not null, "no tool result carried the missing-graph message (T-166: no file at ...; the .texgraph files in ...)");
         var next = calls.FirstOrDefault(c => c.Index > message.Index && c.Name == "mcp__carve__define_material"
             && c.Input.TryGetProperty("name", out var n) && n.GetString() == "steel");
         Assert.True(next is not null, "no define_material for steel after the message");
