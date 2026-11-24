@@ -39,6 +39,12 @@ public sealed class AcceptanceScenario : IScenario
 
     public async Task RunAsync(ScenarioDriver driver)
     {
+        if (Environment.GetEnvironmentVariable("CARVE_WEATHERING_RUN") is { Length: > 0 } weathering)
+        {
+            await WeatheringStep.RunAsync(driver, weathering);
+            return;
+        }
+
         var round = Environment.GetEnvironmentVariable("CARVE_ACCEPTANCE_RUN") ?? throw new InvalidOperationException("CARVE_ACCEPTANCE_RUN is unset");
         var carveFile = Path.Combine(round, "character.carve");
         var glb = Path.Combine(round, "game", "Content", "models", "character.glb");
