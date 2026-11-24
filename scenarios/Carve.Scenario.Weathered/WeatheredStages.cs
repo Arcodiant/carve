@@ -12,6 +12,7 @@ internal static class WeatheredStages
     public static readonly IReadOnlyList<IWeatheredStage> All =
     [
         new BuildStage(),
-        new ResearchStage(),
+        new SeenStage(),
+        new RebakeStage(),
     ];
 }

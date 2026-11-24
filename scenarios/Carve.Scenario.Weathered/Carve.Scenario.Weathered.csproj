@@ -24,6 +24,7 @@
     <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
     <Compile Include="../../tools/Carve.SampleTextures/TextureSet.cs" Link="TextureSet.cs" />
     <Compile Include="../../tools/Carve.SampleTextures/Png.cs" Link="Png.cs" />
+    <Compile Include="../Carve.Scenario.Orcward/ComparisonPng.cs" Link="ComparisonPng.cs" />
     <Content Include="../../samples/barrel.carve" Link="barrel.carve" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../samples/textures/end-grain-*.png" Link="textures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../samples/graphs/weathered-iron.texgraph;../../samples/graphs/weathered-staves.texgraph;../../samples/graphs/planks.texgraph" Link="graphs/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

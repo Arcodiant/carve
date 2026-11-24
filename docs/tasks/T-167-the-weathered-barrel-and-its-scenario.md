@@ -184,6 +184,10 @@ narrowly. Neither `reach` nor the graph was changed.
 5. **Stage 3's `wear_amount = 0`:** "no brighter" taken as the shaded rim minus hoop-top-middle mean luma **at most 2**.
    Not yet measured, so this one is a proposal of form only.
 
+**Ruled (2026-11-24, by the person): all five as proposed**, each a difference of set means. Declined: thresholds at
+three-quarters of the measured differences, and another statistic than set means. (5) was ruled as a form before it was
+measured: if 2 luma does not hold when stage 3 runs, stop and report the number rather than move it.
+
 Alternatives: a margin of 0.75 of the smallest measured gap (12 / 11 / 0.31 / 0.25) is tighter. A test on p95 instead of
 the mean would be noisier on the rim, whose p5 is 0 because of the `breakup` mask.
 

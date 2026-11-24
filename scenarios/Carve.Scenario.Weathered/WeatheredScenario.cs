@@ -29,6 +29,8 @@ public sealed class WeatheredScenario : IScenario
             await stage.RunAsync(run);
         }
 
+        File.WriteAllLines(run.InRun("sets.txt"), run.Log);
+
         if (run.Failures.Count > 0)
         {
             driver.Fail($"{run.Failures.Count} check(s) failed:\n" + string.Join("\n", run.Failures.Select(f => "  " + f)));
@@ -39,7 +41,11 @@ public sealed class WeatheredScenario : IScenario
 /// <summary>What the stages share: the driver, the run folder's files, and the failures noted so far.</summary>
 internal sealed class WeatheredRun(ScenarioDriver driver)
 {
-    /// <summary>The break table's switch (Scope's breaks); none until stage 2 is written.</summary>
+    /// <summary>
+    /// The break table's switch: <c>swap</c> (the two graphs' materials exchanged), <c>neutral</c> (the texel checks read a neutral PNG),
+    /// <c>mirror</c> (the checks' camera mirrored top to bottom), <c>stale</c> (stage 3 reads stage 2's frame after the <c>move</c>) or
+    /// <c>no-rebake</c> (stage 3 expects nothing baked after the graph edit) make the scenario wrong on purpose, and it must then fail.
+    /// </summary>
     public static readonly string? Break = Environment.GetEnvironmentVariable("CARVE_WEATHERED_BREAK") is { Length: > 0 } b ? b : null;
 
     public const int BakeSize = 512;
@@ -55,4 +61,30 @@ internal sealed class WeatheredRun(ScenarioDriver driver)
     public string InRun(string file) => Path.Combine(Driver.RunFolder, file);
 
     public void Note(string failure) => Failures.Add(failure);
+
+    /// <summary>The frames of stage 2 (and later), by name, for the stages after it to compare with.</summary>
+    public Dictionary<string, ScenarioFrame> Frames { get; } = [];
+
+    /// <summary>The numbers every check measured, written to <c>sets.txt</c> at the end.</summary>
+    public List<string> Log { get; } = [];
+
+    /// <summary>The ruled thresholds (the person, 2026-11-24): a - b of set means at least (or at most) the margin, noted when not.</summary>
+    public void AtLeast(string what, double a, double b, double margin)
+    {
+        Log.Add($"{what}: {WeatheredSets.F(a)} - {WeatheredSets.F(b)} = {WeatheredSets.F(a - b)} (at least {margin})");
+        if (!(a - b >= margin)) Note($"{what}: {WeatheredSets.F(a)} - {WeatheredSets.F(b)} = {WeatheredSets.F(a - b)}, under the ruled {margin}");
+    }
+
+    public void AtMost(string what, double a, double b, double margin)
+    {
+        Log.Add($"{what}: {WeatheredSets.F(a)} - {WeatheredSets.F(b)} = {WeatheredSets.F(a - b)} (at most {margin})");
+        if (!(a - b <= margin)) Note($"{what}: {WeatheredSets.F(a)} - {WeatheredSets.F(b)} = {WeatheredSets.F(a - b)}, over the ruled {margin}");
+    }
+
+    /// <summary>Runs a check of M-7's that fails the driver, noting its failure and going on (the driver's first failure stays sticky).</summary>
+    public void Try(Action check)
+    {
+        try { check(); }
+        catch (ScenarioFailedException e) { Note(e.Message); }
+    }
 }
