@@ -86,7 +86,7 @@ The guidance line says to "ask a few of one group at a time", and the worked exa
 **The default held.** `GetMeshPartsTests` holds the default answer by SHA-256 taken on c518cce before the change (wrench,
 barrel-textured, gardener `{}` and `Body`, rover `Cab` and `Cab` level 0). The first `verify` failed it on barrel-textured
 alone: a texture's path in the answer is absolute, so the answer names the checkout, and the suite runs in cairn's own copy.
-The test now swaps the running checkout's root for the one the digests were taken in (`D:epos\carveranchesug\B-10`,
+The test now swaps the running checkout's root for the one the digests were taken in (`D:\repos\carve\branches\bug\B-10`,
 as the test host spelled it). That root was found, not assumed: the answer from a scratch build of this branch, with that root
 put in, hashes to the digest taken before (CC6E5E26...), so the bytes are as before; the digests were not retaken.
 
