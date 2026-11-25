@@ -64,9 +64,10 @@ Each finding of RV-82 named here, by its heading there:
 
 ### As built
 
-Three agents, each on claude-opus-5-5 (Opus 5.5), the first two handing off at the call checkpoint. Commits, after
-the rebase onto `origin/milestone/M-29` (T-221 and T-217 landed; the rebase was clean): `faeba76a` (the frame),
-`f6a73f79` (the clash, cancellation, mesh causes, the piece test), `a60d80cb` (the `uvs` order, the level clash, the
+Four agents, each on claude-opus-5-5 (Opus 5.5), the first three handing off at the call checkpoint, the fourth
+comparing frames and finishing. Commits, after the rebases onto `origin/milestone/M-29` (T-221 and T-217, then T-220
+landed; both rebases were clean, T-220's `help` text and this member's sentences side by side): `1d8662bc` (the
+frame), `587ebc9b` (the clash, cancellation, mesh causes, the piece test), `26652438` (the `uvs` order, the level clash, the
 real-render test, the `help` sentences). Each RV-82 Outcome line is a bare `fixed`; the detail is here.
 
 - **The frame (`DrawnOf`), `faeba76a`.** The pump marks a frame drawn on a model with graph slots no render had baked
@@ -152,23 +153,11 @@ mesh is the cause (no UVs, overlapping UVs, a missing group), says to unwrap or 
 has; a cancelled export, which writes no .glb;". T-220 owns the descriptions and `help`; whoever lands second keeps
 both. `README.md`: nothing needed changing (it does not list render's or export's errors).
 
-**Frames.** Not yet compared (see the Hand-off below).
-
-### Hand-off
-
-Third agent (claude-opus-5-5), at the call checkpoint (about 60 calls). The `### As built` above is drafted in full
-except its Frames line; the five RV-82 Outcome lines are filled (`fixed`) in this worktree. `cairn task T-218 verify`
-passed on `a60d80cb` (server-unit, server-regression with the new `RenderGraphRefusalTests`, scenario-export,
--weathered and -parts all PASS; the suites ran on the runners Mantorok and Xellotath, not here). Left:
-
-- **Frames:** the scenario suites ran on remote runners, so their run folders are not local; compare the frames of
-  scenario-export, -parts and -weathered by hash against a run of `origin/milestone/M-29` (find where the runner
-  leaves CAIRN_ARTIFACTS, or run both locally from a scratch worktree under `$TEMP`), then replace the Frames line.
-- Remove this Hand-off, commit, `cairn task T-218 verify` again (only docs changed since), `cairn lint` as its own
-  command, `cairn task T-218 finish`.
-- **Surprising:** the `uvs` race is real (the order is in As built); its test now drives it with an edit the pump has
-  not shown before the call. A trailing `git checkout` in a combined command was refused by the permission
-  classifier, which saved an uncommitted edit; do such toggles with the Edit tool.
+**Frames.** Compared by SHA-256 by the fourth agent: this member's verified runs at `a60d80cb` (scenario-export
+J-20261125-230738-a9fb84, scenario-weathered J-20261125-230741-7538cc, scenario-parts J-20261125-230743-8fff46) against
+fresh runs of `origin/milestone/M-29` at `a8392d14` (cairn had no artifacts of a pass at that commit; these were queued
+for the comparison: J-20261125-231825-e56895, J-20261125-231827-370725, J-20261125-231826-ad6fec, all PASS). 62 PNGs
+(export 7, weathered 40, parts 15: frames, viewer captures and baked textures); none differs.
 
 **Not checked.** The `uvs` retry inside `RunUvs` itself is exercised only through the same `SheetVersions.Baked` and
 `UvImageStale` it calls, on the linked pump, not through a real uvs render (the harness cannot drive render's frame,
