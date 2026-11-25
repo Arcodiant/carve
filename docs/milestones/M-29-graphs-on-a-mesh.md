@@ -195,6 +195,7 @@ is reached from a plain launch of `carve` and `patina`, through their MCP tools.
 - [ ] [T-168](../tasks/T-168-graphs-on-a-mesh-acceptance-run.md) — Fresh agents weather the wrench with carve and patina from the tool descriptions alone, and recover from a planted wrong graph path
 - [ ] [T-207](../tasks/T-207-carve-s-tool-descriptions-under-claude-code-s-cut.md) — Every carve tool description fits Claude Code's 4,096-character cut, held by a test, with the detail that was cut still reachable by an agent
 - [ ] [B-10](../bugs/B-10-get-mesh-on-a-large-mesh-answers-more-than-an-agent-can-read.md) — get_mesh takes include and faces to answer part of a mesh, so a model like the wrench can be read by an agent whose client limits a tool result
+- [ ] [B-11](../bugs/B-11-the-1024-bake-tests-time-out-under-load.md) — The server-regression tests that bake both weathered materials at 1024 through the real process wait longer than 30 s for that call, so they pass on a loaded machine
 
 ## Decided while it ran
 
@@ -218,6 +219,13 @@ By the person (2026-11-24), each put with a recommendation:
   recorded; the grip is held to what its faces wear in the saved file.
 - **`get_mesh` gains `include` and `faces`** (B-10, found by round 1), fixed in M-29 before round 2. Declined: a
   summary by default past a size, and filing it off-milestone.
+- **T-168's crevice set** (2026-11-25): the drive's texels within 0.004 m of the edges of its two ends, darker than
+  open steel by 10 luma, after round 2 failed on the whole-drive set an agent had chosen. The distance was chosen with
+  round 2's number in view, and the person was told so. Declined: 0.012 m, and a margin of 20.
+- **The taught wear example breaks its mask with noise** (T-168, between the rounds), after the person's note that
+  round 1's wear "reads like an edge highlight". Recipes and guidance to agents as such are T-208, off-milestone.
+- **The 1024 bake tests wait 120 s for that call** (B-11), after the milestone's verify timed out on one. Declined:
+  baking at 512 there, and re-running until it passes.
 
 By the orchestrator:
 
