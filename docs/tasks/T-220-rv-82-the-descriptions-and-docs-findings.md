@@ -58,3 +58,18 @@ Each finding of RV-82 named here, by its heading there:
   that cannot be fixed inside this member's files without a design change is reported, not forced.
 - The member fills the `**Outcome:**` line of each of its findings in RV-82 (`fixed`, with the commit and the test's
   name; or `no change needed: <reason>`), and touches no other finding's line.
+
+### As built
+
+Run on Sonnet 5.5. All in c24e2f54.
+
+- **reads_mesh:** a clause in define_material's description ("whether the graph reads the mesh; null if its file cannot be read now") and one in get_mesh's ("as define_material reports it"), a sentence in README. To fit, define_material's "A face has either a colour or a material..." sentence moved word for word to its entry, and get_mesh's "Coordinates are in metres..." sentence to its entry. Test: `HelpToolTests.The_graph_sentences_are_in_the_descriptions_and_reads_mesh_is_said_where_it_is_answered`.
+- **render:** the `image` clause now gives the form {graph, output, size}, the real curvature, occlusion, masks and position, any role or named output, and the power-of-two size rule from 64 to 4096 kept apart from the frame's. The caption form and the refusals remain only in the entry (the rule asked for form, what it draws and the size rule). Moved word for word to the end of render's entry: "Try the other view, or fix the winding..." and "Tool errors leave the mesh untouched...". Same test.
+- **check, select:** "There is no delete yet..." now says to call delete (check's entry also says define_mesh renumbers); select says "Ids never change (delete leaves a gap)". The tests that pinned the old words (`CheckToolDefinitionTests`, `SelectToolDefinitionTests`) follow. Not checked: the deleted-id wording against the running tool beyond the existing delete tests.
+- **export:** the space after "own:" restored.
+- **Counts:** README names get_mesh and says nine entries; the milestone retrospective says nine; T-207's table (render before 19,954 served), largest entry (19,568), and "12 tool files" corrected; B-10's As built gains a correction note.
+- **Tests of help:** `Every_pointer_names_an_entry_and_every_entry_is_served_whole` (every `More: help` target has an entry, no entry is empty, open's and define_material's are read) and `The_help_and_bake_entries_are_as_pinned` (their whole tools/list entries, pinned).
+- **B-10 digests:** gatehouse `{}` (E7568554...) and arm `{}` (E31431ED...) taken from a scratch build of origin/main (b02b7b2); barrel-weathered `{}` (0229E313...) from origin/milestone/M-29 at c518cce, because it is version 10. All three match HEAD's answers (the test passes), so no finding against B-10. Gatehouse's holes and tombstones were taken from the task's statement, not re-inspected.
+- **Pin:** `PartToolsListTests.Before` retaken once at the end (CB8CCB4A...). Diff of every served tool's description and schema against a scratch build of origin/milestone/M-29: exactly check, define_material, export, get_mesh, render and select differ.
+- **README.md:** the help paragraph, the unit suites line, the `reads_mesh` sentence. **CLAUDE.md:** the WeatheringAcceptance row's grip clause. Not checked: T-218's concurrent edits to export's or define_material's text (whoever lands second retakes the pin).
+
