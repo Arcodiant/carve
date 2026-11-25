@@ -35,6 +35,16 @@ public class WeatheringAcceptanceTests
     private const double GripSlack = 0.01;
 
     private const int NearEdge = 2, FarEdge = 12;
+
+    /// <summary>
+    /// The junction (ruling of 2026-11-25), from samples/wrench.carve: the square drive is a separate box (vertices 168 to 175; side faces 100 to 103, end faces
+    /// 104 at z -0.042 and 105 at z -0.020) standing between two 12-gon caps of the dark socket body, 118 (z -0.0425, the socket top) and 99 (z -0.020, the
+    /// underside of the hub ring). The junction is the eight edges of the drive's two end rectangles; the sets are the texels of the drive's faces and of
+    /// faces 118 and 99 whose 3D distance to those edges is within a reach. Measured only: no margin is ruled on them yet. Caveat: faces 118 and 99 are
+    /// group dark and do not wear the steel material in the file, so their texels in the steel slot's bake are not what is drawn there.
+    /// </summary>
+    private static readonly int[] SocketFaces = [118, 99];
+    private static readonly double[] JunctionReaches = [0.004, 0.012, 0.035];
     private static readonly int[] DriveFaces = [100, 101, 102, 103, 104, 105];
 
     private static string RunFolder => Run ?? throw new InvalidOperationException("CARVE_WEATHERING_RUN is unset");
@@ -197,6 +207,52 @@ public class WeatheringAcceptanceTests
         File.AppendAllText(Path.Combine(RunFolder, "acceptance", "numbers.tsv"), line + "\n");
     }
 
+    /// <summary>Notes, per reach, the junction set's mean luma against the open steel's, with and without the texels within NearEdge of a hard edge.</summary>
+    private static void NoteJunction(PolygonMesh mesh, int n, byte[] rgba, double openMean, int openCount)
+    {
+        var all = DriveFaces.Concat(SocketFaces).ToArray();
+        var hard = HardSegments(mesh, all);
+        var junction = new List<(Vector3 A, Vector3 B)>();
+        foreach (var f in new[] { 104, 105 })
+        {
+            var loop = mesh.Faces[f].Loop;
+            for (var k = 0; k < loop.Count; k++) junction.Add((mesh.Vertices[loop[k]], mesh.Vertices[loop[(k + 1) % loop.Count]]));
+        }
+
+        var texels = new List<(bool Drive, double Metres, bool NearHard, double Luma)>();
+        double scale = 0;
+        foreach (var f in all)
+        {
+            var uv = mesh.Uvs!.Of(f)!;
+            var p = mesh.Faces[f].Loop.Select(i => mesh.Vertices[i]).ToArray();
+            var (e1, e2) = (uv[1] - uv[0], uv[2] - uv[0]);
+            var det = e1.X * e2.Y - e1.Y * e2.X;
+            if (f == 100 || f == 118) scale = (p[1] - p[0]).Length() / (e1.Length() * n);
+            foreach (var t in Texels(mesh, [f], n, hard))
+            {
+                var d = new Vector2((t.X + 0.5f) / n, (t.Y + 0.5f) / n) - uv[0];
+                var (a, b) = ((d.X * e2.Y - d.Y * e2.X) / det, (e1.X * d.Y - e1.Y * d.X) / det);
+                var q = p[0] + (p[1] - p[0]) * a + (p[2] - p[0]) * b;
+                texels.Add((f < 106, junction.Min(s => Dist3(q, s.A, s.B)), t.Distance <= NearEdge, Luma(rgba, n, t.X, t.Y)));
+            }
+        }
+
+        foreach (var reach in JunctionReaches)
+        foreach (var withHard in new[] { true, false })
+        foreach (var withSocket in new[] { false, true })
+        {
+            var set = texels.Where(t => t.Metres <= reach && (withHard || !t.NearHard) && (withSocket || t.Drive)).ToArray();
+            var mean = set.Select(t => t.Luma).DefaultIfEmpty().Average();
+            Note($"junction	{(withSocket ? "drive+socket" : "drive only")}, reach {reach} m ({reach / scale:F1} texels at {n}), {(withHard ? "with" : "without")} texels within {NearEdge} of a hard edge: {set.Length} texels ({set.Count(t => t.Drive)} drive, {set.Count(t => !t.Drive)} socket), mean {F(mean)}; open steel: {openCount}, mean {F(openMean)}	{F(openMean - mean)}");
+        }
+    }
+
+    private static double Dist3(Vector3 p, Vector3 a, Vector3 b)
+    {
+        var ab = b - a;
+        return Vector3.Distance(p, a + ab * Math.Clamp(Vector3.Dot(p - a, ab) / ab.LengthSquared(), 0, 1));
+    }
+
     [SkippableOrRun]
     public void Hard_edge_texels_wear_brighter_and_the_drive_crevice_darker_than_the_open_steel()
     {
@@ -211,6 +267,7 @@ public class WeatheringAcceptanceTests
         var crevice = Texels(polygons, DriveFaces, n, segments).Where(t => t.Distance > NearEdge).Select(t => Luma(rgba, n, t.X, t.Y)).ToArray();
         Note($"hard-edge\twithin {NearEdge} texels: {near.Length} texels, mean {F(near.DefaultIfEmpty().Average())}; more than {FarEdge}: {open.Length} texels, mean {F(open.DefaultIfEmpty().Average())}\t{F(near.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
         Note($"crevice\tdrive texels (faces 100-105, over {NearEdge} from a hard edge): {crevice.Length}, mean {F(crevice.DefaultIfEmpty().Average())}; open steel: {open.Length}, mean {F(open.DefaultIfEmpty().Average())}\t{F(crevice.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
+        NoteJunction(polygons, n, rgba, open.DefaultIfEmpty().Average(), open.Length);
         Assert.True(near.Length >= 20 && open.Length >= 20 && crevice.Length >= 20, $"too few texels: edge {near.Length}, open {open.Length}, crevice {crevice.Length}");
         Assert.True(near.Average() - open.Average() >= HardEdgeMargin, $"hard-edge mean luma {F(near.Average())} - open steel mean {F(open.Average())} = {F(near.Average() - open.Average())}, below {HardEdgeMargin}");
         Assert.True(open.Average() - crevice.Average() >= CreviceMargin, $"open steel mean luma {F(open.Average())} - drive crevice mean {F(crevice.Average())} = {F(open.Average() - crevice.Average())}, below {CreviceMargin}");
