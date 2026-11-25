@@ -342,7 +342,7 @@ I did not get to: anything that needs a device. That covers the sheet title's wi
 - **Rubric:** Correctness; a ruled check implemented as ruled; a record that claims what was not shown
 - **What is wrong:** `NoteJunction` takes the texels of `all = DriveFaces.Concat(SocketFaces)` (100 to 105, then 118 and 99) and flags each `Drive` with `f < 106`. Face 99 (the hub ring's underside, group `dark`, no steel material) is under 106, so its texels go into the "drive only" set, and only face 118 is counted as socket. The person ruled "the drive's texels within 0.004 m of the 8 edges of the drive's two ends", and the task's file says twice that "faces 118 and 99 ... are not in the set". I split the set by face with a probe in a scratch copy (a console on `Carve.Graphs` that bakes each round's saved file as the test does). Its counts add up exactly to `numbers.tsv`. Round 1: 10,357 = 6,589 drive + **3,768 on face 99**. Round 2: 2,604 = 1,662 drive + **942 on face 99**. So 36% of each measured set is a face the steel is never drawn on. The negatives' 2,604 in `%TEMP%\carve-t168-negatives` include the same 942. On the set as ruled, both rounds still pass: round 1 94.05 − 45.97 = 48.1, round 2 93.32 − 68.68 = 24.6 (recorded as 49.143 and 24.862). So the verdict holds, but the numbers and the claim of what the set holds do not. The ruled set is also weaker than it reads. 41% of the drive's own band texels (2,650 of 6,589 and 682 of 1,662) lie on the end faces 104 and 105. Those sit flush against faces 99 and 118 (z −0.020 and −0.042 against −0.020 and −0.0425), so they are never seen and any occlusion darkens them. On the four visible side faces alone, round 2's margin is 93.32 − 78.11 = 15.2. Nobody told the person this when the set was ruled.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### Suite inputs miss sample files that M-29's new tests read at run time
 - **Where:** `tests.json:32-49` (graphs-unit), `tests.json:86-129` (server-unit), `tests.json:131-155` (server-regression)
@@ -387,7 +387,7 @@ I did not get to: anything that needs a device. That covers the sheet title's wi
 - **Rubric:** An honest record
 - **What is wrong:** The As built says "the graph restored (cache hit, byte-identical)", and the Layout row says that in stage 3 "each step checks the `baked:` line". After the restore the code writes "baked" or "nothing baked" to `sets.txt` and asserts only that the frame is byte-identical. Every other step calls `Baked(...)` with an expectation.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### T-168's round 2 bake times mark one 512 bake as 1024
 - **Where:** `docs/tasks/T-168-graphs-on-a-mesh-acceptance-run.md:111`
@@ -395,7 +395,7 @@ I did not get to: anything that needs a device. That covers the sheet title's wi
 - **Rubric:** An honest record
 - **What is wrong:** The row reads "all 1024 unless noted: 471 (512), 810, 1329 (512), 1042 + 114 (512), 1073, 940 + 123 (512), 335". In round 2's `transcript.jsonl`, the 1073 ms entry is `{"material":"worn-steel.texgraph","slot":"image","size":512}`. Everything else in both rounds' rows matches the round folders: 31 and 25 calls, the refused Bash at line 15, `nodes` at calls 5 and 6, `get_mesh` with `include`, every `numbers.tsv` and `differences.tsv` figure, and the identical prompt and plant (they differ only in line ending and key order).
 
-**Outcome:** —
+**Outcome:** fixed
 
 **Covered:** I read these whole: the milestone's file, T-167's and T-168's files, the Weathered scenario (every stage, the sets, the csproj), `tests/Carve.WeatheredLoad.Tests`, `scripts/run-weathered-scenario.ps1`, `Carve.Scenario.Bakes/GraphImageStage.cs` and the BakesChecks/BakesStages diff, T-168's tests, the Acceptance scenario's `WeatheringStep.cs`, and `prepare-weathering-round.ps1`, `run-weathering-negatives.ps1` and `weathering-round/`. I also read the diffs of `tests.json`, `Carve.slnx`, `CLAUDE.md` and `README.md`. I checked each of T-167's five thresholds and three rulings and T-168's margins, grip and crevice against the code: all are as ruled except the crevice set above. The D-6 step after the re-unwrap holds by construction, as the retrospective already says. Things I ran:
 - the link-against-inputs script over every suite;

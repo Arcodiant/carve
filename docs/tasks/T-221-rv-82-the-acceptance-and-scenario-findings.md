@@ -4,7 +4,7 @@ description: >-
 ---
 # T-221 — RV-82: the acceptance and scenario findings
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -54,3 +54,15 @@ Each finding of RV-82 named here, by its heading there:
   that cannot be fixed inside this member's files without a design change is reported, not forced.
 - The member fills the `**Outcome:**` line of each of its findings in RV-82 (`fixed`, with the commit and the test's
   name; or `no change needed: <reason>`), and touches no other finding's line.
+
+### As built
+
+Claude Sonnet 5.5 (`claude-sonnet-5-5`).
+
+- **The crevice set.** `WeatheringAcceptanceTests.DriveSides` picks the drive box's faces whose normal is perpendicular to its z axis (100 to 103); the ends 104 and 105 are what is left, and the end edges are theirs. `JunctionTexels` and `CreviceTexels` (internal) carry the face of each texel; the checked set is the side faces' texels within `CreviceReach` 0.004 m, `open - band >= 10`, unmoved. No face number below a bound remains. The `numbers.tsv` junction rows now name their set (`sides`, `drive (sides and ends)`, `drive+socket`) and count side, end and socket texels. Test: `The_crevice_set_holds_no_texel_of_a_face_that_is_not_a_drive_side` (on `samples/wrench.carve`: sides are exactly 100 to 103 and the set holds those faces only). It is a plain fact in a `regression`-tier project that no unit suite runs, so it ran inside the round checks and the negatives (7 passed per round); I did not run it against the old code.
+- **Numbers** (copies of both rounds' folders from the `G:` copy into `artifacts\T-221\round-N\`, checked with `run-acceptance-check.ps1 -Weathering`; the regenerated `acceptance\` files copied back to the `G:` copies). Open steel mean minus the band's mean: round 1 94.050 - 53.753 = 40.297 (3,939 band texels, 162,126 open); round 2 93.315 - 78.109 = 15.206 (980, 23,646). Both pass, hard-edge unchanged (93.778, 61.501). Negatives on round 2's plant (`run-weathering-negatives.ps1`): reference 135.098 - 67.568 = 67.530 (passes); no-wear 116.400 - 116.323 = 0.077; no-dirt 181.893 - 225.391 = -43.499 (caught by the crevice check; hard-edge still passes at 42.814); grip-wear, unresolved, file-tool and next-define-missing caught by the same tests as before. Distance, margin and set were not moved.
+- **Records.** T-168's ruling section and Rulings bullet no longer say faces 99 and 118 are not in the set (they say it was meant, the code counted 99); a new paragraph records the ruling of 2026-11-25, what was declined and what the person was told, and the figures above; the round 2 bake row now marks 1073 as 512. `CLAUDE.md`'s phrase for the crevice set now says the four side faces.
+- **Stage 3.** `RebakeStage` now calls `Baked(run, "after the graph's restore", restored, false)`. The weathered scenario passes (2 load checks) and with `CARVE_WEATHERED_BREAK=no-rebake` it fails with 1 check (`after wear_amount 0: expected nothing baked`). The frames of that run are byte-identical (all 58 hashes) to a run of the same worktree without the change; not a run of `origin/milestone/M-29` itself.
+- **Not checked.** The frames and images (none opened); that a restore which bakes would fail the new check (no break of my own made); T-168's table figures for the set first ruled were left as history; round 1's bake times beyond what T-168 lists.
+- **README.md:** nothing needed.
+
