@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "size": 512,
+  "seed": 7,
+  "nodes": {
+    "base": { "type": "blend", "inputs": { "a": "dull", "b": "bright", "mask": "rim" }, "params": { "mode": "mix" } },
+    "base_out": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "base_colour" } },
+    "bright": { "type": "gradient_map", "inputs": { "in": "grain" }, "params": { "colours": ["#cfd3d7", "#eef0f2"], "positions": [0, 1] } },
+    "curv": { "type": "mesh_curvature", "params": { "width": 0.02 } },
+    "dull": { "type": "gradient_map", "inputs": { "in": "grain" }, "params": { "colours": ["#64686d", "#7d8187"], "positions": [0, 1] } },
+    "grain": { "type": "fbm", "params": { "basis": "value", "cells": [48, 48], "octaves": 3, "seed": 9 } },
+    "rim": { "type": "levels", "inputs": { "in": "curv" }, "params": { "in_high": 0.85, "in_low": 0.6 } }
+  }
+}
