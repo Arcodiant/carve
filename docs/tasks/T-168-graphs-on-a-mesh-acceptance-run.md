@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-167, T-207
 
-**Verify:** server-unit
+**Verify:** server-unit, patina-unit, scenario-patina
 
 ## Goal
 
@@ -123,3 +123,11 @@ Done: the rulings recorded and built into the checks (section above, commit 3ff7
 Opened 4 images (a stray unrelated Read of a stale temp file counted; then 3 montages of the round's frames; no build, verify or run). Saw: front and three-quarter renders show the steel as grey-blue with a thin bright rim on every edge (head, ring, arm), fairly uniform, closer to an outline than to chipped wear; the grip, socket and caps are near-white (clean, as asked, but flat, not rubber-like); no red or black parts distinguishable; the drive (small dark square shaft) shows only in the close side renders and no dirt can be seen on it from the front or three-quarter; the `uvs` frame (1024) shows the layout with a bright outline on every island, which reads like the layout's own wireframe plus the mask, hard to tell apart.
 
 **The person's ruling on the look (2026-11-24): approved.** Note, word for word: "Generally fine but the wear reads like an edge highlight - how do we expect wear to be implemented?" That is a question to the orchestrator and the next agent, not acted on: the person asks what wear should be (curvature-masked edge brightening with noise breakup, chips, or something else) and the description or margin may need to say so. No code, check or description changed. Not checked: the other 8 session frames, the `glb-*` frames (same hashes as the renders).
+
+### Round 2's description change (agent 4, Claude Sonnet 5.5 `claude-sonnet-5-5`)
+
+Reason: the person approved round 1's look with "Generally fine but the wear reads like an edge highlight". Cause: patina's `nodes` example for `mesh_curvature` used the levels-narrowed curvature straight as a blend mask, so an agent that follows it gets a thin even rim. The person chose: the taught example breaks the mask up with noise. Declined for M-29: retuning `weathered-iron`, leaving the example. Changed only `NodeCatalogue.WorkedMesh` and its caption (`src/Patina.Server/NodeCatalogue.cs`); `MeshNodeToolTests` follows (6 nodes to 9). Suites: patina-unit and scenario-patina pass.
+
+Before (6 nodes, caption "a mesh_curvature node, narrowed by levels, as the mask of a blend that wears a base colour toward bright steel (in patina the stand-in gives 0.5, so the mask is 0 and the image is the base colour)"): `edges` (mesh_curvature, width 0.02) -> `wear` (levels 0.6..0.9) -> mask of `worn` (blend mix iron #303236 to steel #c4c6c8).
+
+After (9 nodes): `edges` -> `band` (levels 0.6..0.9); `grain` (fbm, cells 12x12) -> `chips` (levels 0.45..0.6); `wear` = blend multiply of `band` and `chips`, the mask of `worn`. Caption adds "multiplied by a noise (fbm through levels)" and "wear that comes and goes along an edge reads as wear, an even band as an outline". Stand-in 0.5 still gives band 0, so mask 0 and the base colour.

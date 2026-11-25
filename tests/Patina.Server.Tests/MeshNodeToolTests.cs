@@ -37,7 +37,7 @@ public class MeshNodeToolTests
     {
         using var folder = new TempFolder();
         await using var patina = await PatinaHarness.StartAsync(folder.Path);
-        Assert.Equal(NodeCatalogue.Evaluates(6), await patina.Ok("define_graph", NodeCatalogue.WorkedMesh));
+        Assert.Equal(NodeCatalogue.Evaluates(9), await patina.Ok("define_graph", NodeCatalogue.WorkedMesh));
         const string note = "mesh inputs neutral: edges (mesh_curvature); the real maps come from the mesh when a carve material names the graph";
 
         Assert.Contains("\n" + note + "\n", await patina.Ok("get_graph", "{}"), StringComparison.Ordinal);
