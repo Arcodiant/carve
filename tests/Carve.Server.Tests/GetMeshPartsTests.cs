@@ -27,8 +27,8 @@ public class GetMeshPartsTests(ITestOutputHelper output)
         return CarveProcess.TextOf(result);
     }
 
-    /// <summary>The repo root the digests below were taken in (B-10's worktree checked out at c518cce).</summary>
-    private const string TakenIn = @"D:\Repos\carve\branches\bug\B-10";
+    /// <summary>The repo root the digests below were taken in, as the test host spelled it (B-10's worktree at c518cce).</summary>
+    private const string TakenIn = @"D:\repos\carve\branches\bug\B-10";
 
     private static string Escaped(string s) => JsonSerializer.Serialize(s)[1..^1];
 

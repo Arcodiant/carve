@@ -30,8 +30,9 @@ public class PartToolsListTests
     // project_uvs and unwrap moved it (bake is not among the tools this digest covers); no schema and no other tool did.
     // Taken again, once, for B-10 (Opus 5.5), which lets get_mesh read a mesh in parts: get_mesh's description (the wrench example and
     // the include and faces rules in, its cube and target examples and the ids sentence moved to help) and its schema (include, faces)
-    // moved it; help's own text names the new entry but help is a new tool here; no other tool's text or schema changed (was 9DE9FEB8...).
-    private const string Before = "5E37EB7E8FDADE0A065147A57DDEDB26ACCBDBCFCBA6C323C6E23388148B6929";
+    // moved it; help's own text names the new entry but help is a new tool here; no other tool's text or schema changed (was 9DE9FEB8...); checked by diffing the served tools/list against origin/milestone/M-29's. Its guidance line was
+    // then tightened (ask a few sections of one group at a time) and the digest taken from that final text.
+    private const string Before = "16999BFC2203DC0C6E3D2DDC989C20073A53589D812A1A7A39D5C6A416EA147B";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "help"];
 
