@@ -575,7 +575,7 @@ internal static class RenderTool
                 : (null, $"The render failed: {rendering.Exception?.GetBaseException().Message}");
         }
 
-        var (rendered, failure) = await SheetVersions.OnOneMesh(RenderTiles, f => f.Version, SheetAttempts);
+        var (rendered, failure) = await SheetVersions.OnOneMesh(() => SheetVersions.Baked(RenderTiles, f => f.Unbaked, SheetAttempts), f => f.Version, SheetAttempts);
         if (rendered is not { } frames)
         {
             return Error(failure!);

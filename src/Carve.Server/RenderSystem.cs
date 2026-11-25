@@ -546,7 +546,7 @@ internal sealed class RenderSystem(
                 {
                     if (task.IsCompletedSuccessfully)
                     {
-                        request.Complete(new RenderedFrame(task.Result, vertices, faces) { Version = version });
+                        request.Complete(new RenderedFrame(task.Result, vertices, faces) { Version = version, Unbaked = request.ServedUnbaked });
                     }
                     else
                     {

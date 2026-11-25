@@ -45,6 +45,8 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     // What GraphBakes had resolved for the model shown when it was put in (T-163): another means its graph bakes changed.
     private Model? _shownBakes;
     private Model? _bakedFor;
+    // The model shown has graph slots no render had baked, so they are drawn empty (DrawnOf); its frames say so.
+    private bool _unbaked;
     private long _version;
     private RenderSpec _spec = new(CameraSpec.ForView(RenderView.Front));
     private bool _viewApplied = true;
@@ -183,6 +185,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
 
             queue.TryTake(out _);
             next.ServedVersion = _version;
+            next.ServedUnbaked = _unbaked;
             scene.Render(next);
         }
     }
@@ -197,6 +200,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
             var model = bakes?.DrawnOf(snapshot.Model) ?? snapshot.Model;
             _bakedFor = snapshot.Model;
             _shownBakes = bakes?.Peek(snapshot.Model);
+            _unbaked = bakes is not null && _shownBakes is null && snapshot.Model.Materials.Any(m => m.HasGraph);
             var whole = _shownPart is null && _shownLevel is null;
             var drawn = whole ? model.Combined! : model.CombinedOf(_shownPart, _shownLevel)
                 ?? throw new InvalidOperationException(_shownPart is { } p && model.FindPart(p) is null
