@@ -42,7 +42,28 @@
         "src/Patina.Graphs/**",
         "tests/Carve.Graphs.Tests/**",
         "tests/Carve.Core.Tests/TestMeshes.cs",
-        "samples/wrench.carve"
+        "samples/wrench.carve",
+        "samples/graphs/**"
+      ],
+      "resources": "cpu",
+      "est-seconds": 40
+    },
+    {
+      "id": "graphs-regression",
+      "tier": "regression",
+      "build": "solution",
+      "run": "dotnet test tests/Carve.Graphs.Tests/Carve.Graphs.Tests.csproj -c Debug --no-build --filter Tier=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Carve.Graphs.Tests/Carve.Graphs.Tests.csproj"
+        },
+        "src/Carve.Graphs/**",
+        "src/Carve.Core/**",
+        "src/Patina.Graphs/**",
+        "tests/Carve.Graphs.Tests/**",
+        "tests/Carve.Core.Tests/TestMeshes.cs",
+        "samples/wrench.carve",
+        "samples/graphs/**"
       ],
       "resources": "cpu",
       "est-seconds": 40
@@ -61,7 +82,8 @@
           "dotnet-closure": "tests/Patina.Server.Tests/Patina.Server.Tests.csproj"
         },
         "tests/Carve.Server.Tests/ProductReferenceGuard.cs",
-        "scenarios/Carve.Scenario.Patina/ExportMatch.cs"
+        "scenarios/Carve.Scenario.Patina/ExportMatch.cs",
+        "samples/textures/*.png"
       ],
       "resources": "cpu",
       "est-seconds": 15
@@ -119,10 +141,10 @@
         "scenarios/Carve.Scenario.Orcward/ComparisonPng.cs",
         "scenarios/**/*.csproj",
         "spikes/**/*.csproj",
-        "samples/gardener-soft.carve",
-        "samples/gatehouse.carve",
-        "samples/leaky-shed.carve",
-        "samples/gardener.carve"
+        "samples/*.carve",
+        "samples/graphs/**",
+        "samples/textures/*.png",
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs"
       ],
       "resources": "cpu",
       "est-seconds": 24
@@ -142,9 +164,15 @@
         "scenarios/Carve.Scenario.Acceptance/Silhouette.cs",
         "scenarios/Carve.Scenario.Orcward/GlbEdit.cs",
         "scenarios/Carve.Scenario.Crate/CheckerColours.cs",
-        "samples/leaky-shed.carve",
-        "samples/barrel.carve",
-        "samples/gardener.carve",
+        "scenarios/Carve.Scenario.Crate/ColourRule.cs",
+        "scenarios/Carve.Scenario.Shed/ShedGeometry.cs",
+        "scenarios/Carve.Scenario.Cuts/CutsGeometry.cs",
+        "tests/Carve.Core.Tests/RoverSpec.cs",
+        "tests/Carve.Core.Tests/RoverSpec.Model.cs",
+        "tests/Carve.Core.Tests/PartTreeSample.cs",
+        "samples/*.carve",
+        "samples/graphs/**",
+        "samples/textures/*.png",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1"
       ],

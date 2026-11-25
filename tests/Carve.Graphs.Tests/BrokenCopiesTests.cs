@@ -51,11 +51,14 @@ public class BrokenCopiesTests
         }
     }
 
-    public static TheoryData<string> Rows => ["mask inverted", "curvature read as occlusion", "position's y flipped", "padding left out"];
+    /// <summary>The rows quick enough for <c>unit</c>; "curvature read as occlusion" bakes occlusion and is in <see cref="BrokenCopiesRegressionTests"/>.</summary>
+    public static TheoryData<string> Rows => ["mask inverted", "position's y flipped", "padding left out"];
 
     [Theory]
     [MemberData(nameof(Rows))]
-    public void The_comparison_with_the_bake_catches_it(string what)
+    public void The_comparison_with_the_bake_catches_it(string what) => Catches(what);
+
+    internal static void Catches(string what)
     {
         var model = Wrench();
         var mesh = model.Meshes[0].Mesh;
@@ -85,4 +88,12 @@ public class BrokenCopiesTests
         Assert.Null(AllOpen(Run(real, node, Size)));
         Assert.NotNull(AllOpen(Run(broken, node, Size)));
     }
+}
+
+/// <summary>The broken-copies row that bakes the wrench's occlusion, over a second (RV-82): suite <c>graphs-regression</c>.</summary>
+[Trait("Tier", "regression")]
+public class BrokenCopiesRegressionTests
+{
+    [Fact]
+    public void The_comparison_with_the_bake_catches_curvature_read_as_occlusion() => BrokenCopiesTests.Catches("curvature read as occlusion");
 }

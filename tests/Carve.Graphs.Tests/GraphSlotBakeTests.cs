@@ -171,6 +171,39 @@ public sealed class GraphSlotBakeTests : IDisposable
         Assert.Equal(Key(GraphSlotBake.BaseColour), Key(GraphSlotBake.Occlusion));
     }
 
+    /// <summary>
+    /// The key's claim over the whole slot table: every slot (each texture-slot constant, so one added later is in it) given
+    /// every output of the planks, grey and colour, is keyed apart, or refuses it, or gives base colour's bytes.
+    /// </summary>
+    [Fact]
+    public void A_slot_keyed_as_base_colour_packs_every_output_as_base_colour_does_or_refuses_it()
+    {
+        var files = GraphSlotBake.Read(Planks);
+        var slots = typeof(GraphSlotBake).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(f => f.IsLiteral && f.FieldType == typeof(string)).Select(f => (string)f.GetRawConstantValue()!).ToList();
+        Assert.Contains(GraphSlotBake.Occlusion, slots);
+        var outputs = new GraphEvaluator(TexGraphFile.ReadFile(Planks, GraphSlotBake.Unbound).Graph!, GraphSlotBake.Unbound).Outputs.ToList();
+        Assert.Contains("roughness", outputs);
+        byte[]? Rgba(string slot, string output)
+        {
+            try { return GraphSlotBake.Rgba(new MaterialGraph(Planks, output, 32), slot, Model.Empty, null, TestContext.Current.CancellationToken); }
+            catch (GraphOutputException) { return null; }
+        }
+        string Key(string slot, string output) => GraphSlotBake.Key(files, output, 32, slot, Model.Empty, null);
+        var shared = 0;
+        foreach (var output in outputs)
+        {
+            var baseColour = Rgba(GraphSlotBake.BaseColour, output);
+            Assert.NotNull(baseColour);
+            foreach (var slot in slots.Where(s => Key(s, output) == Key(GraphSlotBake.BaseColour, output)))
+            {
+                if (Rgba(slot, output) is { } bytes) Assert.True(bytes.AsSpan().SequenceEqual(baseColour), $"{slot} packs '{output}' unlike {GraphSlotBake.BaseColour} but shares its key");
+                shared++;
+            }
+        }
+        Assert.True(shared > outputs.Count, $"only {shared} slot and output pairs keyed as base colour");
+    }
+
     [Fact]
     public void The_files_hash_follows_the_nesting_not_the_folder()
     {
