@@ -4,7 +4,7 @@ description: >-
 ---
 # B-11 — The 1024 bake tests time out under load
 
-**Status:** Open
+**Status:** Fixed
 
 **Severity:** Major
 
@@ -44,3 +44,14 @@ loses the check that render bakes all six slots at 1024), and re-running until i
 
 - `server-regression` passing, and a statement of what else was running on the machine.
 - The limit shown to be what the call uses (a unit test of the argument, or the timeout message naming it).
+
+### As built
+
+Model: Sonnet 5.5 (claude-sonnet-5-5).
+
+- `tests/Carve.Server.Tests/CarveProcess.cs`: `CarveProcess.BakeAnswer` (120 s) and an overload `CallToolAsync(name, arguments, TimeSpan answer)`; the two-argument call still waits `Answer` (30 s), so every other call and test is unchanged. The timeout message already names the limit it waited (`No response to N after <limit>`).
+- Calls given `BakeAnswer`, all in `GraphMaterialRenderTests`: `Weathered_graphs_bake_on_the_barrel_at_1024` (the render that bakes the six slots), `The_barrel_export_bakes_and_says_how_long_it_took(size: 1024)` (the export; the 512 case keeps 30 s), and `A_fine_graph_texture_is_drawn_as_its_bake_named_as_a_png_is` (its first render bakes a 1024 graph texture; one slot, given the limit for consistency). No other test in `tests/Carve.Server.Tests` bakes a graph at 1024 through the process: the other 1024 hits are plain `render` sizes of a cube or box (`RenderTests`, `MaterialRenderTests`), no bake. No other test project starts `carve` and bakes at 1024 (`Carve.WeatheringAcceptance.Tests` bakes in process).
+- Shown: new test `A_call_waits_the_limit_it_is_given` (a 5 ms limit on an uninitialised process; the TimeoutException names `after 00:00:00.0050000`) and asserts the 120 s and 30 s constants.
+- No assertion, size or tolerance changed; nothing skipped or retried.
+- Not checked: that a loaded machine passes (the load is not reproducible here); see the verify run below.
+- `README.md` needed nothing.
