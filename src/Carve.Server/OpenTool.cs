@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Carve.Core;
@@ -10,9 +9,6 @@ namespace Carve.Server;
 
 public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
 {
-    /// <summary>How many .carve files a missing-file error lists before it counts the rest.</summary>
-    internal const int ListLimit = GraphSlotProblem.ListLimit;
-
     private const string OpenMeshText =
         "The one mesh to take from the file, by its name there (a version 1 file's single mesh is taken whatever the name, and placed under it, so long as it is a name define_mesh takes: not empty and with no ':'): it replaces the model's mesh of that name, or is added when the name is new, and the rest of the model stays. "
         + "Of a part tree, the part's own geometry and kept levels: a part of that name keeps its place in the tree, and a new one is a top-level part at the origin; an instance or an empty, in the file or the model, is refused. "
@@ -141,29 +137,5 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
     }
 
     /// <summary>The missing-file error: the resolved path and the .carve files that are in its folder.</summary>
-    private static string Missing(ToolPath target)
-    {
-        var folder = Path.GetDirectoryName(target.FullPath)!;
-        var head = $"open: no file at {target.FullPath}; ";
-        if (!Directory.Exists(folder)) return head + $"the folder {folder} does not exist";
-
-        List<string> names;
-        try
-        {
-            names = Directory.EnumerateFiles(folder)
-                .Select(f => Path.GetFileName(f)!)
-                .Where(n => n.EndsWith(SaveTool.Extension, StringComparison.OrdinalIgnoreCase) )
-                .OrderBy(n => n, StringComparer.Ordinal).ToList();
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return head + $"the folder {folder} could not be listed: {e.Message}";
-        }
-
-        var inv = CultureInfo.InvariantCulture;
-        if (names.Count == 0) return head + $"there are no {SaveTool.Extension} files in {folder}";
-        var shown = string.Join(", ", names.Take(ListLimit));
-        var rest = names.Count > ListLimit ? $", and {(names.Count - ListLimit).ToString(inv)} more" : "";
-        return head + $"the {SaveTool.Extension} files in {folder} ({names.Count.ToString(inv)}) are: {shown}{rest}";
-    }
+    private static string Missing(ToolPath target) => "open: " + GraphSlotProblem.Missing(target.FullPath, SaveTool.Extension);
 }
