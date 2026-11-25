@@ -117,7 +117,7 @@ description: >-
 - **Rubric:** 1 (the cache: growth and byte count)
 - **What is wrong:** The cap covers only `_entries`. Each `Resolve` builds the drawn model with a new `ImmutableArray` copy of every slot's PNG, even on a cache hit, and keeps it in `_drawn` for as long as the key `Model` lives. `ModelStore` holds up to 100 earlier models for `undo`. A session that renders after each edit therefore holds up to 100 sets of the bakes, none of them counted and none evicted. By T-163's numbers that is about 6 slots per barrel model at 1024, so several MB per state, and 16 times that at 4096. The count also charges each entry `size*size*4` of "decoded" bytes the cache never holds (the decode is `PbrMaterials`'), so `Bytes` is neither the cache's real size nor the process's. Eviction cannot drop a bake in use, since every user holds a copy, and a single entry over the cap is kept, by design. No test evicts (listed).
 
-**Outcome:** —
+**Outcome:** skipped: filed off-milestone as T-222 by the person's choice (2026-11-25); nothing drawn is wrong
 
 ### Export cannot be cancelled: a cancelled or timed-out export bakes on and then writes the .glb
 - **Where:** `src/Carve.Server/ExportTool.cs:123` (no `CancellationToken` in `Run`), `:165` (`bakes.Resolve(model, CancellationToken.None)`), `:184-195`
