@@ -114,7 +114,8 @@ internal sealed class RebakeStage : IWeatheredStage
 
         File.WriteAllText(graph, text);
         var restored = await driver.CaptureAsync("rebake-restored", front.Args());
-        run.Log.Add($"after the graph's restore: {(restored.Caption?.Contains("\nbaked: ", StringComparison.Ordinal) is true ? "baked" : "nothing baked")}");
+        // The restored graph's bake is in the cache: nothing is baked (T-167's record; RV-82).
+        Baked(run, "after the graph's restore", restored, false);
         Same(run, "after the graph's restore", stage2, restored);
     }
 

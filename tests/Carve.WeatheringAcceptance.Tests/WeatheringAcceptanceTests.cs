@@ -27,8 +27,8 @@ public class WeatheringAcceptanceTests
     /// <summary>
     /// The person's margins (ruling of 2026-11-24, on round 1's 93.8 and 22.3): texels within 2 of a steel hard edge are brighter than steel texels
     /// more than 12 from any by at least 30 luma, and the drive crevice is darker than the open steel by at least 10. The sets they were ruled on:
-    /// both leave out drive faces 100 to 105 from the edge sets. The crevice set was redefined by the ruling of 2026-11-25 (CreviceReach): the drive's texels within
-    /// 0.004 m of the 8 edges of the drive's two ends, all texels of that set (the distance was chosen with round 2's number in view).
+    /// both leave out drive faces 100 to 105 from the edge sets. The crevice set was redefined by the ruling of 2026-11-25 (CreviceReach): the drive's four visible side
+    /// faces' texels within 0.004 m of the 8 edges of the drive's two ends (DriveSides), all texels of that set (the distance was chosen with round 2's number in view).
     /// </summary>
     public const double HardEdgeMargin = 30, CreviceMargin = 10;
 
@@ -41,7 +41,7 @@ public class WeatheringAcceptanceTests
     /// The junction (ruling of 2026-11-25), from samples/wrench.carve: the square drive is a separate box (vertices 168 to 175; side faces 100 to 103, end faces
     /// 104 at z -0.042 and 105 at z -0.020) standing between two 12-gon caps of the dark socket body, 118 (z -0.0425, the socket top) and 99 (z -0.020, the
     /// underside of the hub ring). The junction is the eight edges of the drive's two end rectangles; the sets are the texels of the drive's faces and of
-    /// faces 118 and 99 whose 3D distance to those edges is within a reach. The rows for the other reaches, and for the socket, are notes that assert nothing; only CreviceReach with the drive's own texels is checked. Caveat: faces 118 and 99 are
+    /// faces 118 and 99 whose 3D distance to those edges is within a reach. The rows for the other reaches, and for the socket, are notes that assert nothing; only CreviceReach with the drive's side faces' texels is checked. Caveat: faces 118 and 99 are
     /// group dark and do not wear the steel material in the file, so their texels in the steel slot's bake are not what is drawn there.
     /// </summary>
     private static readonly int[] SocketFaces = [118, 99];
@@ -210,45 +210,77 @@ public class WeatheringAcceptanceTests
         File.AppendAllText(Path.Combine(RunFolder, "acceptance", "numbers.tsv"), line + "\n");
     }
 
-    /// <summary>Notes, per reach, the junction set's mean luma against the open steel's, with and without the texels within NearEdge of a hard edge.</summary>
-    private static double[] NoteJunction(PolygonMesh mesh, int n, byte[] rgba, double openMean, int openCount)
+    /// <summary>
+    /// The drive's side faces, worked out from the geometry and not from a face number: of the drive box's six faces (DriveFaces), the four whose normal is
+    /// perpendicular to the drive's axis (z, the axis the two end faces lie across). The other two are the ends, which sit flush against the socket's faces,
+    /// are never seen and are dark under any occlusion; the person ruled (2026-11-25) that the crevice set is the sides' texels only.
+    /// </summary>
+    internal static int[] DriveSides(PolygonMesh mesh) => DriveFaces.Where(f =>
     {
+        var p = mesh.Faces[f].Loop.Select(i => mesh.Vertices[i]).ToArray();
+        return Math.Abs(Vector3.Normalize(Vector3.Cross(p[1] - p[0], p[2] - p[0])).Z) < 0.5f;
+    }).ToArray();
+
+    /// <summary>
+    /// The texels of the drive's faces and of the socket's two faces, each with its face, its 3D distance to the 8 edges of the drive's two end rectangles,
+    /// whether it lies within NearEdge of a hard edge, and its luma in the bake.
+    /// </summary>
+    internal static List<(int Face, double Metres, bool NearHard, double Luma, double Scale)> JunctionTexels(PolygonMesh mesh, int n, byte[] rgba)
+    {
+        var sides = DriveSides(mesh);
         var all = DriveFaces.Concat(SocketFaces).ToArray();
         var hard = HardSegments(mesh, all);
         var junction = new List<(Vector3 A, Vector3 B)>();
-        foreach (var f in new[] { 104, 105 })
+        foreach (var f in DriveFaces.Except(sides))
         {
             var loop = mesh.Faces[f].Loop;
             for (var k = 0; k < loop.Count; k++) junction.Add((mesh.Vertices[loop[k]], mesh.Vertices[loop[(k + 1) % loop.Count]]));
         }
 
-        var texels = new List<(bool Drive, double Metres, bool NearHard, double Luma)>();
-        double scale = 0;
+        var texels = new List<(int, double, bool, double, double)>();
+        var scale = 0.0;
         foreach (var f in all)
         {
             var uv = mesh.Uvs!.Of(f)!;
             var p = mesh.Faces[f].Loop.Select(i => mesh.Vertices[i]).ToArray();
             var (e1, e2) = (uv[1] - uv[0], uv[2] - uv[0]);
             var det = e1.X * e2.Y - e1.Y * e2.X;
-            if (f == 100 || f == 118) scale = (p[1] - p[0]).Length() / (e1.Length() * n);
+            if (f == sides[0]) scale = (p[1] - p[0]).Length() / (e1.Length() * n);
             foreach (var t in Texels(mesh, [f], n, hard))
             {
                 var d = new Vector2((t.X + 0.5f) / n, (t.Y + 0.5f) / n) - uv[0];
                 var (a, b) = ((d.X * e2.Y - d.Y * e2.X) / det, (e1.X * d.Y - e1.Y * d.X) / det);
                 var q = p[0] + (p[1] - p[0]) * a + (p[2] - p[0]) * b;
-                texels.Add((f < 106, junction.Min(s => Dist3(q, s.A, s.B)), t.Distance <= NearEdge, Luma(rgba, n, t.X, t.Y)));
+                texels.Add((f, junction.Min(s => Dist3(q, s.A, s.B)), t.Distance <= NearEdge, Luma(rgba, n, t.X, t.Y), 0));
             }
         }
 
+        return texels.Select(t => (t.Item1, t.Item2, t.Item3, t.Item4, scale)).ToList();
+    }
+
+    /// <summary>The crevice set: the drive's side faces' texels within CreviceReach of the end edges, all of them.</summary>
+    internal static List<(int Face, double Luma)> CreviceTexels(PolygonMesh mesh, int n, byte[] rgba)
+    {
+        var sides = DriveSides(mesh);
+        return JunctionTexels(mesh, n, rgba).Where(t => sides.Contains(t.Face) && t.Metres <= CreviceReach).Select(t => (t.Face, t.Luma)).ToList();
+    }
+
+    /// <summary>Notes, per reach, the junction sets' mean luma against the open steel's, with and without the texels within NearEdge of a hard edge. The set "sides" is the checked one.</summary>
+    private static double[] NoteJunction(PolygonMesh mesh, int n, byte[] rgba, double openMean, int openCount)
+    {
+        var sides = DriveSides(mesh);
+        var texels = JunctionTexels(mesh, n, rgba);
+        var scale = texels[0].Scale;
         var crevice = Array.Empty<double>();
         foreach (var reach in JunctionReaches)
         foreach (var withHard in new[] { true, false })
-        foreach (var withSocket in new[] { false, true })
+        foreach (var set in new[] { "sides", "drive (sides and ends)", "drive+socket" })
         {
-            var set = texels.Where(t => t.Metres <= reach && (withHard || !t.NearHard) && (withSocket || t.Drive)).ToArray();
-            var mean = set.Select(t => t.Luma).DefaultIfEmpty().Average();
-            if (reach == CreviceReach && !withSocket && withHard) crevice = set.Select(t => t.Luma).ToArray();
-            Note($"junction	{(withSocket ? "drive+socket" : "drive only")}, reach {reach} m ({reach / scale:F1} texels at {n}), {(withHard ? "with" : "without")} texels within {NearEdge} of a hard edge: {set.Length} texels ({set.Count(t => t.Drive)} drive, {set.Count(t => !t.Drive)} socket), mean {F(mean)}; open steel: {openCount}, mean {F(openMean)}	{F(openMean - mean)}");
+            var inSet = texels.Where(t => t.Metres <= reach && (withHard || !t.NearHard)
+                && (set == "drive+socket" || DriveFaces.Contains(t.Face)) && (set != "sides" || sides.Contains(t.Face))).ToArray();
+            var mean = inSet.Select(t => t.Luma).DefaultIfEmpty().Average();
+            if (reach == CreviceReach && set == "sides" && withHard) crevice = inSet.Select(t => t.Luma).ToArray();
+            Note($"junction	{set}, reach {reach} m ({reach / scale:F1} texels at {n}), {(withHard ? "with" : "without")} texels within {NearEdge} of a hard edge: {inSet.Length} texels ({inSet.Count(t => sides.Contains(t.Face))} side, {inSet.Count(t => DriveFaces.Contains(t.Face) && !sides.Contains(t.Face))} end, {inSet.Count(t => !DriveFaces.Contains(t.Face))} socket), mean {F(mean)}; open steel: {openCount}, mean {F(openMean)}	{F(openMean - mean)}");
         }
 
         return crevice;
@@ -273,10 +305,23 @@ public class WeatheringAcceptanceTests
         var open = bodyTexels.Where(t => t.Distance > FarEdge).Select(t => Luma(rgba, n, t.X, t.Y)).ToArray();
         Note($"hard-edge\twithin {NearEdge} texels: {near.Length} texels, mean {F(near.DefaultIfEmpty().Average())}; more than {FarEdge}: {open.Length} texels, mean {F(open.DefaultIfEmpty().Average())}\t{F(near.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
         var crevice = NoteJunction(polygons, n, rgba, open.DefaultIfEmpty().Average(), open.Length);
-        Note($"crevice\tdrive texels within {CreviceReach} m of the 8 end edges (all texels): {crevice.Length}, mean {F(crevice.DefaultIfEmpty().Average())}; open steel: {open.Length}, mean {F(open.DefaultIfEmpty().Average())}\t{F(crevice.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
+        Note($"crevice\tdrive side-face texels within {CreviceReach} m of the 8 end edges (all texels): {crevice.Length}, mean {F(crevice.DefaultIfEmpty().Average())}; open steel: {open.Length}, mean {F(open.DefaultIfEmpty().Average())}\t{F(crevice.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
         Assert.True(near.Length >= 20 && open.Length >= 20 && crevice.Length >= 20, $"too few texels: edge {near.Length}, open {open.Length}, crevice {crevice.Length}");
         Assert.True(near.Average() - open.Average() >= HardEdgeMargin, $"hard-edge mean luma {F(near.Average())} - open steel mean {F(open.Average())} = {F(near.Average() - open.Average())}, below {HardEdgeMargin}");
-        Assert.True(open.Average() - crevice.Average() >= CreviceMargin, $"open steel mean luma {F(open.Average())} - drive crevice mean {F(crevice.Average())} = {F(open.Average() - crevice.Average())}, below {CreviceMargin}");
+        Assert.True(open.Average() - crevice.Average() >= CreviceMargin, $"open steel mean luma {F(open.Average())} - drive-side crevice mean {F(crevice.Average())} = {F(open.Average() - crevice.Average())}, below {CreviceMargin}");
+    }
+
+    /// <summary>The crevice set holds texels of the drive's four side faces and of no other face (the socket's 99 and 118 and the drive's ends 104 and 105 included), on the wrench.</summary>
+    [Fact]
+    public void The_crevice_set_holds_no_texel_of_a_face_that_is_not_a_drive_side()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(dir.FullName, "samples", "wrench.carve"))) dir = dir.Parent!;
+        var wrench = CarveFile.Read(File.ReadAllText(Path.Combine(dir.FullName, "samples", "wrench.carve"))).Mesh!;
+        Assert.Equal([100, 101, 102, 103], DriveSides(wrench).Order());
+        var set = CreviceTexels(wrench, 256, new byte[256 * 256 * 4]);
+        Assert.NotEmpty(set);
+        Assert.Equal([100, 101, 102, 103], set.Select(t => t.Face).Distinct().Order());
     }
 
     /// <summary>
