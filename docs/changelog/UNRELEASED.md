@@ -14,3 +14,4 @@
 - B-11: The server-regression tests that bake both weathered materials at 1024 through the real process wait longer than 30 s for that call, so they pass on a loaded machine
 - T-221: RV-82: the acceptance and scenario findings
 - T-217: RV-82: the bake's key, validation of mesh parameters, and the graphs suites
+- T-220: RV-82: the descriptions and docs findings
