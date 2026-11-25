@@ -88,6 +88,35 @@ public sealed class RenderBakedFrameTests : IDisposable
         Assert.IsType<MaterialTexture>(Assert.Single(_scene.Drawn).Single().BaseColourTexture);
     }
 
+    /// <summary>
+    /// The <c>uvs</c> look (RV-82): its graph image is baked on the snapshot, and the pump serves the request on the model current
+    /// then, so an edit between them would lay another model's layout over the image. That frame is stale, and the model is drawn again.
+    /// </summary>
+    [Fact]
+    public async Task A_uvs_frame_drawn_on_a_later_model_than_its_graph_image_is_drawn_again()
+    {
+        _queue.OnWaiting = Edit;
+        var tries = 0;
+        async Task<((RenderedFrame Frame, bool Stale)[]? Frames, string? Error)> BakeImageAndRender()
+        {
+            tries++;
+            var bakedOn = _store.Current.Version; // what RunUvs bakes its image on
+            var frame = _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, 256, Look.Uvs, LabelSet.None));
+            for (var i = 0; i < 20 && !frame.IsCompleted; i++) _pump.Step();
+            var drawn = await frame;
+            return ([(drawn, SheetVersions.UvImageStale(graphImage: true, bakedOn, drawn.Version))], null);
+        }
+
+        var (frames, error) = await SheetVersions.Baked(BakeImageAndRender, t => t.Stale, 3, SheetVersions.UvImageDrawn);
+
+        Assert.Null(error);
+        Assert.Equal(2, tries); // the first frame was drawn on the edit, a model the image was not baked on
+        Assert.Equal(_store.Current.Version, Assert.Single(frames!).Frame.Version);
+        _queue.Again = true;
+        Assert.Equal("The model changed between its bake and its frame on each of 3 tries, so its graph image would lie under another model's layout; call render again once the edits have settled.",
+            (await SheetVersions.Baked(BakeImageAndRender, t => t.Stale, 3, SheetVersions.UvImageDrawn)).Error);
+    }
+
     /// <summary>Runs an edit at the moment the frame thread finds a request waiting, once or (<see cref="Again"/>) every time.</summary>
     private sealed class QueueWithAHook(ModelStore store) : RenderQueue(store)
     {
