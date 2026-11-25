@@ -101,7 +101,7 @@ description: >-
 - **Rubric:** 7 (tracker hygiene), 1 (threading)
 - **What is wrong:** `render` resolves `store.Current.Model` (M1), then posts the frame. The pump serves "the mesh current at its post or a newer one". If a `move`, `define_material` or `undo` lands in between (M2), the pump calls `ShowMesh(store.Current)`. `DrawnOf(M2)` finds no resolution (`Peek(M2)` is null) and draws M2 with every graph slot empty. That frame is served and returned to the agent, and its caption carries M1's `baked:` list. A single frame gets no version check (`ShiftedIdsRefusal` only runs when ids are shifted), and `SheetVersions.OnOneMesh` only compares tiles with each other. So the code comment is false. The retrospective's wording ("the frame thread draw that model with empty graph slots until the next bake lands") leaves out that the agent's own render returns the blank-slotted frame, and that "the next bake" comes only with the next render or export. The code has no `shortcut:` comment for this limit. The one `shortcut:` in T-163's code (`GraphBakes.cs:278`, the costliest node named by type) states its limit correctly.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### A per-mesh copy's name can be a material the model already has, and export then renames that material's faces away
 - **Where:** `src/Carve.Server/GraphBakes.cs:143-156` (copies named `{m.Name}@{name}` and `{m.Name}@{part}@{level}` with no check against existing names), `src/Carve.Server/ExportTool.cs:306-325` (`Copies`: anything named `<graph material>@...` counts as a copy, and `Base` is cut at the first `@`)
@@ -109,7 +109,7 @@ description: >-
 - **Rubric:** 1 (the copies' names)
 - **What is wrong:** By the planning ruling, a file with an `@` name still opens and its faces can still be given it. A model with a plain material `iron@strip` (an older file) and a mesh-reading graph material `iron` on mesh `strip` therefore collides. `Resolve`'s `WithMaterial` replaces the user's `iron@strip` with iron's copy in the drawn model, and `Copies` treats the user's faces as copy users and renames them `iron`. Probe (scratch copy, unit tier): faces 0-2 `iron` (curvature occlusion graph), face 3 `iron@strip` (base colour `#FF0000`). In the drawn model, `iron@strip` had base colour `#FFFFFF` and a baked `MaterialTexture` occlusion. The exported .glb had one material, `iron`, and the red was gone with no warning. Mesh names may contain `@` (`Model.NameProblem` refuses only `:`), so a mesh `hull@1` and part `hull`'s kept level 1 both make `iron@hull@1`, and one bake replaces the other in render. A graph material whose own name has `@` (only possible from a hand-edited file) would be renamed back to the text before its first `@`. None of these cases is tested.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### Bake memory is held outside the 512 MB cap: every resolved model in the undo history keeps its own copies of its bakes
 - **Where:** `src/Carve.Server/GraphBakes.cs:123` (`new MaterialTexture(g.Path, [.. png], ...)`, a fresh copy per slot on every `Resolve`, hits included), `:27` and `:166-171` (the `ConditionalWeakTable<Model, Drawn>`), `:246` (the count); `ModelStore.UndoDepth` = 100
@@ -125,7 +125,7 @@ description: >-
 - **Rubric:** 1 (cancellation), 7
 - **What is wrong:** The retrospective lists this under "Never verified" ("cancelling mid-bake (export bakes with no cancellation token)"), but the code settles it: nothing can stop an export's bake. A client that cancels, or gives up at its own timeout, has been told the call failed. The server goes on baking (6 to 14 s a material at 1024 in Debug, by B-11) and then writes the .glb and any limits file. If the agent retries in the meantime, two exports run at once toward one path, and the second either finds the file there or overwrites it. T-163 made render's bake honour its token between tiles and maps; export, which bakes the same slots, takes none. This is a known gap, wrongly recorded as unverified.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### A bake that fails on the mesh tells the agent to redefine the material or restore the file, which is the wrong fix
 - **Where:** `src/Carve.Server/GraphSlotProblem.cs:60-61` (`Failed`), used by `GraphBakes.cs:91-94, 115-118`
@@ -133,7 +133,7 @@ description: >-
 - **Rubric:** 1 (errors: what would be right)
 - **What is wrong:** Every `render` and `export` bake failure ends with "; the model is unchanged: define the material again with a graph that bakes, or restore the file". That includes a `MeshLayoutException` (no UVs, overlapping UVs) and a `MeshMaskException` (a group or material the mesh lacks). For those causes the graph and file are fine, and the cause's own text says to unwrap, set UVs or move islands. The render error therefore gives two contradictory fixes, and the trailing one is wrong. The wording is pinned only for file and fault causes (`GraphMaterialErrorsTests.cs:138-145, 170-172`, `GraphBakesTests.cs:118`). No test renders or exports a mesh cause and reads the message.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### `PieceExport.Select` now carries the model's materials, a real fix for a pre-existing failure, with no test
 - **Where:** `src/Carve.Server/PieceExport.cs:34`, `src/Carve.Server/ExportTool.cs:246-251`; T-164 As built, line 77
@@ -141,7 +141,7 @@ description: >-
 - **Rubric:** 2, 3
 - **What is wrong:** The change is right: before it, `Model.Create` was given no materials, so a piece export of any mesh wearing a material (PNG or graph) could not be built, and it threw from `Select`. After it, `Copies` runs over the piece's meshes only, which is the right rule. But this fixes behaviour outside the graph feature, for every textured piece export, and no test in `tests/Carve.Server.Tests` exports a piece with a material of either kind. No test file names `"piece"` together with `define_material`. A revert would pass every suite. The As built says so in passing ("a piece with a graph" is under Not checked). The pre-existing failure was not filed as a bug.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The server suites read sample files their `tests.json` inputs leave out
 - **Where:** `tests.json:90-125` (server-unit), `:135-150` (server-regression); `tests/Carve.Server.Tests/GraphMaterialErrorsTests.cs:180, 190-191`, `GraphMaterialRenderTests.cs:65-67`
