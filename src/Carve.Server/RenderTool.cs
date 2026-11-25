@@ -772,42 +772,12 @@ internal static class RenderTool
         };
     }
 
-    private static readonly string[] ImageGraphKeys = ["graph", "output", "size"];
-
     /// <summary>render's <c>image</c> as <c>{graph, output, size}</c> (T-165), T-160's rules for each field; null with each problem, named by <c>image</c>, in <paramref name="problems"/>.</summary>
     private static MaterialGraph? LoadGraphImage(JsonElement image, string? baseDirectory, List<string> problems)
     {
-        var before = problems.Count;
-        foreach (var key in image.EnumerateObject().Select(p => p.Name).Where(k => !ImageGraphKeys.Contains(k)))
-            problems.Add($"image.{key}: an image graph takes only graph, output and size");
-        string? Text(string key)
-        {
-            if (!image.TryGetProperty(key, out var v)) problems.Add($"image: a graph image needs {key}");
-            else if (v.ValueKind == JsonValueKind.String) return v.GetString();
-            else problems.Add($"image.{key}: expected a string, got {Describe(v)}");
-            return null;
-        }
-        var path = Text("graph");
-        var output = Text("output");
-        int? size = null;
-        if (image.TryGetProperty("size", out var s))
-        {
-            if (s.ValueKind == JsonValueKind.Number && s.TryGetInt32(out var n)) size = n;
-            else problems.Add($"image.size: expected an integer, got {Describe(s)}");
-        }
-        if (problems.Count > before) return null;
-
-        var target = ToolPaths.Resolve("render", path, MaterialGraph.Extension, out var pathError, baseDirectory, verb: "reads");
-        if (target is null) problems.Add("image.graph: " + pathError!["render: ".Length..]);
-        else if (Directory.Exists(target.FullPath)) problems.Add($"image.graph: {target.FullPath} is a folder, not a file");
-        else if (!File.Exists(target.FullPath)) problems.Add($"image.graph: {DefineMaterialTool.Missing(target, MaterialGraph.Extension)}");
-        else if (DefineMaterialTool.ReadGraph(target.FullPath, out var graph) is { } bad) problems.Add($"image.graph: {target.FullPath} {bad}");
-        else
-        {
-            var made = new MaterialGraph(target.FullPath, output!, size ?? Math.Clamp(graph!.Size, MaterialGraph.MinSize, MaterialTexture.MaxSize));
-            if (made.Problem() is { } shape) problems.Add($"image: {shape}");
-            else return made;
-        }
+        if (DefineMaterialTool.ParseGraph("render", "image", image, baseDirectory, problems, "an image graph", "a graph image") is not { } made) return null;
+        if (made.Problem() is { } shape) problems.Add($"image: {shape}");
+        else return made;
         return null;
     }
 

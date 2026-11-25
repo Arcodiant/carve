@@ -245,12 +245,34 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
     /// </summary>
     private static MaterialGraph? LoadGraph(string field, JsonElement slot, string? baseDirectory, List<string> errors)
     {
+        if (ParseGraph("define_material", field, slot, baseDirectory, errors, "a graph slot", "a graph slot") is not { } made) return null;
+        // The faults, the output and the slot table, here rather than at the first render (T-166); a malformed output name is Material.Problems' to report.
+        try
+        {
+            if (MaterialGraph.OutputProblem(made.Output) is null) GraphSlotBake.Validate(made, field);
+        }
+        catch (Exception e) when (GraphSlotProblem.IsCause(e))
+        {
+            errors.Add($"{field}.{(e is GraphOutputException ? "output" : "graph")}: {GraphSlotProblem.Cause(e)}");
+            return null;
+        }
+        return made;
+    }
+
+    /// <summary>
+    /// A <c>{graph, output, size}</c> argument of <paramref name="tool"/> (define_material's slots, render's image): its keys, the graph
+    /// resolved and read, then the size given or the graph's own clamped into 64 to 4096. Null with each problem, named by
+    /// <paramref name="field"/>, in <paramref name="errors"/>; <paramref name="takes"/> and <paramref name="needs"/> name the argument in
+    /// the unknown-key and missing-key errors.
+    /// </summary>
+    internal static MaterialGraph? ParseGraph(string tool, string field, JsonElement slot, string? baseDirectory, List<string> errors, string takes, string needs)
+    {
         var before = errors.Count;
         foreach (var key in slot.EnumerateObject().Select(p => p.Name).Where(k => !GraphKeys.Contains(k)))
-            errors.Add($"{field}.{key}: a graph slot takes only graph, output and size");
+            errors.Add($"{field}.{key}: {takes} takes only graph, output and size");
         string? Text(string key)
         {
-            if (!slot.TryGetProperty(key, out var v)) errors.Add($"{field}: a graph slot needs {key}");
+            if (!slot.TryGetProperty(key, out var v)) errors.Add($"{field}: {needs} needs {key}");
             else if (v.ValueKind == JsonValueKind.String) return v.GetString();
             else errors.Add($"{field}.{key}: expected a string, got {Describe(v)}");
             return null;
@@ -265,10 +287,10 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         }
         if (errors.Count > before) return null;
 
-        var target = ToolPaths.Resolve("define_material", path, MaterialGraph.Extension, out var pathError, baseDirectory, verb: "reads");
+        var target = ToolPaths.Resolve(tool, path, MaterialGraph.Extension, out var pathError, baseDirectory, verb: "reads");
         if (target is null)
         {
-            errors.Add($"{field}.graph: " + pathError!["define_material: ".Length..]);
+            errors.Add($"{field}.graph: " + pathError![$"{tool}: ".Length..]);
             return null;
         }
         if (Directory.Exists(target.FullPath))
@@ -286,18 +308,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
             errors.Add($"{field}.graph: {target.FullPath} {problem}");
             return null;
         }
-        var made = new MaterialGraph(target.FullPath, output!, size ?? Math.Clamp(graph!.Size, MaterialGraph.MinSize, MaterialTexture.MaxSize));
-        // The faults, the output and the slot table, here rather than at the first render (T-166); a malformed output name is Material.Problems' to report.
-        try
-        {
-            if (MaterialGraph.OutputProblem(output) is null) GraphSlotBake.Validate(made, field);
-        }
-        catch (Exception e) when (GraphSlotProblem.IsCause(e))
-        {
-            errors.Add($"{field}.{(e is GraphOutputException ? "output" : "graph")}: {GraphSlotProblem.Cause(e)}");
-            return null;
-        }
-        return made;
+        return new MaterialGraph(target.FullPath, output!, size ?? Math.Clamp(graph!.Size, MaterialGraph.MinSize, MaterialTexture.MaxSize));
     }
 
     /// <summary>
@@ -321,9 +332,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
     }
 
     /// <summary>The missing-file error: the resolved path and the files with <paramref name="extension"/> that are in its folder.</summary>
-    internal static string Missing(ToolPath target, string extension = ".png") => Missing(target.FullPath, extension);
-
-    internal static string Missing(string fullPath, string extension) => GraphSlotProblem.Missing(fullPath, extension);
+    internal static string Missing(ToolPath target, string extension = ".png") => GraphSlotProblem.Missing(target.FullPath, extension);
 }
 
 public sealed class SetMaterialTool(ModelStore store)
