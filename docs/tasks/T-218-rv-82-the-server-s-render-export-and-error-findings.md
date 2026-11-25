@@ -61,3 +61,29 @@ Each finding of RV-82 named here, by its heading there:
   that cannot be fixed inside this member's files without a design change is reported, not forced.
 - The member fills the `**Outcome:**` line of each of its findings in RV-82 (`fixed`, with the commit and the test's
   name; or `no change needed: <reason>`), and touches no other finding's line.
+
+### Hand-off
+
+Written at the call checkpoint (about 60 tool calls) by the first agent, on claude-opus-5-5.
+
+- **Done: the frame finding** (`DrawnOf` / an edit between bake and frame), commit `2ed3e9b2`. The pump marks a
+  frame drawn on a model with graph slots no render had baked: `RenderPump._unbaked`, set in `ShowMesh`, carried as
+  `RenderRequest.ServedUnbaked` and copied by `RenderSystem.Render` to `RenderedFrame.Unbaked`. render's
+  `RenderTiles` is now wrapped in `SheetVersions.Baked` (inside `OnOneMesh`), which bakes and draws again while any
+  frame is `Unbaked`, up to `SheetAttempts` (3), then errors ("The model changed between its bake and its frame on
+  each of 3 tries, ..."). `GraphBakes.DrawnOf`'s comment is corrected. Test: `RenderBakedFrameTests` (unit; the
+  linked pump, bakes and store, and a queue whose `TryPeek` hook lands the edit as the frame thread finds the
+  request waiting). Its first two tests were seen to fail with the retry disabled (2 failed of 1066) and pass with
+  it (server-unit PASS, 1066). Not yet in `### As built`; its RV-82 Outcome line is not filled yet:
+  `fixed, 2ed3e9b2, RenderBakedFrameTests.An_edit_between_the_bake_and_the_frame_is_baked_and_drawn_again_never_returned_with_empty_slots`.
+- **Left:** the `@` clash (refuse in render and export, warn in check, a description or `help` clause and the
+  digest pin), export's cancellation (token into `Run` and `Resolve`, no .glb after a cancel, a test sending
+  `notifications/cancelled` by hand), the mesh-caused failure wording of `GraphSlotProblem.Failed` (a test reading
+  each whole message: no UVs, overlapping UVs, a missing group), the `PieceExport.Select` test (a piece export of a
+  mesh wearing a PNG and a graph material); then `### As built`, every Outcome line, the frame hash comparison
+  against `origin/milestone/M-29`, verify, lint and finish.
+- **Checked:** server-unit only. Not run: server-regression and the scenario suites; no frames compared yet.
+- **Surprising:** `ToolHarness` cannot reach the render tool's internals (the server is an extern-aliased assembly
+  and `EngineStatus.SetReady` is internal to Carve.Hosting), so the loop went into the linked `SheetVersions` and is
+  tested there with the real linked `RenderPump` and `GraphBakes`. The `uvs` look's own post (`RenderTool.cs`, near
+  line 740) draws no graph slots and was left as it was.
