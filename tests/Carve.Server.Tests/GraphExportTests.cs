@@ -118,6 +118,27 @@ public sealed class GraphExportTests() : FileToolTests("carve-graph-export")
         Assert.Contains(Taken + "render and export refuse it" + Rename, Warnings(Ok(await carve.CallToolAsync("check", "{}"))));
     }
 
+    /// <summary>RV-82: a kept level's copy (<c>worn@strip@0</c>) whose name the model already has is refused as a mesh's copy is.</summary>
+    [Fact]
+    public async Task A_kept_levels_copy_whose_name_the_model_already_has_is_refused()
+    {
+        var carve = await StartAsync(second: false);
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_material", """{"name":"red","base_colour":"#FF0000"}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"worn","faces":[0,1,2]}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"red","faces":[3]}"""));
+        Ok(await carve.CallToolAsync("keep_level", """{"level":0}"""));
+        await Reopen(carve, ("red", "worn@strip@0"));
+        var model = carve.Store.Current.Model;
+
+        Assert.Equal(
+            "materials['worn']: its copy for part 'strip' level 0 would be named 'worn@strip@0', which is the material 'worn@strip@0' the model already has, "
+            + "so nothing is replaced and the model is unchanged; rename the material 'worn', the part 'strip' or the material 'worn@strip@0'",
+            Refused(await carve.CallToolAsync("export", """{"path":"l.glb"}""")));
+        Assert.False(File.Exists(Path.Combine(Root, "l.glb")));
+        Assert.Same(model, carve.Store.Current.Model);
+    }
+
     /// <summary>RV-82: two copies of one name (mesh 'zz@second' wearing 'worn', mesh 'second' wearing 'worn@zz') are refused too, the second naming the first.</summary>
     [Fact]
     public async Task Two_copies_of_one_name_are_refused_naming_both()

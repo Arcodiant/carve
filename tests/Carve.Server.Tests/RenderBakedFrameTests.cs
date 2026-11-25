@@ -91,15 +91,19 @@ public sealed class RenderBakedFrameTests : IDisposable
     /// <summary>
     /// The <c>uvs</c> look (RV-82): its graph image is baked on the snapshot, and the pump serves the request on the model current
     /// then, so an edit between them would lay another model's layout over the image. That frame is stale, and the model is drawn again.
+    /// The order: the pump still shows an older model when the call posts (an edit it has not drawn yet), so the request is not due
+    /// on the opening peek, and the edit that lands at that peek is the mesh it is shown and served on.
     /// </summary>
     [Fact]
     public async Task A_uvs_frame_drawn_on_a_later_model_than_its_graph_image_is_drawn_again()
     {
         _queue.OnWaiting = Edit;
         var tries = 0;
+        var behind = 1; // the tries that open with an edit the pump has not shown
         async Task<((RenderedFrame Frame, bool Stale)[]? Frames, string? Error)> BakeImageAndRender()
         {
             tries++;
+            if (behind-- > 0) Edit();
             var bakedOn = _store.Current.Version; // what RunUvs bakes its image on
             var frame = _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, 256, Look.Uvs, LabelSet.None));
             for (var i = 0; i < 20 && !frame.IsCompleted; i++) _pump.Step();
@@ -112,7 +116,7 @@ public sealed class RenderBakedFrameTests : IDisposable
         Assert.Null(error);
         Assert.Equal(2, tries); // the first frame was drawn on the edit, a model the image was not baked on
         Assert.Equal(_store.Current.Version, Assert.Single(frames!).Frame.Version);
-        _queue.Again = true;
+        (_queue.OnWaiting, _queue.Again, behind) = (Edit, true, int.MaxValue);
         Assert.Equal("The model changed between its bake and its frame on each of 3 tries, so its graph image would lie under another model's layout; call render again once the edits have settled.",
             (await SheetVersions.Baked(BakeImageAndRender, t => t.Stale, 3, SheetVersions.UvImageDrawn)).Error);
     }
