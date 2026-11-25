@@ -194,6 +194,7 @@ is reached from a plain launch of `carve` and `patina`, through their MCP tools.
 - [ ] [T-167](../tasks/T-167-the-weathered-barrel-and-its-scenario.md) — samples/barrel-weathered.carve: the barrel with raised hoops, edge wear on the hoop rims from curvature and grime beside the hoops from occlusion, in suite scenario-weathered with re-bakes after mesh, UV and graph edits
 - [ ] [T-168](../tasks/T-168-graphs-on-a-mesh-acceptance-run.md) — Fresh agents weather the wrench with carve and patina from the tool descriptions alone, and recover from a planted wrong graph path
 - [ ] [T-207](../tasks/T-207-carve-s-tool-descriptions-under-claude-code-s-cut.md) — Every carve tool description fits Claude Code's 4,096-character cut, held by a test, with the detail that was cut still reachable by an agent
+- [ ] [B-10](../bugs/B-10-get-mesh-on-a-large-mesh-answers-more-than-an-agent-can-read.md) — get_mesh takes include and faces to answer part of a mesh, so a model like the wrench can be read by an agent whose client limits a tool result
 
 ## Decided while it ran
 
@@ -208,6 +209,15 @@ By the person (2026-11-24), each put with a recommendation:
   filing it off-milestone, and leaving them.
 - **carve gains a `help` tool** (T-207): `help {tool}` returns what was moved out of that tool's description, as
   patina's `nodes` does. Declined: another name, and cutting by shorter writing alone.
+- **T-167's thresholds,** all five as proposed from the measured numbers (rim over hoop top by 8 luma, stave middle over
+  stave beside a hoop by 7, `wear` by 0.2, `grime` by 0.15 with 0.02 elsewhere, 2 luma after `wear_amount` 0); then, in
+  stage 3, D-6's rule on the stave and cap pixels with threshold (1) on the hoops after the unwrap, M-7's relations in
+  place of `ColourRule` for the clean colours, and the stave close-up darker by 4 luma after the hoop is moved.
+- **T-168's rounds run on `--model claude-opus-5-5`,** pinned, where the task said the default.
+- **T-168's margins:** hard-edge wear by 30 luma and the drive crevice by 10; a refused tool call passes and is
+  recorded; the grip is held to what its faces wear in the saved file.
+- **`get_mesh` gains `include` and `faces`** (B-10, found by round 1), fixed in M-29 before round 2. Declined: a
+  summary by default past a size, and filing it off-milestone.
 
 By the orchestrator:
 
