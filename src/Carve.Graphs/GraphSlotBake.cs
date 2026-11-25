@@ -41,7 +41,8 @@ public static class GraphSlotBake
     public const string Emissive = "emissive_texture";
     public const string Occlusion = "occlusion_texture";
 
-    private static readonly NodeRegistry Unbound = MeshNodes.Register(NodeRegistry.BuiltIn, null);
+    /// <summary>The built-in nodes and the mesh nodes bound to no mesh: what a graph is read and validated with.</summary>
+    public static NodeRegistry Unbound { get; } = MeshNodes.Register(NodeRegistry.BuiltIn, null);
 
     /// <summary>Reads the graph at <paramref name="path"/> and every file it nests, hashing their bytes. Throws <see cref="GraphSlotException"/> when one cannot be read.</summary>
     public static GraphSlotFiles Read(string path)
@@ -159,11 +160,8 @@ public static class GraphSlotBake
     /// Everything that makes <paramref name="graph"/> unbakeable into <paramref name="slot"/> before a mesh is in it (T-166): a file gone
     /// or unreadable, every fault of the graph, an output it lacks or the slot cannot take. Evaluates nothing. Throws as <see cref="Png"/> does.
     /// </summary>
-    public static void Validate(MaterialGraph graph, string slot)
-    {
-        var registry = Unbound;
-        PackingOf(slot, new GraphEvaluator(Load(graph.Path, registry), registry), graph.Output);
-    }
+    public static void Validate(MaterialGraph graph, string slot) =>
+        PackingOf(slot, new GraphEvaluator(Load(graph.Path, Unbound), Unbound), graph.Output);
 
     /// <summary>The <c>mesh_mask</c> nodes of the graph and its nested files that name a group or material: (node id, source, name).</summary>
     public static IReadOnlyList<(string Node, MaskSource Source, string Name)> MaskNames(GraphSlotFiles files)

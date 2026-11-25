@@ -277,7 +277,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
             var (type, ms) = _calls.MaxBy(c => c.Ms);
             // shortcut: names the first node of the type across the files; two of one type are told apart only by type.
             var id = files.Files.Prepend(files.Path)
-                .Select(f => Patina.Graphs.TexGraphFile.ReadFile(f, MeshNodes.Register(Patina.Graphs.Nodes.NodeRegistry.BuiltIn, null)).Graph)
+                .Select(f => Patina.Graphs.TexGraphFile.ReadFile(f, GraphSlotBake.Unbound).Graph)
                 .SelectMany(g => g?.Nodes ?? ImmutableSortedDictionary<string, Patina.Graphs.GraphNode>.Empty)
                 .FirstOrDefault(n => n.Value.Type == type).Key;
             return (id is null ? type : $"{type} '{id}'", ms);
