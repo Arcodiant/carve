@@ -12,3 +12,4 @@
 - B-10: get_mesh takes include and faces to answer part of a mesh, so a model like the wrench can be read by an agent whose client limits a tool result
 - T-168: Fresh agents weather the wrench with carve and patina from the tool descriptions alone, and recover from a planted wrong graph path
 - B-11: The server-regression tests that bake both weathered materials at 1024 through the real process wait longer than 30 s for that call, so they pass on a loaded machine
+- T-221: RV-82: the acceptance and scenario findings
