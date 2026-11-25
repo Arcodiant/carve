@@ -4,7 +4,7 @@ description: >-
 ---
 # T-221 — RV-82: the acceptance and scenario findings
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
