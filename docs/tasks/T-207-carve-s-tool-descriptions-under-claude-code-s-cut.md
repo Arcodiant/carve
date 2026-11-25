@@ -297,7 +297,7 @@ holds every tool at 3,686 and `HelpThroughProcessTests` does it again through th
 
 | Tool | Before | After |
 |---|---:|---:|
-| render | 19,122 | 3,573 |
+| render | 19,122 [19,954 served, after T-165] | 3,573 |
 | export | 14,015 | 3,304 |
 | bake | 8,410 (8,684) | 3,361 |
 | check | 7,565 (8,310) | 3,683 |
@@ -313,7 +313,7 @@ holds every tool at 3,686 and `HelpThroughProcessTests` does it again through th
 | every other tool (31) | 3,533 (define_target) down to 262 | unchanged |
 
 All 43 descriptions total 101,042 characters (144,001 over 42 before). Several are within 30 of the budget; the test holds
-them. The largest entry is render's `Reference`, 19,571 characters.
+them. The largest entry is render's `Reference`, 19,568 characters as T-207 left it (RV-82 measured it; T-220 later moved two sentences into it).
 
 **Sentences, per tool** (old sentences of the pre-T-207 text against the served description and the entry; render,
 export, save, open and bake counted by B's and A's scripts, the other seven by an approximate splitter on the source
@@ -388,7 +388,7 @@ than before: `RenderDefinitionTests`, `CheckerArgumentTests`, `ExportToolDefinit
 `SaveOpenToolDefinitionTests`, `BakeNormalToolTests`, `SelectToolDefinitionTests` (above), `ToolHarnessTests` (the tool count, 43).
 `PartToolsListTests`: `help` joined `NewTools`; render's `Parts` paragraph and `PartTexts.Check` are pinned once in the entry; `Before` is the digest taken once
 from the final text (the comment says what moved it); `git diff origin/milestone/M-29 -- src/Carve.Server` is only the files
-this member owns (the 11 tool files, `HelpTool.cs`, and one registration line in `CarveServer.cs`, 14 files).
+this member owns (the 12 tool files, `HelpTool.cs`, and one registration line in `CarveServer.cs`, 14 files).
 
 **The cut, and the result limit.** Established by T-170 (patina, Claude Code 2.1.329): a tool description is cut at 4,096
 characters. Not re-probed here, nor on the Claude Code T-168 will run; the 3,686 budget (10% under) is the margin the person
@@ -396,7 +396,7 @@ approved for patina. Not established: whether Claude Code cuts parameter descrip
 `help` entry is a tool result, and Claude Code's limits on one (https://code.claude.com/docs/en/mcp, "MCP output limits and
 warnings", looked up by B) are a warning above 10,000 tokens, a default maximum of 25,000 tokens (`MAX_MCP_OUTPUT_TOKENS`) and,
 for a tool that does not declare `anthropic/maxResultSizeChars`, saving a text result to a file above 50,000 characters. The
-largest entry, render's, is 19,571 characters, about 5,000 tokens, under all three, so no entry is split. The token count is
+largest entry, render's, is 19,568 characters as T-207 left it, about 5,000 tokens, under all three, so no entry is split. The token count is
 estimated, not measured with Claude Code.
 
 **README.md**: the "Use" section gains a paragraph (the cut, `help {"tool":"render"}` and the other entries, `help {}` lists them,

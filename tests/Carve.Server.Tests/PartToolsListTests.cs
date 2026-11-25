@@ -32,7 +32,9 @@ public class PartToolsListTests
     // the include and faces rules in, its cube and target examples and the ids sentence moved to help) and its schema (include, faces)
     // moved it; help's own text names the new entry but help is a new tool here; no other tool's text or schema changed (was 9DE9FEB8...); checked by diffing the served tools/list against origin/milestone/M-29's. Its guidance line was
     // then tightened (ask a few sections of one group at a time) and the digest taken from that final text.
-    private const string Before = "16999BFC2203DC0C6E3D2DDC989C20073A53589D812A1A7A39D5C6A416EA147B";
+    // Taken again, once, at the end of T-220 (Sonnet 5.5), RV-82's descriptions member: check, select, export, define_material, get_mesh and render moved it
+    // (diff of the served tools/list against origin/milestone/M-29 in T-220's As built); was 16999BFC...
+    private const string Before = "CB8CCB4AA9E5826E36C60D3717720E68853C03A8D99CC1AC561C0EE38F750A2D";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "displace", "help"];
 
@@ -83,6 +85,21 @@ public class PartToolsListTests
         await carve.InitializeAsync();
         var digest = Digest(await carve.ListToolsAsync());
         Assert.True(digest == Before, $"tools/list digest {digest}");
+    }
+
+    /// <summary>RV-82: the digest above leaves out help and bake (new tools), so their whole entries (name, description, schema) are pinned here.</summary>
+    private const string HelpAndBake = "4CC8D9FD46CF80BCD84096E072B18722383A6444838D575BB3FE403A4678D6A8";
+
+    [Fact]
+    public async Task The_help_and_bake_entries_are_as_pinned()
+    {
+        await using var carve = new ToolHarness();
+        await carve.InitializeAsync();
+        var kept = new JsonArray();
+        foreach (var tool in (await carve.ListToolsAsync()).EnumerateArray())
+            if (tool.GetProperty("name").GetString() is "help" or "bake") kept.Add(JsonNode.Parse(tool.GetRawText()));
+        var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(kept.ToJsonString())));
+        Assert.True(digest == HelpAndBake, $"help and bake digest {digest}");
     }
 
     /// <summary>The digest takes the agreed sentences out, so it cannot see one go missing; this pins where each one is.</summary>

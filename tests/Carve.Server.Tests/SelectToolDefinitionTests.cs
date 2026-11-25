@@ -106,7 +106,7 @@ public class SelectToolDefinitionTests
             "a vertex's position, an edge's midpoint, a face's centre",
             "Comparisons are made in float, both sides",
             "move takes vertices, edges and faces, and extrude takes faces",
-            "Ids never change and no edit removes anything yet, so a selection names the same elements after an edit",
+            "Ids never change (delete leaves a gap), so a selection names the same elements after an edit",
             "the server keeps no selection",
             // Every error, in the words the tool uses.
             "where is empty",
