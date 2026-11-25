@@ -234,3 +234,143 @@ By the orchestrator:
   0.0 s when a shared map had been charged to an earlier slot.
 
 ## Retrospective
+
+**As planned.**
+
+- **The slice runs end to end.** A material names `{graph, output, size}` in any texture slot and the Carve file keeps
+  it (version 10); four mesh-input nodes read `Carve.Core.Baking`; `render` and `export` bake each slot on each mesh's
+  UVs, cache it by content and bake again when the graph files, the mesh or its UVs change; the `uvs` look draws a
+  graph output on the mesh; a missing graph lists the graphs in its folder and a fault names its node. The content is
+  `samples/barrel-weathered.carve`, built through the tools.
+- **The waves held:** T-160 and T-161, then T-162 and T-163, then T-164, T-165 and T-166 side by side, then T-167,
+  then T-168. No two members collided on a file; the tools/list digest pin was the one shared line that needed care,
+  and the brief's rule (keep both descriptions, retake it from the result) settled it each time.
+- **The planning calls that held:** the project `src/Carve.Graphs`; the nodes' parameters, defaults and neutral values;
+  8 texels of padding; `open` warning and not refusing on a missing graph; the slot table; the cache's key and 512 MB
+  cap; a warning for per-mesh copies; the wrench and its plant for the acceptance.
+- **Planning's probe held:** the preferred UV layout for the barrel can be had through the tools (every stave face
+  exactly 1/8 wide), grime reaches about 6% of stave texels in a thin line by each hoop, and both sample materials
+  warn at 1024 and not at 512 (1.5 and 1.8 s at 512, 6.6 and 6.3 s at 1024, Debug, with other jobs on the runner).
+- **Acceptance:** two rounds on Opus 5.5 with no file tools. Both recovered from the planted path through `check`'s
+  warning, weathered the steel, left the grip clean, showed the mask, saved and exported, with `render_glb` equal to
+  `render`. Both pass all six checks under the final rules, and the person approved both looks.
+- **`cairn milestone M-29 verify` (2026-11-25, at 677d089):** 12 of 12 members done and merged; 29 suites pass, 12
+  ran and 17 carried; the one failing check is `review`, which is written after the person's go.
+
+**Not as planned.**
+
+- **Twelve members where nine were planned, and 36 agents where the plan's table implies about 14.**
+
+  | Member | Agents | Models | Why more than planned |
+  |---|---|---|---|
+  | T-160 | 2 | Opus | hand-off at the call count |
+  | T-161 | 2 | Opus | hand-off at the call count |
+  | T-162 | 2 | Sonnet | build, then the frame review (as planned) |
+  | T-163 | 3 | Opus | planned as two; the second ran to 128 calls and still handed off |
+  | T-164 | 1 | Sonnet | as planned |
+  | T-165 | 5 | Sonnet, then Opus x4 | a failed check, its diagnosis, the person's ruling on `bake`, a rebase, the review |
+  | T-166 | 2 | Sonnet | hand-off at the call count |
+  | T-167 | 5 | Opus | planned as three; two stops for the person's thresholds and three questions |
+  | T-207 (added) | 5 | Opus to plan, Sonnet x4 | three builders in turn and a close |
+  | T-168 | 6 | Sonnet; rounds on Opus 5.5 | planned as two; three stops for rulings and one for B-10 |
+  | B-10 (added) | 2 | Opus | hand-off with `verify` failing |
+  | B-11 (added) | 1 | Sonnet | |
+
+- **`bake` changed** (T-165). The spec's "the node and the bake are one computation, byte-identical" did not hold
+  beyond the padding, where a mesh node holds its neutral value and `bake` held 0. The person chose to make `bake`
+  write the neutral value there. Six of M-24's `uvs` frames moved in those texels and one written-down number changed
+  (0 to 255); no `render`, `render_glb` or export frame moved.
+- **T-207, carve's descriptions under Claude Code's cut,** was added on the person's ruling after four members each
+  found a description already past 4,096 characters. Seven were over (`render` 19,122) and five within 10%. Every
+  one is now 3,686 or less, held by a test with no exemption, and a new `help` tool serves what left eight of them.
+- **B-10, `get_mesh` on a large mesh.** Round 1's agent could not read the wrench's 53,645-character answer and tried
+  `Bash`. `get_mesh` gained `include` and `faces`; round 2's agent read the wrench with `include` and no refused call.
+- **B-11, the 1024 bake tests.** Three times a test that bakes both materials at 1024 through the real process timed
+  out at 30 s on a loaded machine, the last in this milestone's own verify. Those calls now wait 120 s.
+- **The acceptance checks were ruled three times after numbers were seen:** the margins after round 1; the grip
+  check rebuilt to measure what the grip's faces wear (as written it measured a material where it is not drawn); and
+  the crevice set narrowed to the drive's ends after round 2 failed on the whole drive. The last distance (0.004 m) was
+  chosen with round 2's number in view, and the person was told so before ruling.
+- **Wear reads as an edge highlight.** The person said so of round 1, and both frame reviewers said the same of the
+  barrel ("regular, like a picture frame"). The worked example taught for `mesh_curvature` was a bare curvature band;
+  it now breaks the band with noise, and round 2's wear came and went along the edges. The sample `weathered-iron` was
+  not retuned. Recipes and guidance to agents as such are T-208.
+- **T-167's stage 3 was ruled on, then narrowed.** The iron graph's noise lives in UV space, so a re-unwrap moves the
+  wear and D-6's rule cannot hold on the whole frame. The person ruled D-6 on stave and cap pixels and threshold (1)
+  on the hoops; to keep the caps' UVs still the step then unwrapped the hoops and their walls only, so D-6 there holds
+  by construction and proves little. The person was told with the frames.
+- **Rules broken by agents.** Four ran past the 60-call checkpoint (T-163's second to 128, B-10's first to 88); one
+  ran `dotnet test` by hand; one re-ran a suite after a second failure where its brief said to stop; one committed
+  `test-artifacts/` and untracked it. Every `finish` left its worktree folder behind (the agent's shell was in it).
+- **Runs that hung or flaked:** a `verify` killed at 30 minutes (T-162), an MSBuild node crash cached against a
+  commit (T-166), a `cairn test run` that printed nothing for 30 minutes (T-165), and `server-regression` timing out
+  on extension-loading tests under load (B-10), beside B-11's.
+- **Evidence did not go where two tasks' Notes said** (the container's own `artifacts` folder): a write there was
+  refused, so evidence stayed in each worktree's ignored `artifacts/` and review sets went to the `carve/M-29` folder
+  of the shared artifacts drive.
+
+**Never verified.**
+
+- **`help`.** Neither acceptance agent called it, so nothing shows an agent finding what left a description. The
+  cut itself was not re-probed (4,096 is T-170's figure on Claude Code 2.1.329), nor whether parameter descriptions
+  are cut.
+- **The acceptance is two rounds on one model and one prompt.** Sonnet, or any second model, was not run.
+- **B-11 on a loaded machine:** the load cannot be made on demand; its runs passed on a quiet one.
+- **Times** on an idle machine, in a Release build, or of a bake at 4096.
+- **The cache's 512 MB cap:** no test evicts.
+- **A graph material on a part tree, a kept level, a skinned or a piece export;** cancelling mid-bake (export bakes
+  with no cancellation token); occlusion between parts a part tree moves.
+- **A mesh node inside a nested graph file:** patina's stand-in note does not look into one, and no test bakes one.
+- **`get_mesh`'s narrowed sizes** on any model but the wrench.
+- **Frames by eye:** T-164's `render_glb` frames; the 256 and 1024 frames of the barrel beyond the front and rim
+  close-up; most of the acceptance sessions' own images; a swatch of `weathered-staves`.
+- **The breaks of T-167** in the sizes suite.
+- **The README's examples** are run by no test, as before.
+
+**Known and left.**
+
+- **Beyond the padding, `bake`'s maps disagree:** occlusion, curvature and masks hold their neutral value; base
+  colour, the normal and the ORM hold 0, so the ORM's occlusion channel reads 0 where `occlusion.png` reads 255.
+  Nothing samples those texels. Put to the person and not ruled; left.
+- **The padding fringe no longer shows around white islands** in the steel mask and occlusion `uvs` frames (neutral 1
+  draws as the padding's grey). The person saw it in T-165's review and approved.
+- **Two `get_mesh` asks on the wrench are still over 25,000 characters** (every face with faces and uvs; a group with
+  every section). The description and README say to ask a few sections of one group at a time.
+- **B-10's default-answer test names the path of the worktree its digests were taken in,** to undo absolute texture
+  paths in one model's answer.
+- **Six descriptions sit within 20 characters of the 3,686 budget.** The next sentence added to one must move
+  something into `help`.
+- **The slow-bake warning** is drawn by both sample materials at 1024.
+- **The hoops carry 32 thin wedge walls** from `extrude`; the reviewer read them as joints.
+- **Carve file version 10 is now graph slots.** T-145 (M-32) is titled "Carve file version 10: weight tracks in
+  clips" and needs its version planned again.
+- **A shortcut in T-163:** an edit between `render`'s bake and its frame makes the frame thread draw that model with
+  empty graph slots until the next bake lands.
+- **Member worktree folders** under `branches/task` and `branches/bug`, unregistered from git and not deleted.
+- **T-208** (recipes and guidance for agents), reserved off-milestone at the person's word.
+
+**The test report** (`cairn test report --since 2d`, 2026-11-25): `server-regression` cost most (4,768 slot-seconds,
+38% carried, 3 failures, the flakes above); `scenario-weathered` shows 10 failures, all break runs that are meant to
+fail; `server-unit` and `graphs-unit` show 3 jobs each that never ran (the build crash and its cache). Filed: B-11.
+Not filed: the hung `cairn` runs and the cached failed build are cairn's own, and are named here for the person to
+pass on.
+
+**For the next plan.**
+
+- **Measure every tool description against the cut at planning,** in both servers, and plan the budget for each
+  member that adds a sentence. M-28's retrospective said to check carve's; it was not done, and it cost a member.
+- **Call a tool the way a fresh agent will, on the acceptance model, at planning:** `get_mesh {}` on the wrench would
+  have shown B-10 before round 1.
+- **A check that says "byte-identical" names the region** it holds over, and planning probes it. T-165's did not hold
+  beyond the padding, and T-167's D-6 step could not hold after a re-unwrap.
+- **Fix an acceptance check's sets and statistics before round 1,** with a reference that passes and negatives that
+  fail, so a ruling after a round is about a margin and not about what is measured.
+- **Plan what an agent is taught, not only what it can call.** The worked example decided how round 1's wear looked.
+  T-208 is where recipes get planned; M-30's wear and dirt layers should come with them.
+- **Count on stops, not only hand-offs.** A member whose thresholds are the person's needs an agent before and after
+  each ruling: T-167 and T-168 each took twice their planned agents for that reason.
+- **Give a regression test that bakes at 1024 its own limit from the start,** or keep such bakes in a scenario suite.
+- **Name evidence paths the agents can write:** the worktree's `artifacts/` and the shared artifacts drive, never
+  the container root.
+- **Have each agent leave its worktree before `finish`** (a `cd` to the milestone's worktree first), so the folder
+  can be removed.
