@@ -95,6 +95,8 @@ allowed (3,676 before B-10). The served `tools/list` of this branch against a sc
 in three fields only: `get_mesh`'s description, `get_mesh`'s input schema, and `help`'s description (it names `get_mesh`
 among its entries; help is outside the digest).
 
+**RV-82 correction (T-220).** The six default-answer digests did not reach a holed face, a deleted face, a morph target or a graph slot, and `help` has nine entries, `get_mesh`'s among them. T-220 added three digests, of `gatehouse.carve` (holes and tombstones) and `arm.carve` (morph targets) taken from a build of `origin/main`, and of `barrel-weathered.carve` (a graph slot) taken from `origin/milestone/M-29` at c518cce, the commit before B-10 landed, because that file is version 10 and does not open on `origin/main`. Each matches HEAD's default answer.
+
 **Sizes on the wrench, characters** (whole answer 52,990): uvs 16,312; faces 13,827; edges 11,612; vertices 8,882; seams 2,139;
 groups 1,085; colours 189; the always-answered keys alone 176. Group faces+vertices: all 22,533, steel 10,745, dark 8,128,
 rubber 2,912, red 1,229, black 840. Every section alone and every group's faces and vertices is under 25,000 (the test says

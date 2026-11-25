@@ -59,6 +59,40 @@ public class HelpToolTests : FileToolTests
         Assert.True(Description(tools, "help").Length < 1000);
     }
 
+    /// <summary>RV-82: a pointer to an entry that does not exist, and an entry that is empty or not what its tool's own text says, would not be caught by the loop over the table.</summary>
+    [Fact]
+    public async Task Every_pointer_names_an_entry_and_every_entry_is_served_whole()
+    {
+        var (carve, tools) = await StartAsync(mesh: null);
+        using var _ = carve;
+        foreach (var tool in tools.EnumerateArray())
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(tool.GetProperty("description").GetString()!, """More: help \{"tool":"([a-z_]+)"\}"""))
+                Assert.Contains(m.Groups[1].Value, carve::Carve.Server.HelpTool.Tools);
+        foreach (var name in carve::Carve.Server.HelpTool.Tools)
+        {
+            var entry = carve::Carve.Server.HelpTool.Entry(name);
+            Assert.False(string.IsNullOrWhiteSpace(entry), $"{name}: empty entry");
+            Assert.Equal(entry, Ok(await carve.CallToolAsync("help", $$"""{"tool":"{{name}}"}""")));
+        }
+        Assert.Contains("How the game's PBR shading reads each field", carve::Carve.Server.HelpTool.Entry("define_material"));
+        Assert.Contains("And carve keeps no current file", carve::Carve.Server.HelpTool.Entry("open"));
+    }
+
+    /// <summary>RV-82: what M-29 added about graphs is in the descriptions themselves, not only in help (T-207's rule).</summary>
+    [Fact]
+    public async Task The_graph_sentences_are_in_the_descriptions_and_reads_mesh_is_said_where_it_is_answered()
+    {
+        var (carve, tools) = await StartAsync(mesh: null);
+        using var _ = carve;
+        var render = Description(tools, "render");
+        foreach (var said in new[] { "{graph, output, size} evaluated on this mesh", "real curvature, occlusion, masks and position", "any role or named output may be named", "a power of two from 64 to 4096, not the frame's 256, 512 or 1024" })
+            Assert.Contains(said, render);
+        Assert.Contains("reads_mesh (whether the graph reads the mesh; null if its file cannot be read now)", Description(tools, "define_material"));
+        Assert.Contains("reads_mesh (as define_material reports it)", Description(tools, "get_mesh"));
+        Assert.DoesNotContain("no delete yet", Description(tools, "check") + Description(tools, "select"));
+        Assert.Contains("own: +Y up", Description(tools, "export"));
+    }
+
     [Fact]
     public async Task One_entry_is_returned_whole_and_an_unknown_name_or_a_tool_with_no_entry_is_refused_listing_them()
     {

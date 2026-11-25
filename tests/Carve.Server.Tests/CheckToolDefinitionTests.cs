@@ -69,7 +69,7 @@ public class CheckToolDefinitionTests
 
         var text = Description(tools, "check");
 
-        foreach (var phrase in new[] { "inside-out", "coincident-vertices", "duplicate-face", "invisible", "collision", "z-fight", "reverse", "move", "define_mesh", "no delete yet", "1 unit = 1 m", "y = 0", "Worked example" })
+        foreach (var phrase in new[] { "inside-out", "coincident-vertices", "duplicate-face", "invisible", "collision", "z-fight", "reverse", "move", "define_mesh", "call delete, which keeps every id", "1 unit = 1 m", "y = 0", "Worked example" })
             Assert.Contains(phrase, text);
     }
 }

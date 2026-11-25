@@ -31,8 +31,9 @@ Claude Code's cut of a tool description (4,096 characters; carve holds each to
 3,686). What does not fit is in the `help` tool: `help {"tool":"render"}` gives
 render's full reference (every look, caption and error), and likewise `export`
 (what is written, the limits file), `bake`, `check`, `save`, `open` (the .carve
-format and the part tree), `select` (every error) and `define_material`;
-`help {}` lists the entries. A description ends with `More: help ...` when it
+format and the part tree), `select` (every error), `define_material` and
+`get_mesh` (where ids come from, the worked examples); `help {}` lists the nine
+entries. A description ends with `More: help ...` when it
 has one.
 
 ## Build and test
@@ -47,8 +48,8 @@ Those two suites need no GPU and are what CI runs. `tests.json` lists every
 suite, its tier, its command and the files it reads, and `cairn test list` prints
 them with the device each needs and about how long it takes. By tier:
 
-- unit, no GPU: `core-unit` and `server-unit` (the two above), and `patina-unit`
-  (patina's graphs and its server).
+- unit, no GPU: `core-unit` and `server-unit` (the two above), `graphs-unit` (the
+  graph library) and `patina-unit` (patina's graphs and its server).
 - regression, no GPU: `patina-regression`.
 - regression, on a Vulkan device: `server-regression`, `viewer-cube`, and the
   scenarios under `scenarios/`, each a run through the real server:
@@ -156,7 +157,7 @@ A material is a named PBR look shared by the whole model; any mesh's faces may u
 2. `define_material` with `base_colour`, `metallic`, `roughness`, `emissive`, `occlusion`, `double_sided` and up to five PNG textures (`base_colour_texture`, `metallic_roughness_texture`, `normal_texture`, `emissive_texture`, `occlusion_texture`): `{"name":"crate","roughness":0.8,"base_colour_texture":"textures/crate.png"}`. Anything left out takes its default, so a bare name is matte white.
 3. `set_material` puts it on faces or a group: `{"material":"crate","faces":[1,3]}`.
 
-Any texture slot may instead name a texture graph's output, `{"graph":"graphs/iron.texgraph","output":"base_colour","size":1024}` (`size` a power of two from 64 to 4096, default the graph's own). A graph is read again at every render and export, where a PNG is read once; a model with one is saved as `.carve` version 10. `render` draws a graph material, evaluated on each mesh's UVs and bakes and kept until the graph files, the mesh or its UVs change; `export` bakes each graph slot from the graph files as they are then and writes it into the `.glb` as an ordinary PNG (a material that reads the mesh and is used by several meshes is written once per mesh, `<material>@<mesh>`), so the game loads it with no knowledge of graphs.
+Any texture slot may instead name a texture graph's output, `{"graph":"graphs/iron.texgraph","output":"base_colour","size":1024}` (`size` a power of two from 64 to 4096, default the graph's own). `define_material` and `get_mesh` answer a graph slot as `{graph, output, size, reads_mesh}`: `reads_mesh` is true when the graph reads the mesh (a mesh node in it or a nested file), so each mesh that wears it bakes its own, false when it does not, and null when the graph file cannot be read now. A graph is read again at every render and export, where a PNG is read once; a model with one is saved as `.carve` version 10. `render` draws a graph material, evaluated on each mesh's UVs and bakes and kept until the graph files, the mesh or its UVs change; `export` bakes each graph slot from the graph files as they are then and writes it into the `.glb` as an ordinary PNG (a material that reads the mesh and is used by several meshes is written once per mesh, `<material>@<mesh>`), so the game loads it with no knowledge of graphs.
 
 Texture and graph paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
 

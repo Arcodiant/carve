@@ -38,6 +38,11 @@ public class GetMeshPartsTests(ITestOutputHelper output)
     [InlineData("barrel-textured.carve", "{}", "CC6E5E26D4C96815B60D25E1C0B3AA3AA36DDC57B5AA7226DAF533ADFDC10D76")]
     [InlineData("gardener.carve", "{}", "38DB97E2FD7381DB66A8EEA897AA5CD7688B2CD29C998FA598ED888BCFD88E42")]
     [InlineData("gardener.carve", """{"mesh":"Body"}""", "BBE0E05730BBA99DC84032AF0BA9FDEF628E02DEDE2C74FF8D6C168C7312C99D")]
+    // RV-82 (Sonnet 5.5): a holed face and a deleted face (gatehouse), a morph target (arm) and a graph slot (barrel-weathered). The first two were taken from a build of origin/main
+    // (b02b7b2), where get_mesh has no include or faces; barrel-weathered.carve is version 10 and does not open there, so its digest is from origin/milestone/M-29 at c518cce, the commit before B-10 landed.
+    [InlineData("gatehouse.carve", "{}", "E756855486D651861E40CC265413838C12D9C261E3F5341EEC347288A7E20020")]
+    [InlineData("arm.carve", "{}", "E31431ED9B0BD12D2C28673800B9F009F1D71A5B08C01FF996B5CD07BF8DF858")]
+    [InlineData("barrel-weathered.carve", "{}", "0229E313FB1A1B423F021CEB0AFC9759D011B5A82CD43CED7C8A319D52256DF3")]
     [InlineData("rover.carve", """{"mesh":"Cab"}""", "428894068A6270C51A905874CC5B4938011E8417C7D3DB7C8424299581CD7799")]
     [InlineData("rover.carve", """{"mesh":"Cab","level":0}""", "67CCE472406D335D77530516B6D902EEFC33D3FF1DC763F6D46C0C748AC13DEB")]
     public async Task With_neither_argument_the_answer_is_byte_for_byte_as_before(string sample, string arguments, string before)

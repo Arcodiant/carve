@@ -287,7 +287,7 @@ By the orchestrator:
   (0 to 255); no `render`, `render_glb` or export frame moved.
 - **T-207, carve's descriptions under Claude Code's cut,** was added on the person's ruling after four members each
   found a description already past 4,096 characters. Seven were over (`render` 19,122) and five within 10%. Every
-  one is now 3,686 or less, held by a test with no exemption, and a new `help` tool serves what left eight of them.
+  one is now 3,686 or less, held by a test with no exemption, and a new `help` tool serves what left them, in nine entries (get_mesh's is B-10's).
 - **B-10, `get_mesh` on a large mesh.** Round 1's agent could not read the wrench's 53,645-character answer and tried
   `Bash`. `get_mesh` gained `include` and `faces`; round 2's agent read the wrench with `include` and no refused call.
 - **B-11, the 1024 bake tests.** Three times a test that bakes both materials at 1024 through the real process timed
