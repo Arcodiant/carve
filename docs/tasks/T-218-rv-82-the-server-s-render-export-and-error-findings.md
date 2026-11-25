@@ -4,7 +4,7 @@ description: >-
 ---
 # T-218 — RV-82: the server's render, export and error findings
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
