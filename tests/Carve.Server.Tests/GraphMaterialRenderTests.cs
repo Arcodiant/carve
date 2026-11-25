@@ -78,13 +78,25 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
     }
 
     /// <summary>The bake times of T-162's graphs at 1024 (planning's warning size), kept beside the frames for the record; the 512 ones are the test below's.</summary>
+    /// <summary>B-11: a call's own response limit is what it waits, and the timeout names it.</summary>
+    [Fact]
+    public async Task A_call_waits_the_limit_it_is_given()
+    {
+        using var carve = new CarveProcess([]);
+        var limit = TimeSpan.FromMilliseconds(5);
+        var thrown = await Assert.ThrowsAsync<TimeoutException>(() => carve.CallToolAsync("render", "{}", limit));
+        Assert.Contains($"after {limit}.", thrown.Message);
+        Assert.Equal(TimeSpan.FromSeconds(120), CarveProcess.BakeAnswer);
+        Assert.Equal(TimeSpan.FromSeconds(30), CarveProcess.Answer);
+    }
+
     [Fact]
     public async Task Weathered_graphs_bake_on_the_barrel_at_1024()
     {
         var (process, _) = await StartProcessAsync(mesh: null);
         using var carve = process;
         await BarrelAsync(carve, 1024);
-        var caption = Caption(await carve.CallToolAsync("render", """{"view":"front","size":256}"""));
+        var caption = Caption(await carve.CallToolAsync("render", """{"view":"front","size":256}""", CarveProcess.BakeAnswer));
         File.WriteAllText(Path.Combine(Frames, "barrel-1024-baked.txt"), caption);
         TestContext.Current.TestOutputHelper?.WriteLine(caption); // the bake times in the test log, which a runner returns
         Assert.True(caption.Split("\"size\":1024").Length - 1 == 6, caption);
@@ -130,7 +142,7 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
         using var carve = process;
         await BarrelAsync(carve, size);
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        var line = TextOf(await carve.CallToolAsync("export", $$"""{"path":"barrel-{{size}}.glb"}"""));
+        var line = TextOf(await carve.CallToolAsync("export", $$"""{"path":"barrel-{{size}}.glb"}""", size == 1024 ? CarveProcess.BakeAnswer : CarveProcess.Answer));
         TestContext.Current.TestOutputHelper?.WriteLine($"export at {size}: {clock.ElapsedMilliseconds} ms; {line}");
         Assert.Equal(6, line.Split($"\"size\":{size}").Length - 1);
     }
@@ -179,7 +191,7 @@ public sealed class GraphMaterialRenderTests() : FileToolTests("carve-graph-mate
         Ok(await carve.CallToolAsync("set_uvs", MaterialRenderTests.FrontUvs("mesh")));
         Ok(await carve.CallToolAsync("define_material", """{"name":"fine","base_colour_texture":{"graph":"fine.texgraph","output":"occlusion","size":1024}}"""));
         Ok(await carve.CallToolAsync("set_material", """{"faces":[1],"material":"fine"}"""));
-        var first = await carve.CallToolAsync("render", """{"view":"+z"}""");
+        var first = await carve.CallToolAsync("render", """{"view":"+z"}""", CarveProcess.BakeAnswer);
         var graph = Frame(first, "fine-graph");
         Assert.Contains("""baked: [{"material":"fine","mesh":null,"slot":"base_colour_texture","size":1024,"ms":""", Caption(first));
 
