@@ -161,7 +161,7 @@ description: >-
 - **Rubric:** the descriptions as an agent reads them; correctness of a stated return shape
 - **What is wrong:** `MaterialJson.Of` answers a graph slot as `{graph, output, size, reads_mesh}` (true, false, or null when the file cannot be read now), and get_mesh's `materials` uses the same JSON (held by `GraphBakesTests.cs:126-127`). define_material's description gives the result as "{graph, output, size (the one taken)} for a graph", and get_mesh's as "{graph, output, size} for a graph output". I searched every served description, every parameter schema and every `help` entry in a `tools/list` dump of HEAD taken on `ToolHarness` in a scratch copy: no text says `reads_mesh`, and neither does README.md. So an agent gets a field that nothing explains, and nothing tells it what null means. T-163's spec (`docs/tasks/T-163-...md:40`) has define_material and get_mesh report the field, so the omission started in T-163. This is across the line into the reviewers of render and errors, but the text that leaves it out is in my part.
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: a clause each in define_material's and get_mesh's descriptions and a paragraph in README; held by HelpToolTests.The_graph_sentences_are_in_the_descriptions_and_reads_mesh_is_said_where_it_is_answered.
 
 ### render's description no longer holds T-165's image-graph sentences, against T-207's own rule, and its one `size` rule misleads for `image.size`
 - **Where:** `src/Carve.Server/RenderTool.cs:187` (the description's `uvs`/`image` clause), `src/Carve.Server/RenderTool.cs:287` and on (the sentences now only in the entry); `docs/tasks/T-207-carve-s-tool-descriptions-under-claude-code-s-cut.md:54`, `:144-145`
@@ -176,7 +176,7 @@ description: >-
 
   What is left in the description is the clause "'image' (a PNG path, or a graph output {graph, output, size} evaluated on the mesh)". The only size rule the description gives is "'size' is 256, 512 (the default) or 1024", so an agent that does not call `help` has nothing to tell it that `image.size` follows a different rule. Nothing is out of an agent's reach, because all five sentences are in `help {"tool":"render"}`. But the As built does not record that these moved, and the Done-when it claims is not met as written. check's T-166 sentences are still in the description, shortened with the meaning kept, so they are not a fault.
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: the form, what it draws and the size rule (not the frame's) are back in render's description, two older sentences moved word for word into its entry; held by HelpToolTests.The_graph_sentences_are_in_the_descriptions_and_reads_mesh_is_said_where_it_is_answered.
 
 ### check's and select's descriptions say there is no delete, yet `delete` exists and get_mesh points to it
 - **Where:** `src/Carve.Server/CheckTool.cs:23` (and its `Reference`, `:59`); `src/Carve.Server/SelectTool.cs:39` (and `:66`)
@@ -189,7 +189,7 @@ description: >-
 
   An agent that believes check will rebuild the mesh with `define_mesh`, which loses its groups and colours, instead of calling `delete`, which keeps every id. Both sentences are on origin/main (`git show origin/main:src/Carve.Server/CheckTool.cs` and `SelectTool.cs`, one match each), so M-29 did not write them. But T-207 rewrote both descriptions sentence by sentence and kept them in the served text and in the entries.
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: both sentences now say delete exists (and check's entry too); held by HelpToolTests.The_graph_sentences_are_in_the_descriptions_and_reads_mesh_is_said_where_it_is_answered and the updated CheckToolDefinitionTests and SelectToolDefinitionTests.
 
 ### export's description lost a space: "the mesh's own:+Y up"
 - **Where:** `src/Carve.Server/ExportTool.cs:23`
@@ -197,7 +197,7 @@ description: >-
 - **Rubric:** tracker hygiene (`### As built` matches the code)
 - **What is wrong:** On origin/main the text reads "Axes and units are the mesh's own: +Y up, ...". My sentence diff found it missing at HEAD only because the space after the colon is gone. T-207's As built quotes the sentence with the space, as the D-dup reason for one of define_mesh's drops (`T-207-...md:337`).
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: the space is back; held by HelpToolTests.The_graph_sentences_are_in_the_descriptions_and_reads_mesh_is_said_where_it_is_answered.
 
 ### The count of `help` entries and T-207's figures are out of date or wrong in three places
 - **Where:** `docs/milestones/M-29-graphs-on-a-mesh.md:285`; `README.md:31-35`; `docs/tasks/T-207-carve-s-tool-descriptions-under-claude-code-s-cut.md:300`, `:316`, `:391`
@@ -210,7 +210,7 @@ description: >-
   - T-207 says "the largest entry ... 19,571". The served entry at HEAD is 19,568, and no later commit changes render's text.
   - T-207 says "the 11 tool files". `git diff --stat e4d6dd4 eb4b4ff -- src/` shows 12 tool files, 14 files in all; the total of 14 is right.
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: README lists get_mesh and says nine; the milestone retrospective, and T-207's table, largest entry (19,568) and file count (12) corrected; no test (a record).
 
 ### Nothing holds the open and define_material entries, or a `More: help` pointer without an entry, and the digest leaves out help and bake
 - **Where:** `tests/Carve.Server.Tests/HelpToolTests.cs:45-60`; `tests/Carve.Server.Tests/PartToolsListTests.cs:37`
@@ -222,7 +222,7 @@ description: >-
   - Grepping every test for `WithReference`/`Entry(` finds reads of the render, export, bake, save, select, get_mesh and check entries (check through `PartTexts.Check`), and none of open's or define_material's. Either entry's `Reference` could be emptied and every test would pass.
   - `NewTools` keeps `help` and `bake` out of the tools/list digest. help's description and schema are held only by "names every entry, under 1,000 characters".
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: HelpToolTests.Every_pointer_names_an_entry_and_every_entry_is_served_whole and PartToolsListTests.The_help_and_bake_entries_are_as_pinned.
 
 ### B-10's default-answer digests do not reach a holed face, a deleted face, a morph target or a graph slot
 - **Where:** `tests/Carve.Server.Tests/GetMeshPartsTests.cs:36-52`
@@ -235,7 +235,7 @@ description: >-
 
   None of these meshes has a hole, a tombstone, a `target` read or a graph-slot material (barrel-weathered is not among them). Those default paths are new code in `GetMeshTool.Run` (`Where(Keep)`, the `vertexSet` filter on `target.positions`, the `Where(... g.faces.Count > 0)` on groups). I read each one and found it unchanged when neither argument is given. But only reading holds that for these features, apart from the target example, which `EditToolDefinitionTests.cs:65-80` compares with its written output.
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: three digests added to GetMeshPartsTests.With_neither_argument_the_answer_is_byte_for_byte_as_before (gatehouse and arm from origin/main, barrel-weathered from c518cce).
 
 **Covered:** I read these files whole: `HelpTool.cs`, `GetMeshTool.cs`, `HelpToolTests.cs` and `GetMeshPartsTests.cs`, T-207's and B-10's files, and the milestone file's rulings and retrospective. I also read the served descriptions and schemas at HEAD of render, export, bake, define_material, help, save, open and check, and get_mesh's in its source. For the sentence check I built three scratch copies (origin/main, `e4d6dd4` just before T-207, and HEAD) and dumped `tools/list` and every `help` entry through `ToolHarness` with a test of my own. A script then split the old descriptions of the twelve tools into sentences and looked each one up in the HEAD description plus its entry, after normalising whitespace. Against both bases, every sentence that was not found is one of these:
 - a segmentation artefact, with the text present;
@@ -371,7 +371,7 @@ I did not get to: anything that needs a device. That covers the sheet title's wi
 - **Rubric:** The README and CLAUDE.md kept current
 - **What is wrong:** The `tests/Carve.WeatheringAcceptance.Tests` row lists "the steel's base colour bake (hard-edge wear, drive crevice ..., grip against the clean stand-in ...)". Ruling 4 of 2026-11-24 (T-168:93) replaced that check: the grip is held to what its faces wear in the saved file, against the starter file's grip (`The_grip_wears_no_more_spread_than_the_starters_grip`), and that is not the steel slot's bake.
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: the Layout row now says what the ruling replaced it with; no test (a record).
 
 ### README's list of unit suites leaves out the new graphs-unit
 - **Where:** `README.md:50`
@@ -379,7 +379,7 @@ I did not get to: anything that needs a device. That covers the sheet title's wi
 - **Rubric:** The README kept current
 - **What is wrong:** "unit, no GPU: `core-unit` and `server-unit` (the two above), and `patina-unit`". T-161 added `graphs-unit` (tests.json:32), and every regression suite M-29 added is listed two lines below.
 
-**Outcome:** —
+**Outcome:** fixed in c24e2f54: graphs-unit is listed; no test (a record).
 
 ### Stage 3's restore is said to check for a cache hit; it only logs one
 - **Where:** `scenarios/Carve.Scenario.Weathered/RebakeStage.cs:117`; `docs/tasks/T-167-the-weathered-barrel-and-its-scenario.md:247-248`; `CLAUDE.md:103`
