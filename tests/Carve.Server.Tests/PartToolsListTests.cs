@@ -28,7 +28,11 @@ public class PartToolsListTests
     // Taken again, once, from the final text, for T-207 (Sonnet 5.5), which holds every description under Claude Code's cut: the new help
     // tool joins NewTools, and the descriptions of render, export, save, open, check, select, define_mesh, get_mesh, define_material,
     // project_uvs and unwrap moved it (bake is not among the tools this digest covers); no schema and no other tool did.
-    private const string Before = "9DE9FEB846DAE5AA0E36C6825CB88610677B5CFA4412468E6C75C32E374F674B";
+    // Taken again, once, for B-10 (Opus 5.5), which lets get_mesh read a mesh in parts: get_mesh's description (the wrench example and
+    // the include and faces rules in, its cube and target examples and the ids sentence moved to help) and its schema (include, faces)
+    // moved it; help's own text names the new entry but help is a new tool here; no other tool's text or schema changed (was 9DE9FEB8...); checked by diffing the served tools/list against origin/milestone/M-29's. Its guidance line was
+    // then tightened (ask a few sections of one group at a time) and the digest taken from that final text.
+    private const string Before = "16999BFC2203DC0C6E3D2DDC989C20073A53589D812A1A7A39D5C6A416EA147B";
 
     private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "help"];
 
