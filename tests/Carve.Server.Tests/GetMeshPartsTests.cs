@@ -27,6 +27,11 @@ public class GetMeshPartsTests(ITestOutputHelper output)
         return CarveProcess.TextOf(result);
     }
 
+    /// <summary>The repo root the digests below were taken in (B-10's worktree checked out at c518cce).</summary>
+    private const string TakenIn = @"D:\Repos\carve\branches\bug\B-10";
+
+    private static string Escaped(string s) => JsonSerializer.Serialize(s)[1..^1];
+
     /// <summary>SHA-256 of <c>get_mesh</c>'s text on each sample with neither argument (a model of several meshes refuses <c>{}</c>, and that refusal is held too), taken on origin/milestone/M-29 (c518cce) before B-10.</summary>
     [Theory]
     [InlineData("wrench.carve", "{}", "8759792091DCB13090782AF3BE58BBFBC94BB2ABDCA607C751726D05166B28E0")]
@@ -38,7 +43,9 @@ public class GetMeshPartsTests(ITestOutputHelper output)
     public async Task With_neither_argument_the_answer_is_byte_for_byte_as_before(string sample, string arguments, string before)
     {
         await using var carve = await OpenAsync(sample);
-        var text = CarveProcess.TextOf(await carve.CallToolAsync("get_mesh", arguments));
+        // A texture's path is absolute, so the answer names the checkout it runs in; held as it read in the checkout the digests were taken in.
+        var text = CarveProcess.TextOf(await carve.CallToolAsync("get_mesh", arguments))
+            .Replace(Escaped(Paths.RepoRoot), Escaped(TakenIn), StringComparison.OrdinalIgnoreCase);
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
         output.WriteLine($"{sample} {arguments} {text.Length} {digest}");
         Assert.Equal(before, digest);
