@@ -111,8 +111,11 @@ time and which two asks still pass the limit, that with neither the answer is as
 
 **Checks.** `server-unit` and `server-regression` through `cairn bug B-10 verify`. The first verify's `server-regression`
 failed three extension-loading `LoaderTests` ("carve still running after 00:00:05", log
-`B-10-server-regression-20261124-224717-255144.log`, a 14-minute run); B-10 does not touch extension loading, and they passed on
-the rerun in the final verify, so the first is recorded as a flake.
+`B-10-server-regression-20261124-224717-255144.log`, a 14-minute run); B-10 does not touch extension loading. The second
+verify's run (J-20261125-035955-989a9d, 11 minutes, four other projects' jobs on the machine) passed them but timed out one
+other: `GraphMaterialRenderTests.The_barrel_export_bakes_and_says_how_long_it_took(size: 1024)`, "No response to 11 after
+00:00:30" (a bake, which B-10 does not touch). `cairn test run server-regression` again, unchanged, passed whole
+(J-20261125-041811-b9e3cb, 545 s). Both failures are recorded as flakes under load; no test or timeout was changed.
 
 **Not checked.** T-168's round 2 (a fresh agent reading the wrench without a refused call) is T-168's to run. Other samples'
 sizes when narrowed were not measured.
