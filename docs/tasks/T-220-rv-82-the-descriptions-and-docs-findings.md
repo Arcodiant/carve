@@ -4,7 +4,7 @@ description: >-
 ---
 # T-220 — RV-82: the descriptions and docs findings
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
