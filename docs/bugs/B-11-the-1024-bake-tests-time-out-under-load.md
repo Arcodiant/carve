@@ -4,7 +4,7 @@ description: >-
 ---
 # B-11 — The 1024 bake tests time out under load
 
-**Status:** In Progress
+**Status:** Fixed
 
 **Severity:** Major
 
