@@ -4,7 +4,7 @@ description: >-
 ---
 # B-10 — get_mesh on a large mesh answers more than an agent can read
 
-**Status:** Open
+**Status:** In Progress
 
 **Severity:** Major
 
