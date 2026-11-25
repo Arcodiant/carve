@@ -18,7 +18,14 @@ description: >-
 
 <!-- Diff: `<patch-id> against <base>`, the `git patch-id --stable` of `git diff <base>...HEAD`
      with the tracker's docs/ left out (reviews.diff_patch_id computes it). Reviewer: the model
-     or agent that reviewed. The reviewer writes one ### per finding under ## Findings: the Core and Carve.Graphs (claude-opus-5-5)
+     or agent that reviewed. The reviewer writes one ### per finding under ## Findings, saying
+     what was found and where, with an **Outcome:** line left as —; the implementer fills each
+     with `fixed`, `skipped: <reason>` or `no change needed: <reason>`, then sets
+     **Status:** Answered. Several reviewers in one round write into this one file, each under
+     its own `## Findings: <its part>` heading in place of ## Findings; every ### under any of
+     them is a finding. See the cairn skill's references/artifacts.md and orchestration.md. -->
+
+## Findings: the Core and Carve.Graphs (claude-opus-5-5)
 
 ### The cache key leaves out the slot, but the bake's bytes depend on it, so two slots of one graph output share an entry
 - **Where:** `src/Carve.Graphs/GraphSlotBake.cs:77-96` (`Key`: files' hash, output, size, and the mesh only), against `:112-130` and `:146-151` (`Rgba` packs by `PackingOf(slot, ...)`); used as the whole key at `src/Carve.Server/GraphBakes.cs:104` with the bake at `:113`
@@ -86,11 +93,15 @@ description: >-
 - **Rubric:** 1 (correctness: the cache)
 - **What is wrong:** `GraphSlotBake.Key(files, output, size, model, mesh)` hashes the files, output, size and mesh, but not the slot. `PackingOf` packs `roughness` as `Roughness` (G, with `metallic` in B) for `metallic_roughness_texture`, but as grey RGB (`Occlusion`) for `base_colour_texture`, `emissive_texture` and `occlusion_texture`, all of which the slot table accepts. So a material, or two materials, with `{graph: g, output: "roughness"}` in `metallic_roughness_texture` and in any of those three slots at the same size get one cache entry. The slot baked second takes the first one's PNG, in render and in export alike, so D-6 does not catch it. I proved it in a scratch copy with a unit-tier probe on `ToolHarness`: a worley graph with `roughness` and `metallic` outputs, and material `m` with both `base_colour_texture` and `metallic_roughness_texture` set to `{graph:"rough.texgraph", output:"roughness", size:64}`. `Resolve` baked 1 slot, not 2. The drawn `metallic_roughness_texture` bytes equal the base colour's (`mr==base True`), while `GraphSlotBake.Png` for the two slots gives different bytes (`directMR==directBase False`). Which slot is wrong depends on order, so across materials a base colour can also come out as the packed G/B image. No test has two slots on one output. Adding the slot, or its packing role, to the key fixes it.
 
+**Outcome:** —
+
 ### `DrawnOf` says no render draws empty graph slots, but a render whose frame is served on a newer model returns exactly that frame
 - **Where:** `src/Carve.Server/GraphBakes.cs:48-53` (the claim "No render draws that: render resolves before it queues"), `src/Carve.Server/RenderTool.cs:552-566, 602-611`, `src/Carve.Server/RenderPump.cs:190-200`; the record in the milestone's "Known and left" ("A shortcut in T-163")
 - **Severity:** Minor
 - **Rubric:** 7 (tracker hygiene), 1 (threading)
 - **What is wrong:** `render` resolves `store.Current.Model` (M1), then posts the frame. The pump serves "the mesh current at its post or a newer one". If a `move`, `define_material` or `undo` lands in between (M2), the pump calls `ShowMesh(store.Current)`. `DrawnOf(M2)` finds no resolution (`Peek(M2)` is null) and draws M2 with every graph slot empty. That frame is served and returned to the agent, and its caption carries M1's `baked:` list. A single frame gets no version check (`ShiftedIdsRefusal` only runs when ids are shifted), and `SheetVersions.OnOneMesh` only compares tiles with each other. So the code comment is false. The retrospective's wording ("the frame thread draw that model with empty graph slots until the next bake lands") leaves out that the agent's own render returns the blank-slotted frame, and that "the next bake" comes only with the next render or export. The code has no `shortcut:` comment for this limit. The one `shortcut:` in T-163's code (`GraphBakes.cs:278`, the costliest node named by type) states its limit correctly.
+
+**Outcome:** —
 
 ### A per-mesh copy's name can be a material the model already has, and export then renames that material's faces away
 - **Where:** `src/Carve.Server/GraphBakes.cs:143-156` (copies named `{m.Name}@{name}` and `{m.Name}@{part}@{level}` with no check against existing names), `src/Carve.Server/ExportTool.cs:306-325` (`Copies`: anything named `<graph material>@...` counts as a copy, and `Base` is cut at the first `@`)
@@ -98,11 +109,15 @@ description: >-
 - **Rubric:** 1 (the copies' names)
 - **What is wrong:** By the planning ruling, a file with an `@` name still opens and its faces can still be given it. A model with a plain material `iron@strip` (an older file) and a mesh-reading graph material `iron` on mesh `strip` therefore collides. `Resolve`'s `WithMaterial` replaces the user's `iron@strip` with iron's copy in the drawn model, and `Copies` treats the user's faces as copy users and renames them `iron`. Probe (scratch copy, unit tier): faces 0-2 `iron` (curvature occlusion graph), face 3 `iron@strip` (base colour `#FF0000`). In the drawn model, `iron@strip` had base colour `#FFFFFF` and a baked `MaterialTexture` occlusion. The exported .glb had one material, `iron`, and the red was gone with no warning. Mesh names may contain `@` (`Model.NameProblem` refuses only `:`), so a mesh `hull@1` and part `hull`'s kept level 1 both make `iron@hull@1`, and one bake replaces the other in render. A graph material whose own name has `@` (only possible from a hand-edited file) would be renamed back to the text before its first `@`. None of these cases is tested.
 
+**Outcome:** —
+
 ### Bake memory is held outside the 512 MB cap: every resolved model in the undo history keeps its own copies of its bakes
 - **Where:** `src/Carve.Server/GraphBakes.cs:123` (`new MaterialTexture(g.Path, [.. png], ...)`, a fresh copy per slot on every `Resolve`, hits included), `:27` and `:166-171` (the `ConditionalWeakTable<Model, Drawn>`), `:246` (the count); `ModelStore.UndoDepth` = 100
 - **Severity:** Minor
 - **Rubric:** 1 (the cache: growth and byte count)
 - **What is wrong:** The cap covers only `_entries`. Each `Resolve` builds the drawn model with a new `ImmutableArray` copy of every slot's PNG, even on a cache hit, and keeps it in `_drawn` for as long as the key `Model` lives. `ModelStore` holds up to 100 earlier models for `undo`. A session that renders after each edit therefore holds up to 100 sets of the bakes, none of them counted and none evicted. By T-163's numbers that is about 6 slots per barrel model at 1024, so several MB per state, and 16 times that at 4096. The count also charges each entry `size*size*4` of "decoded" bytes the cache never holds (the decode is `PbrMaterials`'), so `Bytes` is neither the cache's real size nor the process's. Eviction cannot drop a bake in use, since every user holds a copy, and a single entry over the cap is kept, by design. No test evicts (listed).
+
+**Outcome:** —
 
 ### Export cannot be cancelled: a cancelled or timed-out export bakes on and then writes the .glb
 - **Where:** `src/Carve.Server/ExportTool.cs:123` (no `CancellationToken` in `Run`), `:165` (`bakes.Resolve(model, CancellationToken.None)`), `:184-195`
@@ -110,17 +125,23 @@ description: >-
 - **Rubric:** 1 (cancellation), 7
 - **What is wrong:** The retrospective lists this under "Never verified" ("cancelling mid-bake (export bakes with no cancellation token)"), but the code settles it: nothing can stop an export's bake. A client that cancels, or gives up at its own timeout, has been told the call failed. The server goes on baking (6 to 14 s a material at 1024 in Debug, by B-11) and then writes the .glb and any limits file. If the agent retries in the meantime, two exports run at once toward one path, and the second either finds the file there or overwrites it. T-163 made render's bake honour its token between tiles and maps; export, which bakes the same slots, takes none. This is a known gap, wrongly recorded as unverified.
 
+**Outcome:** —
+
 ### A bake that fails on the mesh tells the agent to redefine the material or restore the file, which is the wrong fix
 - **Where:** `src/Carve.Server/GraphSlotProblem.cs:60-61` (`Failed`), used by `GraphBakes.cs:91-94, 115-118`
 - **Severity:** Minor
 - **Rubric:** 1 (errors: what would be right)
 - **What is wrong:** Every `render` and `export` bake failure ends with "; the model is unchanged: define the material again with a graph that bakes, or restore the file". That includes a `MeshLayoutException` (no UVs, overlapping UVs) and a `MeshMaskException` (a group or material the mesh lacks). For those causes the graph and file are fine, and the cause's own text says to unwrap, set UVs or move islands. The render error therefore gives two contradictory fixes, and the trailing one is wrong. The wording is pinned only for file and fault causes (`GraphMaterialErrorsTests.cs:138-145, 170-172`, `GraphBakesTests.cs:118`). No test renders or exports a mesh cause and reads the message.
 
+**Outcome:** —
+
 ### `PieceExport.Select` now carries the model's materials, a real fix for a pre-existing failure, with no test
 - **Where:** `src/Carve.Server/PieceExport.cs:34`, `src/Carve.Server/ExportTool.cs:246-251`; T-164 As built, line 77
 - **Severity:** Minor
 - **Rubric:** 2, 3
 - **What is wrong:** The change is right: before it, `Model.Create` was given no materials, so a piece export of any mesh wearing a material (PNG or graph) could not be built, and it threw from `Select`. After it, `Copies` runs over the piece's meshes only, which is the right rule. But this fixes behaviour outside the graph feature, for every textured piece export, and no test in `tests/Carve.Server.Tests` exports a piece with a material of either kind. No test file names `"piece"` together with `define_material`. A revert would pass every suite. The As built says so in passing ("a piece with a graph" is under Not checked). The pre-existing failure was not filed as a bug.
+
+**Outcome:** —
 
 ### The server suites read sample files their `tests.json` inputs leave out
 - **Where:** `tests.json:90-125` (server-unit), `:135-150` (server-regression); `tests/Carve.Server.Tests/GraphMaterialErrorsTests.cs:180, 190-191`, `GraphMaterialRenderTests.cs:65-67`
