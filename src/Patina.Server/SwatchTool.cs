@@ -116,7 +116,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         if (faults.Count > 0) return Error("swatch: the graph does not evaluate; fix it first. " + Faults(faults));
         if (!ParameterOverrides.TryApply("swatch", graph, Arg("parameters"), registry, out graph, out var overrides, out var overrideError)) return Error(overrideError!);
         var set = overrides.Count == 0 ? "" : "parameters " + GraphParameters.Describe(overrides);
-        var mesh = MeshNote(graph);
+        var mesh = MeshNote(graph, registry);
         var meshTitle = mesh == "" ? "" : "   mesh inputs neutral";
         CallToolResult Show(byte[] rgba, int width, int height, string caption) => Image(rgba, width, height, caption + (mesh == "" ? "" : "; " + mesh));
 

@@ -58,3 +58,47 @@ Each finding of RV-82 named here, by its heading there:
   that cannot be fixed inside this member's files without a design change is reported, not forced.
 - The member fills the `**Outcome:**` line of each of its findings in RV-82 (`fixed`, with the commit and the test's
   name; or `no change needed: <reason>`), and touches no other finding's line.
+
+### Hand-off
+
+Agent one (claude-opus-5-5) stopped at the 60-call checkpoint. Code and tests committed in one commit; `cairn test
+run patina-unit` passes (505 + all of Patina.Server.Tests). `verify` not yet run (server-unit, scenario-patina left).
+
+**Done:**
+- *Bad parameter (Major):* T-217's faults hold in define_graph, open, save (refused) and edit_graph (refused, "would
+  leave 1 new fault"): `MeshGraphTruthTests.A_bad_mesh_parameter_is_a_fault_in_define_edit_open_and_save` (four
+  probe rows) and `Edit_graph_answers_a_width_of_0_as_a_fault`, which passed before any change (T-217's fix). The path
+  that still reached evaluation: an exposed parameter's override inside its range (0) driving `mesh_curvature.width`;
+  export, swatch and check answered "An error occurred invoking '...'" (seen failing). Fixed in
+  `ParameterOverrides.TryApply`: the overridden graph is validated, refused as "<tool>: with parameters w = 0 the graph
+  has 1 fault: - node 'm' parameter 'width': ...". Test: `A_parameter_value_a_mesh_node_refuses_is_answered_naming_the_node`.
+  No other evaluation-time throw found (unknown group/material is accepted by the stand-in, as the reviewer says).
+- *Nested note (Major), the note half:* `ToolSupport.MeshNote` recurses over `GraphValidator.Uses` (reads each
+  expanded use's file, prefixes `<node>/`); `save` now carries the note too. Test:
+  `A_graph_nesting_a_mesh_graph_says_so_in_every_answer` (get_graph, save, open, export, check's notes, and
+  `h/g/edges` two levels down). Not yet seen failing without the fix (the first "before" run failed for another
+  reason, the graph's version); to do: disable the recursion once and see it fail, or say so.
+- *swatch note:* the harness takes `blankEngine: true` (a ready `EngineStatus` by reflection on internal `SetReady`,
+  marked `shortcut:`; a loop answers each `SwatchRequest` with blank frames and keeps the sheet's labels).
+  `Every_swatch_view_says_the_mesh_inputs_are_neutral` holds flat, tiled, sphere, cube and sheet captions and the
+  sheet title label.
+- *Worked examples:* `NodeToolTests.Every_types_worked_examples_run_as_written` now exports each evaluating example
+  (size 32). `MeshGraphTruthTests.The_mesh_curvature_example_is_the_base_colour_on_the_stand_in_and_wears_in_runs_along_a_real_edge`
+  holds both caption claims (a test `IMeshMaps` band).
+- *CheckSamplesTests Nit:* both sides key on "a node type `NodeRegistry.BuiltIn` does not know";
+  `MeshNodeToolTests.MeshSamples` is MemberData, with `The_mesh_samples_are_the_two_weathered_graphs`.
+- README's weathered paragraph names save and the nested case.
+
+**Left:**
+- **Open question for the orchestrator (not decided):** check's `one-value` "clipped or flat; widen its levels" on an
+  output flat only because its mesh inputs are neutral. Any change applies equally to the committed weathered graphs'
+  `wear`/`grime` (direct mesh nodes, flat for the same reason), so per the brief it is a change to an existing check's
+  target. Option A: withhold `one-value` for such an output (check then reports `ok: true`, no problems, for
+  weathered-iron and weathered-staves, the note in `notes`; T-162's `Check_reports_the_one_empty_mask_and_nothing_else`
+  is on `CheckRules` and would still hold, but README line "check reports one-value on those two outputs" and T-162's
+  record change). Option B: keep `one-value` but replace its Fix text for such an output with the reason ("flat
+  because its mesh inputs are neutral stand-ins; the mesh gives the real maps in carve"); same problem list, new
+  message. As committed, nested graphs now get the note and the same `one-value` as the direct ones.
+- The scenario's break (MeshNodesStage), T-162's `### As built` (Carve.Core.dll is new to patina's output), the
+  Outcome lines, `### As built`, frames compared by hash against `origin/milestone/M-29`, verify, lint, finish.
+- Not touched: scenarios/, RV-82.
