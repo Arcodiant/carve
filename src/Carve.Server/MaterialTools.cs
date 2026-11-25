@@ -74,9 +74,9 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         + "base_colour_texture and emissive_texture are sRGB colour; normal_texture is a linear tangent-space normal map; metallic_roughness_texture is linear, roughness in green and metallic in blue; occlusion_texture is linear, occlusion in red. "
         + "Any slot may instead be a texture graph's output, {graph, output, size}: graph a .texgraph path resolved as a PNG's is, output its name, size a power of two from 64 to 4096 (default the graph's own, clamped). Unlike a PNG, a graph is read again at every render and export, so a change saved to it shows there, and one removed or broken later fails them. render draws a graph material, and export bakes it and writes the baked PNGs. "
         + "A texture is drawn only on faces that have UVs (project_uvs, unwrap or set_uvs); check warns of a textured face without them. Materials are opaque: there is no transparency. "
-        + "A face has either a colour (set_colour) or a material, and giving it one clears the other. One undo step. "
+        + "One undo step. "
         + "Returns JSON {replaced: bool, material:{name and every other field above, as taken}, warnings:[]}, "
-        + "each texture null, {path, width, height} for a PNG or {graph, output, size (the one taken)} for a graph, paths absolute. get_mesh lists materials the same way. "
+        + "each texture null, {path, width, height} for a PNG or {graph, output, size (the one taken), reads_mesh (whether the graph reads the mesh; null if its file cannot be read now)} for a graph, paths absolute. get_mesh lists materials the same way. "
         + "Errors, each a tool error naming the argument, that changes nothing: an empty name, one with ':', '#' or '@', or exactly 'carve'; a colour that is not #RRGGBB; metallic, roughness or occlusion outside 0 to 1; a texture path that does not end in .png, names a folder or does not exist (the .png files in its folder are listed); a texture that is not a PNG or is outside 1 to 4096 pixels a side; a graph slot with another key, or without graph or output; a graph that does not end in .texgraph, does not exist (the .texgraph files in its folder are listed), is not a texture graph or has faults (all named); an output not [a-z][a-z0-9_]*, one the graph lacks (its outputs are listed) or one the slot cannot take; any other size; an argument define_material does not take. "
         + "Worked example, a rough wooden material with a texture (set_material's own example puts it on faces):\n"
         + ExampleMarker + """{"name":"crate","roughness":0.8,"base_colour_texture":"textures/crate.png"}"""
@@ -95,7 +95,8 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         + "occlusion, 0 to 1, default 1, is how strongly the occlusion map darkens crevices; with no occlusion_texture it has no effect and the result warns of that. "
         + "double_sided, default false, draws the back of a face too; leave it false for a closed solid. "
         + "base_colour_texture and emissive_texture are sRGB colour. normal_texture is a tangent-space normal map and is linear: its pixels are directions, not colours. "
-        + "metallic_roughness_texture is linear with roughness in the green channel and metallic in the blue channel (red is unused). occlusion_texture is linear with occlusion in the red channel. ";
+        + "metallic_roughness_texture is linear with roughness in the green channel and metallic in the blue channel (red is unused). occlusion_texture is linear with occlusion in the red channel. "
+        + "A face has either a colour (set_colour) or a material, and giving it one clears the other. ";
 
     private static readonly string[] Known =
     [

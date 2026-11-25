@@ -36,7 +36,7 @@ public sealed class SelectTool(ModelStore store)
         + "Comparisons are made in float, both sides, with no tolerance: == is exact, so bracket a computed value (y > 0.99 and y < 1.01).\n"
         + "Returns JSON {kind, vertices|edges|faces, count, of}: ids ascending, edges as [lo, hi] pairs; of is how many elements of that kind the mesh has. A query matching nothing is a success with count 0, not an error.\n"
         + "The lists are exactly what the edit tools take: move takes vertices, edges and faces, and extrude takes faces. "
-        + "Ids never change and no edit removes anything yet, so a selection names the same elements after an edit. "
+        + "Ids never change (delete leaves a gap), so a selection names the same elements after an edit. "
         + "Tool errors (no mesh yet, a bad kind or where, an unknown argument, a fault in where with its character position) leave the mesh unchanged.\n"
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to search. Worked examples on define_mesh's unit cube.\n"
         + PartSpaceText
@@ -63,7 +63,7 @@ public sealed class SelectTool(ModelStore store)
         + "There is no tolerance: == is exact, so for a value that was computed, bracket it (y > 0.99 and y < 1.01).\n"
         + "Returns JSON {kind, vertices|edges|faces, count, of}: the list is named for the kind, ids ascending; edges are [lo, hi] pairs ordered by lo, then hi; "
         + "count is the list's length and of is how many elements of that kind the mesh has. A query matching nothing is a success with count 0, not an error.\n"
-        + "Ids never change and no edit removes anything yet, so a selection names the same elements after an edit, though a move can change what the where would pick now; undo frees the ids its step created. "
+        + "Ids never change (delete leaves a gap), so a selection names the same elements after an edit, though a move can change what the where would pick now; undo frees the ids its step created. "
         + "A selection is the answer at the time of the call: after an edit, ask again rather than assume the same elements still match.\n"
         + "Tool errors leave the mesh unchanged and list every problem that can be found: no mesh yet (call define_mesh or open first); "
         + "an unknown kind (use vertices, edges or faces); a missing or non-string kind or where; an argument select does not take; and these, each after the prefix where and a colon:\n"

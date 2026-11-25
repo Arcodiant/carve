@@ -20,7 +20,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         + "Parts (define_part): the .glb keeps a node only where a part moves; parts marked moves are child nodes, the static ones are merged into the root's mesh. "
         + "With a skeleton (define_skeleton) the file is skinned, one mesh with JOINTS_0 and WEIGHTS_0 from set_weights, an 'Armature' node and one animation per clip (define_clip); a vertex with no weight is refused unless allow_unweighted: true. "
         + "Game limits: export warns, and still writes, past the limits in carve-limits.json (found above the .glb, or named by limits); write_limits: true creates it. "
-        + "Axes and units are the mesh's own:+Y up, +Z front, 1 unit = 1 m, the origin where you authored it. Nothing is scaled, turned, recentred or converted, "
+        + "Axes and units are the mesh's own: +Y up, +Z front, 1 unit = 1 m, the origin where you authored it. Nothing is scaled, turned, recentred or converted, "
         + "so build the model at the size and place the game wants it. "
         + "Path rules: a relative path resolves against carve's working directory, and the result gives the absolute path; missing folders are created; "
         + "an existing file is refused unless overwrite: true is given, and then it is replaced and the result says (replaced); the path must end in .glb, in any case. "
