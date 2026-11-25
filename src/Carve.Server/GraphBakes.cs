@@ -48,8 +48,9 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
     /// <summary>
     /// The model to draw for <paramref name="model"/> (the frame thread's; never bakes): itself without graph slots, else the
     /// one <see cref="Resolve"/> gave it, else, not yet resolved (an edit shown before any render baked it), its graph slots
-    /// left empty. No render draws that: render resolves before it queues, and the pump puts the mesh in again once
-    /// <see cref="Peek"/> changes.
+    /// left empty. No render returns that: render resolves before it queues, the pump puts the mesh in again once
+    /// <see cref="Peek"/> changes, and a frame drawn on an edit that landed after the bake is marked
+    /// <see cref="RenderedFrame.Unbaked"/>, so render bakes that model and draws again.
     /// </summary>
     public Model DrawnOf(Model model)
     {

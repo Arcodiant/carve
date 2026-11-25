@@ -26,6 +26,28 @@ internal static class SheetVersions
     }
 
     /// <summary>
+    /// Bakes and renders (<paramref name="bakeAndRender"/> resolves the store's model, then posts) until no frame is
+    /// <paramref name="unbaked"/>: an edit landing between the bake and the frame is drawn with its graph slots empty
+    /// (<see cref="GraphBakes.DrawnOf"/>), so that model is baked and drawn again (RV-82). An error ends it at once.
+    /// </summary>
+    internal static async Task<(T[]? Frames, string? Error)> Baked<T>(Func<Task<(T[]? Frames, string? Error)>> bakeAndRender, Func<T, bool> unbaked, int attempts)
+    {
+        for (var k = 1; ; k++)
+        {
+            var got = await bakeAndRender();
+            if (got.Frames is not { } frames || !frames.Any(unbaked))
+            {
+                return got;
+            }
+
+            if (k == attempts)
+            {
+                return (null, $"The model changed between its bake and its frame on each of {attempts} tries, so its graph slots would be drawn empty; call render again once the edits have settled.");
+            }
+        }
+    }
+
+    /// <summary>
     /// Why a render whose ids were moved past the meshes before <paramref name="shiftedFor"/> must be refused, or null:
     /// the offsets were taken from the snapshot the call checked (<paramref name="checkedVersion"/>), and a frame drawn on
     /// another version (<paramref name="drawnVersion"/>) may hold other elements at those ids. Null when no ids were shifted.
