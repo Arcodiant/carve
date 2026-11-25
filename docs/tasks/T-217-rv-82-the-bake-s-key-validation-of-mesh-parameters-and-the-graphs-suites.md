@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** — (none)
 
-**Verify:** core-unit, graphs-unit, server-unit, patina-unit
+**Verify:** core-unit, graphs-unit, graphs-regression, server-unit, patina-unit
 
 ## Goal
 
