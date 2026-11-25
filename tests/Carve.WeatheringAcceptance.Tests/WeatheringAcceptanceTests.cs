@@ -25,10 +25,14 @@ public class WeatheringAcceptanceTests
     public const string Model = "claude-opus-5-5";
 
     /// <summary>
-    /// The margins of the two texel checks are the person's to rule after round 1's numbers are seen; until then each is 0 (strictly above / below,
-    /// no margin), and the numbers are written out as <c>a - b</c> for the ruling.
+    /// The person's margins (ruling of 2026-11-24, on round 1's 93.8 and 22.3): texels within 2 of a steel hard edge are brighter than steel texels
+    /// more than 12 from any by at least 30 luma, and the drive crevice is darker than the open steel by at least 10. The sets they were ruled on:
+    /// both leave out drive faces 100 to 105 from the edge sets; the crevice is the whole drive more than 2 texels from a hard edge.
     /// </summary>
-    public const double HardEdgeMargin = 0, CreviceMargin = 0;
+    public const double HardEdgeMargin = 30, CreviceMargin = 10;
+
+    /// <summary>The grip may be no more spread (std of luma over its texels) than the starter's grip, plus float noise.</summary>
+    private const double GripSlack = 0.01;
 
     private const int NearEdge = 2, FarEdge = 12;
     private static readonly int[] DriveFaces = [100, 101, 102, 103, 104, 105];
@@ -44,13 +48,14 @@ public class WeatheringAcceptanceTests
 
     // ---- the transcript ----
 
-    private sealed record Call(int Index, string Name, JsonElement Input);
+    private sealed record Call(int Index, string Name, JsonElement Input, string Id);
 
-    private static (string? Model, List<Call> Calls, List<(int Index, string Text)> Results) Transcript()
+    private static (string? Model, List<Call> Calls, List<(int Index, string Text)> Results, HashSet<string> Failed) Transcript()
     {
         string? model = null;
         List<Call> calls = [];
         List<(int, string)> results = [];
+        HashSet<string> failed = [];
         var i = 0;
         foreach (var line in File.ReadLines(Path.Combine(RunFolder, "transcript.jsonl")).Where(l => l.Trim().Length > 0))
         {
@@ -62,27 +67,34 @@ public class WeatheringAcceptanceTests
             foreach (var block in content.EnumerateArray())
             {
                 var bt = block.TryGetProperty("type", out var b) ? b.GetString() : null;
-                if (bt == "tool_use") calls.Add(new Call(i, block.GetProperty("name").GetString()!, block.GetProperty("input")));
-                else if (bt == "tool_result") results.Add((i, block.GetProperty("content").ToString()));
+                if (bt == "tool_use") calls.Add(new Call(i, block.GetProperty("name").GetString()!, block.GetProperty("input"), block.GetProperty("id").GetString()!));
+                else if (bt == "tool_result")
+                {
+                    results.Add((i, block.GetProperty("content").ToString()));
+                    if (block.TryGetProperty("is_error", out var e) && e.ValueKind == JsonValueKind.True) failed.Add(block.GetProperty("tool_use_id").GetString()!);
+                }
             }
         }
 
-        return (model, calls, results);
+        return (model, calls, results, failed);
     }
 
     [SkippableOrRun]
     public void The_session_ran_on_the_pinned_model_with_no_file_tool()
     {
-        var (model, calls, _) = Transcript();
+        var (model, calls, _, failed) = Transcript();
         Assert.Equal(Model, model);
         Assert.NotEmpty(calls);
-        Assert.All(calls, c => Assert.True(c.Name.StartsWith("mcp__carve__") || c.Name.StartsWith("mcp__patina__"), $"a tool that is neither carve's nor patina's: {c.Name}"));
+        // Ruled 2026-11-24: only a call outside the two servers that succeeded fails the round; a refused attempt passes, counted and listed.
+        var outside = calls.Where(c => !c.Name.StartsWith("mcp__carve__") && !c.Name.StartsWith("mcp__patina__")).ToArray();
+        Note($"refused-attempts	{outside.Count(c => failed.Contains(c.Id))}	{string.Join(", ", outside.Where(c => failed.Contains(c.Id)).Select(c => $"{c.Name} at line {c.Index}"))}");
+        Assert.All(outside, c => Assert.True(failed.Contains(c.Id), $"a tool that is neither carve's nor patina's succeeded: {c.Name} at line {c.Index}"));
     }
 
     [SkippableOrRun]
     public void The_missing_graph_message_came_and_the_next_steel_material_names_a_graph_that_exists()
     {
-        var (_, calls, results) = Transcript();
+        var (_, calls, results, _) = Transcript();
         var message = results.FirstOrDefault(r => r.Text.Contains("no file at", StringComparison.Ordinal) && r.Text.Contains(".texgraph files in", StringComparison.Ordinal));
         Assert.True(message.Text is not null, "no tool result carried the missing-graph message (T-166: no file at ...; the .texgraph files in ...)");
         var next = calls.FirstOrDefault(c => c.Index > message.Index && c.Name == "mcp__carve__define_material"
@@ -200,30 +212,55 @@ public class WeatheringAcceptanceTests
         Note($"hard-edge\twithin {NearEdge} texels: {near.Length} texels, mean {F(near.DefaultIfEmpty().Average())}; more than {FarEdge}: {open.Length} texels, mean {F(open.DefaultIfEmpty().Average())}\t{F(near.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
         Note($"crevice\tdrive texels (faces 100-105, over {NearEdge} from a hard edge): {crevice.Length}, mean {F(crevice.DefaultIfEmpty().Average())}; open steel: {open.Length}, mean {F(open.DefaultIfEmpty().Average())}\t{F(crevice.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
         Assert.True(near.Length >= 20 && open.Length >= 20 && crevice.Length >= 20, $"too few texels: edge {near.Length}, open {open.Length}, crevice {crevice.Length}");
-        Assert.True(near.Average() - open.Average() > HardEdgeMargin, $"hard-edge mean luma {F(near.Average())} - open steel mean {F(open.Average())} = {F(near.Average() - open.Average())}, not above {HardEdgeMargin}");
-        Assert.True(open.Average() - crevice.Average() > CreviceMargin, $"open steel mean luma {F(open.Average())} - drive crevice mean {F(crevice.Average())} = {F(open.Average() - crevice.Average())}, not above {CreviceMargin}");
+        Assert.True(near.Average() - open.Average() >= HardEdgeMargin, $"hard-edge mean luma {F(near.Average())} - open steel mean {F(open.Average())} = {F(near.Average() - open.Average())}, below {HardEdgeMargin}");
+        Assert.True(open.Average() - crevice.Average() >= CreviceMargin, $"open steel mean luma {F(open.Average())} - drive crevice mean {F(crevice.Average())} = {F(open.Average() - crevice.Average())}, below {CreviceMargin}");
     }
 
-    [SkippableOrRun]
-    public void The_grip_is_no_more_varied_than_the_clean_stand_in()
+    /// <summary>
+    /// The luma of every texel of the grip (group rubber) as the file wears it (ruled 2026-11-24): a face's own material's base colour slot (a graph, baked
+    /// here), or that material's flat base colour, or the face's own colour, or glTF's default white. Faces' texels are counted as the bake sees them.
+    /// </summary>
+    private static double[] GripLuma(string file)
     {
-        var (model, mesh, polygons, slot, _, rubber) = Saved();
-        var n = slot.Size;
+        var read = Read(file);
+        var model = read.Model!;
+        var named = model.Meshes.Single();
+        var style = named.Mesh.Style ?? throw new InvalidOperationException("no groups or materials");
         var ct = TestContext.Current.CancellationToken;
-        var baked = GraphSlotBake.Rgba(slot, GraphSlotBake.BaseColour, model, mesh, ct);
-        var clean = GraphSlotBake.Rgba(slot, GraphSlotBake.BaseColour, model, null, ct);
-        var texels = Texels(polygons, rubber, n, []);
-        double Std(byte[] image)
+        var baked = new Dictionary<string, (byte[] Rgba, int Size)>();
+        var luma = new List<double>();
+        foreach (var f in style.FacesOf("rubber") ?? throw new InvalidOperationException("no group rubber"))
         {
-            var v = texels.Select(t => Luma(image, n, t.X, t.Y)).ToArray();
-            var mean = v.Average();
-            return Math.Sqrt(v.Select(x => (x - mean) * (x - mean)).Average());
+            var material = style.MaterialOf(f) is { } name ? model.FindMaterial(name) : null;
+            if (material?.BaseColourTexture is MaterialGraph g)
+            {
+                var slot = g with { Path = Path.GetFullPath(g.Path, RunFolder) };
+                var key = $"{slot.Path}|{slot.Output}|{slot.Size}";
+                if (!baked.TryGetValue(key, out var b)) baked[key] = b = (GraphSlotBake.Rgba(slot, GraphSlotBake.BaseColour, model, named.Name, ct), slot.Size);
+                luma.AddRange(Texels(named.Mesh, [f], b.Size, []).Select(t => Luma(b.Rgba, b.Size, t.X, t.Y)));
+            }
+            else if (material?.BaseColourTexture is not null) throw new InvalidOperationException($"the grip's material {material.Name} wears a PNG base colour; not measured");
+            else
+            {
+                var (r, gg, bb) = FaceStyle.ToBytes(material?.BaseColour ?? style.ColourOf(f) ?? Carve.Core.Material.DefaultBaseColour);
+                var l = 0.2126 * r + 0.7152 * gg + 0.0722 * bb;
+                luma.AddRange(Texels(named.Mesh, [f], 1024, []).Select(_ => l));
+            }
         }
 
-        var (a, b) = (Std(baked), Std(clean));
-        Note($"rubber\tstd of luma over {texels.Count} texels: baked {F(a)}; clean stand-in {F(b)}\t{F(a - b)}");
-        Assert.True(texels.Count >= 20, $"too few rubber texels: {texels.Count}");
-        Assert.True(a <= b + 0.01, $"rubber std of luma {F(a)} (the bake) - {F(b)} (the clean stand-in) = {F(a - b)}, above 0.01");
+        return [.. luma];
+    }
+
+    private static double Std(double[] v) => Math.Sqrt(v.Select(x => (x - v.Average()) * (x - v.Average())).Average());
+
+    [SkippableOrRun]
+    public void The_grip_wears_no_more_spread_than_the_starters_grip()
+    {
+        var (now, start) = (GripLuma("wrench-weathered.carve"), GripLuma("wrench-start.carve"));
+        var (a, b) = (Std(now), Std(start));
+        Note($"grip	std of luma over the grip's texels as worn: saved {now.Length} texels, mean {F(now.Average())}, std {F(a)}; starter {start.Length} texels, mean {F(start.Average())}, std {F(b)}	{F(a - b)}");
+        Assert.True(now.Length >= 20 && start.Length >= 20, $"too few grip texels: {now.Length}, {start.Length}");
+        Assert.True(a <= b + GripSlack, $"grip std of luma {F(a)} (saved file) - {F(b)} (starter file) = {F(a - b)}, above {GripSlack}");
     }
 
     // ---- the exported file ----
