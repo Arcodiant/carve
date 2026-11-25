@@ -51,6 +51,7 @@ public static class GraphSlotBake
         var nested = GraphValidator.Uses(graph, Unbound).SelectMany(u => u.Files).Distinct().Order(StringComparer.Ordinal).ToList();
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var readsMesh = HasMeshNode(graph);
+        var folder = Path.GetDirectoryName(Path.GetFullPath(path))!;
         foreach (var file in nested.Prepend(path))
         {
             byte[] bytes;
@@ -62,7 +63,8 @@ public static class GraphSlotBake
             {
                 throw new GraphSlotException($"the graph file '{file}' cannot be read: {e.Message}");
             }
-            hash.AppendData(Encoding.UTF8.GetBytes(file + "\n" + bytes.Length + "\n"));
+            // Relative to the top file's folder (RV-82): the nesting is in the key, the folder's place is not.
+            hash.AppendData(Encoding.UTF8.GetBytes(Path.GetRelativePath(folder, Path.GetFullPath(file)) + "\n" + bytes.Length + "\n"));
             hash.AppendData(bytes);
             if (file != path && TexGraphFile.ReadFile(file, Unbound).Graph is { } inner && HasMeshNode(inner)) readsMesh = true;
         }
@@ -70,17 +72,36 @@ public static class GraphSlotBake
     }
 
     /// <summary>
-    /// The content key of a bake: the files' hash, the output and the size; for a graph that reads the mesh, also
-    /// <paramref name="mesh"/>'s vertices, faces, UVs, seams, groups, face materials, shading and hard edges, and the
-    /// vertices and faces of every other mesh of <paramref name="model"/> (the occluders). One that does not serves every mesh.
+    /// Whether the files still hold the bytes <paramref name="files"/> hashed. A bake reads the files again, so one is cached
+    /// under its key only when this holds after it (RV-82): else an edit during the bake would be stored under the old bytes' key.
     /// </summary>
-    public static string Key(GraphSlotFiles files, string output, int size, Model model, string? mesh)
+    public static bool Unchanged(GraphSlotFiles files)
+    {
+        try
+        {
+            return Read(files.Path).Hash == files.Hash;
+        }
+        catch (Exception)
+        {
+            return false; // unreadable now: not the bytes the key was taken from
+        }
+    }
+
+    /// <summary>
+    /// The content key of a bake: the files' hash, the output, the size and how <paramref name="slot"/> packs the output; for a
+    /// graph that reads the mesh, also <paramref name="mesh"/>'s vertices, faces, UVs, seams, groups, face materials, shading and
+    /// hard edges, and the vertices and faces of every other mesh of <paramref name="model"/> (the occluders). One that does not
+    /// serves every mesh. Slots that pack the output alike share a key (RV-82).
+    /// </summary>
+    public static string Key(GraphSlotFiles files, string output, int size, string slot, Model model, string? mesh)
     {
         using var stream = new MemoryStream();
         using var w = new BinaryWriter(stream, Encoding.UTF8);
         w.Write(files.Hash);
         w.Write(output);
         w.Write(size);
+        // Of one output, every slot but metallic-roughness packs as base colour does, or refuses it (PackingOf).
+        w.Write(slot == MetallicRoughness ? MetallicRoughness : BaseColour);
         if (files.ReadsMesh)
         {
             ArgumentNullException.ThrowIfNull(mesh);
