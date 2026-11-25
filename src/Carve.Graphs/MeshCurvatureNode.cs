@@ -23,6 +23,9 @@ public sealed class MeshCurvatureNode(IMeshMaps? source) : NodeType
 
     public override PortKind OutputKind(string port, IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters) => PortKind.Grey;
 
+    public override IEnumerable<(string? Parameter, string Message)> CheckParameters(NodeParameters parameters) =>
+        MeshNodes.CheckPositive(parameters, "width", "metres");
+
     public override void Evaluate(NodeEvaluation evaluation)
     {
         var width = MeshNodes.Positive(evaluation, "width", "metres");

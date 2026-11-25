@@ -344,14 +344,20 @@ public class MeshNodesTests
     }
 
     [Theory]
-    [InlineData("mesh_mask", "", "nodes['m']: give exactly one of params 'group' and 'material'")]
-    [InlineData("mesh_mask", "\"group\": \"steel\", \"material\": \"steel\"", "nodes['m']: give exactly one of params 'group' and 'material', not both")]
-    [InlineData("mesh_curvature", "\"width\": 0", "nodes['m'].params['width']: is 0, but must be above 0 metres")]
-    [InlineData("mesh_occlusion", "\"reach\": 0", "nodes['m'].params['reach']: is 0, but must be above 0 metres")]
-    public void Parameters_the_file_cannot_refuse_are_refused_with_or_without_a_source(string type, string parameters, string message)
+    [InlineData("mesh_mask", "", "node 'm': give exactly one of params 'group' and 'material'")]
+    [InlineData("mesh_mask", "\"group\": \"steel\", \"material\": \"steel\"", "node 'm': give exactly one of params 'group' and 'material', not both")]
+    [InlineData("mesh_curvature", "\"width\": 0", "node 'm' parameter 'width': is 0, but must be above 0 metres")]
+    [InlineData("mesh_occlusion", "\"reach\": 0", "node 'm' parameter 'reach': is 0, but must be above 0 metres")]
+    public void Parameters_no_range_can_refuse_are_graph_faults_with_or_without_a_source(string type, string parameters, string message)
     {
-        Assert.Equal(message, Assert.Throws<MeshParameterException>(() => Run(null, Node(type, parameters), 64)).Message);
-        Assert.Equal(message, Assert.Throws<MeshParameterException>(() => Run(new MeshBakeSource(Wrench(), "wrench"), Node(type, parameters), 64)).Message);
+        // RV-82: a fault when the graph is read and validated, not first at the bake.
+        foreach (var source in new IMeshMaps?[] { null, new MeshBakeSource(Wrench(), "wrench") })
+        {
+            var registry = MeshNodes.Register(NodeRegistry.BuiltIn, source);
+            var read = TexGraphFile.Read($$"""{ "version": 1, "size": 64, "seed": 1, "nodes": { "m": {{Node(type, parameters)}}, "o": { "type": "output", "inputs": { "in": "m" }, "params": { "role": "occlusion" } } } }""", registry);
+            Assert.Equal([message], read.Faults.Select(f => f.Message));
+            Assert.Equal([message], Assert.Throws<GraphFaultException>(() => new GraphEvaluator(read.Graph!, registry)).Faults.Select(f => f.Message));
+        }
     }
 
     [Fact]

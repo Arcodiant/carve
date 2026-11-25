@@ -63,6 +63,13 @@ public abstract class NodeType
     public virtual IEnumerable<(string Port, string Message)> CheckInputKinds(IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters) => [];
 
     /// <summary>
+    /// Faults of the parameters that no one <see cref="ParamSpec"/> can say (above 0 where the range starts at 0, exactly one
+    /// of two): the parameter (null for the node as a whole) and a message, which the validator prefixes with the node and
+    /// parameter. Asked only when every parameter the node gives is in its range.
+    /// </summary>
+    public virtual IEnumerable<(string? Parameter, string Message)> CheckParameters(NodeParameters parameters) => [];
+
+    /// <summary>
     /// Fills every texel of <see cref="NodeEvaluation.Rect"/>, a tile inside the image, in each output port, from input
     /// reads that hold what <see cref="InputRect"/> asked for. A node works each texel from its image coordinates and
     /// <see cref="NodeEvaluation.Size"/>, never from its place in the tile: tiles come in no promised order, of any size,

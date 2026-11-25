@@ -101,7 +101,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
             if (slot is not MaterialGraph g) return slot;
             var f = FilesOf(m, field, g);
             var on = f.ReadsMesh ? mesh : null;
-            var key = GraphSlotBake.Key(f, g.Output, g.Size, source, on);
+            var key = GraphSlotBake.Key(f, g.Output, g.Size, field, source, on);
             keys.Add(key);
             if (Get(key) is not { } png)
             {
@@ -118,7 +118,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
                 }
                 var (node, nodeMs) = timed.Costliest(f);
                 baked.Add(new(m.Name, f.ReadsMesh ? label : null, field, g.Size, _clock() - start, node, nodeMs, label));
-                Put(key, png, g.Size);
+                if (GraphSlotBake.Unchanged(f)) Put(key, png, g.Size);
             }
             return new MaterialTexture(g.Path, [.. png], g.Size, g.Size);
         }
@@ -184,14 +184,13 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
         {
             var f = GraphSlotBake.Read(g.Path);
             var on = f.ReadsMesh ? mesh : null;
-            // The key has no slot, and this look packs differently from a metallic-roughness slot, so it is told apart.
-            var key = GraphSlotBake.Key(f, g.Output, g.Size, model, on) + ":image";
+            var key = GraphSlotBake.Key(f, g.Output, g.Size, GraphSlotBake.BaseColour, model, on);
             if (Get(key) is { } hit) return (new MaterialTexture(g.Path, [.. hit], g.Size, g.Size), null);
             var timed = new TimedMaps(_clock);
             var start = _clock();
             var png = GraphSlotBake.Png(g, GraphSlotBake.BaseColour, model, on, cancel, s => timed.Over(s));
             var (node, nodeMs) = timed.Costliest(f);
-            Put(key, png, g.Size);
+            if (GraphSlotBake.Unchanged(f)) Put(key, png, g.Size);
             return (new MaterialTexture(g.Path, [.. png], g.Size, g.Size), new Baked(name, f.ReadsMesh ? mesh : null, "image", g.Size, _clock() - start, node, nodeMs));
         }
         catch (Exception e) when (GraphSlotProblem.IsCause(e))

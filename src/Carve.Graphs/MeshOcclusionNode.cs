@@ -26,6 +26,9 @@ public sealed class MeshOcclusionNode(IMeshMaps? source) : NodeType
 
     public override PortKind OutputKind(string port, IReadOnlyDictionary<string, PortKind> inputs, NodeParameters parameters) => PortKind.Grey;
 
+    public override IEnumerable<(string? Parameter, string Message)> CheckParameters(NodeParameters parameters) =>
+        MeshNodes.CheckPositive(parameters, "reach", "metres");
+
     public override void Evaluate(NodeEvaluation evaluation)
     {
         var reach = (float)MeshNodes.Positive(evaluation, "reach", "metres");

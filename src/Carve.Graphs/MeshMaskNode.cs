@@ -27,10 +27,18 @@ public sealed class MeshMaskNode(IMeshMaps? source) : NodeType
     /// <summary>Which mask the node names; throws <see cref="MeshParameterException"/> when it names both or neither.</summary>
     public static (MaskSource Source, string Name) Selection(string nodeId, NodeParameters parameters)
     {
+        if (NotOne(parameters) is { } wrong) throw new MeshParameterException($"nodes['{nodeId}']: {wrong}");
+        return parameters.Has("group") ? (MaskSource.Group, parameters.Text("group")) : (MaskSource.Material, parameters.Text("material"));
+    }
+
+    /// <summary>Both or neither named is a graph fault at validation (RV-82), as it is the bake's refusal.</summary>
+    public override IEnumerable<(string? Parameter, string Message)> CheckParameters(NodeParameters parameters) =>
+        NotOne(parameters) is { } wrong ? [(null, wrong)] : [];
+
+    private static string? NotOne(NodeParameters parameters)
+    {
         bool group = parameters.Has("group"), material = parameters.Has("material");
-        if (group == material)
-            throw new MeshParameterException($"nodes['{nodeId}']: give exactly one of params 'group' and 'material'{(group ? ", not both" : "")}");
-        return group ? (MaskSource.Group, parameters.Text("group")) : (MaskSource.Material, parameters.Text("material"));
+        return group != material ? null : $"give exactly one of params 'group' and 'material'{(group ? ", not both" : "")}";
     }
 
     public override void Evaluate(NodeEvaluation evaluation)
