@@ -46,7 +46,7 @@
         "samples/graphs/**"
       ],
       "resources": "cpu",
-      "est-seconds": 40
+      "est-seconds": 10
     },
     {
       "id": "graphs-regression",
@@ -66,7 +66,7 @@
         "samples/graphs/**"
       ],
       "resources": "cpu",
-      "est-seconds": 40
+      "est-seconds": 60
     },
     {
       "id": "patina-unit",

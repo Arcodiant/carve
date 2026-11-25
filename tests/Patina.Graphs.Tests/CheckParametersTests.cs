@@ -37,7 +37,7 @@ public class CheckParametersTests
     /// <summary>Read with no check, so the graph exists; then validated alone with it.</summary>
     private static IReadOnlyList<GraphFault> Faults(string parameters)
     {
-        var read = TexGraphFile.Read($$"""{ "version": 1, "size": 16, "seed": 1, "nodes": { "p": { "type": "pair", "params": { {{parameters}} } }, "o": { "type": "output", "inputs": { "in": "p" }, "params": { "role": "occlusion" } } } }""", Lax);
+        var read = TexGraphFile.Read($$"""{ "version": 1, "size": 32, "seed": 1, "nodes": { "p": { "type": "pair", "params": { {{parameters}} } }, "o": { "type": "output", "inputs": { "in": "p" }, "params": { "role": "occlusion" } } } }""", Lax);
         Assert.True(read.Graph is not null, $"{read.Error} {string.Join("; ", read.Faults)}");
         return GraphValidator.Validate(read.Graph!, Strict);
     }
@@ -63,7 +63,7 @@ public class CheckParametersTests
     public void It_is_not_asked_while_a_parameter_is_out_of_its_range()
     {
         // Out of range, the graph is not read even laxly, so this one goes through the read's own validation.
-        var read = TexGraphFile.Read("""{ "version": 1, "size": 16, "seed": 1, "nodes": { "p": { "type": "pair", "params": { "a": 2, "b": 2 } }, "o": { "type": "output", "inputs": { "in": "p" }, "params": { "role": "occlusion" } } } }""", Strict);
+        var read = TexGraphFile.Read("""{ "version": 1, "size": 32, "seed": 1, "nodes": { "p": { "type": "pair", "params": { "a": 2, "b": 2 } }, "o": { "type": "output", "inputs": { "in": "p" }, "params": { "role": "occlusion" } } } }""", Strict);
         Assert.Null(read.Error);
         var faults = read.Faults;
         Assert.NotEmpty(faults);
