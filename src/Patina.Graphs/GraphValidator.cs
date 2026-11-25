@@ -116,6 +116,7 @@ public static class GraphValidator
                     values.Remove(spec.Name);
                     if (exposed.Values.TryGetValue((id, spec.Name), out var drivenValue)) values[spec.Name] = drivenValue;
                 }
+            var faultsBeforeParameters = a.Faults.Count;
             foreach (var (name, value) in node.Params)
             {
                 if (exposed.DrivenBy.ContainsKey((id, name))) continue;
@@ -126,6 +127,9 @@ public static class GraphValidator
                     a.Fault(id, null, name, $"node '{id}' parameter '{name}' {wrong}");
             }
             var resolved = new ResolvedNode(id, type, new NodeParameters(type, values), values);
+            if (a.Faults.Count == faultsBeforeParameters)
+                foreach (var (parameter, message) in type.CheckParameters(resolved.Parameters))
+                    a.Fault(id, null, parameter, parameter is null ? $"node '{id}': {message}" : $"node '{id}' parameter '{parameter}': {message}");
             if (type is InputNode && !isExpanded) InputFaults(a, id, node, resolved.Parameters);
             resolved.Connected.UnionWith(node.Inputs.Keys);
             var faultsBefore = a.Faults.Count;

@@ -109,10 +109,10 @@ public sealed class GraphSlotBakeTests : IDisposable
         var files = GraphSlotBake.Read(Curvature());
         var model = Barrel();
         var mesh = model.Find("barrel")!;
-        string Key(Model m) => GraphSlotBake.Key(files, "occlusion", 256, m, "barrel");
+        string Key(Model m) => GraphSlotBake.Key(files, "occlusion", 256, GraphSlotBake.Occlusion, m, "barrel");
         var at = Key(model);
         Assert.Equal(at, Key(Barrel()));
-        Assert.NotEqual(at, GraphSlotBake.Key(files, "occlusion", 512, model, "barrel"));
+        Assert.NotEqual(at, GraphSlotBake.Key(files, "occlusion", 512, GraphSlotBake.Occlusion, model, "barrel"));
 
         var moved = mesh.WithVertices([.. mesh.Vertices.Select((v, i) => i == 0 ? v + new Vector3(0.01f, 0, 0) : v)]);
         var uvs = mesh.Uvs!.WithFace(mesh.Uvs.MappedFaces[0], [.. mesh.Uvs.Of(mesh.Uvs.MappedFaces[0])!.Select(u => u * 0.5f)]);
@@ -139,17 +139,65 @@ public sealed class GraphSlotBakeTests : IDisposable
     {
         var model = Barrel();
         var files = GraphSlotBake.Read(Planks);
-        var at = GraphSlotBake.Key(files, "base_colour", 256, model, null);
+        const string slot = GraphSlotBake.BaseColour;
+        var at = GraphSlotBake.Key(files, "base_colour", 256, slot, model, null);
         var mesh = model.Find("barrel")!;
-        Assert.Equal(at, GraphSlotBake.Key(files, "base_colour", 256, model.With("barrel", mesh.WithVertices([.. mesh.Vertices.Select(v => v * 2)])), "barrel"));
-        Assert.Equal(at, GraphSlotBake.Key(files, "base_colour", 256, Model.Empty, null));
-        Assert.NotEqual(at, GraphSlotBake.Key(files, "roughness", 256, model, null));
+        Assert.Equal(at, GraphSlotBake.Key(files, "base_colour", 256, slot, model.With("barrel", mesh.WithVertices([.. mesh.Vertices.Select(v => v * 2)])), "barrel"));
+        Assert.Equal(at, GraphSlotBake.Key(files, "base_colour", 256, slot, Model.Empty, null));
+        Assert.NotEqual(at, GraphSlotBake.Key(files, "roughness", 256, slot, model, null));
 
         // One byte of a nested file.
         var inner = Write("inner.texgraph", """ "c": { "type": "colour", "params": { "colour": "#808080" } }, "o": { "type": "output", "inputs": { "in": "c" }, "params": { "role": "base_colour" } } """);
         var outer = Write("outer.texgraph", """ "g": { "type": "graph", "params": { "path": "inner.texgraph" } }, "o": { "type": "output", "inputs": { "in": "g.base_colour" }, "params": { "role": "base_colour" } } """);
-        var before = GraphSlotBake.Key(GraphSlotBake.Read(outer), "base_colour", 64, model, null);
+        var before = GraphSlotBake.Key(GraphSlotBake.Read(outer), "base_colour", 64, slot, model, null);
         File.WriteAllText(inner, File.ReadAllText(inner).Replace("#808080", "#808081"));
-        Assert.NotEqual(before, GraphSlotBake.Key(GraphSlotBake.Read(outer), "base_colour", 64, model, null));
+        Assert.NotEqual(before, GraphSlotBake.Key(GraphSlotBake.Read(outer), "base_colour", 64, slot, model, null));
+    }
+
+    [Fact]
+    public void The_key_tells_apart_slots_that_pack_one_output_differently_and_only_those()
+    {
+        // RV-82's probe: roughness is grey RGB in base colour and emissive, G with metallic in B in metallic-roughness.
+        var files = GraphSlotBake.Read(Planks);
+        string Key(string slot) => GraphSlotBake.Key(files, "roughness", 64, slot, Model.Empty, null);
+        byte[] Rgba(string slot) => GraphSlotBake.Rgba(new MaterialGraph(Planks, "roughness", 64), slot, Model.Empty, null, TestContext.Current.CancellationToken);
+        Assert.NotEqual(Rgba(GraphSlotBake.Emissive), Rgba(GraphSlotBake.MetallicRoughness));
+        Assert.NotEqual(Key(GraphSlotBake.Emissive), Key(GraphSlotBake.MetallicRoughness));
+        Assert.NotEqual(Key(GraphSlotBake.BaseColour), Key(GraphSlotBake.MetallicRoughness));
+        // Slots that pack alike give the same bytes, and share one bake.
+        Assert.Equal(Rgba(GraphSlotBake.Emissive), Rgba(GraphSlotBake.BaseColour));
+        Assert.Equal(Rgba(GraphSlotBake.Occlusion), Rgba(GraphSlotBake.BaseColour));
+        Assert.Equal(Key(GraphSlotBake.BaseColour), Key(GraphSlotBake.Emissive));
+        Assert.Equal(Key(GraphSlotBake.BaseColour), Key(GraphSlotBake.Occlusion));
+    }
+
+    [Fact]
+    public void The_files_hash_follows_the_nesting_not_the_folder()
+    {
+        var inner = """ "c": { "type": "colour", "params": { "colour": "#808080" } }, "o": { "type": "output", "inputs": { "in": "c" }, "params": { "role": "base_colour" } } """;
+        var outer = """ "g": { "type": "graph", "params": { "path": "inner.texgraph" } }, "o": { "type": "output", "inputs": { "in": "g.base_colour" }, "params": { "role": "base_colour" } } """;
+        Write("inner.texgraph", inner);
+        var here = GraphSlotBake.Read(Write("outer.texgraph", outer)).Hash;
+        Directory.CreateDirectory(Path.Combine(_dir, "moved"));
+        Write(Path.Combine("moved", "inner.texgraph"), inner);
+        Assert.Equal(here, GraphSlotBake.Read(Write(Path.Combine("moved", "outer.texgraph"), outer)).Hash);
+    }
+
+    [Fact]
+    public void Validate_refuses_a_mesh_parameter_every_bake_would()
+    {
+        // RV-82's probe: width 0 and a bare mesh_mask passed Validate, then failed the bake.
+        var path = Write("bad.texgraph", """ "w": { "type": "mesh_curvature", "params": { "width": 0 } }, "k": { "type": "mesh_mask" }, "o": { "type": "output", "inputs": { "in": "w" }, "params": { "role": "occlusion" } }, "ko": { "type": "output", "inputs": { "in": "k" }, "params": { "name": "mask" } } """);
+        var e = Assert.Throws<GraphFaultException>(() => GraphSlotBake.Validate(new MaterialGraph(path, "occlusion", 64), GraphSlotBake.Occlusion));
+        Assert.Equal(["node 'k': give exactly one of params 'group' and 'material'", "node 'w' parameter 'width': is 0, but must be above 0 metres"], e.Faults.Select(f => f.Message));
+    }
+
+    [Fact]
+    public void Unchanged_holds_until_a_file_is_edited()
+    {
+        var files = GraphSlotBake.Read(Planks);
+        Assert.True(GraphSlotBake.Unchanged(files));
+        Assert.False(GraphSlotBake.Unchanged(files with { Hash = "0" }));
+        Assert.False(GraphSlotBake.Unchanged(files with { Path = Path.Combine(_dir, "gone.texgraph") }));
     }
 }

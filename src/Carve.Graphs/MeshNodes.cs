@@ -41,11 +41,18 @@ public static class MeshNodes
     }
 
     /// <summary>A float parameter that must be above 0, which the file's range (from 0) cannot refuse.</summary>
-    internal static double Positive(NodeEvaluation e, string name, string unit)
+    internal static double Positive(NodeEvaluation e, string name, string unit) =>
+        NotPositive(e.Parameters, name, unit) is { } wrong
+            ? throw new MeshParameterException($"nodes['{e.NodeId}'].params['{name}']: {wrong}")
+            : e.Parameters.Value(name).Number;
+
+    /// <summary>The fault of a float parameter not above 0 for <see cref="NodeType.CheckParameters"/>, so validation refuses it (RV-82) as the bake does.</summary>
+    internal static IEnumerable<(string? Parameter, string Message)> CheckPositive(NodeParameters parameters, string name, string unit) =>
+        NotPositive(parameters, name, unit) is { } wrong ? [(name, wrong)] : [];
+
+    private static string? NotPositive(NodeParameters parameters, string name, string unit)
     {
-        var v = e.Parameters.Value(name).Number;
-        if (!(v > 0))
-            throw new MeshParameterException($"nodes['{e.NodeId}'].params['{name}']: is {v.ToString(CultureInfo.InvariantCulture)}, but must be above 0 {unit}");
-        return v;
+        var v = parameters.Value(name).Number;
+        return v > 0 ? null : $"is {v.ToString(CultureInfo.InvariantCulture)}, but must be above 0 {unit}";
     }
 }

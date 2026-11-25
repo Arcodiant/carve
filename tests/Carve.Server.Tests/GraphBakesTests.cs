@@ -55,6 +55,42 @@ public class GraphBakesTests : FileToolTests
     }
 
     [Fact]
+    public async Task A_file_edited_during_its_bake_is_not_cached_under_the_bytes_read_before()
+    {
+        // RV-82: the key is taken from the bytes read first, the image from the file read again for the bake.
+        await using var carve = await StartStripAsync();
+        var inner = Path.Combine(Root, "inner.texgraph");
+        var before = File.ReadAllText(inner);
+        var edited = false;
+        // The clock is first asked as the base colour slot's bake starts, after its key is taken.
+        var bakes = new GraphBakes(() =>
+        {
+            if (!edited) { edited = true; File.WriteAllText(inner, before.Replace("#808080", "#ff0000")); }
+            return 0;
+        });
+        var cancel = TestContext.Current.CancellationToken;
+        Assert.Contains("m//base_colour_texture/64", Slots(bakes.Resolve(carve.Store.Current.Model, cancel)));
+        File.WriteAllText(inner, before);
+        Assert.Contains("m//base_colour_texture/64", Slots(bakes.Resolve(carve.Store.Current.Model, cancel)));
+    }
+
+    [Fact]
+    public async Task Two_slots_that_pack_one_output_differently_bake_apart_and_alike_share()
+    {
+        // RV-82's probe: roughness in base colour is grey RGB, in metallic-roughness G with metallic in B.
+        await using var carve = await StartStripAsync();
+        File.Copy(Path.Combine(Paths.RepoRoot, "samples", "graphs", "planks.texgraph"), Path.Combine(Root, "planks.texgraph"));
+        const string rough = """{"graph":"planks.texgraph","output":"roughness","size":64}""";
+        Ok(await carve.CallToolAsync("define_material", $$"""{"name":"m","base_colour_texture":{{rough}},"metallic_roughness_texture":{{rough}},"emissive_texture":{{rough}}}"""));
+        var drawn = new GraphBakes().Resolve(carve.Store.Current.Model, TestContext.Current.CancellationToken);
+        Assert.Equal(["m//base_colour_texture/64", "m//metallic_roughness_texture/64"], Slots(drawn).Order());
+        var m = drawn.Model.FindMaterial("m")!;
+        byte[] Bytes(MaterialSlot? slot) => [.. Assert.IsType<MaterialTexture>(slot).Png];
+        Assert.NotEqual(Bytes(m.BaseColourTexture), Bytes(m.MetallicRoughnessTexture));
+        Assert.Equal(Bytes(m.BaseColourTexture), Bytes(m.EmissiveTexture));
+    }
+
+    [Fact]
     public async Task A_slot_is_baked_once_and_again_only_after_an_edit_it_depends_on()
     {
         await using var carve = await StartStripAsync();
