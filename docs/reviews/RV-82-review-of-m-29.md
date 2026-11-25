@@ -33,7 +33,7 @@ description: >-
 - **Rubric:** 1. Correctness (the cache key)
 - **What is wrong:** `PackingOf` packs one output differently by slot. For example, `roughness` in `emissive_texture` or `base_colour_texture` is grey RGB (`OutputRole.Occlusion`), and in `metallic_roughness_texture` it is G, with B set from `metallic`. `Key` takes no slot, and `GraphBakes.Resolve` caches each slot's PNG under `Key(f, g.Output, g.Size, ...)` alone. So a material whose emissive (or base colour) slot and metallic-roughness slot both name `{graph, roughness, size}` gets whichever bake ran first in both slots. I wrote a probe in a scratch copy (`Probe_key_has_no_slot_but_the_bake_depends_on_it`, on `samples/graphs/planks.texgraph`, `roughness`, 64). It gives equal keys and, for the two slots, 8,192 of 16,384 RGBA bytes different: emissive texel 0 is `152,152,152,255` and metallic-roughness is `255,152,0,255`. The server's own comment at `GraphBakes.cs:187` ("The key has no slot, and this look packs differently from a metallic-roughness slot") appends `:image` for the `uvs` look only, and leaves the render and export path open. T-163's Scope lists the key's contents without the slot, so this is a gap in the spec as well as in the code. The test `The_key_changes_for_each_edit_a_mesh_reading_slot_depends_on` never varies the slot. Across the line: the fix belongs in either `Key` or `GraphBakes`.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### `graphs-unit` reads the planks sample and its PNGs, but neither is in the suite's inputs
 - **Where:** `tests.json:31-49` (suite `graphs-unit`); the reads are at `tests/Carve.Graphs.Tests/GraphSlotBakeTests.cs:20, 44, 51, 141`
@@ -41,7 +41,7 @@ description: >-
 - **Rubric:** 4. Honest Verify scope
 - **What is wrong:** `GraphSlotBakeTests` reads `samples/graphs/planks.texgraph` and compares against `samples/graphs/planks/<output>.png` byte for byte (`A_graph_with_no_mesh_node_gives_the_png_patina_exports`, and also the slot table and the key test). The suite's inputs list `samples/wrench.carve` and no `samples/graphs/**`. A change to the planks graph or its PNGs therefore carries a cached `graphs-unit` pass instead of re-running it. The test that most directly holds "a graph without a mesh node gives patina's export bytes" is the one that goes stale. The dependency came in with T-163 (`6b57f12`), which added the tests and did not add the inputs. (`patina-unit` has `samples/graphs/**`, but that does not make `graphs-unit` re-run.)
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### `Validate` passes mesh-node parameters that every bake then refuses, so `define_material` and `check` accept a graph that never renders
 - **Where:** `src/Carve.Graphs/GraphSlotBake.cs:159-164` (`Validate`), against `src/Carve.Graphs/MeshNodes.cs:44-50` and `MeshMaskNode.cs:28-34` (refused only inside `Evaluate`)
@@ -49,7 +49,7 @@ description: >-
 - **Rubric:** 1. Correctness (refusals); 7. Tracker hygiene
 - **What is wrong:** `Validate` claims "every fault of the graph". However, `mesh_curvature` `width: 0`, `mesh_occlusion` `reach: 0`, and a `mesh_mask` naming both or neither of `group` and `material` are `MeshParameterException`s, thrown only during evaluation. I wrote a probe in a scratch copy (`Probe_validate_passes_parameters_that_fail_every_bake`): a graph with `mesh_curvature` `width: 0` and a bare `mesh_mask`. It gives `Validate: passed` and then `Bake: MeshParameterException: nodes['w'].params['width']: is 0, but must be above 0 metres`. Nothing in `src` calls `MeshMaskNode.Selection` or `Positive` outside evaluation, and `MaskNames` skips a mask with neither name. T-166's Scope uses exactly this case as its example of a graph fault that `define_material` must refuse (`nodes['wear'].params['width']: is 0, ...`). As built, the refusal comes later, at `render` or `export`, with the right words. T-166's As built says `Validate` covers "every fault" and does not mention these cases.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### Seven `unit` tests run well over the tier's 1 s, the slowest at 22 s, and the suite exceeds its estimate
 - **Where:** `tests/Carve.Graphs.Tests/MeshNodesTests.cs:89-115` (`Each_node_equals_its_bake_at_every_tile_size_and_a_zero_cap(1024)`), `:270-293`, `:199-208`, `:226-242`; `BrokenCopiesTests.cs:55`; `tests.json:48` (`est-seconds: 40`); the rule is at `CLAUDE.md:165-167`
@@ -57,7 +57,7 @@ description: >-
 - **Rubric:** 6. Tests are placed
 - **What is wrong:** I ran the whole suite once in a scratch copy, Debug, on this machine. Total 46 s against `est-seconds` 40. Per test: node-equals-bake at 1024 took 21.9 s; `Times_each_map_on_the_wrench` 14.2 s; the occlusion crevice test 3.7 s; broken copy "curvature read as occlusion" 2.4 s; raised hoops 2.1 s; node-equals-bake at 256 1.6 s; plain barrel occlusion 1.2 s. Every class carries `Tier` `unit`, and `unit` means about 1 s or less per test. T-161's Scope asked for 1024 in `graphs-unit`, but the milestone file records no exception to the tier rule. These are the CPU-heavy 1024 occlusion bakes that B-11 found slow under load in the server suite.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### `Read` hashes the bytes once and `Rgba` reads the files again, so an edit during a bake is cached under the old content's key
 - **Where:** `src/Carve.Graphs/GraphSlotBake.cs:48-71` (`Read` hashes) against `:116` (`Rgba` calls `Load(graph.Path, ...)` again, and the `graph` node reads nested files again); used at `src/Carve.Server/GraphBakes.cs:102-113`
@@ -65,7 +65,7 @@ description: >-
 - **Rubric:** 1. Correctness (the cache key)
 - **What is wrong:** The key is taken from the bytes `Read` saw, and the image from whatever the evaluator reads seconds later (a bake at 1024 takes 6 to 14 s). Suppose a graph file changes in that window, for example a `patina` `save`. The new content's image is then stored under the old content's key. While the file stays new, the next render hashes differently and rebakes. If the file goes back to the old bytes (a `pop_snapshot` and `save`, or a revert), the old key hits and serves the image of the edited graph until it is evicted. Found by reading, not run.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### `Times_each_map_on_the_wrench` asserts nothing and writes into the shared temp folder
 - **Where:** `tests/Carve.Graphs.Tests/MeshNodesTests.cs:269-293`
@@ -73,7 +73,7 @@ description: >-
 - **Rubric:** 2. Tests cover the Scope (a test that cannot fail)
 - **What is wrong:** Its summary says "Not a check". It produces As built's times and writes `%TEMP%/carve-graphs-times.txt` on every run, which costs 14 s of the unit suite (above). It cannot fail on anything the code decides. It would sit better as a script or a skipped test.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The files' hash takes each file's absolute path, so the same graph in a moved folder misses the cache
 - **Where:** `src/Carve.Graphs/GraphSlotBake.cs:65`
@@ -81,7 +81,7 @@ description: >-
 - **Rubric:** 1. Correctness (the key changes with "nothing else")
 - **What is wrong:** `hash.AppendData(file + "\n" + bytes.Length + "\n")` puts the absolute path into the key. Moving a project folder, or opening the same model from a copy, changes every key with no change to the bake. This is only a needless rebake, never a wrong image. A path relative to the top graph's folder would keep the nesting structure without the location.
 
-**Outcome:** —
+**Outcome:** fixed
 
 **Covered:** I read whole: `GraphSlotBake.cs`, `MeshBakeSource.cs`, `IMeshMaps.cs`, `MeshNodes.cs`, the four node files, `MeshMapsExceptions.cs`, `Carve.Graphs.csproj`, and every test in `tests/Carve.Graphs.Tests`. I read the diff hunks, with their context, of `Material.cs`, `CarveFile.cs` (writer version choice, `HoldsParts`, `ReadMaterial` and `ReadGraphSlot`, the key lists), `BakePadding.cs` (`FillUncovered`, and `Pad`'s head), `BakeMasks.cs`, the `Patina.Graphs` text kind, and `GraphSlotFileTests.cs` with the other Core test diffs. I also read T-161's and B-11's files whole, the Scope parts of T-160, T-163 and T-166 that concern my part, the milestone's retrospective, and `tests.json`'s `graphs-unit`, `core-unit` and `patina-unit`. Run in a scratch copy (`%TEMP%\rv82-core`): `graphs-unit` whole, 40 of 40 passing, with per-test times; and two probe tests, the slot key and `Validate`. What I checked and found sound: `MeshBakeSource`'s locking (one lock over every map and layout, and `Mask`'s nested `TryAdd` runs under it on the same thread); the neutral fill before padding; padding at the 64 minimum (8 ≤ 32); the mesh-reading key covering vertices, UVs, seams, groups, materials, shading, hard edges and occluders; the v10 writer and reader, including another drive and an absolute path in the file; older versions written byte for byte (by reading the writer, and through the committed-sample test); an old reader refusing v10 on its version; the `@` rule (the faces' side is held by `GraphBakesTests`); and the engine-free guard. I did not get to: `CarveFile.cs` outside its hunks; the v9 SHA-256 baseline against `main`'s own build (not rebuilt); `Pad`'s envelope pass; `TextParamTests` beyond its asserts; a concurrent-use probe of `MeshBakeSource`.
 
@@ -93,7 +93,7 @@ description: >-
 - **Rubric:** 1 (correctness: the cache)
 - **What is wrong:** `GraphSlotBake.Key(files, output, size, model, mesh)` hashes the files, output, size and mesh, but not the slot. `PackingOf` packs `roughness` as `Roughness` (G, with `metallic` in B) for `metallic_roughness_texture`, but as grey RGB (`Occlusion`) for `base_colour_texture`, `emissive_texture` and `occlusion_texture`, all of which the slot table accepts. So a material, or two materials, with `{graph: g, output: "roughness"}` in `metallic_roughness_texture` and in any of those three slots at the same size get one cache entry. The slot baked second takes the first one's PNG, in render and in export alike, so D-6 does not catch it. I proved it in a scratch copy with a unit-tier probe on `ToolHarness`: a worley graph with `roughness` and `metallic` outputs, and material `m` with both `base_colour_texture` and `metallic_roughness_texture` set to `{graph:"rough.texgraph", output:"roughness", size:64}`. `Resolve` baked 1 slot, not 2. The drawn `metallic_roughness_texture` bytes equal the base colour's (`mr==base True`), while `GraphSlotBake.Png` for the two slots gives different bytes (`directMR==directBase False`). Which slot is wrong depends on order, so across materials a base colour can also come out as the packed G/B image. No test has two slots on one output. Adding the slot, or its packing role, to the key fixes it.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### `DrawnOf` says no render draws empty graph slots, but a render whose frame is served on a newer model returns exactly that frame
 - **Where:** `src/Carve.Server/GraphBakes.cs:48-53` (the claim "No render draws that: render resolves before it queues"), `src/Carve.Server/RenderTool.cs:552-566, 602-611`, `src/Carve.Server/RenderPump.cs:190-200`; the record in the milestone's "Known and left" ("A shortcut in T-163")
@@ -149,7 +149,7 @@ description: >-
 - **Rubric:** 4 (honest Verify scope)
 - **What is wrong:** server-unit runs `GraphMaterialErrorsTests`, which opens every `samples/*.carve` (12 files) and copies `samples/barrel.carve` and `samples/graphs/weathered-iron.texgraph`. Its inputs list four samples and nothing under `samples/graphs/`. server-regression's `GraphMaterialRenderTests` copies `samples/graphs/weathered-iron.texgraph`, `weathered-staves.texgraph` and its nested `planks.texgraph`, none of which is an input. A change to a sample graph, or a new sample `.carve` (`barrel-weathered.carve` is one), therefore lets both suites be carried rather than re-run.
 
-**Outcome:** —
+**Outcome:** fixed
 
 **Covered:** I read whole `GraphBakes.cs`, `GraphSlotProblem.cs`, `GraphSlotBake.cs` (to judge the key), `MaterialTools.cs` from `Run` on (`ParseGraph`, `LoadGraph`, `ReadGraph`, `set_material`), `ExportTool.cs` lines 150 to 357, `CheckTool.cs`'s graph path, `PbrMaterials.cs`, `PieceExport`'s change, `RenderPump.cs` lines 100 to 240, `RenderTool.cs` lines 425 to 782 (the shaded and `uvs` paths), and the three refactor commits' diffs. The refactor kept both callers' wording and checks: `ParseGraph` is the old body with the tool and the two nouns passed in, render's `Problem()` check is kept, and `open`'s `Missing` lists the same files. I also read `GraphBakesTests`, `GraphMaterialErrorsTests` (lines 120 to 202), `GraphExportTests` (head), `GraphMaterialRenderTests` (lines 80 to 204), the `CarveProcess` diff, T-163's file and T-164's As built. B-11's 120 s is used only on calls that bake at 1024, as ruled. T-166's `ThrowsAny` is sound: T-166 added the subclasses `GraphOutputException` and `GraphMissingException`, and each call still pins its message. The tiers are right (the process-starting classes are `regression`). I ran two unit-tier probes on `ToolHarness` in a scratch copy (`%TEMP%\m29-rv82-opus2`); both are quoted above. I did not read `GetMeshTool.cs`, `OpenTool.cs` beyond its diff, `BakeTool`, `GraphImageToolTests`, `GraphSlotToolTests` or `GraphExportLoadTests` in full, and did not check each T-165/T-166 Scope bullet against a test. I ran nothing that needs a device, so the race in the second finding comes from reading the code, not from a run.
 
@@ -355,7 +355,7 @@ I did not get to: anything that needs a device. That covers the sheet title's wi
 
   An edit to a sample graph or a sample model therefore carries those suites over unrun, although it changes what they check.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### Two graphs-unit tests take 21 s and 12.7 s in the unit tier, one of them "not a check"
 - **Where:** `tests/Carve.Graphs.Tests/MeshNodesTests.cs:89-91`, `:269-271`
@@ -363,7 +363,7 @@ I did not get to: anything that needs a device. That covers the sheet title's wi
 - **Rubric:** Tests are placed (the right `Tier` trait)
 - **What is wrong:** CLAUDE.md's tiers rule says `unit` means about 1 s or less a test. I ran graphs-unit's command in a scratch copy with a trx log: 40 tests in 43 s, 6 of them over 1 s. `Each_node_equals_its_bake_at_every_tile_size_and_a_zero_cap(size: 1024)` took 21.3 s. `Times_each_map_on_the_wrench` took 12.7 s, and its own summary says "Not a check: each map's time ... written to the temp folder for the As built". So a timing probe with no assertion costs every graphs-unit run 13 s. This may overlap area 1 (Carve.Graphs); it is filed here as a tier-placement point.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### CLAUDE.md says the acceptance grip is checked "against the clean stand-in", which the person's ruling replaced
 - **Where:** `CLAUDE.md:123`
