@@ -82,13 +82,20 @@ public static class ToolSupport
 
     /// <summary>
     /// What a graph with mesh-input nodes (T-162) is told: patina has no mesh, so each reads its neutral stand-in. Empty
-    /// for a graph without any, so its answers stay as they were. Nodes of a graph used as a graph node are not looked into.
+    /// for a graph without any, so its answers stay as they were. The files its graph nodes nest are looked into, all levels
+    /// down (RV-82), each mesh node named as expanded, <c>&lt;node&gt;/&lt;id&gt;</c>.
     /// </summary>
-    public static string MeshNote(TextureGraph graph)
+    public static string MeshNote(TextureGraph graph, NodeRegistry? registry = null)
     {
-        var nodes = graph.Nodes.Where(n => Carve.Graphs.MeshNodes.TypeNames.Contains(n.Value.Type)).Select(n => $"{n.Key} ({n.Value.Type})").ToList();
+        var nodes = MeshNodeNames(graph, registry ?? Program.Registry, "").ToList();
         return nodes.Count == 0 ? "" : "mesh inputs neutral: " + string.Join(", ", nodes) + "; the real maps come from the mesh when a carve material names the graph";
     }
+
+    // The validator's expansion has no cycle and at most MaxDepth levels, so the recursion over its uses ends.
+    private static IEnumerable<string> MeshNodeNames(TextureGraph graph, NodeRegistry registry, string prefix) =>
+        graph.Nodes.Where(n => Carve.Graphs.MeshNodes.TypeNames.Contains(n.Value.Type)).Select(n => $"{prefix}{n.Key} ({n.Value.Type})")
+            .Concat(GraphValidator.Uses(graph, registry).Where(u => u.Expanded && u.File is not null)
+                .SelectMany(u => TexGraphFile.ReadFile(u.File!, registry).Graph is { } inner ? MeshNodeNames(inner, registry, prefix + u.Node + "/") : []));
 
     public static string Count(int n, string what) => $"{n.ToString(CultureInfo.InvariantCulture)} {what}{(n == 1 ? "" : "s")}";
 

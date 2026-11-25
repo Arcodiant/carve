@@ -3,6 +3,7 @@ using Patina.Graphs;
 using Patina.Graphs.Checks;
 using Patina.Graphs.Evaluation;
 using Patina.Graphs.Imaging;
+using Patina.Graphs.Nodes;
 using StbImageSharp;
 
 namespace Patina.Server.Tests;
@@ -72,11 +73,34 @@ public class MeshNodeToolTests
         }
     }
 
-    [Theory]
-    [InlineData("weathered-iron", new[] { "base_colour.png", "roughness.png", "wear.png" })]
-    [InlineData("weathered-staves", new[] { "base_colour.png", "normal.png", "roughness.png", "occlusion.png", "grime.png" })]
-    public void The_committed_pngs_equal_the_graph(string name, string[] files)
+    /// <summary>Each sample graph with a node type <see cref="NodeRegistry.BuiltIn"/> does not know: the files it writes and the one mask the stand-ins empty.</summary>
+    private static readonly Dictionary<string, (string[] Files, string Mask)> Expected = new(StringComparer.Ordinal)
     {
+        ["weathered-iron"] = (["base_colour.png", "roughness.png", "wear.png"], "wear"),
+        ["weathered-staves"] = (["base_colour.png", "normal.png", "roughness.png", "occlusion.png", "grime.png"], "grime"),
+    };
+
+    /// <summary>
+    /// Every top-level sample graph with a node type <see cref="NodeRegistry.BuiltIn"/> does not know: the graphs
+    /// Patina.Graphs.Tests' <c>CheckSamplesTests</c> skips by the same rule (RV-82), so a new one is held here or there.
+    /// </summary>
+    public static TheoryData<string> MeshSamples() => [.. MeshSampleNames()];
+
+    private static IEnumerable<string> MeshSampleNames() =>
+        Directory.GetFiles(Path.Combine(Paths.RepoRoot, "samples", "graphs"), "*.texgraph").Order(StringComparer.Ordinal)
+            .Where(file => !JsonDocument.Parse(File.ReadAllText(file)).RootElement.GetProperty("nodes").EnumerateObject()
+                .All(n => NodeRegistry.BuiltIn.Find(n.Value.GetProperty("type").GetString()!) is not null))
+            .Select(Path.GetFileNameWithoutExtension)!;
+
+    [Fact]
+    public void The_mesh_samples_are_the_two_weathered_graphs() =>
+        Assert.Equal(Expected.Keys.Order(StringComparer.Ordinal), MeshSampleNames());
+
+    [Theory]
+    [MemberData(nameof(MeshSamples))]
+    public void The_committed_pngs_equal_the_graph(string name)
+    {
+        var files = Expected[name].Files;
         var graph = Load(name);
         var evaluator = new GraphEvaluator(graph, Program.Registry);
         var written = evaluator.Outputs.Where(OutputRoles.HasOwnFile).Select(OutputRoles.FileOf).Order(StringComparer.Ordinal).ToArray();
@@ -87,10 +111,10 @@ public class MeshNodeToolTests
     }
 
     [Theory]
-    [InlineData("weathered-iron", "wear")]
-    [InlineData("weathered-staves", "grime")]
-    public void Check_reports_the_one_empty_mask_and_nothing_else(string name, string mask)
+    [MemberData(nameof(MeshSamples))]
+    public void Check_reports_the_one_empty_mask_and_nothing_else(string name)
     {
+        var mask = Expected[name].Mask;
         var graph = Load(name);
         var set = CheckSet.OfGraph(new GraphEvaluator(graph, Program.Registry), graph.Size);
         var problems = CheckRules.Run(set);

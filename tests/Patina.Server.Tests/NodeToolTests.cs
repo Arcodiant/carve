@@ -56,6 +56,9 @@ public class NodeToolTests
             foreach (var (_, graph, returns) in NodeCatalogue.Examples(name))
             {
                 Assert.Equal(returns, await patina.Ok("define_graph", graph));
+                // define_graph only validates; export evaluates every output, so an example that throws when evaluated fails here (RV-82).
+                if (returns.EndsWith("no faults: it evaluates", StringComparison.Ordinal))
+                    Assert.StartsWith("export: wrote ", await patina.Ok("export", """{"folder":"examples","size":32}"""), StringComparison.Ordinal);
                 Assert.Contains($"\"type\":\"{name}\"", graph, StringComparison.Ordinal);
                 Assert.Contains("define_graph " + graph + "\nreturns: " + returns + "\n", NodeCatalogue.Entry(Program.Registry, name), StringComparison.Ordinal);
             }
