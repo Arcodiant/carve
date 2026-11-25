@@ -27,7 +27,8 @@ public class WeatheringAcceptanceTests
     /// <summary>
     /// The person's margins (ruling of 2026-11-24, on round 1's 93.8 and 22.3): texels within 2 of a steel hard edge are brighter than steel texels
     /// more than 12 from any by at least 30 luma, and the drive crevice is darker than the open steel by at least 10. The sets they were ruled on:
-    /// both leave out drive faces 100 to 105 from the edge sets; the crevice is the whole drive more than 2 texels from a hard edge.
+    /// both leave out drive faces 100 to 105 from the edge sets. The crevice set was redefined by the ruling of 2026-11-25 (CreviceReach): the drive's texels within
+    /// 0.004 m of the 8 edges of the drive's two ends, all texels of that set (the distance was chosen with round 2's number in view).
     /// </summary>
     public const double HardEdgeMargin = 30, CreviceMargin = 10;
 
@@ -40,10 +41,12 @@ public class WeatheringAcceptanceTests
     /// The junction (ruling of 2026-11-25), from samples/wrench.carve: the square drive is a separate box (vertices 168 to 175; side faces 100 to 103, end faces
     /// 104 at z -0.042 and 105 at z -0.020) standing between two 12-gon caps of the dark socket body, 118 (z -0.0425, the socket top) and 99 (z -0.020, the
     /// underside of the hub ring). The junction is the eight edges of the drive's two end rectangles; the sets are the texels of the drive's faces and of
-    /// faces 118 and 99 whose 3D distance to those edges is within a reach. Measured only: no margin is ruled on them yet. Caveat: faces 118 and 99 are
+    /// faces 118 and 99 whose 3D distance to those edges is within a reach. The rows for the other reaches, and for the socket, are notes that assert nothing; only CreviceReach with the drive's own texels is checked. Caveat: faces 118 and 99 are
     /// group dark and do not wear the steel material in the file, so their texels in the steel slot's bake are not what is drawn there.
     /// </summary>
     private static readonly int[] SocketFaces = [118, 99];
+    /// <summary>The crevice set's reach (ruled 2026-11-25), in metres on the mesh.</summary>
+    public const double CreviceReach = 0.004;
     private static readonly double[] JunctionReaches = [0.004, 0.012, 0.035];
     private static readonly int[] DriveFaces = [100, 101, 102, 103, 104, 105];
 
@@ -208,7 +211,7 @@ public class WeatheringAcceptanceTests
     }
 
     /// <summary>Notes, per reach, the junction set's mean luma against the open steel's, with and without the texels within NearEdge of a hard edge.</summary>
-    private static void NoteJunction(PolygonMesh mesh, int n, byte[] rgba, double openMean, int openCount)
+    private static double[] NoteJunction(PolygonMesh mesh, int n, byte[] rgba, double openMean, int openCount)
     {
         var all = DriveFaces.Concat(SocketFaces).ToArray();
         var hard = HardSegments(mesh, all);
@@ -237,14 +240,18 @@ public class WeatheringAcceptanceTests
             }
         }
 
+        var crevice = Array.Empty<double>();
         foreach (var reach in JunctionReaches)
         foreach (var withHard in new[] { true, false })
         foreach (var withSocket in new[] { false, true })
         {
             var set = texels.Where(t => t.Metres <= reach && (withHard || !t.NearHard) && (withSocket || t.Drive)).ToArray();
             var mean = set.Select(t => t.Luma).DefaultIfEmpty().Average();
+            if (reach == CreviceReach && !withSocket && withHard) crevice = set.Select(t => t.Luma).ToArray();
             Note($"junction	{(withSocket ? "drive+socket" : "drive only")}, reach {reach} m ({reach / scale:F1} texels at {n}), {(withHard ? "with" : "without")} texels within {NearEdge} of a hard edge: {set.Length} texels ({set.Count(t => t.Drive)} drive, {set.Count(t => !t.Drive)} socket), mean {F(mean)}; open steel: {openCount}, mean {F(openMean)}	{F(openMean - mean)}");
         }
+
+        return crevice;
     }
 
     private static double Dist3(Vector3 p, Vector3 a, Vector3 b)
@@ -264,10 +271,9 @@ public class WeatheringAcceptanceTests
         var bodyTexels = Texels(polygons, body, n, segments);
         var near = bodyTexels.Where(t => t.Distance <= NearEdge).Select(t => Luma(rgba, n, t.X, t.Y)).ToArray();
         var open = bodyTexels.Where(t => t.Distance > FarEdge).Select(t => Luma(rgba, n, t.X, t.Y)).ToArray();
-        var crevice = Texels(polygons, DriveFaces, n, segments).Where(t => t.Distance > NearEdge).Select(t => Luma(rgba, n, t.X, t.Y)).ToArray();
         Note($"hard-edge\twithin {NearEdge} texels: {near.Length} texels, mean {F(near.DefaultIfEmpty().Average())}; more than {FarEdge}: {open.Length} texels, mean {F(open.DefaultIfEmpty().Average())}\t{F(near.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
-        Note($"crevice\tdrive texels (faces 100-105, over {NearEdge} from a hard edge): {crevice.Length}, mean {F(crevice.DefaultIfEmpty().Average())}; open steel: {open.Length}, mean {F(open.DefaultIfEmpty().Average())}\t{F(crevice.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
-        NoteJunction(polygons, n, rgba, open.DefaultIfEmpty().Average(), open.Length);
+        var crevice = NoteJunction(polygons, n, rgba, open.DefaultIfEmpty().Average(), open.Length);
+        Note($"crevice\tdrive texels within {CreviceReach} m of the 8 end edges (all texels): {crevice.Length}, mean {F(crevice.DefaultIfEmpty().Average())}; open steel: {open.Length}, mean {F(open.DefaultIfEmpty().Average())}\t{F(crevice.DefaultIfEmpty().Average() - open.DefaultIfEmpty().Average())}");
         Assert.True(near.Length >= 20 && open.Length >= 20 && crevice.Length >= 20, $"too few texels: edge {near.Length}, open {open.Length}, crevice {crevice.Length}");
         Assert.True(near.Average() - open.Average() >= HardEdgeMargin, $"hard-edge mean luma {F(near.Average())} - open steel mean {F(open.Average())} = {F(near.Average() - open.Average())}, below {HardEdgeMargin}");
         Assert.True(open.Average() - crevice.Average() >= CreviceMargin, $"open steel mean luma {F(open.Average())} - drive crevice mean {F(crevice.Average())} = {F(open.Average() - crevice.Average())}, below {CreviceMargin}");
