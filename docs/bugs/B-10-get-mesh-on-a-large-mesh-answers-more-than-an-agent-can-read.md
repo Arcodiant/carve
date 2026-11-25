@@ -10,7 +10,7 @@ description: >-
 
 **Milestone:** M-29
 
-**Verify:** server-unit
+**Verify:** server-unit, server-regression
 
 ## Symptom
 
@@ -58,3 +58,40 @@ is also past the client's limit, say which in `### As built`; do not fix it here
 - On the wrench: each section asked for alone, and the faces of each group, answers under 25,000 characters; the test
   says what the largest is.
 - T-168's round 2, where a fresh agent reads the wrench without a refused call.
+
+### Hand-off
+
+Written at the call checkpoint by the first agent (Claude Opus 5.5, `claude-opus-5-5`). Code and tests are committed; `verify` is not yet clean.
+
+**Done.** `get_mesh` takes `include` (a list of the answer's own keys; `closed`, `bounds`, `warnings`, `parent`, `world`, and
+`target`/`level` when asked, are always answered; `include: []` answers only those) and `faces` (face ids or a group's name;
+faces, uvs, colours, groups and face_materials narrow to those faces, dropping a group or colour left empty; vertices and
+`target.positions` to the vertices those faces use; edges to those with a chosen face, each still listing every face on it;
+seams to the chosen edges). Refusals: an unknown section lists every section; an unknown group lists the mesh's groups; a bad
+id uses `FaceArguments.CheckIds`; an empty list and a non-list/non-string are refused. Narrowing is in `GetMeshTool.Run` (server):
+it is presentation of a query answer, no edit, so nothing went into the Core. The description leads with reading in parts and
+the wrench example (`GetMeshTool.WrenchGroups`, `WrenchSteel`); the cube and target examples and the "Vertex and face ids..."
+sentence moved word for word to `GetMeshTool.Reference`, the new `help` entry. The graph-slot sentences stay in the description.
+`PartToolsListTests.Before` retaken once (5E37EB7E...); only `GetMeshTool.cs` (description and schema) and `HelpTool.cs` (help
+is in `NewTools`, outside the digest) changed in `src/`. README's "Asking the mesh" gains a line. Verify line now names
+`server-regression` too (`HelpThroughProcessTests`, `ToolFamiliesThroughProcessTests` read the tool list and `get_mesh`).
+
+**Checked** (with `dotnet test --filter` on the touched classes, for measuring only): `GetMeshPartsTests` (new: default answer
+held by SHA-256 taken on c518cce before the change for wrench, barrel-textured, gardener `{}` (a refusal) and `Body`, rover
+`Cab` and `Cab` level 0; the example runs as written; every section alone and every group's faces+vertices under 25,000),
+`HelpToolTests`, `EditToolDefinitionTests`, `TargetToolTests`, `PartToolsListTests` all passed.
+
+**Sizes on the wrench, characters** (whole answer 52,990): uvs 16,312; faces 13,827; edges 11,612; vertices 8,882; seams 2,139;
+groups 1,085; colours 189; the always-answered keys alone 176. Group faces+vertices: all 22,533, steel 10,745, dark 8,128,
+rubber 2,912, red 1,229, black 840. Over 25,000 when narrowed: `{"faces":"all","include":["faces","uvs"]}` 29,963 and
+`{"faces":"steel"}` with every section 25,237 (neither is recommended by the description). The served description's length
+is under 3,686 (HelpToolTests passes; the exact figure is written by the example test's output, not yet read).
+
+**Left.**
+1. The first `cairn bug B-10 verify` failed on: clean-tree (it ran before the commit); server-unit (failure not yet read; the
+   log is under `%TEMP%\cairn-test\`, the listing hung, look by name `B-10-server-unit-*`); server-regression with three
+   `LoaderTests` (extension loading, `carve still running after 00:00:05`) - not touched by B-10, likely load on a 14-minute
+   run; re-run before judging.
+2. Read the description's served length and state it; measure the other tools' answers on the wrench (`get_weights`,
+   `check`, `select`) and name any past 25,000 in `### As built` (not fixed).
+3. `### As built`, `cairn lint`, `cairn bug B-10 finish`.

@@ -72,7 +72,7 @@ public sealed class TargetToolTests() : TempFolderTests("carve-targets")
         Assert.Equal([0f, 0f, 0f], Floats(plain.GetProperty("vertices")[0].GetProperty("at")));
 
         // The example in get_mesh's description.
-        var example = Assert.Single(ToolList.Examples(tools, "get_mesh"), e => e.Contains("target", StringComparison.Ordinal));
+        var example = Assert.Single(ToolList.Examples(HelpToolTests.WithReference(ToolList.Description(tools, "get_mesh"), "get_mesh")), e => e.Contains("target", StringComparison.Ordinal));
         var asked = Ok(await carve.CallToolAsync("get_mesh", example));
         var positions = asked.GetProperty("target").GetProperty("positions");
         Assert.Equal("Bulge", asked.GetProperty("target").GetProperty("name").GetString());
@@ -295,7 +295,7 @@ public sealed class TargetToolTests() : TempFolderTests("carve-targets")
         Assert.Contains("drop_targets", ToolList.Description(tools, "define_mesh"));
         Assert.Equal(["drop_targets", "faces", "name", "vertices"],
             ToolList.Tool(tools, "define_mesh").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray());
-        Assert.Equal(["level", "mesh", "target"], ToolList.Tool(tools, "get_mesh").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray());
+        Assert.Equal(["faces", "include", "level", "mesh", "target"], ToolList.Tool(tools, "get_mesh").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray());
         Assert.Contains("targets:[{name, vertices}]", ToolList.Description(tools, "get_mesh"));
     }
 }

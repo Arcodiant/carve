@@ -49,7 +49,8 @@ public class EditToolDefinitionTests
         // get_mesh's target example is shown after define_target's bulge on the cube.
         if (tool == "get_mesh") Ok(await carve.CallToolAsync("define_target", Bulge));
 
-        var examples = Examples(tools, tool);
+        // get_mesh's cube examples are in its help entry (B-10); its description's example reads the wrench (GetMeshPartsTests).
+        var examples = tool == "get_mesh" ? Examples(HelpToolTests.WithReference("", "get_mesh")) : Examples(tools, tool);
         Assert.NotEmpty(examples);
         foreach (var example in examples) ExpectCleanClosed(Ok(await carve.CallToolAsync(tool, example)));
     }
@@ -61,7 +62,7 @@ public class EditToolDefinitionTests
         using var _ = carve;
         Ok(await carve.CallToolAsync("define_target", Bulge));
 
-        var example = Assert.Single(Examples(tools, "get_mesh"), e => e.Contains("target"));
+        var example = Assert.Single(Examples(HelpToolTests.WithReference(Description(tools, "get_mesh"), "get_mesh")), e => e.Contains("target"));
         var body = Ok(await carve.CallToolAsync("get_mesh", example));
         var target = body.GetProperty("target");
         Assert.Equal("Bulge", target.GetProperty("name").GetString());
@@ -71,12 +72,12 @@ public class EditToolDefinitionTests
 
         // What the description shows is what the tool gives.
         const string marker = "With the target, the output also holds: ";
-        var shown = JsonDocument.Parse(Description(tools, "get_mesh").Split('\n').Single(l => l.StartsWith(marker, StringComparison.Ordinal))[marker.Length..]).RootElement;
+        var shown = JsonDocument.Parse(HelpToolTests.WithReference(Description(tools, "get_mesh"), "get_mesh").Split('\n').Single(l => l.StartsWith(marker, StringComparison.Ordinal))[marker.Length..]).RootElement;
         Assert.Equal(JsonSerializer.Serialize(shown.GetProperty("targets")), JsonSerializer.Serialize(body.GetProperty("targets")));
         Assert.Equal(JsonSerializer.Serialize(shown.GetProperty("target")), JsonSerializer.Serialize(target));
 
         // It sits after the cube example's output, not between that example's introduction and its call.
-        var text = tools.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "get_mesh").GetProperty("description").GetString()!;
+        var text = HelpToolTests.WithReference(Description(tools, "get_mesh"), "get_mesh");
         Assert.True(text.IndexOf("Output: {\"vertices\"", StringComparison.Ordinal) < text.IndexOf("reading a target", StringComparison.Ordinal));
     }
 
@@ -154,7 +155,7 @@ public class EditToolDefinitionTests
         var (carve, tools) = await StartAsync();
         using var _ = carve;
         const string marker = "Output: ";
-        var line = Description(tools, "get_mesh").Split('\n').Single(l => l.StartsWith(marker, StringComparison.Ordinal));
+        var line = HelpToolTests.WithReference(Description(tools, "get_mesh"), "get_mesh").Split('\n').Single(l => l.StartsWith(marker, StringComparison.Ordinal));
         var sample = JsonDocument.Parse(line[marker.Length..].Replace(", ...", "", StringComparison.Ordinal)).RootElement;
         var real = Ok(await carve.CallToolAsync("get_mesh", "{}"));
 
