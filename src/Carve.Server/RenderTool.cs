@@ -220,6 +220,8 @@ internal static class RenderTool
         + "In 'shaded', a face with a material (define_material, set_material) is drawn as the game's PBR shading draws it, its textures sampled at the face's UVs (a face with no UVs samples the texture's corner at (0, 0), as the game does), "
         + "lit by Carve's light and a fixed sky so that metal reads; a game's own lighting will differ. Only material faces take the sky's light, so a matte white material face is brighter and bluer on top than an uncoloured or coloured face. Every other look ignores materials, as it ignores colours. "
         + "The text then gains baked: [{material, mesh, slot, size, ms}], one entry per slot baked in this call (mesh null for a graph that does not read the mesh), and a warning when one material took over 5 s to bake: lower its size or the node's rays. A slot that cannot be baked fails the render. "
+        + "Each of these is a tool error with the model unchanged: a bake that fails on the mesh (no UVs, overlapping UVs, a missing group) says to unwrap or lay out the mesh or name a group it has; a per-mesh copy's name (<material>@<mesh>, or a kept level's) that is a material the model already has is refused as export refuses it, saying to rename one; "
+        + "and an edit landing between the bake and the frame on each of 3 tries (\"The model changed between its bake and its frame on each of 3 tries, so its graph slots would be drawn empty; call render again once the edits have settled.\", or for uvs, \"... so its graph image would lie under another model's layout; ...\"). "
         + "'wireframe' draws every edge in light grey over faces filled near black: use it to count and place edges and see the face loops. It is hidden-line, not see-through: "
         + "an edge behind a face is hidden, so look from another side to see it. "
         + "'normals' colours each face by the way it faces and stands a light grey spike on it along its normal, at its centre, or for a face with holes at a point on the face clear of the holes: use it to find a face pointing the wrong way, or a non-planar face, whose spike is off. On a smooth mesh (set_shading) it shows the corner normals instead: the colour blends across a soft edge and breaks at a hard one, and a spike stands on each corner along its normal. "
@@ -575,7 +577,7 @@ internal static class RenderTool
                 : (null, $"The render failed: {rendering.Exception?.GetBaseException().Message}");
         }
 
-        var (rendered, failure) = await SheetVersions.OnOneMesh(RenderTiles, f => f.Version, SheetAttempts);
+        var (rendered, failure) = await SheetVersions.OnOneMesh(() => SheetVersions.Baked(RenderTiles, f => f.Unbaked, SheetAttempts), f => f.Version, SheetAttempts);
         if (rendered is not { } frames)
         {
             return Error(failure!);
@@ -699,79 +701,97 @@ internal static class RenderTool
             return Error(fault);
         }
 
-        var current = store.Current;
-        if (current.Mesh is null)
-        {
-            return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
-        }
+        // RV-82: a graph image is baked on the snapshot; a frame drawn on a later model would lay another layout over it, so that
+        // model is baked and drawn again, as render's other looks do (SheetVersions.Baked).
+        var (tries, changed) = await SheetVersions.Baked(TryOnce, t => t.Stale, SheetAttempts, SheetVersions.UvImageDrawn);
+        return changed is null ? tries![0].Result : Error(changed);
 
-        if (current.Model.Target(meshName, out var aimed) is not { } named)
+        async Task<(UvTry[]? Frames, string? Error)> TryOnce()
         {
-            return Failed("render", [meshName is null ? aimed + "; mode 'uvs' draws one mesh's layout" : aimed!]);
-        }
-
-        if (named.Mesh.Uvs is not { MappedFaces.Count: > 0 })
-        {
-            return Error($"mesh '{named.Name}' has no UVs; give it some with set_uvs, project_uvs or unwrap");
-        }
-
-        if (MeshEdits.UnknownElements(named.Mesh, [], [], listed.Faces) is { Count: > 0 } missing)
-        {
-            return Failed("render", missing.Select(e => e.ToString()));
-        }
-
-        var baked = new List<GraphBakes.Baked>();
-        if (graphImage is not null)
-        {
-            try
+            static (UvTry[]?, string?) Done(CallToolResult result, bool stale = false) => ([new UvTry(result, stale)], null);
+            var shown = picture;
+            var current = store.Current;
+            if (current.Mesh is null)
             {
-                var (texture, bake) = await Task.Run(() => bakes.Image(current.Model, named.Name, graphImage, cancellationToken), cancellationToken);
-                picture = texture;
-                if (bake is not null) baked.Add(bake);
+                return Done(Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render."));
             }
-            catch (GraphSlotProblemException e)
+
+            if (current.Model.Target(meshName, out var aimed) is not { } named)
             {
-                return Error(e.Message);
+                return Done(Failed("render", [meshName is null ? aimed + "; mode 'uvs' draws one mesh's layout" : aimed!]));
             }
+
+            if (named.Mesh.Uvs is not { MappedFaces.Count: > 0 })
+            {
+                return Done(Error($"mesh '{named.Name}' has no UVs; give it some with set_uvs, project_uvs or unwrap"));
+            }
+
+            if (MeshEdits.UnknownElements(named.Mesh, [], [], listed.Faces) is { Count: > 0 } missing)
+            {
+                return Done(Failed("render", missing.Select(e => e.ToString())));
+            }
+
+            var baked = new List<GraphBakes.Baked>();
+            if (graphImage is not null)
+            {
+                try
+                {
+                    var (texture, bake) = await Task.Run(() => bakes.Image(current.Model, named.Name, graphImage, cancellationToken), cancellationToken);
+                    shown = texture;
+                    if (bake is not null) baked.Add(bake);
+                }
+                catch (GraphSlotProblemException e)
+                {
+                    return Done(Error(e.Message));
+                }
+            }
+
+            var offset = current.Model.OffsetOf(named.Name)!.Value;
+            var faces = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
+            var labelled = labels == "faces" ? LabelSet.Faces : LabelSet.None;
+            var picked = Highlight.Of([], [], listed.Faces.Select(f => f + offset.Faces));
+            var spec = new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, (int)size, Look.Uvs, labelled) { Highlight = picked, UvFaces = faces, UvImage = shown };
+
+            var rendering = queue.Post(spec);
+            await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
+            if (!rendering.IsCompleted)
+            {
+                return Done(Error(status.FaultMessage ?? "The engine has stopped, so nothing can be rendered."));
+            }
+
+            if (!rendering.IsCompletedSuccessfully)
+            {
+                return Done(Error($"The render failed: {rendering.Exception?.GetBaseException().Message}"));
+            }
+
+            var frame = rendering.Result;
+            if (SheetVersions.UvImageStale(graphImage is not null, current.Version, frame.Version))
+            {
+                return Done(Error(""), stale: true);
+            }
+
+            // The face range is the checked snapshot's; a frame drawn on a later model may hold other faces there.
+            if (current.Model.Meshes.Count > 1 && SheetVersions.ShiftedIdsRefusal(named.Name, current.Version, frame.Version) is { } shifted)
+            {
+                return Done(Error(shifted));
+            }
+
+            var report = MeshReport.Create(named.Mesh);
+            var unmapped = named.Mesh.LiveFaces.Count(f => !named.Mesh.Uvs!.IsMapped(f));
+            var pixels = frame.Pixels.ToDecodedImage();
+            return Done(new CallToolResult
+            {
+                Content =
+                [
+                    ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
+                    new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount, shown, graphImage?.Output) + GraphBakes.Text(baked) },
+                ],
+            });
         }
-
-        var offset = current.Model.OffsetOf(named.Name)!.Value;
-        var faces = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
-        var labelled = labels == "faces" ? LabelSet.Faces : LabelSet.None;
-        var picked = Highlight.Of([], [], listed.Faces.Select(f => f + offset.Faces));
-        var spec = new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, (int)size, Look.Uvs, labelled) { Highlight = picked, UvFaces = faces, UvImage = picture };
-
-        var rendering = queue.Post(spec);
-        await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
-        if (!rendering.IsCompleted)
-        {
-            return Error(status.FaultMessage ?? "The engine has stopped, so nothing can be rendered.");
-        }
-
-        if (!rendering.IsCompletedSuccessfully)
-        {
-            return Error($"The render failed: {rendering.Exception?.GetBaseException().Message}");
-        }
-
-        var frame = rendering.Result;
-        // The face range is the checked snapshot's; a frame drawn on a later model may hold other faces there.
-        if (current.Model.Meshes.Count > 1 && SheetVersions.ShiftedIdsRefusal(named.Name, current.Version, frame.Version) is { } stale)
-        {
-            return Error(stale);
-        }
-
-        var report = MeshReport.Create(named.Mesh);
-        var unmapped = named.Mesh.LiveFaces.Count(f => !named.Mesh.Uvs!.IsMapped(f));
-        var pixels = frame.Pixels.ToDecodedImage();
-        return new CallToolResult
-        {
-            Content =
-            [
-                ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
-                new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount, picture, graphImage?.Output) + GraphBakes.Text(baked) },
-            ],
-        };
     }
+
+    /// <summary>One try of the <c>uvs</c> look: its result, and whether its frame was drawn on another model than its graph image's bake.</summary>
+    private sealed record UvTry(CallToolResult Result, bool Stale);
 
     /// <summary>render's <c>image</c> as <c>{graph, output, size}</c> (T-165), T-160's rules for each field; null with each problem, named by <c>image</c>, in <paramref name="problems"/>.</summary>
     private static MaterialGraph? LoadGraphImage(JsonElement image, string? baseDirectory, List<string> problems)

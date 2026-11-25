@@ -44,6 +44,8 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         + "positions and normals, and when any face has UVs, or any material in use has a texture, a TEXCOORD_0 holding each corner's UV exactly as Carve holds it (no conversion: glTF's axes, (0, 0) at the image's top-left), a vertex split wherever its UV or normal differ; "
         + "a model with no UVs and no textured material in use has no TEXCOORD_0; the corners of a face without UVs are written as (0, 0), and the result warns '<mesh>: N faces have no UVs; their corners are written as (0, 0)' with the first face ids, and for faces of a textured material \"material 'wood' has a texture, but N faces using it have no UVs; their corners are written as (0, 0) (<mesh> faces ...)\" in place of that warning for those faces; no vertex colours. "
         + "Errors, each a tool error that writes nothing: an existing file without overwrite: true (the error names the path and overwrite, and the file is unchanged); no mesh yet (call define_mesh or open first; clips mode needs none); an empty path; a path holding a character a file path may not; "
+        + "a per-mesh copy's name (<material>@<mesh>, or a kept level's) that is a material the model already has, or that two copies would take, named with the mesh and the material it would replace, to rename one (render refuses it too, and check warns of it); "
+        + "a graph slot that cannot be baked, whose error, when the mesh is the cause (no UVs, overlapping UVs, a missing group), says to unwrap or lay out the mesh or name a group it has; a cancelled export, which writes no .glb; "
         + "a path naming a folder; any extension but .glb; a write that fails (access denied, a locked file), naming the path and the system's message, "
         + "which leaves any file already there as it was and no partial file. "
         + "A model of several meshes and no skeleton is written as one mesh, every mesh merged in order, as above. "
@@ -120,7 +122,8 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         return MeshToolSupport.Create<ExportTool>("export", Text, schema);
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? limits = null, JsonElement? mode = null, JsonElement? overwrite = null, JsonElement? write_limits = null, JsonElement? meshes = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? limits = null, JsonElement? mode = null, JsonElement? overwrite = null, JsonElement? write_limits = null, JsonElement? meshes = null,
+        CancellationToken cancellationToken = default)
     {
         var errors = UnknownArguments("export", context, "path", "allow_unweighted", "limits", "mode", "meshes", "overwrite", "write_limits");
         var text = RequiredString("path", path, errors);
@@ -162,7 +165,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         {
             try
             {
-                var drawn = bakes.Resolve(model, CancellationToken.None);
+                var drawn = bakes.Resolve(model, cancellationToken);
                 baked.AddRange(drawn.Baked);
                 model = drawn.Model;
             }
@@ -181,6 +184,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         var source = LimitsSource.Find("export", limitsPath, writeLimits, target.FullPath, out var limitsError, toolFolder.Directory);
         if (source is null) return Error(limitsError!);
 
+        cancellationToken.ThrowIfCancellationRequested(); // RV-82: a cancelled export writes nothing, the bake done or not
         var written = clips ? Clips(model, target, replace, source)
             : kind == "piece" ? Piece(model, pieceMeshes ?? [], target, allowUnweighted, replace, source)
             : model.Skeleton is not null ? Skinned(model, target, allowUnweighted, replace, source, copies: copies)
@@ -305,8 +309,10 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
     /// </summary>
     private static (Model Model, string? Warning) Copies(Model model)
     {
-        var copies = model.Materials.Where(m => m.Name.IndexOf('@') is > 0 && model.Materials.Any(o => o.HasGraph && m.Name.StartsWith(o.Name + "@", StringComparison.Ordinal))).Select(m => m.Name).ToHashSet();
-        var users = model.Meshes.SelectMany(n => Model.MaterialsUsedBy(n.Mesh).Where(copies.Contains).Select(c => (Base: c[..c.IndexOf('@')], Copy: c, Mesh: n.Name))).ToList();
+        // A copy is exactly <c>o@mesh</c> on that mesh, o a graph material still unbaked (one that reads the mesh); any other `@` name is the user's (RV-82).
+        var users = model.Meshes.SelectMany(n => Model.MaterialsUsedBy(n.Mesh)
+                .Select(c => (Base: model.Materials.FirstOrDefault(o => o.HasGraph && c == $"{o.Name}@{n.Name}")?.Name!, Copy: c, Mesh: n.Name)))
+            .Where(u => u.Base is not null).ToList();
         var several = new List<string>();
         foreach (var g in users.GroupBy(u => u.Base))
         {

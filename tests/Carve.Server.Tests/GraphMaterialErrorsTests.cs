@@ -173,6 +173,33 @@ public class GraphMaterialErrorsTests : FileToolTests
         Assert.False(File.Exists(Path.Combine(Root, "out.glb")));
     }
 
+    /// <summary>
+    /// RV-82: a bake that fails on the mesh ends with the mesh's fix, not "define the material again": through export, and through
+    /// <see cref="GraphBakes.Resolve"/>, whose message render returns as it is (the render tool refuses at once on the harness).
+    /// </summary>
+    [Fact]
+    public async Task A_bake_that_fails_on_the_mesh_says_to_fix_the_mesh_through_export_and_render()
+    {
+        Write("grey.texgraph", Grey);
+        Write("mask.texgraph", Mask);
+        var rows = new List<string>();
+        foreach (var (uvs, overlap, graph) in new[] { (false, false, "grey"), (true, true, "grey"), (true, false, "mask") })
+        {
+            await using var carve = await StartStripAsync(uvs, overlap);
+            Ok(await carve.CallToolAsync("define_material", $$"""{"name":"m","occlusion_texture":{{Slot(graph + ".texgraph", "occlusion")}}}"""));
+            Ok(await carve.CallToolAsync("set_material", """{"material":"m","faces":[0,1,2,3]}"""));
+            var model = carve.Store.Current.Model;
+            rows.Add("export: " + Refused(await carve.CallToolAsync("export", """{"path":"out.glb"}""")));
+            rows.Add("render: " + Assert.Throws<GraphSlotProblemException>(() => new GraphBakes().Resolve(model, TestContext.Current.CancellationToken)).Message);
+            Assert.Same(model, carve.Store.Current.Model);
+            Assert.False(File.Exists(Path.Combine(Root, "out.glb")));
+        }
+        const string NoUvs = "materials['m'].occlusion_texture: mesh 'strip': the mesh has no UVs, so it has nothing to bake into; give it UVs first (unwrap, project_uvs or set_uvs); the model is unchanged";
+        const string Overlap = "materials['m'].occlusion_texture: mesh 'strip': the UVs overlap, so a texel would show two faces: faces[0] and faces[1]; move the islands apart (unwrap or set_uvs) and bake again; the model is unchanged";
+        const string NoGroup = "materials['m'].occlusion_texture: mesh 'strip' has no group 'rim'; its groups are none and its materials 'm'; the model is unchanged: give mesh 'strip' a group 'rim' (define_group), or name one of its groups in the graph";
+        Assert.Equal([$"export: {NoUvs}", $"render: {NoUvs}", $"export: {Overlap}", $"render: {Overlap}", $"export: {NoGroup}", $"render: {NoGroup}"], rows);
+    }
+
     [Fact]
     public async Task check_is_silent_on_every_committed_sample_and_fast_on_the_barrel_wearing_a_mesh_graph()
     {

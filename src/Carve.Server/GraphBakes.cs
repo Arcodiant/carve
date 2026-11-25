@@ -48,8 +48,9 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
     /// <summary>
     /// The model to draw for <paramref name="model"/> (the frame thread's; never bakes): itself without graph slots, else the
     /// one <see cref="Resolve"/> gave it, else, not yet resolved (an edit shown before any render baked it), its graph slots
-    /// left empty. No render draws that: render resolves before it queues, and the pump puts the mesh in again once
-    /// <see cref="Peek"/> changes.
+    /// left empty. No render returns that: render resolves before it queues, the pump puts the mesh in again once
+    /// <see cref="Peek"/> changes, and a frame drawn on an edit that landed after the bake is marked
+    /// <see cref="RenderedFrame.Unbaked"/>, so render bakes that model and draws again.
     /// </summary>
     public Model DrawnOf(Model model)
     {
@@ -132,6 +133,10 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
             EmissiveTexture = Slot(m, GraphSlotBake.Emissive, m.EmissiveTexture, source, mesh, label),
             OcclusionTexture = Slot(m, GraphSlotBake.Occlusion, m.OcclusionTexture, source, mesh, label),
         };
+
+        // RV-82: a copy never takes a name the model has; refused before anything bakes.
+        foreach (var clash in GraphSlotProblem.Clashes(model, ReadsMesh, GraphSlotProblem.ClashRefused).Take(1))
+            throw new GraphSlotProblemException(clash.Message);
 
         foreach (var m in model.Materials.Where(m => m.HasGraph))
         {
