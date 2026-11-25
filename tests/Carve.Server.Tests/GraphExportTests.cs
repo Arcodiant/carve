@@ -79,6 +79,98 @@ public sealed class GraphExportTests() : FileToolTests("carve-graph-export")
         Assert.Equal(File.ReadAllBytes(Path.Combine(Root, "c.glb")), File.ReadAllBytes(Path.Combine(Root, "again", "c.glb")));
     }
 
+    /// <summary>Saves the model, renames in the file's text and opens it again: an '@' name comes only from a file (T-160).</summary>
+    private async Task Reopen(ToolHarness carve, params (string From, string To)[] names)
+    {
+        Ok(await carve.CallToolAsync("save", """{"path":"at.carve"}"""));
+        var path = Path.Combine(Root, "at.carve");
+        var text = File.ReadAllText(path);
+        foreach (var (from, to) in names) text = text.Replace($"\"{from}\"", $"\"{to}\"", StringComparison.Ordinal);
+        File.WriteAllText(path, text);
+        Ok(await carve.CallToolAsync("open", """{"path":"at.carve"}"""));
+    }
+
+    private static string[] Warnings(string json) =>
+        [.. System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!)];
+
+    /// <summary>
+    /// RV-82, the reviewer's probe: faces 0-2 wear 'worn' (reads the mesh), face 3 a red 'worn@strip' from an older file. Export wrote
+    /// one material 'worn' and the red was gone; now export and render refuse, naming all three, the model unchanged, and check warns.
+    /// </summary>
+    [Fact]
+    public async Task A_copy_whose_name_the_model_already_has_is_refused_by_export_and_render_and_warned_of_by_check()
+    {
+        var carve = await StartAsync(second: false);
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_material", """{"name":"red","base_colour":"#FF0000"}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"worn","faces":[0,1,2]}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"red","faces":[3]}"""));
+        await Reopen(carve, ("red", "worn@strip"));
+        var model = carve.Store.Current.Model;
+
+        const string Taken = "materials['worn']: its copy for mesh 'strip' would be named 'worn@strip', which is the material 'worn@strip' the model already has, so ";
+        const string Rename = "; rename the material 'worn', the mesh 'strip' or the material 'worn@strip'";
+        Assert.Equal(Taken + "nothing is replaced and the model is unchanged" + Rename, Refused(await carve.CallToolAsync("export", """{"path":"a.glb"}""")));
+        Assert.False(File.Exists(Path.Combine(Root, "a.glb")));
+        Assert.Equal(Taken + "nothing is replaced and the model is unchanged" + Rename,
+            Assert.Throws<GraphSlotProblemException>(() => new GraphBakes().Resolve(model, TestContext.Current.CancellationToken)).Message);
+        Assert.Same(model, carve.Store.Current.Model);
+        Assert.Contains(Taken + "render and export refuse it" + Rename, Warnings(Ok(await carve.CallToolAsync("check", "{}"))));
+    }
+
+    /// <summary>RV-82: two copies of one name (mesh 'zz@second' wearing 'worn', mesh 'second' wearing 'worn@zz') are refused too, the second naming the first.</summary>
+    [Fact]
+    public async Task Two_copies_of_one_name_are_refused_naming_both()
+    {
+        var carve = await StartAsync(second: true);
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_material", """{"name":"other","occlusion_texture":{"graph":"curv.texgraph","output":"occlusion","size":64}}"""));
+        await Wear(carve, "worn", "strip");
+        await Wear(carve, "other", "second");
+        await Reopen(carve, ("strip", "zz@second"), ("other", "worn@zz"));
+        Assert.Equal(
+            "materials['worn@zz']: its copy for mesh 'second' would be named 'worn@zz@second', which is the name of the copy of 'worn' for mesh 'zz@second', "
+            + "so nothing is replaced and the model is unchanged; rename the material 'worn@zz', the mesh 'second' or the mesh 'zz@second'",
+            Refused(await carve.CallToolAsync("export", """{"path":"b.glb"}""")));
+        Assert.False(File.Exists(Path.Combine(Root, "b.glb")));
+    }
+
+    /// <summary>RV-82: a graph material whose own name has '@' (a hand-edited file) is written under that name, not cut at its first '@'.</summary>
+    [Fact]
+    public async Task A_graph_material_named_with_an_at_keeps_its_whole_name()
+    {
+        var carve = await StartAsync(second: false);
+        using var scope = carve;
+        await Wear(carve, "worn", "strip");
+        await Reopen(carve, ("worn", "wo@rn"));
+        Ok(await carve.CallToolAsync("export", """{"path":"d.glb"}"""));
+        Assert.Equal(["wo@rn"], Names(Read("d.glb")));
+    }
+
+    /// <summary>
+    /// RV-82: an export named in notifications/cancelled (sent by hand: the SDK's client sends none) stops its bake and writes no .glb.
+    /// A second export of the same model, started after, bakes the same and answers; uncancelled, the first (half a second ahead) has written by then.
+    /// </summary>
+    [Fact]
+    public async Task An_export_named_in_notifications_cancelled_writes_no_glb()
+    {
+        var carve = await StartAsync(second: false);
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("define_material", """{"name":"big","occlusion_texture":{"graph":"curv.texgraph","output":"occlusion","size":2048}}"""));
+        await Wear(carve, "big", "strip");
+
+        using var end = new CancellationTokenSource();
+        var export = carve.CallToolWithIdAsync("big-export", "export", """{"path":"cancelled.glb"}""", end.Token);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await carve.CancelAsync("big-export");
+        Ok(await carve.CallToolAsync("export", """{"path":"after.glb"}"""));
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        Assert.False(File.Exists(Path.Combine(Root, "cancelled.glb")), "the cancelled export wrote its .glb");
+        // A cancelled request gets no answer; the client stops waiting for one here.
+        end.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => export);
+    }
+
     [Fact]
     public async Task A_material_that_does_not_read_the_mesh_is_one_material_whatever_wears_it()
     {

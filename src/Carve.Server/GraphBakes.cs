@@ -134,6 +134,10 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
             OcclusionTexture = Slot(m, GraphSlotBake.Occlusion, m.OcclusionTexture, source, mesh, label),
         };
 
+        // RV-82: a copy never takes a name the model has; refused before anything bakes.
+        foreach (var clash in GraphSlotProblem.Clashes(model, ReadsMesh, GraphSlotProblem.ClashRefused).Take(1))
+            throw new GraphSlotProblemException(clash.Message);
+
         foreach (var m in model.Materials.Where(m => m.HasGraph))
         {
             if (!ReadsMesh(m))

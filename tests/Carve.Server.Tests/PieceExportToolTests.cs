@@ -29,6 +29,26 @@ public sealed class PieceExportToolTests() : TempFolderTests("carve-piece")
         Assert.Equal(modelBytes, File.ReadAllBytes(Path.Combine(Root, "chain.glb")));
     }
 
+    /// <summary>
+    /// RV-82: a piece of a mesh wearing a material (a plain one and a graph one) is built and carries both. Before T-164 gave
+    /// <c>PieceExport.Select</c> the model's materials, the piece could not be built and export threw.
+    /// </summary>
+    [Fact]
+    public async Task A_piece_wearing_a_plain_and_a_graph_material_is_written_with_both()
+    {
+        File.WriteAllText(Path.Combine(Root, "flat.texgraph"), """{ "version": 2, "size": 64, "seed": 1, "nodes": { "c": { "type": "colour", "params": { "colour": "#808080" } }, "o": { "type": "output", "inputs": { "in": "c" }, "params": { "role": "base_colour" } } } }""");
+        using var carve = await StartChainAsync(Root);
+        Ok(await carve.CallToolAsync("define_material", """{"name":"paint","base_colour":"#FF0000"}"""));
+        Ok(await carve.CallToolAsync("define_material", """{"name":"flat","base_colour_texture":{"graph":"flat.texgraph","output":"base_colour","size":64}}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"paint","faces":[0,1,2],"mesh":"upper"}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"flat","faces":[3,4,5],"mesh":"upper"}"""));
+
+        Ok(await carve.CallToolAsync("export", """{"path":"upper.glb","mode":"piece","meshes":["upper"]}"""));
+        var root = SharpGLTF.Schema2.ModelRoot.ParseGLB(File.ReadAllBytes(Path.Combine(Root, "upper.glb")));
+        Assert.Equal(["flat", "paint"], root.LogicalMaterials.Select(m => m.Name).Order(StringComparer.Ordinal));
+        Assert.NotNull(root.LogicalMaterials.Single(m => m.Name == "flat").FindChannel("BaseColor")!.Value.Texture);
+    }
+
     [Theory]
     [InlineData("""{"path":"p.glb","mode":"piece","meshes":[]}""", "meshes is empty")]
     [InlineData("""{"path":"p.glb","mode":"piece"}""", "meshes is empty")]

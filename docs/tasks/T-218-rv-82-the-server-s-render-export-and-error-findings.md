@@ -76,14 +76,54 @@ Written at the call checkpoint (about 60 tool calls) by the first agent, on clau
   request waiting). Its first two tests were seen to fail with the retry disabled (2 failed of 1066) and pass with
   it (server-unit PASS, 1066). Not yet in `### As built`; its RV-82 Outcome line is not filled yet:
   `fixed, 2ed3e9b2, RenderBakedFrameTests.An_edit_between_the_bake_and_the_frame_is_baked_and_drawn_again_never_returned_with_empty_slots`.
-- **Left:** the `@` clash (refuse in render and export, warn in check, a description or `help` clause and the
-  digest pin), export's cancellation (token into `Run` and `Resolve`, no .glb after a cancel, a test sending
-  `notifications/cancelled` by hand), the mesh-caused failure wording of `GraphSlotProblem.Failed` (a test reading
-  each whole message: no UVs, overlapping UVs, a missing group), the `PieceExport.Select` test (a piece export of a
-  mesh wearing a PNG and a graph material); then `### As built`, every Outcome line, the frame hash comparison
-  against `origin/milestone/M-29`, verify, lint and finish.
-- **Checked:** server-unit only. Not run: server-regression and the scenario suites; no frames compared yet.
-- **Surprising:** `ToolHarness` cannot reach the render tool's internals (the server is an extern-aliased assembly
-  and `EngineStatus.SetReady` is internal to Carve.Hosting), so the loop went into the linked `SheetVersions` and is
-  tested there with the real linked `RenderPump` and `GraphBakes`. The `uvs` look's own post (`RenderTool.cs`, near
-  line 740) draws no graph slots and was left as it was.
+- **Surprising (first agent):** `ToolHarness` cannot reach the render tool's internals (the server is an extern-aliased
+  assembly and `EngineStatus.SetReady` is internal to Carve.Hosting), so the loop went into the linked `SheetVersions`
+  and is tested there with the real linked `RenderPump` and `GraphBakes`.
+
+Second agent (claude-opus-5-5), at its call checkpoint (about 57 calls). Rebased on `origin/milestone/M-29`: nothing
+had landed (no sibling commit yet, so T-217's key change is still to come in a later rebase).
+
+- **Done, each test seen failing with the `src/Carve.Server` changes stashed (and `PieceExport.Select`'s
+  `model.Materials` removed: 6 of 1072 failed) and passing with them (server-unit, 1072 PASS):**
+  - **The `@` clash:** `GraphSlotProblem.Clashes(model, readsMesh, so)` lists every per-mesh copy (`m@mesh`,
+    `m@part@level`) whose name the model has, or that another copy took, in `Resolve`'s order. `GraphBakes.Resolve`
+    throws the first as a `GraphSlotProblemException` before anything bakes (render and export return it as it is);
+    `GraphSlotProblem.OnMesh` (check, and define_material's/set_material's warnings) yields those for its mesh with
+    "render and export refuse it". Message: `materials['worn']: its copy for mesh 'strip' would be named 'worn@strip',
+    which is the material 'worn@strip' the model already has, so nothing is replaced and the model is unchanged; rename
+    the material 'worn', the mesh 'strip' or the material 'worn@strip'`. `ExportTool.Copies` now counts as a copy only
+    `o@<that mesh>` on that mesh for a still-unbaked (mesh-reading) graph material `o`, so a graph material named with
+    `@` keeps its whole name. Tests (`GraphExportTests`):
+    `A_copy_whose_name_the_model_already_has_is_refused_by_export_and_render_and_warned_of_by_check` (the reviewer's
+    probe), `Two_copies_of_one_name_are_refused_naming_both`, `A_graph_material_named_with_an_at_keeps_its_whole_name`.
+    No description or `help` text was changed, so the digest pin was not retaken (whether one is wanted is open).
+  - **Export cancellation:** `ExportTool.Run` takes a `CancellationToken`, passes it to `Resolve`, and throws if
+    cancelled before writing. `ToolHarness.CallToolWithIdAsync`/`CancelAsync` (copied from Patina's harness). Test:
+    `GraphExportTests.An_export_named_in_notifications_cancelled_writes_no_glb` (a 2048 curvature bake, cancelled at
+    0.5 s; a second export of the same model answers; the first's .glb never appears).
+  - **Mesh-caused failures:** `GraphSlotProblem.Failed` ends a `MeshLayoutException` with "; the model is unchanged"
+    (its own text already says to unwrap or set UVs), a `MeshMaskException` with "; the model is unchanged: give mesh
+    'strip' a group 'rim' (define_group), or name one of its groups in the graph" (or the material twin, set_material);
+    every other cause as before. Test: `GraphMaterialErrorsTests.A_bake_that_fails_on_the_mesh_says_to_fix_the_mesh_through_export_and_render`
+    (export through the harness; render's path as `GraphBakes.Resolve`, whose message render returns unchanged).
+  - **`PieceExport.Select`:** `PieceExportToolTests.A_piece_wearing_a_plain_and_a_graph_material_is_written_with_both`;
+    failed with `Select`'s `model.Materials` argument removed (the code before T-164).
+- **In progress, not passing: the `uvs` look.** The claim "it draws no graph slots" holds (it draws `spec.UvImage`,
+  not the model's materials), but its graph image is baked on the snapshot and the pump may serve the frame on a later
+  model, laying another layout over the image: the same finding. `RenderTool.RunUvs`'s body from `store.Current` on is
+  now a local `TryOnce` run through `SheetVersions.Baked` (a new optional wording argument; `SheetVersions.UvImageDrawn`
+  and `UvImageStale(graphImage, bakedOn, drawnOn)`), retrying a frame whose version is not the bake's. The test
+  `RenderBakedFrameTests.A_uvs_frame_drawn_on_a_later_model_than_its_graph_image_is_drawn_again` **fails** (1 try, not
+  2): with no `Resolve` before the post, the pump's opening step finds the request "due" (`RenderPump.Step`, line 72:
+  `_version >= PostedVersion`) and serves it on the version it already shows, so the hook's edit does not reach this
+  frame. Next: read `RenderPump.Step` to see which interleaving can serve a uvs frame on a later model than its bake
+  (if none can, the `uvs` change is not needed: revert it and its test and answer that in `### As built`); if one can,
+  make the test drive it.
+- **Left after that:** confirm the "3 tries" error leaves the model unchanged and is the only new refusal; the frame
+  hash comparison against a run of `origin/milestone/M-29`; `cairn task T-218 verify` (server-regression and the
+  scenarios not yet run); `### As built` (fold both hand-offs in); the five Outcome lines as a bare `fixed` (per the
+  orchestrator's correction, `cairn lint` takes nothing after `fixed`; commits and test names go in `### As built`);
+  `cairn lint`; `finish`.
+- **Not checked:** the copy-vs-level clash (`m@part@level`) has no test of its own; render's mesh-cause and clash
+  messages are tested through `Resolve`, not through a real render; the Weathered scenario's `ErrorsStage.Tail` is a
+  file cause and keeps the old tail.

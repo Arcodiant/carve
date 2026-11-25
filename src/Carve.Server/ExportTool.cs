@@ -120,7 +120,8 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         return MeshToolSupport.Create<ExportTool>("export", Text, schema);
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? limits = null, JsonElement? mode = null, JsonElement? overwrite = null, JsonElement? write_limits = null, JsonElement? meshes = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? limits = null, JsonElement? mode = null, JsonElement? overwrite = null, JsonElement? write_limits = null, JsonElement? meshes = null,
+        CancellationToken cancellationToken = default)
     {
         var errors = UnknownArguments("export", context, "path", "allow_unweighted", "limits", "mode", "meshes", "overwrite", "write_limits");
         var text = RequiredString("path", path, errors);
@@ -162,7 +163,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         {
             try
             {
-                var drawn = bakes.Resolve(model, CancellationToken.None);
+                var drawn = bakes.Resolve(model, cancellationToken);
                 baked.AddRange(drawn.Baked);
                 model = drawn.Model;
             }
@@ -181,6 +182,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         var source = LimitsSource.Find("export", limitsPath, writeLimits, target.FullPath, out var limitsError, toolFolder.Directory);
         if (source is null) return Error(limitsError!);
 
+        cancellationToken.ThrowIfCancellationRequested(); // RV-82: a cancelled export writes nothing, the bake done or not
         var written = clips ? Clips(model, target, replace, source)
             : kind == "piece" ? Piece(model, pieceMeshes ?? [], target, allowUnweighted, replace, source)
             : model.Skeleton is not null ? Skinned(model, target, allowUnweighted, replace, source, copies: copies)
@@ -305,8 +307,10 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
     /// </summary>
     private static (Model Model, string? Warning) Copies(Model model)
     {
-        var copies = model.Materials.Where(m => m.Name.IndexOf('@') is > 0 && model.Materials.Any(o => o.HasGraph && m.Name.StartsWith(o.Name + "@", StringComparison.Ordinal))).Select(m => m.Name).ToHashSet();
-        var users = model.Meshes.SelectMany(n => Model.MaterialsUsedBy(n.Mesh).Where(copies.Contains).Select(c => (Base: c[..c.IndexOf('@')], Copy: c, Mesh: n.Name))).ToList();
+        // A copy is exactly <c>o@mesh</c> on that mesh, o a graph material still unbaked (one that reads the mesh); any other `@` name is the user's (RV-82).
+        var users = model.Meshes.SelectMany(n => Model.MaterialsUsedBy(n.Mesh)
+                .Select(c => (Base: model.Materials.FirstOrDefault(o => o.HasGraph && c == $"{o.Name}@{n.Name}")?.Name!, Copy: c, Mesh: n.Name)))
+            .Where(u => u.Base is not null).ToList();
         var several = new List<string>();
         foreach (var g in users.GroupBy(u => u.Base))
         {

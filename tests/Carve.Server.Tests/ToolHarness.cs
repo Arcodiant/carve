@@ -83,6 +83,23 @@ internal sealed class ToolHarness : IToolCaller, IDisposable, IAsyncDisposable
     public Task<JsonElement> CallToolAsync(string name, string arguments) =>
         SendAsync("tools/call", new JsonObject { ["name"] = name, ["arguments"] = JsonNode.Parse(arguments) });
 
+    /// <summary>A tools/call sent with the id <paramref name="id"/>, so a test can cancel it by that id (as Patina's harness does).</summary>
+    public Task CallToolWithIdAsync(string id, string name, string arguments, CancellationToken cancellationToken) =>
+        (_client ?? throw new InvalidOperationException("InitializeAsync first")).SendRequestAsync(
+            new JsonRpcRequest { Id = new RequestId(id), Method = "tools/call", Params = new JsonObject { ["name"] = name, ["arguments"] = JsonNode.Parse(arguments) } },
+            cancellationToken);
+
+    /// <summary>
+    /// Sends notifications/cancelled for the request with <paramref name="id"/> by hand: the SDK's client (2.3.0) sends none when its
+    /// token is cancelled (RV-68), though a client over stdio does.
+    /// </summary>
+    public Task CancelAsync(string id) =>
+        _client!.SendMessageAsync(new JsonRpcNotification
+        {
+            Method = "notifications/cancelled",
+            Params = new JsonObject { ["requestId"] = id, ["reason"] = "test" },
+        });
+
     public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
 
     public async ValueTask DisposeAsync()
