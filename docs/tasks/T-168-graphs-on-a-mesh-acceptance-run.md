@@ -131,3 +131,29 @@ Reason: the person approved round 1's look with "Generally fine but the wear rea
 Before (6 nodes, caption "a mesh_curvature node, narrowed by levels, as the mask of a blend that wears a base colour toward bright steel (in patina the stand-in gives 0.5, so the mask is 0 and the image is the base colour)"): `edges` (mesh_curvature, width 0.02) -> `wear` (levels 0.6..0.9) -> mask of `worn` (blend mix iron #303236 to steel #c4c6c8).
 
 After (9 nodes): `edges` -> `band` (levels 0.6..0.9); `grain` (fbm, cells 12x12) -> `chips` (levels 0.45..0.6); `wear` = blend multiply of `band` and `chips`, the mask of `worn`. Caption adds "multiplied by a noise (fbm through levels)" and "wear that comes and goes along an edge reads as wear, an even band as an outline". Stand-in 0.5 still gives band 0, so mask 0 and the base colour.
+
+### Hand-off (agent 4, Claude Sonnet 5.5 `claude-sonnet-5-5`): round 2, run 2026-11-24 23:34:50 to 23:36:25 (1 m 35 s)
+
+Round folder `artifacts\T-168\round-2\` (copy whole, with `frames/`, on `G:\My Drive\artifacts\carve\M-29\T-168\round-2\`). Model reported `claude-opus-5-5`. Description change: see the section above (mesh_curvature's example now breaks the mask up with noise); nothing else changed. Rebased on origin/milestone/M-29 first (B-10 in). patina-unit and scenario-patina pass.
+
+**Calls (25), in order:** open wrench-start; get_mesh `{"include":["groups","materials","face_materials"]}` (answered, no oversize, none refused); patina open `graphs/worn-steel.texgraph`; get_graph; `nodes` mesh_occlusion then mesh_curvature (calls 5, 6; never `help`); uvs render with labels; define_material steel (graph, 512); render; define_graph of a 24-node graph (fbm-broken curvature wear, occlusion grime, roughness/metallic); save; define_material; uvs renders of `wear` and `grime`; 4-view render; two close renders; edit_graph (occ reach 0.012 to 0.02, grime levels); save; uvs grime; closes; uvs wear; check (clean); save wrench-weathered.carve; export; render_glb. Hesitation: one tuning loop, the dirt first reached only the hidden end of the drive (reach 0.012), widened to 0.02 after the closes; no wrong turn otherwise. Refused attempts 0. It repointed the material at the existing `worn-steel.texgraph` after the open warning, so it never saved a file of its own name. Its final note said the grip stays clean (not on the steel material). Bakes (`baked` ms): 471 (base colour 512), 810 (wear 1024), 1329 (grime 512), 1042 + 114 (base colour + metallic_roughness 512), 1073, 940 + 123, 335 (1024).
+
+| | Round 1 | Round 2 |
+|---|---|---|
+| Model | claude-opus-5-5 | claude-opus-5-5 |
+| Calls | 31 | 25 |
+| Time | 2 m 18 s | 1 m 35 s |
+| `help` / `nodes` | never / yes | never / yes (calls 5, 6) |
+| `get_mesh` | `{}`, 53,645 chars, refused, Bash tried | `include` of groups, materials, face_materials, fine |
+| Refused attempts | 1 | 0 |
+| Hard-edge (margin 30) | 93.778 pass | 61.501 pass |
+| Crevice (margin 10) | 22.268 pass | **2.144 FAIL** (open 93.315 - crevice 91.172) |
+| Grip std | 0.000 pass | 0.000 pass |
+| Other checks | pass | pass; render vs render_glb 0 px |
+| Look | approved with note | approved, no note |
+
+**Checks (5 of 6):** the crevice check fails: `open steel mean luma 93.315 - drive crevice mean 91.172 = 2.144, below 10`. The agent's dirt is real but sits mostly in the ring around the hub and on the drive's hidden end, so the drive's mean barely drops. Not a product fault; no check loosened, no description changed in answer (that goes back through the orchestrator). Round 2 does not meet the Scope's "two rounds at least" cleanly: it has a failed check.
+
+**The person's ruling on round 2's look (2026-11-25): approved**, no notes (outcome "approved", no notes on items or on the whole). The review set was 8 frames (R1 and R2 front, three-quarter, wear mask on `uvs`, R2's agent closes on the drive and glb close) with the prompt, the description change, the transcript and the checks (including the crevice failure) stated. My own reading, given to the person: R1 a thin even rim; R2 patchy bright streaks that come and go along the arm and head rim, uneven bands on the `uvs` mask, still edge-concentrated; dirt a subtle fleck around the drive base and ring.
+
+Images opened: 2 (montages). Not checked: the other session frames, `glb-*` beyond the review set, `render-front-control`.
