@@ -93,8 +93,8 @@ put in, hashes to the digest taken before (CC6E5E26...), so the bytes are as bef
 **Served description and the digest.** `get_mesh`'s description as served by `tools/list` is 3,682 characters of the 3,686
 allowed (3,676 before B-10). The served `tools/list` of this branch against a scratch build of `origin/milestone/M-29` differs
 in three fields only: `get_mesh`'s description, `get_mesh`'s input schema, and `help`'s description (it names `get_mesh`
-among its entries; help is outside the digest).
-
+among its entries; help is outside the digest).
+
 **RV-82 correction (T-220).** The six default-answer digests did not reach a holed face, a deleted face, a morph target or a graph slot, and `help` has nine entries, `get_mesh`'s among them. T-220 added three digests, of `gatehouse.carve` (holes and tombstones) and `arm.carve` (morph targets) taken from a build of `origin/main`, and of `barrel-weathered.carve` (a graph slot) taken from `origin/milestone/M-29` at c518cce, the commit before B-10 landed, because that file is version 10 and does not open on `origin/main`. Each matches HEAD's default answer.
 
 **Sizes on the wrench, characters** (whole answer 52,990): uvs 16,312; faces 13,827; edges 11,612; vertices 8,882; seams 2,139;
