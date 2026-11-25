@@ -4,7 +4,7 @@ description: >-
 ---
 # T-217 — RV-82: the bake's key, validation of mesh parameters, and the graphs suites
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
