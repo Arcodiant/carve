@@ -59,6 +59,49 @@ Each finding of RV-82 named here, by its heading there:
 
 ## Notes
 
+### Hand-off
+
+Written at the 60-call checkpoint by an agent on Claude Opus 5.5 (`claude-opus-5-5`). Commit `fb827d1`.
+
+**Done (committed, `graphs-unit` and `server-unit` pass on it; `verify` not yet run, `core-unit` and `patina-unit` not run):**
+- The key: `GraphSlotBake.Key(files, output, size, slot, model, mesh)` writes `metallic_roughness_texture` for that slot
+  and `base_colour_texture` for every other (each other slot packs an output as base colour does, or refuses it, by
+  `PackingOf`). `GraphBakes.Resolve` passes the field; `Image` (the `uvs` look) passes `BaseColour` and its `:image`
+  suffix is gone. Tests: `GraphSlotBakeTests.The_key_tells_apart_slots_that_pack_one_output_differently_and_only_those`,
+  `GraphBakesTests.Two_slots_that_pack_one_output_differently_bake_apart_and_alike_share` (copies
+  `samples/graphs/planks.texgraph`, so server-unit needs `samples/graphs/**` in its inputs).
+- Read then re-read: `GraphSlotBake.Unchanged(files)` re-reads and compares the hash; both `Put`s in `GraphBakes.cs`
+  run only when it holds. Tests: `GraphSlotBakeTests.Unchanged_holds_until_a_file_is_edited`,
+  `GraphBakesTests.A_file_edited_during_its_bake_is_not_cached_under_the_bytes_read_before` (the injected clock edits
+  `inner.texgraph` as the base colour bake starts; restored, the next resolve must bake again).
+- Absolute paths: `Read` hashes each file's path relative to the top file's folder.
+  Test: `GraphSlotBakeTests.The_files_hash_follows_the_nesting_not_the_folder`.
+- Mesh parameters (for T-219): a new virtual `NodeType.CheckParameters(NodeParameters)` in `src/Patina.Graphs/Nodes/NodeType.cs`,
+  asked by `GraphValidator.Analyse` (`src/Patina.Graphs/GraphValidator.cs`, after a node's parameters resolve, only when
+  none of them had a range fault). `MeshCurvatureNode`, `MeshOcclusionNode` and `MeshMaskNode` override it. The faults are
+  ordinary `GraphFault`s, so `TexGraphFile.Read`'s faults, `GraphEvaluator`'s `GraphFaultException`, and so
+  `GraphSlotBake.Validate`, `define_material`, `check`, and patina's `define_graph`/`edit_graph`/`open`/`save` all carry
+  them. Messages: `node 'w' parameter 'width': is 0, but must be above 0 metres`, `node 'w' parameter 'reach': is 0, but
+  must be above 0 metres`, `node 'k': give exactly one of params 'group' and 'material'` (`, not both` when both). The
+  evaluation-time `MeshParameterException` is kept (same wording after its old `nodes['id']` prefix) but no evaluator
+  reaches it now. Tests: `MeshNodesTests.Parameters_no_range_can_refuse_are_graph_faults_with_or_without_a_source`
+  (replaces `Parameters_the_file_cannot_refuse_are_refused_with_or_without_a_source`),
+  `GraphSlotBakeTests.Validate_refuses_a_mesh_parameter_every_bake_would`.
+
+**Not checked yet:** that each new test fails without its fix (argued from the code, not run against the old code);
+no `Patina.Graphs.Tests` test of `CheckParameters` with a non-mesh node; patina server tests (T-219's) may pin the old
+"it evaluates" answer and fail now.
+
+**Left:**
+- Tiers: move `Each_node_equals_its_bake_at_every_tile_size_and_a_zero_cap` (at 1024; 256 is 1.6 s too), the occlusion
+  crevice test, raised hoops, plain barrel occlusion (`MeshNodesTests.cs`) and the broken-copy "curvature read as
+  occlusion" (`BrokenCopiesTests.cs:55`) to a `Tier` `regression` class; add `graphs-regression` to `tests.json` and to
+  this file's `**Verify:**`; one line in `CLAUDE.md`'s Layout. Delete `Times_each_map_on_the_wrench` (asserts nothing).
+- Inputs in `tests.json`: `graphs-unit` + `samples/graphs/**`; `server-unit` + `samples/*.carve`, `samples/graphs/**`,
+  `tests/Carve.CharacterLoad.Tests/RunContent.cs`; `server-regression` + `samples/graphs/**`. Then search the test sources
+  for `RepoRoot`/`samples` and each project's linked `Compile`/`Content` items for anything else.
+- `### As built`, the eleven `**Outcome:**` lines in RV-82, `verify`, `cairn lint`, `finish`.
+
 - **A fix member of RV-82,** the review of M-29 (`docs/reviews/RV-82-review-of-m-29.md`). Each finding listed in the
   Scope is read in full there: where it is, what is wrong, and how the reviewer showed it.
 - Every finding gets a fix with a test that fails without it, or, where the finding is about a record, the record
