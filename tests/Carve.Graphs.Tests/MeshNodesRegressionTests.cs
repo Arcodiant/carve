@@ -1,3 +1,4 @@
+using System.Numerics;
 using Carve.Core;
 using Carve.Core.Baking;
 using Carve.Core.Tests;
@@ -47,6 +48,53 @@ public class MeshNodesRegressionTests
 
     // ---- M-24's numbers through the node ----
 
+    [Fact]
+    public void Curvature_keeps_M24s_convex_jaw_edges_and_flat_handle()
+    {
+        const int size = 1024;
+        var model = Wrench();
+        var mesh = model.Meshes[0].Mesh;
+        var bytes = Run(new MeshBakeSource(model, model.Meshes[0].Name), Node(MeshCurvatureNode.TypeName, "\"width\": 0.003"), size);
+        int At(Vector2 uv) => bytes[(int)Math.Floor(uv.Y * size) * size + (int)Math.Floor(uv.X * size)];
+
+        // As CurvatureStage: each edge of two jaw ("dark") faces bending 60 degrees or more and turning away, at the middle of its UV edge.
+        var jaw = mesh.Style!.Groups.Single(g => g.Name == "dark").Faces.ToHashSet();
+        var owners = jaw.SelectMany(f => Edges(mesh, f).Select(e => (e.Key, f))).GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Select(p => p.f).ToList());
+        var checkedEdges = 0;
+        foreach (var f in jaw.Where(mesh.Uvs!.IsMapped))
+            foreach (var (key, corner) in Edges(mesh, f))
+            {
+                if (owners[key].Count != 2) continue;
+                var g = owners[key].Single(o => o != f);
+                var (n, m) = (Vector3.Normalize(mesh.FaceNormal(f)), Vector3.Normalize(mesh.FaceNormal(g)));
+                var mid = (mesh.Vertices[key.Item1] + mesh.Vertices[key.Item2]) / 2;
+                if (Math.Acos(Math.Clamp(Vector3.Dot(n, m), -1f, 1f)) * 180 / Math.PI < 60 || Vector3.Dot(Centre(mesh, g) - mid, n) >= 0) continue;
+                var uv = mesh.Uvs.Of(f)!;
+                var value = At((uv[corner] + uv[(corner + 1) % uv.Count]) / 2);
+                Assert.True(value >= 218, $"jaw face {f}'s convex edge to face {g} reads {value}, under 218");
+                checkedEdges++;
+            }
+        Assert.True(checkedEdges >= 50, $"only {checkedEdges} convex jaw edges found");
+
+        var handle = mesh.Style.Groups.Single(g => g.Name == "rubber").Faces.Where(mesh.Uvs.IsMapped).MaxBy(f => Area(mesh.Uvs.Of(f)!));
+        var c = mesh.Uvs.Of(handle)!.Aggregate(Vector2.Zero, (a, b) => a + b) / mesh.Uvs.Of(handle)!.Count;
+        Assert.Equal(128, At(c));
+    }
+
+    private static IEnumerable<((int, int) Key, int Corner)> Edges(PolygonMesh mesh, int face)
+    {
+        var loop = mesh.Faces[face].Loop;
+        for (var i = 0; i < loop.Count; i++)
+            yield return ((Math.Min(loop[i], loop[(i + 1) % loop.Count]), Math.Max(loop[i], loop[(i + 1) % loop.Count])), i);
+    }
+
+    private static float Area(IReadOnlyList<Vector2> p)
+    {
+        float s = 0;
+        for (var i = 0; i < p.Count; i++) s += p[i].X * p[(i + 1) % p.Count].Y - p[(i + 1) % p.Count].X * p[i].Y;
+        return MathF.Abs(s) / 2;
+    }
+
     /// <summary>As OcclusionStage: the socket top within 1.5 mm of the drive's footprint against grip facet 5's middle (2 mm of its centre).</summary>
     [Fact]
     public void Occlusion_keeps_M24s_drive_crevice_50_below_the_open_grip()
@@ -82,4 +130,14 @@ public class MeshNodesRegressionTests
     [Fact]
     public void The_plain_barrels_occlusion_is_exactly_1() =>
         Assert.Null(AllOpen(Run(new MeshBakeSource(Model.Of("barrel", PlainBarrel()), "barrel"), Node(MeshOcclusionNode.TypeName, "\"rays\": 32, \"reach\": 0.15"), 512)));
+
+    // ---- determinism ----
+
+    [Fact]
+    public void Two_sources_give_the_same_bytes()
+    {
+        var model = Wrench();
+        foreach (var node in new[] { Node(MeshCurvatureNode.TypeName, "\"width\": 0.003"), Node(MeshOcclusionNode.TypeName, "\"rays\": 8, \"reach\": 0.035"), Node(MeshPositionNode.TypeName) })
+            Assert.Equal(Run(new MeshBakeSource(model, "wrench"), node, 256), Run(new MeshBakeSource(model, "wrench"), node, 256));
+    }
 }
