@@ -4,7 +4,7 @@ description: >-
 ---
 # T-219 — RV-82: patina's findings
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
