@@ -11,8 +11,8 @@ public sealed class GetMeshTool(ModelStore store)
 {
     public const string Text =
         "Reads back the current mesh, so you can learn its ids before editing. "
-        + "A large mesh is read in parts, as its whole answer can pass a client's limit on a tool result (samples/wrench.carve, 120 faces, is 53,000 characters): include names the sections, faces narrows them to face ids or a group. "
-        + "Worked example on the wrench, each answer under 25,000 characters:\n"
+        + "A large mesh is read in parts, as its whole answer can pass a client's limit (samples/wrench.carve, 120 faces, is 53,000 characters): include names the sections, faces narrows them to face ids or a group; ask a few of one group at a time. "
+        + "Worked example on the wrench, each under 25,000 characters:\n"
         + ExampleMarker + WrenchGroups + "\n"
         + ExampleMarker + WrenchSteel + "\n"
         + "Optional arguments: mesh, the mesh to read, which may be left out while the model has one; target, one of the mesh's morph targets, to read its absolute positions too (an unknown name is a tool error listing them); "
