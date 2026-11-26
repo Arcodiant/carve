@@ -322,8 +322,9 @@ export writes it. The rules:
 `samples/graphs/` holds a graph per material, each with its exported PNGs and
 its swatch sheet in a folder of its name: `planks`, `cobblestones`, `bricks`
 (with mortar, tint and jitter exposed; `bricks/variants/grey/` is its grey stone
-variant), `fabric`, `marble` (veins by `blend`'s `difference`), `painted-metal`, `floor-tiles`, `grime` (a filter graph with
-an `input`) and `old-wall` (the bricks and the grime used as `graph` nodes).
+variant), `fabric`, `marble` (veins by `blend`'s `difference`), `painted-metal`,
+`floor-tiles`, `grime` (a filter graph with an `input`) and `old-wall` (the
+bricks and the grime used as `graph` nodes).
 `samples/graphs/faults/` holds two graphs that `check` finds faults in.
 
 ### A worked example
