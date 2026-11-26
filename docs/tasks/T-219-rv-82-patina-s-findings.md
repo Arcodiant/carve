@@ -58,80 +58,69 @@ Each finding of RV-82 named here, by its heading there:
   that cannot be fixed inside this member's files without a design change is reported, not forced.
 - The member fills the `**Outcome:**` line of each of its findings in RV-82 (`fixed`, with the commit and the test's
   name; or `no change needed: <reason>`), and touches no other finding's line.
+- **The person's ruling (2026-11-25):** `check` keeps `one-value` for an output that reads a mesh node, with the true
+  reason in its text in place of "clipped or flat; widen its levels"; the problem list and `ok` are unchanged.
+  Withholding `one-value` was declined.
 
-### Hand-off
+### As built
 
-**Agent two (claude-opus-5-5) stopped at its 60-call checkpoint.** Rebased onto `origin/milestone/M-29` (clean, after
-T-218 and T-220). Committed in one commit after agent one's:
-- *The person's ruling (2026-11-25), recorded:* `check` keeps `one-value` for an output that is flat only because its
-  mesh inputs are neutral stand-ins, with the true reason in its fix in place of "clipped or flat; widen its levels";
-  problem list and `ok` unchanged. Declined: withholding `one-value`. Chosen where: `GraphEvaluator.TypesReaching(output)`
-  (new, public, read-only: the type names of every node an output reads, nested nodes as expanded) and
-  `CheckTool.Run`/`Report` (an optional `neutral` set of outputs reading a mesh node; one-value's message for those is
-  its measured part plus `CheckTool.NeutralFix`). `OneValueRule` and `CheckRules` are untouched, so carve's use of the
-  rules is unchanged; patina's tool, which knows the mesh, picks the text.
-- Tests: `MeshGraphTruthTests.Check_gives_one_value_the_neutral_reason_only_for_an_output_that_reads_a_mesh_node` (a
-  mesh output and a flat fbm/levels output in one graph: true text vs old text), the nested test now asserts the one
-  problem and `NeutralFix` too, `MeshNodeToolTests.Check_tells_the_empty_mask_it_is_flat_for_the_neutral_inputs` (both
-  weathered samples through the tool). All three seen failing in a scratch copy (`$env:TEMP\t219-scratch`) with the
-  substitution disabled. T-162's `Check_reports_the_one_empty_mask_and_nothing_else` (on `CheckRules`) unchanged and
-  holds; no test pinned the old advice text on a mesh output (`CheckToolTests` flat-mask reads no mesh).
-- *Nested note seen failing:* in the scratch copy with `MeshNodeNames`'s recursion disabled,
-  `A_graph_nesting_a_mesh_graph_says_so_in_every_answer` failed (Assert.Contains, get_graph's note).
-- check's description: "Fix: widen its levels, use a noise or pattern, or drop it; one reading a mesh is told why."
-  (tries at 3,748 and 3,689 chars failed `Every_description_is_under_the_limit`, limit 3,686; this one, about 3,680, is
-  unrun). The last patina-unit run's only failure was that length test.
-- README: the weathered sentence says the fix names the neutral inputs, for any mesh-reading output, nested or not.
-- *Scenario break:* `MeshNodesStage.CheckTitleNote` is the one title-note check; the break runs it on the plain
-  sheet's title against itself (no note), which must fail; no new capture, so no new frame. Not yet run.
-- T-162's `### As built` publish line corrected (`Carve.Core.dll` new to patina, with RV-82's measurement).
-- `PatinaHarness`'s reflection on `EngineStatus.SetReady` kept: Carve.Hosting has no public ready and no
-  InternalsVisibleTo, and the test project has no other seam; the `shortcut:` comment now says the limit and when to
-  replace it. `CheckSamplesTests.cs` edited by agent one (this member's Nit), stands.
+Three agents, all on claude-opus-5-5. Commits: `2e502508` (agent one: the nested note, overrides validated, swatch's
+views, the examples evaluated), `1f4ebd5c` (agent two: check's neutral reason, the scenario's break, T-162's record),
+`08a82f54` (agent two: check's description within its length test); agent three ran the suites, compared the frames
+and wrote this. RV-82's seven Outcome lines are `fixed`.
 
-**Left:** confirm `cairn test run patina-unit` after the description change (a run was in flight at the checkpoint);
-`verify` (server-unit, scenario-patina: the break's run); frames by hash against a run of `origin/milestone/M-29`
-(`cairn test artifacts scenario-patina`); `### As built` from this and agent one's notes below; the seven Outcome lines;
-`cairn lint`; `finish`.
-
-**Agent one's hand-off** (claude-opus-5-5) stopped at the 60-call checkpoint. Code and tests committed in one commit; `cairn test
-run patina-unit` passes (505 + all of Patina.Server.Tests). `verify` not yet run (server-unit, scenario-patina left).
-
-**Done:**
-- *Bad parameter (Major):* T-217's faults hold in define_graph, open, save (refused) and edit_graph (refused, "would
-  leave 1 new fault"): `MeshGraphTruthTests.A_bad_mesh_parameter_is_a_fault_in_define_edit_open_and_save` (four
-  probe rows) and `Edit_graph_answers_a_width_of_0_as_a_fault`, which passed before any change (T-217's fix). The path
-  that still reached evaluation: an exposed parameter's override inside its range (0) driving `mesh_curvature.width`;
-  export, swatch and check answered "An error occurred invoking '...'" (seen failing). Fixed in
-  `ParameterOverrides.TryApply`: the overridden graph is validated, refused as "<tool>: with parameters w = 0 the graph
-  has 1 fault: - node 'm' parameter 'width': ...". Test: `A_parameter_value_a_mesh_node_refuses_is_answered_naming_the_node`.
-  No other evaluation-time throw found (unknown group/material is accepted by the stand-in, as the reviewer says).
-- *Nested note (Major), the note half:* `ToolSupport.MeshNote` recurses over `GraphValidator.Uses` (reads each
-  expanded use's file, prefixes `<node>/`); `save` now carries the note too. Test:
-  `A_graph_nesting_a_mesh_graph_says_so_in_every_answer` (get_graph, save, open, export, check's notes, and
-  `h/g/edges` two levels down). Not yet seen failing without the fix (the first "before" run failed for another
-  reason, the graph's version); to do: disable the recursion once and see it fail, or say so.
-- *swatch note:* the harness takes `blankEngine: true` (a ready `EngineStatus` by reflection on internal `SetReady`,
-  marked `shortcut:`; a loop answers each `SwatchRequest` with blank frames and keeps the sheet's labels).
-  `Every_swatch_view_says_the_mesh_inputs_are_neutral` holds flat, tiled, sphere, cube and sheet captions and the
-  sheet title label.
-- *Worked examples:* `NodeToolTests.Every_types_worked_examples_run_as_written` now exports each evaluating example
-  (size 32). `MeshGraphTruthTests.The_mesh_curvature_example_is_the_base_colour_on_the_stand_in_and_wears_in_runs_along_a_real_edge`
-  holds both caption claims (a test `IMeshMaps` band).
-- *CheckSamplesTests Nit:* both sides key on "a node type `NodeRegistry.BuiltIn` does not know";
-  `MeshNodeToolTests.MeshSamples` is MemberData, with `The_mesh_samples_are_the_two_weathered_graphs`.
-- README's weathered paragraph names save and the nested case.
-
-**Left:**
-- **Open question for the orchestrator (not decided):** check's `one-value` "clipped or flat; widen its levels" on an
-  output flat only because its mesh inputs are neutral. Any change applies equally to the committed weathered graphs'
-  `wear`/`grime` (direct mesh nodes, flat for the same reason), so per the brief it is a change to an existing check's
-  target. Option A: withhold `one-value` for such an output (check then reports `ok: true`, no problems, for
-  weathered-iron and weathered-staves, the note in `notes`; T-162's `Check_reports_the_one_empty_mask_and_nothing_else`
-  is on `CheckRules` and would still hold, but README line "check reports one-value on those two outputs" and T-162's
-  record change). Option B: keep `one-value` but replace its Fix text for such an output with the reason ("flat
-  because its mesh inputs are neutral stand-ins; the mesh gives the real maps in carve"); same problem list, new
-  message. As committed, nested graphs now get the note and the same `one-value` as the direct ones.
-- The scenario's break (MeshNodesStage), T-162's `### As built` (Carve.Core.dll is new to patina's output), the
-  Outcome lines, `### As built`, frames compared by hash against `origin/milestone/M-29`, verify, lint, finish.
-- Not touched: scenarios/, RV-82.
+- **A bad mesh parameter (Major).** T-217's validation faults (merged as `091a4d57`, "Merge task/T-217") already held in
+  patina's `define_graph`, `open`, `save` and `edit_graph`:
+  `MeshGraphTruthTests.A_bad_mesh_parameter_is_a_fault_in_define_edit_open_and_save` (four probe rows) and
+  `Edit_graph_answers_a_width_of_0_as_a_fault` passed before any change here. The one path that still reached
+  evaluation was an exposed parameter's override, inside its declared range (0), driving `mesh_curvature.width`:
+  `export`, `swatch` and `check` answered "An error occurred invoking '...'". `ParameterOverrides.TryApply` now validates
+  the overridden graph and refuses it as "<tool>: with parameters w = 0 the graph has 1 fault: - node 'm' parameter
+  'width': ..." (`2e502508`). Test: `A_parameter_value_a_mesh_node_refuses_is_answered_naming_the_node`, seen failing
+  with the SDK's generic error before the fix. No other evaluation-time throw was found.
+- **The nested graph (Major).** `ToolSupport.MeshNote` recurses over `GraphValidator.Uses`, naming nested nodes as
+  expanded (`h/g/edges`); `save` carries the note too (`2e502508`). Test: `A_graph_nesting_a_mesh_graph_says_so_in_every_answer`
+  (get_graph, save, open, export, check, two levels down), seen failing (Assert.Contains on get_graph's note) in a
+  scratch copy with the recursion disabled. *What `check` says now* (`1f4ebd5c`): for an output whose reach includes a
+  mesh node, `one-value` stays in the problem list and `ok` is unchanged, but its message is the measured part followed
+  by `CheckTool.NeutralFix`: "Fix: none here: it reads a mesh input, which in patina is a neutral stand-in, so it is flat
+  for that reason; carve gives the real maps when a material names the graph, and its check there judges them." The text
+  is chosen in `CheckTool.Run`/`Report` (patina's tool, which knows the mesh), from a set of outputs found by the new
+  read-only `GraphEvaluator.TypesReaching(output)`; `OneValueRule` and `CheckRules` are untouched, so carve's check is
+  unchanged. Tests: `MeshGraphTruthTests.Check_gives_one_value_the_neutral_reason_only_for_an_output_that_reads_a_mesh_node`
+  (a mesh output and a flat fbm/levels output in one graph get the true and the old text), the nested test (the one
+  problem and `NeutralFix`), and `MeshNodeToolTests.Check_tells_the_empty_mask_it_is_flat_for_the_neutral_inputs` (both
+  weathered samples); all three seen failing in a scratch copy with the substitution disabled. T-162's
+  `Check_reports_the_one_empty_mask_and_nothing_else` holds unchanged. check's description gained "one reading a mesh
+  is told why" (an earlier wording failed `Every_description_is_under_the_limit` at 3,748 of 3,686 characters; the
+  committed one passes `patina-unit`).
+- **The scenario's break.** `MeshNodesStage.CheckTitleNote` is now the one title-note check (the sheet's title runs at
+  least 80 px past the same graph's with a gradient in place of the mesh node), and the break runs that same check on
+  the plain sheet's title against itself (`1f4ebd5c`). In the verified run (J-20261126-001448-df13e3, `08a82f54`) it
+  failed as predicted: "the sheet's title runs to x 258, only 0 px past the title with no note (258)", and the stage's
+  `checks.Check(probe.Failures.Count > 0, ...)` passed. What it does not prove: the check could still pass with the note
+  missing if the mesh graph's title grew by 80 px for another reason, or if the plain title were measured short (glyphs
+  too dim for `SwatchStage.Bright`, or a blank capture), since it compares extents, not the text. No new capture.
+- **The worked examples.** `NodeToolTests.Every_types_worked_examples_run_as_written` now exports every evaluating
+  example (size 32), not only validates it;
+  `MeshGraphTruthTests.The_mesh_curvature_example_is_the_base_colour_on_the_stand_in_and_wears_in_runs_along_a_real_edge`
+  holds the caption's two claims, on the neutral stand-in and on a test `IMeshMaps` band (`2e502508`). Not seen failing:
+  they guard claims that were true and unguarded.
+- **swatch's note.** `Every_swatch_view_says_the_mesh_inputs_are_neutral` holds the flat, tiled, sphere, cube and sheet
+  captions and the sheet's title label (`2e502508`), through `PatinaHarness(blankEngine: true)`, which answers each
+  `SwatchRequest` with blank frames. Its `shortcut:` stays: the harness reaches Carve.Hosting's internal
+  `EngineStatus.SetReady` by reflection, since Carve.Hosting has no public ready state and no InternalsVisibleTo and the
+  test project has no other seam; a rename fails every blankEngine test with a NullReferenceException, and it is to be
+  replaced when `EngineStatus` gains a public ready state. Not seen failing (new coverage of a true note).
+- **CheckSamplesTests (Nit).** It and its stand-in both key on "a node type `NodeRegistry.BuiltIn` does not know", not
+  on file names; `MeshNodeToolTests.MeshSamples` is MemberData, held by `The_mesh_samples_are_the_two_weathered_graphs`
+  (`2e502508`). Not seen failing.
+- **T-162's As built.** Its publish line now says `Carve.Core.dll` is new to patina's output, with RV-82's measurement
+  (`1f4ebd5c`); a record, no test.
+- **README.md:** patina's weathered paragraph names `save` and the nested case, and says check's fix names the neutral
+  inputs for any mesh-reading output, nested or not.
+- **Frames:** scenario-patina's PNGs compared by SHA-256 between the verified run at `08a82f54`
+  (J-20261126-001448-df13e3) and a run queued at `origin/milestone/M-29` `ed94eadf` (J-20261126-001804-380271), both on
+  Mantorok: 76 PNGs each (35 captures, 41 exported maps), none differ. No frame was opened.
+- **Not checked:** the worked-example, swatch-note and CheckSamplesTests tests were not run against a disabled fix; no
+  frame was looked at (none changed); carve's side of a nested mesh graph was not exercised here.
