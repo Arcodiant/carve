@@ -28,7 +28,7 @@ public sealed class KnifeTool(ModelStore store)
         + ExampleMarker + """{"points":[[0.35,0,1],[0.35,0.7,1],[0.65,0.7,1],[0.65,0,1]]}""" + "\n"
         + ExampleMarker + """{"points":[[0.25,0.25,1],[0.75,0.25,1],[0.75,0.75,1],[0.25,0.75,1]],"closed":true}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<KnifeTool>("knife", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<KnifeTool>("knife", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -52,17 +52,18 @@ public sealed class KnifeTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("points"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? points = null, JsonElement? closed = null, JsonElement? mesh = null)
+        JsonElement? points = null, JsonElement? closed = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("knife", context, "points", "closed", "mesh");
+        var errors = UnknownArguments("knife", context, "points", "closed", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var path = Points(points, errors);
         var isClosed = !Absent(closed) && OptionalBool("closed", closed, errors);
         if (errors.Count > 0) return Failed("knife", errors);
-        return Edit(store, "knife", name, m => Knife.Cut(m, path, isClosed).Edit, (_, _) => { });
+        return Edit(store, "knife", name, m => Knife.Cut(m, path, isClosed).Edit, (_, _) => { }, level);
     }
 
     private static List<Vector3> Points(JsonElement? value, List<string> errors)

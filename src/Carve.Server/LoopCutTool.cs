@@ -27,7 +27,7 @@ public sealed class LoopCutTool(ModelStore store)
         + "Worked example on define_mesh's unit cube: one loop at 0.5 round the four sides, starting on the vertical edge 0-3, gives 12 vertices and 10 faces:\n"
         + ExampleMarker + """{"edge":[0,3],"at":[0.5]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<LoopCutTool>("loop_cut", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<LoopCutTool>("loop_cut", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -49,12 +49,13 @@ public sealed class LoopCutTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("edge", "at"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? edge = null, JsonElement? at = null, JsonElement? mesh = null)
+        JsonElement? edge = null, JsonElement? at = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("loop_cut", context, "edge", "at", "mesh");
+        var errors = UnknownArguments("loop_cut", context, "edge", "at", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
 
         (int A, int B)? pair = null;
@@ -85,6 +86,6 @@ public sealed class LoopCutTool(ModelStore store)
         }
 
         if (errors.Count > 0) return Failed("loop_cut", errors);
-        return Edit(store, "loop_cut", name, m => LoopCut.Cut(m, pair!.Value, fractions!).Edit, (_, _) => { });
+        return Edit(store, "loop_cut", name, m => LoopCut.Cut(m, pair!.Value, fractions!).Edit, (_, _) => { }, level);
     }
 }

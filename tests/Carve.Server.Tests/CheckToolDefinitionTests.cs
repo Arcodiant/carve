@@ -58,7 +58,7 @@ public class CheckToolDefinitionTests
         Assert.Contains("deep: not an argument of check; its arguments are mesh, targets", CarveProcess.TextOf(result));
         var schema = Tool(tools, "check").GetProperty("inputSchema");
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal(["targets", "mesh"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["targets", "mesh", "verbosity"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name));
     }
 
     [Fact]

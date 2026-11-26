@@ -60,11 +60,11 @@ public sealed class CheckTool(ModelStore store)
         + "Notes. 1 unit = 1 m, so size is the model's size in metres. A prop stands on y = 0, so the base note says where this one stands. The origin is where a game places the model, so it belongs inside the bounds (on them counts). More than one shell is noted because a model is usually one, though a detached part may be meant. "
         + "Stats. bounds and size are of the vertices faces use, closed is true when every edge has exactly two faces, triangles are what a game draws, area is the sum of the face areas in square metres, and volume is in cubic metres: the sum of the shells' signed volumes, null unless every shell is closed and consistently wound, and an inside-out shell's counts as negative. ";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<CheckTool>("check", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<CheckTool>("check", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject { ["targets"] = TargetWeightsArgument.Schema() },
-    }));
+    })));
 
     /// <summary>The warnings of the graph materials <paramref name="target"/> uses (T-166): what stops each slot baking, then what stops it on this mesh. No ray is cast and no graph evaluated.</summary>
     private static IEnumerable<string> GraphMaterialWarnings(Model model, PolygonMesh target)
@@ -75,9 +75,10 @@ public sealed class CheckTool(ModelStore store)
                 yield return w;
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? targets = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? targets = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("check", context, "mesh", "targets");
+        var errors = UnknownArguments("check", context, "mesh", "targets", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         // One snapshot for the whole call: the mesh, its materials and the envelopes all come from the same model (RV-71).
         var model = store.Current.Model;
@@ -104,12 +105,15 @@ public sealed class CheckTool(ModelStore store)
         };
         var envelope = model.EnvelopeWarnings().Select(w => w.Message).Concat(GraphMaterialWarnings(model, target)).ToArray();
         if (stats.Uvs is { } uvs) shown["uvs"] = new { mapped = uvs.Mapped, unmapped = uvs.Unmapped };
+        var ok = health.Ok && envelope.Length == 0;
+        // Silent answers check's own ok, not true: true over a broken mesh would mislead (M-23's ruling 3).
+        if (level == Verbosity.Silent) return Ok(new { ok });
         return Ok(new
         {
-            ok = health.Ok && envelope.Length == 0,
+            ok,
             problems = health.Problems.Select(p => new { check = p.Check, element = p.Element, message = p.Message }).ToArray(),
             // The model's envelope warnings (T-91) come after the mesh's own; a model with no envelopes has none, so its output is as before.
-            warnings = MeshWarningGroups.Lines(health.Warnings).Concat(envelope).ToArray(),
+            warnings = WarningLines(health.Warnings, level).Concat(envelope).ToArray(),
             notes = health.Notes,
             stats = shown,
         });

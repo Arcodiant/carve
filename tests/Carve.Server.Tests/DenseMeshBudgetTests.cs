@@ -16,14 +16,33 @@ public sealed class DenseMeshBudgetTests
 
     private readonly List<(string Call, int Length)> _seen = [];
 
+    /// <summary>T-200's silent column: the same run on a second carve, each call at <c>verbosity: "silent"</c>; null to skip it.</summary>
+    private ToolHarness? _silent;
+
+    /// <summary>The tools of the run that take verbosity (T-200); project_uvs gets it in T-201.</summary>
+    private static readonly string[] Quietened = ["open", "check", "subdivide", "export", "delete", "undo"];
+
+    private static string TextOf(JsonElement result) =>
+        string.Concat(result.GetProperty("content").EnumerateArray().Select(c => c.GetProperty("text").GetString()));
+
     private async Task<JsonElement> Call(ToolHarness carve, string tool, string arguments)
     {
         var result = await carve.CallToolAsync(tool, arguments);
-        var text = string.Concat(result.GetProperty("content").EnumerateArray().Select(c => c.GetProperty("text").GetString()));
+        var text = TextOf(result);
         Assert.False(result.TryGetProperty("isError", out var error) && error.GetBoolean(), $"{tool}: {text}");
         _seen.Add(($"{tool} {arguments}", text.Length));
         Assert.True(text.Length <= Budget, $"{tool} {arguments}: {text.Length} characters, over {Budget}: {text[..Math.Min(text.Length, 600)]}");
-        return text.StartsWith('{') ? JsonDocument.Parse(text).RootElement : default;
+        var body = text.StartsWith('{') ? JsonDocument.Parse(text).RootElement : default;
+        if (_silent is not null)
+        {
+            var quiet = Quietened.Contains(tool);
+            var silent = await _silent.CallToolAsync(tool, quiet ? arguments[..^1] + (arguments == "{}" ? "" : ",") + "\"verbosity\":\"silent\"}" : arguments);
+            Assert.False(silent.TryGetProperty("isError", out var e) && e.GetBoolean(), $"{tool} silent: {TextOf(silent)}");
+            // check answers its own ok (M-23's ruling 3, read in T-200); every other result is exactly {"ok":true}.
+            var expected = tool == "check" ? $"{{\"ok\":{(body.GetProperty("ok").GetBoolean() ? "true" : "false")}}}" : """{"ok":true}""";
+            if (quiet) Assert.Equal(expected, TextOf(silent));
+        }
+        return body;
     }
 
     [Fact]
@@ -34,6 +53,9 @@ public sealed class DenseMeshBudgetTests
         {
             await using var carve = new ToolHarness(folder);
             await carve.InitializeAsync();
+            await using var silent = new ToolHarness(Directory.CreateDirectory(Path.Combine(folder, "silent")).FullName);
+            await silent.InitializeAsync();
+            _silent = silent;
             var cage = Path.Combine(Paths.RepoRoot, "samples", "arms-cage.carve");
 
             await Call(carve, "open", JsonSerializer.Serialize(new { path = cage }));
@@ -60,6 +82,9 @@ public sealed class DenseMeshBudgetTests
 
             await Call(carve, "delete", JsonSerializer.Serialize(new { faces = Enumerable.Range(0, 200).Select(i => i * 2 + 1) }));
             await Call(carve, "check", "{}");
+
+            // The silent run made the same changes.
+            Assert.Equal(TextOf(await carve.CallToolAsync("check", "{}")), TextOf(await silent.CallToolAsync("check", "{}")));
         }
         finally
         {
