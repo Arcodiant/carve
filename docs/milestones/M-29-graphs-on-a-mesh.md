@@ -201,6 +201,9 @@ is reached from a plain launch of `carve` and `patina`, through their MCP tools.
 - [ ] [T-219](../tasks/T-219-rv-82-patina-s-findings.md) — patina tells an agent the truth about a mesh-reading graph: one that nests a mesh-reading graph carries the "mesh inputs neutral" note everywhere and is not called broken by `check`, an evaluation that fails says why, and the checks of the note and of the worked examples can fail.
 - [ ] [T-220](../tasks/T-220-rv-82-the-descriptions-and-docs-findings.md) — What carve's descriptions, `help` entries, README and CLAUDE.md say is complete and true: `reads_mesh` is explained, `render` says how `image` takes a graph, no description denies a tool that exists, and the counts and tests around `help` are right.
 - [ ] [T-221](../tasks/T-221-rv-82-the-acceptance-and-scenario-findings.md) — The acceptance crevice check measures the set the person ruled and the record says what it measures; the weathered scenario checks the cache hit it claims; the round record's figures are right.
+- [ ] [T-226](../tasks/T-226-rv-83-the-render-pump-the-bake-key-and-export-s-copies.md) — No order of events draws a model with empty graph slots and calls it baked; a slot that refuses an output refuses it from the cache too; export never renames a material the user named; and the render retry is held by a test of `render` itself.
+- [ ] [T-227](../tasks/T-227-rv-83-patina-s-check-text-and-the-title-break.md) — patina's `check` says only what is known about a flat output that reads a mesh node, and the scenario's break for the title note fails on two titles the product really drew.
+- [ ] [T-228](../tasks/T-228-rv-83-the-crevice-test-s-suite-and-the-records.md) — The test that holds the acceptance crevice set runs in a suite, and the records and docs the review found wrong say what is true.
 
 ## Decided while it ran
 
