@@ -18,3 +18,4 @@
 - T-218: RV-82: the server's render, export and error findings
 - T-219: RV-82: patina's findings
 - T-227: RV-83: patina's check text and the title break
+- T-228: RV-83: the crevice test's suite and the records
