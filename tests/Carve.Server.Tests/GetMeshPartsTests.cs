@@ -41,7 +41,8 @@ public class GetMeshPartsTests(ITestOutputHelper output)
     // RV-82 (Sonnet 5.5): a holed face and a deleted face (gatehouse), a morph target (arm) and a graph slot (barrel-weathered). The first two were taken from a build of origin/main
     // (b02b7b2), where get_mesh has no include or faces; barrel-weathered.carve is version 10 and does not open there, so its digest is from origin/milestone/M-29 at c518cce, the commit before B-10 landed.
     [InlineData("gatehouse.carve", "{}", "E756855486D651861E40CC265413838C12D9C261E3F5341EEC347288A7E20020")]
-    [InlineData("arm.carve", "{}", "E31431ED9B0BD12D2C28673800B9F009F1D71A5B08C01FF996B5CD07BF8DF858")]
+    // Re-pinned for T-198 (Opus 5.5): a smooth mesh no longer warns of not-planar faces, so arm.carve's eleven warning lines are gone (was E31431ED...).
+    [InlineData("arm.carve", "{}", "3EE304AC93D33A10E67F20EB29800BE70121482B6F15A526916D8E08DC7AD96C")]
     [InlineData("barrel-weathered.carve", "{}", "0229E313FB1A1B423F021CEB0AFC9759D011B5A82CD43CED7C8A319D52256DF3")]
     [InlineData("rover.carve", """{"mesh":"Cab"}""", "428894068A6270C51A905874CC5B4938011E8417C7D3DB7C8424299581CD7799")]
     [InlineData("rover.carve", """{"mesh":"Cab","level":0}""", "67CCE472406D335D77530516B6D902EEFC33D3FF1DC763F6D46C0C748AC13DEB")]
