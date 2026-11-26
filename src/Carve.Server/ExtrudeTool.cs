@@ -29,7 +29,7 @@ public sealed class ExtrudeTool(ModelStore store)
         + ExampleMarker + """{"faces":[1],"distance":0,"inset":0.2}""" + "\n"
         + ExampleMarker + """{"faces":[1],"distance":-0.2}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<ExtrudeTool>("extrude", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<ExtrudeTool>("extrude", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -55,12 +55,13 @@ public sealed class ExtrudeTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("faces", "distance"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? faces = null, JsonElement? distance = null, JsonElement? inset = null, JsonElement? mesh = null)
+        JsonElement? faces = null, JsonElement? distance = null, JsonElement? inset = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("extrude", context, "faces", "distance", "inset", "mesh");
+        var errors = UnknownArguments("extrude", context, "faces", "distance", "inset", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var unknown = errors.Count;
         var f = Ids("faces", faces, errors);
@@ -71,6 +72,6 @@ public sealed class ExtrudeTool(ModelStore store)
 
         return Edit(store, "extrude", name, mesh => MeshEdits.Extrude(mesh, f!, d!.Value, i ?? 0),
             (body, result) => body["extruded"] = result.Extruded
-                .Select(x => new { face = x.Face, cap = x.Cap, walls = x.Walls, vertices = x.NewVertices }).ToArray());
+                .Select(x => new { face = x.Face, cap = x.Cap, walls = x.Walls, vertices = x.NewVertices }).ToArray(), level);
     }
 }

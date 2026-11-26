@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using static Carve.Server.MeshToolSupport;
@@ -10,7 +11,7 @@ public sealed class UndoTool(ModelStore store)
         "Steps the model back one change: the last define_mesh, open, move, extrude, subdivide, define_group, set_colour, define_skeleton, set_weights, define_clip or delete_clip is taken back and the model before it is current again, its meshes with the ids they had. "
         + "So undo after set_colour takes back the colour, and after set_weights the weights, not the last mesh edit. "
         + "The ids the undone step created are free again and the next edit gives them out to new vertices and faces, so forget any you kept from its report. "
-        + "Takes no arguments; any argument is a tool error. The last 100 changes can be undone, one call each; there is no redo, and an undo cannot itself be undone. "
+        + "Takes only verbosity; any other is a tool error. The last 100 changes can be undone, one call each; there is no redo, and an undo cannot itself be undone. "
         + "A call that failed was never recorded, so it is not a step. "
         + "Returns the same JSON as define_mesh for the mesh now current ({vertices, faces, edges, closed, bounds:{min,max}, warnings:[]}; while the model has several meshes, {meshes:[{name, and that report}], in model order}) "
         + "plus undone, the name of the tool whose change was taken back, e.g. \"extrude\". "
@@ -20,26 +21,28 @@ public sealed class UndoTool(ModelStore store)
         + "Worked example, straight after an extrude (returns undone \"extrude\"):\n"
         + ExampleMarker + "{}";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<UndoTool>("undo", Text, null);
+    public static McpServerTool Create() => MeshToolSupport.Create<UndoTool>("undo", Text, WithVerbosity(null));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? verbosity = null)
     {
-        if (UnknownArguments("undo", context) is { Count: > 0 } unknown) return Failed("undo", unknown);
+        var errors = UnknownArguments("undo", context, "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
+        if (errors.Count > 0) return Failed("undo", errors);
         var undo = store.Undo();
         if (undo is null) return Error("undo: nothing to undo; there is no older state of the mesh");
         var model = undo.Current.Model;
         var body = model.Meshes.Count == 1
-            ? Report(model.Meshes[0].Mesh)
+            ? Report(model.Meshes[0].Mesh, level)
             : new Dictionary<string, object>
             {
                 ["meshes"] = model.Meshes.Select(m =>
                 {
                     var one = new Dictionary<string, object> { ["name"] = m.Name };
-                    foreach (var (k, v) in Report(m.Mesh)) one[k] = v;
+                    foreach (var (k, v) in Report(m.Mesh, level)) one[k] = v;
                     return one;
                 }).ToArray(),
             };
         body["undone"] = undo.Undone;
-        return Ok(body);
+        return Quiet(Ok(body), level);
     }
 }

@@ -28,7 +28,7 @@ public sealed class MoveTool(ModelStore store)
         + "Worked example on define_mesh's unit cube, raising the top face (face 3, y = 1) by half a unit:\n"
         + ExampleMarker + """{"faces":[3],"by":[0,0.5,0]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<MoveTool>("move", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<MoveTool>("move", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -67,12 +67,13 @@ public sealed class MoveTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("by"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? vertices = null, JsonElement? edges = null, JsonElement? faces = null, JsonElement? by = null, JsonElement? mesh = null)
+        JsonElement? vertices = null, JsonElement? edges = null, JsonElement? faces = null, JsonElement? by = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("move", context, "vertices", "edges", "faces", "by", "mesh");
+        var errors = UnknownArguments("move", context, "vertices", "edges", "faces", "by", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var v = Ids("vertices", vertices, errors);
         var e = Pairs("edges", edges, errors);
@@ -81,6 +82,6 @@ public sealed class MoveTool(ModelStore store)
         if (errors.Count > 0) return Failed("move", errors);
 
         return Edit(store, "move", name, mesh => MeshEdits.Move(mesh, v, e, f, offset!.Value),
-            (body, result) => body["moved"] = result.MovedVertices);
+            (body, result) => body["moved"] = result.MovedVertices, level);
     }
 }

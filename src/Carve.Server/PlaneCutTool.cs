@@ -26,7 +26,7 @@ public sealed class PlaneCutTool(ModelStore store)
         + "Worked example on define_mesh's unit cube: a cut at y = 0.5 keeping below with fill gives a half-height closed box (8 vertices, 6 faces):\n"
         + ExampleMarker + """{"point":[0,0.5,0],"normal":[0,1,0],"keep":"below"}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<PlaneCutTool>("plane_cut", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<PlaneCutTool>("plane_cut", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -66,13 +66,14 @@ public sealed class PlaneCutTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("point", "normal"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
         JsonElement? point = null, JsonElement? normal = null, JsonElement? keep = null, JsonElement? fill = null,
-        JsonElement? faces = null, JsonElement? mesh = null)
+        JsonElement? faces = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("plane_cut", context, "point", "normal", "keep", "fill", "faces", "mesh");
+        var errors = UnknownArguments("plane_cut", context, "point", "normal", "keep", "fill", "faces", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var p = Vec3("point", point, errors);
         var n = Vec3("normal", normal, errors);
@@ -97,6 +98,6 @@ public sealed class PlaneCutTool(ModelStore store)
         }, (body, _) =>
         {
             if (warnings.Count > 0) body["warnings"] = ((string[])body["warnings"]).Concat(warnings).ToArray();
-        });
+        }, level);
     }
 }

@@ -28,7 +28,7 @@ public sealed class SubdivideTool(ModelStore store)
         + "Worked example on define_mesh's unit cube, one level:\n"
         + ExampleMarker + """{"levels":1}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SubdivideTool>("subdivide", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<SubdivideTool>("subdivide", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -42,11 +42,12 @@ public sealed class SubdivideTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("levels"),
-    }));
+    })));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? levels = null, JsonElement? mesh = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? levels = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("subdivide", context, "levels", "mesh");
+        var errors = UnknownArguments("subdivide", context, "levels", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var n = Levels(levels, errors);
         if (errors.Count > 0) return Failed("subdivide", errors);
@@ -62,7 +63,7 @@ public sealed class SubdivideTool(ModelStore store)
         var appended = edited.Vertices.Count - before;
         var triangles = snapshot.Model.Meshes.Sum(m => m.Mesh.Faces.Sum(f => f.TriangleCount));
         var report = MeshReport.Create(edited);
-        var warnings = MeshWarningGroups.Lines(report.Warnings);
+        var warnings = WarningLines(report.Warnings, level);
         var ordered = new Dictionary<string, object>
         {
             ["vertices"] = report.VertexCount,
@@ -81,7 +82,7 @@ public sealed class SubdivideTool(ModelStore store)
             ["deleted"] = Deleted(result.Deleted),
             ["split"] = Split(result.Split),
         };
-        return Ok(ordered);
+        return Quiet(Ok(ordered), level);
     }
 
     private static int? Levels(JsonElement? value, List<string> errors)

@@ -123,6 +123,20 @@ open`, `edges where nonmanifold`, `vertices where unattached`.
 
 On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-planar face is not a warning: `check` gives one note with the count and the worst case ("...; expected on a smooth mesh, which export triangulates"), every other tool says nothing, and `ok` can be true. `select faces where non_planar` names every one either way, and a flat mesh warns as above.
 
+`define_mesh`, `move`, `extrude`, `delete`, `merge_faces`, `bridge`, `plane_cut`,
+`loop_cut`, `knife`, `subdivide`, `undo`, `open`, `check` and `export` take
+`verbosity`:
+
+```
+verbosity: "silent"     {"ok":true}: no counts, no ids, no warnings; the change is made all the same
+verbosity: "summary"    the result as above, each kind of four or more on one line (the default)
+verbosity: "full"       the same, with every warning one per line
+```
+
+`check` at `silent` answers its own `ok` (`{"ok":false}` on a broken mesh), and
+`export` answers the same JSON although its result is otherwise a line of text. A
+tool error is returned whole at every level, and any other value is a tool error.
+
 ## Cutting
 
 Each of these edits the mesh in place and appends new ids at the end; each example is on a fresh `define_mesh` unit cube unless it says otherwise. A cut is refused, with the point and its distance, when a knife point is off the surface.

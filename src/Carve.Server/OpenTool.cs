@@ -56,12 +56,13 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
     {
         var schema = WithMesh(PathSchema("The .carve file to read, absolute or relative to carve's working directory."), OpenMeshText);
         schema["properties"]!.AsObject()["drop_targets"] = new JsonObject { ["description"] = DropTargetsText, ["type"] = "boolean" };
-        return MeshToolSupport.Create<OpenTool>("open", Text, schema);
+        return MeshToolSupport.Create<OpenTool>("open", Text, WithVerbosity(schema));
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null, JsonElement? drop_targets = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null, JsonElement? drop_targets = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("open", context, "path", "mesh", "drop_targets");
+        var errors = UnknownArguments("open", context, "path", "mesh", "drop_targets", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var text = RequiredString("path", path, errors);
         var name = MeshName(mesh, errors);
         var drop = OptionalBool("drop_targets", drop_targets, errors);
@@ -102,12 +103,12 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         var body = new Dictionary<string, object> { ["path"] = target.FullPath };
         var shown = name is null ? model.Meshes : [model.Meshes.First(m => m.Name == name)];
         if (shown.Count == 1)
-            foreach (var (key, value) in Report(shown[0].Mesh)) body[key] = value;
+            foreach (var (key, value) in Report(shown[0].Mesh, level)) body[key] = value;
         else
             body["meshes"] = shown.Select(m =>
             {
                 var one = new Dictionary<string, object> { ["name"] = m.Name };
-                foreach (var (k, v) in Report(m.Mesh)) one[k] = v;
+                foreach (var (k, v) in Report(m.Mesh, level)) one[k] = v;
                 return one;
             }).ToArray();
         if (model.Skeleton is { } skeleton)
@@ -117,7 +118,7 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         }
         // A missing or broken graph does not refuse the open (T-160): the slot is kept so define_material can fix it.
         if (MaterialJson.BrokenGraphs(file).ToArray() is { Length: > 0 } broken) body["material_warnings"] = broken;
-        return Ok(body);
+        return Quiet(Ok(body), level);
     }
 
     /// <summary>
