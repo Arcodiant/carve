@@ -79,7 +79,7 @@ public sealed class DefineTargetTool(ModelStore store, ToolFolder toolFolder)
 
     public const string FileExample = """{"name":"Lean","file":"cube-lean.carve"}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DefineTargetTool>("define_target", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<DefineTargetTool>("define_target", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -109,7 +109,7 @@ public sealed class DefineTargetTool(ModelStore store, ToolFolder toolFolder)
             },
         },
         ["required"] = new JsonArray("name"),
-    }));
+    })));
 
     private static JsonObject Position() => new()
     {
@@ -120,9 +120,10 @@ public sealed class DefineTargetTool(ModelStore store, ToolFolder toolFolder)
     };
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? name = null, JsonElement? positions = null,
-        JsonElement? file = null, JsonElement? file_mesh = null, JsonElement? mesh = null)
+        JsonElement? file = null, JsonElement? file_mesh = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("define_target", context, "name", "positions", "file", "file_mesh", "mesh");
+        var errors = UnknownArguments("define_target", context, "name", "positions", "file", "file_mesh", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var targetName = TargetToolSupport.RequiredTargetName(name, errors);
         var path = OptionalString("file", file, errors);
@@ -177,7 +178,7 @@ public sealed class DefineTargetTool(ModelStore store, ToolFolder toolFolder)
         if (snapshot is null) return Failed("define_target", problems);
 
         var now = snapshot.Model.Find(named.Name)!;
-        return Ok(new Dictionary<string, object>
+        return Quiet(Ok(new Dictionary<string, object>
         {
             ["mesh"] = named.Name,
             ["name"] = made!.Name,
@@ -185,7 +186,7 @@ public sealed class DefineTargetTool(ModelStore store, ToolFolder toolFolder)
             ["largest_move"] = made.Deltas.Count == 0 ? 0f : made.Deltas.Values.Max(d => d.Length()),
             ["replaced"] = replaced,
             ["targets"] = TargetToolSupport.Names(now),
-        });
+        }), level);
     }
 
     /// <summary>The dense form, a null filled in at each slot: null, with the problems, when a live vertex has none.</summary>
@@ -289,7 +290,7 @@ public sealed class DeleteTargetTool(ModelStore store)
         + "Worked example on define_target's bulge:\n"
         + ExampleMarker + """{"name":"Bulge"}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DeleteTargetTool>("delete_target", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<DeleteTargetTool>("delete_target", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -297,11 +298,12 @@ public sealed class DeleteTargetTool(ModelStore store)
             ["name"] = new JsonObject { ["description"] = "The name of the target to remove.", ["type"] = "string" },
         },
         ["required"] = new JsonArray("name"),
-    }));
+    })));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? name = null, JsonElement? mesh = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? name = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("delete_target", context, "name", "mesh");
+        var errors = UnknownArguments("delete_target", context, "name", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var targetName = TargetToolSupport.RequiredTargetName(name, errors);
         if (errors.Count > 0) return Failed("delete_target", errors);
@@ -318,11 +320,11 @@ public sealed class DeleteTargetTool(ModelStore store)
         if (storeProblem is not null) return Failed("delete_target", [storeProblem]);
         if (snapshot is null) return Failed("delete_target", problems);
 
-        return Ok(new Dictionary<string, object>
+        return Quiet(Ok(new Dictionary<string, object>
         {
             ["mesh"] = named.Name,
             ["deleted"] = targetName!,
             ["targets"] = TargetToolSupport.Names(snapshot.Model.Find(named.Name)!),
-        });
+        }), level);
     }
 }

@@ -140,6 +140,17 @@ verbosity: "full"       the same, with every warning one per line
 `export` answers the same JSON although its result is otherwise a line of text. A
 tool error is returned whole at every level, and any other value is a tool error.
 
+The tools that change the model or write a file take it too, on the same three
+levels: `define_part`, `keep_level`, `define_group`, `set_colour`,
+`define_material`, `set_material`, `set_shading`, `mark_edges`, `set_uvs`,
+`project_uvs`, `define_skeleton`, `set_weights`, `weigh`, `define_clip`,
+`delete_clip`, `define_target`, `delete_target`, `save`, `bake` and `displace`.
+At `silent` each answers `{"ok":true}` with the change made (the file written, for
+`save` and `bake`); `summary` is the result as it was, and `full` the same, since
+none of these shortens a list of warnings. The tools that only read (`get_mesh`,
+`get_parts`, `get_skeleton`, `get_weights`, `get_clips`, `select`, `render`,
+`render_glb`, `help`) take none.
+
 ## Cutting
 
 Each of these edits the mesh in place and appends new ids at the end; each example is on a fresh `define_mesh` unit cube unless it says otherwise. A cut is refused, with the point and its distance, when a knife point is off the surface.

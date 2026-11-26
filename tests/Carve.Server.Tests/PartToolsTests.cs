@@ -386,9 +386,9 @@ public class PartToolsTests
             Assert.Equal(required, schema.TryGetProperty("required", out var r) ? r.EnumerateArray().Select(x => x.GetString()!) : []);
             Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
         }
-        Schema("define_part", ["part", "parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves"], ["part"]);
+        Schema("define_part", ["part", "parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves", "verbosity"], ["part"]);
         Schema("get_parts", [], []);
-        Schema("keep_level", ["level", "parts"], ["level"]);
+        Schema("keep_level", ["level", "parts", "verbosity"], ["level"]);
         Assert.Equal(DefinePartTool.Text, tools["define_part"].GetProperty("description").GetString());
         Assert.Equal(GetPartsTool.Text, tools["get_parts"].GetProperty("description").GetString());
         Assert.Equal(KeepLevelTool.Text, tools["keep_level"].GetProperty("description").GetString());

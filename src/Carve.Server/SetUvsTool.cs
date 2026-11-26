@@ -23,7 +23,7 @@ public sealed class SetUvsTool(ModelStore store)
         + "Worked example on define_mesh's unit cube: face 0 is [0,3,2,1], four corners, here mapped to the whole texture, corner 0 at the top-left and the others following round the loop:\n"
         + ExampleMarker + """{"faces":[{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]}]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SetUvsTool>("set_uvs", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<SetUvsTool>("set_uvs", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -60,11 +60,12 @@ public sealed class SetUvsTool(ModelStore store)
                 ["items"] = new JsonObject { ["type"] = "integer" },
             },
         },
-    }));
+    })));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? faces = null, JsonElement? clear = null, JsonElement? mesh = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? faces = null, JsonElement? clear = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("set_uvs", context, "faces", "clear", "mesh");
+        var errors = UnknownArguments("set_uvs", context, "faces", "clear", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var given = new List<(int Face, Vector2[] Uv)>();
         var seen = new HashSet<int>();
@@ -114,7 +115,7 @@ public sealed class SetUvsTool(ModelStore store)
 
         var target = snapshot.Model.Target(meshName, out _)!;
         var unmapped = target.Mesh.LiveFaces.Count(f => target.Mesh.Uvs?.IsMapped(f) != true);
-        return Ok(new { mesh = target.Name, set = given.Count, cleared = cleared.Count, unmapped });
+        return Quiet(Ok(new { mesh = target.Name, set = given.Count, cleared = cleared.Count, unmapped }), level);
     }
 
     private static void ParseEntry(JsonElement entry, int k, List<(int Face, Vector2[] Uv)> given, HashSet<int> seen, List<string> errors)

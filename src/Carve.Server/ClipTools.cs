@@ -37,7 +37,7 @@ public sealed class DefineClipTool(ModelStore store)
         + "Once a clip exists, define_skeleton with other bone names or another order is a tool error. "
         + ExampleMarker + " on bones base (at the origin) and joint (1 m above it, parent base), the joint turns a quarter about +Z by 0.5 s, so the part above it swings to lie along -X, and back by 1 s: " + Example;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DefineClipTool>("define_clip", Text, Schema());
+    public static McpServerTool Create() => MeshToolSupport.Create<DefineClipTool>("define_clip", Text, WithVerbosity(Schema()));
 
     private static JsonObject Channel(string what, int count) => new()
     {
@@ -91,9 +91,10 @@ public sealed class DefineClipTool(ModelStore store)
     };
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? name = null, JsonElement? duration = null, JsonElement? loop = null, JsonElement? channels = null)
+        JsonElement? name = null, JsonElement? duration = null, JsonElement? loop = null, JsonElement? channels = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("define_clip", context, "name", "duration", "loop", "channels");
+        var errors = UnknownArguments("define_clip", context, "name", "duration", "loop", "channels", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         string clipName = "";
         if (Absent(name)) errors.Add("name: required but missing");
         else if (name!.Value.ValueKind != JsonValueKind.String) errors.Add($"name: expected a string, got {Describe(name.Value)}");
@@ -116,7 +117,7 @@ public sealed class DefineClipTool(ModelStore store)
         if (errors.Count > 0) return Failed("define_clip", errors);
         if (store.DefineClip("define_clip", skeleton => Clip.Create(clipName, length, loops, specs, skeleton), out var clip, out var replaced, out var problems) is not { } done)
             return Failed("define_clip", problems);
-        return Ok(new
+        return Quiet(Ok(new
         {
             name = clip!.Name,
             duration = clip.Duration,
@@ -125,7 +126,7 @@ public sealed class DefineClipTool(ModelStore store)
             replaced,
             clips = done.Model.Clips.Select(c => c.Name).ToArray(),
             warnings = ClipChecks.Check(clip, done.Model.Skeleton!),
-        });
+        }), level);
     }
 
     private static BoneChannelsSpec? ReadBone(JsonProperty bone, List<string> errors)
@@ -237,7 +238,7 @@ public sealed class DeleteClipTool(ModelStore store)
         + "Errors, changing nothing: no clip of that name (the error lists the clips), a name that is not a string. "
         + ExampleMarker + """{"name":"wave"}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DeleteClipTool>("delete_clip", Text, new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<DeleteClipTool>("delete_clip", Text, WithVerbosity(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -245,17 +246,18 @@ public sealed class DeleteClipTool(ModelStore store)
             ["name"] = new JsonObject { ["description"] = "The clip to delete, as named to define_clip.", ["type"] = "string" },
         },
         ["required"] = new JsonArray("name"),
-    });
+    }));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? name = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? name = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("delete_clip", context, "name");
+        var errors = UnknownArguments("delete_clip", context, "name", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         if (Absent(name)) errors.Add("name: required but missing");
         else if (name!.Value.ValueKind != JsonValueKind.String) errors.Add($"name: expected a string, got {Describe(name.Value)}");
         if (errors.Count > 0) return Failed("delete_clip", errors);
         var clip = name!.Value.GetString()!;
         if (store.DeleteClip("delete_clip", clip, out var refusal) is not { } done) return Failed("delete_clip", [refusal!]);
-        return Ok(new { deleted = clip, clips = done.Model.Clips.Select(c => c.Name).ToArray() });
+        return Quiet(Ok(new { deleted = clip, clips = done.Model.Clips.Select(c => c.Name).ToArray() }), level);
     }
 }
 

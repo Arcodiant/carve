@@ -57,9 +57,10 @@ internal static class MeshToolSupport
     /// <paramref name="text"/> and <paramref name="meshName"/> set, or the failed result naming every problem.
     /// </summary>
     public static CallToolResult? PathAndMeshArguments(string tool, RequestContext<CallToolRequestParams> context, JsonElement? path, JsonElement? mesh,
-        out string? text, out string? meshName)
+        JsonElement? verbosity, out string? text, out string? meshName, out Verbosity level)
     {
-        var errors = UnknownArguments(tool, context, "path", "mesh");
+        var errors = UnknownArguments(tool, context, "path", "mesh", "verbosity");
+        level = ReadVerbosity(verbosity, errors);
         text = RequiredString("path", path, errors);
         meshName = MeshName(mesh, errors);
         return errors.Count > 0 ? Failed(tool, errors) : null;

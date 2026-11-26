@@ -134,7 +134,7 @@ public sealed class DefinePartTool(ModelStore store)
         + "Worked example on the rover, the front right wheel as an instance of the front left one, turned half a turn so its hub faces outward:\n"
         + ExampleMarker + Example;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DefinePartTool>("define_part", Text, Schema());
+    public static McpServerTool Create() => MeshToolSupport.Create<DefinePartTool>("define_part", Text, WithVerbosity(Schema()));
 
     private static JsonObject Vec(string description, int count) => new()
     {
@@ -173,10 +173,11 @@ public sealed class DefinePartTool(ModelStore store)
         ["required"] = new JsonArray("part"),
     };
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? verbosity = null)
     {
         const string tool = "define_part";
-        var errors = UnknownArguments(tool, context, "part", "parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves");
+        var errors = UnknownArguments(tool, context, "part", "parent", "translation", "rotation", "scale", "envelope", "instance_of", "moves", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var given = PartToolSupport.Arguments(context);
         string? name = null;
         if (!given.TryGetValue("part", out var p) || p.ValueKind == JsonValueKind.Null) errors.Add("part: required but missing");
@@ -245,7 +246,7 @@ public sealed class DefinePartTool(ModelStore store)
         }, out var refusal);
         if (snapshot is null) return Failed(tool, [refusal!]);
         var now = snapshot.Model;
-        return Ok(new { created, part = PartToolSupport.Entry(now, now.FindPart(name!)!, now.EnvelopeWarnings()) });
+        return Quiet(Ok(new { created, part = PartToolSupport.Entry(now, now.FindPart(name!)!, now.EnvelopeWarnings()) }), level);
     }
 
     private static Vector3? Missing(string name, List<string> errors)
@@ -301,7 +302,7 @@ public sealed class KeepLevelTool(ModelStore store)
         + ExampleMarker + Example
         + "\nOutput: {\"level\":0,\"kept\":[{\"part\":\"Chassis\",\"levels\":[0]},{\"part\":\"Cab\",\"levels\":[0]},{\"part\":\"Mast\",\"levels\":[0]},{\"part\":\"Lamp\",\"levels\":[0]},{\"part\":\"Wheel_FL\",\"levels\":[0]}]}";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<KeepLevelTool>("keep_level", Text, new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<KeepLevelTool>("keep_level", Text, WithVerbosity(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -315,12 +316,13 @@ public sealed class KeepLevelTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("level"),
-    });
+    }));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? verbosity = null)
     {
         const string tool = "keep_level";
-        var errors = UnknownArguments(tool, context, "level", "parts");
+        var errors = UnknownArguments(tool, context, "level", "parts", "verbosity");
+        var how = ReadVerbosity(verbosity, errors);
         var given = PartToolSupport.Arguments(context);
         int level = 0;
         if (!given.TryGetValue("level", out var l) || l.ValueKind == JsonValueKind.Null) errors.Add("level: required but missing");
@@ -366,10 +368,10 @@ public sealed class KeepLevelTool(ModelStore store)
             return (next, null);
         }, out var refusal);
         if (snapshot is null) return refusal is { } bare && problems.Count == 0 ? Error(bare) : Failed(tool, problems.Count > 0 ? problems : [refusal!]);
-        return Ok(new
+        return Quiet(Ok(new
         {
             level,
             kept = kept.Select(n => new { part = n, levels = snapshot.Model.FindPart(n)!.Levels.Select(x => x.Number).ToArray() }).ToArray(),
-        });
+        }), how);
     }
 }
