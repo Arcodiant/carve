@@ -127,12 +127,14 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
     }
 
     /// <summary>
-    /// one-value's fix for an output that reads a mesh node (the person's ruling, 2026-11-25): the problem stays, but it is
-    /// flat because patina's mesh inputs are neutral stand-ins, so widening its levels is not the advice.
+    /// one-value's fix for an output that reads a mesh node (the person's rulings, 2026-11-25): only what is known. It may be
+    /// flat only for patina's neutral stand-ins, or for a real reason (its own levels); carve's render mode 'uvs' draws it
+    /// on the real mesh (RenderTool's image {graph, output, size}), and carve's check evaluates no graph, so it is not named.
     /// </summary>
     public const string NeutralFix =
-        "Fix: none here: it reads a mesh input, which in patina is a neutral stand-in, so it is flat for that reason; "
-        + "carve gives the real maps when a material names the graph, and its check there judges them.";
+        "Fix: it reads a mesh input, which in patina is a neutral stand-in, so it may be flat only for that; "
+        + "to see the real map, save the graph and draw it in carve: render mode 'uvs' with image {graph: the .texgraph's path, output: this output's name, size}; "
+        + "if it is flat there too, widen its levels.";
 
     /// <summary>The one square size every output of <paramref name="set"/> has, or null when they differ or one is not square (RV-76).</summary>
     public static int? OneSize(CheckSet set) =>
