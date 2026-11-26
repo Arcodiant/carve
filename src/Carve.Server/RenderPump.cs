@@ -194,13 +194,15 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     {
         // Taken as seen even on a failure: the next try is the next mesh, not every frame.
         _version = snapshot.Version;
+        // A model with graph materials is drawn with their bakes (T-163), resolved by render before it queued the frame. The bake is
+        // read once (RV-83): what is drawn, the frame's unbaked mark and what Step compares later all come from this one read.
+        var resolved = bakes?.Peek(snapshot.Model);
+        _bakedFor = snapshot.Model;
+        _shownBakes = resolved;
         try
         {
-            // A model with graph materials is drawn with their bakes (T-163), resolved by render before it queued the frame.
-            var model = bakes?.DrawnOf(snapshot.Model) ?? snapshot.Model;
-            _bakedFor = snapshot.Model;
-            _shownBakes = bakes?.Peek(snapshot.Model);
-            _unbaked = bakes is not null && _shownBakes is null && snapshot.Model.Materials.Any(m => m.HasGraph);
+            var model = bakes is null ? snapshot.Model : GraphBakes.DrawnOf(snapshot.Model, resolved);
+            _unbaked = bakes is not null && resolved is null && snapshot.Model.Materials.Any(m => m.HasGraph);
             var whole = _shownPart is null && _shownLevel is null;
             var drawn = whole ? model.Combined! : model.CombinedOf(_shownPart, _shownLevel)
                 ?? throw new InvalidOperationException(_shownPart is { } p && model.FindPart(p) is null
@@ -234,8 +236,6 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
         catch (Exception e)
         {
             // Until the next mesh, a render is this error, never the last mesh under a new caption.
-            _bakedFor = snapshot.Model;
-            _shownBakes = bakes?.Peek(snapshot.Model);
             _meshFault = $"The current mesh could not be put in the scene: {e.GetBaseException().Message}";
             scene.Report(e, _meshFault);
             return;

@@ -161,6 +161,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         // T-164: each graph slot is baked (or found cached, as render's bake) and written as an ordinary PNG; clips mode writes no material.
         var baked = new List<GraphBakes.Baked>();
         string? copies = null;
+        IReadOnlyList<(string Copy, string Material, string Mesh)> made = [];
         if (!clips && model.Materials.Any(m => m.HasGraph))
         {
             try
@@ -168,12 +169,13 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
                 var drawn = bakes.Resolve(model, cancellationToken);
                 baked.AddRange(drawn.Baked);
                 model = drawn.Model;
+                made = drawn.Copies;
             }
             catch (GraphSlotProblemException e)
             {
                 return Error(e.Message);
             }
-            if (kind != "piece") (model, copies) = Copies(model); // a piece names its copies over the meshes it writes
+            if (kind != "piece") (model, copies) = Copies(model, made); // a piece names its copies over the meshes it writes
         }
         var mesh = model.Combined;
 
@@ -186,7 +188,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
 
         cancellationToken.ThrowIfCancellationRequested(); // RV-82: a cancelled export writes nothing, the bake done or not
         var written = clips ? Clips(model, target, replace, source)
-            : kind == "piece" ? Piece(model, pieceMeshes ?? [], target, allowUnweighted, replace, source)
+            : kind == "piece" ? Piece(model, made, pieceMeshes ?? [], target, allowUnweighted, replace, source)
             : model.Skeleton is not null ? Skinned(model, target, allowUnweighted, replace, source, copies: copies)
             : Static(model, mesh!, target, replace, source, copies);
         if (written.IsError == true) return written;
@@ -247,10 +249,10 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
     }
 
     /// <summary>Piece mode: the named meshes with the whole skeleton and no clips, or a refusal that writes nothing.</summary>
-    private static CallToolResult Piece(Model model, List<string> meshes, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source)
+    private static CallToolResult Piece(Model model, IReadOnlyList<(string Copy, string Material, string Mesh)> made, List<string> meshes, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source)
     {
         if (PieceExport.Refusal(model, meshes) is { } refusal) return Error($"export: mode piece: {refusal}. Nothing was written.");
-        var (piece, copies) = Copies(PieceExport.Select(model, meshes));
+        var (piece, copies) = Copies(PieceExport.Select(model, meshes), made);
         return Skinned(piece, target, allowUnweighted, overwrite, source, asPiece: true, copies: copies);
     }
 
@@ -307,12 +309,11 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
     /// original, which stays in the model with its graph slots and unused. A material that one mesh uses (among the meshes written)
     /// goes back to its plain name; one that several use keeps its copies, and the warning names them.
     /// </summary>
-    private static (Model Model, string? Warning) Copies(Model model)
+    private static (Model Model, string? Warning) Copies(Model model, IReadOnlyList<(string Copy, string Material, string Mesh)> made)
     {
-        // A copy is exactly <c>o@mesh</c> on that mesh, o a graph material still unbaked (one that reads the mesh); any other `@` name is the user's (RV-82).
-        var users = model.Meshes.SelectMany(n => Model.MaterialsUsedBy(n.Mesh)
-                .Select(c => (Base: model.Materials.FirstOrDefault(o => o.HasGraph && c == $"{o.Name}@{n.Name}")?.Name!, Copy: c, Mesh: n.Name)))
-            .Where(u => u.Base is not null).ToList();
+        // A copy is one Resolve made for that mesh, still on its faces; any other `@` name is the user's (RV-82, RV-83).
+        var users = made.Where(c => model.Find(c.Mesh) is { } mesh && Model.MaterialsUsedBy(mesh).Contains(c.Copy))
+            .Select(c => (Base: c.Material, c.Copy, c.Mesh)).ToList();
         var several = new List<string>();
         foreach (var g in users.GroupBy(u => u.Base))
         {

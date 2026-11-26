@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Carve.Core;
+using Carve.Graphs;
 
 namespace Carve.Server.Tests;
 
@@ -41,6 +42,42 @@ public class GraphBakesTests : FileToolTests
     }
 
     private static string[] Slots(GraphBakes.Drawn drawn) => [.. drawn.Baked.Select(b => $"{b.Material}/{b.Mesh}/{b.Slot}/{b.Size}")];
+
+    /// <summary>
+    /// RV-83: T-217's slot table through the cache. With base colour's bake of each of the planks' outputs cached, every slot given that
+    /// output refuses it exactly when its own bake would: a slot keyed as base colour is never served a bake it would refuse.
+    /// </summary>
+    [Fact]
+    public void Every_slot_refuses_an_output_from_the_cache_exactly_when_its_own_bake_would()
+    {
+        var planks = Path.Combine(Paths.RepoRoot, "samples", "graphs", "planks.texgraph");
+        var outputs = new Patina.Graphs.Evaluation.GraphEvaluator(Patina.Graphs.TexGraphFile.ReadFile(planks, GraphSlotBake.Unbound).Graph!, GraphSlotBake.Unbound).Outputs;
+        string[] slots = [GraphSlotBake.BaseColour, GraphSlotBake.MetallicRoughness, GraphSlotBake.Normal, GraphSlotBake.Emissive, GraphSlotBake.Occlusion];
+        var ct = TestContext.Current.CancellationToken;
+        var refused = 0;
+        foreach (var output in outputs)
+        {
+            var g = new MaterialGraph(planks, output, 64);
+            var bakes = new GraphBakes();
+            bakes.Resolve(Model.Empty.WithMaterial(new Material("b", BaseColourTexture: g)), ct);
+            foreach (var slot in slots)
+            {
+                var own = Record.Exception(() => GraphSlotBake.Rgba(g, slot, Model.Empty, null, ct)) is GraphOutputException;
+                Material m = slot switch
+                {
+                    GraphSlotBake.BaseColour => new("s", BaseColourTexture: g),
+                    GraphSlotBake.MetallicRoughness => new("s", MetallicRoughnessTexture: g),
+                    GraphSlotBake.Normal => new("s", NormalTexture: g),
+                    GraphSlotBake.Emissive => new("s", EmissiveTexture: g),
+                    _ => new("s", OcclusionTexture: g),
+                };
+                var cached = Record.Exception(() => bakes.Resolve(Model.Empty.WithMaterial(m), ct)) is GraphSlotProblemException;
+                Assert.True(own == cached, $"{slot} given '{output}': its bake {(own ? "refuses" : "takes")} it, from the cache it {(cached ? "refuses" : "takes")} it");
+                if (own) refused++;
+            }
+        }
+        Assert.True(refused > 0, "no slot refused an output of the planks");
+    }
 
     [Fact]
     public void The_warning_names_the_slot_and_node_that_cost_most_not_a_later_slot_that_shared_the_map()
@@ -99,7 +136,7 @@ public class GraphBakesTests : FileToolTests
         GraphBakes.Drawn Resolve() => bakes.Resolve(carve.Store.Current.Model, cancel);
 
         // Before any render resolves it, the frame thread draws the graph slots empty and bakes nothing.
-        Assert.Null(bakes.DrawnOf(carve.Store.Current.Model).FindMaterial("m")!.BaseColourTexture);
+        Assert.Null(GraphBakes.DrawnOf(carve.Store.Current.Model, bakes.Peek(carve.Store.Current.Model)).FindMaterial("m")!.BaseColourTexture);
         Assert.Equal(0, bakes.Count);
 
         var first = Resolve();
