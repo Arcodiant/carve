@@ -69,6 +69,21 @@
       "est-seconds": 60
     },
     {
+      "id": "weathering-unit",
+      "tier": "unit",
+      "build": "solution",
+      "run": "dotnet test tests/Carve.WeatheringAcceptance.Tests/Carve.WeatheringAcceptance.Tests.csproj -c Debug --no-build --filter Tier!=regression",
+      "inputs": [
+        {
+          "dotnet-closure": "tests/Carve.WeatheringAcceptance.Tests/Carve.WeatheringAcceptance.Tests.csproj"
+        },
+        "tests/Carve.CharacterLoad.Tests/RunContent.cs",
+        "samples/wrench.carve"
+      ],
+      "resources": "cpu",
+      "est-seconds": 10
+    },
+    {
       "id": "patina-unit",
       "tier": "unit",
       "build": "solution",
