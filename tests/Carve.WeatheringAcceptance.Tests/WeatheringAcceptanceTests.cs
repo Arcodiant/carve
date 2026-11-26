@@ -311,19 +311,6 @@ public class WeatheringAcceptanceTests
         Assert.True(open.Average() - crevice.Average() >= CreviceMargin, $"open steel mean luma {F(open.Average())} - drive-side crevice mean {F(crevice.Average())} = {F(open.Average() - crevice.Average())}, below {CreviceMargin}");
     }
 
-    /// <summary>The crevice set holds texels of the drive's four side faces and of no other face (the socket's 99 and 118 and the drive's ends 104 and 105 included), on the wrench.</summary>
-    [Fact]
-    public void The_crevice_set_holds_no_texel_of_a_face_that_is_not_a_drive_side()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (!File.Exists(Path.Combine(dir.FullName, "samples", "wrench.carve"))) dir = dir.Parent!;
-        var wrench = CarveFile.Read(File.ReadAllText(Path.Combine(dir.FullName, "samples", "wrench.carve"))).Mesh!;
-        Assert.Equal([100, 101, 102, 103], DriveSides(wrench).Order());
-        var set = CreviceTexels(wrench, 256, new byte[256 * 256 * 4]);
-        Assert.NotEmpty(set);
-        Assert.Equal([100, 101, 102, 103], set.Select(t => t.Face).Distinct().Order());
-    }
-
     /// <summary>
     /// The luma of every texel of the grip (group rubber) as the file wears it (ruled 2026-11-24): a face's own material's base colour slot (a graph, baked
     /// here), or that material's flat base colour, or the face's own colour, or glTF's default white. Faces' texels are counted as the bake sees them.

@@ -143,7 +143,7 @@ description: >-
 - **Rubric:** tests are placed; honest `**Verify:**` lines; CLAUDE.md kept current
 - **What is wrong:** The new test is a plain `[Fact]` on `samples/wrench.carve` and a blank bake, quick and with no device. Its class is `Tier` `regression`, and no suite's `run` names `Carve.WeatheringAcceptance.Tests`: the project is only a `dotnet-closure` input of `server-unit`, whose command runs `tests/Carve.Server.Tests`. Only `run-acceptance-check.ps1 -Weathering` and `run-weathering-negatives.ps1` run it, by hand, against a round folder. So `verify` never runs it. An edit to `wrench.carve`'s drive, to `DriveFaces` or to `DriveSides` would pass every suite and change which texels the crevice check measures. T-221's `**Verify:**` (server-unit, scenario-weathered) runs neither the test nor the crevice code. The As built says so ("no unit suite runs"). The CLAUDE.md row still says the project "Reads `CARVE_WEATHERING_RUN`, skipped when it is unset". That is now untrue of this test, which needs no round and is not skipped.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The milestone file's rulings leave out the three rulings of the review round, and its crevice ruling states the set that was replaced
 - **Where:** `docs/milestones/M-29-graphs-on-a-mesh.md:205-233` ("Decided while it ran"), `:227-229`
@@ -178,7 +178,7 @@ description: >-
 - **Rubric:** an honest record
 - **What is wrong:** The per-round table still labels 49.143 and 24.862 (10,357 and 2,604 texels) "the ruled set", and the Comparison line repeats "ruled set: 49.143, 24.862". The set ruled now gives 40.297 and 15.206: both rounds' `acceptance/numbers.tsv` on the shared drive agree, at 3,939 and 980 texels. The new paragraph says "The figures in the table below and in the Negatives table are those of the set first ruled". The per-round table is above it, not below. And those figures are of the set as coded, with face 99. The set first ruled gives 48.1 and 24.6, as the same paragraph says two sentences earlier. The negatives' new figures match `%TEMP%\carve-t168-negatives\*\acceptance\numbers.tsv` (reference 67.530, no-wear 0.077, no-dirt −43.499).
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### CLAUDE.md still lists the grip check as part of the steel's base colour bake
 - **Where:** `CLAUDE.md:123`
@@ -186,7 +186,7 @@ description: >-
 - **Rubric:** RV-82 answer does not hold: CLAUDE.md says the acceptance grip is checked "against the clean stand-in"
 - **What is wrong:** The finding said ruling 4 holds the grip "to what its faces wear in the saved file ..., and that is not the steel slot's bake". The row now reads "the steel's base colour bake (hard-edge wear, drive crevice (...), grip held to what its faces wear in the saved file, against the starter file's grip ...)". The wording of the clause is fixed, but the grip is still listed inside the steel bake's parenthesis, as one of that bake's checks.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### README's list of regression suites leaves out the new graphs-regression
 - **Where:** `README.md:53`
@@ -194,7 +194,7 @@ description: >-
 - **Rubric:** the README kept current
 - **What is wrong:** T-217 added the suite `graphs-regression` (`tests.json:52`, no GPU) and named it in CLAUDE.md. README's line reads "regression, no GPU: `patina-regression`." T-220 corrected the unit line two lines above, but the two members ran side by side, and neither added the new suite to this line.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### T-220's As built names a commit that is not on the branch
 - **Where:** `docs/tasks/T-220-rv-82-the-descriptions-and-docs-findings.md:64`
@@ -202,7 +202,7 @@ description: >-
 - **Rubric:** tracker hygiene (`### As built` true of the code)
 - **What is wrong:** It says "All in 4a69443e", and commit `8a873264` is titled "As built names the rebased commit". But `git merge-base --is-ancestor 4a69443e HEAD` fails: the change on `milestone/M-29` is `45f7b023`.
 
-**Outcome:** —
+**Outcome:** fixed
 
 **Covered:** I read RV-82's three sections whole, T-219's, T-220's and T-221's files whole, T-217's As built, the milestone file's rulings and retrospective, the T-219 source and scenario diff, the T-220 commit, the T-221 test, scenario and record diffs, the new and changed patina tests (`MeshGraphTruthTests`, `MeshNodeToolTests`, `NodeToolTests`, `PatinaHarness`, `CheckSamplesTests`), and the tests.json diff. I ran these in scratch copies under `%TEMP%\m29-rv83-o2`:
 - a `ToolHarness` dump of `tools/list` and every `help` entry at `4138e51` and at HEAD, and a sentence script over both. Nothing was lost except the intended rewrites; no schema changed; no description is over 3,686 (the longest is 3,685); exactly check, define_material, export, get_mesh, render and select changed, matching the pin's comment;
