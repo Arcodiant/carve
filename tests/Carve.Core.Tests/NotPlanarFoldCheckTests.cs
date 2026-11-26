@@ -105,7 +105,7 @@ public class NotPlanarFoldCheckTests
 
     private static string Check(string warnings = "", params string[] notes) => System.Text.Json.JsonSerializer.Serialize(new { warnings = warnings.Length == 0 ? [] : new[] { warnings }, notes });
 
-    private static string Right => Check("", "size 1 x 1 x 1 m", "13 faces are not planar: worst faces[1], 0.2 off its plane (limit 0.001); e.g. faces[0], faces[1], faces[2]" + SmoothTail);
+    private static string Right => Check("", "size 1 x 1 x 1 m", "13 faces are not planar: worst faces[1], 0.2 off its plane (limit 0.001); e.g. faces[0], faces[1], faces[2]; " + Fold + SmoothTail);
 
     [Fact]
     public void The_smooth_note_passes_against_select_s_faces() => Assert.Null(NotPlanarFold.CheckSmoothNote(Right, Enumerable.Range(0, 13).ToList()));

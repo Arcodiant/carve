@@ -48,6 +48,8 @@ public sealed class SmoothNotPlanarToolTests() : FileToolTests("carve-smooth")
         Assert.False(Planar(Strings(check, "warnings")), check);
         var note = Assert.Single(Strings(check, "notes"), n => n.EndsWith(Note));
         Assert.StartsWith($"{quads} faces are not planar: worst faces[", note);
+        Assert.EndsWith($"; select faces where non_planar names them; {Note}", note);
+        Assert.Equal("x", note);
         var selected = JsonDocument.Parse(Ok(await smooth.CallToolAsync("select", """{"kind":"faces","where":"non_planar"}"""))).RootElement;
         Assert.Equal(quads, selected.GetProperty("count").GetInt32());
 
