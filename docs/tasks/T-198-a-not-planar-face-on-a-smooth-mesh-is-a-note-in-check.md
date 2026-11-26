@@ -4,7 +4,7 @@ description: >-
 ---
 # T-198 — A not-planar face on a smooth mesh is a note in check
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
