@@ -124,6 +124,21 @@ public class MeshNodeToolTests
         Assert.All(Committed(name, mask + ".png").Chunk(4), p => Assert.Equal(0, p[0]));
     }
 
+    /// <summary>The person's ruling (2026-11-25): check's answer keeps the one problem, its fix the true reason rather than "widen its levels".</summary>
+    [Theory]
+    [MemberData(nameof(MeshSamples))]
+    public async Task Check_tells_the_empty_mask_it_is_flat_for_the_neutral_inputs(string name)
+    {
+        await using var patina = await PatinaHarness.StartAsync(Paths.RepoRoot);
+        await patina.Ok("open", JsonSerializer.Serialize(new { path = Sample(name + ".texgraph") }));
+        var report = JsonDocument.Parse(await patina.Ok("check", "{}")).RootElement;
+        Assert.False(report.GetProperty("ok").GetBoolean());
+        var only = Assert.Single(report.GetProperty("problems").EnumerateArray());
+        Assert.Equal(("one-value", Expected[name].Mask), (only.GetProperty("check").GetString(), only.GetProperty("output").GetString()));
+        Assert.EndsWith(CheckTool.NeutralFix, only.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("widen", only.GetProperty("message").GetString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Neutral_weathered_staves_show_the_planks_own_maps_byte_for_byte()
     {

@@ -61,7 +61,39 @@ Each finding of RV-82 named here, by its heading there:
 
 ### Hand-off
 
-Agent one (claude-opus-5-5) stopped at the 60-call checkpoint. Code and tests committed in one commit; `cairn test
+**Agent two (claude-opus-5-5) stopped at its 60-call checkpoint.** Rebased onto `origin/milestone/M-29` (clean, after
+T-218 and T-220). Committed in one commit after agent one's:
+- *The person's ruling (2026-11-25), recorded:* `check` keeps `one-value` for an output that is flat only because its
+  mesh inputs are neutral stand-ins, with the true reason in its fix in place of "clipped or flat; widen its levels";
+  problem list and `ok` unchanged. Declined: withholding `one-value`. Chosen where: `GraphEvaluator.TypesReaching(output)`
+  (new, public, read-only: the type names of every node an output reads, nested nodes as expanded) and
+  `CheckTool.Run`/`Report` (an optional `neutral` set of outputs reading a mesh node; one-value's message for those is
+  its measured part plus `CheckTool.NeutralFix`). `OneValueRule` and `CheckRules` are untouched, so carve's use of the
+  rules is unchanged; patina's tool, which knows the mesh, picks the text.
+- Tests: `MeshGraphTruthTests.Check_gives_one_value_the_neutral_reason_only_for_an_output_that_reads_a_mesh_node` (a
+  mesh output and a flat fbm/levels output in one graph: true text vs old text), the nested test now asserts the one
+  problem and `NeutralFix` too, `MeshNodeToolTests.Check_tells_the_empty_mask_it_is_flat_for_the_neutral_inputs` (both
+  weathered samples through the tool). All three seen failing in a scratch copy (`$env:TEMP\t219-scratch`) with the
+  substitution disabled. T-162's `Check_reports_the_one_empty_mask_and_nothing_else` (on `CheckRules`) unchanged and
+  holds; no test pinned the old advice text on a mesh output (`CheckToolTests` flat-mask reads no mesh).
+- *Nested note seen failing:* in the scratch copy with `MeshNodeNames`'s recursion disabled,
+  `A_graph_nesting_a_mesh_graph_says_so_in_every_answer` failed (Assert.Contains, get_graph's note).
+- check's description: "Fix: widen its levels, drive it from a noise or pattern, or drop it; one reading a mesh is told
+  why." (first try was 3,748 chars, over 3,686; this one is to be confirmed by the run).
+- README: the weathered sentence says the fix names the neutral inputs, for any mesh-reading output, nested or not.
+- *Scenario break:* `MeshNodesStage.CheckTitleNote` is the one title-note check; the break runs it on the plain
+  sheet's title against itself (no note), which must fail; no new capture, so no new frame. Not yet run.
+- T-162's `### As built` publish line corrected (`Carve.Core.dll` new to patina, with RV-82's measurement).
+- `PatinaHarness`'s reflection on `EngineStatus.SetReady` kept: Carve.Hosting has no public ready and no
+  InternalsVisibleTo, and the test project has no other seam; the `shortcut:` comment now says the limit and when to
+  replace it. `CheckSamplesTests.cs` edited by agent one (this member's Nit), stands.
+
+**Left:** confirm `cairn test run patina-unit` after the description change (a run was in flight at the checkpoint);
+`verify` (server-unit, scenario-patina: the break's run); frames by hash against a run of `origin/milestone/M-29`
+(`cairn test artifacts scenario-patina`); `### As built` from this and agent one's notes below; the seven Outcome lines;
+`cairn lint`; `finish`.
+
+**Agent one's hand-off** (claude-opus-5-5) stopped at the 60-call checkpoint. Code and tests committed in one commit; `cairn test
 run patina-unit` passes (505 + all of Patina.Server.Tests). `verify` not yet run (server-unit, scenario-patina left).
 
 **Done:**

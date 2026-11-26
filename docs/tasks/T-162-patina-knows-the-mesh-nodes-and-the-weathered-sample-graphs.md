@@ -103,7 +103,11 @@ Built by Claude Sonnet 5.5 (`claude-sonnet-5-5`). Frame review by Claude Sonnet 
   - Neutral: `wear` and `grime` are 0 on every texel; `check` reports exactly `one-value` on each of those two and nothing else; weathered-staves' base_colour, roughness, normal and occlusion are byte-equal to planks' (all in `tests/Patina.Server.Tests/MeshNodeToolTests.cs`). Other neutral output ranges were not measured beyond that.
 - **Tests:** `MeshNodeToolTests` (every tool with a mesh graph and the notes, planks unchanged, PNGs equal the graphs, check's problems, staves = planks, exposed amounts); `NodeToolTests` use `Program.Registry`; `CheckSamplesTests` (Patina.Graphs.Tests) skips `weathered-*`, which need the mesh registry and are held by the above; `ProductReferenceGuard`'s allowed list gained `Carve.Graphs`, a shared line that only adds (carve's own tests link the file, so `server-unit` is in the Verify line).
 - **Scenario:** `MeshNodesStage.cs` and one line in `PatinaStages.cs` (in the `base` selection, so suite `scenario-patina`); it judges the title's note by the title running at least 80 px past the same graph's with no mesh node (text is not decoded). The break (the note left out of the expected title) failed, in `mesh-nodes-breaks.txt`. Frames: `mesh-nodes-iron-sheet`, `mesh-nodes-iron-sphere`, `mesh-nodes-plain-sheet`.
-- **publish folder:** patina's output gained `Carve.Graphs.dll` (and `Carve.Core.dll` if not already there); no engine or extension.
+- **publish folder:** patina's output gained two assemblies, `Carve.Graphs.dll` and `Carve.Core.dll`, both new to it
+  (before, patina referenced `Carve.Extensibility`, `Carve.Hosting` and `Patina.Graphs`, none of which reaches
+  `Carve.Core`), so all of carve's model library now loads in patina beside its extensions; neither takes a package,
+  and no engine, extension or scenario library is reachable (`PatinaReferencesNoExtensionTests`). Corrected by T-219
+  from RV-82's measurement.
 - **README:** the Samples paragraph of the patina section names the two graphs and the neutral rule. CLAUDE.md: rows for `src/Patina.Server`, `tools/Patina.SampleGraphs` and the Patina scenario.
 - **Not checked:** the frames by eye (the reviewing agent's); `swatch` of `weathered-staves` (no scenario frame, only its PNGs); a mesh node inside a nested graph file's note; the exact text of the title in pixels.
 

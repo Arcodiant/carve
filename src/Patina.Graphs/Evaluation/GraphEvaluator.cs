@@ -73,6 +73,21 @@ public sealed class GraphEvaluator
         return _analysis.Nodes[node].OutputKinds[port];
     }
 
+    /// <summary>The type names of every node the output reads, all the way up, nested graphs' nodes as expanded (RV-82).</summary>
+    public IReadOnlySet<string> TypesReaching(string output)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var types = new HashSet<string>(StringComparer.Ordinal);
+        var todo = new Stack<string>([_analysis.Outputs[output]]);
+        while (todo.TryPop(out var id))
+        {
+            if (!seen.Add(id) || !_analysis.Nodes.TryGetValue(id, out var node)) continue;
+            types.Add(node.Type.Name);
+            foreach (var (from, _) in node.Sources.Values) todo.Push(from);
+        }
+        return types;
+    }
+
     /// <summary>What the last <see cref="Evaluate"/> held: its tile size, the most tiles and bytes held at once, the cap, and how many node tiles it made.</summary>
     public EvaluationRun? LastRun { get; private set; }
 
