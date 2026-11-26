@@ -91,4 +91,28 @@ public sealed class DenseMeshBudgetTests
             Directory.Delete(folder, true);
         }
     }
+
+    /// <summary>T-202: unwrap on the four tool samples (39, 95, 135 and 67 islands) is within the budget, and says the island count.</summary>
+    [Theory]
+    [InlineData("wrench.carve", 39)]
+    [InlineData("cutter-src.carve", 95)]
+    [InlineData("toolkit-src.carve", 135)]
+    [InlineData("scanner-src.carve", 67)]
+    public async Task Unwrap_on_a_tool_sample_is_within_the_budget(string sample, int islands)
+    {
+        var folder = Directory.CreateTempSubdirectory("carve-unwrap-").FullName;
+        try
+        {
+            await using var carve = new ToolHarness(folder);
+            await carve.InitializeAsync();
+            await Call(carve, "open", JsonSerializer.Serialize(new { path = Path.Combine(Paths.RepoRoot, "samples", sample) }));
+            var made = await Call(carve, "unwrap", "{}");
+            Assert.Equal(islands, made.GetProperty("islands").GetInt32());
+            Assert.Equal(5, made.GetProperty("largest").GetArrayLength());
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
 }

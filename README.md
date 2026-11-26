@@ -151,6 +151,11 @@ none of these shortens a list of warnings. The tools that only read (`get_mesh`,
 `get_parts`, `get_skeleton`, `get_weights`, `get_clips`, `select`, `render`,
 `render_glb`, `help`) take none.
 
+`unwrap` takes `verbosity` too, and answers a summary, not every island: the
+count (`islands`, with `single_face_islands`), `fill`, `scale`, the worst
+`stretch` named by its island's lowest face, the `flipped` total and `largest`,
+the five largest islands by face count. `full` adds `all`, every island.
+
 ## Cutting
 
 Each of these edits the mesh in place and appends new ids at the end; each example is on a fresh `define_mesh` unit cube unless it says otherwise. A cut is refused, with the point and its distance, when a knife point is off the surface.
@@ -192,7 +197,7 @@ A face's UVs are one `[u, v]` per corner. They run as in glTF: (0, 0) is the tex
 
 - `set_uvs` gives faces UVs by coordinates. On the unit cube this maps face 0 (corners `[0,3,2,1]`) to the whole texture: `{"faces":[{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]}]}`.
 - `project_uvs` projects faces: `planar` (one side of a thing), `box` (crates, rooms) or `cylindrical` (barrels, posts): `{"method":"box"}`, or `{"method":"planar","view":"+y","faces":[3],"into":[0,0,0.5,1]}` for the top into the left half.
-- `unwrap` cuts the faces at their seams, flattens each island and packs them: `{}`. Mark the seams first with `mark_edges` and `seam`: `{"edges":[[0,3]],"seam":true}`. Each island must lie flat, so a closed box needs enough seams to unfold, and a cylinder needs one down its side and one round each rim. `unwrap`'s description works through a barrel.
+- `unwrap` cuts the faces at their seams, flattens each island and packs them: `{}`. Mark the seams first with `mark_edges` and `seam`: `{"edges":[[0,3]],"seam":true}`. Each island must lie flat, so a closed box needs enough seams to unfold, and a cylinder needs one down its side and one round each rim. `unwrap` answers the island count, the worst stretch and its five largest islands (`verbosity: "full"` adds every island); its description works through a barrel.
 - `render` with `mode` `checker` draws a checker at each face's UVs, with unmapped faces magenta. `mode` `uvs` draws the layout flat, with seams in yellow.
 - `check` warns of unmapped, flipped, zero-area and overlapping UV faces.
 

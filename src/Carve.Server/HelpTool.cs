@@ -28,6 +28,7 @@ public sealed class HelpTool
         ("define_material", "how the game's shading reads each field, the glow and occlusion rules, and each texture's colour space and channels", DefineMaterialTool.Reference),
         ("check", "the thresholds, the morph-target and UV-warning rules, every warning's full wording, the envelope warnings, the notes and the stats", CheckTool.Reference),
         ("get_mesh", "where vertex and face ids come from, the worked examples on the unit cube, with its output, and reading a morph target", GetMeshTool.Reference),
+        ("unwrap", "what each field of the result means, the stretch and flipped counts and the full list", UnwrapTool.Reference),
     ];
 
     /// <summary>
