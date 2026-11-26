@@ -4,7 +4,7 @@ description: >-
 ---
 # T-202 — unwrap reports a summary and its five largest islands
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
