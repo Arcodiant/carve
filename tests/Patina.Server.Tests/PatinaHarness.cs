@@ -77,7 +77,8 @@ internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
         if (blankEngine)
         {
             status = new Carve.Hosting.EngineStatus();
-            // shortcut: SetReady is internal to Carve.Hosting; a test-only reflection, until the status takes a public ready.
+            // shortcut: reaches Carve.Hosting's internal SetReady by name (no public ready, no InternalsVisibleTo), so a rename
+            // fails every blankEngine test with a NullReferenceException here; replace it when EngineStatus gains a public ready state.
             typeof(Carve.Hosting.EngineStatus).GetMethod("SetReady", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(status, null);
         }
         builder.Services.AddSingleton(status);

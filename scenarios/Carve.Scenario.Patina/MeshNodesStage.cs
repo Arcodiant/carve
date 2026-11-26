@@ -10,7 +10,7 @@ namespace Carve.Scenario.Patina;
 /// the tools, swatched (sheet and sphere), its title and results naming the neutral mesh inputs, <c>wear</c> black on every
 /// texel and the base colour the clean iron (the same graph exported with wear_amount 0), then saved, opened and exported,
 /// every PNG compared byte for byte with samples/graphs/weathered-iron/. The title's note is judged by how far the title
-/// runs past the same graph's with no mesh node. One break, made here: the note left out of the expected title must fail.
+/// runs past the same graph's with no mesh node. One break, made here: that check run on the plain title, which has no note, must fail.
 /// Writes mesh-nodes-breaks.txt.
 /// </summary>
 internal sealed class MeshNodesStage : IPatinaStage
@@ -40,7 +40,7 @@ internal sealed class MeshNodesStage : IPatinaStage
         var plainText = await checks.CallAsync("swatch", """{"view":"flat","output":"wear","size":64}""");
         checks.Check(!plainText.Contains("mesh inputs", StringComparison.Ordinal), "mesh nodes: a graph with no mesh node was given the note: " + plainText);
         var plain = TitleExtent(await driver.CaptureToolAsync("swatch", "mesh-nodes-plain-sheet", new { view = "sheet" }));
-        checks.Check(extent - plain >= NoteWidth, $"mesh nodes: the sheet's title runs to x {extent}, only {extent - plain} px past the title with no note ({plain}); the note is not on it");
+        CheckTitleNote(checks, extent, plain);
 
         await checks.CallAsync("define_graph", define);
         var texels = Path.Combine(driver.RunFolder, "mesh-nodes-export");
@@ -72,14 +72,18 @@ internal sealed class MeshNodesStage : IPatinaStage
             checks.Check(File.ReadAllBytes(Path.Combine(again, file)).AsSpan().SequenceEqual(committed), $"mesh nodes: {file} exported from the opened graph is not the sample's bytes");
         }
 
-        // The break, made here: the title expected without the note must fail the check above.
+        // The break, made here (RV-82): the same check run on a title with no note, the plain sheet's, must fail on its own.
         var probe = new PatinaChecks(driver);
-        probe.Check(extent - plain < 8, $"mesh nodes: the sheet's title runs to x {extent}, {extent - plain} px past the title with no note");
-        var log = new StringBuilder("== the note left out of the expected title\n");
+        CheckTitleNote(probe, plain, plain);
+        var log = new StringBuilder("== the title-note check on the plain sheet's title, which has no note\n");
         foreach (var failure in probe.Failures) log.AppendLine("  " + failure);
         checks.Check(probe.Failures.Count > 0, "mesh nodes: the title without its note was accepted");
         File.WriteAllText(Path.Combine(driver.RunFolder, "mesh-nodes-breaks.txt"), log.ToString());
     }
+
+    /// <summary>The title-note check: a title runs at least <see cref="NoteWidth"/> past the same graph's with no mesh node.</summary>
+    private static void CheckTitleNote(PatinaChecks checks, int extent, int plain) =>
+        checks.Check(extent - plain >= NoteWidth, $"mesh nodes: the sheet's title runs to x {extent}, only {extent - plain} px past the title with no note ({plain}); the note is not on it");
 
     /// <summary>The rightmost bright column of the title strip.</summary>
     private static int TitleExtent(ScenarioFrame sheet)

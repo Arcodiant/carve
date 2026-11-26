@@ -91,12 +91,31 @@ public class MeshGraphTruthTests
         Assert.EndsWith("\n" + Note, await patina.Ok("export", """{"folder":"out"}"""), StringComparison.Ordinal);
         var report = JsonDocument.Parse(await patina.Ok("check", "{}")).RootElement;
         Assert.Contains(Note, report.GetProperty("notes").EnumerateArray().Select(n => n.GetString()));
+        // The person's ruling (2026-11-25): one-value stays, its fix the true reason, through the nested file too.
+        var problem = Assert.Single(report.GetProperty("problems").EnumerateArray());
+        Assert.Equal(("one-value", "edge"), (problem.GetProperty("check").GetString(), problem.GetProperty("output").GetString()));
+        Assert.EndsWith(CheckTool.NeutralFix, problem.GetProperty("message").GetString(), StringComparison.Ordinal);
 
         // Two levels down, each graph node in the name.
         File.WriteAllText(Path.Combine(folder.Path, "outer2.texgraph"),
             """{"version":2,"size":32,"seed":0,"nodes":{"h":{"type":"graph","params":{"path":"outer"}},"o":{"type":"output","inputs":{"in":"h.edge"},"params":{"name":"edge"}}}}""");
         var read = TexGraphFile.ReadFile(Path.Combine(folder.Path, "outer2.texgraph"), Program.Registry);
         Assert.StartsWith("mesh inputs neutral: h/g/edges (mesh_curvature);", ToolSupport.MeshNote(read.Graph!, Program.Registry), StringComparison.Ordinal);
+    }
+
+    /// <summary>The ruling decided by what an output reads, not by the graph or the output's name: a mesh-reading output's one-value gives the true reason, a flat output beside it that reads no mesh node keeps the old advice.</summary>
+    [Fact]
+    public async Task Check_gives_one_value_the_neutral_reason_only_for_an_output_that_reads_a_mesh_node()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+        await patina.Ok("define_graph", """{"graph":{"version":1,"size":32,"seed":0,"nodes":{"edges":{"type":"mesh_curvature","params":{"width":0.02}},"n":{"type":"fbm","params":{"seed":3}},"w":{"type":"levels","inputs":{"in":"n"},"params":{"in_low":0,"in_high":0}},"oe":{"type":"output","inputs":{"in":"edges"},"params":{"name":"edge"}},"ow":{"type":"output","inputs":{"in":"w"},"params":{"name":"wear"}}}}}""");
+        var report = JsonDocument.Parse(await patina.Ok("check", "{}")).RootElement;
+        var messages = report.GetProperty("problems").EnumerateArray()
+            .ToDictionary(p => (p.GetProperty("check").GetString(), p.GetProperty("output").GetString()), p => p.GetProperty("message").GetString()!);
+        Assert.Equal(2, messages.Count);
+        Assert.EndsWith(CheckTool.NeutralFix, messages[("one-value", "edge")], StringComparison.Ordinal);
+        Assert.Contains("widen its levels", messages[("one-value", "wear")], StringComparison.Ordinal);
+        Assert.DoesNotContain("neutral", messages[("one-value", "wear")], StringComparison.Ordinal);
     }
 
     [Theory]

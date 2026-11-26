@@ -54,7 +54,7 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         + "- normal-not-unit: a normal is a unit vector. A fault when over 0.1% of texels' length differs from 1 by more than 0.02 (0.03 for a PNG, for the 8-bit rounding). "
         + "Fix: make it with height_to_normal, which normalises, and do not mix a normal's components as colours.\n"
         + "- one-value: a greyscale output (roughness, occlusion, height, a greyscale named output; not metallic) whose texels all pack to one byte; a mask of one value masks nothing. "
-        + "Fix: widen its levels, or drive it from a noise or pattern, or drop the output.\n"
+        + "Fix: widen its levels, drive it from a noise or pattern, or drop it; one reading a mesh is told why.\n"
         + "- does-not-tile: the mean step between neighbouring columns (and rows, for v), in packed levels over the channels, is measured at every column boundary, the wrap's between the last and first included; "
         + "the wrap is a fault when its step is more than twice the 99th percentile of the steps inside, plus 2 levels, so the texture shows a seam when it repeats (a pattern's own hard edge that falls on the wrap is not one). "
         + "Fix: whole-number frequencies and counts and quarter turns; swatch's tiled view shows where.\n"
@@ -87,6 +87,7 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         var haveFiles = files is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) };
         CheckSet set;
         int? pixels;
+        IReadOnlySet<string> neutral = new HashSet<string>();
         if (haveFiles)
         {
             if (!TryFiles(files!.Value, out set, out var fileError)) return Error(fileError!);
@@ -116,12 +117,22 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
                 if (!(given.ValueKind == JsonValueKind.Number && given.TryGetInt32(out side) && TextureGraph.IsValidSize(side) && side <= MaxSize))
                     return Error($"check: size {given.GetRawText()} is not allowed; size is a power of two from 32 to {MaxSize} (32, 64, 128, 256, 512, 1024 or 2048)");
             }
-            set = CheckSet.OfGraph(new GraphEvaluator(graph, registry), side);
+            var evaluator = new GraphEvaluator(graph, registry);
+            set = CheckSet.OfGraph(evaluator, side);
             if (MeshNote(graph, registry) is { Length: > 0 } meshNote) set = new(set.Source, set.Outputs, [.. set.Notes, meshNote]);
+            neutral = evaluator.Outputs.Where(o => evaluator.TypesReaching(o).Overlaps(Carve.Graphs.MeshNodes.TypeNames)).ToHashSet();
             pixels = side;
         }
-        return Line(Report(set, pixels).ToJsonString());
+        return Line(Report(set, pixels, neutral).ToJsonString());
     }
+
+    /// <summary>
+    /// one-value's fix for an output that reads a mesh node (the person's ruling, 2026-11-25): the problem stays, but it is
+    /// flat because patina's mesh inputs are neutral stand-ins, so widening its levels is not the advice.
+    /// </summary>
+    public const string NeutralFix =
+        "Fix: none here: it reads a mesh input, which in patina is a neutral stand-in, so it is flat for that reason; "
+        + "carve gives the real maps when a material names the graph, and its check there judges them.";
 
     /// <summary>The one square size every output of <paramref name="set"/> has, or null when they differ or one is not square (RV-76).</summary>
     public static int? OneSize(CheckSet set) =>
@@ -131,9 +142,10 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
     /// The report for <paramref name="set"/>: <c>{ok, problems, notes, stats}</c>. With a <paramref name="size"/> it is
     /// <c>stats.size</c>; with none (files of mixed sizes) each output's stats name its own <c>width</c> and <c>height</c>.
     /// </summary>
-    public static JsonObject Report(CheckSet set, int? size)
+    public static JsonObject Report(CheckSet set, int? size, IReadOnlySet<string>? neutral = null)
     {
-        var problems = CheckRules.Run(set);
+        var problems = CheckRules.Run(set).Select(p => p.Check == OneValueRule.Id && neutral?.Contains(p.Output) == true
+            ? p with { Message = p.Message[..p.Message.IndexOf("Fix:", StringComparison.Ordinal)] + NeutralFix } : p).ToList();
         var notes = new List<string>(set.Notes);
         foreach (var o in set.Outputs.Where(o => o.IsRole(OutputRole.BaseColour) && set.MetallicFor(o) is null && set.Find("metallic") is not null))
             notes.Add("base_colour and metallic are different sizes, so every base colour texel is judged as a non-metal");
