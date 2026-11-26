@@ -57,7 +57,8 @@ public sealed class UnwrapToolTests
         var made = Ok(await carve.CallToolAsync("unwrap", example));
 
         Assert.Equal("mesh", made.GetProperty("mesh").GetString());
-        var islands = made.GetProperty("islands").EnumerateArray().ToArray();
+        Assert.Equal(3, made.GetProperty("islands").GetInt32());
+        var islands = made.GetProperty("largest").EnumerateArray().ToArray();
         Assert.Equal([(32, 0), (1, 32), (1, 33)], islands.Select(i => (i.GetProperty("faces").GetInt32(), i.GetProperty("lowest_face").GetInt32())));
         Assert.All(islands, i => Assert.Equal(0, i.GetProperty("flipped").GetInt32()));
         Assert.All(islands, i => Assert.Equal(4, i.GetProperty("rect").GetArrayLength()));
@@ -84,14 +85,52 @@ public sealed class UnwrapToolTests
     }
 
     [Fact]
+    public async Task Summary_counts_the_islands_and_lists_the_five_largest_and_full_adds_every_one()
+    {
+        // 8 islands: a strip of 7 two-face blocks and one single, cut by seams on every vertical edge between them.
+        using var carve = new ToolHarness();
+        await carve.InitializeAsync();
+        var vertices = new List<int[]>();
+        var faces = new List<int[]>();
+        int[] sizes = [1, 3, 2, 3, 1, 4, 2, 1];
+        var seams = new List<int[]>();
+        var x = 0;
+        foreach (var n in sizes)
+        {
+            var first = vertices.Count;
+            for (var k = 0; k <= n; k++) { vertices.Add([x + k, 0, 0]); vertices.Add([x + k, 1, 0]); }
+            for (var k = 0; k < n; k++) faces.Add([first + 2 * k, first + 2 * k + 2, first + 2 * k + 3, first + 2 * k + 1]);
+            x += n + 2;
+        }
+        Ok(await carve.CallToolAsync("define_mesh", JsonSerializer.Serialize(new { vertices, faces })));
+        var summary = Ok(await carve.CallToolAsync("unwrap", "{}"));
+        Assert.Equal((8, 3), (summary.GetProperty("islands").GetInt32(), summary.GetProperty("single_face_islands").GetInt32()));
+        Assert.False(summary.TryGetProperty("all", out _));
+        // By face count, ties to the lowest face: 4 faces, then the 3s, then the 2s.
+        var largest = summary.GetProperty("largest").EnumerateArray().Select(i => (i.GetProperty("faces").GetInt32(), i.GetProperty("lowest_face").GetInt32())).ToArray();
+        Assert.Equal([(4, 10), (3, 1), (3, 6), (2, 4), (2, 14)], largest);
+        var full = Ok(await carve.CallToolAsync("unwrap", """{"verbosity":"full"}"""));
+        var all = full.GetProperty("all").EnumerateArray().ToArray();
+        Assert.Equal(8, all.Length);
+        Assert.Equal(all.Select(i => i.GetProperty("lowest_face").GetInt32()).Order(), all.Select(i => i.GetProperty("lowest_face").GetInt32()));
+        Assert.Equal(summary.GetProperty("flipped").GetInt32(), all.Sum(i => i.GetProperty("flipped").GetInt32()));
+        var worst = all.OrderByDescending(i => i.GetProperty("stretch").GetDouble()).ThenBy(i => i.GetProperty("lowest_face").GetInt32()).First();
+        Assert.Equal(worst.GetProperty("lowest_face").GetInt32(), summary.GetProperty("stretch").GetProperty("lowest_face").GetInt32());
+        Assert.Equal(worst.GetProperty("stretch").GetDouble(), summary.GetProperty("stretch").GetProperty("worst").GetDouble());
+        // full is the summary plus all.
+        Assert.Equal(summary.GetProperty("largest").GetRawText(), full.GetProperty("largest").GetRawText());
+        Assert.Equal("""{"ok":true}""", TextOf(await carve.CallToolAsync("unwrap", """{"verbosity":"silent"}""")));
+    }
+
+    [Fact]
     public async Task A_partial_set_into_and_margin_are_kept_and_the_rest_keeps_its_uvs()
     {
         using var carve = await StartAsync();
         Ok(await carve.CallToolAsync("unwrap", """{"into":[0,0,0.5,0.5]}"""));
         var first = Ok(await carve.CallToolAsync("get_mesh", "{}")).GetProperty("uvs").EnumerateArray().Select(e => e.GetRawText()).ToArray();
         var made = Ok(await carve.CallToolAsync("unwrap", """{"faces":[32,33],"into":[0.5,0.5,1,1],"margin":0.01}"""));
-        Assert.Equal([32, 33], made.GetProperty("islands").EnumerateArray().Select(i => i.GetProperty("lowest_face").GetInt32()));
-        Assert.All(made.GetProperty("islands").EnumerateArray(), i => Assert.True(i.GetProperty("rect")[0].GetDouble() >= 0.51 - 1e-6));
+        Assert.Equal([32, 33], made.GetProperty("largest").EnumerateArray().Select(i => i.GetProperty("lowest_face").GetInt32()));
+        Assert.All(made.GetProperty("largest").EnumerateArray(), i => Assert.True(i.GetProperty("rect")[0].GetDouble() >= 0.51 - 1e-6));
         var second = Ok(await carve.CallToolAsync("get_mesh", "{}")).GetProperty("uvs").EnumerateArray().Select(e => e.GetRawText()).ToArray();
         Assert.Equal(first.Take(32), second.Take(32));
         Assert.NotEqual(first[32], second[32]);
