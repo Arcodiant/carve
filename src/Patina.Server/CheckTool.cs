@@ -54,7 +54,7 @@ public sealed class CheckTool(GraphStore store, NodeRegistry registry, ToolFolde
         + "- normal-not-unit: a normal is a unit vector. A fault when over 0.1% of texels' length differs from 1 by more than 0.02 (0.03 for a PNG, for the 8-bit rounding). "
         + "Fix: make it with height_to_normal, which normalises, and do not mix a normal's components as colours.\n"
         + "- one-value: a greyscale output (roughness, occlusion, height, a greyscale named output; not metallic) whose texels all pack to one byte; a mask of one value masks nothing. "
-        + "Fix: widen its levels, drive it from a noise or pattern, or drop it; one reading a mesh is told why.\n"
+        + "Fix: widen its levels, use a noise or pattern, or drop it; one reading a mesh is told why.\n"
         + "- does-not-tile: the mean step between neighbouring columns (and rows, for v), in packed levels over the channels, is measured at every column boundary, the wrap's between the last and first included; "
         + "the wrap is a fault when its step is more than twice the 99th percentile of the steps inside, plus 2 levels, so the texture shows a seam when it repeats (a pattern's own hard edge that falls on the wrap is not one). "
         + "Fix: whole-number frequencies and counts and quarter turns; swatch's tiled view shows where.\n"

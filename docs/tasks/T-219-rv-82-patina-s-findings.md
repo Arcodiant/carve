@@ -78,8 +78,9 @@ T-218 and T-220). Committed in one commit after agent one's:
   holds; no test pinned the old advice text on a mesh output (`CheckToolTests` flat-mask reads no mesh).
 - *Nested note seen failing:* in the scratch copy with `MeshNodeNames`'s recursion disabled,
   `A_graph_nesting_a_mesh_graph_says_so_in_every_answer` failed (Assert.Contains, get_graph's note).
-- check's description: "Fix: widen its levels, drive it from a noise or pattern, or drop it; one reading a mesh is told
-  why." (first try was 3,748 chars, over 3,686; this one is to be confirmed by the run).
+- check's description: "Fix: widen its levels, use a noise or pattern, or drop it; one reading a mesh is told why."
+  (tries at 3,748 and 3,689 chars failed `Every_description_is_under_the_limit`, limit 3,686; this one, about 3,680, is
+  unrun). The last patina-unit run's only failure was that length test.
 - README: the weathered sentence says the fix names the neutral inputs, for any mesh-reading output, nested or not.
 - *Scenario break:* `MeshNodesStage.CheckTitleNote` is the one title-note check; the break runs it on the plain
   sheet's title against itself (no note), which must fail; no new capture, so no new frame. Not yet run.
