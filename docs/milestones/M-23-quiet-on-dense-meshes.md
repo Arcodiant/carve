@@ -109,6 +109,23 @@ On `main` at planning, the real `carve` over stdio, fps-arms' files as they are.
 
 fps-arms' 12,000 tokens for one `open` was Carve 0.9.0, before T-72's fold; `main` already folds not-planar faces, and no other kind. Tool descriptions over 3,686 characters: render 18,551, export 13,480, bake 8,410, check 7,565, save 5,997, select 5,571, open 5,334, get_mesh 4,068, define_mesh 4,032, project_uvs 3,809, unwrap 3,720.
 
+### Measured
+
+Measured by T-206 on Claude Sonnet 5.5, the real `carve` over stdio at `summary`, characters of the result text (`silent` is 11, or 12 for a `check` that reads false; `full` and every call are in `artifacts/M-23/T-206/dense-run.tsv`).
+
+| Call | At planning | Now |
+|---|---|---|
+| `open` the cage | 1,156 | 244 |
+| `check` the cage | 1,434 | 730 |
+| `export` the cage, skinned | 2,038 | 1,039 |
+| `subdivide` once, twice | 373, 386 | 319, 332 |
+| `check` after two | 1,467 | 766 (ok: true) |
+| `delete` 200 faces | 41,310 | 1,119 |
+| `check` after `project_uvs box` | 43,700 | 848 |
+| `unwrap` wrench, scanner, cutter, toolkit | 4,778, 8,089, 11,371, 16,086 | 787, 786, 794, 790 |
+
+The exported cage holds 18,976 triangles. Largest description 3,684 (limit 3,686). No result is over 2,000.
+
 ### Order
 
 | Wave | Tasks | Why |

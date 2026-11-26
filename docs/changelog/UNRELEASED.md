@@ -6,3 +6,4 @@
 - T-199: help takes a topic beside tool; the warnings topic explains every warning kind, its grouping, its fix and the verbosity levels, and check's catalogue of warnings moves into it
 - T-201: The parts, style, UV, skeleton, weight, clip, target, save and bake tools take verbosity, silent answering only ok
 - T-202: unwrap returns the island count, worst stretch, flipped total and five largest islands, and every island only at verbosity full
+- T-206: The fps-arms cage opened, subdivided twice, checked, unwrapped and exported through the real carve with every result under 2,000 characters, the sizes tabled
