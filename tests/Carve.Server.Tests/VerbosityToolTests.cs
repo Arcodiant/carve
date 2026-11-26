@@ -22,9 +22,6 @@ public sealed class VerbosityToolTests
     private static readonly string[] Readers =
         ["get_mesh", "get_parts", "get_skeleton", "get_weights", "get_clips", "select", "render", "render_glb", "help"];
 
-    /// <summary>The tools still to take <c>verbosity</c>: none.</summary>
-    private static readonly string[] ToDo = [];
-
     /// <summary>Each tool here: the calls that set it up, a call that succeeds, and a call that is a tool error.</summary>
     public static TheoryData<string, string[], string, string> Tools => new()
     {
@@ -221,7 +218,7 @@ public sealed class VerbosityToolTests
     }
 
     [Fact]
-    public async Task Every_tool_has_verbosity_or_is_a_reader_or_is_still_to_do()
+    public async Task Every_tool_has_verbosity_or_is_a_reader()
     {
         await using var carve = new ToolHarness();
         await carve.InitializeAsync();
@@ -231,7 +228,7 @@ public sealed class VerbosityToolTests
         {
             var name = tool.GetProperty("name").GetString()!;
             var has = tool.GetProperty("inputSchema").TryGetProperty("properties", out var p) && p.TryGetProperty("verbosity", out _);
-            if (has == (Readers.Contains(name) || ToDo.Contains(name)))
+            if (has == (Readers.Contains(name)))
                 wrong.Add(has ? $"{name} has verbosity but is listed as without it" : $"{name} has no verbosity");
         }
         Assert.Empty(wrong);

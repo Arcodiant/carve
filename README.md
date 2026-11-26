@@ -156,6 +156,26 @@ count (`islands`, with `single_face_islands`), `fill`, `scale`, the worst
 `stretch` named by its island's lowest face, the `flipped` total and `largest`,
 the five largest islands by face count. `full` adds `all`, every island.
 
+Measured through the real `carve` on fps-arms' cage and tool sources
+(`DenseRunProcessTests`), characters of the result text at `summary`, the
+default; every result is within the 2,000-character budget, and at `silent` each
+is `{"ok":true}` (`check` its own `ok`):
+
+| Call | Characters | Planning (`main`) |
+|---|---|---|
+| `open` the cage | 244 | 1,156 |
+| `check` the cage | 730 | 1,434 |
+| `export` the cage, skinned | 1,039 | 2,038 |
+| `subdivide`, once then twice | 319, 332 | 373, 386 |
+| `check` after two (reads `ok: true`) | 766 | 1,467 |
+| `delete` 200 faces (798 open edges) | 1,119 | 41,310 |
+| `check` after it | 873 | |
+| `check` after `project_uvs box` (280 overlaps) | 848 | 43,700 |
+| `unwrap` wrench, cutter, toolkit, scanner | 787, 794, 790, 786 | 4,778, 11,371, 16,086, 8,089 |
+
+`verbosity: "full"` lists every warning (40,389 characters for the 798 open
+edges); the exported cage holds 18,976 triangles.
+
 ## Cutting
 
 Each of these edits the mesh in place and appends new ids at the end; each example is on a fresh `define_mesh` unit cube unless it says otherwise. A cut is refused, with the point and its distance, when a knife point is off the surface.
