@@ -4,7 +4,7 @@ description: >-
 ---
 # T-197 — Warnings grouped one line per kind, and the fps-arms samples
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
