@@ -124,7 +124,8 @@ public class MeshNodeToolTests
         Assert.All(Committed(name, mask + ".png").Chunk(4), p => Assert.Equal(0, p[0]));
     }
 
-    /// <summary>The person's ruling (2026-11-25): check's answer keeps the one problem, its fix the true reason rather than "widen its levels".</summary>
+    /// <summary>The person's rulings (2026-11-25): check's answer keeps the one problem, its fix saying only what is known: it may be
+    /// flat for the neutral inputs, to draw it in carve, and to widen its levels only if it is flat there too.</summary>
     [Theory]
     [MemberData(nameof(MeshSamples))]
     public async Task Check_tells_the_empty_mask_it_is_flat_for_the_neutral_inputs(string name)
@@ -136,7 +137,10 @@ public class MeshNodeToolTests
         var only = Assert.Single(report.GetProperty("problems").EnumerateArray());
         Assert.Equal(("one-value", Expected[name].Mask), (only.GetProperty("check").GetString(), only.GetProperty("output").GetString()));
         Assert.EndsWith(CheckTool.NeutralFix, only.GetProperty("message").GetString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("widen", only.GetProperty("message").GetString(), StringComparison.Ordinal);
+        var message = only.GetProperty("message").GetString()!;
+        Assert.True(message.IndexOf("render mode 'uvs'", StringComparison.Ordinal) is var carve and >= 0
+            && carve < message.IndexOf("if it is flat there too, widen its levels", StringComparison.Ordinal), message);
+        Assert.DoesNotContain("none here", message, StringComparison.Ordinal);
     }
 
     [Fact]
