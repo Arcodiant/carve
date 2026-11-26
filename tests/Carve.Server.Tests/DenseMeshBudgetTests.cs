@@ -41,7 +41,10 @@ public sealed class DenseMeshBudgetTests
             await Call(carve, "subdivide", """{"levels":1}""");
             var twice = await Call(carve, "subdivide", """{"levels":1}""");
             Assert.Equal((9492, 9488), (twice.GetProperty("vertices").GetInt32(), twice.GetProperty("faces").GetInt32()));
-            await Call(carve, "check", "{}");
+            // T-198: the cage is smooth, so its not-planar faces are a note and not a warning, and it reads ok.
+            var cageCheck = await Call(carve, "check", "{}");
+            Assert.True(cageCheck.GetProperty("ok").GetBoolean(), cageCheck.ToString());
+            Assert.Contains(cageCheck.GetProperty("notes").EnumerateArray(), n => n.GetString()!.Contains(" faces are not planar: worst faces[") && n.GetString()!.EndsWith("expected on a smooth mesh, which export triangulates"));
             await Call(carve, "export", """{"path":"cage.glb"}""");
 
             var deleted = await Call(carve, "delete", JsonSerializer.Serialize(new { faces = Enumerable.Range(0, 200).Select(i => i * 2) }));

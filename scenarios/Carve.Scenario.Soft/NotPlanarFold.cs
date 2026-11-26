@@ -15,8 +15,34 @@ public static partial class NotPlanarFold
     [GeneratedRegex(@"mesh '(?<mesh>[^']+)': (?<n>\d+) faces are not planar: worst faces\[(?<worst>\d+)\], [^;]+ off its plane \(limit [^;)]+\); e\.g\. faces\[(?<a>\d+)\], faces\[(?<b>\d+)\], faces\[(?<c>\d+)\]; select faces where non_planar names them")]
     private static partial Regex GroupLine();
 
+    [GeneratedRegex(@"^(?<n>\d+) faces are not planar: worst faces\[(?<worst>\d+)\], [^;]+ off its plane \(limit [^;)]+\); e\.g\. [^;]+; expected on a smooth mesh, which export triangulates$")]
+    private static partial Regex SmoothNote();
+
     [GeneratedRegex(@"^mesh '(?<mesh>[^']+)': faces\[(?<face>\d+)\]: face is not planar: ")]
     private static partial Regex NamedLine();
+
+    /// <summary>
+    /// The problem with an export of a smooth mesh (T-198), or null when it is right: the result has no warning at all, since a
+    /// not-planar face on a smooth mesh is no warning, and select finds some (so the rule is being exercised).
+    /// </summary>
+    public static string? CheckSmoothExport(string exportResult, int selectedCount) =>
+        exportResult.Contains("warning(s)", StringComparison.Ordinal) ? $"a smooth mesh's export warns: {exportResult}"
+        : selectedCount == 0 ? "select finds no non_planar face, so nothing is tested" : null;
+
+    /// <summary>
+    /// The problem with <c>check</c>'s result JSON for a smooth mesh, or null when it is right: no warning says not planar, and one
+    /// note counts select's faces, names a worst face select finds, and says it is expected.
+    /// </summary>
+    public static string? CheckSmoothNote(string checkResult, IReadOnlyList<int> selectedIds)
+    {
+        var root = System.Text.Json.JsonDocument.Parse(checkResult).RootElement;
+        if (root.GetProperty("warnings").EnumerateArray().Any(w => w.GetString()!.Contains("not planar", StringComparison.Ordinal)))
+            return $"check warns of a not-planar face on a smooth mesh: {root.GetProperty("warnings")}";
+        var notes = root.GetProperty("notes").EnumerateArray().Select(n => SmoothNote().Match(n.GetString()!)).Where(m => m.Success).ToList();
+        if (notes.Count != 1) return $"check has {notes.Count} not-planar notes, not 1: {root.GetProperty("notes")}";
+        if (int.Parse(notes[0].Groups["n"].Value) != selectedIds.Count) return $"the note counts {notes[0].Groups["n"].Value}, not select's {selectedIds.Count} non_planar faces";
+        return selectedIds.Contains(int.Parse(notes[0].Groups["worst"].Value)) ? null : $"the note's worst face, faces[{notes[0].Groups["worst"].Value}], is not one select finds";
+    }
 
     /// <summary>
     /// The problem with an export's result text, or null when it is right: with no "warning(s): " the export is clean, which meets the

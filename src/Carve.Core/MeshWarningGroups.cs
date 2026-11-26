@@ -30,6 +30,10 @@ public static class MeshWarningGroups
         return lines;
     }
 
+    /// <summary>The note <c>check</c> gives of the not-planar faces of a smooth mesh (T-198): the grouped line at any count, then why it is no warning.</summary>
+    public static string SmoothNote(IReadOnlyList<MeshWarning> nonPlanar) =>
+        Grouped(MeshWarningKind.NonPlanarFace, nonPlanar.ToList()) + "; expected on a smooth mesh, which export triangulates";
+
     private static string Grouped(MeshWarningKind kind, List<MeshWarning> all)
     {
         var sorted = all.OrderBy(w => Key(w.Element).A).ThenBy(w => Key(w.Element).B).ThenBy(w => w.Element, StringComparer.Ordinal).ToList();

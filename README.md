@@ -121,6 +121,8 @@ all:
 `select` names every element of a kind: `faces where non_planar`, `edges where
 open`, `edges where nonmanifold`, `vertices where unattached`.
 
+On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-planar face is not a warning: `check` gives one note with the count and the worst case ("...; expected on a smooth mesh, which export triangulates"), every other tool says nothing, and `ok` can be true. `select faces where non_planar` names every one either way, and a flat mesh warns as above.
+
 ## Cutting
 
 Each of these edits the mesh in place and appends new ids at the end; each example is on a fresh `define_mesh` unit cube unless it says otherwise. A cut is refused, with the point and its distance, when a knife point is off the surface.

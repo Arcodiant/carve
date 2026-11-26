@@ -109,7 +109,7 @@ public sealed class MeshHealth
         if (uvStats is not null) stats = stats with { Uvs = uvStats };
         IReadOnlyList<MeshWarning> warnings = uvWarnings.Count == 0 ? report.Warnings : [.. report.Warnings, .. uvWarnings];
 
-        return new MeshHealth(shells, problems, warnings, BuildNotes(report, size, shells.Count), stats);
+        return new MeshHealth(shells, problems, warnings, BuildNotes(report, size, shells.Count, mesh.ShadingMode == ShadingMode.Smooth), stats);
     }
 
     private static List<MeshShell> FindShells(PolygonMesh mesh, IReadOnlyList<MeshTriangle> triangles)
@@ -321,7 +321,7 @@ public sealed class MeshHealth
         }
     }
 
-    private static List<string> BuildNotes(MeshReport report, Vector3 size, int shells)
+    private static List<string> BuildNotes(MeshReport report, Vector3 size, int shells, bool smooth)
     {
         var min = report.BoundsMin;
         var max = report.BoundsMax;
@@ -333,6 +333,7 @@ public sealed class MeshHealth
             min.X <= 0 && max.X >= 0 && min.Y <= 0 && max.Y >= 0 && min.Z <= 0 && max.Z >= 0 ? "origin inside the bounds" : "origin outside the bounds",
         };
         if (shells > 1) notes.Add(MeshEdits.Invariant($"{shells} separate shells; a model is usually one"));
+        if (smooth && report.NonPlanarFaces.Count > 0) notes.Add(MeshWarningGroups.SmoothNote(report.NonPlanarFaces));
         return notes;
     }
 }

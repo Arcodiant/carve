@@ -138,13 +138,14 @@ internal static class ArmStages
         var glb = Path.Combine(models, "arm.glb");
         var result = await CallTextAsync(driver, "export", new { path = glb });
         if (result.Contains("replaced") || !result.Contains("exported arm.glb") || !result.Contains("1 clip(s) 'Curl'")) driver.Fail($"export arm.glb: expected a new skinned file with Curl, got {result}");
-        // The smoothed quads are slightly off their planes (subdivide). By the person's ruling of 2026-11-18 only not-planar warnings are
-        // accepted, grouped by T-197's rule: past 3, one line whose count is what select's non_planar finds and whose samples its lowest ids.
-        // Any other warning fails. (The rule itself is T-127's.)
+        // The smoothed quads are slightly off their planes (subdivide), and the arm is smooth, so by the person's ruling of 2026-11-24
+        // (T-198) that is no warning: the export has none, and check's note counts what select's non_planar finds.
         var selected = await CallTextAsync(driver, "select", new { kind = "faces", where = "non_planar", mesh = "mesh" });
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "select-non-planar-mesh.txt"), selected);
         var nonPlanar = System.Text.Json.JsonDocument.Parse(selected).RootElement.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
-        var problem = NotPlanarFold.CheckExport(result, new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = nonPlanar });
+        var checkResult = await CallTextAsync(driver, "check", new { mesh = "mesh" });
+        await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "check-mesh.txt"), checkResult);
+        var problem = NotPlanarFold.CheckSmoothExport(result, nonPlanar.Count) ?? NotPlanarFold.CheckSmoothNote(checkResult, nonPlanar);
         if (problem is not null) driver.Fail($"export arm.glb: {problem}");
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "export-arm.glb.txt"), result);
 

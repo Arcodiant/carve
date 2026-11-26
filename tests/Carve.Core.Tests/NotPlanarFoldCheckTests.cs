@@ -99,4 +99,35 @@ public class NotPlanarFoldCheckTests
     [Fact]
     public void Samples_out_of_order_fail() =>
         Assert.NotNull(NotPlanarFold.Check(Good().Replace("faces[0], faces[1], faces[2]", "faces[1], faces[0], faces[2]"), Counts));
+
+    // T-198: a smooth mesh's not-planar faces are a note in check and no warning in the export.
+    private const string SmoothTail = "; expected on a smooth mesh, which export triangulates";
+
+    private static string Check(string warnings = "", params string[] notes) => System.Text.Json.JsonSerializer.Serialize(new { warnings = warnings.Length == 0 ? [] : new[] { warnings }, notes });
+
+    private static string Right => Check("", "size 1 x 1 x 1 m", "13 faces are not planar: worst faces[1], 0.2 off its plane (limit 0.001); e.g. faces[0], faces[1], faces[2]" + SmoothTail);
+
+    [Fact]
+    public void The_smooth_note_passes_against_select_s_faces() => Assert.Null(NotPlanarFold.CheckSmoothNote(Right, Enumerable.Range(0, 13).ToList()));
+
+    [Fact]
+    public void A_note_that_does_not_count_select_s_faces_fails() => Assert.NotNull(NotPlanarFold.CheckSmoothNote(Right, Enumerable.Range(0, 12).ToList()));
+
+    [Fact]
+    public void A_worst_face_select_does_not_find_fails() => Assert.Contains("worst face", NotPlanarFold.CheckSmoothNote(Right, Enumerable.Range(2, 13).ToList()));
+
+    [Fact]
+    public void A_missing_note_fails() => Assert.NotNull(NotPlanarFold.CheckSmoothNote(Check("", "size 1 x 1 x 1 m"), [0, 1]));
+
+    [Fact]
+    public void A_not_planar_warning_on_a_smooth_mesh_fails() =>
+        Assert.Contains("warns", NotPlanarFold.CheckSmoothNote(Check("13 faces are not planar: worst faces[1]") , Enumerable.Range(0, 13).ToList()));
+
+    [Fact]
+    public void A_smooth_export_with_any_warning_fails_and_one_without_passes()
+    {
+        Assert.Null(NotPlanarFold.CheckSmoothExport("exported arm.glb, 1 clip(s) 'Curl'", 13));
+        Assert.NotNull(NotPlanarFold.CheckSmoothExport("exported arm.glb; warning(s): mesh 'mesh': faces[3]: face is not planar: x", 13));
+        Assert.NotNull(NotPlanarFold.CheckSmoothExport("exported arm.glb", 0));
+    }
 }

@@ -275,10 +275,10 @@ public static class MeshQuery
             return _boundary[vertex];
         }
 
-        /// <summary>The rule is MeshReport's and is asked of it, so a face is non-planar here exactly when the report warns of it.</summary>
+        /// <summary>The rule is MeshReport's and is asked of it, so a face is non-planar here exactly when the report measures it so (smooth or flat).</summary>
         public bool NonPlanar(int face)
         {
-            _nonPlanar ??= MeshReport.Create(Mesh).Warnings.Where(w => w.Kind == MeshWarningKind.NonPlanarFace).Select(w => w.Element).ToHashSet();
+            _nonPlanar ??= MeshReport.Create(Mesh).NonPlanarFaces.Select(w => w.Element).ToHashSet();
             return _nonPlanar.Contains($"faces[{face}]");
         }
     }
