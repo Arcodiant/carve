@@ -8,7 +8,7 @@ namespace Carve.Server.Tests;
 /// <summary>
 /// RV-82: a render never hands back a frame drawn with empty graph slots. render bakes the store's model and then posts;
 /// an edit that lands in between is drawn by the pump on a model no render baked. Here the edit lands at the very moment
-/// the frame thread finds the request waiting, and <c>SheetVersions.Baked</c>, render's loop, bakes that model and draws again.
+/// the frame thread finds the request waiting, and <c>SheetVersions.Render</c>, render's own loop, bakes that model and draws again.
 /// </summary>
 [Trait("Tier", "unit")]
 public sealed class RenderBakedFrameTests : IDisposable
@@ -31,6 +31,7 @@ public sealed class RenderBakedFrameTests : IDisposable
         Assert.NotNull(_store.DefineMaterial("define_material", new Material("flat", BaseColourTexture: new MaterialGraph(graph, "base_colour", 64)), out _, out var problems));
         Assert.Empty(problems);
         _pump.Step();
+        _queue.Pump = _pump;
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
@@ -42,21 +43,18 @@ public sealed class RenderBakedFrameTests : IDisposable
         _store.OpenModel(model.WithMaterial(model.Materials.Single() with { Roughness = 0.5f }), "define_material");
     }
 
-    /// <summary>What render's <c>RenderTiles</c> does: resolve the store's model, post, and wait for the frame thread.</summary>
-    private async Task<(RenderedFrame[]? Frames, string? Error)> BakeAndRender()
-    {
-        _bakes.Resolve(_store.Current.Model, CancellationToken.None);
-        var frame = _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front)));
-        for (var i = 0; i < 20 && !frame.IsCompleted; i++) _pump.Step();
-        return ([await frame], null);
-    }
+    private static readonly RenderSpec[] Front = [new(CameraSpec.ForView(RenderView.Front))];
+
+    /// <summary>render's own loop for its model looks (<c>SheetVersions.Render</c>), the frame thread stepped as each frame is posted.</summary>
+    private Task<(RenderedFrame[]? Frames, string? Error)> Render() =>
+        SheetVersions.Render(_bakes, _store, _queue, Front, new TaskCompletionSource().Task, () => null, [], 3, CancellationToken.None);
 
     [Fact]
     public async Task An_edit_between_the_bake_and_the_frame_is_baked_and_drawn_again_never_returned_with_empty_slots()
     {
         _queue.OnWaiting = Edit;
 
-        var (frames, error) = await SheetVersions.Baked(BakeAndRender, f => f.Unbaked, 3);
+        var (frames, error) = await Render();
 
         Assert.Null(error);
         // The first frame was drawn on the edit with its graph slot empty; the one returned is drawn with its bake.
@@ -73,7 +71,7 @@ public sealed class RenderBakedFrameTests : IDisposable
         _queue.OnWaiting = Edit;
         _queue.Again = true;
 
-        var (frames, error) = await SheetVersions.Baked(BakeAndRender, f => f.Unbaked, 3);
+        var (frames, error) = await Render();
 
         Assert.Null(frames);
         Assert.Equal("The model changed between its bake and its frame on each of 3 tries, so its graph slots would be drawn empty; call render again once the edits have settled.", error);
@@ -82,48 +80,72 @@ public sealed class RenderBakedFrameTests : IDisposable
     [Fact]
     public async Task With_no_edit_the_frame_is_drawn_once_with_its_bakes()
     {
-        var (frames, _) = await SheetVersions.Baked(BakeAndRender, f => f.Unbaked, 3);
+        var (frames, _) = await Render();
 
         Assert.False(Assert.Single(frames!).Unbaked);
         Assert.IsType<MaterialTexture>(Assert.Single(_scene.Drawn).Single().BaseColourTexture);
     }
 
     /// <summary>
-    /// The <c>uvs</c> look (RV-82): its graph image is baked on the snapshot, and the pump serves the request on the model current
-    /// then, so an edit between them would lay another model's layout over the image. That frame is stale, and the model is drawn again.
-    /// The order: the pump still shows an older model when the call posts (an edit it has not drawn yet), so the request is not due
-    /// on the opening peek, and the edit that lands at that peek is the mesh it is shown and served on.
+    /// RV-83: a render's <c>Resolve</c> of the model the pump is putting in lands right after the pump has read the bake (the seam
+    /// <c>GraphBakes.AfterPeek</c>). The pump drew that model with its graph slots empty, so the frame says so, or the mesh is put in
+    /// again with the bake before it is served: never empty slots on a frame marked baked.
+    /// </summary>
+    [Fact]
+    public async Task A_resolve_landing_as_the_pump_reads_the_bake_never_leaves_empty_slots_unmarked()
+    {
+        Edit(); // a model no render has baked, not yet shown
+        var model = _store.Current.Model;
+        _bakes.AfterPeek = m =>
+        {
+            _bakes.AfterPeek = null;
+            _bakes.Resolve(model, CancellationToken.None);
+        };
+
+        var frame = await _queue.Post(Front[0]);
+
+        var empty = _scene.Drawn[^1].Single().BaseColourTexture is null;
+        Assert.False(empty && !frame.Unbaked, "a frame drawn with empty graph slots is marked baked");
+        Assert.False(empty); // the bake landed before the frame was served, so the mesh was put in again with it
+    }
+
+    /// <summary>
+    /// The <c>uvs</c> look (RV-82), through render's own loop (<c>SheetVersions.Uvs</c>, RV-83): its graph image is baked on the
+    /// snapshot, and an edit landing before the post is the model the frame is drawn on, laying another model's layout over the image.
+    /// That frame is stale, and the model is baked and drawn again.
     /// </summary>
     [Fact]
     public async Task A_uvs_frame_drawn_on_a_later_model_than_its_graph_image_is_drawn_again()
     {
-        _queue.OnWaiting = Edit;
+        var graph = _store.Current.Model.Materials.Single().BaseColourTexture as MaterialGraph;
         var tries = 0;
-        var behind = 1; // the tries that open with an edit the pump has not shown
-        async Task<((RenderedFrame Frame, bool Stale)[]? Frames, string? Error)> BakeImageAndRender()
-        {
-            tries++;
-            if (behind-- > 0) Edit();
-            var bakedOn = _store.Current.Version; // what RunUvs bakes its image on
-            var frame = _queue.Post(new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, 256, Look.Uvs, LabelSet.None));
-            for (var i = 0; i < 20 && !frame.IsCompleted; i++) _pump.Step();
-            var drawn = await frame;
-            return ([(drawn, SheetVersions.UvImageStale(graphImage: true, bakedOn, drawn.Version))], null);
-        }
+        Task<string> Uvs() => SheetVersions.Uvs(_bakes, _store, _queue, graph, null,
+            current => { tries++; return (null, current.Model.Meshes[0].Name); },
+            (_, _, image) => new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, 256, Look.Uvs, LabelSet.None) { UvImage = image },
+            (current, _, frame, _, _) => $"drawn on {frame.Version}, baked on {current.Version}", e => e,
+            new TaskCompletionSource().Task, () => null, 3, CancellationToken.None);
+        _queue.BeforePost = () => { _queue.BeforePost = null; Edit(); };
 
-        var (frames, error) = await SheetVersions.Baked(BakeImageAndRender, t => t.Stale, 3, SheetVersions.UvImageDrawn);
+        var answer = await Uvs();
 
-        Assert.Null(error);
         Assert.Equal(2, tries); // the first frame was drawn on the edit, a model the image was not baked on
-        Assert.Equal(_store.Current.Version, Assert.Single(frames!).Frame.Version);
-        (_queue.OnWaiting, _queue.Again, behind) = (Edit, true, int.MaxValue);
+        Assert.Equal($"drawn on {_store.Current.Version}, baked on {_store.Current.Version}", answer);
+        (tries, _queue.BeforePost) = (0, Edit);
         Assert.Equal("The model changed between its bake and its frame on each of 3 tries, so its graph image would lie under another model's layout; call render again once the edits have settled.",
-            (await SheetVersions.Baked(BakeImageAndRender, t => t.Stale, 3, SheetVersions.UvImageDrawn)).Error);
+            await Uvs());
+        Assert.Equal(3, tries);
     }
 
-    /// <summary>Runs an edit at the moment the frame thread finds a request waiting, once or (<see cref="Again"/>) every time.</summary>
+    /// <summary>
+    /// Runs an edit at the moment the frame thread finds a request waiting, once or (<see cref="Again"/>) every time, and one
+    /// (<see cref="BeforePost"/>) as a request is posted; steps <see cref="Pump"/>, as the frame thread would, until a posted frame is drawn.
+    /// </summary>
     private sealed class QueueWithAHook(ModelStore store) : RenderQueue(store)
     {
+        public RenderPump? Pump { get; set; }
+
+        public Action? BeforePost { get; set; }
+
         public Action? OnWaiting { get; set; }
 
         public bool Again { get; set; }
@@ -138,6 +160,14 @@ public sealed class RenderBakedFrameTests : IDisposable
             }
 
             return waiting;
+        }
+
+        public override Task<RenderedFrame> Post(RenderSpec spec)
+        {
+            BeforePost?.Invoke();
+            var frame = base.Post(spec);
+            for (var i = 0; Pump is not null && i < 20 && !frame.IsCompleted; i++) Pump.Step();
+            return frame;
         }
     }
 

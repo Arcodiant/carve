@@ -82,7 +82,7 @@ internal sealed class RenderRequest(RenderSpec spec, long postedVersion) : Offsc
 /// </summary>
 internal class RenderQueue(ModelStore store) : OffscreenQueue<RenderRequest>
 {
-    public Task<RenderedFrame> Post(RenderSpec spec)
+    public virtual Task<RenderedFrame> Post(RenderSpec spec)
     {
         var request = new RenderRequest(spec, store.Current.Version);
         Enqueue(request);
