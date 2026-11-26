@@ -129,11 +129,11 @@ public static class Displacement
             foreach (var v in mesh.Faces[f].Corners) normals[v] += weighted;
         }
 
-        // A vertex on no face has no normal: without an axis it has nowhere to go, so it is left out and named.
+        // A vertex on no face, or whose faces' normals cancel (a two-sided card), has no normal: without an axis it has nowhere to go, so it is left out and named.
         var stranded = direction is null ? selected.Where(v => normals[v] == Vector3.Zero).ToList() : [];
         selected.ExceptWith(stranded);
         if (selected.Count == 0)
-            return EditResult.Refused([new MeshError("selection", "matches no vertex with a normal (they are on no face): give axis to move them, or select vertices on faces")]);
+            return EditResult.Refused([new MeshError("selection", "matches no vertex with a normal (each is on no face, or its faces face opposite ways): give axis to move them")]);
 
         var heights = Heights(mesh, selected, source, errors);
         if (errors.Count > 0) return EditResult.Refused(errors);
@@ -154,7 +154,7 @@ public static class Displacement
         {
             var warnings = new List<string>();
             if (stranded.Count > 0)
-                warnings.Add($"vertices {Listed(stranded)} are on no face, so they have no normal and did not move; give axis to move them");
+                warnings.Add($"vertices {Listed(stranded)} have no normal (on no face, or their faces face opposite ways) and did not move; give axis to move them");
             if (Coarse(mesh, selected, source) is { } coarse) warnings.Add(coarse);
             report = new DisplaceReport(largest, warnings);
         }

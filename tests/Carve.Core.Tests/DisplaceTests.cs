@@ -146,7 +146,7 @@ public class DisplaceTests
         var result = Displacement.Displace(mesh, [8, 0], Rough, 1, 0, null, out var report);
         Assert.DoesNotContain(8, result.MovedVertices);
         Assert.Equal(new Vector3(3, 3, 3), Ok(result).Vertices[8]);
-        Assert.Contains(report!.Warnings, w => w.StartsWith("vertices 8 are on no face"));
+        Assert.Contains(report!.Warnings, w => w.StartsWith("vertices 8 have no normal"));
 
         var alone = Displacement.Displace(mesh, [8], Rough, 1, 0, null, out _);
         Assert.Contains("matches no vertex with a normal", string.Join("; ", alone.Errors));
