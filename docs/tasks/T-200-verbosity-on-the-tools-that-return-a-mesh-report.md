@@ -48,23 +48,47 @@ The tools that answer with a mesh report take `verbosity`, so a script can run t
 - Search for what reads the thing you change (`grep` over `tests/` and `scenarios/`) before changing it; do not list the readers from memory. Show each changed or new check failing on a wrong input, as a table in `### As built`.
 - Run `finish` from inside the worktree and leave the folder.
 
-### Hand-off
+### As built
 
-By the first agent, Claude Opus 5.5, at the 60-call checkpoint. Code and tests committed; `cairn task T-200 verify` not yet run.
+By two agents in turn, both Claude Opus 5.5: the first wrote the code and the tests and handed off at its 60-call checkpoint; the second recorded the person's rulings below, ran `verify`, built the table below and wrote this.
 
-**Done.**
-- Helpers in `src/Carve.Server/MeshToolSupport.cs`: `enum Verbosity { Summary, Silent, Full }`; `WithVerbosity(JsonObject? schema)` adds the `verbosity` property (string, enum of the three, description `VerbositySchemaText`); `ReadVerbosity(JsonElement? value, List<string> errors)` gives Summary when absent and adds `verbosity: expected "silent", "summary" or "full", got ...` otherwise; `WarningLines(warnings, level)` is T-197's grouping at summary and every `MeshWarning.ToString()` at full; `Quiet(result, level)` turns a success into `{"ok":true}` at silent and leaves an error whole; `Report(mesh, level)` and `Edit(..., addIds, level)` take the level (Edit returns `{"ok":true}` at silent after the edit is made).
-- Adopting (as all fourteen do): wrap the schema in `WithVerbosity(...)`, add `JsonElement? verbosity = null` to `Run`, add `"verbosity"` to `UnknownArguments`, `var level = ReadVerbosity(verbosity, errors);` before the `Failed` return, pass `level` to `Report`/`Edit`/`WarningLines`, and return `Quiet(Ok(body), level)`.
-- The fourteen tools adopted. `check` at silent answers `{"ok":<its own ok>}` (in `CheckTool.Run`), `export` at silent answers the JSON `{"ok":true}` (both of its success returns go through `Quiet`), as the planner read them.
-- No tool description carries a verbosity sentence: one was tried and put `define_mesh` (3,830) and `check` (3,796) over 3,686, so the explanation is only the schema description, as the spec says. `undo`'s "Takes no arguments; any argument is a tool error." became "Takes only verbosity; any other is a tool error." (one character shorter).
-- Tests: new `tests/Carve.Server.Tests/VerbosityToolTests.cs` (theory over the fourteen: silent exact and the same change made, summary = no argument, full = summary but every warning, error at silent equals error without, `"loud"` refused with the model unchanged; check's `{"ok":false}` on an open cube; a non-string value; full on the holed cage gives 798 open-edge lines from both `delete` and `check`; the tools/list guard). `DenseMeshBudgetTests` runs a second carve at silent beside the first, step for step.
-- Pins moved (each now also lists `verbosity`): `CheckToolDefinitionTests`, `ExportToolDefinitionTests`, `SaveOpenToolDefinitionTests` (open only), `TargetToolTests` (define_mesh's properties), `DefineMeshDefinitionTests` (the published schema text and the property count 4 to 5).
-- README: `## Dense meshes` gains the fourteen tools, the three levels, check's and export's silent answers.
-- `dotnet test tests/Carve.Server.Tests --filter Tier=unit`: 1,112 passed.
+**The person's rulings (2026-11-26).**
+- The planner's two readings are confirmed: `check` at `silent` answers its own `ok` (`{"ok":false}` on a broken mesh), and `export` at `silent` answers the JSON `{"ok":true}` although its result is otherwise text.
+- `displace` (it changes the model and returns a mesh report, but no M-23 task named it) goes to T-201, not here. It stays in the guard's `ToDo` table, labelled as T-201's.
+- `verbosity` is explained only in the argument's schema description, and no tool description grows. A sentence in each description was tried and put `define_mesh` (3,830) and `check` (3,796) over 3,686. `undo`'s "Takes no arguments; any argument is a tool error." became "Takes only verbosity; any other is a tool error." so it stays true (one character shorter).
 
-**Left.** Run `cairn task T-200 verify` (full, so `ToolHarnessMatchesProcessTests` and `ToolFamiliesThroughProcessTests` against the real process); build the wrong-input table for `### As built` (e.g. `Quiet` not applied, `WarningLines` grouping at full, check silent answering true, the guard with a tool removed from `ToDo`); write `### As built`; `cairn lint`; `finish`.
+**The helper, for T-201 and T-202** (all in `src/Carve.Server/MeshToolSupport.cs`):
+- `enum Verbosity { Summary, Silent, Full }`.
+- `WithVerbosity(JsonObject? schema)` adds the `verbosity` property (string, enum `silent`/`summary`/`full`, description `VerbositySchemaText`) to the schema, or to an empty object schema when null, and returns it.
+- `ReadVerbosity(JsonElement? value, List<string> errors)` gives `Summary` when absent; any other value than the three adds `verbosity: expected "silent", "summary" or "full", got ...` to `errors`.
+- `WarningLines(warnings, level)`: T-197's grouping at `summary`, every `MeshWarning.ToString()` one per line at `full`.
+- `Quiet(result, level)`: at `silent` a success becomes exactly `{"ok":true}`; a tool error is returned whole.
+- `Report(mesh, level)` and `Edit(store, tool, mesh, edit, addIds, level)` take the level; `Edit` makes the edit (one undo step as ever) and then answers `{"ok":true}` at `silent`, after its refusals.
 
-**Surprising, for the person.**
-- `displace` changes the model and returns a mesh report, but no M-23 task names it (not T-200's fourteen, T-201's nineteen or the readers). It is in the guard's `ToDo` table so the guard holds; someone must own it.
-- The orchestrator asked for the levels in each short description; that cannot be done for `define_mesh` and `check` under 3,686 without moving text into a `Reference`, so it was not done anywhere (the spec's own rule). Raise if wanted otherwise.
-- The planner's two readings (check's own ok, export's JSON) are implemented but not yet confirmed by the person.
+How a tool adopts it, as the fourteen do: wrap the schema in `WithVerbosity(...)`; add `JsonElement? verbosity = null` to `Run` and `"verbosity"` to its `UnknownArguments`; `var level = ReadVerbosity(verbosity, errors);` before the `Failed` return; pass `level` to `Report`/`Edit`/`WarningLines`; return `Quiet(Ok(body), level)`. What each level returns: `silent` exactly `{"ok":true}` (check: its own `ok`); `summary`, the default, byte for byte the result without the argument; `full`, the summary with every warning one per line; a tool error whole at every level. T-201 and T-202 move their tools out of `ToDo` in `VerbosityToolTests` as they adopt it.
+
+**Tools.** `define_mesh`, `move`, `extrude`, `delete`, `merge_faces`, `bridge`, `plane_cut`, `loop_cut`, `knife`, `subdivide`, `undo`, `open`, `check`, `export`. `CarveServer.cs` is not touched and no tool added.
+
+**Tests.** New `tests/Carve.Server.Tests/VerbosityToolTests.cs`: a theory over the fourteen (silent exact and the same change made, summary equals no argument, full is summary with every warning, an error at silent equals it without, `"loud"` refused with the model unchanged); check's `{"ok":false}` on an open cube; a non-string value refused; `full` on the holed cage of `DenseMeshBudgetTests` gives 798 open-edge lines from both `delete` and `check`; the tools/list guard (every tool has `verbosity`, or is one of the readers, `help` included whether or not T-199 has landed, or is in `ToDo`). `DenseMeshBudgetTests` runs a second carve at `silent` beside the first, step for step: every result exactly `{"ok":true}`, check its own `ok`.
+
+**Pins that moved**, each asserting the same thing with `verbosity` now among the listed properties: `CheckToolDefinitionTests` (check's closed schema), `ExportToolDefinitionTests` (export's), `SaveOpenToolDefinitionTests` (open's only; `save` is T-201's), `TargetToolTests` (define_mesh's properties), `DefineMeshDefinitionTests` (the published schema text, and its property count 4 to 5). No number of the 3, the 2,000 or the 3,686 moved; no committed sample was edited.
+
+**README.** `## Dense meshes` gains a paragraph: the fourteen tools take `verbosity`, the three levels in a sketch, check's and export's silent answers, a tool error whole at every level and any other value an error.
+
+**Each check failing on a wrong input** (the source changed, the classes `VerbosityToolTests`, `DenseMeshBudgetTests` and the moved pins run, then restored):
+
+| Wrong input | What fails |
+|---|---|
+| `Quiet` returns the result unchanged | `Each_level_answers_as_ruled` (13 of 14 rows; `check` answers its own ok), `DenseMeshBudgetTests` |
+| `Edit` answers `{"ok":true}` at silent before making the edit | `Each_level_answers_as_ruled` (the 8 edits: model unchanged), `DenseMeshBudgetTests` |
+| `Edit` answers `{"ok":true}` at silent before its refusals | `Each_level_answers_as_ruled` (the 8 edits: error at silent differs) |
+| `WarningLines` groups at `full` | `Full_on_the_holed_cage_lists_every_open_edge` |
+| `WarningLines` lists every warning at `summary` | `DenseMeshBudgetTests` (over budget) |
+| `ReadVerbosity` accepts a bad value | `Each_level_answers_as_ruled` (all 14), `A_value_that_is_not_a_string_is_a_tool_error` |
+| `check` at silent answers `{"ok":true}` | `Check_at_silent_answers_its_own_ok_on_a_broken_mesh`, `DenseMeshBudgetTests` |
+| `displace` removed from `ToDo` | `Every_tool_has_verbosity_or_is_a_reader_or_is_still_to_do` |
+| `WithVerbosity` adds nothing | all six moved pins and the guard |
+
+`Quiet` turning a tool error into `{"ok":true}` fails nothing: no caller passes it an error (each tool returns its errors before `Quiet`), so the guard in `Quiet` is defence only, and the error-at-silent row above is what holds the rule. `summary` equals no argument by construction, so the summary row is held by `DenseMeshBudgetTests`' budget, not by the theory.
+
+**Checked.** `cairn task T-200 verify` (full): VERIFY PASS, `server-regression` (with `ToolHarnessMatchesProcessTests` and `ToolFamiliesThroughProcessTests`) and the scenarios run against the real process. Not checked: no frames were judged, since nothing here draws.

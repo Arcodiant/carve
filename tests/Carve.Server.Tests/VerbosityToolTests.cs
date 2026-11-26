@@ -23,14 +23,17 @@ public sealed class VerbosityToolTests
         ["get_mesh", "get_parts", "get_skeleton", "get_weights", "get_clips", "select", "render", "render_glb", "help"];
 
     /// <summary>
-    /// The tools still to take <c>verbosity</c>: T-201's nineteen and T-202's unwrap empty it. displace is named by no
-    /// M-23 task; it is listed so the guard holds, and raised in T-200's As built.
+    /// The tools still to take <c>verbosity</c>: T-201's (its nineteen, and displace, which the person gave it on
+    /// 2026-11-26) and T-202's unwrap, which those tasks empty.
     /// </summary>
     private static readonly string[] ToDo =
     [
+        // T-201
         "define_part", "keep_level", "define_group", "set_colour", "define_material", "set_material", "set_shading", "mark_edges",
         "set_uvs", "project_uvs", "define_skeleton", "set_weights", "weigh", "define_clip", "delete_clip", "define_target",
-        "delete_target", "save", "bake", "unwrap", "displace",
+        "delete_target", "save", "bake", "displace",
+        // T-202
+        "unwrap",
     ];
 
     /// <summary>Each tool here: the calls that set it up, a call that succeeds, and a call that is a tool error.</summary>
