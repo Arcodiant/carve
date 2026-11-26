@@ -45,7 +45,7 @@ public sealed class CheckTool(ModelStore store)
         + "\"edge belongs to only one face\": an open edge, a hole; collision built from the mesh breaks later. "
         + "\"edge is shared by N faces\": a non-manifold edge, which breaks collision the same way; call define_mesh again without the extra face. "
         + "\"two faces cross this edge in the same direction\": inconsistent winding, so a face points the wrong way and is culled; reverse that face's loop and call define_mesh again. An edge with this warning and a non-manifold one usually means a duplicate face, not a flipped one. "
-        + "\"face is not planar\": a lifted corner, so the face folds along a diagonal the game chooses; move the vertex back onto the plane with move. Up to 10 such faces are listed, the lowest ids first; past 10 the rest are one line, \"and N more faces are not planar; select faces where non_planar names them\". "
+        + "\"face is not planar\": a lifted corner, so the face folds along a diagonal the game chooses; move the vertex back onto the plane with move. Any kind past 3 is one line, \"252 faces are not planar: worst faces[10], ...; e.g. faces[0], faces[1], faces[2]; select faces where non_planar names them\". "
         + "\"no face uses this vertex\": a stray that a game loads for nothing; call define_mesh again without it. "
         + "UV warnings, only for a mesh that has UVs on some face (a mesh with none gets none, and no uvs in stats; uvs counts the faces with and without UVs), each by face id. "
         + "\"no UVs, so the face samples the texture's corner\": the face is unmapped; project_uvs or unwrap it, or set_uvs it. "
@@ -109,7 +109,7 @@ public sealed class CheckTool(ModelStore store)
             ok = health.Ok && envelope.Length == 0,
             problems = health.Problems.Select(p => new { check = p.Check, element = p.Element, message = p.Message }).ToArray(),
             // The model's envelope warnings (T-91) come after the mesh's own; a model with no envelopes has none, so its output is as before.
-            warnings = MeshWarningFold.Lines(health.Warnings).Concat(envelope).ToArray(),
+            warnings = MeshWarningGroups.Lines(health.Warnings).Concat(envelope).ToArray(),
             notes = health.Notes,
             stats = shown,
         });

@@ -4,8 +4,8 @@ using static Carve.Server.Tests.CarveProcess;
 namespace Carve.Server.Tests;
 
 /// <summary>
-/// The not-planar fold (the person's rule, 2026-11-13, "name 10, fold the rest") in each tool's result through the real
-/// server: define_mesh, get_mesh, check, move, open and export on a row of lifted quads, and the leaky shed left as it was.
+/// The not-planar grouping (T-197, the person's ruling of 2026-11-24, which replaced T-72's "name 10, fold the rest") in each
+/// tool's result through the real server: define_mesh, get_mesh, check, move, open and export on a row of lifted quads, and the leaky shed left as it was.
 /// </summary>
 [Trait("Tier", "unit")]
 public sealed class NotPlanarFoldToolTests() : FileToolTests("carve-fold")
@@ -23,25 +23,24 @@ public sealed class NotPlanarFoldToolTests() : FileToolTests("carve-fold")
     private static string[] Warnings(string json) =>
         JsonDocument.Parse(json).RootElement.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToArray();
 
-    private static void ExpectFolded(IEnumerable<string> warnings, int quads, string prefix = "")
+    /// <summary>The one grouped not-planar line for a row of <paramref name="quads"/>, and nothing else about planarity.</summary>
+    private static void ExpectGrouped(IEnumerable<string> warnings, int quads)
     {
-        var planar = warnings.Where(w => w.Contains("face is not planar:")).ToArray();
-        Assert.Equal(Enumerable.Range(0, 10).Select(i => prefix + $"faces[{i}]: "), planar.Select(w => w[..(w.IndexOf(':') + 2)]));
-        var more = quads - 10;
-        Assert.Single(warnings, w => w == prefix + $"and {more} more {(more == 1 ? "face is" : "faces are")} not planar; {Fold}");
-        // Nothing else about planarity: the named lines and the one fold.
-        Assert.Equal(11, warnings.Count(w => w.Contains("planar")));
+        var line = Assert.Single(warnings, w => w.Contains("planar"));
+        Assert.StartsWith($"{quads} faces are not planar: worst faces[", line);
+        Assert.Contains(" off its plane (limit ", line);
+        Assert.EndsWith($"; e.g. faces[0], faces[1], faces[2]; {Fold}", line);
     }
 
     [Fact]
-    public async Task Define_mesh_get_mesh_check_and_move_name_ten_faces_and_fold_the_rest()
+    public async Task Define_mesh_get_mesh_check_and_move_group_the_faces_in_one_line()
     {
         var (carve, _) = await StartAsync(Row(12));
         using var _ = carve;
 
-        ExpectFolded(Warnings(Ok(await carve.CallToolAsync("get_mesh", "{}"))), 12);
-        ExpectFolded(Warnings(Ok(await carve.CallToolAsync("check", "{}"))), 12);
-        ExpectFolded(Warnings(Ok(await carve.CallToolAsync("move", """{"vertices":[0],"by":[0,0,0.01]}"""))), 12);
+        ExpectGrouped(Warnings(Ok(await carve.CallToolAsync("get_mesh", "{}"))), 12);
+        ExpectGrouped(Warnings(Ok(await carve.CallToolAsync("check", "{}"))), 12);
+        ExpectGrouped(Warnings(Ok(await carve.CallToolAsync("move", """{"vertices":[0],"by":[0,0,0.01]}"""))), 12);
 
         // Every face is still named by select.
         var selected = JsonDocument.Parse(Ok(await carve.CallToolAsync("select", """{"kind":"faces","where":"non_planar"}"""))).RootElement;
@@ -49,45 +48,44 @@ public sealed class NotPlanarFoldToolTests() : FileToolTests("carve-fold")
     }
 
     [Fact]
-    public async Task Ten_faces_fold_nothing_and_eleven_fold_one()
+    public async Task Three_faces_are_each_named_and_four_are_one_line()
     {
-        var (carve, _) = await StartAsync(Row(10));
+        var (carve, _) = await StartAsync(Row(3));
         using var _ = carve;
-        var ten = Warnings(Ok(await carve.CallToolAsync("check", "{}")));
-        Assert.Equal(10, ten.Count(w => w.Contains("face is not planar:")));
-        Assert.DoesNotContain(ten, w => w.StartsWith("and "));
+        var three = Warnings(Ok(await carve.CallToolAsync("check", "{}")));
+        Assert.Equal(["faces[0]: ", "faces[1]: ", "faces[2]: "], three.Where(w => w.Contains("planar")).Select(w => w[..(w.IndexOf(':') + 2)]));
 
-        Ok(await carve.CallToolAsync("define_mesh", Row(11)));
-        var eleven = Warnings(Ok(await carve.CallToolAsync("check", "{}")));
-        ExpectFolded(eleven, 11);
+        Ok(await carve.CallToolAsync("define_mesh", Row(4)));
+        ExpectGrouped(Warnings(Ok(await carve.CallToolAsync("check", "{}"))), 4);
     }
 
     [Fact]
-    public async Task Open_and_export_fold_the_same_way()
+    public async Task Open_and_export_group_the_same_way()
     {
         var (carve, _) = await StartAsync(Row(12));
         using var _ = carve;
         Ok(await carve.CallToolAsync("save", """{"path":"out/row.carve"}"""));
 
-        ExpectFolded(Warnings(Ok(await carve.CallToolAsync("open", """{"path":"out/row.carve"}"""))), 12);
+        ExpectGrouped(Warnings(Ok(await carve.CallToolAsync("open", """{"path":"out/row.carve"}"""))), 12);
 
         var exported = Ok(await carve.CallToolAsync("export", """{"path":"out/row.glb"}"""));
         var at = exported.IndexOf("warning(s): ", StringComparison.Ordinal);
         Assert.True(at >= 0, exported);
-        // The fold line holds a "; " of its own, so it is cut out before the warnings are split.
+        // The grouped line holds "; " of its own, so it is cut out of the text whole (the row's open edges are a line before it).
         var text = exported[(at + "warning(s): ".Length)..];
-        var foldLine = $"and 2 more faces are not planar; {Fold}";
-        Assert.Contains(foldLine, text);
-        ExpectFolded(text.Replace(foldLine, "FOLD").Split("; ").Select(w => w == "FOLD" ? foldLine : w), 12);
+        var from = text.IndexOf("12 faces are not planar", StringComparison.Ordinal);
+        Assert.True(from >= 0, text);
+        ExpectGrouped([text[from..(text.IndexOf(Fold, from, StringComparison.Ordinal) + Fold.Length)]], 12);
+        Assert.Single(text.Split("not planar").Skip(1));
     }
 
     [Fact]
-    public async Task The_leaky_sheds_planted_faults_stay_named()
+    public async Task The_leaky_sheds_warnings_are_grouped_by_kind()
     {
         var shed = Core.Tests.TestMeshes.LeakyShed();
         var (carve, _) = await StartAsync(JsonSerializer.Serialize(new { vertices = shed.Vertices.Select(v => new[] { v.X, v.Y, v.Z }), faces = shed.Faces.Select(f => f.Loop) }));
         using var _ = carve;
         var warnings = Warnings(Ok(await carve.CallToolAsync("check", "{}")));
-        Assert.Equal(Core.Tests.TestMeshes.LeakyShedWarnings, warnings);
+        Assert.Equal(Core.Tests.TestMeshes.LeakyShedLines, warnings);
     }
 }

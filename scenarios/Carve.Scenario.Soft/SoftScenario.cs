@@ -176,10 +176,9 @@ public sealed class SoftScenario : IScenario
         }
 
         // Every warning is a face that is not planar (what subdivide makes of a quad); a limit (triangles, primitives, height) must not
-        // be one. By T-72's rule (the person, 2026-11-13) each mesh names its first 10 and folds the rest into one line, and the named
-        // lines and the folded count add up to select's non_planar faces of that mesh, the named faces are select's lowest ids and the
-        // fold line comes after them, so a regression that adds a warning or loses a
-        // face is caught. select's results are kept in the run folder for SoftLoad.Tests.
+        // be one. By T-197's rule (the person, 2026-11-24) each mesh with more than 3 has one grouped line, its count select's
+        // non_planar faces of that mesh, its samples select's 3 lowest ids and its worst face one select finds, so a regression that
+        // adds a warning or loses a face is caught. select's results are kept in the run folder for SoftLoad.Tests.
         var nonPlanar = new Dictionary<string, IReadOnlyList<int>>();
         foreach (var name in new[] { "Body", "Hat" })
         {

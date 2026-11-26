@@ -110,7 +110,7 @@ public class MorphLoadTests
     public void The_export_is_clean()
     {
         var result = File.ReadAllText(Path.Combine(RunFolder, "work", "export-arm.glb.txt"));
-        // Only not-planar warnings (the person's ruling of 2026-11-18), folded by T-72: the named faces and the fold add up to select's count.
+        // Only not-planar warnings (the person's ruling of 2026-11-18), grouped by T-197: the grouped line counts select's faces.
         Assert.DoesNotContain("replaced", result);
         var selected = File.ReadAllText(Path.Combine(RunFolder, "work", "select-non-planar-mesh.txt"));
         var faces = System.Text.Json.JsonDocument.Parse(selected).RootElement.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();

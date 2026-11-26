@@ -53,7 +53,8 @@ public sealed class DisplaceToolTests() : FileToolTests("carve-displace")
         Assert.Equal(386, body.GetProperty("moved").GetArrayLength());
         Assert.InRange(body.GetProperty("largest").GetDouble(), 0.08, 0.3);
         Assert.DoesNotContain(body.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.Contains("too coarse"));
-        Assert.Contains(body.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.EndsWith("not planar (expected after displace)"));
+        var nonPlanar = Ok(await carve.CallToolAsync("select", """{"kind":"faces","where":"non_planar"}""")).GetProperty("count").GetInt32();
+        Assert.Contains(body.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.StartsWith($"{nonPlanar} faces are not planar: worst faces["));
         var rough = Positions(Ok(await carve.CallToolAsync("get_mesh", "{}")));
         Assert.NotEqual(smooth, rough);
 

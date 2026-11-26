@@ -138,8 +138,8 @@ internal static class ArmStages
         var glb = Path.Combine(models, "arm.glb");
         var result = await CallTextAsync(driver, "export", new { path = glb });
         if (result.Contains("replaced") || !result.Contains("exported arm.glb") || !result.Contains("1 clip(s) 'Curl'")) driver.Fail($"export arm.glb: expected a new skinned file with Curl, got {result}");
-        // The smoothed quads are slightly off their planes (subdivide). By T-72's rule and the person's ruling of 2026-11-18 only not-planar
-        // warnings are accepted: the mesh names its first 10 and folds the rest, and the two add up to what select's non_planar finds.
+        // The smoothed quads are slightly off their planes (subdivide). By the person's ruling of 2026-11-18 only not-planar warnings are
+        // accepted, grouped by T-197's rule: past 3, one line whose count is what select's non_planar finds and whose samples its lowest ids.
         // Any other warning fails. (The rule itself is T-127's.)
         var selected = await CallTextAsync(driver, "select", new { kind = "faces", where = "non_planar", mesh = "mesh" });
         await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, "work", "select-non-planar-mesh.txt"), selected);

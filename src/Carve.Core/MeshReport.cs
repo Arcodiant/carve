@@ -16,8 +16,12 @@ public enum MeshWarningKind
     MaterialNoEffect,
 }
 
-/// <summary>A legal-but-suspicious feature of a mesh. <see cref="Element"/> names it, e.g. <c>faces[2]</c>, <c>vertices[7]</c> or <c>edges[0-1]</c>.</summary>
-public sealed record MeshWarning(MeshWarningKind Kind, string Element, string Message)
+/// <summary>
+/// A legal-but-suspicious feature of a mesh. <see cref="Element"/> names it, e.g. <c>faces[2]</c>, <c>vertices[7]</c> or <c>edges[0-1]</c>.
+/// <see cref="Measure"/> and <see cref="Limit"/> are what a kind that measures something measured (a not-planar face's distance
+/// off its plane and its limit; a non-manifold edge's face count), read by <see cref="MeshWarningGroups"/> for the worst case.
+/// </summary>
+public sealed record MeshWarning(MeshWarningKind Kind, string Element, string Message, double Measure = 0, double Limit = 0)
 {
     public override string ToString() => $"{Element}: {Message}";
 }
@@ -74,7 +78,7 @@ public sealed class MeshReport
             else if (total > 2)
             {
                 closed = false;
-                warnings.Add(new MeshWarning(MeshWarningKind.NonManifoldEdge, name, $"edge is shared by {total} faces"));
+                warnings.Add(new MeshWarning(MeshWarningKind.NonManifoldEdge, name, $"edge is shared by {total} faces", total));
             }
 
             // Two or more faces running the same way along an edge disagree about which side is outside.
@@ -96,7 +100,7 @@ public sealed class MeshReport
             var limit = PolygonMesh.PlanarityTolerance * PolygonMesh.FaceSize(verts, corners);
             var worst = corners.Max(i => Math.Abs(((double)verts[i].X - o.X - cx) * normal.X + ((double)verts[i].Y - o.Y - cy) * normal.Y + ((double)verts[i].Z - o.Z - cz) * normal.Z));
             if (worst > limit)
-                warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", MeshEdits.Invariant($"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})")));
+                warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", MeshEdits.Invariant($"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})"), worst, limit));
         }
 
         for (var i = 0; i < verts.Count; i++)

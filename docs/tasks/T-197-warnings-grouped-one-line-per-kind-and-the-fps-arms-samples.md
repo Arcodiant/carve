@@ -50,3 +50,61 @@ Every mesh report says each kind of warning once, however many elements have it,
 - **Ask, don't land.** A rule neither this file nor the milestone settles, a changed number (the 3, the 2,000, the 3,686), or a check that would be loosened goes back to the person. An assertion that moves keeps asserting the same thing; say in `### As built` which moved where.
 - Search for what reads the thing you change (`grep` over `tests/` and `scenarios/`) before changing it; do not list the readers from memory. Show each changed or new check failing on a wrong input, as a table in `### As built`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Built on Claude Opus 5.5.
+
+**Grouping.** `src/Carve.Core/MeshWarningGroups.cs` (`Lines`, `ListedLimit = 3`, `Samples = 3`) replaces `MeshWarningFold` (deleted). `MeshWarning` gained `Measure` and `Limit` (default 0), set by `MeshReport` for not-planar faces (the distance off the plane and its limit) and non-manifold edges (the face count). Callers: `MeshToolSupport.Report`, `CheckTool`, `ExportTool` (both paths; per mesh with `mesh 'Name': ` kept), `SubdivideTool` (its own fold and `Warnings` deleted) and `DisplaceTool`, which used subdivide's fold ("expected after displace") and now groups the same way.
+
+A kind of 1 to 3 is listed as before. A kind of 4 or more is one line where its first warning stood. The count is of distinct elements: a UV-overlap face warned once per other face counts once. The samples are the three lowest ids; edges sort by both ids, so `edges[4-5]` comes before `edges[4-10]`. Worst: not planar, the largest `Measure / Limit`; non-manifold, the most faces; a tie goes to the lowest id. The exact line of each kind, with N at least 4:
+
+| Kind | Line |
+|---|---|
+| NonPlanarFace | `N faces are not planar: worst faces[i], D off its plane (limit L); e.g. faces[a], faces[b], faces[c]; select faces where non_planar names them` (D and L `G3`, as the single line has them) |
+| OpenEdge | `N edges belong to only one face: e.g. edges[a-b], ...; select edges where open names them` |
+| NonManifoldEdge | `N edges are shared by more than two faces: worst edges[a-b], shared by K faces; e.g. ...; select edges where nonmanifold names them` |
+| InconsistentWinding | `N edges have two faces crossing them in the same direction: e.g. edges[a-b], ...` |
+| UnusedVertex | `N vertices are used by no face: e.g. vertices[a], ...; select vertices where unattached names them` |
+| UvUnmapped | `N faces have no UVs, so they sample the texture's corner: e.g. faces[a], ...` |
+| UvFlipped | `N faces have flipped UVs, so the texture is mirrored on them: e.g. ...` |
+| UvZeroArea | `N faces have UVs of zero area, so each is one smeared texel: e.g. ...` |
+| UvOverlap | `N faces have UVs that overlap another face: e.g. ...` |
+| MaterialNoEffect | `N materials set occlusion that has no effect without an occlusion_texture: e.g. materials['a'], ...` |
+
+**Descriptions** (each sentence no longer than before): `check`, `export`, `move`, `subdivide` and `displace` say the new rule. `define_mesh` has no "up to 10" sentence today, so it is unchanged.
+
+**PartToolsListTests**: deleted the digest test, `Before`, `Digest`, `NewTools`, `Agreed`, `T94Added` and `T94Reworded`, and the usings only they needed. The two sentence-placement tests are kept.
+
+**Samples**: `samples/arms-cage.carve`, `cutter-src.carve`, `toolkit-src.carve` and `scanner-src.carve`, compared with `cmp` against fps-arms' `work/` files. `work/` is git-ignored there, so the files are not in any commit. Their dates (2026-11-15) are before `0813e3a` (2026-11-22), and fps-arms `main` is at `cf5d8db` now. `SampleMeshTests` reads each with its counts. `samples/*.carve` was added to `server-unit` and `server-regression`, and the four were added to CLAUDE.md's `samples/` row.
+
+**README**: a new `## Dense meshes` section after `## Asking the mesh`. It gives the rule, two example lines from the agreed sketch, and the four `select` queries.
+
+**Pins that moved** (each still asserts the same thing in the new form):
+- `MeshWarningFoldTests` became `MeshWarningGroupsTests`: 0, 1, 3, 4 and 504 of a kind, order, the tie, worst over its own limit, the edge order, the non-manifold worst, the overlap counted once, two kinds at once, and every kind having a line.
+- `NotPlanarFold` (Soft, linked by Morph and the load tests): the count is select's, the samples are select's 3 lowest, the worst is a face select finds, and no other warning is there. `NotPlanarFoldCheckTests` was rewritten to match.
+- `NotPlanarFoldToolTests`, `SubdivideToolTests` and `DisplaceToolTests`: the grouped line's count equals `select faces where non_planar`.
+- The shed's pinned tool warnings are now `TestMeshes.LeakyShedLines` and `ShedFacts.Warnings`, five lines. `LeakyShedWarnings`, the raw `MeshHealth` list, is unchanged.
+
+**DenseMeshBudgetTests** (`Budget = 2000`): the run the scope lists. One change: `project_uvs` on faces 0 to 99 is refused after the delete, because half of those faces are gone. So the test undoes the delete, projects, checks, then deletes the 200 odd faces and checks again ("both").
+
+### Hand-off
+
+Written by Claude Opus 5.5 at the ~60-call checkpoint (73 calls).
+
+**Done.** Everything in `### As built` above is in place and builds clean. The solution builds with no warnings.
+
+**Verify results.** The first verify failed on four things:
+- `clean-tree`: nothing was committed at that point. This commit fixes it.
+- `scenario-uvs`: `check` expected eight `no UVs` lines for faces 34 to 41. It now gets one grouped line, `8 faces have no UVs, so they sample the texture's corner: e.g. faces[34], faces[35], faces[36]`. That pin moves to the grouped line, under the person's rule.
+- `server-unit`: `MaterialToolDefinitionTests.The_two_descriptions_examples_define_and_assign_on_the_cube_and_get_mesh_and_check_read_it_back` and `MaterialToolTests.Check_names_the_material_of_a_textured_face_without_UVs_once_per_face_replacing_the_generic_warning` fail, most likely the same grouping of 4 or more UV warnings. Not yet read.
+- `core-unit`: `MorphTargetFileTests.Every_committed_file_rereads_and_rewrites_equal` fails, almost certainly because it now iterates the four new `samples/*.carve`. fps-arms wrote them, and they may not round-trip through `CarveFile.Write` byte for byte. Not yet read. Do not rewrite the samples; they must stay byte for byte.
+
+Every other suite passed, including every scenario except uvs, and server-regression.
+
+**Left to do:**
+1. Fix the four failures above.
+2. Show each new or changed check failing on a wrong input, and add the table to `### As built`. Only `NotPlanarFoldCheckTests` has its negative cases built in.
+3. Verify until clean, then `cairn lint` and `finish`.
+
+**Question for the person.** The scope says a kind of 1 to 3 is listed as before "so the leaky shed's planted faults stay named". But the shed has 8 inconsistent-winding, 8 open and 4 non-manifold edges, so under the 4-or-more rule each kind is one line. Its tool warnings are now the five lines in `TestMeshes.LeakyShedLines` and `ShedFacts.Warnings`. The winding kind has no `select` predicate, so the duplicate face's winding edges (12-13 and the rest) are no longer named in `check`'s output. I applied the ruling; whether that is wanted is the person's call.

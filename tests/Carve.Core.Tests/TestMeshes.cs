@@ -186,6 +186,19 @@ internal static class TestMeshes
         "vertices[24]: no face uses this vertex",
     ];
 
+    /// <summary>
+    /// <see cref="LeakyShedWarnings"/> as a tool's result says them (T-197): a kind past 3 is one line where its first warning stood,
+    /// so the 8 winding, 8 open and 4 non-manifold edges are a line each and the one not-planar face and unused vertex are listed.
+    /// </summary>
+    public static readonly string[] LeakyShedLines =
+    [
+        "8 edges have two faces crossing them in the same direction: e.g. edges[0-3], edges[0-4], edges[3-7]",
+        "8 edges belong to only one face: e.g. edges[4-5], edges[4-10], edges[5-6]; select edges where open names them",
+        "4 edges are shared by more than two faces: worst edges[12-13], shared by 3 faces; e.g. edges[12-13], edges[12-15], edges[13-14]; select edges where nonmanifold names them",
+        "faces[11]: face is not planar: a vertex is 0.0105 off its plane (limit 0.000439)",
+        "vertices[24]: no face uses this vertex",
+    ];
+
     /// <summary>The notes of <see cref="LeakyShed"/>.</summary>
     public static readonly string[] LeakyShedNotes =
     [

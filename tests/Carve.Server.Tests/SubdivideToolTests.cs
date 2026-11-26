@@ -126,7 +126,7 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
     }
 
     [Fact]
-    public async Task The_result_folds_not_planar_warnings_into_one_line_and_check_folds_by_its_own_rule()
+    public async Task The_result_groups_not_planar_warnings_into_one_line_as_check_does()
     {
         var (carve, _) = await StartAsync();
         using var __ = carve;
@@ -137,18 +137,16 @@ public sealed class SubdivideToolTests() : TempFolderTests("carve-subdivide")
 
         var warnings = body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToList();
         Assert.DoesNotContain(warnings, w => w.Contains("face is not planar:"));
-        var folded = Assert.Single(warnings, w => w.EndsWith("not planar (expected after subdivide)"));
-        Assert.Equal(warnings.Count - 1, warnings.IndexOf(folded));
+        var grouped = Assert.Single(warnings, w => w.Contains("not planar"));
         var selected = Ok(await carve.CallToolAsync("select", """{"mesh":"Body","kind":"faces","where":"non_planar"}"""));
         var count = selected.GetProperty("count").GetInt32();
-        Assert.True(count > 1, $"only {count} non-planar faces");
-        Assert.Equal($"{count} faces are not planar (expected after subdivide)", folded);
+        Assert.True(count > 3, $"only {count} non-planar faces");
+        Assert.StartsWith($"{count} faces are not planar: worst faces[", grouped);
+        Assert.EndsWith("; select faces where non_planar names them", grouped);
 
-        // Subdivide keeps its own fold (T-43); check folds by T-72's rule: 10 named, the rest one line, adding up to select's count.
+        // T-197: subdivide's own fold (T-43) is gone; check groups by the same rule, so its line is the same one.
         var check = Ok(await carve.CallToolAsync("check", """{"mesh":"Body"}"""));
-        var lines = check.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToList();
-        Assert.Equal(10, lines.Count(w => w.Contains("face is not planar:")));
-        Assert.Contains($"and {count - 10} more faces are not planar; select faces where non_planar names them", lines);
+        Assert.Contains(grouped, check.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!));
     }
 
     [Theory]

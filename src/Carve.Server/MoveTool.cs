@@ -16,7 +16,7 @@ public sealed class MoveTool(ModelStore store)
         + "an edge is a [a, b] pair of vertex ids (either order) and must be an edge of the mesh. A pair that is not an edge of the mesh is refused, and the error names the pair. select with kind edges lists the real edges. "
         + "by is exactly three numbers [dx, dy, dz], in the same coordinates as define_mesh (1 unit = 1 m), Y up; a positive dy moves up. "
         + "At least one of vertices, edges, faces is required, and by must not be zero. "
-        + "Moving adds and removes nothing, so the counts stay the same, but moving some corners of a face off its plane gives a non-planar warning (up to 10 faces are named, the rest folded into one line that points at select faces where non_planar). "
+        + "Moving adds and removes nothing, so the counts stay the same, but moving some corners of a face off its plane gives a non-planar warning (past 3 faces, one line: the count, the worst, three lowest ids and select faces where non_planar). "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[], moved:[vertex ids moved, ascending]}; "
         + "created, deleted and split are always empty for a move. "
         + "Bad input (an unknown vertex or face id, a pair that is not an edge, nothing listed, a zero or non-finite by, an argument move does not take) is a tool error "

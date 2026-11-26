@@ -104,6 +104,23 @@ An agent can question a mesh instead of reading every id out of `get_mesh`.
 
 `samples/leaky-shed.carve` is a broken shed to try them on.
 
+## Dense meshes
+
+A mesh of thousands of faces can have hundreds of warnings of one kind, so every
+tool's result says each kind once past three. One to three warnings of a kind are
+listed one per line, each naming its element; four or more are one line, where
+the kind's first warning would stand: the count, the worst case where the kind
+measures one, three samples by lowest id, and the `select` query that names them
+all:
+
+```
+252 faces are not planar: worst faces[10], 6.03E-05 off its plane (limit 1.07E-05); e.g. faces[0], faces[1], faces[2]; select faces where non_planar names them
+798 edges belong to only one face: e.g. edges[0-1], edges[0-9], edges[1-2]; select edges where open names them
+```
+
+`select` names every element of a kind: `faces where non_planar`, `edges where
+open`, `edges where nonmanifold`, `vertices where unattached`.
+
 ## Cutting
 
 Each of these edits the mesh in place and appends new ids at the end; each example is on a fresh `define_mesh` unit cube unless it says otherwise. A cut is refused, with the point and its distance, when a knife point is off the surface.
