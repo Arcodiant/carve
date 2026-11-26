@@ -283,7 +283,7 @@ public sealed class TargetToolTests() : TempFolderTests("carve-targets")
         var define = ToolList.Tool(tools, "define_target");
         var schema = define.GetProperty("inputSchema");
         var props = schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray();
-        Assert.Equal(["file", "file_mesh", "mesh", "name", "positions"], props);
+        Assert.Equal(["file", "file_mesh", "mesh", "name", "positions", "verbosity"], props);
         Assert.Equal(["name"], Names(schema.GetProperty("required")));
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
         Assert.All(props, p => Assert.False(string.IsNullOrWhiteSpace(schema.GetProperty("properties").GetProperty(p).GetProperty("description").GetString())));

@@ -30,7 +30,7 @@ public sealed class ProjectUvsTool(ModelStore store)
         + ExampleMarker + """{"method":"box"}""" + "\n"
         + ExampleMarker + """{"method":"planar","view":"+y","faces":[3],"into":[0,0,0.5,1]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<ProjectUvsTool>("project_uvs", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<ProjectUvsTool>("project_uvs", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -45,7 +45,7 @@ public sealed class ProjectUvsTool(ModelStore store)
             ["seam"] = Numbers("cylindrical: [x, y, z] a direction across the axis where u is 0; default [0, 0, -1].", 3),
         },
         ["required"] = new JsonArray("method"),
-    }));
+    })));
 
     private static JsonObject Numbers(string description, int count) => new()
     {
@@ -57,9 +57,10 @@ public sealed class ProjectUvsTool(ModelStore store)
     };
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? method = null, JsonElement? faces = null, JsonElement? into = null,
-        JsonElement? view = null, JsonElement? direction = null, JsonElement? axis = null, JsonElement? centre = null, JsonElement? seam = null, JsonElement? mesh = null)
+        JsonElement? view = null, JsonElement? direction = null, JsonElement? axis = null, JsonElement? centre = null, JsonElement? seam = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("project_uvs", context, "method", "faces", "into", "view", "direction", "axis", "centre", "seam", "mesh");
+        var errors = UnknownArguments("project_uvs", context, "method", "faces", "into", "view", "direction", "axis", "centre", "seam", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var chosen = RequiredString("method", method, errors);
         if (chosen is not null && !Methods.Contains(chosen))
@@ -194,9 +195,9 @@ public sealed class ProjectUvsTool(ModelStore store)
         var target = snapshot.Model.Target(meshName, out _)!;
         var written = mapped.SelectMany(f => target.Mesh.Uvs!.Of(f)!).ToArray();
         float[] bounds = [written.Min(p => p.X), written.Min(p => p.Y), written.Max(p => p.X), written.Max(p => p.Y)];
-        return axes is null
+        return Quiet(axes is null
             ? Ok(new { mesh = target.Name, method = chosen, mapped, bounds })
-            : Ok(new { mesh = target.Name, method = chosen, mapped, bounds, axes });
+            : Ok(new { mesh = target.Name, method = chosen, mapped, bounds, axes }), level);
     }
 
     private static bool Usable(Vector3 v)

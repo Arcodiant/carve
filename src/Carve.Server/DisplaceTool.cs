@@ -33,7 +33,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         + "Worked example on define_mesh's unit cube after subdivide levels 3, a rough boulder:\n"
         + ExampleMarker + Example;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DisplaceTool>("displace", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<DisplaceTool>("displace", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -58,14 +58,15 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
             ["group"] = new JsonObject { ["description"] = "A face group from define_group whose corners to displace.", ["type"] = "string" },
         },
         ["required"] = new JsonArray("source", "amount"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? source = null, JsonElement? amount = null,
         JsonElement? midlevel = null, JsonElement? axis = null, JsonElement? vertices = null, JsonElement? faces = null,
-        JsonElement? group = null, JsonElement? mesh = null)
+        JsonElement? group = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
         const string tool = "displace";
-        var errors = UnknownArguments(tool, context, "source", "amount", "midlevel", "axis", "vertices", "faces", "group", "mesh");
+        var errors = UnknownArguments(tool, context, "source", "amount", "midlevel", "axis", "vertices", "faces", "group", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var by = Number("amount", amount, errors);
         var mid = Number("midlevel", midlevel, errors, required: false) ?? 0.5f;
@@ -97,14 +98,14 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         if (!result!.Succeeded) return Failed(tool, result.Errors.Select(x => x.ToString()));
 
         var edited = snapshot.Model.Find(name ?? snapshot.Model.Meshes[0].Name)!;
-        var body = Report(edited);
-        body["warnings"] = MeshWarningGroups.Lines(MeshReport.Create(edited).Warnings).Concat(report!.Warnings).ToArray();
+        var body = Report(edited, level);
+        body["warnings"] = WarningLines(MeshReport.Create(edited).Warnings, level).Concat(report!.Warnings).ToArray();
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
         body["deleted"] = Deleted(result.Deleted);
         body["split"] = Split(result.Split);
         body["moved"] = result.MovedVertices;
         body["largest"] = Math.Round(report.Largest, 6);
-        return Ok(body);
+        return Quiet(Ok(body), level);
     }
 
     /// <summary>The source argument as a <see cref="DisplaceSource"/>: a graph's output read into a height field, or noise.</summary>

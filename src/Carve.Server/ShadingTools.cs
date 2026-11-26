@@ -21,7 +21,7 @@ public sealed class SetShadingTool(ModelStore store)
         + "Worked example on define_mesh's unit cube:\n"
         + ExampleMarker + """{"shading":"smooth"}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SetShadingTool>("set_shading", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<SetShadingTool>("set_shading", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -29,11 +29,12 @@ public sealed class SetShadingTool(ModelStore store)
             ["shading"] = new JsonObject { ["description"] = "flat or smooth.", ["type"] = "string", ["enum"] = new JsonArray("flat", "smooth") },
         },
         ["required"] = new JsonArray("shading"),
-    }));
+    })));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? shading = null, JsonElement? mesh = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? shading = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("set_shading", context, "shading", "mesh");
+        var errors = UnknownArguments("set_shading", context, "shading", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var text = RequiredString("shading", shading, errors);
         if (text is not null && text != "flat" && text != "smooth") errors.Add($"shading: '{text}' is not a shading: it is flat or smooth");
@@ -46,7 +47,7 @@ public sealed class SetShadingTool(ModelStore store)
         if (snapshot is null) return Error("set_shading: " + NoMesh);
 
         var target = snapshot.Model.Target(meshName, out _)!;
-        return Ok(new { mesh = target.Name, shading = text, hard_edges = target.Mesh.HardEdges.Select(e => new[] { e.Lo, e.Hi }).ToArray() });
+        return Quiet(Ok(new { mesh = target.Name, shading = text, hard_edges = target.Mesh.HardEdges.Select(e => new[] { e.Lo, e.Hi }).ToArray() }), level);
     }
 }
 
@@ -66,7 +67,7 @@ public sealed class MarkEdgesTool(ModelStore store)
         + ExampleMarker + """{"edges":[[0,1]],"hard":true}""" + "\n"
         + ExampleMarker + """{"edges":[[0,3]],"seam":true}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<MarkEdgesTool>("mark_edges", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<MarkEdgesTool>("mark_edges", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -88,11 +89,12 @@ public sealed class MarkEdgesTool(ModelStore store)
             ["seam"] = new JsonObject { ["description"] = "true to mark the edges as UV seams, false to clear them. A call with only seam leaves hard edges alone.", ["type"] = "boolean" },
         },
         ["required"] = new JsonArray("edges"),
-    }));
+    })));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? edges = null, JsonElement? hard = null, JsonElement? seam = null, JsonElement? mesh = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? edges = null, JsonElement? hard = null, JsonElement? seam = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("mark_edges", context, "edges", "hard", "seam", "mesh");
+        var errors = UnknownArguments("mark_edges", context, "edges", "hard", "seam", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var unknown = errors.Count;
         var pairs = Pairs("edges", edges, errors);
@@ -130,6 +132,6 @@ public sealed class MarkEdgesTool(ModelStore store)
             ["hard_edges"] = target.Mesh.HardEdges.Select(e => new[] { e.Lo, e.Hi }).ToArray(),
         };
         if (!Absent(seam)) body["seams"] = target.Mesh.Seams.Select(e => new[] { e.Lo, e.Hi }).ToArray();
-        return Ok(body);
+        return Quiet(Ok(body), level);
     }
 }

@@ -40,7 +40,7 @@ public sealed class DefineGroupTool(ModelStore store)
         + "Worked example on define_mesh's unit cube, naming the four sides:\n"
         + ExampleMarker + """{"name":"sides","faces":[0,1,2,3]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DefineGroupTool>("define_group", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<DefineGroupTool>("define_group", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -49,12 +49,13 @@ public sealed class DefineGroupTool(ModelStore store)
             ["faces"] = FaceArguments.FacesSchema("Face ids of the mesh, as get_mesh reports them."),
         },
         ["required"] = new JsonArray("name", "faces"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? name = null, JsonElement? faces = null, JsonElement? mesh = null)
+        JsonElement? name = null, JsonElement? faces = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("define_group", context, "name", "faces", "mesh");
+        var errors = UnknownArguments("define_group", context, "name", "faces", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var group = RequiredString("name", name, errors);
         if (group is not null && FaceStyle.GroupNameProblem(group) is { } badName) errors.Add("name: " + badName);
@@ -75,13 +76,13 @@ public sealed class DefineGroupTool(ModelStore store)
         if (snapshot is null) return Error("define_group: " + NoMesh);
 
         var target = snapshot.Model.Target(meshName, out _)!;
-        return Ok(new
+        return Quiet(Ok(new
         {
             mesh = target.Name,
             group,
             faces = target.Mesh.Style!.FacesOf(group!),
             groups = target.Mesh.Style.Groups.Select(g => new { name = g.Name, faces = g.Faces }).ToArray(),
-        });
+        }), level);
     }
 }
 
@@ -99,7 +100,7 @@ public sealed class SetColourTool(ModelStore store)
         + "Worked example on define_mesh's unit cube:\n"
         + ExampleMarker + """{"colour":"#C8503C","faces":[0,1]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SetColourTool>("set_colour", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<SetColourTool>("set_colour", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -109,12 +110,13 @@ public sealed class SetColourTool(ModelStore store)
             ["group"] = new JsonObject { ["description"] = "A group name from define_group. Give this or faces, not both.", ["type"] = "string" },
         },
         ["required"] = new JsonArray("colour"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? colour = null, JsonElement? faces = null, JsonElement? group = null, JsonElement? mesh = null)
+        JsonElement? colour = null, JsonElement? faces = null, JsonElement? group = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("set_colour", context, "colour", "faces", "group", "mesh");
+        var errors = UnknownArguments("set_colour", context, "colour", "faces", "group", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var hex = RequiredString("colour", colour, errors);
         if (hex is not null && FaceStyle.ColourProblem(hex) is { } bad) errors.Add("colour: " + bad);
@@ -145,6 +147,6 @@ public sealed class SetColourTool(ModelStore store)
         if (refused.Count > 0) return Failed("set_colour", refused);
         if (snapshot is null) return Error("set_colour: " + NoMesh);
 
-        return Ok(new { mesh = snapshot.Model.Target(meshName, out _)!.Name, colour = hex, faces = coloured });
+        return Quiet(Ok(new { mesh = snapshot.Model.Target(meshName, out _)!.Name, colour = hex, faces = coloured }), level);
     }
 }

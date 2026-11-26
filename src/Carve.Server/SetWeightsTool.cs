@@ -26,7 +26,7 @@ public sealed class SetWeightsTool(ModelStore store)
         + "Worked example on a model with bones Hips and Head (a box on the head):\n"
         + ExampleMarker + """{"group":"hat","weights":{"Head":1}}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SetWeightsTool>("set_weights", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<SetWeightsTool>("set_weights", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -47,12 +47,13 @@ public sealed class SetWeightsTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("weights"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? vertices = null, JsonElement? group = null, JsonElement? weights = null, JsonElement? mesh = null)
+        JsonElement? vertices = null, JsonElement? group = null, JsonElement? weights = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("set_weights", context, "vertices", "group", "weights", "mesh");
+        var errors = UnknownArguments("set_weights", context, "vertices", "group", "weights", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var before = errors.Count;
         var ids = Ids("vertices", vertices, errors);
@@ -95,7 +96,7 @@ public sealed class SetWeightsTool(ModelStore store)
         if (refused.Count > 0) return Failed("set_weights", refused);
         if (snapshot is null || change is null) return Error("set_weights: " + NoMesh);
 
-        return Ok(new
+        return Quiet(Ok(new
         {
             mesh = change.Mesh,
             set = change.Set,
@@ -103,6 +104,6 @@ public sealed class SetWeightsTool(ModelStore store)
             unweighted = change.Unweighted,
             weights = change.Influences.ToDictionary(
                 i => snapshot.Model.Skeleton!.Bones[i.Bone].Name, i => i.Weight),
-        });
+        }), level);
     }
 }
