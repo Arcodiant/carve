@@ -74,9 +74,9 @@ Each finding of RV-83 named here, by its heading there:
 
 ### As built
 
-One agent, on claude-opus-5-5 (Opus 5.5). Code commit `6543ceed`. Five of the six findings are fixed; the Nit (the A, B, A
+One agent, on claude-opus-5-5 (Opus 5.5). Code commit the commit "T-226: one bake read per mesh shown, render's loops tested as run, the cache refuses, export's copies". Five of the six findings are fixed; the Nit (the A, B, A
 rewrite) is skipped, filed off-milestone as T-229. Every new or moved test was seen failing in a scratch copy
-(`%TEMP%\t226-scratch`, `git archive` of `6543ceed`) with the five fix hunks reverted at once (each test reaches only its own
+(`%TEMP%\t226-scratch`, `git archive` of the commit "T-226: one bake read per mesh shown, render's loops tested as run, the cache refuses, export's copies") with the five fix hunks reverted at once (each test reaches only its own
 hunk): 7 of the 8 tests below failed, `With_no_edit_the_frame_is_drawn_once_with_its_bakes` passed as it should; all pass with the fixes.
 
 - **The pump (Major, third attempt).** `RenderPump.ShowMesh` reads the bake once, `resolved = bakes.Peek(snapshot.Model)`, before
@@ -130,7 +130,7 @@ hunk): 7 of the 8 tests below failed, `With_no_edit_the_frame_is_drawn_once_with
   `File.ReadAllText`) reads every nested file. Comparing with the bytes the bake read needs a hook in `Patina.Graphs`, which this
   member does not own. Nothing is cached wrongly unless a graph file is rewritten and restored within one bake.
 
-**Frames.** Compared by SHA-256: this member's verify at `6543ceed` (scenario-export J-20261126-041854-7378b9, scenario-weathered
+**Frames.** Compared by SHA-256: this member's verify at the commit "T-226: one bake read per mesh shown, render's loops tested as run, the cache refuses, export's copies" (scenario-export J-20261126-041854-7378b9, scenario-weathered
 J-20261126-041857-a6a1e5) against runs of `origin/milestone/M-29` at `8d4b6be5` queued for it (J-20261126-041906-e3f792,
 J-20261126-041907-d918d8, both PASS). 47 PNGs (export 7, weathered 40); none differs. The verify: graphs-unit carried, server-unit,
 scenario-export, scenario-weathered and server-regression ran, all PASS, none re-run.
