@@ -4,7 +4,7 @@ description: >-
 ---
 # T-227 — RV-83: patina's check text and the title break
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
