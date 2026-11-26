@@ -169,27 +169,47 @@ public sealed class GraphExportTests() : FileToolTests("carve-graph-export")
     }
 
     /// <summary>
-    /// RV-82: an export named in notifications/cancelled (sent by hand: the SDK's client sends none) stops its bake and writes no .glb.
-    /// A second export of the same model, started after, bakes the same and answers; uncancelled, the first (half a second ahead) has written by then.
+    /// RV-83, the reviewer's probe: 'worn' reads the mesh but no face wears it, so no copy is made, and a red material named
+    /// 'worn@strip' in the file is on faces 0-3. It is the user's, so it is written under its own name and 'worn' replaces nothing.
     /// </summary>
     [Fact]
-    public async Task An_export_named_in_notifications_cancelled_writes_no_glb()
+    public async Task A_users_at_material_is_not_taken_for_a_copy_of_a_mesh_reading_material_no_mesh_wears()
     {
         var carve = await StartAsync(second: false);
         using var scope = carve;
-        Ok(await carve.CallToolAsync("define_material", """{"name":"big","occlusion_texture":{"graph":"curv.texgraph","output":"occlusion","size":2048}}"""));
-        await Wear(carve, "big", "strip");
+        Ok(await carve.CallToolAsync("define_material", """{"name":"red","base_colour":"#FF0000"}"""));
+        await Wear(carve, "red", "strip");
+        await Reopen(carve, ("red", "worn@strip"));
 
-        using var end = new CancellationTokenSource();
-        var export = carve.CallToolWithIdAsync("big-export", "export", """{"path":"cancelled.glb"}""", end.Token);
-        await Task.Delay(500, TestContext.Current.CancellationToken);
-        await carve.CancelAsync("big-export");
-        Ok(await carve.CallToolAsync("export", """{"path":"after.glb"}"""));
-        await Task.Delay(500, TestContext.Current.CancellationToken);
-        Assert.False(File.Exists(Path.Combine(Root, "cancelled.glb")), "the cancelled export wrote its .glb");
-        // A cancelled request gets no answer; the client stops waiting for one here.
-        end.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => export);
+        Ok(await carve.CallToolAsync("export", """{"path":"u.glb"}"""));
+
+        Assert.Equal(["worn@strip"], Names(Read("u.glb")));
+    }
+
+    /// <summary>
+    /// RV-83, the reviewer's probe: base colour and occlusion share a key, so once 'x' turns from grey to colour, base colour's bake
+    /// of it was served to occlusion from the cache. Occlusion refuses a colour output before the cache is asked, by export and render.
+    /// </summary>
+    [Fact]
+    public async Task A_slot_that_refuses_its_output_refuses_it_from_the_cache_too()
+    {
+        var carve = await StartAsync(second: false);
+        using var scope = carve;
+        Write("g.texgraph", """ "m": { "type": "mesh_curvature" }, "x": { "type": "output", "inputs": { "in": "m" }, "params": { "name": "x" } } """);
+        Ok(await carve.CallToolAsync("define_material", """{"name":"m","base_colour_texture":{"graph":"g.texgraph","output":"x","size":64},"occlusion_texture":{"graph":"g.texgraph","output":"x","size":64}}"""));
+        await Wear(carve, "m", "strip");
+        Ok(await carve.CallToolAsync("export", """{"path":"a.glb"}"""));
+        Write("g.texgraph", """ "c": { "type": "colour", "params": { "colour": "#808080" } }, "x": { "type": "output", "inputs": { "in": "c" }, "params": { "name": "x" } } """);
+
+        const string Takes = "'x' is a colour output; occlusion_texture takes a grey one";
+        Assert.Contains(Takes, Refused(await carve.CallToolAsync("export", """{"path":"b.glb"}""")));
+        Assert.False(File.Exists(Path.Combine(Root, "b.glb")));
+        // Base colour's bake of the colour 'x' is cached now: a material with occlusion alone on it still refuses, render's path too.
+        var x = new Carve.Core.MaterialGraph(Path.Combine(Root, "g.texgraph"), "x", 64);
+        var bakes = new GraphBakes();
+        bakes.Resolve(Carve.Core.Model.Empty.WithMaterial(new Carve.Core.Material("bc", BaseColourTexture: x)), TestContext.Current.CancellationToken);
+        var solo = Carve.Core.Model.Empty.WithMaterial(new Carve.Core.Material("solo", OcclusionTexture: x));
+        Assert.Contains(Takes, Assert.Throws<GraphSlotProblemException>(() => bakes.Resolve(solo, TestContext.Current.CancellationToken)).Message);
     }
 
     [Fact]
@@ -204,5 +224,37 @@ public sealed class GraphExportTests() : FileToolTests("carve-graph-export")
         Assert.Equal(["plain"], Names(Read("e.glb")));
         Assert.DoesNotContain("reads the mesh", line);
         Assert.Contains("\"mesh\":null", line);
+    }
+}
+
+/// <summary>RV-82, RV-83: export's cancellation. A whole 2048 bake, so it is a regression test (RV-83: it took 6 s in a unit class).</summary>
+[Trait("Tier", "regression")]
+public sealed class GraphExportCancelTests() : FileToolTests("carve-graph-export-cancel")
+{
+    /// <summary>
+    /// RV-82: an export named in notifications/cancelled (sent by hand: the SDK's client sends none) stops its bake and writes no .glb.
+    /// A second export of the same model, started after, bakes the same and answers; uncancelled, the first (half a second ahead) has written by then.
+    /// </summary>
+    [Fact]
+    public async Task An_export_named_in_notifications_cancelled_writes_no_glb()
+    {
+        File.WriteAllText(Path.Combine(Root, "curv.texgraph"),
+            """{ "version": 2, "size": 64, "seed": 1, "nodes": { "m": { "type": "mesh_curvature" }, "o": { "type": "output", "inputs": { "in": "m" }, "params": { "role": "occlusion" } } } }""");
+        var (carve, _) = await StartAsync(BakeToolTests.Strip);
+        using var scope = carve;
+        Ok(await carve.CallToolAsync("set_uvs", BakeToolTests.StripUvs()));
+        Ok(await carve.CallToolAsync("define_material", """{"name":"big","occlusion_texture":{"graph":"curv.texgraph","output":"occlusion","size":2048}}"""));
+        Ok(await carve.CallToolAsync("set_material", """{"material":"big","faces":[0,1,2,3],"mesh":"strip"}"""));
+
+        using var end = new CancellationTokenSource();
+        var export = carve.CallToolWithIdAsync("big-export", "export", """{"path":"cancelled.glb"}""", end.Token);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await carve.CancelAsync("big-export");
+        Ok(await carve.CallToolAsync("export", """{"path":"after.glb"}"""));
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        Assert.False(File.Exists(Path.Combine(Root, "cancelled.glb")), "the cancelled export wrote its .glb");
+        // A cancelled request gets no answer; the client stops waiting for one here.
+        end.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => export);
     }
 }

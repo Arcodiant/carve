@@ -34,8 +34,11 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
     /// </summary>
     internal sealed record Baked(string Material, string? Mesh, string Slot, int Size, double Ms, string? Node, double NodeMs, string? On = null);
 
-    /// <summary>The model to draw, the key of every bake it uses, what this call baked, and a warning per material over <see cref="WarnMs"/>.</summary>
-    internal sealed record Drawn(Model Model, string Key, IReadOnlyList<Baked> Baked, IReadOnlyList<string> Warnings);
+    /// <summary>
+    /// The model to draw, the key of every bake it uses, what this call baked, a warning per material over <see cref="WarnMs"/>, and
+    /// each per-mesh copy this resolve made for a live mesh (RV-83: export names a copy by this, never by the name's shape).
+    /// </summary>
+    internal sealed record Drawn(Model Model, string Key, IReadOnlyList<Baked> Baked, IReadOnlyList<string> Warnings, IReadOnlyList<(string Copy, string Material, string Mesh)> Copies);
 
     /// <summary>The cache's bytes (PNG and decoded) and entries now.</summary>
     public long Bytes { get { lock (_lock) return _bytes; } }
@@ -43,19 +46,26 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
     public int Count { get { lock (_lock) return _entries.Count; } }
 
     /// <summary>The model last resolved for <paramref name="model"/>, or null: never reads or bakes (the frame thread's check).</summary>
-    public Model? Peek(Model model) => _drawn.TryGetValue(model, out var d) ? d.Model : null;
+    public Model? Peek(Model model)
+    {
+        var drawn = _drawn.TryGetValue(model, out var d) ? d.Model : null;
+        AfterPeek?.Invoke(model);
+        return drawn;
+    }
+
+    /// <summary>A test's seam (RV-83): runs right after <see cref="Peek"/> has read, so a test can land a <see cref="Resolve"/> there.</summary>
+    internal Action<Model>? AfterPeek { get; set; }
 
     /// <summary>
-    /// The model to draw for <paramref name="model"/> (the frame thread's; never bakes): itself without graph slots, else the
-    /// one <see cref="Resolve"/> gave it, else, not yet resolved (an edit shown before any render baked it), its graph slots
-    /// left empty. No render returns that: render resolves before it queues, the pump puts the mesh in again once
-    /// <see cref="Peek"/> changes, and a frame drawn on an edit that landed after the bake is marked
-    /// <see cref="RenderedFrame.Unbaked"/>, so render bakes that model and draws again.
+    /// The model to draw for <paramref name="model"/> (the frame thread's; never bakes), given <paramref name="resolved"/>, the
+    /// caller's one <see cref="Peek"/> of it: itself without graph slots, else <paramref name="resolved"/>, else, not yet resolved
+    /// (an edit shown before any render baked it), its graph slots left empty. No render returns that: the pump marks the frame
+    /// <see cref="RenderedFrame.Unbaked"/> from the same <paramref name="resolved"/> (RV-83), so render bakes that model and draws again.
     /// </summary>
-    public Model DrawnOf(Model model)
+    public static Model DrawnOf(Model model, Model? resolved)
     {
         if (!model.Materials.Any(m => m.HasGraph)) return model;
-        if (Peek(model) is { } drawn) return drawn;
+        if (resolved is not null) return resolved;
         static MaterialSlot? Png(MaterialSlot? slot) => slot is MaterialGraph ? null : slot;
         foreach (var m in model.Materials.Where(m => m.HasGraph))
             model = model.WithMaterial(m with
@@ -72,7 +82,7 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
     /// <summary>Reads every graph file again and bakes what the cache lacks. Throws <see cref="GraphSlotProblemException"/> or <see cref="OperationCanceledException"/>.</summary>
     public Drawn Resolve(Model model, CancellationToken cancel)
     {
-        if (!model.Materials.Any(m => m.HasGraph)) return new(model, "", [], []);
+        if (!model.Materials.Any(m => m.HasGraph)) return new(model, "", [], [], []);
         var files = new Dictionary<string, GraphSlotFiles>(StringComparer.Ordinal);
         var baked = new List<Baked>();
         var keys = new List<string>();
@@ -104,6 +114,16 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
             var on = f.ReadsMesh ? mesh : null;
             var key = GraphSlotBake.Key(f, g.Output, g.Size, field, source, on);
             keys.Add(key);
+            // RV-83: normal and occlusion share base colour's key but refuse some outputs it takes, so they refuse before the cache is asked.
+            if (field is GraphSlotBake.Normal or GraphSlotBake.Occlusion)
+                try
+                {
+                    GraphSlotBake.Validate(g, field);
+                }
+                catch (Exception e) when (GraphSlotProblem.IsCause(e))
+                {
+                    throw GraphSlotProblem.Failed(m.Name, field, e);
+                }
             if (Get(key) is not { } png)
             {
                 cancel.ThrowIfCancellationRequested();
@@ -167,7 +187,8 @@ internal sealed class GraphBakes(Func<double>? clockMs = null)
                 Levels = [.. part.Levels.Select(l => levels.TryGetValue((part.Name, l.Number), out var c) ? l with { Mesh = Renamed(l.Mesh, c) } : l)],
             });
 
-        var drawn = new Drawn(next, string.Join(",", keys), baked, Warnings(baked));
+        var made = renamed.SelectMany(r => r.Value.Select(c => (Copy: c.Value, Material: c.Key, Mesh: r.Key))).ToList();
+        var drawn = new Drawn(next, string.Join(",", keys), baked, Warnings(baked), made);
         lock (_lock)
         {
             // The same bakes give the same model, so the frame thread does not put the mesh in again for nothing.
