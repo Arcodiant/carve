@@ -29,7 +29,7 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         + "and when the model now has a skeleton, bones (how many) and clips (their names). "
         + "The whole sequence from an empty file to a game is the worked example in save's description.\n"
         + ExampleMarker + SaveTool.WorkedFile + "\n"
-        + """More: help {"tool":"open"} gives the version 1 detail, the part tree and its example, every error, and which file to keep working in.""";
+        + """More: help {"tool":"open"} gives the version 1 detail, the part tree and its example, every error, and which file to keep working in; help {"topic":"warnings"} gives every warning in its report, its fix and how warnings are grouped.""";
 
     /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"open"}</c> returns it.</summary>
     public const string Reference =

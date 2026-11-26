@@ -33,7 +33,8 @@ render's full reference (every look, caption and error), and likewise `export`
 (what is written, the limits file), `bake`, `check`, `save`, `open` (the .carve
 format and the part tree), `select` (every error), `define_material` and
 `get_mesh` (where ids come from, the worked examples); `help {}` lists the nine
-entries. A description ends with `More: help ...` when it
+entries and the topics. `help {"topic":"warnings"}` gives every warning, its fix, how
+warnings are grouped and the verbosity levels. A description ends with `More: help ...` when it
 has one.
 
 ## Build and test
@@ -117,6 +118,8 @@ all:
 252 faces are not planar: worst faces[10], 6.03E-05 off its plane (limit 1.07E-05); e.g. faces[0], faces[1], faces[2]; select faces where non_planar names them
 798 edges belong to only one face: e.g. edges[0-1], edges[0-9], edges[1-2]; select edges where open names them
 ```
+
+Every warning, its fix and these rules are in `help {"topic":"warnings"}`.
 
 `select` names every element of a kind: `faces where non_planar`, `edges where
 open`, `edges where nonmanifold`, `vertices where unattached`.

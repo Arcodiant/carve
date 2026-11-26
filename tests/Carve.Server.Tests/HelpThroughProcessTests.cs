@@ -23,5 +23,9 @@ public sealed class HelpThroughProcessTests
         var result = await process.CallToolAsync("help", """{"tool":"render"}""");
         Assert.False(CarveProcess.IsError(result));
         Assert.Equal(carve::Carve.Server.HelpTool.Entry("render"), CarveProcess.TextOf(result));
+
+        var topic = await process.CallToolAsync("help", """{"topic":"warnings"}""");
+        Assert.False(CarveProcess.IsError(topic));
+        Assert.Equal(carve::Carve.Server.HelpTool.Topic("warnings"), CarveProcess.TextOf(topic));
     }
 }
