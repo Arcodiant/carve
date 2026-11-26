@@ -22,8 +22,8 @@ public sealed class VerbosityToolTests
     private static readonly string[] Readers =
         ["get_mesh", "get_parts", "get_skeleton", "get_weights", "get_clips", "select", "render", "render_glb", "help"];
 
-    /// <summary>The tools still to take <c>verbosity</c>: T-202's unwrap, which that task empties.</summary>
-    private static readonly string[] ToDo = ["unwrap"];
+    /// <summary>The tools still to take <c>verbosity</c>: none.</summary>
+    private static readonly string[] ToDo = [];
 
     /// <summary>Each tool here: the calls that set it up, a call that succeeds, and a call that is a tool error.</summary>
     public static TheoryData<string, string[], string, string> Tools => new()

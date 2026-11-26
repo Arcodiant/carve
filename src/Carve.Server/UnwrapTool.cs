@@ -18,12 +18,20 @@ public sealed class UnwrapTool(ModelStore store)
         + "UVs run as in glTF: (0, 0) is the texture's top-left, u runs right and v runs down. faces defaults to every face; faces outside it keep their UVs, and seams are left as they are. into is [u0, v0, u1, v1], default [0, 0, 1, 1]; margin defaults to 1/64 of into's shorter side (four texels of a 256 texture)."
         + "One call is one step for undo, and a call that fails changes nothing. "
         + PartTargetText
-        + "Returns JSON {mesh, islands, fill, scale}: islands lists each island by its lowest face as {faces (its face count), lowest_face, rect: [u0, v0, u1, v1], stretch, flipped}, where stretch is the largest ratio of a triangle's two singular values (1 is none; a curved island shows more) and flipped counts folded triangles (normally 0); fill is the share of into the islands cover, and scale is UV units per metre. get_mesh reads the UVs back as uvs. "
+        + "Returns JSON {mesh, islands (the count), single_face_islands, fill, scale, stretch: {worst, lowest_face}, flipped, largest: the five largest islands as {faces, lowest_face, rect: [u0, v0, u1, v1], stretch, flipped}}; verbosity full adds all, every island. get_mesh reads the UVs back as uvs. "
         + "Errors, each a tool error that changes nothing and names the element: no mesh yet; a face that is not a face of the mesh, is deleted or is listed twice, or an empty faces list; an island that is not a disc (faces[lowest]: its face count and its boundary loops; mark a seam across it with mark_edges); an island with too few seams to lay flat (faces[lowest]: its face count; mark more seams with mark_edges, e.g. a path round it), told apart from an island with no extent (its corners on one point or one line); a flattening that did not converge; into not four finite numbers or with no area; a margin below 0 or of half into's shorter side or more, or one the islands cannot fit with; an unknown argument. "
         + "Worked example, a barrel (define_mesh with 40 vertices in five rings of 8, ring k at index 8k, the k = 2 column at -Z; faces 0 to 31 the side's quads, 32 the bottom cap, 33 the top cap): first mark_edges with seam: true on the four vertical edges at -Z, [[2,10],[10,18],[18,26],[26,34]], and both rims, [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0]] and [[32,33],[33,34],[34,35],[35,36],[36,37],[37,38],[38,39],[39,32]]; then unwrap with the defaults, which gives three islands: the side (32 faces, lowest face 0) as a long strip across the top, and the two caps (faces 32 and 33) side by side below it:\n"
-        + ExampleMarker + "{}";
+        + ExampleMarker + "{}\n"
+        + """More: help {"tool":"unwrap"} gives what each field of the result means.""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<UnwrapTool>("unwrap", Text, WithMesh(new JsonObject
+    /// <summary>What <c>help {"tool":"unwrap"}</c> answers (T-202): what each field of the result means.</summary>
+    public const string Reference =
+        "unwrap's result: islands is the count and single_face_islands how many of them are one face; largest lists up to five islands by face count, ties to the lowest face, each as {faces (its face count), lowest_face, rect: [u0, v0, u1, v1], stretch, flipped}. "
+        + "stretch is the largest ratio of a triangle's two singular values (1 is none; a curved island shows more): worst is the largest over all the islands and lowest_face names that island, the lowest if two tie. "
+        + "flipped is the number of folded triangles over all the islands (normally 0). fill is the share of into the islands cover, and scale is UV units per metre. "
+        + "verbosity full adds all, every island in the form of largest, in the order of their lowest faces; silent answers {\"ok\":true}.";
+
+    public static McpServerTool Create() => MeshToolSupport.Create<UnwrapTool>("unwrap", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -48,15 +56,19 @@ public sealed class UnwrapTool(ModelStore store)
                 ["type"] = "number",
             },
         },
-    }));
+    })));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? faces = null, JsonElement? into = null, JsonElement? margin = null, JsonElement? mesh = null)
+    /// <summary>How many islands the summary lists (M-23 ruling 4).</summary>
+    private const int Largest = 5;
+
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? faces = null, JsonElement? into = null, JsonElement? margin = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("unwrap", context, "faces", "into", "margin", "mesh");
+        var errors = UnknownArguments("unwrap", context, "faces", "into", "margin", "mesh", "verbosity");
         var meshName = MeshName(mesh, errors);
         var ids = Ids("faces", faces, errors);
         var box = Into(into, errors);
         var gap = Number("margin", margin, errors, required: false);
+        var level = ReadVerbosity(verbosity, errors);
         if (errors.Count > 0) return Failed("unwrap", errors);
 
         UnwrapResult? made = null;
@@ -70,20 +82,29 @@ public sealed class UnwrapTool(ModelStore store)
         if (refused.Count > 0) return Failed("unwrap", refused);
         if (snapshot is null || made is null) return Error("unwrap: " + NoMesh);
 
-        return Ok(new
+        object Entry(UnwrapIsland i) => new
         {
-            mesh = snapshot.Model.Target(meshName, out _)!.Name,
-            islands = made.Islands.Select(i => new
-            {
-                faces = i.Faces.Count,
-                lowest_face = i.LowestFace,
-                rect = new[] { i.Rect.U0, i.Rect.V0, i.Rect.U1, i.Rect.V1 },
-                stretch = i.Stretch,
-                flipped = i.Flipped,
-            }),
-            fill = made.Fill,
-            scale = made.Scale,
-        });
+            faces = i.Faces.Count,
+            lowest_face = i.LowestFace,
+            rect = new[] { i.Rect.U0, i.Rect.V0, i.Rect.U1, i.Rect.V1 },
+            stretch = i.Stretch,
+            flipped = i.Flipped,
+        };
+        var all = made.Islands;
+        var worst = all.Count == 0 ? null : all.OrderByDescending(i => i.Stretch).ThenBy(i => i.LowestFace).First();
+        var body = new Dictionary<string, object?>
+        {
+            ["mesh"] = snapshot.Model.Target(meshName, out _)!.Name,
+            ["islands"] = all.Count,
+            ["single_face_islands"] = all.Count(i => i.Faces.Count == 1),
+            ["fill"] = made.Fill,
+            ["scale"] = made.Scale,
+            ["stretch"] = new { worst = worst?.Stretch ?? 1, lowest_face = worst?.LowestFace ?? 0 },
+            ["flipped"] = all.Sum(i => i.Flipped),
+            ["largest"] = all.OrderByDescending(i => i.Faces.Count).ThenBy(i => i.LowestFace).Take(Largest).Select(Entry).ToList(),
+        };
+        if (level == Verbosity.Full) body["all"] = all.Select(Entry).ToList();
+        return Quiet(Ok(body), level);
     }
 
     private static (double, double, double, double)? Into(JsonElement? value, List<string> errors)
