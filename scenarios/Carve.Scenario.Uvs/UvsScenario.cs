@@ -281,8 +281,9 @@ public sealed class UvsScenario : IScenario
 
         var check = await CallJsonAsync(driver, "check", new { mesh = "Barrel" });
         var listed = check.GetProperty("warnings").EnumerateArray().Select(w => w.GetString() ?? "").Where(w => w.Contains("no UVs")).OrderBy(w => w).ToArray();
-        var expected = Enumerable.Range(34, 8).Select(f => $"faces[{f}]: no UVs").OrderBy(w => w).ToArray();
-        if (listed.Length != 8 || !listed.Zip(expected).All(p => p.First.StartsWith(p.Second))) driver.Fail($"check: expected eight 'no UVs' warnings for faces 34 to 41, got: {string.Join("; ", listed)}");
+        // T-197: eight of a kind are one line, the count and the three lowest of faces 34 to 41.
+        const string expected = "8 faces have no UVs, so they sample the texture's corner: e.g. faces[34], faces[35], faces[36]";
+        if (listed.Length != 1 || listed[0] != expected) driver.Fail($"check: expected one 'no UVs' line for the eight faces 34 to 41, got: {string.Join("; ", listed)}");
 
         var work = Path.Combine(driver.RunFolder, "work");
         Directory.CreateDirectory(work);

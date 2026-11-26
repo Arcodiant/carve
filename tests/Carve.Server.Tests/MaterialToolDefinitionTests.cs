@@ -56,12 +56,10 @@ public class MaterialToolDefinitionTests : FileToolTests
         Assert.Equal([2, 3], onFaces.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()));
         Assert.Empty(mesh.GetProperty("colours").EnumerateArray());
 
-        // Faces 2 and 3 are mapped: no warning for them; the other four are the generic unmapped ones.
+        // Faces 2 and 3 are mapped: no warning for them; the other four are the generic unmapped ones, grouped past 3 (T-197),
+        // and nothing else, as the example says (RV-47).
         var warnings = Strings(Body(Ok(await carve.CallToolAsync("check", "{}"))).GetProperty("warnings"));
-        Assert.DoesNotContain(warnings, w => w.StartsWith("faces[2]:") || w.StartsWith("faces[3]:"));
-        Assert.Equal(4, warnings.Count(w => w.EndsWith("no UVs, so the face samples the texture's corner")));
-        // ... and nothing else, as the example says (RV-47).
-        Assert.Equal(new[] { 0, 1, 4, 5 }.Select(f => $"faces[{f}]: no UVs, so the face samples the texture's corner"), warnings);
+        Assert.Equal(["4 faces have no UVs, so they sample the texture's corner: e.g. faces[0], faces[1], faces[4]"], warnings);
         Assert.Contains("check warns only of the other four faces, 0, 1, 4 and 5", Description(tools, "set_material"));
     }
 }
