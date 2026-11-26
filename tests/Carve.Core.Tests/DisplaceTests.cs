@@ -138,4 +138,20 @@ public class DisplaceTests
         Displacement.Displace(MappedGrid(), null, new FieldSource(busy, "checks"), 1, 0.5f, null, out var checks);
         Assert.Contains(checks!.Warnings, w => w.Contains("too coarse for checks"));
     }
+
+    [Fact]
+    public void An_unattached_vertex_without_an_axis_is_left_out_and_named_and_with_one_it_moves()
+    {
+        var mesh = Make([.. CubeVertices, new Vector3(3, 3, 3)], CubeFaces);
+        var result = Displacement.Displace(mesh, [8, 0], Rough, 1, 0, null, out var report);
+        Assert.DoesNotContain(8, result.MovedVertices);
+        Assert.Equal(new Vector3(3, 3, 3), Ok(result).Vertices[8]);
+        Assert.Contains(report!.Warnings, w => w.StartsWith("vertices 8 are on no face"));
+
+        var alone = Displacement.Displace(mesh, [8], Rough, 1, 0, null, out _);
+        Assert.Contains("matches no vertex with a normal", string.Join("; ", alone.Errors));
+
+        var lifted = Ok(Displacement.Displace(mesh, [8], Rough, 1, 0, Vector3.UnitY, out _));
+        Assert.NotEqual(new Vector3(3, 3, 3), lifted.Vertices[8]);
+    }
 }

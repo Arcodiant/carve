@@ -21,10 +21,10 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         "Roughens a mesh in its geometry: moves each selected vertex along its vertex normal (its faces' normals weighted by area, taken before any vertex moves) by amount x (h - midlevel), where h is a height 0 to 1, as one edit that one undo takes back. "
         + "Meant for a mesh with vertices to spare (subdivide it first): a rock, a cliff, bark, a dented hull. "
         + "source is one of: {graph, output}, a Patina .texgraph file (absolute or relative to carve's working directory) and one of its greyscale outputs (default height), evaluated at the graph's own size and sampled bilinearly at the vertex's UVs, wrapping; a vertex on a UV seam takes the mean of its corners' samples, so the seam does not tear; the mesh needs UVs (project_uvs or unwrap). "
-        + "Or {noise: {seed, scale, octaves}}: seeded 3D gradient noise summed over octaves (1 to 8, default 4; each twice the detail at half the strength) at the vertex's position in the mesh's own coordinates, scale the size in metres of the largest bumps (default 1), seed a whole number (default 0); it needs no UVs and has no seams, and the same arguments always give the same positions. "
+        + "Or {noise: {seed, scale, octaves}}: seeded 3D gradient noise summed over octaves (1 to 8, default 4; each twice the detail at half the strength) at the vertex's position in the mesh's own coordinates, scale the size in metres of the largest bumps (default 1), seed a whole number from -2147483648 to 2147483647 (default 0); it needs no UVs and has no seams, and the same arguments always give the same positions. "
         + "amount is in metres and may be negative (dents instead of bumps); midlevel (0 to 1, default 0.5) is the height that does not move; axis [x, y, z], when given, replaces every normal with that one direction (for terrain). "
         + "Give vertices, faces (every corner) or group (a face group from define_group) to displace part of the mesh, or none of them for every vertex. "
-        + "Ids, faces, UVs, groups, colours and weights are kept; only positions change. "
+        + "Ids, faces, UVs, groups, colours and weights are kept; only positions change. A vertex on no face has no normal: without axis it stays, and a warning names it. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[], moved:[vertex ids, ascending], largest: the largest offset in metres}; "
         + "the not-planar warnings fold into one line, \"N faces are not planar (expected after displace)\", and a warning says when the mesh is too coarse for the source to show (fewer than two vertices to a bump). "
         + "Errors, each a tool error that changes nothing: no source, or both graph and noise; a graph file that is missing (the error lists the .texgraph files in its folder), will not read or has faults; an output the graph has not, or a colour one; a mesh without UVs for a graph; amount missing or zero; midlevel outside 0 to 1; a zero axis; octaves outside 1 to 8; scale not above 0; an unknown vertex, face or group; a selection that matches no vertex; a face that would cross itself. "
@@ -77,16 +77,22 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         var from = Source(source, errors);
         if (errors.Count > 0) return Failed(tool, errors);
 
-        if (groupName is not null)
-        {
-            if (Target(store, tool, name, out var noMesh) is not { } target) return noMesh!;
-            if (target.Style?.FacesOf(groupName) is not { } grouped) return Failed(tool, [NoGroup(target.Style, groupName)]);
-            f = [.. grouped];
-        }
-
         DisplaceReport? report = null;
-        var snapshot = store.Edit(tool, name, m => Displacement.Displace(m, v, from!, by!.Value, mid, direction, out report, f), out var result, out var problem);
+        string? noGroup = null;
+        // The group is read inside the store's lock, on the mesh the edit is given, as set_weights reads it.
+        var snapshot = store.Edit(tool, name, m =>
+        {
+            var chosen = f;
+            if (groupName is not null)
+            {
+                chosen = m.Style?.FacesOf(groupName) is { } grouped ? [.. grouped] : null;
+                if (chosen is null) noGroup = NoGroup(m.Style, groupName);
+            }
+            // An unknown group is refused below; an empty face list makes the Core refuse without trying the edit.
+            return Displacement.Displace(m, v, from!, by!.Value, mid, direction, out report, noGroup is null ? chosen : []);
+        }, out var result, out var problem);
         if (problem is not null) return Failed(tool, [problem]);
+        if (noGroup is not null) return Failed(tool, [noGroup]);
         if (snapshot is null) return Error($"{tool}: " + NoMesh);
         if (!result!.Succeeded) return Failed(tool, result.Errors.Select(x => x.ToString()));
 
@@ -122,7 +128,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         var hasNoise = x.TryGetProperty("noise", out var noise);
         if (hasGraph == hasNoise)
         {
-            errors.Add(hasGraph ? "source: give graph or noise, not both" : "source: give graph (with output) or noise");
+            errors.Add(hasGraph ? "source: give graph or noise, not both" : "source: give graph (and output, default height) or noise");
             return null;
         }
         if (hasNoise)
@@ -148,7 +154,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         {
             if (!noise.TryGetProperty(key, out var n) || n.ValueKind == JsonValueKind.Null) return fallback;
             if (n.ValueKind == JsonValueKind.Number && n.TryGetInt32(out var i)) return i;
-            errors.Add($"source.noise.{key}: expected a whole number, got {n.GetRawText()}");
+            errors.Add($"source.noise.{key}: expected a whole number from {int.MinValue} to {int.MaxValue}, got {n.GetRawText()}");
             return fallback;
         }
         var seed = Whole("seed", 0);
@@ -156,8 +162,8 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         var scale = 1.0;
         if (noise.TryGetProperty("scale", out var s) && s.ValueKind != JsonValueKind.Null)
         {
-            if (s.ValueKind == JsonValueKind.Number) scale = s.GetDouble();
-            else errors.Add($"source.noise.scale: expected a number, got {Describe(s)}");
+            if (s.ValueKind == JsonValueKind.Number && double.IsFinite(s.GetDouble())) scale = s.GetDouble();
+            else errors.Add($"source.noise.scale: expected a finite number of metres, got {(s.ValueKind == JsonValueKind.Number ? s.GetRawText() : Describe(s))}");
         }
         return errors.Count == before ? new NoiseSource(seed, scale, octaves) : null;
     }

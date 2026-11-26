@@ -129,6 +129,12 @@ public static class Displacement
             foreach (var v in mesh.Faces[f].Corners) normals[v] += weighted;
         }
 
+        // A vertex on no face has no normal: without an axis it has nowhere to go, so it is left out and named.
+        var stranded = direction is null ? selected.Where(v => normals[v] == Vector3.Zero).ToList() : [];
+        selected.ExceptWith(stranded);
+        if (selected.Count == 0)
+            return EditResult.Refused([new MeshError("selection", "matches no vertex with a normal (they are on no face): give axis to move them, or select vertices on faces")]);
+
         var heights = Heights(mesh, selected, source, errors);
         if (errors.Count > 0) return EditResult.Refused(errors);
 
@@ -136,7 +142,7 @@ public static class Displacement
         var moved = new List<KeyValuePair<int, Vector3>>();
         foreach (var v in selected)
         {
-            var along = direction ?? (normals[v] == Vector3.Zero ? Vector3.Zero : Vector3.Normalize(normals[v]));
+            var along = direction ?? Vector3.Normalize(normals[v]);
             var offset = amount * (heights[v] - midlevel);
             largest = Math.Max(largest, Math.Abs(offset));
             moved.Add(KeyValuePair.Create(v, mesh.Vertices[v] + along * (float)offset));
@@ -145,7 +151,13 @@ public static class Displacement
         var result = mesh.Edit(movedVertices: moved);
         var edited = EditResult.From(mesh, result, [.. selected], [], [], []);
         if (edited.Succeeded)
-            report = new DisplaceReport(largest, Coarse(mesh, selected, source) is { } coarse ? [coarse] : []);
+        {
+            var warnings = new List<string>();
+            if (stranded.Count > 0)
+                warnings.Add($"vertices {Listed(stranded)} are on no face, so they have no normal and did not move; give axis to move them");
+            if (Coarse(mesh, selected, source) is { } coarse) warnings.Add(coarse);
+            report = new DisplaceReport(largest, warnings);
+        }
         return edited;
     }
 
@@ -181,8 +193,7 @@ public static class Displacement
                 var unmapped = wanted.Where(v => !sum.ContainsKey(v)).Order().ToList();
                 if (unmapped.Count > 0)
                 {
-                    var shown = string.Join(", ", unmapped.Take(10)) + (unmapped.Count > 10 ? Invariant($" and {unmapped.Count - 10} more") : "");
-                    errors.Add(new MeshError("selection", $"vertices {shown} are on no face with UVs, so the graph cannot be read for them; map their faces (project_uvs, unwrap) or leave them out"));
+                    errors.Add(new MeshError("selection", $"vertices {Listed(unmapped)} are on no face with UVs, so the graph cannot be read for them; map their faces (project_uvs, unwrap) or leave them out"));
                     return heights;
                 }
                 foreach (var (v, (total, count)) in sum) heights[v] = total / count;
@@ -191,6 +202,10 @@ public static class Displacement
                 throw new ArgumentException("an unknown source", nameof(source));
         }
     }
+
+    /// <summary>Up to 10 ids, then how many more.</summary>
+    private static string Listed(IReadOnlyList<int> ids) =>
+        string.Join(", ", ids.Take(10)) + (ids.Count > 10 ? Invariant($" and {ids.Count - 10} more") : "");
 
     /// <summary>
     /// A warning when the selected part of the mesh is too coarse for the source to show: fewer than two vertices to a

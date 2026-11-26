@@ -115,6 +115,9 @@ public sealed class DisplaceToolTests() : FileToolTests("carve-displace")
         Assert.Contains("source: required", Refused(await carve.CallToolAsync("displace", """{"amount":0.1}""")));
         Assert.Contains("amount: required", Refused(await carve.CallToolAsync("displace", """{"source":{"noise":{}}}""")));
         Assert.Contains("amount: is zero", Refused(await carve.CallToolAsync("displace", """{"source":{"noise":{}},"amount":0}""")));
+        Assert.Contains("from -2147483648 to 2147483647, got 4294967296", Refused(await carve.CallToolAsync("displace", """{"source":{"noise":{"seed":4294967296}},"amount":0.1}""")));
+        Assert.Contains("expected a finite number of metres, got 1e400", Refused(await carve.CallToolAsync("displace", """{"source":{"noise":{"scale":1e400}},"amount":0.1}""")));
+        Assert.Contains("output, default height", Refused(await carve.CallToolAsync("displace", """{"source":{},"amount":0.1}""")));
         Assert.Contains("octaves", Refused(await carve.CallToolAsync("displace", """{"source":{"noise":{"octaves":12}},"amount":0.1}""")));
         Assert.Contains("source.noise.size", Refused(await carve.CallToolAsync("displace", """{"source":{"noise":{"size":2}},"amount":0.1}""")));
         Assert.Contains("selection: matches no vertex", Refused(await carve.CallToolAsync("displace", """{"source":{"noise":{}},"amount":0.1,"vertices":[]}""")));
