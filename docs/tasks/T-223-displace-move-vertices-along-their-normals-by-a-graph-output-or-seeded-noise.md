@@ -4,7 +4,7 @@ description: >-
 ---
 # T-223 — displace: move vertices along their normals by a graph output or seeded noise
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
