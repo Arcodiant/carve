@@ -76,6 +76,15 @@ Raised by the fps-arms project (private repo `Arcodiant/fps-arms`, 2026-11-15), 
    ```
 9. **`PartToolsListTests`' SHA-256 digest of tools/list is retired** (T-197 deletes it). Its companion, which pins where each agreed sentence is, stays and follows the sentences into `help`.
 
+**Re-scoped after M-29 (2026-11-26).** The person's rulings, which bind over the planner's draft (`artifacts/M-23/rescope.md`). M-29's T-207 had already built `help` (by tool, released in 0.19.0) and brought every description under 3,686 with a test and no tool exempt, so rulings 7 and 9 were met by T-207.
+
+1. `help` gains a `topic` argument beside the released `tool`; `warnings` is the only topic for now, and `tool` is unchanged.
+2. T-203 is merged into T-199; T-204 and T-205 are dropped. All three are Done, each noting that T-207 delivered the work.
+3. check's catalogue of warnings moves out of its description into the `warnings` topic; check keeps what it does, one example and a pointer to `help {"topic":"warnings"}`.
+4. The `warnings` topic covers the ten mesh-report kinds plus check's model and graph-material warnings. Export's limit warnings and the clip warnings stay in their tools' entries.
+5. `displace` (added by M-29) joins T-201's tools that take `verbosity`.
+6. The planner's readings in T-200 are confirmed: `check` at `silent` answers its own `ok`, and `export` at `silent` answers JSON. The description limit stays at 3,686.
+
 No frame is drawn by this milestone, so it has no scenario project and no golden: the real `carve` is reached through `server-regression` (T-206).
 
 ### Measured at planning
@@ -106,18 +115,17 @@ fps-arms' 12,000 tokens for one `open` was Carve 0.9.0, before T-72's fold; `mai
 |---|---|---|
 | 1 | T-197 | the grouped line and the samples; everything reads its wording |
 | 2 | T-198 | the smooth rule, on the same pins and `MeshReport` |
-| 3 | T-199, T-200 | side by side: `help` adds a tool and no existing tool file; `verbosity` keeps out of `CarveServer.cs` |
-| 4 | T-201, T-202 | side by side on T-200's helper: nineteen tools, and `unwrap` |
-| 5 | T-203, T-204, T-205 | side by side, each its own tool files; they share only lists that add or remove a row |
-| 6 | T-206 | the real run and the measured table |
+| 3 | T-200 | `verbosity` and its helper, which the next wave builds on |
+| 4 | T-199, T-201, T-202 | side by side: T-199 owns check, open and export descriptions and `HelpTool.cs`; T-201 its twenty tools; T-202 `UnwrapTool.cs` |
+| 5 | T-206 | the real run and the measured table |
 
-Ten tasks, past the usual eight, because the description cut was taken in whole. T-197, T-199 and T-200 are design-heavy and decide what others build on (a wording, a public tool, a mechanism); T-201 and the three description tasks are mechanical; T-206 is a real run.
+T-203, T-204 and T-205 are Done: M-29's T-207 delivered them (T-203's remainder moved into T-199). Seven tasks remain of the ten. T-197, T-199 and T-200 are design-heavy and decide what others build on; T-201 is mechanical; T-206 is a real run.
 
 ## Required tasks
 
 - [ ] [T-197](../tasks/T-197-warnings-grouped-one-line-per-kind-and-the-fps-arms-samples.md) — Every mesh report groups a warning kind past 3 into one line (count, worst, 3 samples, the select query), on the fps-arms cage and tool sources now in samples/
 - [ ] [T-198](../tasks/T-198-a-not-planar-face-on-a-smooth-mesh-is-a-note-in-check.md) — A smooth-shaded mesh no longer warns of not-planar faces: check notes their count and worst case, and a subdivided mesh can read ok
-- [ ] [T-199](../tasks/T-199-the-help-tool-with-the-warnings-topic.md) — help lists reference topics and returns one; the warnings topic explains every warning kind, its grouping and the verbosity levels, and a test holds description lengths
+- [ ] [T-199](../tasks/T-199-the-help-tool-with-the-warnings-topic.md) — help takes a topic beside tool; the warnings topic explains every warning kind, its grouping, its fix and the verbosity levels, and check's catalogue of warnings moves into it
 - [ ] [T-200](../tasks/T-200-verbosity-on-the-tools-that-return-a-mesh-report.md) — define_mesh, the edits, subdivide, undo, open, check and export take verbosity: silent answers only ok, summary groups, full lists every warning
 - [ ] [T-201](../tasks/T-201-verbosity-on-the-other-tools-that-change-the-model-or-write-a-file.md) — The parts, style, UV, skeleton, weight, clip, target, save and bake tools take verbosity, silent answering only ok
 - [ ] [T-202](../tasks/T-202-unwrap-reports-a-summary-and-its-five-largest-islands.md) — unwrap returns the island count, worst stretch, flipped total and five largest islands, and every island only at verbosity full

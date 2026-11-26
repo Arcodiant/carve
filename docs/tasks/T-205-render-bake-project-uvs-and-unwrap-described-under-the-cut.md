@@ -4,7 +4,7 @@ description: >-
 ---
 # T-205 — render, bake, project_uvs and unwrap described under the cut
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -30,6 +30,10 @@ description: >-
 - **`README.md`**: the new topics on the `help` line.
 
 ## Notes
+
+### As built
+
+Delivered by M-29's T-207; dropped from M-23 (unwrap's 1 character of room went to T-202).
 
 - Runs beside T-203 and T-204, sharing what T-203's Notes list. T-206 deletes the table once all three have emptied it.
 - `render` is the largest move of the milestone: nothing but text and tests changes, no frame. If a frame differs, something else was changed; stop.
