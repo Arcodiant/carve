@@ -146,12 +146,28 @@ public class FirstNodesTests
     [InlineData("multiply", 0.24f)]
     [InlineData("add", 1.1f)]
     [InlineData("subtract", 0.5f)]
+    [InlineData("difference", 0.5f)]
     [InlineData("min", 0.3f)]
     [InlineData("max", 0.8f)]
     public void BlendModesOnGreyscale(string mode, float expected)
     {
         var v = Grey($$"""{{Const("a", .8)}}, {{Const("b", .3)}}, "t": { "type": "blend", "inputs": { "a": "a", "b": "b" }, "params": { "mode": "{{mode}}" } } """, 32);
         Assert.Equal(expected, v[0], 6);
+    }
+
+    [Fact]
+    public void BlendDifferenceIsTheDistanceEitherWayAndALineAtALevel()
+    {
+        // a = 0.3 under b = 0.8: subtract goes below zero, difference does not
+        var v = Grey($$"""{{Const("a", .3)}}, {{Const("b", .8)}}, "t": { "type": "blend", "inputs": { "a": "a", "b": "b" }, "params": { "mode": "difference" } } """, 32);
+        Assert.Equal(.5f, v[0], 6);
+        // a gradient's texel x is u = (x + 0.5) / 32 against a level of 0.5: |u - 0.5|, 0 at the middle and 0.5 at the edges
+        var line = Grey($$"""{{Const("b", .5)}}, "a": { "type": "gradient" }, "t": { "type": "blend", "inputs": { "a": "a", "b": "b" }, "params": { "mode": "difference" } } """, 32);
+        for (var x = 0; x < 32; x++) Assert.Equal(MathF.Abs((x + .5f) / 32 - .5f), line[x], 5);
+        // on colour, channel by channel: #ff8000 against grey 0.5 is |1 - .5|, |128/255 - .5|, |0 - .5|
+        var nodes = $$"""{{Const("b", .5)}}, "a": { "type": "colour", "params": { "colour": "#ff8000" } }, "t": { "type": "blend", "inputs": { "a": "a", "b": "b" }, "params": { "mode": "difference" } } """;
+        float[] want = [.5f, MathF.Abs(128 / 255f - .5f), .5f];
+        for (var ch = 0; ch < 3; ch++) Assert.Equal(want[ch], Run(nodes, 32, OutputRole.BaseColour, ch)[0], 5);
     }
 
     [Fact]
@@ -241,6 +257,7 @@ public class FirstNodesTests
         { "linear gradient (repeats)", """ "t": { "type": "gradient", "params": { "repeat": 4 } } """ },
         { "levels of noise", """ "n": { "type": "noise", "params": { "cells": [4, 4] } }, "t": { "type": "levels", "inputs": { "in": "n" }, "params": { "in_low": 0.2, "in_high": 0.9, "gamma": 1.6 } } """ },
         { "blend of noises", """ "n": { "type": "noise", "params": { "cells": [4, 4] } }, "m": { "type": "noise", "params": { "cells": [3, 5], "seed": 4 } }, "t": { "type": "blend", "inputs": { "a": "n", "b": "m" }, "params": { "mode": "add" } } """ },
+        { "difference of noises", """ "n": { "type": "noise", "params": { "cells": [4, 4] } }, "m": { "type": "noise", "params": { "cells": [3, 5], "seed": 4 } }, "t": { "type": "blend", "inputs": { "a": "n", "b": "m" }, "params": { "mode": "difference" } } """ },
     };
 
     [Theory]
@@ -285,6 +302,7 @@ public class FirstNodesTests
         AssertSizeInvariant(""" "t": { "type": "gradient", "params": { "repeat": 8, "shape": "triangle" } } """);
         AssertSizeInvariant(""" "n": { "type": "noise", "params": { "cells": [8, 8] } }, "t": { "type": "levels", "inputs": { "in": "n" }, "params": { "in_low": 0.3, "gamma": 2 } } """);
         AssertSizeInvariant(""" "n": { "type": "noise", "params": { "cells": [8, 8] } }, "m": { "type": "gradient", "params": { "axis": "v" } }, "t": { "type": "blend", "inputs": { "a": "n", "b": "m", "mask": "m" }, "params": { "mode": "multiply" } } """);
+        AssertSizeInvariant(""" "n": { "type": "noise", "params": { "cells": [8, 8] } }, "m": { "type": "gradient", "params": { "axis": "v" } }, "t": { "type": "blend", "inputs": { "a": "n", "b": "m" }, "params": { "mode": "difference" } } """);
         // a normal from a smooth height: strength is per image width, so the tilt agrees; the central difference is read over one texel at each size
         AssertSizeInvariant(""" "h": { "type": "noise", "params": { "cells": [4, 4] } }, "t": { "type": "height_to_normal", "inputs": { "height": "h" }, "params": { "strength": 0.05 } } """, OutputRole.Normal, 0);
         AssertSizeInvariant(""" "h": { "type": "noise", "params": { "cells": [4, 4] } }, "t": { "type": "height_to_normal", "inputs": { "height": "h" }, "params": { "strength": 0.05 } } """, OutputRole.Normal, 1);
@@ -342,6 +360,8 @@ public class FirstNodesTests
         Assert.Equal(.3f, apply("mix", .8f, .3f, 1), 6);
         Assert.Equal(.675f, apply("mix", .8f, .3f, .25f), 6);                          // catches opacity or mask inverted
         Assert.Equal(.5f, apply("subtract", .8f, .3f, 1), 6);                         // catches a - b flipped
+        Assert.Equal(.5f, apply("difference", .3f, .8f, 1), 6);                       // catches a difference that is not absolute
+        Assert.Equal(.4f, apply("difference", .3f, .8f, .5f), 6);                     // catches opacity ignored in difference
         Assert.Equal(.3f, apply("min", .8f, .3f, 1), 6);                              // catches min and max swapped
         Assert.Equal(.8f, apply("max", .8f, .3f, 1), 6);
         Assert.Equal(.24f, apply("multiply", .8f, .3f, 1), 6);
@@ -393,6 +413,8 @@ public class FirstNodesTests
             ("levels: gamma the other way", () => CheckLevels((v, il, ih, ol, oh, g) => LevelsNode.Map(v, il, ih, ol, oh, 1 / g))),
             ("blend: mask taken the wrong way round", () => CheckBlend((m, a, b, k) => BlendNode.Apply(m, a, b, 1 - k))),
             ("blend: subtract flipped", () => CheckBlend((m, a, b, k) => m == "subtract" ? BlendNode.Apply(m, b, a, k) : BlendNode.Apply(m, a, b, k))),
+            ("blend: difference not absolute", () => CheckBlend((m, a, b, k) => BlendNode.Apply(m == "difference" ? "subtract" : m, a, b, k))),
+            ("blend: difference ignores opacity", () => CheckBlend((m, a, b, k) => m == "difference" ? MathF.Abs(a - b) : BlendNode.Apply(m, a, b, k))),
             ("blend: min and max swapped", () => CheckBlend((m, a, b, k) => BlendNode.Apply(m == "min" ? "max" : m == "max" ? "min" : m, a, b, k))),
             ("height_to_normal: x sign flipped", () => CheckNormal((l, r, u, d, s, st) => { var n = HeightToNormalNode.Normal(l, r, u, d, s, st); return (-n.X, n.Y, n.Z); })),
             ("height_to_normal: y sign flipped", () => CheckNormal((l, r, u, d, s, st) => { var n = HeightToNormalNode.Normal(l, r, u, d, s, st); return (n.X, -n.Y, n.Z); })),

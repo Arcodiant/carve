@@ -5,7 +5,8 @@ namespace Patina.Graphs.Nodes;
 
 /// <summary>
 /// <c>blend</c>: inputs <c>a</c> and <c>b</c>, optional greyscale <c>mask</c>; <c>mode</c> <c>mix</c>, <c>multiply</c>, <c>add</c>,
-/// <c>subtract</c>, <c>min</c> or <c>max</c>; <c>opacity</c> 0..1. The result is <c>a</c> moved toward <c>mode(a, b)</c> by
+/// <c>subtract</c>, <c>difference</c> (|a - b|: against a flat <c>b</c>, a thin line where <c>a</c> crosses that level), <c>min</c> or
+/// <c>max</c>; <c>opacity</c> 0..1. The result is <c>a</c> moved toward <c>mode(a, b)</c> by
 /// <c>opacity * mask</c> (mask 1 where there is none), so in <c>mix</c> the mask takes <c>a</c> where it is 0 and <c>b</c> where it is 1.
 /// Colour if either of a and b is colour (a greyscale input is spread to grey), else greyscale. Not clamped: the output packing clamps.
 /// </summary>
@@ -24,7 +25,7 @@ public sealed class BlendNode : NodeType
 
     public override IReadOnlyList<ParamSpec> Parameters { get; } =
     [
-        ParamSpec.Enum("mode", "mix", "mix", "multiply", "add", "subtract", "min", "max"),
+        ParamSpec.Enum("mode", "mix", "mix", "multiply", "add", "subtract", "difference", "min", "max"),
         ParamSpec.Float("opacity", 0, 1, 1),
     ];
 
@@ -36,6 +37,7 @@ public sealed class BlendNode : NodeType
         "multiply" => a * b,
         "add" => a + b,
         "subtract" => a - b,
+        "difference" => MathF.Abs(a - b),
         "min" => MathF.Min(a, b),
         "max" => MathF.Max(a, b),
         _ => b,

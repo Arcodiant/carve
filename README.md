@@ -246,7 +246,9 @@ range, default) and a worked example; `nodes {"type":"tiles"}` gives one.
   `gradient`, `colour`, and the patterns `tiles` (tiles and bricks, with gaps,
   bevel and jitter), `stripes` and `shape` (a circle, square, ring, diamond or
   polygon in each cell of a grid).
-- Filters: `levels`, `blend`, `warp` (domain warp), `blur`, `gradient_map`,
+- Filters: `levels`, `blend` (`mix`, `multiply`, `add`, `subtract`,
+  `difference`, `min`, `max`; `difference` against a flat level draws a thin
+  line where a noise crosses it), `warp` (domain warp), `blur`, `gradient_map`,
   `transform` (offset, tile, mirror, free rotation and scale), `distance` (from
   a mask's edge) and `height_to_normal`.
 - Structure: `output` (one per role), `input` (an image input of a graph used
@@ -320,8 +322,9 @@ export writes it. The rules:
 `samples/graphs/` holds a graph per material, each with its exported PNGs and
 its swatch sheet in a folder of its name: `planks`, `cobblestones`, `bricks`
 (with mortar, tint and jitter exposed; `bricks/variants/grey/` is its grey stone
-variant), `fabric`, `painted-metal`, `floor-tiles`, `grime` (a filter graph with
-an `input`) and `old-wall` (the bricks and the grime used as `graph` nodes).
+variant), `fabric`, `marble` (veins by `blend`'s `difference`), `painted-metal`,
+`floor-tiles`, `grime` (a filter graph with an `input`) and `old-wall` (the
+bricks and the grime used as `graph` nodes).
 `samples/graphs/faults/` holds two graphs that `check` finds faults in.
 
 ### A worked example

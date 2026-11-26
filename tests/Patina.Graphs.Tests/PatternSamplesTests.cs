@@ -6,7 +6,7 @@ using Xunit;
 namespace Patina.Graphs.Tests;
 
 /// <summary>
-/// samples/graphs/bricks.texgraph and fabric.texgraph (T-136) and their committed PNGs: the PNGs equal the graph, and each
+/// samples/graphs/bricks.texgraph and fabric.texgraph (T-136), marble.texgraph (T-185: veins by blend's difference) and their committed PNGs: the PNGs equal the graph, and each
 /// is worked against check's rules (M-28's planning: base colour 20..245 by the brightest channel in 99% or more of texels,
 /// no metallic, normals unit within 0.02 in all but 0.1%, no output of one value, no seam across the wrap), with the
 /// figures printed, so the rules hold before check (T-141) exists.
@@ -42,6 +42,7 @@ public class PatternSamplesTests(ITestOutputHelper output)
     {
         { "bricks", OutputRole.BaseColour }, { "bricks", OutputRole.Normal }, { "bricks", OutputRole.Roughness }, { "bricks", OutputRole.Occlusion },
         { "fabric", OutputRole.BaseColour }, { "fabric", OutputRole.Normal }, { "fabric", OutputRole.Roughness }, { "fabric", OutputRole.Occlusion },
+        { "marble", OutputRole.BaseColour }, { "marble", OutputRole.Normal }, { "marble", OutputRole.Roughness },
     };
 
     [Theory]
@@ -57,6 +58,7 @@ public class PatternSamplesTests(ITestOutputHelper output)
     [Theory]
     [InlineData("bricks")]
     [InlineData("fabric")]
+    [InlineData("marble")]
     public void TheBaseColourStaysInTwentyTo245ByItsBrightestChannel(string name)
     {
         var px = Committed(name, OutputRole.BaseColour);
@@ -75,6 +77,7 @@ public class PatternSamplesTests(ITestOutputHelper output)
     [Theory]
     [InlineData("bricks")]
     [InlineData("fabric")]
+    [InlineData("marble")]
     public void TheNormalsAreUnitLength(string name)
     {
         var px = Committed(name, OutputRole.Normal);
@@ -126,5 +129,31 @@ public class PatternSamplesTests(ITestOutputHelper output)
         output.WriteLine($"{name}/{OutputRoles.Name(role)}: step across u wrap {wrapX:0.00} (interior {interiorX:0.00}), across v wrap {wrapY:0.00} (interior {interiorY:0.00})");
         Assert.True(wrapX <= 2 * interiorX + 2, "a seam across the u wrap");
         Assert.True(wrapY <= 2 * interiorY + 2, "a seam across the v wrap");
+    }
+
+    [Fact]
+    public void TheMarbleVeinsAreThinDarkLines()
+    {
+        // a vein texel is one whose brightest channel is under 160 (stone is 201 or more, the vein colour 104)
+        var px = Committed("marble", OutputRole.BaseColour);
+        var dark = new bool[Size * Size];
+        for (var i = 0; i < dark.Length; i++) dark[i] = Math.Max(px[i * 4], Math.Max(px[i * 4 + 1], px[i * 4 + 2])) < 160;
+        var share = dark.Count(d => d) / (double)dark.Length;
+        // thin: of the vein texels, most have a stone texel within 2 texels (wrapping), so no vein is a broad patch
+        int near = 0, all = 0;
+        for (var y = 0; y < Size; y++)
+            for (var x = 0; x < Size; x++)
+            {
+                if (!dark[y * Size + x]) continue;
+                all++;
+                var edge = false;
+                for (var dy = -2; dy <= 2 && !edge; dy++)
+                    for (var dx = -2; dx <= 2 && !edge; dx++)
+                        edge = !dark[(y + dy + Size) % Size * Size + (x + dx + Size) % Size];
+                if (edge) near++;
+            }
+        output.WriteLine($"marble: {100 * share:0.00}% vein texels, {100.0 * near / all:0.0}% of them within 2 texels of stone");
+        Assert.InRange(share, 0.01, 0.15);
+        Assert.True(near >= all * 0.9, $"only {near} of {all} vein texels are within 2 texels of stone: the veins are not thin lines");
     }
 }
