@@ -60,7 +60,7 @@ Built on Claude Sonnet 5.5, by one agent.
 - Arm: `ArmStages` (scenario-morph) and `MorphLoadTests` assert the same; `A_wrong_count..._fails_the_fold_check` became `..._fails_the_note_check`.
 - `DenseMeshBudgetTests`: the cage's `check` after two subdivides asserts `ok: true` and the note.
 - New `SmoothNotPlanarToolTests`: flat and smooth rows of lifted quads (12 and 2) through `check`, `get_mesh`, `move` and `export`; `set_shading` smooth and back flips the answer; a subdivided smooth cube reads ok; the note's count against `select`.
-- The scenarios themselves (`scenario-soft`, `scenario-morph`) are real-server runs; see the verify output below for whether they ran.
+- `scenario-soft` and `scenario-morph` (real-server runs) ran in verify and passed. The note checker first failed there: its regex lacked the `; select faces where non_planar names them` clause the note carries; `SmoothNotPlanarToolTests` now pins the note's ending exactly.
 
 **Wrong inputs** (each check, fed the wrong thing, fails):
 
