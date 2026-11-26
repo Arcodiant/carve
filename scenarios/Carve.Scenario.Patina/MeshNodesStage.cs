@@ -42,6 +42,9 @@ internal sealed class MeshNodesStage : IPatinaStage
         checks.Check(!plainText.Contains("mesh inputs", StringComparison.Ordinal), "mesh nodes: a graph with no mesh node was given the note: " + plainText);
         var plain = TitleExtent(await driver.CaptureToolAsync("swatch", "mesh-nodes-plain-sheet", new { view = "sheet" }));
         CheckTitleNote(checks, extent, plain);
+        // The break's own capture (RV-83): the same plain graph swatched again, measured apart. Taken here, before save names a
+        // file: a sheet drawn after save and open has a longer title (run J-20261126-040901-4df0ed measured x 338 against 258).
+        var second = TitleExtent(await driver.CaptureToolAsync("swatch", "mesh-nodes-break-plain-sheet", new { view = "sheet" }));
 
         await checks.CallAsync("define_graph", define);
         var texels = Path.Combine(driver.RunFolder, "mesh-nodes-export");
@@ -73,10 +76,8 @@ internal sealed class MeshNodesStage : IPatinaStage
             checks.Check(File.ReadAllBytes(Path.Combine(again, file)).AsSpan().SequenceEqual(committed), $"mesh nodes: {file} exported from the opened graph is not the sample's bytes");
         }
 
-        // The break, made here (RV-83, the person's ruling): a second sheet the product draws with no note (the mesh node swapped
-        // for a gradient again), captured on its own and presented as the mesh graph's to the same check, must fail.
-        await checks.CallAsync("edit_graph", """{"operations":[{"op":"set_node","node":"curv","type":"gradient"}]}""");
-        var second = TitleExtent(await driver.CaptureToolAsync("swatch", "mesh-nodes-break-plain-sheet", new { view = "sheet" }));
+        // The break, made here (RV-83, the person's ruling): the second plain sheet, a title the product drew with no note,
+        // presented as the mesh graph's to the same check, must fail.
         var probe = new PatinaChecks(driver);
         CheckTitleNote(probe, second, plain);
         var log = new StringBuilder($"== the title-note check on a second plain sheet's title (x {second}), which has no note, against the plain sheet's (x {plain})\n");
