@@ -114,7 +114,7 @@ public class NotPlanarFoldCheckTests
     public void A_note_that_does_not_count_select_s_faces_fails() => Assert.NotNull(NotPlanarFold.CheckSmoothNote(Right, Enumerable.Range(0, 12).ToList()));
 
     [Fact]
-    public void A_worst_face_select_does_not_find_fails() => Assert.Contains("worst face", NotPlanarFold.CheckSmoothNote(Right, Enumerable.Range(2, 13).ToList()));
+    public void A_worst_face_the_note_names_that_select_does_not_find_fails() => Assert.Contains("worst face", NotPlanarFold.CheckSmoothNote(Right, Enumerable.Range(2, 13).ToList()));
 
     [Fact]
     public void A_missing_note_fails() => Assert.NotNull(NotPlanarFold.CheckSmoothNote(Check("", "size 1 x 1 x 1 m"), [0, 1]));
