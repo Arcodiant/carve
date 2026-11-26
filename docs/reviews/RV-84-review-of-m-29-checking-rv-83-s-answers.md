@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-84 — Review of M-29, checking RV-83's answers
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-29
 
@@ -67,7 +67,7 @@ The argument fails on one point. The single read tells "resolved at some time" f
 
   Neither result lasts: the next render's `Resolve` stores a new key, and `:174` shows it again. Both need a concurrent call and a graph save, so this is narrower than RV-83's Major. But it is the "stale graph slots handed back unmarked" case. It is also the claim T-226's argument makes for two renders at once ("its own resolution or a newer one"), and that claim is untrue. Storing a resolution only if it is not older than the one stored, and having the pump compare against the resolution its request was posted after, would close it. For example, the request could carry its `Drawn` key, and the pump would mark the frame when the drawn key differs.
 
-**Outcome:** —
+**Outcome:** skipped: filed off-milestone as B-12 by the person's choice (2026-11-26); it needs a concurrent call and a graph save, and does not last past the next render
 
 ### T-226's As built names a code commit that is not on the branch
 - **Where:** `docs/tasks/T-226-rv-83-the-render-pump-the-bake-key-and-export-s-copies.md:77` ("Code commit `6543ceed`"), `:79`
@@ -75,7 +75,7 @@ The argument fails on one point. The single read tells "resolved at some time" f
 - **Rubric:** tracker hygiene (`### As built` true of the code)
 - **What is wrong:** `git merge-base --is-ancestor 6543ceed HEAD` fails. The code commit on `milestone/M-29` is `2e09c51b` ("T-226: one bake read per mesh shown, ..."), rebased by `finish`. This is the same slip RV-83 found in T-220. The ids of T-227 (`079079d9`, `cc6708ee`) and T-220 (`45f7b023`) are on the branch.
 
-**Outcome:** —
+**Outcome:** fixed
 
 **Covered:** I read these whole: RV-83, T-226, the As built sections of T-227 and T-228, T-229, `RenderPump.cs`, `GraphBakes.cs`, `SheetVersions.cs`, `RenderQueue.cs`, `LookHolder.cs`, and `RenderSystem.cs` from its `Update` and from `Make` to the end. I also read the milestone file from "Decided while it ran" to the end, and the fix diff of every one of the 19 files. Of `RenderTool.cs` I read the two changed loops and the `image` loader. Of `ExportTool.cs` I read `Run`'s bake part, `Piece` and `Copies`. Of `GraphSlotBake.cs` I read `Key`, `PackingOf`, `Validate` and `Rgba`.
 

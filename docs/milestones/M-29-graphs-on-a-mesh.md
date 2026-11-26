@@ -251,6 +251,8 @@ By the person, on the review's findings (2026-11-25 and 2026-11-26), each put wi
   filing it as a bug and shipping.
 - **The Patina scenario's title break is made of two titles the product drew** (T-227), after two rounds. Declined:
   accepting the break as it was, and checking the answer's text in place of the frame.
+- **A render that returns stale graph slots is filed as a bug** (B-12, off-milestone), found in round 3. Declined: a
+  fourth fix to the render path inside M-29.
 
 By the orchestrator:
 
@@ -375,6 +377,8 @@ By the orchestrator:
   of 3 tries, it says so and asks to be called again (T-218). The fault it replaces, a frame drawn with empty graph
   slots, took three fixes (T-163's shortcut, T-218, T-226).
 - **A graph file rewritten and restored during one bake** can be cached under the wrong bytes (T-229, off-milestone).
+- **A render can return stale graph slots** when an undo or a second render straddles a graph save (B-12,
+  off-milestone); it does not last past the next render.
 - **A test reaches an internal of `Carve.Hosting` by reflection** to mark the engine ready (T-219's `swatch` note
   test), for want of a public seam; it carries a `shortcut:` comment.
 - **Member worktree folders** under `branches/task` and `branches/bug`, unregistered from git and not deleted.
