@@ -227,13 +227,30 @@ By the person (2026-11-24), each put with a recommendation:
   recorded; the grip is held to what its faces wear in the saved file.
 - **`get_mesh` gains `include` and `faces`** (B-10, found by round 1), fixed in M-29 before round 2. Declined: a
   summary by default past a size, and filing it off-milestone.
-- **T-168's crevice set** (2026-11-25): the drive's texels within 0.004 m of the edges of its two ends, darker than
-  open steel by 10 luma, after round 2 failed on the whole-drive set an agent had chosen. The distance was chosen with
-  round 2's number in view, and the person was told so. Declined: 0.012 m, and a margin of 20.
+- **T-168's crevice set** (2026-11-25): first the drive's texels within 0.004 m of the edges of its two ends, darker
+  than open steel by 10 luma, after round 2 failed on the whole-drive set an agent had chosen (the distance was chosen
+  with round 2's number in view, and the person was told so; declined: 0.012 m, and a margin of 20). Then, on the
+  review's finding that the code counted a socket face and that 41% of the set lay on the drive's hidden ends, **the
+  drive's four visible side faces only,** same distance and margin (T-221). Declined: the first set with the socket
+  face removed.
 - **The taught wear example breaks its mask with noise** (T-168, between the rounds), after the person's note that
   round 1's wear "reads like an edge highlight". Recipes and guidance to agents as such are T-208, off-milestone.
 - **The 1024 bake tests wait 120 s for that call** (B-11), after the milestone's verify timed out on one. Declined:
   baking at 512 there, and re-running until it passes.
+
+By the person, on the review's findings (2026-11-25 and 2026-11-26), each put with a recommendation:
+
+- **A per-mesh copy whose name the model already has is refused** by `render` and `export`, naming both, and `check`
+  warns (T-218). Declined: picking a free name.
+- **Bake memory beyond the cache's cap is filed off-milestone** (T-222). Declined: fixing it in M-29.
+- **patina's `check` keeps `one-value` for a flat output that reads a mesh node, with a true reason** (T-219), and,
+  after round 2 found the first wording untrue, **says only what is known:** it may be flat only because its mesh
+  inputs are neutral in patina, how to draw the real map in carve, and to widen its levels if it is flat there too
+  (T-227). Declined: withholding `one-value`, and going back to the old text.
+- **The empty-slots fault is fixed a third time and that fix re-reviewed** (T-226), after two rounds. Declined:
+  filing it as a bug and shipping.
+- **The Patina scenario's title break is made of two titles the product drew** (T-227), after two rounds. Declined:
+  accepting the break as it was, and checking the answer's text in place of the frame.
 
 By the orchestrator:
 
@@ -254,8 +271,8 @@ By the orchestrator:
   then T-168. No two members collided on a file; the tools/list digest pin was the one shared line that needed care,
   and the brief's rule (keep both descriptions, retake it from the result) settled it each time.
 - **The planning calls that held:** the project `src/Carve.Graphs`; the nodes' parameters, defaults and neutral values;
-  8 texels of padding; `open` warning and not refusing on a missing graph; the slot table; the cache's key and 512 MB
-  cap; a warning for per-mesh copies; the wrench and its plant for the acceptance.
+  8 texels of padding; `open` warning and not refusing on a missing graph; the slot table; the cache's 512 MB cap (its key
+  did not hold: the review found it left out the slot); a warning for per-mesh copies; the wrench and its plant for the acceptance.
 - **Planning's probe held:** the preferred UV layout for the barrel can be had through the tools (every stave face
   exactly 1/8 wide), grime reaches about 6% of stave texels in a thin line by each hoop, and both sample materials
   warn at 1024 and not at 512 (1.5 and 1.8 s at 512, 6.6 and 6.3 s at 1024, Debug, with other jobs on the runner).
@@ -295,10 +312,11 @@ By the orchestrator:
   `Bash`. `get_mesh` gained `include` and `faces`; round 2's agent read the wrench with `include` and no refused call.
 - **B-11, the 1024 bake tests.** Three times a test that bakes both materials at 1024 through the real process timed
   out at 30 s on a loaded machine, the last in this milestone's own verify. Those calls now wait 120 s.
-- **The acceptance checks were ruled three times after numbers were seen:** the margins after round 1; the grip
-  check rebuilt to measure what the grip's faces wear (as written it measured a material where it is not drawn); and
-  the crevice set narrowed to the drive's ends after round 2 failed on the whole drive. The last distance (0.004 m) was
-  chosen with round 2's number in view, and the person was told so before ruling.
+- **The acceptance checks were ruled four times after numbers were seen:** the margins after round 1; the grip
+  check rebuilt to measure what the grip's faces wear (as written it measured a material where it is not drawn); the
+  crevice set narrowed to the drive's ends after round 2 failed on the whole drive (the distance, 0.004 m, chosen with
+  round 2's number in view, and the person told so before ruling); and, in the review, narrowed again to the drive's
+  four visible side faces.
 - **Wear reads as an edge highlight.** The person said so of round 1, and both frame reviewers said the same of the
   barrel ("regular, like a picture frame"). The worked example taught for `mesh_curvature` was a bare curvature band;
   it now breaks the band with noise, and round 2's wear came and went along the edges. The sample `weathered-iron` was
@@ -326,9 +344,10 @@ By the orchestrator:
 - **B-11 on a loaded machine:** the load cannot be made on demand; its runs passed on a quiet one.
 - **Times** on an idle machine, in a Release build, or of a bake at 4096.
 - **The cache's 512 MB cap:** no test evicts.
-- **A graph material on a part tree, a kept level, a skinned or a piece export;** cancelling mid-bake (export bakes
-  with no cancellation token); occlusion between parts a part tree moves.
-- **A mesh node inside a nested graph file:** patina's stand-in note does not look into one, and no test bakes one.
+- **A graph material on a part tree, a kept level or a skinned export;** occlusion between parts a part tree moves.
+  (A piece export, and cancelling an export mid-bake, were settled in the review: T-218.)
+- **A mesh node inside a nested graph file, in carve:** patina's side was verified in the review, found wrong and
+  fixed (T-219); no test bakes one in carve.
 - **`get_mesh`'s narrowed sizes** on any model but the wrench.
 - **Frames by eye:** T-164's `render_glb` frames; the 256 and 1024 frames of the barrel beyond the front and rim
   close-up; most of the acceptance sessions' own images; a swatch of `weathered-staves`.
@@ -346,14 +365,18 @@ By the orchestrator:
   every section). The description and README say to ask a few sections of one group at a time.
 - **B-10's default-answer test names the path of the worktree its digests were taken in,** to undo absolute texture
   paths in one model's answer.
-- **Six descriptions sit within 20 characters of the 3,686 budget.** The next sentence added to one must move
+- **Five descriptions sit within 20 characters of the 3,686 budget.** The next sentence added to one must move
   something into `help`.
 - **The slow-bake warning** is drawn by both sample materials at 1024.
 - **The hoops carry 32 thin wedge walls** from `extrude`; the reviewer read them as joints.
 - **Carve file version 10 is now graph slots.** T-145 (M-32) is titled "Carve file version 10: weight tracks in
   clips" and needs its version planned again.
-- **A shortcut in T-163:** an edit between `render`'s bake and its frame makes the frame thread draw that model with
-  empty graph slots until the next bake lands.
+- **`render` can answer with an error in place of a frame:** if edits land between its bake and its frame on each
+  of 3 tries, it says so and asks to be called again (T-218). The fault it replaces, a frame drawn with empty graph
+  slots, took three fixes (T-163's shortcut, T-218, T-226).
+- **A graph file rewritten and restored during one bake** can be cached under the wrong bytes (T-229, off-milestone).
+- **A test reaches an internal of `Carve.Hosting` by reflection** to mark the engine ready (T-219's `swatch` note
+  test), for want of a public seam; it carries a `shortcut:` comment.
 - **Member worktree folders** under `branches/task` and `branches/bug`, unregistered from git and not deleted.
 - **T-208** (recipes and guidance for agents), reserved off-milestone at the person's word.
 

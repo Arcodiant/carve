@@ -156,7 +156,7 @@ description: >-
   
   The milestone's crevice bullet (`:227`) still reads "the drive's texels within 0.004 m of the edges of its two ends", the set the person replaced. `grep 2026-11-25` over the milestone file finds only that bullet, the verify line and the test report.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### Retrospective lines the fixes have made untrue
 - **Where:** `docs/milestones/M-29-graphs-on-a-mesh.md:253-255`, `:295-298`, `:326-328`, `:346-347`, `:352-353`
@@ -170,7 +170,7 @@ description: >-
   - Known and left: "Six descriptions sit within 20 characters of the 3,686 budget" (`:346`). The served text at HEAD has five (define_material and get_mesh 3,678, project_uvs 3,682, define_mesh 3,684, unwrap 3,685). It had seven at `4138e51`.
   - Known and left: "A shortcut in T-163: an edit between render's bake and its frame makes the frame thread draw that model with empty graph slots" (`:352-353`). T-218 now bakes and draws again, up to 3 tries (`SheetVersions.Baked`).
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### T-168's table and comparison still call the old figures "the ruled set", and the new paragraph misnames them and says the table is below
 - **Where:** `docs/tasks/T-168-graphs-on-a-mesh-acceptance-run.md:113` (the "Crevice (margin 10, the ruled set)" row), `:143` (the new paragraph's last sentence), `:145` ("ruled set: 49.143, 24.862")
