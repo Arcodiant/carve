@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "size": 256,
+  "seed": 71,
+  "nodes": {
+    "band": { "type": "gradient", "params": { "axis": "v", "repeat": 2, "shape": "triangle" } },
+    "base": { "type": "blend", "inputs": { "a": "vein_colour", "b": "stone", "mask": "veins" }, "params": { "mode": "mix" } },
+    "base_out": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "base_colour" } },
+    "bend": { "type": "fbm", "params": { "basis": "gradient", "cells": [2, 2], "octaves": 2, "seed": 5 } },
+    "bent_band": { "type": "warp", "inputs": { "by": "bend", "in": "band" }, "params": { "amount": 0.22, "angle": 90 } },
+    "field": { "type": "fbm", "params": { "basis": "gradient", "cells": [3, 3], "gain": 0.55, "octaves": 6, "seed": 11 } },
+    "fine_band": { "type": "warp", "inputs": { "by": "bend", "in": "fine_ramp" }, "params": { "amount": 0.12, "angle": 0 } },
+    "fine_distance": { "type": "blend", "inputs": { "a": "field", "b": "fine_band" }, "params": { "mode": "difference" } },
+    "fine_ramp": { "type": "gradient", "params": { "axis": "u", "repeat": 3, "shape": "triangle" } },
+    "fine_vein": { "type": "levels", "inputs": { "in": "fine_distance" }, "params": { "in_high": 0.02 } },
+    "mottle": { "type": "fbm", "params": { "basis": "value", "cells": [8, 8], "octaves": 3, "seed": 3 } },
+    "normal": { "type": "height_to_normal", "inputs": { "height": "veins" }, "params": { "strength": 0.01 } },
+    "normal_out": { "type": "output", "inputs": { "in": "normal" }, "params": { "role": "normal" } },
+    "rough": { "type": "levels", "inputs": { "in": "veins" }, "params": { "out_high": 0.22, "out_low": 0.45 } },
+    "rough_out": { "type": "output", "inputs": { "in": "rough" }, "params": { "role": "roughness" } },
+    "stone": { "type": "gradient_map", "inputs": { "in": "mottle" }, "params": { "colours": ["#d6d2c9", "#e4e0d8", "#eeebe5"], "positions": [0, 0.5, 1] } },
+    "vein": { "type": "levels", "inputs": { "in": "vein_distance" }, "params": { "gamma": 0.6, "in_high": 0.05 } },
+    "vein_colour": { "type": "colour", "params": { "colour": "#5c6168" } },
+    "vein_distance": { "type": "blend", "inputs": { "a": "field", "b": "bent_band" }, "params": { "mode": "difference" } },
+    "veins": { "type": "blend", "inputs": { "a": "vein", "b": "fine_vein" }, "params": { "mode": "min", "opacity": 0.55 } }
+  }
+}

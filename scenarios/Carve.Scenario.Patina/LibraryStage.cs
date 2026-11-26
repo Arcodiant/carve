@@ -30,6 +30,7 @@ internal sealed class LibraryStage : IPatinaStage
         new("bricks", "bricks.texgraph", "bricks", null, 1),
         new("bricks-grey", "bricks.texgraph", "bricks/variants/grey", GreyOverrides, 1),
         new("fabric", "fabric.texgraph", "fabric", null, 1),
+        new("marble", "marble.texgraph", "marble", null, 1),
         new("painted-metal", "painted-metal.texgraph", "painted-metal", null, 2),
         new("floor-tiles", "floor-tiles.texgraph", "floor-tiles", null, 2),
         new("old-wall", "old-wall.texgraph", "old-wall", null, 2),
