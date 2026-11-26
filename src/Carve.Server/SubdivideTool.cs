@@ -89,14 +89,14 @@ public sealed class SubdivideTool(ModelStore store)
     /// almost never flat, and one line per face would bury the rest (the person's ruling, 2026-11-10). Only this
     /// result folds them; the other reports fold at 10 faces (MeshWarningFold).
     /// </summary>
-    internal static List<string> Warnings(MeshReport report)
+    internal static List<string> Warnings(MeshReport report, string tool = "subdivide")
     {
         var all = report.Warnings;
         var warnings = all.Where(w => w.Kind != MeshWarningKind.NonPlanarFace).Select(w => w.ToString()).ToList();
         var nonPlanar = all.Count(w => w.Kind == MeshWarningKind.NonPlanarFace);
         if (nonPlanar > 0)
             warnings.Add(string.Create(CultureInfo.InvariantCulture,
-                $"{nonPlanar} {(nonPlanar == 1 ? "face is" : "faces are")} not planar (expected after subdivide)"));
+                $"{nonPlanar} {(nonPlanar == 1 ? "face is" : "faces are")} not planar (expected after {tool})"));
         return warnings;
     }
 
