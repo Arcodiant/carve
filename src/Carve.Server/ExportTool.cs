@@ -30,7 +30,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         + "Returns one line: exported <file> to <absolute path>, then the triangles, the materials, the size and bounds, where the limits came from and any warnings. A mesh with warnings still exports and the result repeats them. export changes nothing and is not an undo step. Every error writes nothing and names itself. "
         + "Worked example, a crate into a game's content folder (put the game's folder for <game>):\n"
         + ExampleMarker + SaveTool.WorkedExport + "\n"
-        + """More: help {"tool":"export"} gives what is written (nodes, materials, UVs), the parts and skinned detail, the piece and clips modes, the limits file and its format, the result line, the errors and the worked examples.""";
+        + """More: help {"tool":"export"} gives what is written (nodes, materials, UVs), the parts and skinned detail, the piece and clips modes, the limits file and its format, the result line, the errors and the worked examples; help {"topic":"warnings"} gives every warning, its fix and how warnings are grouped.""";
 
     /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"export"}</c> returns it.</summary>
     public const string Reference =

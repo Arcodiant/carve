@@ -276,7 +276,7 @@ extension API is built ready for it.
   example; the rest of a tool's reference is a `public const string Reference`
   on its tool class, served by `help {"tool":"<name>"}` (`HelpTool.Entries` is
   the table; the description ends `More: help {...} gives ...`), or for patina
-  by `nodes`. Add a sentence to a description and re-measure it.
+  by `nodes`, or a topic (`help {"topic":...}`) for text no one tool owns. Add a sentence to a description and re-measure it.
 - **Stop only your own processes.** An agent stops only processes it started,
   identified by a command line inside its own worktree, never a test host,
   `dotnet` or a runtime machine-wide.
