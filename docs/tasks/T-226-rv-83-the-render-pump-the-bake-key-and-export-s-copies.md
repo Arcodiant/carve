@@ -75,7 +75,7 @@ Each finding of RV-83 named here, by its heading there:
 ### As built
 
 One agent, on claude-opus-5-5 (Opus 5.5). Code commit `6543ceed`. Five of the six findings are fixed; the Nit (the A, B, A
-rewrite) is not, and is a question below, its Outcome line left `—`. Every new or moved test was seen failing in a scratch copy
+rewrite) is skipped, filed off-milestone as T-229. Every new or moved test was seen failing in a scratch copy
 (`%TEMP%\t226-scratch`, `git archive` of `6543ceed`) with the five fix hunks reverted at once (each test reaches only its own
 hunk): 7 of the 8 tests below failed, `With_no_edit_the_frame_is_drawn_once_with_its_bakes` passed as it should; all pass with the fixes.
 
@@ -124,13 +124,11 @@ hunk): 7 of the 8 tests below failed, `With_no_edit_the_frame_is_drawn_once_with
   .glb's one material is `worn@strip`); seen failing on the old rule.
 - **The cancellation test** moved, unchanged in what it does, to `GraphExportCancelTests` (`Tier` `regression`, same file), so it
   runs in `server-regression`; the suites select by trait, so `tests.json` needs nothing.
-- **The A, B, A rewrite (Nit): not fixed; a question.** The bake reads its files twice besides `Read`: `Rgba` loads the top file, and
-  `GraphEvaluator`'s analysis (`Patina.Graphs.GraphValidator.Expand`, `File.ReadAllText`) reads every nested file. The top file can be
-  hashed from the very bytes the bake parses, inside `GraphSlotBake`; the nested files cannot without a hook in `Patina.Graphs`
-  (an observer of the text its analysis reads, or a reader it is given), which this member does not own. A bracketing check (hashing
-  again just before and after the evaluator is built) only narrows the window, and a write-time check depends on the file system's
-  clock granularity. Which is wanted: a small additive hook in `Patina.Graphs` (engine-free, deterministic), or the top-file fix
-  with the nested files' window recorded as a limit?
+- **The A, B, A rewrite (Nit): skipped, filed off-milestone as T-229.** Raised in two review rounds, so closed here by the person's
+  standing rule (the orchestrator's answer, 2026-11-25); not fixed in either form. What was found: the bake reads its files again
+  besides `Read`: `Rgba` loads the top file, and `GraphEvaluator`'s analysis (`Patina.Graphs.GraphValidator.Expand`,
+  `File.ReadAllText`) reads every nested file. Comparing with the bytes the bake read needs a hook in `Patina.Graphs`, which this
+  member does not own. Nothing is cached wrongly unless a graph file is rewritten and restored within one bake.
 
 **Frames.** Compared by SHA-256: this member's verify at `6543ceed` (scenario-export J-20261126-041854-7378b9, scenario-weathered
 J-20261126-041857-a6a1e5) against runs of `origin/milestone/M-29` at `8d4b6be5` queued for it (J-20261126-041906-e3f792,
