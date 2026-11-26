@@ -32,14 +32,14 @@ description: >-
 - **Severity:** Gap
 - **What is wrong:** The change adds `marble` to `LibraryStage`'s list, to the samples `tools/Patina.SampleGraphs` writes, and to `PatternSamplesTests` (with a new `TheMarbleVeinsAreThinDarkLines`), but CLAUDE.md is not in the diff. All three rows still list the old samples, and the `LibraryStage` row calls its list "every M-28 sample", which marble (T-185, off-milestone) is not. The README was updated; the layout table was not. Inferred by reading CLAUDE.md against the diff.
 
-**Outcome:** fixed: marble named in the three rows (the Patina scenario, `tools/Patina.SampleGraphs`, `tests/Patina.Graphs.Tests`)
+**Outcome:** fixed
 
 ### The README's Samples paragraph line was not rewrapped
 - **Where:** README.md, `### Samples`, the line "variant), `fabric`, `marble` (veins by `blend`'s `difference`), `painted-metal`, `floor-tiles`, `grime` (a filter graph with".
 - **Severity:** Nit
 - **What is wrong:** The inserted text makes that line about 125 characters wide, in a paragraph wrapped at about 80 like the rest of the file, including the Filters bullet this same change rewrapped. Inferred by reading.
 
-**Outcome:** fixed: the paragraph rewrapped at 80
+**Outcome:** fixed
 
 ## Summary
 
