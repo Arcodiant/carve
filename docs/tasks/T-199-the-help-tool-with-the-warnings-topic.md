@@ -40,3 +40,30 @@ The reference text no one tool owns is served by `help` as a topic, starting wit
 - **Ask, don't land.** A rule neither this file nor the milestone settles, a changed number (the 3, the 2,000, the 3,686), or a check that would be loosened goes back to the person. An assertion that moves keeps asserting the same thing; say in `### As built` which moved where.
 - Search for what reads the thing you change (`grep` over `tests/` and `scenarios/`) before changing it; do not list the readers from memory. Show each changed or new check failing on a wrong input, as a table in `### As built`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Built on Claude Sonnet 5.5, by one agent.
+
+**Topics, a public API.** `help` takes `topic` beside `tool`. The only topic is `warnings`. Registration: a second table, `HelpTool.Topics` (name, what it covers, text); adding one is one line there, plus a description naming it with `help {"topic":"name"}`. `help {}` lists the entries, then `topic warnings: ...`. Both arguments, a non-string or an unknown topic is a tool error listing the topics (and, for both, the entries). `HelpTool.Topic(name)` and `TopicNames` are for tests.
+
+**The text** is `WarningsTopic.Text` (`src/Carve.Server/WarningsTopic.cs`), headed by each `MeshWarningKind` name (ten), then check's model and graph-material warnings, T-197's grouping rule with one exact line, T-198's smooth rule with its note ending, and T-200's three levels. Export's and the clip warnings stay in their tools' entries. `CheckTool.Reference` is unchanged.
+
+**Where each moved paragraph went.** check's Warnings, UV warnings, Model warnings and Graph material warnings paragraphs left `CheckTool.Text` for the topic (their sentences kept, with the fixes; the mesh kinds got a heading each). check keeps one sentence saying warnings are define_mesh's and the edits', plus the model's and graph materials'. The pointer is `More: help {"tool":"check"} gives ...; help {"topic":"warnings"} gives every warning, its fix and how warnings are grouped.` open and export gained the same clause on their `More:` line (it must stay the last single line).
+
+**Description lengths** (before, after): check 3,650 to 2,195; open 3,225 to 3,324; export 3,305 to 3,390; help 629 to 781 (under 1,000). The limit of 3,686 is unchanged.
+
+**README**: the `help` paragraph names `help {"topic":"warnings"}`; `## Dense meshes` gains one sentence pointing to it. **CLAUDE.md**: the cut rule gains "or a topic (`help {"topic":...}`) for text no one tool owns".
+
+**Pins that moved**: `CheckToolDefinitionTests.Tools_list_has_check_and_its_description_teaches_the_fixes` reads the topic as well as the description, with the same phrases. No other test read a moved sentence (searched `tests/` and `scenarios/`). New in `HelpToolTests`: the topic whole and `help {}` listing it, every kind named, refusals in the message's words, topics and pointers matching both ways; `HelpThroughProcessTests` asks for the topic.
+
+**Failing on a wrong input**
+
+| Wrong input | Fails |
+|---|---|
+| `UvOverlap` heading renamed in the topic | `The_warnings_topic_is_returned_whole...` |
+| `NonPlanarFace` heading renamed | the same |
+| check's pointer names topic `warning` | `Every_topic_is_named_by_a_description_and_every_topic_a_description_names_exists` |
+| both arguments accepted (tool alone refused instead) | 4 tests, `A_bad_topic_or_both_arguments...` among them |
+
+Not checked: no frame is drawn. `README.md` and `CLAUDE.md` are in no suite's inputs (verify warns).
