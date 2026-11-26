@@ -1,3 +1,4 @@
+extern alias carve;
 using System.Text.Json;
 using Carve.Core.Tests;
 
@@ -67,7 +68,8 @@ public class CheckToolDefinitionTests
         var (carve, tools) = await StartAsync();
         using var _ = carve;
 
-        var text = Description(tools, "check");
+        // The warnings' fixes moved to the topic (T-199), so they are read from there.
+        var text = Description(tools, "check") + "\n" + carve::Carve.Server.HelpTool.Topic("warnings");
 
         foreach (var phrase in new[] { "inside-out", "coincident-vertices", "duplicate-face", "invisible", "collision", "z-fight", "reverse", "move", "define_mesh", "call delete, which keeps every id", "1 unit = 1 m", "y = 0", "Worked example" })
             Assert.Contains(phrase, text);
