@@ -166,8 +166,8 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         return texture is not null;
     }
 
-    /// <summary>The missing-file error: the resolved path and the .png files that are in its folder.</summary>
-    internal static string Missing(ToolPath target)
+    /// <summary>The missing-file error: the resolved path and the files of <paramref name="extension"/> (.png unless named) that are in its folder.</summary>
+    internal static string Missing(ToolPath target, string extension = ".png")
     {
         var folder = Path.GetDirectoryName(target.FullPath)!;
         var head = $"no file at {target.FullPath}; ";
@@ -177,7 +177,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         try
         {
             names = Directory.EnumerateFiles(folder).Select(f => Path.GetFileName(f)!)
-                .Where(n => n.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                .Where(n => n.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(n => n, StringComparer.Ordinal).ToList();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -186,10 +186,10 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         }
 
         var inv = CultureInfo.InvariantCulture;
-        if (names.Count == 0) return head + $"there are no .png files in {folder}";
+        if (names.Count == 0) return head + $"there are no {extension} files in {folder}";
         var shown = string.Join(", ", names.Take(OpenTool.ListLimit));
         var rest = names.Count > OpenTool.ListLimit ? $", and {(names.Count - OpenTool.ListLimit).ToString(inv)} more" : "";
-        return head + $"the .png files in {folder} ({names.Count.ToString(inv)}) are: {shown}{rest}";
+        return head + $"the {extension} files in {folder} ({names.Count.ToString(inv)}) are: {shown}{rest}";
     }
 }
 

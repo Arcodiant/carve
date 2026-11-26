@@ -111,6 +111,7 @@ A model holds named meshes. `define_mesh` with a `name` adds a mesh, or replaces
 - `set_colour` colours faces, or a group, with sRGB hex: `{"colour":"#C8503C","faces":[0,1]}`. Export writes one matte material per colour.
 - `set_shading` makes a mesh `smooth` (or `flat`, the default): `{"shading":"smooth"}`. Under smooth, `mark_edges` keeps chosen edges creased: `{"edges":[[0,1]],"hard":true}`.
 - `subdivide` rounds a mesh off by Catmull-Clark, 1 to 3 levels: `{"levels":1}`. Every id stays, new ones are appended, and hard edges stay sharp.
+- `displace` roughens a mesh in its geometry: each vertex moves along its normal by `amount` x (h - `midlevel`), h read from a patina graph's greyscale output at the vertex's UVs (`{"source":{"graph":"rock.texgraph","output":"height"},"amount":0.1}`) or from seeded 3D noise at its position (`{"source":{"noise":{"seed":7,"scale":0.35,"octaves":5}},"amount":0.6}`). `axis` moves along one direction instead (terrain), and `vertices`, `faces` or `group` displace part of the mesh. Only positions change. `samples/boulder.carve` is the cube subdivided 3 levels, displaced by that noise and set smooth; `samples/boulder.png` is its front frame from scenario-cuts.
 
 `render` and `export` draw the same normals, so a smooth mesh looks the same in the game.
 

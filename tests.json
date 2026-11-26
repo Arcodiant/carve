@@ -100,7 +100,8 @@
         "samples/gardener-soft.carve",
         "samples/gatehouse.carve",
         "samples/leaky-shed.carve",
-        "samples/gardener.carve"
+        "samples/gardener.carve",
+        "samples/boulder.carve"
       ],
       "resources": "cpu",
       "est-seconds": 24
