@@ -49,8 +49,9 @@ suite, its tier, its command and the files it reads, and `cairn test list` print
 them with the device each needs and about how long it takes. By tier:
 
 - unit, no GPU: `core-unit` and `server-unit` (the two above), `graphs-unit` (the
-  graph library) and `patina-unit` (patina's graphs and its server).
-- regression, no GPU: `patina-regression`.
+  graph library), `patina-unit` (patina's graphs and its server) and
+  `weathering-unit` (the weathering acceptance project's round-free fact).
+- regression, no GPU: `graphs-regression` and `patina-regression`.
 - regression, on a Vulkan device: `server-regression`, `viewer-cube`, and the
   scenarios under `scenarios/`, each a run through the real server:
   `scenario-cube`, `-sky`, `-rig`, `-crate`, `-uvs`, `-shed`, `-export`,

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- T-168: the checks on a weathering acceptance round folder (transcript.jsonl, wrench-weathered.carve, game/Content/models/wrench.glb). Read CARVE_WEATHERING_RUN and skipped when it is unset; no suite of its own. -->
+  <!-- T-168: the checks on a weathering acceptance round folder (transcript.jsonl, wrench-weathered.carve, game/Content/models/wrench.glb). The checks read CARVE_WEATHERING_RUN and are skipped when it is unset (regression tier, no suite); CreviceSetTests needs no round and is run by weathering-unit. -->
   <PropertyGroup>
     <RootNamespace>Carve.WeatheringAcceptance.Tests</RootNamespace>
     <IsPackable>false</IsPackable>

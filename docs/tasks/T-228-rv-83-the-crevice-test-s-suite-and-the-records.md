@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** — (none)
 
-**Verify:** server-unit
+**Verify:** weathering-unit
 
 ## Goal
 
@@ -58,3 +58,15 @@ Each finding of RV-83 named here, by its heading there:
 - The member sets the `**Outcome:**` line of each of its findings in RV-83 to a bare `fixed` (`cairn lint` accepts
   nothing after it) or `no change needed: <reason>`, and touches no other finding's line. Commits and test names go
   in this member's `### As built`.
+
+### As built
+
+Run on Sonnet 5.5 (`claude-sonnet-5-5`). All in this member's one code commit (the commit is `T-228: the crevice test's suite and the records`, on `task/T-228`).
+
+- **The crevice test's suite.** `The_crevice_set_holds_no_texel_of_a_face_that_is_not_a_drive_side` moved to a new class `CreviceSetTests` (`tests/Carve.WeatheringAcceptance.Tests/CreviceSetTests.cs`, `Tier` `unit`), in the same project so it reaches `DriveSides` and `CreviceTexels` (internal) without a copy. It takes about 0.4 s (375 ms in the scratch run), so `unit` is true of it. New suite `weathering-unit` in `tests.json` (`--filter Tier!=regression`; inputs: the project's `dotnet-closure`, the linked `tests/Carve.CharacterLoad.Tests/RunContent.cs`, `samples/wrench.carve`); this member's `**Verify:**` names it. Shown failing: in a scratch copy under `%TEMP%\t228-scratch`, `DriveSides`'s `< 0.5f` made `< 1.5f` (every drive face counts as a side): the test fails ("Collections differ", 398 ms). The worktree was never broken. `verify` passed `weathering-unit` (24 s).
+- **T-168's records.** The table row and the comparison line name 49.143 / 24.862 as the set that counted face 99, and the comparison also gives 48.1 / 24.6 (set first ruled) and 40.297 / 15.206 (side faces, 2026-11-25); the paragraph says "above" and names the three sets. I did not re-read the Negatives table's figures against a set (the paragraph says only that they were not re-read).
+- **CLAUDE.md.** The acceptance project's row is rewritten from the code: six round checks (session model and no file tool; missing-graph message and next steel `define_material`; saved file v10 with a mesh-reading steel graph; hard-edge and drive-crevice bake of the steel slot; grip held to the starter's grip as the saved file draws it, not a part of the steel bake; glb loads) and `CreviceSetTests` (no round, `unit`, run by `weathering-unit`).
+- **README.md.** Unit list adds `weathering-unit`, regression list adds `graphs-regression`. Checked against `tests.json`'s ids: the regression no-GPU line now has both; I did not re-audit the Vulkan list beyond that.
+- **T-220's As built** now names `45f7b023`, the commit on `milestone/M-29` (`git log`).
+- The five findings' `**Outcome:**` lines in RV-83 are `fixed`.
+- Not checked: that the test's name appears in the suite's log (verify reports the suite as passed; I saw the test by name only in the scratch run).

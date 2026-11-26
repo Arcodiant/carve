@@ -61,7 +61,7 @@ Each finding of RV-82 named here, by its heading there:
 
 ### As built
 
-Run on Sonnet 5.5. All in 4a69443e.
+Run on Sonnet 5.5. All in 45f7b023.
 
 - **reads_mesh:** a clause in define_material's description ("whether the graph reads the mesh; null if its file cannot be read now") and one in get_mesh's ("as define_material reports it"), a sentence in README. To fit, define_material's "A face has either a colour or a material..." sentence moved word for word to its entry, and get_mesh's "Coordinates are in metres..." sentence to its entry. Test: `HelpToolTests.The_graph_sentences_are_in_the_descriptions_and_reads_mesh_is_said_where_it_is_answered`.
 - **render:** the `image` clause now gives the form {graph, output, size}, the real curvature, occlusion, masks and position, any role or named output, and the power-of-two size rule from 64 to 4096 kept apart from the frame's. The caption form and the refusals remain only in the entry (the rule asked for form, what it draws and the size rule). Moved word for word to the end of render's entry: "Try the other view, or fix the winding..." and "Tool errors leave the mesh untouched...". Same test.
