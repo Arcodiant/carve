@@ -61,7 +61,7 @@ Each finding of RV-83 named here, by its heading there:
 
 ### As built
 
-Run on Sonnet 5.5 (`claude-sonnet-5-5`). All in this member's one code commit (the commit is `T-228: the crevice test's suite and the records`, on `task/T-228`).
+Run on Sonnet 5.5 (`claude-sonnet-5-5`). All in this member's one code commit (`git log` on `task/T-228`: "the crevice test runs in weathering-unit, and the records say what is true").
 
 - **The crevice test's suite.** `The_crevice_set_holds_no_texel_of_a_face_that_is_not_a_drive_side` moved to a new class `CreviceSetTests` (`tests/Carve.WeatheringAcceptance.Tests/CreviceSetTests.cs`, `Tier` `unit`), in the same project so it reaches `DriveSides` and `CreviceTexels` (internal) without a copy. It takes about 0.4 s (375 ms in the scratch run), so `unit` is true of it. New suite `weathering-unit` in `tests.json` (`--filter Tier!=regression`; inputs: the project's `dotnet-closure`, the linked `tests/Carve.CharacterLoad.Tests/RunContent.cs`, `samples/wrench.carve`); this member's `**Verify:**` names it. Shown failing: in a scratch copy under `%TEMP%\t228-scratch`, `DriveSides`'s `< 0.5f` made `< 1.5f` (every drive face counts as a side): the test fails ("Collections differ", 398 ms). The worktree was never broken. `verify` passed `weathering-unit` (24 s).
 - **T-168's records.** The table row and the comparison line name 49.143 / 24.862 as the set that counted face 99, and the comparison also gives 48.1 / 24.6 (set first ruled) and 40.297 / 15.206 (side faces, 2026-11-25); the paragraph says "above" and names the three sets. I did not re-read the Negatives table's figures against a set (the paragraph says only that they were not re-read).
