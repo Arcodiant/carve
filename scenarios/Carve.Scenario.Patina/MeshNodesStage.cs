@@ -10,7 +10,8 @@ namespace Carve.Scenario.Patina;
 /// the tools, swatched (sheet and sphere), its title and results naming the neutral mesh inputs, <c>wear</c> black on every
 /// texel and the base colour the clean iron (the same graph exported with wear_amount 0), then saved, opened and exported,
 /// every PNG compared byte for byte with samples/graphs/weathered-iron/. The title's note is judged by how far the title
-/// runs past the same graph's with no mesh node. One break, made here: that check run on the plain title, which has no note, must fail.
+/// runs past the same graph's with no mesh node. One break, made here: that check run on a second plain sheet's title, captured
+/// apart and presented as the mesh graph's, must fail.
 /// Writes mesh-nodes-breaks.txt.
 /// </summary>
 internal sealed class MeshNodesStage : IPatinaStage
@@ -41,6 +42,9 @@ internal sealed class MeshNodesStage : IPatinaStage
         checks.Check(!plainText.Contains("mesh inputs", StringComparison.Ordinal), "mesh nodes: a graph with no mesh node was given the note: " + plainText);
         var plain = TitleExtent(await driver.CaptureToolAsync("swatch", "mesh-nodes-plain-sheet", new { view = "sheet" }));
         CheckTitleNote(checks, extent, plain);
+        // The break's own capture (RV-83): the same plain graph swatched again, measured apart. Taken here, before save names a
+        // file: a sheet drawn after save and open has a longer title (run J-20261126-040901-4df0ed measured x 338 against 258).
+        var second = TitleExtent(await driver.CaptureToolAsync("swatch", "mesh-nodes-break-plain-sheet", new { view = "sheet" }));
 
         await checks.CallAsync("define_graph", define);
         var texels = Path.Combine(driver.RunFolder, "mesh-nodes-export");
@@ -72,10 +76,11 @@ internal sealed class MeshNodesStage : IPatinaStage
             checks.Check(File.ReadAllBytes(Path.Combine(again, file)).AsSpan().SequenceEqual(committed), $"mesh nodes: {file} exported from the opened graph is not the sample's bytes");
         }
 
-        // The break, made here (RV-82): the same check run on a title with no note, the plain sheet's, must fail on its own.
+        // The break, made here (RV-83, the person's ruling): the second plain sheet, a title the product drew with no note,
+        // presented as the mesh graph's to the same check, must fail.
         var probe = new PatinaChecks(driver);
-        CheckTitleNote(probe, plain, plain);
-        var log = new StringBuilder("== the title-note check on the plain sheet's title, which has no note\n");
+        CheckTitleNote(probe, second, plain);
+        var log = new StringBuilder($"== the title-note check on a second plain sheet's title (x {second}), which has no note, against the plain sheet's (x {plain})\n");
         foreach (var failure in probe.Failures) log.AppendLine("  " + failure);
         checks.Check(probe.Failures.Count > 0, "mesh nodes: the title without its note was accepted");
         File.WriteAllText(Path.Combine(driver.RunFolder, "mesh-nodes-breaks.txt"), log.ToString());

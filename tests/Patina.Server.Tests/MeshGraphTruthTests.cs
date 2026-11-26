@@ -118,6 +118,26 @@ public class MeshGraphTruthTests
         Assert.DoesNotContain("neutral", messages[("one-value", "wear")], StringComparison.Ordinal);
     }
 
+    /// <summary>RV-83's probe: a mesh-reading output clipped flat by its own levels is flat in carve too, so its text must not
+    /// say it needs no fix, nor name a carve check that judges it (carve's check evaluates no graph); it says how to find out and what then.</summary>
+    [Fact]
+    public async Task A_mesh_output_flat_by_its_own_levels_is_told_how_to_find_out_and_what_to_do()
+    {
+        await using var patina = await PatinaHarness.StartAsync();
+        await patina.Ok("define_graph", """{"graph":{"version":1,"size":32,"seed":0,"nodes":{"c":{"type":"mesh_curvature","params":{"width":0.02}},"w":{"type":"levels","inputs":{"in":"c"},"params":{"in_low":0,"in_high":0}},"o":{"type":"output","inputs":{"in":"w"},"params":{"name":"wear"}}}}}""");
+        var report = JsonDocument.Parse(await patina.Ok("check", "{}")).RootElement;
+        var problem = Assert.Single(report.GetProperty("problems").EnumerateArray());
+        Assert.Equal(("one-value", "wear"), (problem.GetProperty("check").GetString(), problem.GetProperty("output").GetString()));
+        var message = problem.GetProperty("message").GetString()!;
+        Assert.EndsWith(CheckTool.NeutralFix, message, StringComparison.Ordinal);
+        Assert.Contains("may be flat only for that", message, StringComparison.Ordinal);
+        Assert.Contains("render mode 'uvs' with image {graph: the .texgraph's path, output: this output's name, size}", message, StringComparison.Ordinal);
+        Assert.EndsWith("if it is flat there too, widen its levels.", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("none here", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("check there", message, StringComparison.Ordinal);
+        Assert.False(report.GetProperty("ok").GetBoolean()); // the verdict is the rule's, unchanged
+    }
+
     [Theory]
     [InlineData("""{"view":"flat"}""")]
     [InlineData("""{"view":"tiled"}""")]
