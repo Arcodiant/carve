@@ -16,3 +16,4 @@
 - T-217: RV-82: the bake's key, validation of mesh parameters, and the graphs suites
 - T-220: RV-82: the descriptions and docs findings
 - T-218: RV-82: the server's render, export and error findings
+- T-219: RV-82: patina's findings
