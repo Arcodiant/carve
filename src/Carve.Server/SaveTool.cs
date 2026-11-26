@@ -101,12 +101,12 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         + "which leaves any file already there as it was and no partial file. "
         + "The result line, after the bones and clips, then has a line \"warning: the texture '<path>' (<where it is used>) is no longer at its path; ...\" for each texture whose PNG has been moved or deleted since define_material or open read it, since open reads the PNG again and refuses the file until it is back (save still writes the file).\n";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SaveTool>("save", Text, WithMesh(PathSchema("The .carve file to write, absolute or relative to carve's working directory; replaced if it exists."),
-        "The one mesh to write, by name, with the skeleton and clips when it has weights; of a part tree, that part's own geometry and kept levels at the origin (not an instance or an empty). Left out, the whole model is written."));
+    public static McpServerTool Create() => MeshToolSupport.Create<SaveTool>("save", Text, WithVerbosity(WithMesh(PathSchema("The .carve file to write, absolute or relative to carve's working directory; replaced if it exists."),
+        "The one mesh to write, by name, with the skeleton and clips when it has weights; of a part tree, that part's own geometry and kept levels at the origin (not an instance or an empty). Left out, the whole model is written.")));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        if (PathAndMeshArguments("save", context, path, mesh, out var text, out var name) is { } refused) return refused;
+        if (PathAndMeshArguments("save", context, path, mesh, verbosity, out var text, out var name, out var level) is { } refused) return refused;
 
         var current = store.Current;
         var model = current.Model;
@@ -128,9 +128,9 @@ public sealed class SaveTool(ModelStore store, ToolFolder toolFolder)
         if (!ToolPaths.Write("save", target, bytes, out var replaced, out var writeError)) return Error(writeError!);
 
         var warnings = ClipChecks.Check(model);
-        return Line($"saved {target.Written(replaced)}: {Summary(model)}"
+        return Quiet(Line($"saved {target.Written(replaced)}: {Summary(model)}"
             + WarningsSuffix(warnings)
-            + string.Concat(MissingTextures(model).Select(w => "\nwarning: " + w)));
+            + string.Concat(MissingTextures(model).Select(w => "\nwarning: " + w))), level);
     }
 
     /// <summary>

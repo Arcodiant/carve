@@ -22,19 +22,8 @@ public sealed class VerbosityToolTests
     private static readonly string[] Readers =
         ["get_mesh", "get_parts", "get_skeleton", "get_weights", "get_clips", "select", "render", "render_glb", "help"];
 
-    /// <summary>
-    /// The tools still to take <c>verbosity</c>: T-201's (its nineteen, and displace, which the person gave it on
-    /// 2026-11-26) and T-202's unwrap, which those tasks empty.
-    /// </summary>
-    private static readonly string[] ToDo =
-    [
-        // T-201
-        "define_part", "keep_level", "define_group", "set_colour", "define_material", "set_material", "set_shading", "mark_edges",
-        "set_uvs", "project_uvs", "define_skeleton", "set_weights", "weigh", "define_clip", "delete_clip", "define_target",
-        "delete_target", "save", "bake", "displace",
-        // T-202
-        "unwrap",
-    ];
+    /// <summary>The tools still to take <c>verbosity</c>: T-202's unwrap, which that task empties.</summary>
+    private static readonly string[] ToDo = ["unwrap"];
 
     /// <summary>Each tool here: the calls that set it up, a call that succeeds, and a call that is a tool error.</summary>
     public static TheoryData<string, string[], string, string> Tools => new()
@@ -53,7 +42,34 @@ public sealed class VerbosityToolTests
         { "open", ["define_mesh " + Cube, """save {"path":"v.carve"}""", """move {"faces":[3],"by":[0,0.5,0]}"""], """{"path":"v.carve"}""", """{"path":"missing.carve"}""" },
         { "check", ["define_mesh " + Cube], "{}", """{"mesh":"nope"}""" },
         { "export", ["define_mesh " + Cube], """{"path":"v.glb"}""", """{"path":"v.txt"}""" },
+        { "define_part", ["define_mesh " + Cube], """{"part":"p","translation":[0,1,0]}""", """{"part":"p","scale":[0,1,1]}""" },
+        { "keep_level", ["define_mesh " + Cube], """{"level":0}""", """{"level":"x"}""" },
+        { "define_group", ["define_mesh " + Cube], """{"name":"g","faces":[0,1]}""", """{"name":"g","faces":[99]}""" },
+        { "set_colour", ["define_mesh " + Cube], """{"colour":"#C8503C","faces":[1]}""", """{"colour":"red","faces":[1]}""" },
+        { "define_material", ["define_mesh " + Cube], """{"name":"m","roughness":0.25}""", """{"name":"m","roughness":2}""" },
+        { "set_material", ["define_mesh " + Cube, """define_material {"name":"m","roughness":0.25}"""], """{"material":"m","faces":[2]}""", """{"material":"nope","faces":[2]}""" },
+        { "set_shading", ["define_mesh " + Cube], """{"shading":"smooth"}""", """{"shading":"round"}""" },
+        { "mark_edges", ["define_mesh " + Cube], """{"edges":[[0,3]]}""", """{"edges":[[0,6]]}""" },
+        { "set_uvs", ["define_mesh " + Cube], """{"faces":[{"face":0,"uv":[[0,0],[1,0],[1,1],[0,1]]}]}""", """{"faces":[{"face":99,"uv":[[0,0],[1,0],[1,1],[0,1]]}]}""" },
+        { "project_uvs", ["define_mesh " + Cube], """{"method":"box"}""", """{"method":"cube"}""" },
+        { "define_skeleton", ["define_mesh " + Cube], Rig, """{"bones":[{"name":"a","parent":"zz","position":[0,0,0],"rotation":[0,0,0,1]}]}""" },
+        { "set_weights", ["define_mesh " + Cube, "define_skeleton " + Rig], """{"vertices":[0,1,2,3,4,5,6,7],"weights":{"base":1}}""", """{"vertices":[0,1,2,3,4,5,6,7],"weights":{"nope":1}}""" },
+        { "weigh", ["define_mesh " + Cube, "define_skeleton " + Rig], "{}", """{"bones":["nope"]}""" },
+        { "define_clip", ["define_mesh " + Cube, "define_skeleton " + Rig], Wave, """{"name":"w","duration":-1,"channels":{}}""" },
+        { "delete_clip", ["define_mesh " + Cube, "define_skeleton " + Rig, "define_clip " + Wave], """{"name":"wave"}""", """{"name":"zz"}""" },
+        { "define_target", ["define_mesh " + Cube], Bulge, """{"name":"Bulge","positions":{"99":[0,0,0]}}""" },
+        { "delete_target", ["define_mesh " + Cube, "define_target " + Bulge], """{"name":"Bulge"}""", """{"name":"zz"}""" },
+        { "save", ["define_mesh " + Cube], """{"path":"v.carve"}""", """{"path":"v.txt"}""" },
+        { "bake", ["define_mesh " + Cube, """project_uvs {"method":"box"}"""], """{"size":64,"padding":0,"maps":["normal"],"bevel":{"width":0.1}}""", """{"size":64,"maps":["nope"]}""" },
+        { "displace", ["define_mesh " + Cube, """subdivide {"levels":2}"""], """{"source":{"noise":{"seed":7,"scale":0.35,"octaves":5}},"amount":0.6}""", """{"amount":"x"}""" },
     };
+
+    private const string Rig = """{"bones":[{"name":"base","parent":null,"position":[0,0,0],"rotation":[0,0,0,1]},{"name":"joint","parent":"base","position":[0,1,0],"rotation":[0,0,0,1]}]}""";
+
+    private const string Wave =
+        """{"name":"wave","duration":1,"loop":true,"channels":{"joint":{"rotation":{"interpolation":"LINEAR","keys":[{"time":0,"value":[0,0,0,1]},{"time":0.5,"value":[0,0,0.70710677,0.70710677]},{"time":1,"value":[0,0,0,1]}]}}}}""";
+
+    private const string Bulge = """{"name":"Bulge","positions":{"2":[1.1,1.3,-0.1],"3":[-0.1,1.3,-0.1],"6":[1.1,1.3,1.1],"7":[-0.1,1.3,1.1]}}""";
 
     private static string With(string arguments, string verbosity) =>
         arguments.TrimEnd()[..^1] + (arguments.Trim() == "{}" ? "" : ",") + $"\"verbosity\":\"{verbosity}\"}}";
@@ -77,9 +93,20 @@ public sealed class VerbosityToolTests
         return carve;
     }
 
-    /// <summary>What the call left: the model as get_mesh reads it, and the files in the folder.</summary>
+    /// <summary>What the call left: the model as the get_* tools read it, and the files in the folder.</summary>
     private static async Task<string> State(ToolHarness carve, string folder) =>
-        Text(await carve.CallToolAsync("get_mesh", "{}")) + "|" + string.Join(",", Directory.GetFiles(folder).Select(Path.GetFileName).Order());
+        string.Join("|", await Task.WhenAll(new[] { "get_mesh", "get_parts", "get_skeleton", "get_weights", "get_clips" }.Select(async t => Text(await carve.CallToolAsync(t, "{}"))))) + "|" + await Saved(carve, folder) + "|" + string.Join(",", Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(folder, f)).Order());
+
+    /// <summary>The model as a file holds it, which shows what no get_* does (shading, hard edges); the file is removed again.</summary>
+    private static async Task<string> Saved(ToolHarness carve, string folder)
+    {
+        var path = Path.Combine(folder, "state.carve");
+        await carve.CallToolAsync("save", $"{{\"path\":{JsonSerializer.Serialize(path)}}}");
+        if (!File.Exists(path)) return "no model";
+        var text = await File.ReadAllTextAsync(path);
+        File.Delete(path);
+        return text;
+    }
 
     [Theory]
     [MemberData(nameof(Tools))]
@@ -97,7 +124,8 @@ public sealed class VerbosityToolTests
                 await using var carve = await Start(folder, setup);
                 var before = await State(carve, folder);
                 var result = await carve.CallToolAsync(tool, level == "" ? args : With(args, level));
-                return (Text(result), IsError(result), before, await State(carve, folder));
+                // bake times each map ("ms"), which differs from run to run.
+                return (System.Text.RegularExpressions.Regex.Replace(Text(result), "\"ms\":[0-9]+", "\"ms\":0"), IsError(result), before, await State(carve, folder));
             }
 
             var plain = await Run("", arguments);
@@ -142,6 +170,19 @@ public sealed class VerbosityToolTests
         {
             Directory.Delete(root, true);
         }
+    }
+
+    /// <summary>displace shortens its list of warnings at summary, so full is the one that lists every one (T-201).</summary>
+    [Fact]
+    public async Task Full_on_displace_lists_every_open_edge()
+    {
+        await using var carve = await Start(Path.GetTempPath(), ["define_mesh " + Cube, """delete {"faces":[3]}"""]);
+        const string Arguments = """{"source":{"noise":{"seed":7,"scale":0.35,"octaves":5}},"amount":0.01,"verbosity":"VERB"}""";
+        var summary = JsonDocument.Parse(Text(await carve.CallToolAsync("displace", Arguments.Replace("VERB", "summary")))).RootElement.GetProperty("warnings");
+        await carve.CallToolAsync("undo", "{}");
+        var full = JsonDocument.Parse(Text(await carve.CallToolAsync("displace", Arguments.Replace("VERB", "full")))).RootElement.GetProperty("warnings");
+        Assert.True(full.GetArrayLength() > summary.GetArrayLength(), full.ToString());
+        Assert.All(full.EnumerateArray(), w => Assert.DoesNotContain("e.g.", w.GetString()));
     }
 
     [Fact]
