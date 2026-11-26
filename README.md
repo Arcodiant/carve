@@ -341,9 +341,12 @@ an `input`) and `old-wall` (the bricks and the grime used as `graph` nodes).
 `weathered-iron` and `weathered-staves` read the mesh (`mesh_curvature`, `mesh_occlusion`,
 `mesh_mask`, `mesh_position`): patina has no mesh, so it evaluates those nodes on neutral
 stand-ins (curvature 0.5, occlusion 1, mask 1, position `#808080`) and says so in `get_graph`,
-`open`, `swatch`, `export` and `check`; the real maps come from the mesh when a carve
+`open`, `swatch`, `export`, `check` and `save`, also for a graph that nests one (the node
+named as expanded, `g/edges`); the real maps come from the mesh when a carve
 material names the graph. Their PNGs are the neutral ones (`wear` and `grime` are black),
-so `check` reports `one-value` on those two outputs and nothing else.
+so `check` reports `one-value` on those two outputs and nothing else, its fix saying they are
+flat because the mesh inputs are neutral here, not to widen their levels (any output reading a
+mesh node, nested or not, is told the same).
 `samples/graphs/faults/` holds two graphs that `check` finds faults in.
 
 ### A worked example

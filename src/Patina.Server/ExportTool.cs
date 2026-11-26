@@ -208,7 +208,7 @@ public sealed class ExportTool(GraphStore store, NodeRegistry registry, ToolFold
                     : "no Carve slot (a named output)";
                 lines.Add($"- {OutputRoles.FileOf(role)}: {pixels}x{pixels}, {length.ToString(CultureInfo.InvariantCulture)} bytes{(replaced ? " (replaced)" : "")}, {slot}");
             }
-            return Line($"export: wrote {Count(lines.Count, "file")} to {target} at size {pixels}{(overrides.Count == 0 ? "" : ", parameters " + GraphParameters.Describe(overrides))}\n" + string.Join("\n", lines) + (MeshNote(graph) is { Length: > 0 } meshNote ? "\n" + meshNote : ""));
+            return Line($"export: wrote {Count(lines.Count, "file")} to {target} at size {pixels}{(overrides.Count == 0 ? "" : ", parameters " + GraphParameters.Describe(overrides))}\n" + string.Join("\n", lines) + (MeshNote(graph, registry) is { Length: > 0 } meshNote ? "\n" + meshNote : ""));
         }
         finally
         {

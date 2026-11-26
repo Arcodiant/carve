@@ -261,7 +261,7 @@ Every answer matched the descriptions. The length test measures the served `tool
 - **Rubric:** Correctness (a wrong answer presented as right, then a useless error on reachable input); tests cover Scope (no patina test of a faulted mesh node)
 - **What is wrong:** `mesh_mask`'s "exactly one of group or material" and the "above 0" rule for `mesh_curvature.width` and `mesh_occlusion.reach` are enforced only by `MeshParameterException` at evaluation, because the declared ranges start at 0 and the validator cannot check "one of". I ran a probe on `PatinaHarness` in a scratch copy with four graphs: `mesh_mask` with no params, `mesh_mask` with both `group` and `material`, `mesh_curvature` width 0, and `mesh_occlusion` reach 0. For each one, `define_graph` answered `no faults: it evaluates` and `save` wrote the file. Then `export`, `swatch` (flat) and `check` each came back `isError` with only the SDK's generic `An error occurred invoking 'export'.` (or `'swatch'`, `'check'`). The error names no node and no rule, so the agent has nothing to fix from. carve does handle this: `MeshParameterException` derives from `MeshMapsException`, which `GraphSlotProblem.IsCause` (`src/Carve.Server/GraphSlotProblem.cs:64`) turns into a named error. patina, which the person chose as the place to author these graphs, does not. Note for the Core and `Carve.Graphs` reviewer: the root cause is on that side of the line.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### A graph that nests a mesh-reading graph gets no note in any answer, and check calls its mask broken
 - **Where:** `src/Patina.Server/ToolSupport.cs:87-91` (`MeshNote` reads `graph.Nodes` only)
@@ -276,7 +276,7 @@ Every answer matched the descriptions. The length test measures the served `tool
 
   Nesting is how the samples themselves are built (`weathered-staves` nests `planks`), so an agent that layers `weathered-staves` or `weathered-iron` into another graph hits this case. The fix is one recursion over `GraphValidator.Uses` (`OpenTool` already calls it).
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The scenario's break cannot fail on its own: it negates a looser form of the check on the same two numbers
 - **Where:** `scenarios/Carve.Scenario.Patina/MeshNodesStage.cs:43-44, 74-80`
@@ -284,7 +284,7 @@ Every answer matched the descriptions. The length test measures the served `tool
 - **Rubric:** A check that cannot catch what it is there for (the break is meant to prove the title check)
 - **What is wrong:** The check is `extent - plain >= 80`. The break runs `probe.Check(extent - plain < 8)` on the same `extent` and `plain` and requires it to fail. Whenever the real check passes (a gap of 80 or more), the break fails automatically, so `mesh-nodes-breaks.txt` records a failure that proves nothing. The rule is never run on a title that lacks the note. An honest break would apply the real rule (gap of at least 80) to two titles that have no note, for example `plain` against a second capture of the plain sheet, and show that it fails. Separately, because the title's text is not decoded, any suffix of about 10 or more characters passes as "the note". As built discloses this ("text is not decoded"), so I list it here only as context.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### The worked-example test only validates the examples, so it cannot catch what the changed `mesh_curvature` caption claims
 - **Where:** `tests/Patina.Server.Tests/NodeToolTests.cs:50-62`; the caption is at `src/Patina.Server/NodeCatalogue.cs:133`
@@ -297,7 +297,7 @@ Every answer matched the descriptions. The length test measures the served `tool
 
   The caption is true today. Nothing holds it true.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### swatch's mesh note is in no unit test, and the sphere, tiled and sheet captions' note in no test at all
 - **Where:** `tests/Patina.Server.Tests/MeshNodeToolTests.cs:36-52`; `src/Patina.Server/SwatchTool.cs:119-121`
@@ -305,7 +305,7 @@ Every answer matched the descriptions. The length test measures the served `tool
 - **Rubric:** Tests cover Scope ("Tests (`patina-unit`): every tool with a mesh-node graph ... the notes")
 - **What is wrong:** `Every_tool_takes_a_mesh_graph_and_says_the_inputs_are_neutral` covers `define_graph`, `get_graph`, `edit_graph`, `save`, `open`, `export` and `check`, but not `swatch`. The harness serves swatch's flat and tiled views without an engine (my probe called flat through it). The swatch note is held only by the GPU scenario, which checks the flat view's text and the sheet title's pixel width. Nothing in either tier checks the note on the tiled, sphere, cube or sheet text results, though `Show` adds it to all of them.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### `CheckSamplesTests` skips by file name, and its stand-in covers only the two names it lists
 - **Where:** `tests/Patina.Graphs.Tests/CheckSamplesTests.cs:31-34`; `tests/Patina.Server.Tests/MeshNodeToolTests.cs:75-105`
@@ -313,7 +313,7 @@ Every answer matched the descriptions. The length test measures the served `tool
 - **Rubric:** Tests cover Scope (judge whether the replacement checks are equal)
 - **What is wrong:** For these two graphs the checks are equal. Both use the same `CheckRules` at `graph.Size` and the same no-faults load. The only difference is the expected `one-value` on `wear` or `grime`, which T-162's Notes record. The PNG equality is held by `The_committed_pngs_equal_the_graph`, and canonical text by `NestedGraphTests.A_file_without_graph_or_input_nodes_is_unchanged_by_the_expansion`, which reads every sample. But the skip keys on the `weathered-` prefix, while the replacement names its two graphs in `InlineData`. A third `weathered-*.texgraph` would therefore be clean-checked by neither, and its PNGs compared by neither. Keying the skip on "has a mesh node", and having the server test take the same `MemberData`, would close that gap.
 
-**Outcome:** —
+**Outcome:** fixed
 
 ### As built leaves open what patina's output gained; Carve.Core is new to it
 - **Where:** `docs/tasks/T-162-patina-knows-the-mesh-nodes-and-the-weathered-sample-graphs.md:106`
@@ -321,7 +321,7 @@ Every answer matched the descriptions. The length test measures the served `tool
 - **Rubric:** Tracker hygiene (Notes asked As built to say what the publish folder gained; planning listed it as not checked)
 - **What is wrong:** As built says "`Carve.Graphs.dll` (and `Carve.Core.dll` if not already there)". It was not already there. On `main`, patina references `Carve.Extensibility`, `Carve.Hosting` and `Patina.Graphs`, and none of those references `Carve.Core`. A scratch Debug build of patina now has `Carve.Core.dll` (597,504 B) and `Carve.Graphs.dll` (39,936 B), and no other new assembly; `Carve.Core` and `Carve.Graphs` take no package references. `PatinaReferencesNoExtensionTests` still passes, so no extension, engine or scenario library is reachable. All of carve's model library is now loaded in patina, which also loads extensions, and this is not recorded anywhere.
 
-**Outcome:** —
+**Outcome:** fixed
 
 **Covered:** I read these whole: T-162's file, the milestone's file, the diff of `src/Patina.Server` (Program, ToolSupport, FileTools, CheckTool, ExportTool, SwatchTool, NodeCatalogue, csproj), `tools/Patina.SampleGraphs`, both weathered graphs, `MeshNodesStage.cs`, `MeshNodeToolTests`, `NodeToolTests`' changes, `CheckSamplesTests`, `ProductReferenceGuard`, the patina reference tests, `Carve.Graphs`' `MeshNodes`/`MeshMaskNode`/`MeshCurvatureNode`, T-168's commit to the example (`d09e21a`), and the `patina-unit`, `scenario-patina` and `server-unit` inputs in `tests.json`. In a scratch copy I ran the `MeshNodeToolTests` and `NodeToolTests` (15 pass, length test included; it measures `tools/list` as served through `Program.AddTools`) and a probe test on `PatinaHarness`, and ran `tools/Patina.SampleGraphs`. What the probes showed:
 - **Sample PNGs:** the tool reproduces every committed PNG byte for byte and prints `(mesh inputs neutral)` on the two weathered lines. `wear.png` and `grime.png` have no non-zero colour byte and full alpha. The staves' four shared PNGs are byte-equal to the planks' files.

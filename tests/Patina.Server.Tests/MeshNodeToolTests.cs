@@ -3,6 +3,7 @@ using Patina.Graphs;
 using Patina.Graphs.Checks;
 using Patina.Graphs.Evaluation;
 using Patina.Graphs.Imaging;
+using Patina.Graphs.Nodes;
 using StbImageSharp;
 
 namespace Patina.Server.Tests;
@@ -72,11 +73,34 @@ public class MeshNodeToolTests
         }
     }
 
-    [Theory]
-    [InlineData("weathered-iron", new[] { "base_colour.png", "roughness.png", "wear.png" })]
-    [InlineData("weathered-staves", new[] { "base_colour.png", "normal.png", "roughness.png", "occlusion.png", "grime.png" })]
-    public void The_committed_pngs_equal_the_graph(string name, string[] files)
+    /// <summary>Each sample graph with a node type <see cref="NodeRegistry.BuiltIn"/> does not know: the files it writes and the one mask the stand-ins empty.</summary>
+    private static readonly Dictionary<string, (string[] Files, string Mask)> Expected = new(StringComparer.Ordinal)
     {
+        ["weathered-iron"] = (["base_colour.png", "roughness.png", "wear.png"], "wear"),
+        ["weathered-staves"] = (["base_colour.png", "normal.png", "roughness.png", "occlusion.png", "grime.png"], "grime"),
+    };
+
+    /// <summary>
+    /// Every top-level sample graph with a node type <see cref="NodeRegistry.BuiltIn"/> does not know: the graphs
+    /// Patina.Graphs.Tests' <c>CheckSamplesTests</c> skips by the same rule (RV-82), so a new one is held here or there.
+    /// </summary>
+    public static TheoryData<string> MeshSamples() => [.. MeshSampleNames()];
+
+    private static IEnumerable<string> MeshSampleNames() =>
+        Directory.GetFiles(Path.Combine(Paths.RepoRoot, "samples", "graphs"), "*.texgraph").Order(StringComparer.Ordinal)
+            .Where(file => !JsonDocument.Parse(File.ReadAllText(file)).RootElement.GetProperty("nodes").EnumerateObject()
+                .All(n => NodeRegistry.BuiltIn.Find(n.Value.GetProperty("type").GetString()!) is not null))
+            .Select(Path.GetFileNameWithoutExtension)!;
+
+    [Fact]
+    public void The_mesh_samples_are_the_two_weathered_graphs() =>
+        Assert.Equal(Expected.Keys.Order(StringComparer.Ordinal), MeshSampleNames());
+
+    [Theory]
+    [MemberData(nameof(MeshSamples))]
+    public void The_committed_pngs_equal_the_graph(string name)
+    {
+        var files = Expected[name].Files;
         var graph = Load(name);
         var evaluator = new GraphEvaluator(graph, Program.Registry);
         var written = evaluator.Outputs.Where(OutputRoles.HasOwnFile).Select(OutputRoles.FileOf).Order(StringComparer.Ordinal).ToArray();
@@ -87,10 +111,10 @@ public class MeshNodeToolTests
     }
 
     [Theory]
-    [InlineData("weathered-iron", "wear")]
-    [InlineData("weathered-staves", "grime")]
-    public void Check_reports_the_one_empty_mask_and_nothing_else(string name, string mask)
+    [MemberData(nameof(MeshSamples))]
+    public void Check_reports_the_one_empty_mask_and_nothing_else(string name)
     {
+        var mask = Expected[name].Mask;
         var graph = Load(name);
         var set = CheckSet.OfGraph(new GraphEvaluator(graph, Program.Registry), graph.Size);
         var problems = CheckRules.Run(set);
@@ -98,6 +122,21 @@ public class MeshNodeToolTests
         Assert.Equal(("one-value", mask), (only.Check, only.Output));
         // Neutral inputs leave the mask 0 on every texel.
         Assert.All(Committed(name, mask + ".png").Chunk(4), p => Assert.Equal(0, p[0]));
+    }
+
+    /// <summary>The person's ruling (2026-11-25): check's answer keeps the one problem, its fix the true reason rather than "widen its levels".</summary>
+    [Theory]
+    [MemberData(nameof(MeshSamples))]
+    public async Task Check_tells_the_empty_mask_it_is_flat_for_the_neutral_inputs(string name)
+    {
+        await using var patina = await PatinaHarness.StartAsync(Paths.RepoRoot);
+        await patina.Ok("open", JsonSerializer.Serialize(new { path = Sample(name + ".texgraph") }));
+        var report = JsonDocument.Parse(await patina.Ok("check", "{}")).RootElement;
+        Assert.False(report.GetProperty("ok").GetBoolean());
+        var only = Assert.Single(report.GetProperty("problems").EnumerateArray());
+        Assert.Equal(("one-value", Expected[name].Mask), (only.GetProperty("check").GetString(), only.GetProperty("output").GetString()));
+        Assert.EndsWith(CheckTool.NeutralFix, only.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("widen", only.GetProperty("message").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -49,6 +49,13 @@ public static class ParameterOverrides
             error = $"{tool}: {applied.Error}";
             return false;
         }
+        // A value inside its range can still be one a node refuses (a mesh_curvature width of 0, RV-82): judge the graph as set,
+        // so the fault names the node rather than the evaluation throwing.
+        if (GraphValidator.Validate(applied.Graph!, registry) is { Count: > 0 } faults)
+        {
+            error = $"{tool}: with parameters {GraphParameters.Describe(read)} the graph has {Faults(faults)}";
+            return false;
+        }
         result = applied.Graph!;
         overrides = read;
         return true;
