@@ -90,8 +90,9 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         if (snapshot is null) return Error($"{tool}: " + NoMesh);
         if (!result!.Succeeded) return Failed(tool, result.Errors.Select(x => x.ToString()));
 
-        var body = Report(snapshot.Model.Find(name ?? snapshot.Model.Meshes[0].Name)!);
-        body["warnings"] = SubdivideTool.Warnings(MeshReport.Create(snapshot.Model.Find(name ?? snapshot.Model.Meshes[0].Name)!), tool).Concat(report!.Warnings).ToArray();
+        var edited = snapshot.Model.Find(name ?? snapshot.Model.Meshes[0].Name)!;
+        var body = Report(edited);
+        body["warnings"] = SubdivideTool.Warnings(MeshReport.Create(edited), tool).Concat(report!.Warnings).ToArray();
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
         body["deleted"] = Deleted(result.Deleted);
         body["split"] = Split(result.Split);
