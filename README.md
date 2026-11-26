@@ -348,9 +348,10 @@ stand-ins (curvature 0.5, occlusion 1, mask 1, position `#808080`) and says so i
 `open`, `swatch`, `export`, `check` and `save`, also for a graph that nests one (the node
 named as expanded, `g/edges`); the real maps come from the mesh when a carve
 material names the graph. Their PNGs are the neutral ones (`wear` and `grime` are black),
-so `check` reports `one-value` on those two outputs and nothing else, its fix saying they are
-flat because the mesh inputs are neutral here, not to widen their levels (any output reading a
-mesh node, nested or not, is told the same).
+so `check` reports `one-value` on those two outputs and nothing else, its fix saying they may be
+flat only because the mesh inputs are neutral here: to see the real map, draw it in carve with
+`render` mode `uvs` and the graph as `image`, and if it is flat there too, widen its levels (any
+output reading a mesh node, nested or not, is told the same).
 `samples/graphs/faults/` holds two graphs that `check` finds faults in.
 
 ### A worked example
