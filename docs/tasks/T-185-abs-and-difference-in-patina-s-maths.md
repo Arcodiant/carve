@@ -4,7 +4,7 @@ description: >-
 ---
 # T-185 — abs and difference in patina's maths
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
