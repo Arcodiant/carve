@@ -129,6 +129,24 @@ public sealed class DisplaceToolTests() : FileToolTests("carve-displace")
     }
 
     [Fact]
+    /// <summary>
+    /// The rebase onto T-223: displace reads a graph through Patina.Graphs' built-in registry, not M-29's Carve.Graphs, so a
+    /// graph with a mesh-input node is refused as a fault and the mesh left as it was (the wording is a finding for the person).
+    /// </summary>
+    public async Task A_mesh_reading_graph_is_refused_and_changes_nothing()
+    {
+        var weathered = Path.Combine(Path.GetDirectoryName(SamplePath())!, "graphs", "weathered-iron.texgraph");
+        var (carve, _) = await StartAsync();
+        using var __ = carve;
+        Ok(await carve.CallToolAsync("subdivide", """{"levels":2}"""));
+        Ok(await carve.CallToolAsync("project_uvs", """{"method":"box"}"""));
+        var before = Positions(Ok(await carve.CallToolAsync("get_mesh", "{}")));
+        var refused = Refused(await carve.CallToolAsync("displace", $$"""{"source":{"graph":{{JsonSerializer.Serialize(weathered)}},"output":"wear"},"amount":0.1}"""));
+        Assert.Contains("unknown type 'mesh_curvature'", refused);
+        Assert.Equal(before, Positions(Ok(await carve.CallToolAsync("get_mesh", "{}"))));
+    }
+
+    [Fact]
     public async Task A_group_or_faces_displace_only_their_corners()
     {
         var (carve, _) = await StartAsync();

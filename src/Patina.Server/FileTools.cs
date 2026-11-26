@@ -42,6 +42,9 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
         + "- mortar: a number, 0.1, from 0 to 0.45; drives layout.gap\n"
         + "- tint: a colour, \"#a8452f\", any colour \"#rrggbb\"; drives clay.colour";
 
+    /// <summary>The mesh nodes' note as a line of its own, or nothing.</summary>
+    public static string MeshLine(TextureGraph graph, NodeRegistry registry) => MeshNote(graph, registry) is { Length: > 0 } note ? note + "\n" : "";
+
     /// <summary>A line for each exposed parameter, its kind, value, range and drives, under a count line; nothing for a graph without. A parameter at fault says so.</summary>
     public static string ParameterLines(TextureGraph graph, NodeRegistry registry)
     {
@@ -85,7 +88,7 @@ public sealed class GetGraphTool(GraphStore store, NodeRegistry registry)
         {
             if (store.Graph is not { } graph) return Error("get_graph: " + NoGraph);
             var path = store.Path is { } p ? "path " + p : "no path (save gives it one)";
-            return Line($"get_graph: {Describe(graph)}; {path}; {Faults(GraphValidator.Validate(graph, registry))}\n{ParameterLines(graph, registry)}{UseLines(graph, registry, store.Path is null)}{TexGraphFile.WriteShowingDriven(graph).TrimEnd('\n')}");
+            return Line($"get_graph: {Describe(graph)}; {path}; {Faults(GraphValidator.Validate(graph, registry))}\n{ParameterLines(graph, registry)}{UseLines(graph, registry, store.Path is null)}{MeshLine(graph, registry)}{TexGraphFile.WriteShowingDriven(graph).TrimEnd('\n')}");
         }
     }
 }
@@ -136,7 +139,7 @@ public sealed class SaveTool(GraphStore store, NodeRegistry registry, ToolFolder
                 return Error($"save: refused: the graph saved in {folderTo} would use other files than it does now: {changed}\nA saved graph is the graph defined; save it beside the files it uses, or copy them there. Nothing was written.");
             if (!Write("save", target, TexGraphFile.Write(graph), out var replaced, out var writeError)) return Error(writeError!);
             store.Saved(target);
-            return Line($"save: saved {Path.GetFileName(target)} to {target}{(replaced ? " (replaced)" : "")}: {Describe(graph)}");
+            return Line($"save: saved {Path.GetFileName(target)} to {target}{(replaced ? " (replaced)" : "")}: {Describe(graph)}" + (MeshNote(graph, registry) is { Length: > 0 } meshNote ? "\n" + meshNote : ""));
         }
     }
 
@@ -225,7 +228,7 @@ public sealed class OpenTool(GraphStore store, NodeRegistry registry, ToolFolder
                 : Faults(read.Faults) + "\nIt is open: fix them with edit_graph (save refuses it until then).";
             var nested = GraphValidator.Uses(store.Graph!, registry).SelectMany(u => u.Files).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             var files = nested.Count == 0 ? "" : $"\nread {nested.Count.ToString(CultureInfo.InvariantCulture)} nested file{(nested.Count == 1 ? "" : "s")} for its graph nodes: {string.Join(", ", nested)}";
-            return Line($"open: opened {Path.GetFileName(target)} from {target}: {Describe(read.Graph)}; {faults}{files}");
+            return Line($"open: opened {Path.GetFileName(target)} from {target}: {Describe(read.Graph)}; {faults}{files}" + (MeshNote(read.Graph, registry) is { Length: > 0 } meshNote ? "\n" + meshNote : ""));
         }
     }
 

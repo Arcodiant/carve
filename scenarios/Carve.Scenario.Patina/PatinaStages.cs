@@ -19,6 +19,7 @@ internal static class PatinaStages
         new NestedGraphStage(),
         new WideSheetStage(),
         new LibraryStage(),
+        new MeshNodesStage(),
     ];
 
     /// <summary>The key of the configuration (<c>--Patina:Stages=</c> on the command line) that picks a suite's share of the run (T-172); unset runs everything.</summary>

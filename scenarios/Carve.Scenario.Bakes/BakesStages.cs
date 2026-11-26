@@ -17,5 +17,6 @@ internal static class BakesStages
         new CurvatureStage(),
         new OcclusionStage(),
         new BevelStage(),
+        new GraphImageStage(),
     ];
 }

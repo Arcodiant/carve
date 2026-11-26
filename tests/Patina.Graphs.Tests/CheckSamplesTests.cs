@@ -29,9 +29,17 @@ public class CheckSamplesTests(ITestOutputHelper output)
     {
         var data = new TheoryData<string>();
         foreach (var file in Directory.GetFiles(Samples.Folder, "*.texgraph").Order(StringComparer.Ordinal))
-            data.Add(Path.GetFileNameWithoutExtension(file));
+            // A graph with a node type Patina.Graphs does not know (the weathered graphs' mesh nodes, T-162) is held by
+            // tests/Patina.Server.Tests' MeshNodeToolTests, whose samples are the same rule's other side (RV-82).
+            if (OnlyBuiltIns(file))
+                data.Add(Path.GetFileNameWithoutExtension(file));
         return data;
     }
+
+    /// <summary>Whether every node of the file at <paramref name="file"/> is of a type <see cref="NodeRegistry.BuiltIn"/> knows.</summary>
+    public static bool OnlyBuiltIns(string file) =>
+        System.Text.Json.JsonDocument.Parse(File.ReadAllText(file)).RootElement.GetProperty("nodes").EnumerateObject()
+            .All(n => NodeRegistry.BuiltIn.Find(n.Value.GetProperty("type").GetString()!) is not null);
 
     private static IReadOnlyList<CheckProblem> Check(TextureGraph graph, int? size = null)
     {

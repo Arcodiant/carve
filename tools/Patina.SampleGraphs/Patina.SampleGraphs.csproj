@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Patina.Graphs/Patina.Graphs.csproj" />
+    <ProjectReference Include="../../src/Carve.Graphs/Carve.Graphs.csproj" />
   </ItemGroup>
 
 </Project>

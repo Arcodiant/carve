@@ -110,7 +110,7 @@ public class BakeNormalToolTests : FileToolTests
         var (carve, tools) = await StartAsync(null);
         using var scope = carve;
         var bake = (tools.ValueKind == JsonValueKind.Array ? tools : tools.GetProperty("tools")).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "bake");
-        var text = bake.GetProperty("description").GetString()!;
+        var text = HelpToolTests.WithReference(bake.GetProperty("description").GetString()!, "bake");
         Assert.Contains("'normal' writes <folder>/<mesh>.normal.png", text);
         Assert.Contains("green up", text);
         Assert.Contains("normal_texture", text);

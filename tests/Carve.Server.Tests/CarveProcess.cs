@@ -43,6 +43,8 @@ internal static class Paths
 internal sealed class CarveProcess : IToolCaller, IDisposable
 {
     public static readonly TimeSpan Answer = TimeSpan.FromSeconds(30);
+    /// <summary>B-11: the wait for a call that bakes at 1024 (6 to 14 s a material in Debug, more under load).</summary>
+    public static readonly TimeSpan BakeAnswer = TimeSpan.FromSeconds(120);
     public static readonly TimeSpan Exit = TimeSpan.FromSeconds(5);
 
     private readonly Process _process;
@@ -138,11 +140,14 @@ internal sealed class CarveProcess : IToolCaller, IDisposable
     /// <summary>The <c>result</c> of <c>tools/call</c>.</summary>
     /// <param name="name">The tool.</param>
     /// <param name="arguments">The arguments, as JSON.</param>
-    public async Task<JsonElement> CallToolAsync(string name, string arguments)
+    public Task<JsonElement> CallToolAsync(string name, string arguments) => CallToolAsync(name, arguments, Answer);
+
+    /// <param name="answer">How long to wait for the response.</param>
+    public async Task<JsonElement> CallToolAsync(string name, string arguments, TimeSpan answer)
     {
         var id = Interlocked.Increment(ref _lastId);
         await SendAsync($$$"""{"jsonrpc":"2.0","id":{{{id}}},"method":"tools/call","params":{"name":"{{{name}}}","arguments":{{{arguments}}}}}""");
-        var result = (await ReadResponseAsync(id)).GetProperty("result");
+        var result = (await ReadResponseAsync(id, answer)).GetProperty("result");
         FrameLog.Call(name, arguments, result);
         return result;
     }
@@ -193,10 +198,11 @@ internal sealed class CarveProcess : IToolCaller, IDisposable
     }
 
     /// <summary>Waits for the response carrying this id, failing with the stderr so far.</summary>
-    private async Task<JsonElement> ReadResponseAsync(int id)
+    private async Task<JsonElement> ReadResponseAsync(int id, TimeSpan? answer = null)
     {
+        var limit = answer ?? Answer;
         var deadline = Stopwatch.StartNew();
-        while (deadline.Elapsed < Answer)
+        while (deadline.Elapsed < limit)
         {
             foreach (var line in StdoutLines)
             {
@@ -210,7 +216,7 @@ internal sealed class CarveProcess : IToolCaller, IDisposable
             await Task.Delay(10);
         }
 
-        throw new TimeoutException($"No response to {id} after {Answer}. stderr:\n{Stderr}");
+        throw new TimeoutException($"No response to {id} after {limit}. stderr:\n{Stderr}");
     }
 
     private async Task PumpStdoutAsync()

@@ -1,6 +1,8 @@
+using Carve.Graphs;
 using Patina.Graphs;
 using Patina.Graphs.Evaluation;
 using Patina.Graphs.Imaging;
+using Patina.Graphs.Nodes;
 
 // Usage: dotnet run --project tools/Patina.SampleGraphs [--canonical]
 // Evaluates every samples/graphs/*.texgraph (beside Carve.slnx) at the graph's own size into samples/graphs/<name>/
@@ -13,11 +15,13 @@ var variants = new (string Graph, string Variant, (string Name, ParamValue Value
 {
     ("bricks", "grey", [("mortar", ParamValue.Of(0.08)), ("tint", ParamValue.Of("#7a7a70"))]), // grey stone bricks
 };
+// The mesh nodes (T-162) are registered with no source: every one gives its neutral value, as in patina.
+var registry = MeshNodes.Register(NodeRegistry.BuiltIn, null);
 var root = FindRoot();
 var folder = Path.Combine(root, "samples", "graphs");
 foreach (var path in Directory.GetFiles(folder, "*" + TexGraphFile.Extension).Order(StringComparer.Ordinal))
 {
-    var read = TexGraphFile.ReadFile(path);
+    var read = TexGraphFile.ReadFile(path, registry);
     if (!read.Loaded) { Console.Error.WriteLine($"{path}: {read.Error}"); return 1; }
     // A graph with an input lacking a default (T-140) is only used as a node: it has nothing of its own to evaluate.
     if (read.Faults.Count > 0 && read.Faults.All(f => f.OnItsOwn))
@@ -33,19 +37,19 @@ foreach (var path in Directory.GetFiles(folder, "*" + TexGraphFile.Extension).Or
     var graph = read.Graph!;
     if (args.Contains("--canonical")) TexGraphFile.WriteFile(path, graph);
     var name = Path.GetFileNameWithoutExtension(path);
-    WritePngs(graph, Path.Combine(folder, name), name);
+    WritePngs(graph, registry, Path.Combine(folder, name), name + (graph.Nodes.Values.Any(n => MeshNodes.TypeNames.Contains(n.Type)) ? " (mesh inputs neutral)" : ""));
     foreach (var (_, variant, values) in variants.Where(v => v.Graph == name))
     {
         var set = GraphParameters.WithOverrides(graph, values.ToDictionary(v => v.Name, v => v.Value));
         if (!set.Ok) { Console.Error.WriteLine($"{path} variant {variant}: {set.Error}"); return 1; }
-        WritePngs(set.Graph!, Path.Combine(folder, name, "variants", variant), $"{name}/variants/{variant}");
+        WritePngs(set.Graph!, registry, Path.Combine(folder, name, "variants", variant), $"{name}/variants/{variant}");
     }
 }
 return 0;
 
-static void WritePngs(TextureGraph graph, string outFolder, string label)
+static void WritePngs(TextureGraph graph, NodeRegistry registry, string outFolder, string label)
 {
-    var evaluator = new GraphEvaluator(graph);
+    var evaluator = new GraphEvaluator(graph, registry);
     Directory.CreateDirectory(outFolder);
     // Each output's file: metallic is packed into roughness.png, so it has none of its own.
     foreach (var output in evaluator.Outputs.Where(OutputRoles.HasOwnFile))

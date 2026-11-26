@@ -4,7 +4,7 @@ description: >-
 ---
 # T-165 — A graph output under the UV layout look
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-163
 
-**Verify:** server-unit, scenario-bakes, scenario-materials
+**Verify:** core-unit, graphs-unit, server-unit, scenario-bakes, scenario-materials
 
 ## Goal
 
@@ -85,3 +85,110 @@ under the layout.
 - The wrench has no concave edge and no jaw opening (M-24's retrospective); write no check that needs one.
 - **Write down for T-167** (As built): the argument's shape, the caption, and how its frames were checked.
 - **Stop and ask:** an existing `uvs` frame that changes; a byte-identity check that fails.
+
+### As built
+
+**Models:** Sonnet 5.5 built the member. Opus 5.5 (`claude-opus-5-5`) diagnosed the byte-identity failure and applied the fill
+ruling. A later Opus 5.5 agent rebased onto T-166 and added the `image` wording; that is how far the hand-off goes. The
+frame review, the person's approval, this write-up and `finish` were done by a final Opus 5.5 agent.
+
+**Built:**
+- `render mode=uvs` takes `image` as a PNG path, as before, or as `{graph, output, size}`. `size` defaults to the graph's
+  own, a power of two from 64 to 4096. The output is baked for the mesh the look shows, through T-163's call and cache,
+  and drawn by T-121's path unchanged.
+- `roughness` is drawn as its own grey values and `normal` as its colours.
+- The caption is a text line, not drawn in the image: `image weathered-iron.texgraph wear 256 px`. The text carries
+  `baked` on first use only.
+- The description's worked example, run by its test:
+  `{"mode":"uvs","image":{"graph":"weathered-iron.texgraph","output":"wear","size":256}}`.
+- `GraphImageStage.cs` in scenario-bakes, on the wrench. Its three byte-identity checks and the position frame's block
+  rule are described below.
+- CLAUDE.md's Bakes scenario row.
+- **README.md:** one sentence in Baked maps on the neutral fill beyond the padding.
+
+**For T-167 and T-207:**
+- T-167 builds on the argument's shape `{graph, output, size}`, the caption above, and how the frames were checked:
+  - Each graph frame is byte-equal to the bake-PNG frame of the same map at 1024 with padding 8. This holds over the
+    whole frame, because the caption is not drawn in the image.
+  - The position frame is held to T-121's block rule inside the islands only.
+- T-207 builds on the description lengths: `render` went from 19122 to 19954 characters and `bake` from 8410 to 8684.
+  Both were already over 4,096 before this member.
+
+**Frame review (final agent, Opus 5.5):**
+- Frames are from `verify`'s run J-20261124-094654-73b501, against the base run J-20261124-085554-4d6a68, compared by hash.
+  Exactly the new and moved frames listed below differ. Each graph frame equals its PNG frame and its moved bake frame,
+  with 0 differing pixels.
+- Six side-by-side views were opened, scaled to 1400 wide:
+  - the graph curvature and steel frames;
+  - the graph occlusion and position frames;
+  - before and after for the wrench's occlusion, the L-block's curvature, and the jaw and steel-padding 4x crops.
+- What the frames show:
+  - Inside the islands each output reads right on this mesh. Curvature has bright convex rims on mid grey. Occlusion has
+    dark contact areas and whole black faces where parts meet. The steel islands are white and the rest black. Position
+    is a smooth colour gradient.
+  - Edges are white and seams yellow.
+  - On curvature and position, the padding still reads as a fringe: a lighter grey on the dark-grey area beyond it. It
+    has less contrast than against the old black.
+- **Reads worse:** the steel mask and occlusion have a neutral value of 1, so beyond the padding is now 128 grey. That is
+  the same grey as the padding around a white island (all steel, or unoccluded). In the steel-padding 4x crop, the steel
+  strip's fringe can no longer be told from the area beyond it. Its pixels at 128 went from 21504 to 53040, and those at 0
+  from 68976 to 37440. Only the black fringe of the non-steel islands still shows.
+- The person was told this and approved the set in round 1 (`G:\My Drive\artifacts\carve\M-29\T-165\round-1`, 19 files),
+  with no notes.
+
+- **The person's ruling (2026-11-24):** `bake` writes each map's neutral value in the texels no island or padding covers,
+  so the node and the bake are one computation over the whole image. Declined: comparing islands and padding only, and
+  making the mesh nodes fill 0. Done: `Bake.FillUncovered` (`src/Carve.Core/Baking/BakePadding.cs`), used by
+  `MeshBakeSource.Finish` and by `BakeTool` for masks, `curvature` and `occlusion`, each with its node's `Neutral` constant
+  (`MeshMaskNode`, `MeshCurvatureNode`, `MeshOcclusionNode`; not written twice); the fill comes before `Pad`, so padding
+  is unchanged. One sentence in `bake`'s description and in README's Baked maps. A core-unit test of the fill.
+- **Not asked, left as they are:** `base_colour`, `orm` and `normal` hold black (0, 0, 0) beyond the padding, as before.
+  The ORM's R (occlusion) is now 0 there while `occlusion.png` is 255: they disagree beyond the padding (inside islands
+  and padding they agree). Not decided.
+- **Numbers written down that moved, only because of those texels:** `BakeToolTests` (the 64 x 64 box's left and right
+  masks): a texel beyond both islands' padding was predicted 0 in both masks, now 255 in both.
+- **Measured against a run of `origin/milestone/M-29`** (jobs J-20261124-085554-4d6a68 and -085556-0bb89a, frames
+  compared by hash, none opened): changed, all `uvs` frames: `wrench-uvs-curvature`, `wrench-uvs-steel`,
+  `wrench-orm-uvs-occlusion` (303229 pixels each), `lblock-uvs-curvature` (500186), and the crops cut from them,
+  `wrench-uvs-curvature-jaw-4x` and `wrench-uvs-steel-padding-4x` (`lblock-uvs-curvature-inner-4x` did not move). No
+  `render`, `render_glb` or export frame moved. In the PNGs, each wrench map changed in 396290 texels, exactly the texels
+  `wrench.mask.all.png` holds 0 in on the base run (beyond the padding), 0 to 128 for curvature, 0 to 255 for masks and
+  occlusion; `lblock.curvature.png` in 653450 texels, all 0 to 128. Every changed pixel samples a changed texel by the
+  block rule's pixel-to-texel mapping, but for 592 (wrench) and 420 (L-block) whose centres lie within 0.01 texel of a
+  texel boundary next to a changed texel (one at 0.14, an edge-overlay pixel). New frames: `wrench-uvs-graph-curvature`,
+  `-graph-occlusion`, `-graph-steel`, `-graph-position` and the bake-PNG frames they equal, `wrench-uvs-curvature-png`,
+  `-occlusion-png`, `-steel-png`, all in `frames/` of a `scenario-bakes` run (`cairn test artifacts scenario-bakes`).
+- **Checked:** `verify` passes (below); the three identity checks and the position frame pass; each break fails as it
+  should, on its own check only (ad-hoc runs with `CARVE_BAKES_BREAK`): `graph-width` "graph image curvature: 169958
+  pixels differ", `graph-mask` "graph image steel: 362288 pixels differ", `graph-pos` 22256 pixels breaking the block
+  rule on `wrench-uvs-graph-position`. The position frame is held to the block rule inside islands only (`insideOnly`),
+  as the first agent wrote it: the padding's texels are not predicted from `get_mesh`.
+- **Run time:** `scenario-bakes` 50.7 s on `origin/milestone/M-29`, 68.4 s with this member, one run each on one runner:
+  the new stage adds about 18 s.
+- **Descriptions** (characters, `origin/milestone/M-29` then this member): `render` 19122 to 19954, `bake` 8410 to
+  8684; both were over 4,096 before. `PartToolsListTests`' digest did not move.
+- **Rebased onto T-166 (`origin/milestone/M-29` at 53734e2):** no conflict at all, `PartToolsListTests.Before` included;
+  this member never touched that file and the digest did not move (`server-unit` passes on it).
+- **The `image` wording:** `GraphSlotProblem.Of(argument, cause)` gives `image: <cause>`, the cause in T-166's words
+  (`Cause`, unchanged); `GraphBakes.Image` uses it, so the look's error no longer reads `materials['<file>'].image`.
+  T-166's material wording is untouched. `GraphImageToolTests.A_graph_that_cannot_be_baked_is_named_by_image_not_by_a_material`
+  holds the whole message for a missing file (`image: no file at <root>\gone.texgraph; the .texgraph files in <root> (3)
+  are: ...`), a graph fault (`image: the graph has faults: node 'o' input 'in': output needs it connected, and it is not`)
+  and an unknown output (`image: the graph has no output 'nothing'; its outputs are wear`). Note: the parse-time refusals
+  in `RenderTool.LoadGraphImage` still say `image.graph: ...` (a missing or unreadable file seen before any bake), as
+  before; the bake-time ones say `image: ...`.
+- **Frames after the rebase, by hash** (`verify`'s jobs J-20261124-094654-73b501 scenario-bakes and -094657-64871f
+  scenario-materials): identical to this member's previous runs (scenario-bakes J-20261124-085556-0bb89a and
+  -090639-7f519f, scenario-materials -090643-b92aa2), 74 and 24 frames, none moved. Against the base run
+  J-20261124-085554-4d6a68, the changed and new frames are exactly the ones listed above. The bake-PNG identity checks
+  pass in the stage itself. The one other new file is not a frame: `bakes/graph-image/wrench.material.wrench-bevel.png`,
+  a bake the stage writes.
+- **Not explained:** this agent's first `cairn test run server-unit` printed nothing and was stopped at the 30-minute
+  background limit, with no job in the queue. `verify` straight after ran `server-unit` in 59 s. Not looked into.
+- **Known and left with the person:** what `base_colour`, `normal` and the ORM hold beyond the padding. Also left: the
+  steel and occlusion padding fringe that can no longer be seen around white islands (see the frame review).
+- **Not checked:**
+  - The caption's text in a scenario run (it is held by the server-unit tests).
+  - `wrench-uvs-curvature` and `wrench-uvs-steel` were not opened side by side as before and after. They equal the
+    graph frames, which were opened, and their old copies differ only in texels that are 0 on the base run's all-mask.
+  - The unexplained silent `server-unit` run above.

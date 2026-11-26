@@ -7,6 +7,9 @@ internal sealed record RenderedFrame(RenderTargetPixels Pixels, int Vertices, in
 {
     /// <summary>The store's version of the mesh drawn, so a sheet can tell whether its tiles agree.</summary>
     public long Version { get; init; }
+
+    /// <summary>True when the model drawn has graph slots no render had baked yet, so they were drawn empty (an edit landed after this render's bake).</summary>
+    public bool Unbaked { get; init; }
 }
 
 /// <summary>
@@ -68,6 +71,9 @@ internal sealed class RenderRequest(RenderSpec spec, long postedVersion) : Offsc
 
     /// <summary>The version of the mesh the frame thread drew it on, set as it is served.</summary>
     public long ServedVersion { get; set; }
+
+    /// <summary>Whether that mesh's graph slots were drawn empty, unbaked (<see cref="RenderedFrame.Unbaked"/>), set as it is served.</summary>
+    public bool ServedUnbaked { get; set; }
 }
 
 /// <summary>
@@ -76,7 +82,7 @@ internal sealed class RenderRequest(RenderSpec spec, long postedVersion) : Offsc
 /// </summary>
 internal class RenderQueue(ModelStore store) : OffscreenQueue<RenderRequest>
 {
-    public Task<RenderedFrame> Post(RenderSpec spec)
+    public virtual Task<RenderedFrame> Post(RenderSpec spec)
     {
         var request = new RenderRequest(spec, store.Current.Version);
         Enqueue(request);

@@ -6,6 +6,7 @@
   <Project Path="scenarios/Carve.Scenario.Uvs/Carve.Scenario.Uvs.csproj" />
   <Project Path="scenarios/Carve.Scenario.Materials/Carve.Scenario.Materials.csproj" />
   <Project Path="scenarios/Carve.Scenario.Planks/Carve.Scenario.Planks.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Weathered/Carve.Scenario.Weathered.csproj" />
   <Project Path="scenarios/Carve.Scenario.Export/Carve.Scenario.Export.csproj" />
   <Project Path="scenarios/Carve.Scenario.Shed/Carve.Scenario.Shed.csproj" />
   <Project Path="scenarios/Carve.Scenario.Character/Carve.Scenario.Character.csproj" />
@@ -25,7 +26,9 @@
   <Project Path="tests/Carve.MaterialsLoad.Tests/Carve.MaterialsLoad.Tests.csproj" />
   <Project Path="tests/Carve.PartsLoad.Tests/Carve.PartsLoad.Tests.csproj" />
   <Project Path="tests/Carve.PartsAcceptance.Tests/Carve.PartsAcceptance.Tests.csproj" />
+  <Project Path="tests/Carve.WeatheringAcceptance.Tests/Carve.WeatheringAcceptance.Tests.csproj" />
   <Project Path="tests/Carve.PlanksLoad.Tests/Carve.PlanksLoad.Tests.csproj" />
+  <Project Path="tests/Carve.WeatheredLoad.Tests/Carve.WeatheredLoad.Tests.csproj" />
   <Project Path="tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj" />
   <Project Path="tests/Carve.GatehouseLoad.Tests/Carve.GatehouseLoad.Tests.csproj" />
   <Project Path="tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj" />
@@ -36,9 +39,11 @@
   <Project Path="src/Carve.Extensibility/Carve.Extensibility.csproj" />
   <Project Path="src/Carve.Hosting/Carve.Hosting.csproj" />
   <Project Path="src/Carve.Server/Carve.Server.csproj" />
+  <Project Path="src/Carve.Graphs/Carve.Graphs.csproj" />
   <Project Path="src/Patina.Graphs/Patina.Graphs.csproj" />
   <Project Path="src/Patina.Server/Patina.Server.csproj" />
   <Project Path="tests/Carve.Core.Tests/Carve.Core.Tests.csproj" />
+  <Project Path="tests/Carve.Graphs.Tests/Carve.Graphs.Tests.csproj" />
   <Project Path="tests/Carve.ExportViewer.Tests/Carve.ExportViewer.Tests.csproj" />
   <Project Path="tests/Carve.ModelViewer.Tests/Carve.ModelViewer.Tests.csproj" />
   <Project Path="tests/Carve.Scenario.Tiny/Carve.Scenario.Tiny.csproj" />

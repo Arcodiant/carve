@@ -1,3 +1,4 @@
+using Carve.Graphs;
 using Carve.Hosting;
 using Empyrean;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,9 @@ return await EngineHost.RunAsync(args, new EngineHostOptions
 /// <summary>patina's tools, and the services they share, in one place for this file and the unit harness.</summary>
 public partial class Program
 {
+    /// <summary>The one registry every tool validates and evaluates with: the built-in nodes and the four mesh nodes on their neutral stand-ins (T-162).</summary>
+    public static NodeRegistry Registry { get; } = MeshNodes.Register(NodeRegistry.BuiltIn, null);
+
     /// <summary>The tools patina serves, in the order tools/list gives them. A later task adds its tool with one line here.</summary>
     public static McpServerTool[] Tools(NodeRegistry registry) =>
     [
@@ -45,7 +49,7 @@ public partial class Program
     /// </summary>
     public static void AddTools(IServiceCollection services, IMcpServerBuilder mcp, string? baseDirectory = null)
     {
-        var registry = NodeRegistry.BuiltIn;
+        var registry = Registry;
         mcp.WithTools(Tools(registry));
         services.AddSingleton(registry);
         services.AddSingleton<GraphStore>();

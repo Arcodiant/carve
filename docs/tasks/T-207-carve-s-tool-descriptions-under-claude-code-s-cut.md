@@ -1,0 +1,410 @@
+---
+description: >-
+  Every carve tool description fits Claude Code's 4,096-character cut, held by a test, with the detail that was cut still reachable by an agent
+---
+# T-207 — carve's tool descriptions under Claude Code's cut
+
+**Status:** Done
+
+**Pri:** P1
+
+**Milestone:** M-29
+
+**Batch:** — (standalone)
+
+**Depends on:** T-165, T-166
+
+**Verify:** server-unit, server-regression
+
+## Goal
+
+Every description `carve` serves in `tools/list` reaches an agent whole. Claude Code cuts an MCP tool description at
+4,096 characters, and several of carve's are past it: `render` (about 18,600), `export` (about 14,000), `check` (about
+8,300), `save` (6,286) and `open` (5,617), all from before M-29. What is cut today is still reachable by an agent
+through the tools, and a test holds every description under the cut, as `NodeToolTests` does for patina (T-170).
+
+## Scope
+
+Written for the recommended option, a `help` tool (see "For the person to decide"); the parts marked **[alt]** change
+if the person declines it.
+
+- **Measure first, after T-165 and T-166 land.** Re-run the measurement below on the rebased task branch (lengths of
+  `tools/list` as served, not the source literals) and write the figures here; the plan is against M-29 at `edb34ba`
+  plus those two members' sentences.
+- **The budget.** Every description in carve's `tools/list` is at most **3,686 characters** (Claude Code's cut of
+  4,096 less 10%, T-170's measured cut and the margin the person approved for patina), counted as `string.Length`, no
+  tool exempt, the new tool included. Parameter descriptions are not budgeted (no cut is known for them; the largest is
+  586, `open.mesh`).
+- **The mechanism: a `help` tool** (`src/Carve.Server/HelpTool.cs`, registered in `CarveServer.AddTools` after
+  `bake`). **[alt]** none of this bullet; see the alternative under "For the person to decide".
+  - `help {"tool":"render"}` returns that tool's reference as one text block: the detail that left its description,
+    in the same words, with its worked examples kept as `Example: ` lines (`MeshToolSupport.ExampleMarker`) so tests
+    read them the way they read a description's. `help {}` returns the list of entries, one line each (the tool and
+    what its reference covers). A tool with no entry, or an unknown name, is a tool error listing the entries (patina's
+    `nodes` refusal: `help: there is no entry for 'move'; the entries are bake, check, export, open, render, save,
+    select`). It reads nothing of the model: it answers with no mesh, changes nothing and is not an undo step.
+  - Each entry's text lives beside its tool's `Text`, as `public const string Reference` on the tool class
+    (`RenderTool`, `ExportTool`, `BakeTool`, `CheckTool`, `SaveTool`, `OpenTool`, `SelectTool`); `HelpTool` holds
+    only the name-to-`Reference` table and its own description (under 1,000 characters, naming every entry).
+  - Every trimmed description ends with one pointer sentence of one form, `More: help {"tool":"<name>"} gives
+    <what moved>.`, so an agent knows the rest exists and how to ask.
+- **What stays in a description, for every tool:** what the tool does and when to call it; every argument by name with
+  its one-line meaning (the schema's parameter descriptions carry the rest); the rules that change what a call does or
+  would destroy (render's MISSING/EMPTY winding reading, open's REPLACES THE WHOLE MODEL, export's axes and units and
+  `overwrite`); every sentence M-29 added about graph materials (T-160 to T-166), since T-168 depends on them; the
+  return shape in one sentence; one short worked example run as written; the pointer to `help`. **What moves:**
+  caption formats, colour tables, thresholds, file formats, the long error catalogues (each error still names itself
+  when it happens), second and third worked examples, and per-feature detail an agent needs only once it uses that
+  feature.
+- **Tool by tool, over the cut** (figures from the table in Notes; aim at 3,000 to 3,400 so T-165/T-166 and later
+  sentences fit):
+  - **render** (19,122): keeps the purpose and what is drawn; views, direction, zoom/target, projection and size in
+    a sentence each; one sentence per mode (`shaded` with materials and the graph-bake sentences, `wireframe`,
+    `normals`, `checker`, `uvs` and `image`); highlight, labels and `views` sheets one sentence each, with the six-axis
+    sheet example; the winding and EMPTY reading; pose, clip/time, targets, bones, weights, part/level one sentence
+    each; the no-mesh and Vulkan errors. Moves: every caption format, the normals colour code, the checker hue table
+    and its cube example, uvs mode's drawing rules and refused arguments, label placement, sheet geometry and retries,
+    bone and weight drawing rules, and the error list (about 3,700 across the description).
+  - **export** (14,015): keeps purpose, path/overwrite, axes and units, the three modes (model, piece, clips) one
+    sentence each, parts-to-nodes in one sentence, skinned in one, graph materials (T-164's paragraph, shortened only
+    if it must be, keeping its meaning), the limits warning in one sentence, the result line's shape, the crate
+    example. Moves: "what is written" (about 2,600), the limits file format (about 1,600), the skinned detail, the
+    piece and clips detail, the rover and material worked examples, the content-folder example, the full result line.
+  - **bake** (8,410): keeps purpose, the UV layout in one sentence, the arguments sentence, one line per map, the
+    return shape, the wrench `Example:`. Moves: each map's channel and normal-map detail (about 3,600), the `surface`
+    entry rules, curvature, the errors (about 1,100) and the worked-example prose.
+  - **check** (7,565 before T-166): keeps purpose, `mesh` and `targets`, the return shape, the name of every problem,
+    warning and note with its fix in a clause (T-166's material warnings among them), the cube `Example:` and
+    `Output:`. Moves: thresholds (signed volume, coincidence), the morph-target detail, the UV and envelope warnings'
+    rules, the stats definitions.
+  - **save** (6,286): keeps whole model vs one mesh, the .carve-vs-.glb rule, a one-sentence version list (2 to 10,
+    what each adds), path rules, errors in one sentence, the result line, and the five-step workflow (open's and
+    export's descriptions point at it). Moves: the cube file listing, the format paragraph, the part-tree detail and
+    example, the graph-slot version detail.
+  - **open** (5,617): keeps replace vs one mesh, the undo rule, materials and graph slots coming back (with T-160's and
+    T-166's warnings), ids as saved, path rules, the return shape, the example. Moves: the error catalogue (1,274),
+    the version 1 detail, the part-tree detail and its example.
+  - **select** (5,571): keeps the grammar, the properties of each kind, the return shape, the three cube examples and
+    one select-then-move. Moves: the twelve sample error messages, the float-comparison detail, the duplicated top-face
+    example.
+- **Under the cut but over the budget** (no `help` entry; tightened in place, nothing of substance cut): define_mesh
+  (4,032), get_mesh (3,983), define_material (3,961 before T-165/T-166), project_uvs (3,809), unwrap (3,720). If one
+  will not come under without losing a rule, it gets an entry like the seven.
+- **Tests** (`tests/Carve.Server.Tests`, `unit`, on `ToolHarness`):
+  - **New `HelpToolTests.cs`**: every description from `tools/list` at most 3,686, no tool exempt, with `ClientCut`
+    and `Limit` constants and the comment as in `NodeToolTests`; `help` is in the list; each entry's tool ends with the
+    pointer sentence; `help {}` names every entry; one entry returned, an unknown name and a tool with no entry refused
+    in the message's words; help works with no mesh and leaves undo as it was. **[alt]** only the length test.
+  - **`FileToolTests.Examples`** gains an overload over a text, so a test can take `Example: ` lines from a `help`
+    result the same way.
+  - **Every test that reads a sentence or example that moves** reads it from `help`'s entry instead; none is deleted,
+    and no worked example stops being run as written. The files that read description text today (count of reads):
+    EditToolDefinitionTests 13, TargetToolTests 11, UvToolDefinitionTests 8, MergeBridgeToolDefinitionTests 5,
+    FileToolTests 4, SaveOpenToolDefinitionTests 4, SelectToolDefinitionTests 4, CheckToolDefinitionTests 3,
+    GraphSlotToolTests 3, MaterialToolDefinitionTests 3, PartToolsTests 3, RenderDefinitionTests 3, and one or two in
+    BakeToolTests, BakeNormalToolTests, CheckToolTests, CheckerArgumentTests, DefineMeshDefinitionTests,
+    DefineMeshTests, ExportPartsToolTests, ExportToolDefinitionTests, GetWeightsToolDefinitionTests,
+    HoledFaceToolDefinitionTests, HoledFaceToolTests, LoopCutToolDefinitionTests, MergeBridgeToolTests,
+    NamedMeshDefinitionTests, NamedMeshTests, SkeletonToolDefinitionTests, SkeletonToolTests, SubdivideToolTests,
+    UnwrapToolDefinitionTests, UvToolTests. Only those touching the twelve tools above should need changing.
+  - **`PartToolsListTests`**: `help` joins `NewTools`; a pinned sentence that moves (`RenderPartTexts.Parts`,
+    `RenderPartTexts.Image`, `RenderGlbTexts.Sampling` if render_glb is touched, `PartTexts.Check`) has its pin follow
+    it into the entry's text; the digest is taken again once, last, with a line in its comment saying which
+    descriptions T-207 changed.
+  - **`GraphSlotToolTests.The_descriptions_this_task_lengthened_stay_under_claude_codes_cut`** is removed, superseded
+    by the new test (which is stricter and covers its two tools).
+- **README.md**: the "Use" section gains a short paragraph: each tool's description is complete enough to use it and
+  stays under Claude Code's cut; `help {"tool":"render"}` (and the other entries) gives the rest; `help {}` lists them.
+  Where a later section speaks of a detail that moved (render's looks, export's limits file, the .carve format), it
+  says `help` has it. **[alt]** the paragraph says only that descriptions are kept under the cut.
+- **CLAUDE.md**: a Working rule: a tool description of carve or patina is at most 3,686 characters (Claude Code cuts at
+  4,096); detail goes to `help` (carve) or `nodes` (patina), held by `HelpToolTests` and `NodeToolTests`. The Layout
+  rows for `src/Carve.Server` and `tests/Carve.Server.Tests` name `HelpTool` and `HelpToolTests`.
+- **The split** (three agents, about 60 calls each; or two, with B and C merged):
+  - **A, first: the mechanism and render.** Owns `HelpTool.cs`, `CarveServer.cs` (the one registration line),
+    `HelpToolTests.cs`, the `Examples` overload in `FileToolTests.cs`, `RenderTool.cs` (`Text`, `Reference`,
+    `RenderPartTexts`) and the render tests (RenderDefinitionTests, CheckerArgumentTests, the render reads in
+    UvToolDefinitionTests, HoledFace*), `README.md` and `CLAUDE.md`. Lands the help tool with render's entry before B
+    and C start, and takes the `PartToolsListTests` digest last, after B and C.
+  - **B: export, save, open, bake.** Owns `ExportTool.cs`, `SaveTool.cs`, `OpenTool.cs`, `BakeTool.cs` and their
+    tests (ExportToolDefinitionTests, ExportPartsToolTests, SaveOpenToolDefinitionTests, FileToolTests' save/open
+    reads, GraphSlotToolTests, BakeToolTests, BakeNormalToolTests); adds four lines to `HelpTool`'s table.
+  - **C: check, select and the five near the cut.** Owns `CheckTool.cs`, `SelectTool.cs`, `PartTools.cs`
+    (`PartTexts.Check` only), `DefineMeshTool.cs`, `GetMeshTool.cs`, `MaterialTools.cs` (define_material's text only),
+    `ProjectUvsTool.cs`, `UnwrapTool.cs` and their tests (CheckToolDefinitionTests, CheckToolTests,
+    SelectToolDefinitionTests, SelectToolTests, DefineMesh*, MaterialToolDefinitionTests, ProjectUvsToolDefinitionTests,
+    UnwrapToolDefinitionTests, the get_mesh reads in EditToolDefinitionTests and TargetToolTests); adds two lines to the
+    table.
+  - Shared lines that only add (`HelpTool`'s table, `PartToolsListTests`' pins) are kept on both sides; no agent edits
+    another's tool file.
+- **Done when:**
+  - `HelpToolTests`' length test passes with no tool exempt: every carve description at most 3,686 in `tools/list`;
+  - `help {}` and `help {"tool": T}` answer for render, export, bake, check, save, open and select, and refuse the rest
+    in words that list the entries;
+  - each of the seven descriptions ends with the pointer sentence, and every M-29 graph-material sentence is still in a
+    description (not only in `help`);
+  - every worked example that was run as written still is, from the description or from `help`'s entry;
+  - `PartToolsListTests` passes with the digest taken again and its comment saying why;
+  - `README.md` and `CLAUDE.md` say what is above;
+  - `cairn task T-207 verify` passes (`server-unit`).
+
+## Notes
+
+- **Added to M-29 by the person on 2026-11-24,** to land before T-168, whose fresh agents work from the descriptions
+  alone. Asked whether to cut the descriptions down inside M-29, file it off-milestone or leave them, the person chose a
+  new member before T-168.
+- **Found by:** T-160 (`save`, `open`), T-163 (`render`), T-164 (`export`) and T-166 (`check`), each of which added
+  the sentences its spec asked for to a description already over the cut.
+- **Precedent:** T-170 did this for patina (an index in `define_graph`'s description, the detail served by `nodes`).
+- **Waits on T-165 and T-166,** which are still changing descriptions.
+- **Planned by Claude Opus 5.5 (`claude-opus-5-5`), 2026-11-24.**
+- **Measured** on `milestone/M-29` at `edb34ba` (before T-165 and T-166): a Release build of `src/Carve.Server` to
+  `%TEMP%\t207\` (`--artifacts-path`, nothing written in the worktree), `initialize` then `tools/list` over stdio, the
+  lengths of the served text (Python `len`, the same as `string.Length` here: no character outside the BMP). 42 tools,
+  144,001 description characters in all. The server declares only `tools` and `logging` (no resources, no prompts, no
+  `instructions`).
+
+  | Tool | Description | Against 4,096 / 3,686 | Parameter descriptions (largest) |
+  |---|---:|---|---|
+  | render | 19,122 | over the cut | 4,131 (targets 427) |
+  | export | 14,015 | over the cut | 1,170 (mode 262) |
+  | bake | 8,410 | over the cut | 1,237 (maps 344) |
+  | check | 7,565 | over the cut | 607 (targets 427) |
+  | save | 6,286 | over the cut | 319 (mesh 220) |
+  | open | 5,617 | over the cut | 837 (mesh 586) |
+  | select | 5,571 | over the cut | 299 (mesh 180) |
+  | define_mesh | 4,032 | under the cut, over the budget | 743 (name 237) |
+  | get_mesh | 3,983 | under the cut, over the budget | 424 (mesh 180) |
+  | define_material | 3,961 | under the cut, over the budget | 809 (base_colour_texture 116) |
+  | project_uvs | 3,809 | under the cut, over the budget | 760 (mesh 180) |
+  | unwrap | 3,720 | under the cut, over the budget | 503 (mesh 180) |
+  | define_target | 3,533 | under | 906 (positions 251) |
+  | knife | 3,255 | under | 309 |
+  | the other 28 (below) | 2,912 to 262 | under | render_glb 1,194; the rest under 700 |
+
+  The other 28: subdivide 2,912, define_clip 2,789, define_part 2,692, loop_cut 2,541, plane_cut 2,476, merge_faces
+  2,455, bridge 2,405, extrude 2,343, mark_edges 2,334, move 2,309, set_uvs 2,148, set_material 1,927, get_parts 1,917,
+  define_skeleton 1,904, delete 1,891, set_weights 1,848, get_weights 1,761, undo 1,714, weigh 1,632, render_glb 1,581,
+  set_colour 1,390, keep_level 1,377, set_shading 1,157, get_skeleton 1,121, define_group 886, delete_target 686,
+  get_clips 664, delete_clip 262. `select` and `bake` were not in the Goal's list and are over the cut too. render
+  is 19,122 now (T-163 lengthened it).
+- **What the seven over the cut hold, by kind** (approximate characters, from the served text split into sentences):
+  - **render 19,122:** what it does and what is drawn 0.8k; camera arguments (views, direction, zoom, target,
+    projection, size) 2.3k, of which caption formats 0.6k; shaded with materials and graph bakes 1.2k; wireframe and
+    normals 1.0k; checker 1.8k (its cube worked example 0.55k); uvs and image 2.0k; highlight 1.1k; labels 0.9k; views
+    sheets 1.5k; light and winding 0.4k; pose, targets, bones, weights, clip 1.5k; parts and levels 0.9k; **errors
+    3.7k** (a 1,949-character list plus each feature's own). One paragraph, no line breaks; no `Example:` line.
+  - **export 14,015:** purpose and arguments 0.25k; what is written (nodes, materials, UVs) 2.6k; axes, units and paths
+    0.5k; parts 1.9k (rover example 0.4k); skinned 1.5k; game limits and their file 1.6k; result line 1.4k; clips mode
+    1.0k; piece 0.9k; targets 0.25k; graph materials 0.55k; errors 1.1k; worked examples 0.9k.
+  - **bake 8,410:** purpose and layout 0.5k; arguments 0.7k; the maps 3.6k; result 0.8k; errors 1.1k; worked example
+    0.6k plus the `Example:` 0.3k.
+  - **check 7,565:** purpose, arguments, result 0.8k; problems and fixes 1.0k; morph targets 1.0k; mesh warnings 1.0k;
+    UV warnings 1.8k; material and envelope warnings 0.85k; notes and stats 0.85k; example and output 0.33k.
+  - **save 6,286:** purpose, whole vs one mesh, .carve vs .glb 0.9k; materials, targets, versions 0.75k; the format
+    and the cube file listing 1.2k; part tree 1.25k (example 0.36k); graph slots 0.3k; paths 0.25k; errors 0.5k; result
+    0.5k; the five-step workflow 0.43k.
+  - **open 5,617:** purpose, whole vs one mesh, version 1 0.73k; undo 0.45k; materials and graph slots 0.85k; ids,
+    history, which file to keep 0.48k; paths 0.15k; result 0.37k; **errors 1.27k**; part tree 1.1k (example 0.32k).
+  - **select 5,571:** purpose 0.33k; grammar 0.67k; properties by kind 1.33k; comparisons 0.27k; result and use 0.73k;
+    errors 1.25k (twelve sample messages 0.77k); part tree 0.3k; worked examples 0.75k (the top-face one twice).
+  - Across all seven, **errors are about 10k of the 66k**, and each error already names itself when returned, so they
+    are the cheapest to move; caption formats, colour and channel tables, file formats and second worked examples are
+    the next.
+- **Tests that read description text.** `FileToolTests.Description` and `FileToolTests.Examples` (also reached as
+  `ToolList.Examples`): `Examples` takes every line of a description that starts with `Example: `
+  (`MeshToolSupport.ExampleMarker`), and about 40 tests run those as written; `SelectTool.ResultMarker` (`Result: `)
+  and check's and get_mesh's `Output: ` are compared with what the call returns. `FileToolTests` also reads define_mesh's
+  `Worked example (a unit cube): `. `PartToolsListTests` pins a SHA-256 of every pre-M-9 tool's whole entry (taken
+  again by T-132, T-95, RV-71, T-160, T-164) and pins `PartTexts.*` and `RenderPartTexts.Parts` sentences once each.
+  `GraphSlotToolTests` holds define_material and get_mesh under 4,096 and says save, open and render are not held.
+  The files and their counts are in Scope.
+- **How an agent reaches the detail, the options:**
+  - **A help tool** (recommended): one tool taking a tool name. Costs one small tool file, a table, a test class, a
+    tools/list digest retake. Reachable under T-168's conditions (`--tools ""`, `--allowedTools "mcp__carve__*"
+    "mcp__patina__*"`), since it is a carve tool. **T-170's evidence:** patina's `nodes` (same shape) was the re-run
+    agent's first call, `nodes {}`, and the session made 10 calls with no probing against round 1's 25 with three
+    deliberately wrong graphs. That is one session; no later round is recorded calling or ignoring it.
+  - **MCP resources or prompts:** carve declares neither today. Claude Code reaches resources only through its own
+    built-in tools (resource listing and reading) or a user's `@` mention, and prompts only as a user's slash command;
+    T-168 runs with `--tools ""`, which removes the built-ins, so an agent there could not read a resource at all.
+    Not workable for T-168, and nothing shows agents reading them unprompted.
+  - **Detail in errors and results:** already true for errors (each says what is wrong), which is why errors can
+    leave first; but formats an agent needs before the call (the limits file, the .carve layout, caption and colour
+    codes) cannot wait for a failure.
+  - **Shorter writing, no second place:** enough for the five near the cut; for render and export it means losing
+    about 15k and 10k characters an agent can reach today (only by a client that does not cut), including the limits
+    file format and the uvs look's reading.
+- **Verify:** `server-unit` (as the header has it). Tool text and a tool's answers are `ToolHarness` territory; no
+  transport, rendering or export bytes change, so `server-regression` is not needed (the milestone's landing runs it).
+  No scenario reads carve's tools/list as a whole (`AcceptanceScenario` calls tools by name;
+  `ToolFamiliesThroughProcessTests` runs families, not the whole list), so no scenario suite is added.
+- **Not established:**
+  - **Whether Claude Code cuts parameter descriptions** in `inputSchema`. T-170 measured only tool descriptions. In
+    this planning session (Claude Agent SDK, tools loaded on demand by tool search) `open`'s published-copy entry
+    arrived whole, its description well over 4,096 (about 5,300) and `mesh`'s 586-character parameter description
+    intact: so the cut is not applied on every path, and `claude -p` with tools loaded up front (T-170's probe and
+    T-168's conditions) is the one measured. No parameter description is near any plausible cut, so none is budgeted.
+  - **Whether the cut is still 4,096** in the Claude Code version T-168 will run; T-170 measured 2.1.329. Not probed.
+  - **T-165's and T-166's final sentences**; the figures above are before them.
+  - Characters, not tokens: the cut is by characters per T-170; the tool's result size for a 15k `help` entry was not
+    checked against Claude Code's limit on an MCP result (well under its documented default by tokens).
+
+### For the person to decide
+
+1. **Does carve gain a tool, and what is it called?** Recommended: **yes, `help`**, `help {"tool":"render"}` for a
+   tool's reference and `help {}` for the list, the seven over-the-cut tools having entries. `help` is the name an
+   agent guesses; `guide` or `reference` work as well. Patina's `nodes` stays as it is (it is a node catalogue, not
+   help on tools). **If declined:** the descriptions are cut to the budget by shorter writing alone; what does not fit
+   is lost to agents (errors still name themselves; formats such as export's limits file and the .carve layout go to
+   `README.md` only, which an agent under T-168's conditions cannot read); `HelpTool`, `HelpToolTests`' help checks
+   and the `Reference` constants are not built; every test that reads a moved example has to be rewritten to hold the
+   behaviour without the text, and that is a loosened check to bring back to the person for each one (Working rules).
+2. **The margin:** 10% under the cut (3,686), as for patina. Recommended: yes, one number for both servers. If
+   declined (say, the cut itself, 4,096): the five near the cut need no change and the seven trim less.
+3. **The five between 3,686 and 4,096** (define_mesh, get_mesh, define_material, project_uvs, unwrap): recommended,
+   trimmed in this task, as T-170 trimmed swatch and export. If declined, the test exempts them by name, which T-170's
+   ruling ("no tool exempt") argues against.
+4. **What a `help` entry holds:** recommended, only what left the description (the agent has read the description).
+   The alternative, the whole description again followed by the detail, is simpler to read and costs nothing in the
+   cut; say if you prefer it.
+5. **Re-measure the cut before building?** Recommended: no separate probe; the 10% margin covers a small change, and
+   T-168's first round records whether any description arrived cut. If you want it measured: one `claude -p` probe as
+   T-170's (quote the last 150 characters of each carve description, no tool call), about one session's cost.
+
+**Decided (2026-11-24).** By the person: carve gains the tool, named `help`. By the orchestrator, following patina's
+T-170: the 10% margin (3,686), the five descriptions near the cut trimmed in this task, a `help` entry holding only
+what left its description, and no separate probe of the cut before T-168's first round.
+
+### As built
+
+Three agents built it, one after another, and a fourth closed it; all four ran on Claude Sonnet 5.5 (`claude-sonnet-5-5`):
+A (the `help` tool and render), B (export, save, open, bake), C (check, select, define_material and the four tightened in
+place), D (the close: the drops below, the table, the digest, README and CLAUDE.md, the process test).
+
+**The tool.** `help` (`src/Carve.Server/HelpTool.cs`, registered after `bake`). `help {"tool":"render"}` answers one text
+block, that tool's `Reference`; `help {}` lists the entries; an unknown name, or a tool with no entry, is a tool error
+listing the entries. It needs no mesh and is not an undo step. Entries: render, export, bake, check, save, open, select,
+define_material (the last is the one the Scope did not name; it needed a place for the field-by-field PBR text). Each entry
+is `public const string Reference` on its tool class, the old source lines word for word; each of the eight descriptions
+ends `More: help {"tool":"<name>"} gives <what moved>.`. A test reads a sentence that moved as
+`HelpToolTests.WithReference(description, tool)`; an entry's `Example: ` lines run through `ToolList.Examples(string)`.
+
+**Lengths, from the served `tools/list`** (a Release build of `src/Carve.Server` to `%TEMP%\t207close`, `initialize` then
+`tools/list` over stdio, Python `len`; the test `HelpToolTests.Every_description_is_under_the_limit_with_no_tool_exempt`
+holds every tool at 3,686 and `HelpThroughProcessTests` does it again through the process). Before is the Scope's table
+(at `edb34ba`), with the figure after T-165/T-166 in brackets where it moved:
+
+| Tool | Before | After |
+|---|---:|---:|
+| render | 19,122 [19,954 served, after T-165] | 3,573 |
+| export | 14,015 | 3,304 |
+| bake | 8,410 (8,684) | 3,361 |
+| check | 7,565 (8,310) | 3,683 |
+| save | 6,286 | 3,126 |
+| open | 5,617 (5,676) | 3,225 |
+| select | 5,571 | 3,669 |
+| define_mesh | 4,032 | 3,684 |
+| get_mesh | 3,983 | 3,676 |
+| define_material | 3,961 (4,059) | 3,685 |
+| project_uvs | 3,809 | 3,682 |
+| unwrap | 3,720 | 3,685 |
+| help (new) | none | 619 |
+| every other tool (31) | 3,533 (define_target) down to 262 | unchanged |
+
+All 43 descriptions total 101,042 characters (144,001 over 42 before). Several are within 30 of the budget; the test holds
+them. The largest entry is render's `Reference`, 19,568 characters as T-207 left it (RV-82 measured it; T-220 later moved two sentences into it).
+
+**Sentences, per tool** (old sentences of the pre-T-207 text against the served description and the entry; render,
+export, save, open and bake counted by B's and A's scripts, the other seven by an approximate splitter on the source
+literals, so a count there includes sentences that sit in a parameter description):
+render 263 old: 12 in the description, 251 only in the entry; export 147: 25, 121, 1 tightened; save 73: 36, 35, 2
+tightened; open 54: 24, 29, 1 tightened; bake 99: 25, 72, 2 tightened (the arguments sentence now says what "below" meant);
+check 97: 14 verbatim in the description, 82 in the entry, 1 changed; select 98: 31, 63, 4 changed; define_material 144:
+31, 112, 1 changed; define_mesh 77: 14 verbatim, 21 changed or tightened, the rest in other literals; get_mesh 46: 23, 9
+changed; unwrap 56: 43, 4 changed; project_uvs 85: 29, 9 changed. Tightened in place (no entry): define_mesh, get_mesh,
+unwrap, project_uvs. check, select and define_material moved whole old lines into `Reference`, so what is new in them is the
+summary sentences and the pointer; the full old text of each sentence is in the entry.
+
+**Every changed sentence of the four tightened tools, old then new** (a change that is wording only is marked "same rule";
+every drop is marked D-dup with the text that still holds it, or D-back where it was put back, or D-lost where the clause
+carried no rule, argument, error or example):
+
+define_mesh
+- "a polygon mesh, given by vertex coordinates and faces" to "a polygon mesh of vertex coordinates and the faces that index them": same rule.
+- "in the order they were first defined" to "in the order first defined"; "ADDS a mesh. Either is one step for undo, and a call that fails leaves the model unchanged" to "ADDS a mesh; either is one step for undo, and a failed call leaves the model unchanged": same rule.
+- "Replacing a mesh that has morph targets (see define_target) is refused, naming them, because the new mesh would lose them; give drop_targets: true to replace it and drop them anyway" to "Replacing a mesh that has morph targets (see define_target) is refused, naming them, unless drop_targets: true replaces it and drops them": same rule. "(see define_target)" was dropped by C and is D-back (put back).
+- "Coordinates are in metres (1 unit = 1 m, as export writes them)" to "(1 unit = 1 m)": D-dup, export's description says "Axes and units are the mesh's own: +Y up, +Z front, 1 unit = 1 m".
+- "three or more; it does not need to be a triangle" to "three or more": D-dup, the same sentence says "any number of sides, three or more".
+- "counter-clockwise seen from outside as for any face" to "counter-clockwise as for any face": D-dup, "wound counter-clockwise when seen from outside the solid" two sentences before.
+- "each hole ... wound the other way, CLOCKWISE seen from outside, lying strictly inside the loop (not touching it)" to "wound CLOCKWISE seen from outside, strictly inside the loop": D-dup ("the other way" and "(not touching it)" restate CLOCKWISE and "strictly").
+- "nothing is drawn in a hole unless another face fills it. Its edges are edges like any other: a hole no face fills shows as open edges" to "nothing is drawn there unless another face fills it; a hole no face fills shows as open edges": same rule.
+- "deleted and split always empty and no created, as nothing was there before" to "deleted and split always empty, no created": D-lost (the reason only).
+- "closed is true when every edge is shared by exactly two faces" to "has exactly two faces"; "is probably not what you meant" to "may not be what you meant"; "a vertex without exactly 3 numbers" to "a vertex that is not 3 numbers"; "an argument define_mesh does not take" to "an argument it does not take": same rule.
+- "(vertex 0 is the first in vertices, face 0 the first in faces)" to "(vertex 0 is the first vertex, face 0 the first)": same rule.
+- Example prose: "a 1 m crate called crate and a lid called lid", "(leaving mesh out here is a tool error that lists 'crate', 'lid')", "a 2 x 2 plate facing +Z with a 1 x 1 square hole in its middle, one face:" to "a 1 m crate and a lid", "(leaving mesh out is a tool error listing 'crate', 'lid')", "a 2 x 2 plate with a 1 x 1 hole in its middle:": D-dup, the names are the `"name"` of the example calls, and the plate's z = 0 vertices and its single `{"loop":..., "holes":...}` face are in the example JSON; the examples run as written.
+
+get_mesh
+- "or, for a face with holes, {loop:[ids], holes:[[ids], ...]} as define_mesh takes it" to "or {loop:[ids], holes:[[ids], ...]} for a face with holes": D-lost ("as define_mesh takes it" is a cross-reference; the shape is given whole).
+- "(mean of the outer loop's corners)" to "(mean of the outer corners)": same rule.
+- "face_materials ... (the faces with a material; a face has a colour or a material, never both)" to "(a face has a colour or a material, never both)": D-dup, "only when a face of the mesh has a material" a few words before.
+- "(one pair per corner in the face's loop order ...; the mapped faces only, as set_uvs gave them)" to "(one pair per corner in loop order ...; the mapped faces only)": D-dup, "the mapped faces only" says it.
+- "seams:[[a,b]...] (sorted pairs, a < b, from mark_edges seam)" to "(sorted pairs, from mark_edges seam)": D-dup, edges say "vertices:[a,b] (a < b)" in the same line of the result.
+- "targets:[{name, vertices}] (in definition order; vertices is how many vertices the target moves)" to "(in definition order; vertices is how many it moves)": same rule ("in definition order" was dropped by C and is D-back).
+- "target:{name, positions:...} (the absolute positions of the vertices that target moves, sparse, as define_target takes them; ...)" to "(sparse, as define_target takes them; ...)": D-dup, the argument sentence says "to read its absolute positions as well".
+- "its slot of vertices or faces: its id is never given out again, so every other id keeps its place" to "its slot: its id is never given out again": D-lost (the consequence, not a rule).
+- "The output is the whole mesh, never trimmed, so it grows with the mesh" to "The output is never trimmed": same rule.
+- "Worked example reading a target ...; the output is shown trimmed, where ... stands for the vertices, faces and edges as above:" to "(... stands for the vertices, faces and edges as above):": same rule; both examples run as written.
+
+unwrap
+- "packed side by side into a rectangle of the texture, all deterministically: the same mesh and seams always give the same UVs" to "packed into a rectangle of the texture, deterministically: the same mesh and seams give the same UVs": same rule.
+- "edges of three or more faces, and the border" to "edges of three or more faces and the border": same rule.
+- "a cylinder needs one seam down its side, so the side can unroll into a strip, and its caps cut free by seams round both rims" to "so it unrolls into a strip, and seams round both rims to cut the caps free": same rule.
+- "margin defaults to 1/64 of into's shorter side (four texels of a 256 texture)": unchanged by D; C dropped the parenthetical, D-back (put back).
+
+project_uvs
+- "into is [u0, v0, u1, v1], the rectangle of UV space the result fills ...; u1 must exceed u0 and v1 exceed v0" to "the UV rectangle the result fills ...; u1 > u0 and v1 > v0": same rule.
+- "(a face with holes, one for every vertex of the loop and of each hole)" to "one per vertex of the loop and each hole": same rule.
+- "(a tie goes to x, then y, then z) and is laid out as that axis's head-on view shows it" to "(a tie goes to x, then y, then z), laid out as that axis's head-on view": same rule.
+- "at one scale so texel density is even" to "at one scale": D-dup, one scale for all six groups is even texel density by definition.
+- "One call is one step for undo, and a call that fails changes nothing" to "One call is one undo step, and a failed call changes nothing": same rule.
+- "axes says which faces went to which axis, e.g. {"+x": [5], "-z": [0], ...} with every axis listed" to "({"+x": [5], ...}, every axis listed)": same rule, the example is shorter and every axis listed is kept.
+- "a view that is not one of the eight names" to "a bad view name": D-dup, the `view` argument's own description lists the eight names (in the served schema).
+
+check, select, define_material (moved, not tightened away): the old lines are whole in `Reference`. Dropped from select's description:
+the fifth worked example, the second "select the top face" call, a true duplicate: `{"kind":"faces","where":"normal.y > 0.9"}` with
+`{"kind":"faces","faces":[3],"count":1,"of":6}` is the first example's call and result, character for character. The chain test
+(`SelectToolDefinitionTests`) ran examples[3] (that duplicate) then moved examples[4]; it now runs examples[0] (the same JSON) and moves
+examples[3] (the move call), asserts 4 examples instead of 5 and pairs `examples[..3]` with the three Results instead of `[..4]`.
+Nothing it ran is gone. The select sentence "then call move with the ids from that result, its faces list as it stands" is now "select the
+top face as above, then call move with its ids", with "The lists are exactly what the edit tools take" in the description: same rule.
+
+**Tests that moved.** New: `HelpToolTests` (length test with no tool exempt, pointers, entries, refusals, no mesh and no undo
+step, help's own example), `HelpThroughProcessTests` (regression: through the real process `tools/list` serves `help`, every
+description is within the limit, and `help {"tool":"render"}` equals render's entry; `server-regression` joined `**Verify:**`),
+`FileToolTests.ToolList.Examples(string)`. Removed: `GraphSlotToolTests.The_descriptions_this_task_lengthened_stay_under_claude_codes_cut`
+(superseded by the length test, which is stricter and covers its two tools). Changed to read description plus entry, none run less
+than before: `RenderDefinitionTests`, `CheckerArgumentTests`, `ExportToolDefinitionTests`, `ExportPartsToolTests`,
+`SaveOpenToolDefinitionTests`, `BakeNormalToolTests`, `SelectToolDefinitionTests` (above), `ToolHarnessTests` (the tool count, 43).
+`PartToolsListTests`: `help` joined `NewTools`; render's `Parts` paragraph and `PartTexts.Check` are pinned once in the entry; `Before` is the digest taken once
+from the final text (the comment says what moved it); `git diff origin/milestone/M-29 -- src/Carve.Server` is only the files
+this member owns (the 12 tool files, `HelpTool.cs`, and one registration line in `CarveServer.cs`, 14 files).
+
+**The cut, and the result limit.** Established by T-170 (patina, Claude Code 2.1.329): a tool description is cut at 4,096
+characters. Not re-probed here, nor on the Claude Code T-168 will run; the 3,686 budget (10% under) is the margin the person
+approved for patina. Not established: whether Claude Code cuts parameter descriptions (none is near; `open.mesh` is 586). A
+`help` entry is a tool result, and Claude Code's limits on one (https://code.claude.com/docs/en/mcp, "MCP output limits and
+warnings", looked up by B) are a warning above 10,000 tokens, a default maximum of 25,000 tokens (`MAX_MCP_OUTPUT_TOKENS`) and,
+for a tool that does not declare `anthropic/maxResultSizeChars`, saving a text result to a file above 50,000 characters. The
+largest entry, render's, is 19,568 characters as T-207 left it, about 5,000 tokens, under all three, so no entry is split. The token count is
+estimated, not measured with Claude Code.
+
+**README.md**: the "Use" section gains a paragraph (the cut, `help {"tool":"render"}` and the other entries, `help {}` lists them,
+the `More: help ...` ending). No other section speaks of a detail that moved (checked by search: no limits file, .carve layout or
+caption format in it). **CLAUDE.md**: a Working rule (every carve and patina description at most 3,686, detail in `help` or `nodes`,
+held by `HelpToolTests` and `NodeToolTests`), the Layout rows for `src/Carve.Server` (`HelpTool`) and `tests/Carve.Server.Tests`
+(`HelpToolTests`, `HelpThroughProcessTests`).
+
+**Not checked.** No frame was drawn; no real agent read a `help` entry (T-168's first round is that evidence; T-170's one patina
+session is the only one on record); Claude Code's own cut was not re-probed; the entry-size estimate is by characters; the
+sentence counts of the seven tools counted by the approximate splitter are approximate; no engine need arose.

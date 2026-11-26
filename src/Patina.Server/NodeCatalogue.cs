@@ -33,6 +33,10 @@ public static class NodeCatalogue
         ["input"] = "one of the graph's image inputs (version 2), a port of a graph node that uses this graph: name is the port, kind grey or colour, default the value used when the graph is evaluated on its own (a number 0 to 1, or \"#rrggbb\"); a graph with an input lacking a default saves but cannot be evaluated on its own. Its value input is wired only by the graph node using it, so leave it unconnected",
         ["transform"] = "moves, repeats, mirrors, turns and scales in, about the image centre, applied in this order: tile [x, y] whole repeats; scale the image's size (2 doubles it so a half shows, 0.5 halves it so it shows twice); rotation degrees clockwise as seen; mirror none, u (left for right), v (top for bottom) or both; offset [u, v] fractions of the image, wrapping (positive u moves it right); filter bilinear or nearest, reading wrapping. It still tiles at a whole number of quarter turns (0, 90, 180, 270, -90 ...) with scale 1 or 1/n (0.5, 0.25: n repeats); a whole-number scale above 1 zooms in and does not tile, and any other rotation or scale generally does not tile, and check's seam rule reports it",
         ["distance"] = "each texel's distance to the edge of the mask in (inside at 0.5 or more), from its centre to the nearest texel centre on the other side, as a fraction of range (a part of the image width, 0 to 0.25), clamped to 1; side inside (outside texels 0), outside (inside texels 0) or both; exact Euclidean and wrapping, so it tiles: a bevel is the inside distance",
+        ["mesh_curvature"] = "grey from the mesh, not an image: 0.5 on flat surface, toward 1 at convex edges, toward 0 at concave ones; width is metres on the mesh (above 0 to 1), so the picture is the same at every size. In patina a stand-in: 0.5 everywhere, and the real map comes from the mesh when a carve material names the graph",
+        ["mesh_occlusion"] = "grey from the mesh: 1 where open, toward 0 where other geometry shadows it; rays 1 to 1024 cast per texel, reach in metres (above 0 to 10). In patina a stand-in: 1 everywhere, and the real map comes from the mesh when a carve material names the graph",
+        ["mesh_mask"] = "grey from the mesh: 1 on the faces of one group or one material, 0 elsewhere; give exactly one of group or material, a name as carve has it. In patina a stand-in: 1 everywhere, and the real map comes from the mesh when a carve material names the graph",
+        ["mesh_position"] = "colour from the mesh: r, g, b are the x, y, z of the surface, each 0 to 1 across the mesh's own bounding box at rest. In patina a stand-in: #808080 everywhere, and the real map comes from the mesh when a carve material names the graph",
         ["output"] = "one of the material's images, at most one per role or name: base_colour takes colour or grey, normal colour, roughness, metallic, occlusion and height grey; with a name in place of a role, an extra image <name>.png, colour or grey",
     };
 
@@ -57,6 +61,10 @@ public static class NodeCatalogue
         ["input"] = "an image input of this graph",
         ["transform"] = "move, repeat, mirror, turn, scale",
         ["distance"] = "distance to a mask's edge",
+        ["mesh_curvature"] = "curvature of the mesh (stand-in)",
+        ["mesh_occlusion"] = "occlusion of the mesh (stand-in)",
+        ["mesh_mask"] = "a mesh group or material (stand-in)",
+        ["mesh_position"] = "position on the mesh (stand-in)",
         ["output"] = "one of the material's images",
     };
 
@@ -85,6 +93,18 @@ public static class NodeCatalogue
     public const string WorkedDistance =
         """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"layout":{"type":"tiles","params":{"count":[4,4],"gap":0.1}},"bevel":{"type":"distance","inputs":{"in":"layout.mask"},"params":{"range":0.05,"side":"inside"}},"out":{"type":"output","inputs":{"in":"bevel"},"params":{"name":"bevel"}}}}}""";
 
+    public const string WorkedMesh =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"iron":{"type":"colour","params":{"colour":"#303236"}},"steel":{"type":"colour","params":{"colour":"#c4c6c8"}},"edges":{"type":"mesh_curvature","params":{"width":0.02}},"band":{"type":"levels","inputs":{"in":"edges"},"params":{"in_low":0.6,"in_high":0.9}},"grain":{"type":"fbm","params":{"cells":[12,12]}},"chips":{"type":"levels","inputs":{"in":"grain"},"params":{"in_low":0.45,"in_high":0.6}},"wear":{"type":"blend","inputs":{"a":"band","b":"chips"},"params":{"mode":"multiply"}},"worn":{"type":"blend","inputs":{"a":"iron","b":"steel","mask":"wear"},"params":{"mode":"mix"}},"out":{"type":"output","inputs":{"in":"worn"},"params":{"role":"base_colour"}}}}}""";
+
+    public const string WorkedMeshOcclusion =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"occ":{"type":"mesh_occlusion","params":{"rays":32,"reach":0.15}},"grime":{"type":"levels","inputs":{"in":"occ"},"params":{"in_low":0.45,"out_low":1,"out_high":0}},"out":{"type":"output","inputs":{"in":"grime"},"params":{"name":"grime"}}}}}""";
+
+    public const string WorkedMeshMask =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"steel":{"type":"mesh_mask","params":{"group":"steel"}},"out":{"type":"output","inputs":{"in":"steel"},"params":{"name":"steel"}}}}}""";
+
+    public const string WorkedMeshPosition =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"where":{"type":"mesh_position"},"out":{"type":"output","inputs":{"in":"where"},"params":{"role":"base_colour"}}}}}""";
+
     /// <summary>What a fault-free define_graph of <paramref name="nodes"/> nodes at size 256 returns.</summary>
     public static string Evaluates(int nodes) => $"define_graph: the open graph is now {nodes} nodes, size 256, seed 0; no faults: it evaluates";
 
@@ -110,6 +130,10 @@ public static class NodeCatalogue
         "transform" => [("stripes turned 30 degrees. It evaluates, but a turn that is not a quarter turn does not tile, so the image shows a seam where it repeats and check's seam rule reports it; rotation 90 would tile", DefineGraphTool.WorkedTurn, DefineGraphTool.WorkedTurnResult)],
         "distance" => [("a bevel inside each tile, written as the named output bevel", WorkedDistance, Evaluates(3))],
         "output" => [("the metal plate: grey, metallic from a gradient across u, roughness its inverse, and a named output edge (a triangle gradient down v); export's and swatch's examples use it", DefineGraphTool.WorkedMetal, DefineGraphTool.WorkedMetalResult)],
+        "mesh_curvature" => [("a mesh_curvature node, narrowed by levels and multiplied by a noise (fbm through levels), as the mask of a blend that wears a base colour toward bright steel: wear that comes and goes along an edge reads as wear, an even band as an outline (in patina the stand-in gives 0.5, so the mask is 0 and the image is the base colour)", WorkedMesh, Evaluates(9))],
+        "mesh_occlusion" => [("a grime mask: one minus the occlusion (32 rays, reach 0.15 m), as a named output; in patina the stand-in is 1, so it is 0 everywhere", WorkedMeshOcclusion, Evaluates(3))],
+        "mesh_mask" => [("the faces of the group steel as a named output; in patina the stand-in is 1 everywhere", WorkedMeshMask, Evaluates(2))],
+        "mesh_position" => [("the position on the mesh as the base colour; in patina the stand-in is #808080", WorkedMeshPosition, Evaluates(2))],
         _ => [],
     };
 

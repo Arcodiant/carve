@@ -106,7 +106,7 @@ public sealed class FaceStyle
     public FaceStyle WithMaterial(IEnumerable<int> faces, string name)
     {
         ArgumentNullException.ThrowIfNull(faces);
-        if (Material.NameProblem(name) is { } problem) throw new ArgumentException(problem, nameof(name));
+        if (Material.NameProblem(name, existing: true) is { } problem) throw new ArgumentException(problem, nameof(name));
         var colours = new SortedDictionary<int, string>(_colours);
         var materials = new SortedDictionary<int, string>(_materials);
         foreach (var f in faces)

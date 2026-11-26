@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The weathered barrel (T-167): M-7's barrel with raised hoops, wear on the hoop rims and grime beside the hoops from T-162's graphs, built, seen, re-baked, saved and exported through the tools. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Scenario.Weathered</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StbImageWriteSharp" Version="$(StbImageWriteSharpVersion)" />
+    <PackageReference Include="StbImageSharp" Version="$(StbImageSharpVersion)" />
+    <ProjectReference Include="../../src/Carve.Extensibility/Carve.Extensibility.csproj" />
+    <ProjectReference Include="../../extensions/Carve.Debug/Carve.Debug.csproj" />
+  </ItemGroup>
+
+  <!-- Linked, never copied: the planks' links (M-7's sampler and checks, the Crate's build, camera and colour rule), and the bakes' UV pixel. -->
+  <ItemGroup>
+    <Compile Include="../Carve.Scenario.Materials/MaterialsSampler.cs" Link="MaterialsSampler.cs" />
+    <Compile Include="../Carve.Scenario.Materials/MaterialsChecks.cs" Link="MaterialsChecks.cs" />
+    <Compile Include="../Carve.Scenario.Uvs/UvsScene.cs" Link="UvsScene.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CrateBuild.cs" Link="CrateBuild.cs" />
+    <Compile Include="../Carve.Scenario.Crate/CameraPixels.cs" Link="CameraPixels.cs" />
+    <Compile Include="../Carve.Scenario.Crate/ColourRule.cs" Link="ColourRule.cs" />
+    <Compile Include="../../tools/Carve.SampleTextures/TextureSet.cs" Link="TextureSet.cs" />
+    <Compile Include="../../tools/Carve.SampleTextures/Png.cs" Link="Png.cs" />
+    <Compile Include="../Carve.Scenario.Orcward/ComparisonPng.cs" Link="ComparisonPng.cs" />
+    <Content Include="../../samples/barrel.carve" Link="barrel.carve" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../samples/textures/end-grain-*.png" Link="textures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../samples/graphs/weathered-iron.texgraph;../../samples/graphs/weathered-staves.texgraph;../../samples/graphs/planks.texgraph" Link="graphs/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

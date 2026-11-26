@@ -40,8 +40,13 @@ internal interface IRenderScene
 /// the mesh current at its post or a newer one, never the newest, so each step opens by serving a
 /// head the shown mesh satisfies: however fast the store moves, the queue moves too.
 /// </summary>
-internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderScene scene)
+internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderScene scene, GraphBakes? bakes = null)
 {
+    // What GraphBakes had resolved for the model shown when it was put in (T-163): another means its graph bakes changed.
+    private Model? _shownBakes;
+    private Model? _bakedFor;
+    // The model shown has graph slots no render had baked, so they are drawn empty (DrawnOf); its frames say so.
+    private bool _unbaked;
     private long _version;
     private RenderSpec _spec = new(CameraSpec.ForView(RenderView.Front));
     private bool _viewApplied = true;
@@ -165,6 +170,13 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
                 continue;
             }
 
+            // And the bakes of its graph materials: a render that baked again (a graph file edited) puts the mesh in again with them.
+            if (bakes is not null && _bakedFor is { } bakedFor && !ReferenceEquals(bakes.Peek(bakedFor), _shownBakes))
+            {
+                ShowMesh(store.Current);
+                continue;
+            }
+
             if (next.Spec != _spec || !_viewApplied)
             {
                 ChangeView(next);
@@ -173,6 +185,7 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
 
             queue.TryTake(out _);
             next.ServedVersion = _version;
+            next.ServedUnbaked = _unbaked;
             scene.Render(next);
         }
     }
@@ -181,25 +194,32 @@ internal sealed class RenderPump(RenderQueue queue, ModelStore store, IRenderSce
     {
         // Taken as seen even on a failure: the next try is the next mesh, not every frame.
         _version = snapshot.Version;
+        // A model with graph materials is drawn with their bakes (T-163), resolved by render before it queued the frame. The bake is
+        // read once (RV-83): what is drawn, the frame's unbaked mark and what Step compares later all come from this one read.
+        var resolved = bakes?.Peek(snapshot.Model);
+        _bakedFor = snapshot.Model;
+        _shownBakes = resolved;
         try
         {
+            var model = bakes is null ? snapshot.Model : GraphBakes.DrawnOf(snapshot.Model, resolved);
+            _unbaked = bakes is not null && resolved is null && snapshot.Model.Materials.Any(m => m.HasGraph);
             var whole = _shownPart is null && _shownLevel is null;
-            var drawn = whole ? snapshot.Mesh! : snapshot.Model.CombinedOf(_shownPart, _shownLevel)
-                ?? throw new InvalidOperationException(_shownPart is { } p && snapshot.Model.FindPart(p) is null
+            var drawn = whole ? model.Combined! : model.CombinedOf(_shownPart, _shownLevel)
+                ?? throw new InvalidOperationException(_shownPart is { } p && model.FindPart(p) is null
                     ? $"part: there is no part named '{p}'" : "nothing is drawn: no part of it has geometry at that level");
-            scene.ShowMaterials(snapshot.Model.Materials);
+            scene.ShowMaterials(model.Materials);
             // The bone of the last weights look may be gone from a newer model (an undo, open or renaming define_skeleton):
             // then the mesh is shown shaded, and only a weights request for that bone fails, at the head of the queue.
-            var heat = _shownWeights is null || WeightHeat.Refusal(snapshot.Model, _shownWeights) is not null
-                ? null : Within(snapshot.Model, WeightHeat.Of(snapshot.Model, _shownWeights));
-            if ((_shownPose is not null && snapshot.Model.Skeleton is not null) || _shownTargets is not null)
+            var heat = _shownWeights is null || WeightHeat.Refusal(model, _shownWeights) is not null
+                ? null : Within(model, WeightHeat.Of(model, _shownWeights));
+            if ((_shownPose is not null && model.Skeleton is not null) || _shownTargets is not null)
             {
                 // The morph comes before the skin. With no pose only the morph is applied, so the mesh is not skinned at rest.
                 var morphed = _shownTargets is { } weights ? weights.ByName : null;
                 // Each weighted occurrence is skinned where it is drawn, in model space, as the skinned export bakes it (RV-71).
-                var posed = (_shownPose is { } pose && snapshot.Model.Skeleton is not null
-                    ? Skinning.PosedOf(snapshot.Model, pose, morphed, _shownPart)
-                    : Skinning.Morphed(snapshot.Model, morphed!).CombinedOf(_shownPart, null))!;
+                var posed = (_shownPose is { } pose && model.Skeleton is not null
+                    ? Skinning.PosedOf(model, pose, morphed, _shownPart)
+                    : Skinning.Morphed(model, morphed!).CombinedOf(_shownPart, null))!;
                 if (heat is null) scene.ShowMesh(posed, drawn);
                 else scene.ShowMesh(posed, drawn, heat);
             }

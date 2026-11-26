@@ -177,8 +177,26 @@ internal static class RenderTool
     }
 
     private const string Text =
-        "Renders the current mesh, as set by define_mesh or open and changed by the edits (move, extrude, subdivide, delete, merge_faces, bridge, plane_cut, loop_cut, knife) or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line, "
-        + "e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
+        "Renders the current mesh, as set by define_mesh or open and changed by the edits (move, extrude, subdivide, delete, merge_faces, bridge, plane_cut, loop_cut, knife) or undo (with several meshes, every mesh together; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line. "
+        + "'view' is 'front' (the default, from the +X +Y +Z corner), 'back', or head-on '+x', '-x', '+y', '-y', '+z', '-z'; or give 'direction', [x, y, z] from the point looked at toward the eye, any length. "
+        + "'zoom' (1 to 8) narrows the view about 'target', a point [x, y, z] in model space inside the bounds of what is drawn (default: the centre); 'projection' is 'perspective' (the default, what a game shows) or 'orthographic' (true proportions, for reading dimensions); 'size' is 256, 512 (the default) or 1024. "
+        + "'mode' is the look: 'shaded' (the default), 'wireframe', 'normals', 'checker' or 'uvs'. "
+        + "In 'shaded', a face with a material (define_material, set_material) is drawn as the game's PBR shading draws it, its textures sampled at the face's UVs, lit by Carve's light and a fixed sky; every other look ignores materials, as it ignores colours. "
+        + "A slot that names a graph output (define_material) is evaluated for each mesh that wears it, on that mesh's UVs and bakes when the graph reads the mesh, on the first render that draws it and again after an edit to the mesh, its UVs or a graph file; otherwise it comes from memory. "
+        + "The text then gains baked: [{material, mesh, slot, size, ms}], one entry per slot baked in this call (mesh null for a graph that does not read the mesh), and a warning when one material took over 5 s (lower its size or the node's rays). A slot that cannot be baked fails the render. "
+        + "'wireframe' draws the edges over dark faces (hidden-line); 'normals' colours each face by its facing, with a spike along its normal, to find a face pointing the wrong way; 'checker' draws a checker at each face's UVs, to read stretch and mirroring; 'uvs' draws one mesh's UV layout flat, with 'image' drawn under it: a PNG path, or a graph output {graph, output, size} evaluated on this mesh with its real curvature, occlusion, masks and position; any role or named output may be named, each drawn as its own values; image.size defaults to the graph's own and is a power of two from 64 to 4096, not the frame's 256, 512 or 1024; e.g.\n"
+        + ExampleMarker + "{\"mode\":\"uvs\",\"image\":{\"graph\":\"weathered-iron.texgraph\",\"output\":\"wear\",\"size\":256}}\n"
+        + "'highlight' ({\"vertices\":[ids],\"edges\":[[a,b]],\"faces\":[ids]}) draws what a select picked in orange; 'labels' ('faces', 'vertices' or 'both') writes element ids. "
+        + "'views' (2 to 6 view names or {view or direction, zoom, target}; 'columns' 1 to 3) draws a contact sheet in one image: the six axis views are {\"views\": [\"+x\", \"-x\", \"+y\", \"-y\", \"+z\", \"-z\"], \"projection\": \"orthographic\", \"size\": 256}. "
+        + "Faces wound the wrong way (clockwise seen from outside) show as MISSING: you see through them. An EMPTY result, an image of only the dark background with no error, means no face points at the camera: the faces are wound the wrong way, or the mesh is an open surface seen from behind. "
+        + "'pose', 'clip' with 'time', 'targets', 'bones' and 'weights' draw the model posed, morphed, with its skeleton or a bone's weights; 'part' and 'level' draw one part or kept level of the placed model. "
+        + "More: help {\"tool\":\"render\"} gives the caption formats, the normals and checker colour codes, the uvs look's rules, labels, sheets, pose, targets, bones and weights, parts and levels, and every error.";
+
+    /// <summary>What left render's description (T-207), served by help {"tool":"render"}: the same sentences, and the part and level paragraph last.</summary>
+    public const string Reference =
+        "The detail that left render's description, in its own words: caption formats, the colour and hue tables, each look and argument in full, and every error.\n"
+        + "Renders the current mesh, as set by define_mesh or open and changed by the edits (move, extrude, subdivide, delete, merge_faces, bridge, plane_cut, loop_cut, knife) or undo (with several meshes, every mesh together, framed on the bounds of them all; labels and highlight apply to the one mesh 'mesh' names, with its own ids), and returns one PNG image, 512x512 pixels unless 'size' says otherwise, followed by one caption line. Neither wireframe nor normals depends on the light. "
+        + "The caption reads e.g. '512x512, view front, 8 vertices, 6 faces'. The image is shaded by Empyrean, the engine games built on this model use. "
         + "No file is written. Nothing is drawn but the mesh, and the look's lines and spikes, the highlight's orange lines and stars, and the labels and tile captions you ask for: no grid or axes, a dark background, about 8% margin around the mesh. "
         + "Views: 'front' (the default) looks from the +X +Y +Z corner, showing the mesh's top, its +Z side on the left and its +X side on the right; "
         + "'back' looks from the opposite corner, -X -Y -Z, upward from below, showing its underside, -Z side and -X side. "
@@ -199,9 +217,11 @@ internal static class RenderTool
         + "The caption says so after the view: '512x512, view +x, orthographic, 8 vertices, 6 faces'. "
         + "'size' is the image's width and height: 256 for a quick look or a sheet tile, 512 (the default), 1024 for a dense mesh with labels. "
         + "The caption opens with it: '256x256, view front, 8 vertices, 6 faces'. "
-        + "'mode' is the look: 'shaded' (the default), 'wireframe', 'normals', 'checker' or 'uvs'. Neither wireframe nor normals depends on the light. "
         + "In 'shaded', a face with a material (define_material, set_material) is drawn as the game's PBR shading draws it, its textures sampled at the face's UVs (a face with no UVs samples the texture's corner at (0, 0), as the game does), "
         + "lit by Carve's light and a fixed sky so that metal reads; a game's own lighting will differ. Only material faces take the sky's light, so a matte white material face is brighter and bluer on top than an uncoloured or coloured face. Every other look ignores materials, as it ignores colours. "
+        + "The text then gains baked: [{material, mesh, slot, size, ms}], one entry per slot baked in this call (mesh null for a graph that does not read the mesh), and a warning when one material took over 5 s to bake: lower its size or the node's rays. A slot that cannot be baked fails the render. "
+        + "Each of these is a tool error with the model unchanged: a bake that fails on the mesh (no UVs, overlapping UVs, a missing group) says to unwrap or lay out the mesh or name a group it has; a per-mesh copy's name (<material>@<mesh>, or a kept level's) that is a material the model already has is refused as export refuses it, saying to rename one; "
+        + "and an edit landing between the bake and the frame on each of 3 tries (\"The model changed between its bake and its frame on each of 3 tries, so its graph slots would be drawn empty; call render again once the edits have settled.\", or for uvs, \"... so its graph image would lie under another model's layout; ...\"). "
         + "'wireframe' draws every edge in light grey over faces filled near black: use it to count and place edges and see the face loops. It is hidden-line, not see-through: "
         + "an edge behind a face is hidden, so look from another side to see it. "
         + "'normals' colours each face by the way it faces and stands a light grey spike on it along its normal, at its centre, or for a face with holes at a point on the face clear of the holes: use it to find a face pointing the wrong way, or a non-planar face, whose spike is off. On a smooth mesh (set_shading) it shows the corner normals instead: the colour blends across a soft edge and breaks at a hard one, and a spike stands on each corner along its normal. "
@@ -222,8 +242,6 @@ internal static class RenderTool
         + "A sheet's caption gives columns by rows, the tile size, the parts a single caption has, and every tile's caption: '2x2 tiles of 512x512, wireframe, labels faces, views front, (2, 1, 1), +x, -z, 72 vertices, 70 faces'. "
         + "The light turns with the view, and faces turned different ways show as different brightnesses. "
         + "Faces wound the wrong way (clockwise seen from outside) show as MISSING: you see through them to whatever is behind. "
-        + "An EMPTY result, an image of only the dark background with no error, means no face points at the camera: "
-        + "the faces are wound the wrong way, or the mesh is an open surface seen from behind. "
         + "Try the other view, or fix the winding and call define_mesh again (move and extrude keep each face's winding, so they cannot fix it). "
         + "'checker' draws the model lit with a 256x256 checker of 8x8 cells at each face's corner UVs (set_uvs, project_uvs, unwrap), with the same normals as shaded. "
         + "Each column has its own hue, red at u = 0 through orange, yellow, green, cyan, blue and indigo to violet at u = 1; light and dark cells alternate, and the cell at uv (0,0), the texture's top-left, is white. "
@@ -251,7 +269,9 @@ internal static class RenderTool
         + "'level' draws a kept level (keep_level): each part at its newest kept level at or below it, a part with none not drawn; not with pose, clip, targets or weights, since a level is drawn as it was kept, at rest. "
         + "With part, labels and highlight apply to 'mesh', which must be drawn with it, or with mesh left out to the one part under it with geometry of its own; the ids are that part's own (at a level, the level's), shown on its own occurrence and not on its instances. "
         + "The caption names them before the counts: '512x512, view front, part Axle_F, level 0, 32 vertices, 20 faces'. "
-        + "Errors: a part the model lacks (the parts are listed), a level below 0, a part or level that draws nothing, and a mesh not drawn with the part or at the level. ";
+        + "Errors: a part the model lacks (the parts are listed), a level below 0, a part or level that draws nothing, and a mesh not drawn with the part or at the level. "
+        + "Try the other view, or fix the winding and call define_mesh again (move and extrude keep each face's winding). "
+        + "Tool errors leave the mesh untouched; so do no mesh and a machine with no Vulkan device. ";
 
     /// <summary>The description of render's <c>part</c>.</summary>
     public const string PartArgumentText = "A part's name (get_parts): draws only it and the parts under it, each where it is placed, framed on them. Default: the whole model.";
@@ -266,11 +286,12 @@ internal static class RenderTool
         + "left out while there are several and they are asked for, the call is a tool error that lists the names. In mode 'uvs', the one mesh drawn, required when there are several.";
 
     /// <summary>The sentences render's description gains for <c>image</c> (T-121), kept apart so the unchanged-tools digest can take them out.</summary>
-    internal const string ImageLookText = "With image (a PNG path), the PNG is drawn under the layout to show a bake or a texture where it lands on the mesh: it covers the unit square, u right and v down, drawn as stored inside the islands (where the checker is bright) and at half brightness outside them, each channel halved, so padding shows as a fringe of island colour on a darker ground; beyond the unit square the dim checker stays. It is sampled nearest, unlit, with no colour conversion (a grey or single-channel PNG shows as grey), and the edges, seams, labels and highlight are drawn over it. The caption names it: 'image wrench.occlusion.png 1024 x 1024'. A PNG that is missing (the folder's PNGs are listed), is not a PNG or is over 4096 is refused as define_material refuses a texture. ";
+    internal const string ImageLookText = "With image (a PNG path), the PNG is drawn under the layout to show a bake or a texture where it lands on the mesh: it covers the unit square, u right and v down, drawn as stored inside the islands (where the checker is bright) and at half brightness outside them, each channel halved, so padding shows as a fringe of island colour on a darker ground; beyond the unit square the dim checker stays. It is sampled nearest, unlit, with no colour conversion (a grey or single-channel PNG shows as grey), and the edges, seams, labels and highlight are drawn over it. The caption names it: 'image wrench.occlusion.png 1024 x 1024'. A PNG that is missing (the folder's PNGs are listed), is not a PNG or is over 4096 is refused as define_material refuses a texture. "
+        + "image may instead be a graph output, {graph, output, size}: the output is evaluated on this mesh, with its real curvature, occlusion, masks and position, and drawn the same way, so a mesh mask can be seen where it lands. Any role or named output may be named: a grey one is drawn grey, roughness as its own grey values (not the packed image) and normal as its colours. size defaults to the graph's own, a power of two from 64 to 4096. Example: {\"mode\":\"uvs\",\"image\":{\"graph\":\"weathered-iron.texgraph\",\"output\":\"wear\",\"size\":256}}. The caption names the file, the output and the size: 'image weathered-iron.texgraph wear 256 px', and the text carries baked, as render's does, on the first use. An output the graph lacks, a graph that cannot be baked for this mesh, or a key other than graph, output and size is refused naming image. ";
 
     /// <summary>The text of render's <c>image</c> (T-121).</summary>
     internal const string ImageArgumentText =
-        "A PNG path, mode 'uvs' only (refused with any other mode): draws that image under the layout, to see a bake or a texture where it lands on the mesh's UVs. "
+        "A PNG path, or a graph output {graph, output, size} evaluated on the mesh; mode 'uvs' only (refused with any other mode): draws that image under the layout, to see a bake or a texture where it lands on the mesh's UVs. "
         + "Resolved as define_material's texture paths are (relative to the working directory) and read under its rules: a PNG of 1 to 4096 pixels on each side. A missing file lists the .png files in its folder.";
 
     [McpServerTool(Name = "render"), Description(Text)]
@@ -279,6 +300,7 @@ internal static class RenderTool
         EngineStatus status,
         ModelStore store,
         RenderQueue queue,
+        GraphBakes bakes,
         [Description("Where to look from: the corner 'front' (the default when no direction is given) or 'back', or head-on along an axis: '+x', '-x', '+y', '-y', '+z', '-z'. Not with direction."), AllowedValues("front", "back", "+x", "-x", "+y", "-y", "+z", "-z")] string? view = null,
         [Description("[x, y, z]: from the point looked at toward the eye. Up is +Y, or -Z within 1 degree of vertical. Not with view.")] double[]? direction = null,
         [Description("1 to 8: how far to zoom in about the target. The default 1 frames the whole mesh.")] double zoom = 1,
@@ -300,7 +322,7 @@ internal static class RenderTool
         [Description("A bone's name: draws the model unlit with that bone's weight at each vertex, dark blue at 0 through green (0.5) to red at 1; a vertex with no weight at all is magenta and needs fixing (set_weights or weigh). Needs a skeleton; follows pose or clip; not with mode wireframe, normals or checker.")] string? weights = null,
         [Description(PartArgumentText)] string? part = null,
         [Description(LevelArgumentText)] int? level = null,
-        [Description(ImageArgumentText)] string? image = null,
+        [Description(ImageArgumentText)] JsonElement? image = null,
         ToolFolder? toolFolder = null,
         CancellationToken cancellationToken = default)
     {
@@ -311,11 +333,11 @@ internal static class RenderTool
 
         if (mode == "uvs")
         {
-            return await RunUvs(context, status, store, queue, size, labels, highlight, mesh, image, toolFolder?.Directory, cancellationToken);
+            return await RunUvs(context, status, store, queue, bakes, size, labels, highlight, mesh, image, toolFolder?.Directory, cancellationToken);
         }
 
         // RV-74: the image's refusal is listed with the call's other problems, in its own words, and alone when it is the only one.
-        var imageProblem = image is null ? null : $"image: not with mode '{mode ?? "shaded"}'; it is the picture drawn under the layout of mode 'uvs'.";
+        var imageProblem = Absent(image) ? null : $"image: not with mode '{mode ?? "shaded"}'; it is the picture drawn under the layout of mode 'uvs'.";
         CallToolResult Refuse(string problem) => imageProblem is null ? Error(problem) : Failed("render", [imageProblem, problem]);
 
         var sheet = !Absent(views);
@@ -527,24 +549,10 @@ internal static class RenderTool
             listed.Vertices.Select(v => v + offset.Vertices),
             listed.Edges.Select(e => (e.A + offset.Vertices, e.B + offset.Vertices)),
             listed.Faces.Select(f => f + offset.Faces));
-        async Task<(RenderedFrame[]? Frames, string? Error)> RenderTiles()
-        {
-            var rendering = Task.WhenAll(tiles
-                .Select(tile => queue.Post(new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Targets = morph, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton, Weights = weights, Part = part, Level = level })));
-
-            // The frame thread drains the queue; once it has ended, nothing will.
-            await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
-            if (!rendering.IsCompleted)
-            {
-                return (null, status.FaultMessage ?? "The engine has stopped, so nothing can be rendered.");
-            }
-
-            return rendering.IsCompletedSuccessfully
-                ? (rendering.Result, null)
-                : (null, $"The render failed: {rendering.Exception?.GetBaseException().Message}");
-        }
-
-        var (rendered, failure) = await SheetVersions.OnOneMesh(RenderTiles, f => f.Version, SheetAttempts);
+        var baked = new List<GraphBakes.Baked>();
+        var specs = tiles.Select(tile => new RenderSpec(tile.Camera, projected, (int)size, look, labelled) { Pose = posed, Targets = morph, Highlight = picked, TileCaption = sheet ? tile.Caption : null, LabelWindow = window, Bones = skeleton, Weights = weights, Part = part, Level = level }).ToList();
+        // Graph slots are baked there, off the frame thread, before the frames are queued (T-163); the frame thread finds them cached.
+        var (rendered, failure) = await SheetVersions.Render(bakes, store, queue, specs, status.WhenStopped, () => status.FaultMessage, baked, SheetAttempts, cancellationToken);
         if (rendered is not { } frames)
         {
             return Error(failure!);
@@ -564,7 +572,7 @@ internal static class RenderTool
                 Content =
                 [
                     ImageContentBlock.FromBytes(EncodePng(composed.Pixels, composed.Width, composed.Height), "image/png"),
-                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton, weights, noUvs, part, level) },
+                    new TextContentBlock { Text = SheetCaption(frames[^1], across, tiles, projected, look, labelled, picked, skeleton, weights, noUvs, part, level) + GraphBakes.Text(baked) },
                 ],
             };
         }
@@ -576,7 +584,7 @@ internal static class RenderTool
             Content =
             [
                 ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
-                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs, part, level) },
+                new TextContentBlock { Text = Caption(frame, view, direction, projected, look, labelled, picked, zoom, target, skeleton, weights, noUvs, part, level) + GraphBakes.Text(baked) },
             ],
         };
     }
@@ -607,8 +615,8 @@ internal static class RenderTool
     /// then the mesh is picked (required among several) and must have a mapped face.
     /// </summary>
     private static async Task<CallToolResult> RunUvs(
-        RequestContext<CallToolRequestParams> context, EngineStatus status, ModelStore store, RenderQueue queue,
-        double size, string? labels, JsonElement? highlight, JsonElement? mesh, string? image, string? baseDirectory, CancellationToken cancellationToken)
+        RequestContext<CallToolRequestParams> context, EngineStatus status, ModelStore store, RenderQueue queue, GraphBakes bakes,
+        double size, string? labels, JsonElement? highlight, JsonElement? mesh, JsonElement? image, string? baseDirectory, CancellationToken cancellationToken)
     {
         var given = context.Params?.Arguments;
         bool Given(string name) =>
@@ -637,9 +645,24 @@ internal static class RenderTool
         }
 
         MaterialTexture? picture = null;
-        if (image is not null && !DefineMaterialTool.LoadTexture("render", "image", image, baseDirectory, out picture, out var imageProblem))
+        MaterialGraph? graphImage = null;
+        if (Absent(image))
         {
-            problems.Add(imageProblem!);
+        }
+        else if (image!.Value.ValueKind == JsonValueKind.String)
+        {
+            if (!DefineMaterialTool.LoadTexture("render", "image", image.Value.GetString()!, baseDirectory, out picture, out var imageProblem))
+            {
+                problems.Add(imageProblem!);
+            }
+        }
+        else if (image.Value.ValueKind == JsonValueKind.Object)
+        {
+            graphImage = LoadGraphImage(image.Value, baseDirectory, problems);
+        }
+        else
+        {
+            problems.Add($"image: expected a PNG path or {{graph, output, size}}, got {Describe(image.Value)}");
         }
 
         if (problems.Count > 0)
@@ -653,70 +676,84 @@ internal static class RenderTool
             return Error(fault);
         }
 
-        var current = store.Current;
-        if (current.Mesh is null)
-        {
-            return Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render.");
-        }
-
-        if (current.Model.Target(meshName, out var aimed) is not { } named)
-        {
-            return Failed("render", [meshName is null ? aimed + "; mode 'uvs' draws one mesh's layout" : aimed!]);
-        }
-
-        if (named.Mesh.Uvs is not { MappedFaces.Count: > 0 })
-        {
-            return Error($"mesh '{named.Name}' has no UVs; give it some with set_uvs, project_uvs or unwrap");
-        }
-
-        if (MeshEdits.UnknownElements(named.Mesh, [], [], listed.Faces) is { Count: > 0 } missing)
-        {
-            return Failed("render", missing.Select(e => e.ToString()));
-        }
-
-        var offset = current.Model.OffsetOf(named.Name)!.Value;
-        var faces = new ElementWindow(offset.Vertices, offset.Faces, named.Mesh.Faces.Count);
+        // RV-82: a graph image is baked on the snapshot; a frame drawn on a later model would lay another layout over it, so that
+        // model is baked and drawn again, as render's other looks do (SheetVersions.Baked).
         var labelled = labels == "faces" ? LabelSet.Faces : LabelSet.None;
-        var picked = Highlight.Of([], [], listed.Faces.Select(f => f + offset.Faces));
-        var spec = new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, (int)size, Look.Uvs, labelled) { Highlight = picked, UvFaces = faces, UvImage = picture };
+        return await SheetVersions.Uvs(bakes, store, queue, graphImage, picture, Check, Spec, Answer, Error, status.WhenStopped, () => status.FaultMessage, SheetAttempts, cancellationToken);
 
-        var rendering = queue.Post(spec);
-        await Task.WhenAny(rendering, status.WhenStopped).WaitAsync(cancellationToken);
-        if (!rendering.IsCompleted)
+        (CallToolResult? Refused, string? Mesh) Check(ModelSnapshot current)
         {
-            return Error(status.FaultMessage ?? "The engine has stopped, so nothing can be rendered.");
+            if (current.Mesh is null)
+            {
+                return (Error("There is no mesh yet: call define_mesh first, or open to read a saved .carve file, then render."), null);
+            }
+
+            if (current.Model.Target(meshName, out var aimed) is not { } named)
+            {
+                return (Failed("render", [meshName is null ? aimed + "; mode 'uvs' draws one mesh's layout" : aimed!]), null);
+            }
+
+            if (named.Mesh.Uvs is not { MappedFaces.Count: > 0 })
+            {
+                return (Error($"mesh '{named.Name}' has no UVs; give it some with set_uvs, project_uvs or unwrap"), null);
+            }
+
+            if (MeshEdits.UnknownElements(named.Mesh, [], [], listed.Faces) is { Count: > 0 } missing)
+            {
+                return (Failed("render", missing.Select(e => e.ToString())), null);
+            }
+
+            return (null, named.Name);
         }
 
-        if (!rendering.IsCompletedSuccessfully)
+        RenderSpec Spec(ModelSnapshot current, string mesh, MaterialTexture? shown)
         {
-            return Error($"The render failed: {rendering.Exception?.GetBaseException().Message}");
+            var offset = current.Model.OffsetOf(mesh)!.Value;
+            var faces = new ElementWindow(offset.Vertices, offset.Faces, current.Model.Find(mesh)!.Faces.Count);
+            var picked = Highlight.Of([], [], listed.Faces.Select(f => f + offset.Faces));
+            return new RenderSpec(CameraSpec.ForView(RenderView.Front), Projection.Orthographic, (int)size, Look.Uvs, labelled) { Highlight = picked, UvFaces = faces, UvImage = shown };
         }
 
-        var frame = rendering.Result;
-        // The face range is the checked snapshot's; a frame drawn on a later model may hold other faces there.
-        if (current.Model.Meshes.Count > 1 && SheetVersions.ShiftedIdsRefusal(named.Name, current.Version, frame.Version) is { } stale)
+        CallToolResult Answer(ModelSnapshot current, string mesh, RenderedFrame frame, MaterialTexture? shown, List<GraphBakes.Baked> baked)
         {
-            return Error(stale);
-        }
+            var named = (Name: mesh, Mesh: current.Model.Find(mesh)!);
+            var offset = current.Model.OffsetOf(mesh)!.Value;
+            var picked = Highlight.Of([], [], listed.Faces.Select(f => f + offset.Faces));
+            // The face range is the checked snapshot's; a frame drawn on a later model may hold other faces there.
+            if (current.Model.Meshes.Count > 1 && SheetVersions.ShiftedIdsRefusal(named.Name, current.Version, frame.Version) is { } shifted)
+            {
+                return Error(shifted);
+            }
 
-        var report = MeshReport.Create(named.Mesh);
-        var unmapped = named.Mesh.LiveFaces.Count(f => !named.Mesh.Uvs!.IsMapped(f));
-        var pixels = frame.Pixels.ToDecodedImage();
-        return new CallToolResult
-        {
-            Content =
-            [
-                ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
-                new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount, picture) },
-            ],
-        };
+            var report = MeshReport.Create(named.Mesh);
+            var unmapped = named.Mesh.LiveFaces.Count(f => !named.Mesh.Uvs!.IsMapped(f));
+            var pixels = frame.Pixels.ToDecodedImage();
+            return new CallToolResult
+            {
+                Content =
+                [
+                    ImageContentBlock.FromBytes(EncodePng(pixels.Pixels, pixels.Width, pixels.Height), "image/png"),
+                    new TextContentBlock { Text = UvCaption((int)size, named.Name, labelled, picked, unmapped, report.VertexCount, report.FaceCount, shown, graphImage?.Output) + GraphBakes.Text(baked) },
+                ],
+            };
+        }
     }
 
-    /// <summary>The <c>uvs</c> caption: <c>512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 8 vertices, 6 faces</c>, the named mesh's counts.</summary>
-    internal static string UvCaption(int size, string mesh, LabelSet labels, Highlight highlight, int unmapped, int vertices, int faces, MaterialTexture? image = null)
+    /// <summary>render's <c>image</c> as <c>{graph, output, size}</c> (T-165), T-160's rules for each field; null with each problem, named by <c>image</c>, in <paramref name="problems"/>.</summary>
+    private static MaterialGraph? LoadGraphImage(JsonElement image, string? baseDirectory, List<string> problems)
+    {
+        if (DefineMaterialTool.ParseGraph("render", "image", image, baseDirectory, problems, "an image graph", "a graph image") is not { } made) return null;
+        if (made.Problem() is { } shape) problems.Add($"image: {shape}");
+        else return made;
+        return null;
+    }
+
+    /// <summary>The <c>uvs</c> caption:<c>512x512, uvs crate, labels faces, highlight 1 face, 2 faces unmapped, 8 vertices, 6 faces</c>, the named mesh's counts.</summary>
+    internal static string UvCaption(int size, string mesh, LabelSet labels, Highlight highlight, int unmapped, int vertices, int faces, MaterialTexture? image = null, string? graphOutput = null)
     {
         var parts = new List<string> { $"{size}x{size}", $"uvs {mesh}" };
-        if (image is not null) parts.Add($"image {Path.GetFileName(image.Path)} {image.Width} x {image.Height}");
+        if (image is not null && graphOutput is not null) parts.Add($"image {Path.GetFileName(image.Path)} {graphOutput} {image.Width} px");
+        else if (image is not null) parts.Add($"image {Path.GetFileName(image.Path)} {image.Width} x {image.Height}");
         if (labels == LabelSet.Faces) parts.Add("labels faces");
         if (!highlight.IsEmpty) parts.Add($"highlight {highlight.Counts()}");
         if (unmapped > 0) parts.Add(unmapped == 1 ? "1 face unmapped" : $"{unmapped} faces unmapped");

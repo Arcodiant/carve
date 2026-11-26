@@ -116,6 +116,9 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         if (faults.Count > 0) return Error("swatch: the graph does not evaluate; fix it first. " + Faults(faults));
         if (!ParameterOverrides.TryApply("swatch", graph, Arg("parameters"), registry, out graph, out var overrides, out var overrideError)) return Error(overrideError!);
         var set = overrides.Count == 0 ? "" : "parameters " + GraphParameters.Describe(overrides);
+        var mesh = MeshNote(graph, registry);
+        var meshTitle = mesh == "" ? "" : "   mesh inputs neutral";
+        CallToolResult Show(byte[] rgba, int width, int height, string caption) => Image(rgba, width, height, caption + (mesh == "" ? "" : "; " + mesh));
 
         int size;
         if (Arg("size") is { ValueKind: not JsonValueKind.Null } sizeArg)
@@ -170,12 +173,12 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
             var texels = OutputImage.Rgba8(evaluator, role, size);
             if (view == "flat")
             {
-                return Image(texels, size, size, $"swatch flat: {role} of {name}, {size} x {size} px, exact texels" + (set == "" ? "" : "; " + set));
+                return Show(texels, size, size, $"swatch flat: {role} of {name}, {size} x {size} px, exact texels" + (set == "" ? "" : "; " + set));
             }
             var side = SwatchImages.TiledSide(size);
             var tiled = SwatchImages.Tiled(texels, size, side);
             var scaled = side == 3 * size ? "exact texels" : $"nearest-scaled from {3 * size} px";
-            return Image(tiled, side, side, $"swatch tiled: {role} of {name}, 3 x 3 of {size} px, {side} x {side} px, {scaled}" + (set == "" ? "" : "; " + set));
+            return Show(tiled, side, side, $"swatch tiled: {role} of {name}, 3 x 3 of {size} px, {side} x {side} px, {scaled}" + (set == "" ? "" : "; " + set));
         }
 
         // Each column as the sheet shows it (roughness with B 0, metallic, height and greyscale named outputs grey); the
@@ -185,7 +188,7 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
         var worn = new Dictionary<OutputRole, byte[]>();
         foreach (var r in new[] { OutputRole.BaseColour, OutputRole.Normal, OutputRole.Roughness, OutputRole.Occlusion }.Where(r => evaluator.Has(OutputRoles.Name(r))))
             worn[r] = r == OutputRole.Roughness && metallic ? OutputImage.FileRgba8(evaluator, OutputRoles.Name(r), size) : images[OutputRoles.Name(r)];
-        var title = $"{(path is null ? "unsaved graph" : name)}   {size} px   seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}" + (set == "" ? "" : "   " + set) + (tiled3 == "" ? "" : "   " + tiled3);
+        var title = $"{(path is null ? "unsaved graph" : name)}   {size} px   seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}" + (set == "" ? "" : "   " + set) + (tiled3 == "" ? "" : "   " + tiled3) + meshTitle;
         var columns = roles.ToList();
         var labels = view == "sheet" ? SwatchSheet.Labels(title, columns, angle, tiling) : null;
 
@@ -201,16 +204,16 @@ public sealed class SwatchTool(GraphStore store, NodeRegistry registry, EngineSt
 
         if (view == "sphere")
         {
-            return Image(frame.Sphere, SwatchImages.SphereCell, SwatchImages.SphereCell,
+            return Show(frame.Sphere, SwatchImages.SphereCell, SwatchImages.SphereCell,
                 $"swatch sphere: {name} at {size} px on the engine's UV sphere, angle {angleText}, {(tiling == 1 ? "" : $"tiling {tiling}, ")}{SwatchImages.SphereCell} x {SwatchImages.SphereCell} px" + (set == "" ? "" : "; " + set));
         }
         if (view == "cube")
         {
-            return Image(frame.Sphere, SwatchImages.SphereCell, SwatchImages.SphereCell,
+            return Show(frame.Sphere, SwatchImages.SphereCell, SwatchImages.SphereCell,
                 $"swatch cube: {name} at {size} px on a cube, each face 0 to 1 in u and v, angle {angleText}, {(tiling == 1 ? "" : $"tiling {tiling}, ")}{SwatchImages.SphereCell} x {SwatchImages.SphereCell} px" + (set == "" ? "" : "; " + set));
         }
         var (sheet, layout) = SwatchSheet.Compose([.. columns.Select(r => images[r])], size, frame.Sphere, frame.Atlas!, frame.Extents!);
-        return Image(sheet, layout.Width, layout.Height,
+        return Show(sheet, layout.Width, layout.Height,
             $"swatch sheet: {name}, {size} px, seed {graph.Seed.ToString(CultureInfo.InvariantCulture)}{(set == "" ? "" : ", " + set)}; columns {string.Join(", ", columns)}, flat over tiled 3 x 3; sphere at angle {angleText}{(tiling == 1 ? "" : $", tiling {tiling}")}; {layout.Width} x {layout.Height} px");
     }
 

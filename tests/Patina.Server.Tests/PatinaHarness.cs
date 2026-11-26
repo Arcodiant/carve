@@ -59,22 +59,52 @@ internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
     private readonly Pipe _fromServer = new();
     private McpClient? _client;
 
-    private PatinaHarness(string? workingDirectory)
+    private readonly CancellationTokenSource _stop = new();
+    private Task _drawer = Task.CompletedTask;
+
+    /// <summary>The labels of the last sheet a blank engine drew (its first is the title); null before one.</summary>
+    public IReadOnlyList<string>? LastLabels { get; private set; }
+
+    private PatinaHarness(string? workingDirectory, bool blankEngine)
     {
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         var mcp = builder.Services.AddMcpServer(o => o.ServerInfo = new Implementation { Name = "patina", Version = "0" });
         mcp.WithStreamServerTransport(_toServer.Reader.AsStream(), _fromServer.Writer.AsStream());
         Program.AddTools(builder.Services, mcp, workingDirectory is null ? null : Path.GetFullPath(workingDirectory));
         // No engine here: swatch's flat and tiled views need none, and its sphere and sheet are refused with this.
-        builder.Services.AddSingleton(Carve.Hosting.EngineStatus.Faulted(NoEngine));
+        // A blank engine instead answers every draw with blank frames, so the sphere's, cube's and sheet's text is served (RV-82).
+        var status = Carve.Hosting.EngineStatus.Faulted(NoEngine);
+        if (blankEngine)
+        {
+            status = new Carve.Hosting.EngineStatus();
+            // shortcut: reaches Carve.Hosting's internal SetReady by name (no public ready, no InternalsVisibleTo), so a rename
+            // fails every blankEngine test with a NullReferenceException here; replace it when EngineStatus gains a public ready state.
+            typeof(Carve.Hosting.EngineStatus).GetMethod("SetReady", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(status, null);
+        }
+        builder.Services.AddSingleton(status);
         _host = builder.Build();
     }
 
-    /// <summary>A started harness; relative paths given to save and open resolve against <paramref name="workingDirectory"/>.</summary>
-    public static async Task<PatinaHarness> StartAsync(string? workingDirectory = null)
+    private async Task DrawBlank(Carve.Hosting.OffscreenQueue<SwatchRequest> queue)
     {
-        var harness = new PatinaHarness(workingDirectory);
+        while (!_stop.IsCancellationRequested)
+        {
+            if (queue.TryTake(out var request) && request is not null)
+            {
+                LastLabels = request.Spec.Labels;
+                request.Complete(new SwatchFrame(new byte[SwatchImages.SphereCell * SwatchImages.SphereCell * 4], new byte[LabelAtlas.Size * LabelAtlas.Size * 4],
+                    request.Spec.Labels is { } labels ? [.. labels.Select(_ => System.Numerics.Vector2.Zero)] : null));
+            }
+            else await Task.Delay(5);
+        }
+    }
+
+    /// <summary>A started harness; relative paths given to save and open resolve against <paramref name="workingDirectory"/>. With <paramref name="blankEngine"/>, swatch's engine views draw blank frames.</summary>
+    public static async Task<PatinaHarness> StartAsync(string? workingDirectory = null, bool blankEngine = false)
+    {
+        var harness = new PatinaHarness(workingDirectory, blankEngine);
         await harness._host.StartAsync();
+        if (blankEngine) harness._drawer = Task.Run(() => harness.DrawBlank(harness._host.Services.GetRequiredService<Carve.Hosting.OffscreenQueue<SwatchRequest>>()));
         harness._client = await McpClient.CreateAsync(
             new PipeClientTransport(harness._fromServer.Reader.AsStream(), harness._toServer.Writer.AsStream()),
             new McpClientOptions { ProtocolVersion = ProtocolVersion });
@@ -108,6 +138,8 @@ internal sealed class PatinaHarness : IToolCaller, IAsyncDisposable
     {
         if (_client is not null) await _client.DisposeAsync();
         await _host.StopAsync();
+        _stop.Cancel();
+        await _drawer;
         _host.Dispose();
     }
 

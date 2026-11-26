@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Engine-free mesh-input graph nodes (M-29, T-161): texture-graph node types fed from Carve.Core.Baking on a mesh's UV layout.
+       References Carve.Core and Patina.Graphs only; never the engine, an Arcodiant package, System.Random or the clock
+       (CarveGraphsIsEngineFreeTests). -->
+  <PropertyGroup>
+    <RootNamespace>Carve.Graphs</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Carve.Core/Carve.Core.csproj" />
+    <ProjectReference Include="../Patina.Graphs/Patina.Graphs.csproj" />
+  </ItemGroup>
+
+</Project>

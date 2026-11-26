@@ -16,14 +16,27 @@ namespace Carve.Server.Tests;
 /// Taken again for RV-71 (Opus 5.5), whose project_uvs text says planar sees the mesh's own axes and whose export text says a piece of an
 /// instance or an empty is refused as save's is: with those two changes stripped the digest was the one before (DCE3D7BA...).
 /// T-124 (Opus 5.5) adds render_glb's sentence on texture sampling (mip maps, as render's); it is taken out with T-94's additions.
+/// Taken again for T-160 (Opus 5.5), whose define_material text and schema take graph slots and whose get_mesh, save and open
+/// texts name them; the diff of src/Carve.Server against origin/milestone/M-29 changes no other tool's text or schema (was 1697322B...).
+/// Taken again for T-164 (Sonnet 5.5), whose export text gains the paragraph on graph materials and whose define_material sentence
+/// says export writes them; only those two descriptions moved it (was D5334566...).
 /// </summary>
 [Trait("Tier", "unit")]
 public class PartToolsListTests
 {
     /// <summary>SHA-256 of the existing tools' entries before T-93, in registration order, as <see cref="Digest"/> takes it.</summary>
-    private const string Before = "1697322BAD754E9F549E58F829ACB3038B71EA812D27C0FEA8C1782F06D46820";
+    // Taken again, once, from the final text, for T-207 (Sonnet 5.5), which holds every description under Claude Code's cut: the new help
+    // tool joins NewTools, and the descriptions of render, export, save, open, check, select, define_mesh, get_mesh, define_material,
+    // project_uvs and unwrap moved it (bake is not among the tools this digest covers); no schema and no other tool did.
+    // Taken again, once, for B-10 (Opus 5.5), which lets get_mesh read a mesh in parts: get_mesh's description (the wrench example and
+    // the include and faces rules in, its cube and target examples and the ids sentence moved to help) and its schema (include, faces)
+    // moved it; help's own text names the new entry but help is a new tool here; no other tool's text or schema changed (was 9DE9FEB8...); checked by diffing the served tools/list against origin/milestone/M-29's. Its guidance line was
+    // then tightened (ask a few sections of one group at a time) and the digest taken from that final text.
+    // Taken again, once, at the end of T-220 (Sonnet 5.5), RV-82's descriptions member: check, select, export, define_material, get_mesh and render moved it
+    // (diff of the served tools/list against origin/milestone/M-29 in T-220's As built); was 16999BFC...
+    private const string Before = "CB8CCB4AA9E5826E36C60D3717720E68853C03A8D99CC1AC561C0EE38F750A2D";
 
-    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "displace"];
+    private static readonly string[] NewTools = ["define_part", "get_parts", "keep_level", "bake", "displace", "help"];
 
     /// <summary>The sentences T-93 adds to existing descriptions, each removed before the digest.</summary>
     private static readonly string[] Agreed = [carve::Carve.Server.PartTexts.PartSpace, carve::Carve.Server.PartTexts.DefineMesh, carve::Carve.Server.PartTexts.Check,
@@ -74,6 +87,21 @@ public class PartToolsListTests
         Assert.True(digest == Before, $"tools/list digest {digest}");
     }
 
+    /// <summary>RV-82: the digest above leaves out help and bake (new tools), so their whole entries (name, description, schema) are pinned here.</summary>
+    private const string HelpAndBake = "4CC8D9FD46CF80BCD84096E072B18722383A6444838D575BB3FE403A4678D6A8";
+
+    [Fact]
+    public async Task The_help_and_bake_entries_are_as_pinned()
+    {
+        await using var carve = new ToolHarness();
+        await carve.InitializeAsync();
+        var kept = new JsonArray();
+        foreach (var tool in (await carve.ListToolsAsync()).EnumerateArray())
+            if (tool.GetProperty("name").GetString() is "help" or "bake") kept.Add(JsonNode.Parse(tool.GetRawText()));
+        var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(kept.ToJsonString())));
+        Assert.True(digest == HelpAndBake, $"help and bake digest {digest}");
+    }
+
     /// <summary>The digest takes the agreed sentences out, so it cannot see one go missing; this pins where each one is.</summary>
     [Fact]
     public async Task Each_agreed_sentence_is_in_its_tools_description_once()
@@ -89,7 +117,7 @@ public class PartToolsListTests
             Assert.True(Count(text, carve::Carve.Server.PartTexts.PartSpace) == (partSpace.Contains(name) ? 1 : 0), $"{name}: PartSpace sentence count");
             Assert.True(Count(text, carve::Carve.Server.PartTexts.PartTarget) == (partTarget.Contains(name) ? 1 : 0), $"{name}: PartTarget sentence count");
             Assert.True(Count(text, carve::Carve.Server.PartTexts.DefineMesh) == (name == "define_mesh" ? 1 : 0), $"{name}: DefineMesh sentence count");
-            Assert.True(Count(text, carve::Carve.Server.PartTexts.Check) == (name == "check" ? 1 : 0), $"{name}: Check sentence count");
+            Assert.True(Count(name == "check" ? HelpToolTests.WithReference(text, name) : text, carve::Carve.Server.PartTexts.Check) == (name == "check" ? 1 : 0), $"{name}: Check sentence count");
         }
     }
 
@@ -102,9 +130,16 @@ public class PartToolsListTests
         foreach (var tool in (await carve.ListToolsAsync()).EnumerateArray())
         {
             var (name, text) = (tool.GetProperty("name").GetString()!, tool.GetProperty("description").GetString()!);
-            Assert.True(Count(text, carve::Carve.Server.RenderPartTexts.Parts) == (name == "render" ? 1 : 0), $"{name}: render's part and level paragraph count");
+            // T-207: render's paragraph moved to its help entry, so it is in no description and once in that entry.
+            Assert.True(Count(text, carve::Carve.Server.RenderPartTexts.Parts) == 0, $"{name}: render's part and level paragraph count");
             Assert.True(Count(text, carve::Carve.Server.GetMeshTool.PlacementText) == (name == "get_mesh" ? 1 : 0), $"{name}: get_mesh's placement paragraph count");
         }
+    }
+
+    [Fact]
+    public void Renders_part_and_level_paragraph_is_in_its_help_entry_once()
+    {
+        Assert.Equal(1, Count(carve::Carve.Server.HelpTool.Entry("render")!, carve::Carve.Server.RenderPartTexts.Parts));
     }
 
     private static int Count(string text, string sentence)

@@ -26,6 +26,16 @@ nuget.org, so the first `dotnet run` restores everything. There is no window;
 every look is an offscreen render. If no device is found the server stays up
 and the `render` tool says so.
 
+Each tool's description is complete enough to use the tool and stays under
+Claude Code's cut of a tool description (4,096 characters; carve holds each to
+3,686). What does not fit is in the `help` tool: `help {"tool":"render"}` gives
+render's full reference (every look, caption and error), and likewise `export`
+(what is written, the limits file), `bake`, `check`, `save`, `open` (the .carve
+format and the part tree), `select` (every error), `define_material` and
+`get_mesh` (where ids come from, the worked examples); `help {}` lists the nine
+entries. A description ends with `More: help ...` when it
+has one.
+
 ## Build and test
 
 ```
@@ -38,14 +48,16 @@ Those two suites need no GPU and are what CI runs. `tests.json` lists every
 suite, its tier, its command and the files it reads, and `cairn test list` prints
 them with the device each needs and about how long it takes. By tier:
 
-- unit, no GPU: `core-unit` and `server-unit` (the two above), and `patina-unit`
-  (patina's graphs and its server).
-- regression, no GPU: `patina-regression`.
+- unit, no GPU: `core-unit` and `server-unit` (the two above), `graphs-unit` (the
+  graph library), `patina-unit` (patina's graphs and its server) and
+  `weathering-unit` (the weathering acceptance project's round-free fact).
+- regression, no GPU: `graphs-regression` and `patina-regression`.
 - regression, on a Vulkan device: `server-regression`, `viewer-cube`, and the
   scenarios under `scenarios/`, each a run through the real server:
   `scenario-cube`, `-sky`, `-rig`, `-crate`, `-uvs`, `-shed`, `-export`,
   `-character`, `-soft`, `-materials`, `-planks`, `-cuts`, `-parts`, `-morph`,
-  `-gatehouse`, `-orcward` and `-bakes` on carve, and `scenario-patina`,
+  `-gatehouse`, `-orcward`, `-bakes`, `-weathered` and `-weathered-sizes` on
+  carve, and `scenario-patina`,
   `scenario-patina-library-1` and `scenario-patina-library-2` on patina.
 
 `scripts/verify.ps1` builds, runs every test project and the cube scenario.
@@ -82,6 +94,8 @@ tool list can follow it.
 ## Asking the mesh
 
 An agent can question a mesh instead of reading every id out of `get_mesh`.
+
+- `get_mesh` reads a large mesh in parts. `include` names the sections to answer, by the answer's own keys (`vertices`, `faces`, `edges`, `colours`, `groups`, `materials`, `face_materials`, `uvs`, `seams`, `targets`); `closed`, `bounds`, `warnings`, `parent` and `world` are always answered. `faces` (face ids or a group's name) narrows the per-face sections to those faces, and vertices and edges to the ones those faces use. On the wrench, whose whole answer is about 53,000 characters, `{"include":["groups"]}` then `{"faces":"steel","include":["faces","vertices"]}` each answer under 25,000; ask a few sections of one group at a time, since a group with every section, or every face with its uvs, can still pass that. With neither, `get_mesh` answers the whole mesh as before. `help {"tool":"get_mesh"}` gives its worked examples on the cube.
 
 - `check` (no arguments) lists what is wrong: inside-out shells, coincident or unused vertices, duplicate faces, open edges (holes), flipped or non-manifold edges, bent faces, each with the element ids.
 - `select` takes a `kind` (`vertices`, `edges` or `faces`) and a `where`, and returns the ids. `where` is comparisons on a property (`y > 3.55`, `min.y >= 3.6`, `length < 0.2`) or a flag (`open`, `unattached`, `non_planar`), joined by `and`, `or`, `not` and brackets; `all` and `none` also work. For example `edges` where `open`, or `faces` where `normal.y > 0.9`.
@@ -145,9 +159,11 @@ A material is a named PBR look shared by the whole model; any mesh's faces may u
 2. `define_material` with `base_colour`, `metallic`, `roughness`, `emissive`, `occlusion`, `double_sided` and up to five PNG textures (`base_colour_texture`, `metallic_roughness_texture`, `normal_texture`, `emissive_texture`, `occlusion_texture`): `{"name":"crate","roughness":0.8,"base_colour_texture":"textures/crate.png"}`. Anything left out takes its default, so a bare name is matte white.
 3. `set_material` puts it on faces or a group: `{"material":"crate","faces":[1,3]}`.
 
-Texture paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
+Any texture slot may instead name a texture graph's output, `{"graph":"graphs/iron.texgraph","output":"base_colour","size":1024}` (`size` a power of two from 64 to 4096, default the graph's own). `define_material` and `get_mesh` answer a graph slot as `{graph, output, size, reads_mesh}`: `reads_mesh` is true when the graph reads the mesh (a mesh node in it or a nested file), so each mesh that wears it bakes its own, false when it does not, and null when the graph file cannot be read now. A graph is read again at every render and export, where a PNG is read once; a model with one is saved as `.carve` version 10. `render` draws a graph material, evaluated on each mesh's UVs and bakes and kept until the graph files, the mesh or its UVs change; `export` bakes each graph slot from the graph files as they are then and writes it into the `.glb` as an ordinary PNG (a material that reads the mesh and is used by several meshes is written once per mesh, `<material>@<mesh>`), so the game loads it with no knowledge of graphs.
 
-`samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`, and `samples/barrel-planks.carve` is the same barrel with its staves from patina's planks graph.
+Texture and graph paths are relative to carve's working folder, or absolute; the `.carve` file keeps them relative to itself. A texture is drawn only on faces with UVs, and `check` and `set_material` warn of faces without them. `render` draws a material face with the engine's PBR shading under a fixed sky, so metal reads. `export` writes each material as a glTF metallic-roughness material with its PNGs embedded.
+
+`samples/barrel-textured.carve` is the barrel with `staves`, `iron`, `end-grain` and `rune-stave` materials from `samples/textures/`, and `samples/barrel-planks.carve` is the same barrel with its staves from patina's planks graph. `samples/barrel-weathered.carve` is the barrel with raised hoops and two materials that read the mesh, `samples/graphs/weathered-iron.texgraph` on the hoops (worn bright on their rims, from `mesh_curvature`) and `samples/graphs/weathered-staves.texgraph` on the staves (grime beside the hoops, from `mesh_occlusion`); open it and `render` to see the bake, or `render` `{"mode":"uvs","image":{"graph":"samples/graphs/weathered-iron.texgraph","output":"wear"}}` (from the repo root) to see the wear map in the layout.
 
 ## Baked maps
 
@@ -156,6 +172,7 @@ Texture paths are relative to carve's working folder, or absolute; the `.carve` 
 - `maps` picks from `masks` (a grey mask for each face group and each material), `base_colour`, `curvature` (convex and concave edges, for wear in a texture graph), `occlusion`, `orm` (occlusion, roughness and metallic in one RGB file, as glTF reads them) and `normal` (the hard edges rounded over `bevel.width` metres, with no extra geometry). The default is `masks` and `base_colour`.
 - `surface` gives a colour, roughness and metallic per group or material, a later entry winning a face two of them name. `occlusion` needs `occlusion.reach` in metres; `curvature` and `normal` need a `width` in their `curvature` and `bevel` blocks.
 - `size` is a power of two from 64 to 4096 (default 1024) and `folder` defaults to `textures`, relative to carve's working folder. A bake always overwrites; the result gives each file's path in the form `define_material` takes, with its coverage and its range of values.
+- Beyond the padding, where no island reaches, a mask and `occlusion` hold white and `curvature` 128, the values the mesh graph nodes read there, so a node and its bake are one image; `base_colour`, `orm` and `normal` hold black.
 
 On `samples/wrench.carve` (`open` it first), the bake in `bake`'s own description, then a material from it:
 
@@ -326,6 +343,16 @@ its swatch sheet in a folder of its name: `planks`, `cobblestones`, `bricks`
 variant), `fabric`, `marble` (veins by `blend`'s `difference`), `painted-metal`,
 `floor-tiles`, `grime` (a filter graph with an `input`) and `old-wall` (the
 bricks and the grime used as `graph` nodes).
+`weathered-iron` and `weathered-staves` read the mesh (`mesh_curvature`, `mesh_occlusion`,
+`mesh_mask`, `mesh_position`): patina has no mesh, so it evaluates those nodes on neutral
+stand-ins (curvature 0.5, occlusion 1, mask 1, position `#808080`) and says so in `get_graph`,
+`open`, `swatch`, `export`, `check` and `save`, also for a graph that nests one (the node
+named as expanded, `g/edges`); the real maps come from the mesh when a carve
+material names the graph. Their PNGs are the neutral ones (`wear` and `grime` are black),
+so `check` reports `one-value` on those two outputs and nothing else, its fix saying they may be
+flat only because the mesh inputs are neutral here: to see the real map, draw it in carve with
+`render` mode `uvs` and the graph as `image`, and if it is flat there too, widen its levels (any
+output reading a mesh node, nested or not, is told the same).
 `samples/graphs/faults/` holds two graphs that `check` finds faults in.
 
 ### A worked example

@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "size": 256,
+  "seed": 77,
+  "parameters": {
+    "grime_amount": { "value": 1, "drives": ["base.opacity", "rough.opacity"] }
+  },
+  "nodes": {
+    "base": { "type": "blend", "inputs": { "a": "staves.base_colour", "b": "dirt", "mask": "grime" }, "params": { "mode": "mix" } },
+    "base_out": { "type": "output", "inputs": { "in": "base" }, "params": { "role": "base_colour" } },
+    "dirt": { "type": "colour", "params": { "colour": "#3a2a1c" } },
+    "grime": { "type": "levels", "inputs": { "in": "occ" }, "params": { "in_high": 1, "in_low": 0.45, "out_high": 0, "out_low": 1 } },
+    "grime_out": { "type": "output", "inputs": { "in": "grime" }, "params": { "name": "grime" } },
+    "normal_out": { "type": "output", "inputs": { "in": "staves.normal" }, "params": { "role": "normal" } },
+    "occ": { "type": "mesh_occlusion", "params": { "rays": 32, "reach": 0.15 } },
+    "occlusion_out": { "type": "output", "inputs": { "in": "staves.occlusion" }, "params": { "role": "occlusion" } },
+    "rough": { "type": "blend", "inputs": { "a": "staves.roughness", "b": "rough_dirt", "mask": "grime" }, "params": { "mode": "mix" } },
+    "rough_dirt": { "type": "levels", "inputs": { "in": "staves.roughness" }, "params": { "out_high": 0.95, "out_low": 0.95 } },
+    "rough_out": { "type": "output", "inputs": { "in": "rough" }, "params": { "role": "roughness" } },
+    "staves": { "type": "graph", "params": { "path": "planks.texgraph" } }
+  }
+}
