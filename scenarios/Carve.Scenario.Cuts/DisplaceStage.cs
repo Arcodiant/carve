@@ -96,7 +96,7 @@ internal sealed class DisplaceStage : ICutsStage
             yield return (loop[start % loop.Length], loop[(start + k) % loop.Length], loop[(start + k + 1) % loop.Length]);
     }
 
-    /// <summary>Möller-Trumbore, either side.</summary>
+    /// <summary>MÃ¶ller-Trumbore, either side.</summary>
     private static bool Crosses(Vector3 o, Vector3 d, Vector3 a, Vector3 b, Vector3 c)
     {
         Vector3 e1 = b - a, e2 = c - a, p = Vector3.Cross(d, e2);

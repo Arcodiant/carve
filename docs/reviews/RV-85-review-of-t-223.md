@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-85 — Review of T-223
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** T-223
 
@@ -14,7 +14,7 @@ description: >-
 
 **Diff:** —
 
-**Reviewer:** —
+**Reviewer:** two fresh Opus 5.5 subagents (Core; Server, scenario and docs)
 
 <!-- Diff: `<patch-id> against <base>`, the `git patch-id --stable` of `git diff <base>...HEAD`
      with the tracker's docs/ left out (reviews.diff_patch_id computes it). Reviewer: the model
@@ -40,7 +40,7 @@ succeeds with no position changed, `report.Largest` about 0.5 m, and the vertex 
 call with `amount: 0` is refused as "nothing would change". Refuse it (or skip it with a warning) when there is no
 normal and no axis, and leave it out of `largest`.
 
-**Outcome:** —
+**Outcome:** fixed: a vertex with no normal and no axis is now left out of the edit, `moved` and `largest`, and a warning names it; if no selected vertex can move, the call is refused (`DisplaceTests.An_unattached_vertex_without_an_axis_is_left_out_and_named_and_with_one_it_moves`).
 
 ## Findings: Server
 
@@ -56,7 +56,7 @@ the same time, so another call landing between the two reads makes displace use 
 call is refused with a `faces[N]` deleted error naming an id the caller never gave. Fix: resolve the group inside the
 `store.Edit` lambda on `m.Style`, and return the `NoGroup` problem from there.
 
-**Outcome:** —
+**Outcome:** fixed: the group is now resolved inside the `store.Edit` lambda on the mesh the edit is given, as set_weights does; an unknown group is refused from there.
 
 ### Noise arguments that are valid get misleading refusals
 
@@ -67,7 +67,7 @@ description says only "seed a whole number". Agents often pass large seeds. Eith
 `GetDouble` (checked on .NET 10: no exception) and Core refuses it as `∞ is not above 0`. Last, a source with neither key
 gets "give graph (with output) or noise", but `output` is optional and defaults to `height`.
 
-**Outcome:** —
+**Outcome:** fixed: a seed out of range now names the range (in the description too), a non-finite scale is refused as `expected a finite number of metres`, and the neither-key message says output defaults to height; each is covered in `DisplaceToolTests`.
 
 ## Summary
 
