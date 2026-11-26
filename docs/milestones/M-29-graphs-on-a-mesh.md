@@ -253,6 +253,8 @@ By the person, on the review's findings (2026-11-25 and 2026-11-26), each put wi
   accepting the break as it was, and checking the answer's text in place of the frame.
 - **A render that returns stale graph slots is filed as a bug** (B-12, off-milestone), found in round 3. Declined: a
   fourth fix to the render path inside M-29.
+- **What the rebase's review found about `displace` is filed** (T-236, off-milestone). Declined: fixing its wording
+  now, with another review round.
 
 By the orchestrator:
 
@@ -409,3 +411,68 @@ pass on.
   the container root.
 - **Have each agent leave its worktree before `finish`** (a `cd` to the milestone's worktree first), so the folder
   can be removed.
+
+**After the person's go (2026-11-25 to 2026-11-26).**
+
+- **No rebase at first:** `origin/main` had not moved since the milestone forked.
+- **Refactor pass (Opus 5.5):** three cuts, no behaviour or test changed: one `{graph, output, size}` parser shared by
+  `define_material` and `render`; `open`'s missing-file error through the shared helper; one unbound node registry for
+  reading graph slots. Named and left as taste: five small duplications. Not read: the scenarios and new tests.
+- **Review round 1, RV-82:** five Opus 5.5 reviewers, split by area (the Core and `Carve.Graphs`; the server's bake,
+  render and export; the descriptions, `help` and `get_mesh`; patina and the samples; the scenarios, the acceptance
+  and the whole diff). 36 findings: 6 Major, 18 Minor, 12 Nit.
+  - **The Majors:** the bake cache's key left out the slot, so two slots of one graph output shared a bake (found
+    from both sides); patina said a mesh node with a bad parameter evaluates, then failed with a generic error; a
+    graph nesting a mesh-reading graph got no "mesh inputs neutral" note and `check` called its mask broken; the
+    acceptance crevice check counted a socket face as drive; `graphs-unit` lacked sample files among its inputs.
+  - **What held:** no sentence was lost from the trimmed descriptions; the sample PNGs equal their graphs; the
+    thresholds and margins were coded as ruled; no scenario references a product library.
+  - **Answers:** five fix members, T-217 to T-221, eleven agents (T-217 two, T-218 four, T-219 three on Opus 5.5;
+    T-220 and T-221 one each on Sonnet 5.5). 35 fixed, 1 filed (bake memory, T-222).
+- **Review round 2, RV-83:** two Opus 5.5 reviewers checking the answers against the code. 31 of 36 held. 15 findings:
+  3 Major, 7 Minor, 5 Nit.
+  - **Did not hold:** a model could still be drawn with empty graph slots (the pump read the bake twice); a user's
+    `o@mesh` material was still renamed on export; the Patina scenario's title break still proved only arithmetic;
+    `check`'s new text for a mesh-reading output was untrue; one clause of `CLAUDE.md`.
+  - **New from the fixes:** with the slot in the key, a slot that refuses its output was served another slot's bake.
+  - **Answers:** T-226 (Opus 5.5), T-227 (Opus 5.5), T-228 (Sonnet 5.5), one agent each, and the orchestrator for the
+    milestone file. 14 fixed, 1 filed (T-229).
+- **Review round 3, RV-84:** one Opus 5.5 reviewer. All 15 answers held, and the pump's third fix held for the fault
+  it was for: with the old code put back, its tests fail. 2 findings: a frame with stale, not empty, graph slots can
+  come back when an undo or a second render straddles a graph save (filed as B-12), and a commit hash in an As built
+  (fixed: As builts now name a commit by its subject, which a rebase does not change).
+- **`main` moved during the review:** T-223 (`displace`, a `marble` sample, `blend`'s `difference` mode) and releases
+  to 0.18.2, 26 commits. **Rebase (two Opus 5.5 agents):** seven conflicts, none of intent, each resolved keeping both
+  sides; one fix, a doubled project reference. `displace`'s description was already under the limit and the tools/list
+  digest held. Frames: every frame the milestone had before the rebase is byte-identical after it, and every frame of
+  `main` is too, except 15 bake frames that M-29's own neutral fill moved.
+- **Review of the rebase, RV-90:** one Opus 5.5 reviewer. The rebased tree equals a clean merge apart from the
+  conflicts' resolutions and the fix. 3 findings (1 Minor, 2 Nit), all about `displace` given a mesh-reading graph:
+  it refuses safely but says the graph is faulty and to fix it in patina. Filed as T-236.
+- **The person's rulings on the findings** are under "Decided while it ran". Two findings came to the person because
+  they survived two rounds (the empty slots, the title break); both were fixed a further time and held.
+- **Agents:** 26 after the go (one refactor, nine reviewers, fourteen fixers, two for the rebase), 62 in all.
+- **Not as planned after the go:**
+  - **The render path took three fixes** for one fault, and its neighbour (stale slots) is left as B-12. The first fix
+    marked a frame; the second round found the mark could lie; the third made it one read.
+  - **A fix made a new fault:** putting the slot in the cache's key let a refusing slot take another's bake.
+  - **Two answers ruled by the person were implemented untruly at first** (`check`'s text; the crevice set's code
+    before the review), and were caught only by a reviewer reading the code against the ruling.
+  - **A brief was wrong:** it told fix agents to put the commit and test name on a review's Outcome line, which
+    `cairn lint` refuses; three agents were corrected by message.
+  - **Checkpoints were overrun again:** eight of the fourteen fix agents ran past 60 calls.
+  - **Flakes:** a native crash at engine start-up in `scenario-patina` (once, passed on re-run), and a runner that
+    failed every suite with "build 'solution' already ran at this commit" (once). The earlier ones did not recur.
+- **Left, beside "Known and left" above:** T-222 (bake memory), T-229 (a file rewritten and restored during a bake),
+  B-12 (stale slots), T-236 (`displace` and a mesh-reading graph), T-208 (recipes); scratch copies under the temp
+  folder; the unregistered member worktree folders; the local milestone branch, diverged from its remote by the
+  rebase.
+- **Next time:**
+  - **Check `main` before each review round, not only the first.** It moved between rounds 1 and 3 and cost a rebase
+    and a fourth review. M-27's retrospective said to check before reserving the review; that was done once.
+  - **Give a concurrency fix a reviewer's read before it is called fixed.** Each round's fix was right for the order
+    of events its finding named and wrong for the next one.
+  - **Have a ruling's implementer quote the ruling in a test**, so the text or the set ruled is what is held.
+  - **Say in every fix brief that an Outcome line is a bare `fixed`,** and that an As built names a commit by subject.
+  - **Round 1's split by area and round 2's split by fix member both worked;** most findings were where the briefs
+    pointed.
