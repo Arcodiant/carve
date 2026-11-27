@@ -219,6 +219,33 @@ public sealed class ImageNodeTests : IDisposable
     }
 
     [Fact]
+    public void One_png_is_decoded_once_however_many_nodes_and_uses_read_it()
+    {
+        // RV-94: two image nodes of the graph and a graph node whose file reads the same PNG share one decoded image.
+        WritePng("bake.png", 32, 32, Hashed(32, 32));
+        File.WriteAllText(Path.Combine(_dir, "inner.texgraph"), """{ "version": 2, "size": 32, "seed": 0, "nodes": { "i": { "type": "image", "params": { "path": "bake.png", "kind": "grey" } }, "o": { "type": "output", "inputs": { "in": "i" }, "params": { "role": "roughness" } } } }""");
+        var graph = Graph(Image("bake.png", "colour") + ", " + Image("bake.png", "normal", "u") + """, "g": { "type": "graph", "params": { "path": "inner" } }, "o": { "type": "output", "inputs": { "in": "t" } }, "r": { "type": "output", "inputs": { "in": "g.roughness" }, "params": { "role": "roughness" } }, "n": { "type": "output", "inputs": { "in": "u" }, "params": { "role": "normal" } } """, 32);
+        var a = GraphValidator.Analyse(graph, NodeRegistry.BuiltIn);
+        var image = a.Nodes["t"].Parameters.Image;
+        Assert.NotNull(image);
+        Assert.Same(image, a.Nodes["u"].Parameters.Image);
+        Assert.Same(image, a.Nodes["g/i"].Parameters.Image);
+    }
+
+    [Fact]
+    public void Files_lists_a_png_without_decoding_it()
+    {
+        // RV-94: carve asks for the files on every render, so Files only lists a PNG; a damaged one is listed, and its fault is validation's.
+        var bad = PngWriter.Encode(Hashed(32, 32), 32, 32);
+        bad[^20] ^= 1;
+        var path = Path.Combine(_dir, "bad.png");
+        File.WriteAllBytes(path, bad);
+        var read = TexGraphFile.Read("""{ "version": 2, "size": 32, "seed": 0, "nodes": { "t": { "type": "image", "params": { "path": "bad.png" } }, "o": { "type": "output", "inputs": { "in": "t" } } } }""", folder: _dir);
+        Assert.Equal([path], GraphValidator.Files(read.Graph!));
+        Assert.Single(GraphValidator.Validate(read.Graph!));
+    }
+
+    [Fact]
     public void An_image_node_is_format_version_2()
     {
         WritePng("bake.png", 32, 32, Hashed(32, 32));

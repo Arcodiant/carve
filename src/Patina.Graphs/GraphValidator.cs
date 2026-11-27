@@ -47,10 +47,11 @@ public static class GraphValidator
     /// <summary>
     /// Every file validation reads (T-240), all levels down, each once, in the order read: each <c>graph</c> node's
     /// nested files, then each <c>image</c> node's PNG (a nested graph's among its files). carve's bake hashes them, and
-    /// open names them.
+    /// open names them. A PNG is listed when it is there, and not decoded (RV-94: carve asks on every render).
     /// </summary>
     public static IReadOnlyList<string> Files(TextureGraph graph, NodeRegistry? registry = null) =>
-        [.. Analyse(graph, registry ?? NodeRegistry.BuiltIn).Files.Distinct(StringComparer.OrdinalIgnoreCase)];
+        [.. Analyse(graph, registry ?? NodeRegistry.BuiltIn, [], 0, new NodeBudget(graph.Nodes.Count) { ListOnly = true })
+            .Files.Distinct(StringComparer.OrdinalIgnoreCase)];
 
     /// <summary>Each of the graph's own <c>image</c> nodes (T-240) as validation read it, in id order: its file (null when its path is not one) and the image's size (0 when it was not read; its faults say why). get_graph shows them.</summary>
     public static IReadOnlyList<ImageUse> Images(TextureGraph graph, NodeRegistry? registry = null)
@@ -91,6 +92,12 @@ public static class GraphValidator
 
         /// <summary>The nested files read for drives, by the chain of files above and the file: what <see cref="NestedParameters"/> gave.</summary>
         public Dictionary<string, NestedParameterSet?> Read { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Each PNG decoded so far, by its full path (RV-94): one file read by several image nodes, or by a graph used many times, is decoded and held once.</summary>
+        public Dictionary<string, PngImage> Images { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>For <see cref="Files"/>: an image node's PNG is listed when it is there, never read or decoded.</summary>
+        public bool ListOnly { get; init; }
     }
 
     private static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth, NodeBudget budget)
@@ -147,7 +154,7 @@ public static class GraphValidator
             }
             PngImage? image = null;
             if (type is ImageNode)
-                image = isExpanded ? a.Images.GetValueOrDefault(id).Image : ReadImage(a, id, graph, node);
+                image = isExpanded ? a.Images.GetValueOrDefault(id).Image : ReadImage(a, id, graph, node, budget);
             var resolved = new ResolvedNode(id, type, new NodeParameters(type, values) { Image = image }, values);
             if (a.Faults.Count == faultsBeforeParameters)
                 foreach (var (parameter, message) in type.CheckParameters(resolved.Parameters))
@@ -262,7 +269,7 @@ public static class GraphValidator
     /// not there or cannot be read, and one <see cref="PngReader"/> does not decode or does not read. A path at fault as a
     /// value has its own fault already.
     /// </summary>
-    private static PngImage? ReadImage(GraphAnalysis a, string id, TextureGraph graph, GraphNode node)
+    private static PngImage? ReadImage(GraphAnalysis a, string id, TextureGraph graph, GraphNode node, NodeBudget budget)
     {
         if (!node.Params.TryGetValue("path", out var pathValue))
         {
@@ -282,6 +289,13 @@ public static class GraphValidator
             a.Fault(id, null, "path", $"node '{id}' parameter 'path': {Missing(full, ".png")}");
             return null;
         }
+        var known = budget.Images.GetValueOrDefault(full);
+        if (budget.ListOnly || known is not null)
+        {
+            a.Files.Add(full);
+            a.Images[id] = (full, known);
+            return known;
+        }
         byte[] bytes;
         try
         {
@@ -295,7 +309,7 @@ public static class GraphValidator
         a.Files.Add(full);
         try
         {
-            var image = PngReader.Decode(bytes);
+            var image = budget.Images[full] = PngReader.Decode(bytes);
             a.Images[id] = (full, image);
             return image;
         }

@@ -165,7 +165,15 @@ public class PngReaderTests
             { "image data too short", [.. good[..33], .. TestPng.Chunk("IDAT", ZLib(new byte[13])), .. TestPng.Chunk("IEND", [])], "its image data ends at row 1 of 4 (the file is damaged)" },
             { "a filter PNG does not have", Rgb(filter: y => y == 2 ? 7 : 0), "its row 2 has filter type 7, which PNG does not have" },
             { "too large", TestPng.Make(8193, 1, 0, new byte[8193], _ => 0), "it is 8193x1, larger than 8192 on a side" },
+            { "a wrong Adler-32 (the CRC right)", [.. good[..33], .. TestPng.Chunk("IDAT", BadAdler(ZLib(new byte[4 * 13]))), .. TestPng.Chunk("IEND", [])], "its image data does not inflate (the file is damaged)" },
+            { "an unknown critical chunk", [.. good[..33], .. TestPng.Chunk("ZZZZ", [1]), .. good[33..]], "it has a critical chunk ZZZZ that PNG readers must understand, and this one does not" },
         };
+    }
+
+    private static byte[] BadAdler(byte[] zlib)
+    {
+        zlib[^1] ^= 1;
+        return zlib;
     }
 
     private static byte[] ZLib(byte[] data)

@@ -193,4 +193,26 @@ public class NestedGraphToolTests
         File.Copy(Path.Combine(Sample("bricks"), "normal.png"), Path.Combine(folder.Path, "materials", "bricks", "normal.png"), overwrite: true);
         Assert.StartsWith("save: saved wall.texgraph", await patina.Ok("save", """{"path":"materials/wall.texgraph"}"""));
     }
+
+    [Fact]
+    public async Task A_nested_graphs_png_is_judged_by_its_bytes_when_save_moves_the_graph()
+    {
+        // RV-94: a graph node whose file reads a PNG; saved into materials/ beside copies of both, the same bytes save, other bytes refuse.
+        using var folder = new TempFolder();
+        const string Inner = """{ "version": 2, "size": 256, "seed": 0, "nodes": { "i": { "type": "image", "params": { "path": "bake.png" } }, "o": { "type": "output", "inputs": { "in": "i" }, "params": { "role": "base_colour" } } } }""";
+        foreach (var where in new[] { folder.Path, Path.Combine(folder.Path, "materials") })
+        {
+            Directory.CreateDirectory(where);
+            File.WriteAllText(Path.Combine(where, "inner.texgraph"), Inner);
+            File.Copy(Path.Combine(Sample("bricks"), "normal.png"), Path.Combine(where, "bake.png"));
+        }
+        await using var patina = await PatinaHarness.StartAsync(folder.Path);
+        await patina.Ok("define_graph", """{"graph":{"version":2,"size":256,"seed":0,"nodes":{"g":{"type":"graph","params":{"path":"inner"}},"out":{"type":"output","inputs":{"in":"g.base_colour"},"params":{"role":"base_colour"}}}}}""");
+
+        File.Copy(Path.Combine(Sample("bricks"), "roughness.png"), Path.Combine(folder.Path, "materials", "bake.png"), overwrite: true);
+        var refused = folder.Normalise(await patina.Refused("save", """{"path":"materials/a.texgraph"}"""));
+        Assert.Contains("graph node 'g' would read <folder>/materials/bake.png, which differs from <folder>/bake.png, the file it reads now", refused);
+        File.Copy(Path.Combine(Sample("bricks"), "normal.png"), Path.Combine(folder.Path, "materials", "bake.png"), overwrite: true);
+        Assert.StartsWith("save: saved a.texgraph", await patina.Ok("save", """{"path":"materials/a.texgraph"}"""));
+    }
 }

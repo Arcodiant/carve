@@ -381,8 +381,9 @@ version 1.
 
 An `image` node covers the whole square whatever the PNG's size: at the graph's
 size it is read texel for texel, at any other bilinear and wrapping, so it
-tiles. `kind: normal` decodes each channel as 2c / 255 - 1 and makes the vector
-unit length, as `height_to_normal` gives it. It reads 8-bit greyscale, grey +
+tiles (below half the graph's size it reads the 2x2 texels around each centre,
+so a line one texel thin can drop out). `kind: normal` decodes each channel as
+2c / 255 - 1 and makes the vector unit length, as `height_to_normal` gives it. It reads 8-bit greyscale, grey +
 alpha, RGB and RGBA PNGs, not interlaced, and ignores alpha; a missing file or
 one it does not read is a fault on its `path`. `open` and `get_graph` name the
 file it reads, and a carve material's graph slot is baked again when the PNG
