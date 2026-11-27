@@ -140,9 +140,11 @@ public sealed class VerbosityToolTests
             {
                 // A kind of 4 or more (delete's open edges, subdivide's faces) is one line at summary and every one at full; nothing else differs.
                 var (a, b) = (JsonDocument.Parse(plain.Text).RootElement, JsonDocument.Parse(full.Text).RootElement);
-                Assert.Equal(a.EnumerateObject().Where(x => x.Name != "warnings").Select(x => x.ToString()), b.EnumerateObject().Where(x => x.Name != "warnings").Select(x => x.ToString()));
-                Assert.True(b.GetProperty("warnings").GetArrayLength() > a.GetProperty("warnings").GetArrayLength());
-                Assert.All(b.GetProperty("warnings").EnumerateArray(), w => Assert.Matches(@"^[a-z]+\[[0-9-]+\]: ", w.GetString()!));
+                // moved is {count, first} at summary and the whole list at full.
+                Assert.Equal(a.EnumerateObject().Where(x => x.Name is not ("warnings" or "moved")).Select(x => x.ToString()), b.EnumerateObject().Where(x => x.Name is not ("warnings" or "moved")).Select(x => x.ToString()));
+                if (b.TryGetProperty("moved", out var moved)) Assert.Equal(a.GetProperty("moved").GetProperty("count").GetInt32(), moved.GetArrayLength());
+                if (b.GetProperty("warnings").GetArrayLength() > a.GetProperty("warnings").GetArrayLength())
+                    Assert.All(b.GetProperty("warnings").EnumerateArray(), w => Assert.Matches(@"^[a-z]+\[[0-9-]+\]: ", w.GetString()!));
             }
 
             var refused = await Run("", bad);
