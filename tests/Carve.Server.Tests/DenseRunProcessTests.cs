@@ -93,9 +93,11 @@ public sealed class DenseRunProcessTests
                         default:
                             if (counts.TryGetValue(key, out var n) && n > 0)
                             {
-                                var lines = JsonDocument.Parse(text).RootElement.GetProperty("warnings").EnumerateArray()
-                                    .Count(w => w.GetString()!.Contains("belongs to only one face") || w.GetString()!.Contains("overlap"));
-                                Assert.True(lines >= n, $"{label} full: {lines} warning lines for {n} counted at summary");
+                                var warnings = JsonDocument.Parse(text).RootElement.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToList();
+                                // an overlap line names both faces of its pair, and summary counts every face (RV-91), so count the faces full names
+                                var lines = warnings.Count(w => w.Contains("belongs to only one face"))
+                                    + warnings.Where(w => w.Contains("UVs overlap")).SelectMany(w => Regex.Matches(w, @"faces\[\d+\]").Select(m => m.Value)).Distinct().Count();
+                                Assert.True(lines >= n, $"{label} full: {lines} open edges and overlapping faces for {n} counted at summary");
                             }
                             break;
                     }

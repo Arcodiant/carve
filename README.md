@@ -164,14 +164,14 @@ is `{"ok":true}` (`check` its own `ok`):
 
 | Call | Characters | Planning (`main`) |
 |---|---|---|
-| `open` the cage | 244 | 1,156 |
+| `open` the cage | 248 | 1,156 |
 | `check` the cage | 730 | 1,434 |
 | `export`, skinned: now after two subdivides and a move, at planning the 590-face cage | 1,039 | 2,038 |
 | `subdivide`, once then twice | 319, 332 | 373, 386 |
 | `check` after two (reads `ok: true`) | 766 | 1,467 |
 | `delete` 200 faces (798 open edges) | 1,119 | 41,310 |
 | `check` after it | 873 | |
-| `check` after `project_uvs box` (280 overlaps) | 848 | 43,700 |
+| `check` after `project_uvs box` (280 overlapping pairs) | 849 | 43,700 |
 | `unwrap` wrench, cutter, toolkit, scanner | 787, 794, 790, 786 | 4,778, 11,371, 16,086, 8,089 |
 
 `verbosity: "full"` lists every warning (40,389 characters for the 798 open
