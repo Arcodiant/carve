@@ -61,30 +61,40 @@ existing vertex, and keeps the mesh closed.
 - Triangles are required, not just allowed (see Goal).
 - Not tested by the requester: `subdivide` with every edge hard as a stand-in, and `subdivide` on holed faces.
 
-### Hand-off
+### As built
 
-Ran on Claude Opus 5.5; handed off at the 60-call checkpoint, everything below committed on `task/T-237`.
+Ran on Claude Opus 5.5 (two agents; the first handed off at its 60-call checkpoint).
 
-- **Done.** Core: `src/Carve.Core/Tessellation.cs` (`Tessellation.Tessellate(mesh, maxEdge, faces?)`) on a new
-  `src/Carve.Core/ConstrainedDelaunay.cs` (incremental Delaunay with Lawson flips, Sloan constraint recovery by
-  flipping, parity classification for holes, midpoint refinement of any inner edge over `max_edge`). Edge points by each
-  edge's own length, carried into neighbours' loops with `FaceSplit.Insert` (made internal); inner points an
-  equilateral lattice at `max_edge`, kept 0.5 `max_edge` clear of the loops, positioned and blended (UVs, weights) from
-  the face's own ear-clip triangles; provenance as `FaceSplit`'s, so groups, colour, material, hard edges and seams
-  carry. Server: `src/Carve.Server/TessellateTool.cs`, registered after `displace` in `CarveServer.cs`; `created`
-  as subdivide's blocks. Fixture: `TestMeshes.Dais()` (with `DaisVertices`, `DaisFaces`, `DaisGroup`, `DaisMaxEdge`,
-  `DaisDefineMesh()` for the server tests) in `tests/Carve.Core.Tests/TestMeshes.cs`, which `Carve.Server.Tests`
-  links. Tests: `tests/Carve.Core.Tests/TessellateTests.cs` (11, pass: quad, 127 x 2 strip, hole, border, UVs,
-  attributes and hard edges, refusals, the dais at 0.75 closed with no warning, every vertex unmoved, only 0 and 1
-  split, no angle under 10 degrees) and `tests/Carve.Server.Tests/TessellateToolTests.cs` (10, pass: example and undo,
-  each error leaves the mesh, the dais through the tools). `VerbosityToolTests` row and `PartToolsListTests`'
-  part-space list take `tessellate`; those classes, `HelpToolTests` and `EditToolDefinitionTests` pass. Content:
-  `scenarios/Carve.Scenario.Cuts/TessellateStage.cs` and its line in `CutsStages.cs`; it builds.
-- **Left.** README's tool list (not yet touched); the `TessellateStage` run (`cairn task T-237 verify`, which runs
-  `scenario-cuts`) and the frame review of `tessellate-slab-wireframe` by a subagent; any `CLAUDE.md` Layout line for
-  the stage (the Cuts row lists each stage file); `### As built`; `cairn lint`; `finish`.
-- **Not checked.** The full `core-unit` and `server-unit` suites (only the classes above were run); the stage has not
-  run, so its probe count (Look notes under 40) and line checks are unproven.
-- **Surprising.** On the strip the 26 edge-point rectangles are co-circular and their diagonals (5.28) exceed
-  `max_edge` 5, so refinement puts one point on the middle line of each: the edges are cut along the length only, but
-  points are added inside. Colour and material are exclusive on a face (`WithColour` drops the material).
+- Core: `src/Carve.Core/Tessellation.cs` (`Tessellation.Tessellate(mesh, maxEdge, faces?)`) on a new
+  `src/Carve.Core/ConstrainedDelaunay.cs`. That file does incremental Delaunay with Lawson flips, recovers the
+  constraints by Sloan's flipping, classifies holes by parity, and splits any inner edge over `max_edge` at its
+  midpoint. Each edge's points are spaced by its own length and carried into the neighbours' loops by
+  `FaceSplit.Insert`, which is now internal. The inner points are an equilateral lattice at `max_edge`, on the plane
+  basis of `PlaneGeometry.Basis` (so on a face square to z its rows run along y), kept half a spacing clear of the
+  loops. Positions, UVs and weights are blended from the face's own ear-clip triangles. Provenance works as in
+  `FaceSplit`, so groups, colour, material, hard edges and seams carry over.
+- Server: `src/Carve.Server/TessellateTool.cs`, registered after `displace`; `created` is reported in subdivide's
+  blocks. `ToolHarnessTests` now counts 45 tools, and the `VerbosityToolTests` row and `PartToolsListTests`' part-space
+  list include `tessellate`.
+- Fixture for T-238: `TestMeshes.Dais()` in `tests/Carve.Core.Tests/TestMeshes.cs`, with `DaisVertices`, `DaisFaces`,
+  `DaisGroup` (`wear`), `DaisMaxEdge` (0.75) and `DaisDefineMesh()` for the server tests, which link the file.
+- Tests: `tests/Carve.Core.Tests/TessellateTests.cs` (quad, 127 x 2 strip, hole, border, UVs, attributes, refusals,
+  the dais: closed, no warning, every vertex unmoved, only faces 0 and 1 split, no angle under 10 degrees) and
+  `tests/Carve.Server.Tests/TessellateToolTests.cs` (the example and undo, each error leaves the mesh, the dais
+  through the tools).
+- Content: `scenarios/Carve.Scenario.Cuts/TessellateStage.cs` and its line in `CutsStages.cs`. A holed slab has its
+  front group tessellated at 0.25 and is seen in the wireframe frame `tessellate-slab-wireframe`. At some slopes
+  (upright, 45 degrees, 2:1, flat) 4x MSAA draws a 1-px line on 3 of its 4 samples at most, so the shared `Line` rule
+  (within 10 of 237) failed 17 piece edges at 212. Tipping the slab only moved the failures to other edges. The person
+  chose option A (Waystone review, round 1, 2026-11-27): in this stage only, a piece edge also passes within 10 of the
+  3/4-coverage blend over the fill. `ShedChecks.Line` is unchanged; `ShedChecks.Closest` became internal so that the
+  stage can use it.
+- Frame review (a subagent): the frame does what is meant, with no triangles in the socket, no lines across the sides
+  or walls, and no gaps. It pointed out uneven density (finer between the socket and the slab's edge, where the lattice's
+  clearance leaves room for refinement only) and a few narrow triangles by the socket. These are looks only: the stage
+  and the dais both pass `check` with no warning.
+- README: `tessellate` added to the edit tools that take `verbosity`, and a bullet with its worked example before
+  `displace`'s. CLAUDE.md's Cuts Layout row names `TessellateStage.cs`.
+- On the strip, the 26 edge-point rectangles are co-circular and their diagonals (5.28) exceed `max_edge` 5, so
+  refinement puts one point on the middle line of each. The edges are still cut along the length only. Colour and
+  material are exclusive on a face (`WithColour` drops the material).
