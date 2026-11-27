@@ -83,18 +83,9 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
 
         DisplaceReport? report = null;
         string? noGroup = null;
-        // The group is read inside the store's lock, on the mesh the edit is given, as set_weights reads it.
-        var snapshot = store.Edit(tool, name, m =>
-        {
-            var chosen = f;
-            if (groupName is not null)
-            {
-                chosen = m.Style?.FacesOf(groupName) is { } grouped ? [.. grouped] : null;
-                if (chosen is null) noGroup = NoGroup(m.Style, groupName);
-            }
-            // An unknown group is refused below; an empty face list makes the Core refuse without trying the edit.
-            return Displacement.Displace(m, v, from!, by!.Value, mid, direction, out report, noGroup is null ? chosen : [], pin);
-        }, out var result, out var problem);
+        var snapshot = store.Edit(tool, name,
+            m => Displacement.Displace(m, v, from!, by!.Value, mid, direction, out report, FacesOrGroup(m, f, groupName, ref noGroup), pin),
+            out var result, out var problem);
         if (problem is not null) return Failed(tool, [problem]);
         if (noGroup is not null) return Failed(tool, [noGroup]);
         if (snapshot is null) return Error($"{tool}: " + NoMesh);

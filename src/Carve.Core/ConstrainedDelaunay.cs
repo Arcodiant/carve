@@ -49,6 +49,8 @@ internal sealed class ConstrainedDelaunay
 
     private int N(int t, int k) => _n[3 * t + k % 3];
 
+    private bool C(int t, int k) => _c[3 * t + k % 3];
+
     /// <summary>Inserts <paramref name="p"/> and returns its index. A point on an existing point is refused.</summary>
     public int Add(Vector2D p)
     {
@@ -117,7 +119,7 @@ internal sealed class ConstrainedDelaunay
             {
                 var u = N(t, k);
                 if (u < 0) continue;
-                var step = _c[3 * t + k] ? 1 : 0;
+                var step = C(t, k) ? 1 : 0;
                 if (depth[u] >= 0 && depth[u] <= depth[t] + step) continue;
                 depth[u] = depth[t] + step;
                 if (step == 0) queue.AddFirst(u); else queue.AddLast(u);
@@ -137,7 +139,7 @@ internal sealed class ConstrainedDelaunay
                 for (var k = 0; k < 3; k++)
                 {
                     var (a, b) = (V(t, k), V(t, k + 1));
-                    if (!_inside[t] || _c[3 * t + k] || a > b) continue;
+                    if (!_inside[t] || C(t, k) || a > b) continue;
                     var d = _p[b] - _p[a];
                     var length = Math.Sqrt(d.X * d.X + d.Y * d.Y);
                     if (length > over) longEdges.Add((length, a, b));
@@ -218,7 +220,7 @@ internal sealed class ConstrainedDelaunay
     {
         var (a, b, c) = (V(t, 0), V(t, 1), V(t, 2));
         var (na, nb, nc) = (N(t, 0), N(t, 1), N(t, 2));
-        var (ca, cb, cc) = (_c[3 * t], _c[3 * t + 1], _c[3 * t + 2]);
+        var (ca, cb, cc) = (C(t, 0), C(t, 1), C(t, 2));
         var inside = _inside[t];
         var (t1, t2) = (TriangleCount, TriangleCount + 1);
         Set(t, a, b, p, na, t1, t2, ca, false, false);
@@ -234,13 +236,13 @@ internal sealed class ConstrainedDelaunay
     {
         var (a, b, c) = (V(t, k), V(t, k + 1), V(t, k + 2));
         var (nbc, nca) = (N(t, k + 1), N(t, k + 2));
-        var (cbc, cca, cf) = (_c[3 * t + (k + 1) % 3], _c[3 * t + (k + 2) % 3], _c[3 * t + k]);
+        var (cbc, cca, cf) = (C(t, k + 1), C(t, k + 2), C(t, k));
         var u = N(t, k);
         if (u < 0) throw new InvalidOperationException("a point on the super triangle's rim");
         var j = EdgeIndex(u, b, a);
         var d = V(u, j + 2);
         var (nad, ndb) = (N(u, j + 1), N(u, j + 2));
-        var (cad, cdb) = (_c[3 * u + (j + 1) % 3], _c[3 * u + (j + 2) % 3]);
+        var (cad, cdb) = (C(u, j + 1), C(u, j + 2));
         var (inT, inU) = (_inside[t], _inside[u]);
         var (t2, u2) = (TriangleCount, TriangleCount + 1);
         Set(t, p, b, c, u2, nbc, t2, cf, cbc, false);
@@ -261,7 +263,7 @@ internal sealed class ConstrainedDelaunay
         var j = EdgeIndex(u, b, a);
         var d = V(u, j + 2);
         var (nbc, nca, nad, ndb) = (N(t, k + 1), N(t, k + 2), N(u, j + 1), N(u, j + 2));
-        var (cbc, cca, cad, cdb) = (_c[3 * t + (k + 1) % 3], _c[3 * t + (k + 2) % 3], _c[3 * u + (j + 1) % 3], _c[3 * u + (j + 2) % 3]);
+        var (cbc, cca, cad, cdb) = (C(t, k + 1), C(t, k + 2), C(u, j + 1), C(u, j + 2));
         Set(t, c, a, d, nca, nad, u, cca, cad, false);
         Set(u, d, b, c, ndb, nbc, t, cdb, cbc, false);
         Relink(nad, u, t);
@@ -281,10 +283,8 @@ internal sealed class ConstrainedDelaunay
             if (++guard > 1_000_000 + 64 * TriangleCount) throw new InvalidOperationException("legalization did not settle");
             var (t, k) = stack.Pop();
             var u = N(t, k);
-            if (u < 0 || _c[3 * t + k]) continue;
-            var (a, b, c) = (V(t, k), V(t, k + 1), V(t, k + 2));
-            var d = V(u, EdgeIndex(u, b, a) + 2);
-            if (InCircle(_p[a], _p[b], _p[c], _p[d])) Flip(t, k, stack);
+            if (u < 0 || C(t, k)) continue;
+            if (InCircle(_p[V(t, k)], _p[V(t, k + 1)], _p[V(t, k + 2)], _p[Opposite(t, k)])) Flip(t, k, stack);
         }
     }
 

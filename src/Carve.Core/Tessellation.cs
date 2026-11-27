@@ -145,13 +145,15 @@ public static class Tessellation
                 ids.Add(v);
             }
 
-        var segments = loops.SelectMany(l => l.Select((v, i) => (A: Of(v), B: Of(l[(i + 1) % l.Count])))).ToArray();
+        // The loop edges in the plane z = 0, for PlaneGeometry's segment distance.
+        static Vector3D Flat(Vector2D p) => new(p.X, p.Y, 0);
+        var segments = loops.SelectMany(l => l.Select((v, i) => (A: Flat(Of(v)), B: Flat(Of(l[(i + 1) % l.Count]))))).ToArray();
         var row = maxEdge * Math.Sqrt(3) / 2;
         for (var j = 0; minY + j * row < maxY; j++)
             for (var x = minX + (j % 2) * maxEdge / 2; x < maxX; x += maxEdge)
             {
                 var p = new Vector2D(x, minY + j * row);
-                if (!Inside(loops, Of, p) || segments.Any(s => Distance(p, s.A, s.B) < maxEdge / 2)) continue;
+                if (!Inside(loops, Of, p) || segments.Any(s => SegmentDistance(Flat(p), s.A, s.B) < maxEdge / 2)) continue;
                 cdt.Add(p);
                 ids.Add(-1);
             }
@@ -189,14 +191,5 @@ public static class Tessellation
             added.Add(new Vector3((float)position.X, (float)position.Y, (float)position.Z));
         }
         return cdt.Inside().Select(t => (vertexOf[t.A], vertexOf[t.B], vertexOf[t.C])).ToList();
-    }
-
-    private static double Distance(Vector2D p, Vector2D a, Vector2D b)
-    {
-        var ab = b - a;
-        var len2 = ab.X * ab.X + ab.Y * ab.Y;
-        var t = len2 == 0 ? 0 : Math.Clamp(((p.X - a.X) * ab.X + (p.Y - a.Y) * ab.Y) / len2, 0, 1);
-        var d = p - (a + ab * t);
-        return Math.Sqrt(d.X * d.X + d.Y * d.Y);
     }
 }

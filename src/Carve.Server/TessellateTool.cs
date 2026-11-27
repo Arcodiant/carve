@@ -56,17 +56,10 @@ public sealed class TessellateTool(ModelStore store)
 
         var before = (Vertices: 0, Faces: 0);
         string? noGroup = null;
-        // The group is read inside the store's lock, on the mesh the edit is given, as displace reads it.
         var snapshot = store.Edit(tool, name, m =>
         {
             before = (m.Vertices.Count, m.Faces.Count);
-            var chosen = f;
-            if (groupName is not null)
-            {
-                chosen = m.Style?.FacesOf(groupName) is { } grouped ? [.. grouped] : null;
-                if (chosen is null) noGroup = NoGroup(m.Style, groupName);
-            }
-            return Tessellation.Tessellate(m, limit!.Value, noGroup is null ? chosen : []);
+            return Tessellation.Tessellate(m, limit!.Value, FacesOrGroup(m, f, groupName, ref noGroup));
         }, out var result, out var problem);
         if (problem is not null) return Failed(tool, [problem]);
         if (noGroup is not null) return Failed(tool, [noGroup]);
