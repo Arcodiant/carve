@@ -16,8 +16,13 @@ public enum MeshWarningKind
     MaterialNoEffect,
 }
 
-/// <summary>A legal-but-suspicious feature of a mesh. <see cref="Element"/> names it, e.g. <c>faces[2]</c>, <c>vertices[7]</c> or <c>edges[0-1]</c>.</summary>
-public sealed record MeshWarning(MeshWarningKind Kind, string Element, string Message)
+/// <summary>
+/// A legal-but-suspicious feature of a mesh. <see cref="Element"/> names it, e.g. <c>faces[2]</c>, <c>vertices[7]</c> or <c>edges[0-1]</c>.
+/// <see cref="Measure"/> and <see cref="Limit"/> are what a kind that measures something measured (a not-planar face's distance
+/// off its plane and its limit; a non-manifold edge's face count), read by <see cref="MeshWarningGroups"/> for the worst case.
+/// <see cref="Other"/> is the second element a warning is about (the other face of a UV overlap), which a grouped line counts too.
+/// </summary>
+public sealed record MeshWarning(MeshWarningKind Kind, string Element, string Message, double Measure = 0, double Limit = 0, string? Other = null)
 {
     public override string ToString() => $"{Element}: {Message}";
 }
@@ -25,7 +30,7 @@ public sealed record MeshWarning(MeshWarningKind Kind, string Element, string Me
 /// <summary>Counts, bounds and warnings for a <see cref="PolygonMesh"/>.</summary>
 public sealed class MeshReport
 {
-    private MeshReport(int vertexCount, int faceCount, int edgeCount, bool closed, Vector3 boundsMin, Vector3 boundsMax, IReadOnlyList<MeshWarning> warnings)
+    private MeshReport(int vertexCount, int faceCount, int edgeCount, bool closed, Vector3 boundsMin, Vector3 boundsMax, IReadOnlyList<MeshWarning> warnings, IReadOnlyList<MeshWarning> nonPlanar)
     {
         VertexCount = vertexCount;
         FaceCount = faceCount;
@@ -34,6 +39,7 @@ public sealed class MeshReport
         BoundsMin = boundsMin;
         BoundsMax = boundsMax;
         Warnings = warnings;
+        NonPlanarFaces = nonPlanar;
     }
 
     public int VertexCount { get; }
@@ -50,11 +56,19 @@ public sealed class MeshReport
     public Vector3 BoundsMax { get; }
     public IReadOnlyList<MeshWarning> Warnings { get; }
 
+    /// <summary>
+    /// Every not-planar face and how far off its plane, on any mesh: the one place that says (T-198). <see cref="Warnings"/> holds them
+    /// only while the mesh is flat-shaded; on a smooth one (a subdivided cage) they are expected and <c>check</c> notes them.
+    /// </summary>
+    public IReadOnlyList<MeshWarning> NonPlanarFaces { get; }
+
     public static MeshReport Create(PolygonMesh mesh)
     {
         var verts = mesh.Vertices;
         var topology = mesh.Topology;
         var warnings = new List<MeshWarning>();
+        var nonPlanar = new List<MeshWarning>();
+        var flatNonPlanar = new List<MeshWarning>();
         var used = new bool[verts.Count];
         for (var i = 0; i < verts.Count; i++)
             used[i] = topology.VertexFaces(i).Count > 0;
@@ -74,7 +88,7 @@ public sealed class MeshReport
             else if (total > 2)
             {
                 closed = false;
-                warnings.Add(new MeshWarning(MeshWarningKind.NonManifoldEdge, name, $"edge is shared by {total} faces"));
+                warnings.Add(new MeshWarning(MeshWarningKind.NonManifoldEdge, name, $"edge is shared by {total} faces", total));
             }
 
             // Two or more faces running the same way along an edge disagree about which side is outside.
@@ -95,9 +109,15 @@ public sealed class MeshReport
             cx /= face.Count; cy /= face.Count; cz /= face.Count;
             var limit = PolygonMesh.PlanarityTolerance * PolygonMesh.FaceSize(verts, corners);
             var worst = corners.Max(i => Math.Abs(((double)verts[i].X - o.X - cx) * normal.X + ((double)verts[i].Y - o.Y - cy) * normal.Y + ((double)verts[i].Z - o.Z - cz) * normal.Z));
-            if (worst > limit)
-                warnings.Add(new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", MeshEdits.Invariant($"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})")));
+            if (worst <= limit) continue;
+            var warning = new MeshWarning(MeshWarningKind.NonPlanarFace, $"faces[{f}]", MeshEdits.Invariant($"face is not planar: a vertex is {worst:G3} off its plane (limit {limit:G3})"), worst, limit);
+            nonPlanar.Add(warning);
+            if (!Shading.FaceHasCornerNormals(mesh, f)) flatNonPlanar.Add(warning);
         }
+
+        // Kept in the order the warnings had: after the edge kinds, before the unused vertices. Decided per face, so a flat mesh's
+        // faces still warn in a mesh joined with a smooth one (Model.Combined, ruling 2).
+        warnings.AddRange(flatNonPlanar);
 
         for (var i = 0; i < verts.Count; i++)
         {
@@ -114,6 +134,6 @@ public sealed class MeshReport
             max = Vector3.Max(max, verts[i]);
         }
 
-        return new MeshReport(mesh.LiveVertexCount, mesh.LiveFaceCount, topology.Edges.Count, closed, min, max, warnings);
+        return new MeshReport(mesh.LiveVertexCount, mesh.LiveFaceCount, topology.Edges.Count, closed, min, max, warnings, nonPlanar);
     }
 }

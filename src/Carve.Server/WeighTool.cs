@@ -24,7 +24,7 @@ public sealed class WeighTool(ModelStore store)
         + "Worked example on a model with a skeleton:\n"
         + ExampleMarker + """{"replace":true}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<WeighTool>("weigh", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<WeighTool>("weigh", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -38,12 +38,13 @@ public sealed class WeighTool(ModelStore store)
             },
             ["replace"] = new JsonObject { ["description"] = "true weighs vertices that already have weights too (default false: only unweighted ones).", ["type"] = "boolean" },
         },
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? bones = null, JsonElement? replace = null, JsonElement? mesh = null)
+        JsonElement? bones = null, JsonElement? replace = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("weigh", context, "bones", "replace", "mesh");
+        var errors = UnknownArguments("weigh", context, "bones", "replace", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var again = OptionalBool("replace", replace, errors);
         List<string>? names = null;
@@ -68,6 +69,6 @@ public sealed class WeighTool(ModelStore store)
         if (snapshot is null || change is null) return Error("weigh: " + NoMesh);
 
         var (name, outcome) = change.Value;
-        return Ok(new { mesh = name, weighed = outcome.Weighed, kept = outcome.Kept, unweighted = outcome.Unweighted });
+        return Quiet(Ok(new { mesh = name, weighed = outcome.Weighed, kept = outcome.Kept, unweighted = outcome.Unweighted }), level);
     }
 }

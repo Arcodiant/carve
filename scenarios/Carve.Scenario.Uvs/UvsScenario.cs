@@ -77,12 +77,12 @@ public sealed class UvsScenario : IScenario
         CheckCounts(driver, "define_mesh", await CallJsonAsync(driver, "define_mesh", new { name = "Barrel", vertices = BarrelSpec.Vertices, faces = BarrelSpec.Faces }), 40, 34);
         await CallJsonAsync(driver, "mark_edges", new { edges = BarrelSpec.Seams, seam = true, mesh = "Barrel" });
         var unwrapped = await CallJsonAsync(driver, "unwrap", new { mesh = "Barrel" });
-        var side = unwrapped.GetProperty("islands").EnumerateArray().Single(i => i.GetProperty("faces").GetInt32() == 32);
+        var side = unwrapped.GetProperty("largest").EnumerateArray().Single(i => i.GetProperty("faces").GetInt32() == 32);
         var baseline = side.GetProperty("stretch").GetDouble();
         var barrel0 = await Scene.ReadOneAsync(driver, "Barrel");
-        if (unwrapped.GetProperty("islands").GetArrayLength() != 3 || Scene.Islands(barrel0) != 3 || barrel0.Uvs.Count != 34)
+        if (unwrapped.GetProperty("islands").GetInt32() != 3 || Scene.Islands(barrel0) != 3 || barrel0.Uvs.Count != 34)
         {
-            driver.Fail($"unwrap: expected three islands and 34 mapped faces, got {unwrapped.GetProperty("islands").GetArrayLength()} islands, {Scene.Islands(barrel0)} by the seams, {barrel0.Uvs.Count} mapped");
+            driver.Fail($"unwrap: expected three islands and 34 mapped faces, got {unwrapped.GetProperty("islands").GetInt32()} islands, {Scene.Islands(barrel0)} by the seams, {barrel0.Uvs.Count} mapped");
         }
 
         var check = await CallJsonAsync(driver, "check", new { mesh = "Barrel" });
@@ -257,7 +257,7 @@ public sealed class UvsScenario : IScenario
         var shot = await CheckerAsync(driver, scene, barrel, "barrel-moved-checker-front", "front", Front, 3, true);
 
         var again = await CallJsonAsync(driver, "unwrap", new { mesh = "Barrel" });
-        var stretch = again.GetProperty("islands").EnumerateArray().Single(i => i.GetProperty("faces").GetInt32() == 32).GetProperty("stretch").GetDouble();
+        var stretch = again.GetProperty("largest").EnumerateArray().Single(i => i.GetProperty("faces").GetInt32() == 32).GetProperty("stretch").GetDouble();
         UvsChecker.Log.Add($"moved ring\tunwrap stretch of the side\tbefore {baseline:0.0000}\tafter {stretch:0.0000}");
         if (stretch <= baseline + 0.01) driver.Fail($"unwrap's stretch of the side is {stretch:0.0000} on the moved barrel, not above {baseline:0.0000}");
 
@@ -281,8 +281,9 @@ public sealed class UvsScenario : IScenario
 
         var check = await CallJsonAsync(driver, "check", new { mesh = "Barrel" });
         var listed = check.GetProperty("warnings").EnumerateArray().Select(w => w.GetString() ?? "").Where(w => w.Contains("no UVs")).OrderBy(w => w).ToArray();
-        var expected = Enumerable.Range(34, 8).Select(f => $"faces[{f}]: no UVs").OrderBy(w => w).ToArray();
-        if (listed.Length != 8 || !listed.Zip(expected).All(p => p.First.StartsWith(p.Second))) driver.Fail($"check: expected eight 'no UVs' warnings for faces 34 to 41, got: {string.Join("; ", listed)}");
+        // T-197: eight of a kind are one line, the count and the three lowest of faces 34 to 41.
+        const string expected = "8 faces have no UVs, so they sample the texture's corner: e.g. faces[34], faces[35], faces[36]";
+        if (listed.Length != 1 || listed[0] != expected) driver.Fail($"check: expected one 'no UVs' line for the eight faces 34 to 41, got: {string.Join("; ", listed)}");
 
         var work = Path.Combine(driver.RunFolder, "work");
         Directory.CreateDirectory(work);

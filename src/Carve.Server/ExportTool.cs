@@ -30,7 +30,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         + "Returns one line: exported <file> to <absolute path>, then the triangles, the materials, the size and bounds, where the limits came from and any warnings. A mesh with warnings still exports and the result repeats them. export changes nothing and is not an undo step. Every error writes nothing and names itself. "
         + "Worked example, a crate into a game's content folder (put the game's folder for <game>):\n"
         + ExampleMarker + SaveTool.WorkedExport + "\n"
-        + """More: help {"tool":"export"} gives what is written (nodes, materials, UVs), the parts and skinned detail, the piece and clips modes, the limits file and its format, the result line, the errors and the worked examples.""";
+        + """More: help {"tool":"export"} gives what is written (nodes, materials, UVs), the parts and skinned detail, the piece and clips modes, the limits file and its format, the result line, the errors and the worked examples; help {"topic":"warnings"} gives every warning, its fix and how warnings are grouped.""";
 
     /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"export"}</c> returns it.</summary>
     public const string Reference =
@@ -65,7 +65,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         + "The file is a JSON object of optional keys: max_triangles (the whole model), max_submeshes (submeshes, or distinct colours), and min_height and max_height in metres (the rest height of every mesh, only for a skeleton with the Synty humanoid bones: Hips, Spine_01, Head, Shoulder/Elbow/Hand and UpperLeg/LowerLeg/Ankle _L and _R); each warns past its value and never at it, a key left out never warns, and with no file there are no limit warnings, which the result says. "
         + "write_limits: true fills in the keys the file is missing with Orcward's starting numbers (max_triangles 5000, max_submeshes 8, min_height 1.4, max_height 2.4), creating the file beside the .glb when none was named or found, and never changes a key already set, though it rewrites the file with the keys in a fixed order (plain JSON, no comments); it is written after the .glb, and the result says what it filled. Edit the numbers to the game's own. "
         + "A limits file that is not a plain JSON object of those keys (a count a whole number of at least 1, a height a number above 0, min_height not above max_height), a limits argument naming no file without write_limits, or one no file could be written at (a file that is not .json, a folder, a character a path may not hold), is a tool error that writes nothing. "
-        + "A mesh with warnings still exports, and the result repeats them (up to 10 not-planar faces named per mesh, the lowest ids first, the rest in one line \"and N more faces are not planar; select faces where non_planar names them\"); so do a skinned or clips export's clip warnings (see define_clip: a looping clip that does not close, a root that ends elsewhere on the ground plane). export changes nothing: not the mesh, its ids, or what undo steps back to. "
+        + "A mesh with warnings still exports, and the result repeats them (a kind past 3 in one line: count, worst, three lowest ids, select query; not-planar only on a flat mesh; a skinned export's per mesh, the others' over the joined meshes); so do a skinned or clips export's clip warnings (see define_clip: a looping clip that does not close, a root that ends elsewhere on the ground plane). export changes nothing: not the mesh, its ids, or what undo steps back to. "
         + "Returns one line: exported <file> to <absolute path> (replaced, when it was): <n> triangles, 1 material 'carve' (or each material, when there are several) (the colours' and each material's name), size <x> x <y> x <z> m, "
         + "bounds (<min x, y, z>) to (<max x, y, z>), with moving parts then \", <n> nodes: '<file>' and the moving part(s) '<part>', ...\", then where the limits came from (limits from <file>, or no game limits), then any warnings; a skinned export's line names its pieces, materials, bones and clips instead of the one material. "
         + "mode: 'model' (the default) writes all of the above; 'clips' writes the armature, skins[0] and the animations with no mesh, no node holding a mesh and no material, "
@@ -119,13 +119,14 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
             ["description"] = "Fill the keys the limits file is missing with Orcward's starting numbers (5000 triangles, 8 submeshes, 1.4 to 2.4 m), creating it beside the .glb when none was named or found. Keys already set are kept. Default false.",
             ["type"] = "boolean",
         };
-        return MeshToolSupport.Create<ExportTool>("export", Text, schema);
+        return MeshToolSupport.Create<ExportTool>("export", Text, WithVerbosity(schema));
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? limits = null, JsonElement? mode = null, JsonElement? overwrite = null, JsonElement? write_limits = null, JsonElement? meshes = null,
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? allow_unweighted = null, JsonElement? limits = null, JsonElement? mode = null, JsonElement? overwrite = null, JsonElement? write_limits = null, JsonElement? meshes = null, JsonElement? verbosity = null,
         CancellationToken cancellationToken = default)
     {
-        var errors = UnknownArguments("export", context, "path", "allow_unweighted", "limits", "mode", "meshes", "overwrite", "write_limits");
+        var errors = UnknownArguments("export", context, "path", "allow_unweighted", "limits", "mode", "meshes", "overwrite", "write_limits", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var text = RequiredString("path", path, errors);
         var allowUnweighted = OptionalBool("allow_unweighted", allow_unweighted, errors);
         var replace = OptionalBool("overwrite", overwrite, errors);
@@ -188,36 +189,36 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
 
         cancellationToken.ThrowIfCancellationRequested(); // RV-82: a cancelled export writes nothing, the bake done or not
         var written = clips ? Clips(model, target, replace, source)
-            : kind == "piece" ? Piece(model, made, pieceMeshes ?? [], target, allowUnweighted, replace, source)
-            : model.Skeleton is not null ? Skinned(model, target, allowUnweighted, replace, source, copies: copies)
-            : Static(model, mesh!, target, replace, source, copies);
+            : kind == "piece" ? Piece(model, made, pieceMeshes ?? [], target, allowUnweighted, replace, source, level)
+            : model.Skeleton is not null ? Skinned(model, target, allowUnweighted, replace, source, copies: copies, level: level)
+            : Static(model, mesh!, target, replace, source, copies, level);
         if (written.IsError == true) return written;
         var bakedText = GraphBakes.Text(baked);
-        if (!source.NeedsWrite) return Line(TextOf(written) + bakedText);
+        if (!source.NeedsWrite) return Quiet(Line(TextOf(written) + bakedText), level);
 
         // The .glb is written; the limits file follows it, so a refused export writes neither.
         if (!source.Write("export", out var writeLimitsError))
             return Error($"{writeLimitsError} The .glb was written: {TextOf(written)}");
-        return Line(TextOf(written).Replace(source.Describe(written: false), source.Describe(written: true), StringComparison.Ordinal) + bakedText);
+        return Quiet(Line(TextOf(written).Replace(source.Describe(written: false), source.Describe(written: true), StringComparison.Ordinal) + bakedText), level);
     }
 
     private static string TextOf(CallToolResult result) => ((TextContentBlock)result.Content[0]).Text;
 
     /// <summary>A model with no skeleton: every mesh merged into one, as T-30 writes it, warned on the game's limits.</summary>
-    private static CallToolResult Static(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source, string? copies)
+    private static CallToolResult Static(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source, string? copies, Verbosity level)
     {
-        if (GlbParts.HasMoving(model)) return Tree(model, mesh, target, overwrite, source, copies);
+        if (GlbParts.HasMoving(model)) return Tree(model, mesh, target, overwrite, source, copies, level);
         var triangles = Shading.Triangles(mesh);
         var bytes = GlbExport.Write(mesh, triangles, target.Stem, model.Materials);
         if (!ToolPaths.Write("export", target, bytes, out var replaced, out var writeError, overwrite)) return Error(writeError!);
 
         var warnings = source.Limits.Warnings(model, triangles.Count, GlbExport.MaterialNames(mesh, model.Materials).Length);
         return Line(Summary(mesh, GlbExport.MaterialNames(mesh, model.Materials), target, replaced, triangles.Count, TargetsPart(model) + source.Describe(written: false), warnings,
-            [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model), .. Copy(copies)]));
+            [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model), .. Copy(copies)], level));
     }
 
     /// <summary>T-95: a model with parts marked moves, a node per moving part (<see cref="GlbParts"/>), counted on the game's limits as drawn.</summary>
-    private static CallToolResult Tree(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source, string? copies)
+    private static CallToolResult Tree(Model model, PolygonMesh mesh, ToolPath target, bool overwrite, LimitsSource source, string? copies, Verbosity level)
     {
         if (GlbParts.Plan(model, target.Stem, out var refusal) is not { } layout) return Error($"export: {refusal}. Nothing was written.");
         var bytes = GlbParts.Write(model, layout);
@@ -229,7 +230,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         List<string> more = [.. GlbExport.UvWarnings(model), .. GlbExport.MaterialUvWarnings(model), .. Copy(copies)];
         if (model.TargetNames.Count > 0)
             more.Add("the file has morph targets and moving parts: a split load (ModelParseOptions SplitParts) refuses a file with morph targets, so a game reads this one with the merged load");
-        return Line(Summary(mesh, names, target, replaced, triangles, GlbParts.Describe(layout) + TargetsPart(model) + source.Describe(written: false), warnings, more));
+        return Line(Summary(mesh, names, target, replaced, triangles, GlbParts.Describe(layout) + TargetsPart(model) + source.Describe(written: false), warnings, more, level));
     }
 
     /// <summary>Clips mode: the armature, skin and animations with no mesh, or a refusal that writes nothing.</summary>
@@ -249,15 +250,15 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
     }
 
     /// <summary>Piece mode: the named meshes with the whole skeleton and no clips, or a refusal that writes nothing.</summary>
-    private static CallToolResult Piece(Model model, IReadOnlyList<(string Copy, string Material, string Mesh)> made, List<string> meshes, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source)
+    private static CallToolResult Piece(Model model, IReadOnlyList<(string Copy, string Material, string Mesh)> made, List<string> meshes, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source, Verbosity level)
     {
         if (PieceExport.Refusal(model, meshes) is { } refusal) return Error($"export: mode piece: {refusal}. Nothing was written.");
         var (piece, copies) = Copies(PieceExport.Select(model, meshes), made);
-        return Skinned(piece, target, allowUnweighted, overwrite, source, asPiece: true, copies: copies);
+        return Skinned(piece, target, allowUnweighted, overwrite, source, asPiece: true, copies: copies, level: level);
     }
 
     /// <summary>A model with a skeleton: the skinned file, or a refusal listing unweighted vertices that writes nothing.</summary>
-    private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source, bool asPiece = false, string? copies = null)
+    private static CallToolResult Skinned(Model model, ToolPath target, bool allowUnweighted, bool overwrite, LimitsSource source, bool asPiece = false, string? copies = null, Verbosity level = Verbosity.Summary)
     {
         static string N(int x) => x.ToString(CultureInfo.InvariantCulture);
         // T-95: the parts baked into placed meshes, instances copied; moves has no effect, said in one warning.
@@ -298,7 +299,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
         warnings.AddRange(ClipChecks.Check(model));
         if (movesWarning is not null) warnings.Add(movesWarning);
         foreach (var piece in model.Meshes)
-            warnings.AddRange(MeshWarningFold.Lines(MeshReport.Create(piece.Mesh).Warnings).Select(w => $"mesh '{piece.Name}': " + w.ReplaceLineEndings(" ")));
+            warnings.AddRange(WarningLines(MeshReport.Create(piece.Mesh).Warnings, level).Select(w => $"mesh '{piece.Name}': " + w.ReplaceLineEndings(" ")));
         return Line(line + WarningsSuffix(warnings));
     }
 
@@ -346,7 +347,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
             : $"{names.Length.ToString(CultureInfo.InvariantCulture)} materials {NameList.Quoted(names)}";
     }
 
-    private static string Summary(PolygonMesh mesh, string[] materialNames, ToolPath target, bool replaced, int triangles, string limits, IReadOnlyList<string> limitWarnings, IReadOnlyList<string> uvWarnings)
+    private static string Summary(PolygonMesh mesh, string[] materialNames, ToolPath target, bool replaced, int triangles, string limits, IReadOnlyList<string> limitWarnings, IReadOnlyList<string> uvWarnings, Verbosity level)
     {
         var report = MeshReport.Create(mesh);
         var (min, max) = (report.BoundsMin, report.BoundsMax);
@@ -358,7 +359,7 @@ internal sealed class ExportTool(ModelStore store, ToolFolder toolFolder, GraphB
             + $"{triangles.ToString(CultureInfo.InvariantCulture)} triangles, {Materials(materialNames)}, "
             + $"size {Size(min.X, max.X)} x {Size(min.Y, max.Y)} x {Size(min.Z, max.Z)} m, bounds {Point(min)} to {Point(max)}"
             + limits;
-        var warnings = limitWarnings.Concat(MeshWarningFold.Lines(report.Warnings)).Select(w => w.ReplaceLineEndings(" ")).Concat(uvWarnings).ToList();
+        var warnings = limitWarnings.Concat(WarningLines(report.Warnings, level)).Select(w => w.ReplaceLineEndings(" ")).Concat(uvWarnings).ToList();
         return line + WarningsSuffix(warnings);
     }
 }

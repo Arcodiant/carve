@@ -26,14 +26,14 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         + "Give vertices, faces (every corner) or group (a face group from define_group) to displace part of the mesh, or none of them for every vertex. "
         + "Ids, faces, UVs, groups, colours and weights are kept; only positions change. A vertex with no normal (on no face, or its faces facing opposite ways) stays without axis, and a warning names it. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[], moved:[vertex ids, ascending], largest: the largest offset in metres}; "
-        + "the not-planar warnings fold into one line, \"N faces are not planar (expected after displace)\", and a warning says when the mesh is too coarse for the source to show (fewer than two vertices to a bump). "
+        + "a kind of warning past 3 is one line, as in every report, and a warning says when the mesh is too coarse for the source to show (fewer than two vertices to a bump). "
         + "Errors, each a tool error that changes nothing: no source, or both graph and noise; a graph file that is missing (the error lists the .texgraph files in its folder), will not read or has faults; an output the graph has not, or a colour one; a mesh without UVs for a graph; amount missing or zero; midlevel outside 0 to 1; a zero axis; octaves outside 1 to 8; scale not above 0; an unknown vertex, face or group; a selection that matches no vertex; a face that would cross itself. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to displace. "
         + PartSpaceText
         + "Worked example on define_mesh's unit cube after subdivide levels 3, a rough boulder:\n"
         + ExampleMarker + Example;
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DisplaceTool>("displace", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<DisplaceTool>("displace", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -58,14 +58,15 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
             ["group"] = new JsonObject { ["description"] = "A face group from define_group whose corners to displace.", ["type"] = "string" },
         },
         ["required"] = new JsonArray("source", "amount"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? source = null, JsonElement? amount = null,
         JsonElement? midlevel = null, JsonElement? axis = null, JsonElement? vertices = null, JsonElement? faces = null,
-        JsonElement? group = null, JsonElement? mesh = null)
+        JsonElement? group = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
         const string tool = "displace";
-        var errors = UnknownArguments(tool, context, "source", "amount", "midlevel", "axis", "vertices", "faces", "group", "mesh");
+        var errors = UnknownArguments(tool, context, "source", "amount", "midlevel", "axis", "vertices", "faces", "group", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var by = Number("amount", amount, errors);
         var mid = Number("midlevel", midlevel, errors, required: false) ?? 0.5f;
@@ -97,14 +98,14 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         if (!result!.Succeeded) return Failed(tool, result.Errors.Select(x => x.ToString()));
 
         var edited = snapshot.Model.Find(name ?? snapshot.Model.Meshes[0].Name)!;
-        var body = Report(edited);
-        body["warnings"] = SubdivideTool.Warnings(MeshReport.Create(edited), tool).Concat(report!.Warnings).ToArray();
+        var body = Report(edited, level);
+        body["warnings"] = WarningLines(MeshReport.Create(edited).Warnings, level).Concat(report!.Warnings).ToArray();
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
         body["deleted"] = Deleted(result.Deleted);
         body["split"] = Split(result.Split);
         body["moved"] = result.MovedVertices;
         body["largest"] = Math.Round(report.Largest, 6);
-        return Ok(body);
+        return Quiet(Ok(body), level);
     }
 
     /// <summary>The source argument as a <see cref="DisplaceSource"/>: a graph's output read into a height field, or noise.</summary>

@@ -101,7 +101,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
     private static readonly string[] Known =
     [
         "name", "base_colour", "metallic", "roughness", "emissive", "occlusion", "double_sided",
-        "base_colour_texture", "metallic_roughness_texture", "normal_texture", "emissive_texture", "occlusion_texture",
+        "base_colour_texture", "metallic_roughness_texture", "normal_texture", "emissive_texture", "occlusion_texture", "verbosity",
     ];
 
     private static JsonObject Str(string text) => new() { ["description"] = text, ["type"] = "string" };
@@ -128,7 +128,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
 
     private static JsonObject Factor(string text) => new() { ["description"] = text, ["type"] = "number", ["minimum"] = 0, ["maximum"] = 1 };
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DefineMaterialTool>("define_material", Text, new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<DefineMaterialTool>("define_material", Text, WithVerbosity(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -147,15 +147,16 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
             ["occlusion_texture"] = Slot("A .png path; linear, occlusion in R."),
         },
         ["required"] = new JsonArray("name"),
-    });
+    }));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
         JsonElement? name = null, JsonElement? base_colour = null, JsonElement? metallic = null, JsonElement? roughness = null,
         JsonElement? emissive = null, JsonElement? occlusion = null, JsonElement? double_sided = null,
         JsonElement? base_colour_texture = null, JsonElement? metallic_roughness_texture = null, JsonElement? normal_texture = null,
-        JsonElement? emissive_texture = null, JsonElement? occlusion_texture = null)
+        JsonElement? emissive_texture = null, JsonElement? occlusion_texture = null, JsonElement? verbosity = null)
     {
         var errors = UnknownArguments("define_material", context, Known);
+        var level = ReadVerbosity(verbosity, errors);
         var materialName = RequiredString("name", name, errors);
         var baseColour = OptionalString("base_colour", base_colour, errors);
         var emissiveColour = OptionalString("emissive", emissive, errors);
@@ -206,7 +207,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
         foreach (var (field, slot) in material.Textures)
             if (slot is MaterialGraph { } g && MaterialJson.ReadsMesh(g.Path) == true)
                 warnings.Add($"{field}: the graph reads the mesh, so it is baked onto each mesh that wears '{material.Name}' (its UVs, its groups and materials); set_material it on a mesh with UVs that do not overlap, and check lists what stops it");
-        return Ok(new { replaced, material = MaterialJson.Of(material), warnings });
+        return Quiet(Ok(new { replaced, material = MaterialJson.Of(material), warnings }), level);
     }
 
     /// <summary>Resolves (against <paramref name="baseDirectory"/>, the working directory when null), finds and reads one texture path; false with <paramref name="problem"/> (named by the argument) when it cannot.</summary>
@@ -352,7 +353,7 @@ public sealed class SetMaterialTool(ModelStore store)
         + "3. set_material is this call, after which get_mesh lists faces 2 and 3 under crate, and check warns only of the other four faces, 0, 1, 4 and 5, which have no UVs (\"faces[0]: no UVs, so the face samples the texture's corner\"); they have no material and no texture, so nothing is drawn wrong:\n"
         + ExampleMarker + """{"material":"crate","faces":[2,3]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<SetMaterialTool>("set_material", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<SetMaterialTool>("set_material", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -362,12 +363,13 @@ public sealed class SetMaterialTool(ModelStore store)
             ["group"] = new JsonObject { ["description"] = "A group name from define_group. Give this or faces, not both.", ["type"] = "string" },
         },
         ["required"] = new JsonArray("material"),
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? material = null, JsonElement? faces = null, JsonElement? group = null, JsonElement? mesh = null)
+        JsonElement? material = null, JsonElement? faces = null, JsonElement? group = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("set_material", context, "material", "faces", "group", "mesh");
+        var errors = UnknownArguments("set_material", context, "material", "faces", "group", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var materialName = RequiredString("material", material, errors);
         var f = Ids("faces", faces, errors);
@@ -412,8 +414,8 @@ public sealed class SetMaterialTool(ModelStore store)
         var name = snapshot.Model.Target(meshName, out _)!.Name;
         if (snapshot.Model.FindMaterial(materialName!) is { HasGraph: true } worn)
             warnings.AddRange(GraphSlotProblem.OnMesh(snapshot.Model, worn, name));
-        return warnings.Count == 0
+        return Quiet(warnings.Count == 0
             ? Ok(new { mesh = name, material = materialName, faces = given })
-            : Ok(new { mesh = name, material = materialName, faces = given, warnings });
+            : Ok(new { mesh = name, material = materialName, faces = given, warnings }), level);
     }
 }

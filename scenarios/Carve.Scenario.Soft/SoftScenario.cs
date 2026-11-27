@@ -175,28 +175,23 @@ public sealed class SoftScenario : IScenario
             driver.Fail($"export: expected 22 bones, 2 clips and {triangles} triangles, got {exported}");
         }
 
-        // Every warning is a face that is not planar (what subdivide makes of a quad); a limit (triangles, primitives, height) must not
-        // be one. By T-72's rule (the person, 2026-11-13) each mesh names its first 10 and folds the rest into one line, and the named
-        // lines and the folded count add up to select's non_planar faces of that mesh, the named faces are select's lowest ids and the
-        // fold line comes after them, so a regression that adds a warning or loses a
-        // face is caught. select's results are kept in the run folder for SoftLoad.Tests.
-        var nonPlanar = new Dictionary<string, IReadOnlyList<int>>();
+        // Both meshes are smooth (set_shading), so what subdivide makes of a quad is no warning (T-198, the person's ruling of
+        // 2026-11-24): the export has none at all, and check's note counts select's non_planar faces of that mesh and names a worst
+        // face select finds. select's and check's results are kept in the run folder for SoftLoad.Tests.
         foreach (var name in new[] { "Body", "Hat" })
         {
             var selected = await CallTextAsync(driver, "select", new { kind = "faces", where = "non_planar", mesh = name });
             await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, $"select-non-planar-{name}.txt"), selected);
             var found = JsonDocument.Parse(selected).RootElement;
-            nonPlanar[name] = [.. found.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32())];
-            if (nonPlanar[name].Count != found.GetProperty("count").GetInt32())
+            var ids = found.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
+            if (ids.Count != found.GetProperty("count").GetInt32())
             {
-                driver.Fail($"select non_planar on {name}: count {found.GetProperty("count")} against {nonPlanar[name].Count} faces listed");
+                driver.Fail($"select non_planar on {name}: count {found.GetProperty("count")} against {ids.Count} faces listed");
             }
-        }
-        var warned = exported.IndexOf("warning(s): ", StringComparison.Ordinal);
-        var problem = warned < 0 ? "no warnings" : NotPlanarFold.Check(exported[(warned + "warning(s): ".Length)..], nonPlanar);
-        if (problem is not null)
-        {
-            driver.Fail($"export: {problem}");
+            var checkResult = await CallTextAsync(driver, "check", new { mesh = name });
+            await File.WriteAllTextAsync(Path.Combine(driver.RunFolder, $"check-{name}.txt"), checkResult);
+            if (NotPlanarFold.CheckSmoothNote(checkResult, ids) is { } note) driver.Fail($"check {name}: {note}");
+            if (NotPlanarFold.CheckSmoothExport(exported, ids.Count) is { } warned) driver.Fail($"export: {warned}");
         }
 
         if (flatExport.Contains("warning(s)"))

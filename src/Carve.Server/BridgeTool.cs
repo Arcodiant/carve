@@ -31,7 +31,7 @@ public sealed class BridgeTool(ModelStore store)
         + MergeFacesTool.DefineMarker + Squares + "\n"
         + ExampleMarker + """{"loops":[[0,1,2,3],[4,5,6,7]]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<BridgeTool>("bridge", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<BridgeTool>("bridge", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -51,11 +51,12 @@ public sealed class BridgeTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("loops"),
-    }));
+    })));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? loops = null, JsonElement? mesh = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? loops = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("bridge", context, "loops", "mesh");
+        var errors = UnknownArguments("bridge", context, "loops", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         List<int>?[] read = [null, null];
         if (Absent(loops))
@@ -74,6 +75,6 @@ public sealed class BridgeTool(ModelStore store)
             }
         if (errors.Count > 0) return Failed("bridge", errors);
 
-        return Edit(store, "bridge", name, m => Bridge.Join(m, read[0]!, read[1]!), (_, _) => { });
+        return Edit(store, "bridge", name, m => Bridge.Join(m, read[0]!, read[1]!), (_, _) => { }, level);
     }
 }

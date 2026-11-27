@@ -4,7 +4,7 @@ description: >-
 ---
 # T-203 — check and export described under the cut
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -30,6 +30,10 @@ An agent in Claude Code reads all of `check`'s and `export`'s descriptions: each
 - **`README.md`**: nothing a user reaches changes but where the text is; say so in `### As built`, and add the new topics to the `help` line.
 
 ## Notes
+
+### As built
+
+Delivered by M-29's T-207; what was left of it (check's warnings into help, and the pointer) moved into T-199.
 
 - Runs beside T-204 and T-205. Shared with them: `HelpTopics.All` (adds one line each), `DescriptionLengthTests`' table (removes rows), `PartToolsListTests`' companion; keep both sides of each conflict.
 - Rewording is not the task: move text, cut repetition. A sentence that states a rule keeps its words.

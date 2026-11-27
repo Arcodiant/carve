@@ -33,7 +33,8 @@ render's full reference (every look, caption and error), and likewise `export`
 (what is written, the limits file), `bake`, `check`, `save`, `open` (the .carve
 format and the part tree), `select` (every error), `define_material` and
 `get_mesh` (where ids come from, the worked examples); `help {}` lists the nine
-entries. A description ends with `More: help ...` when it
+entries and the topics. `help {"topic":"warnings"}` gives every warning, its fix, how
+warnings are grouped and the verbosity levels. A description ends with `More: help ...` when it
 has one.
 
 ## Build and test
@@ -104,6 +105,78 @@ An agent can question a mesh instead of reading every id out of `get_mesh`.
 
 `samples/leaky-shed.carve` is a broken shed to try them on.
 
+## Dense meshes
+
+A mesh of thousands of faces can have hundreds of warnings of one kind, so every
+tool's result says each kind once past three. One to three warnings of a kind are
+listed one per line, each naming its element; four or more are one line, where
+the kind's first warning would stand: the count, the worst case where the kind
+measures one, three samples by lowest id, and the `select` query that names them
+all:
+
+```
+252 faces are not planar: worst faces[10], 6.03E-05 off its plane (limit 1.07E-05); e.g. faces[0], faces[1], faces[2]; select faces where non_planar names them
+798 edges belong to only one face: e.g. edges[0-1], edges[0-9], edges[1-2]; select edges where open names them
+```
+
+Every warning, its fix and these rules are in `help {"topic":"warnings"}`.
+
+`select` names every element of a kind: `faces where non_planar`, `edges where
+open`, `edges where nonmanifold`, `vertices where unattached`.
+
+On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-planar face is not a warning: `check` gives one note with the count and the worst case ("...; expected on a smooth mesh, which export triangulates"), every other tool says nothing, and `ok` can be true. `select faces where non_planar` names every one either way, and a flat mesh warns as above.
+
+`define_mesh`, `move`, `extrude`, `delete`, `merge_faces`, `bridge`, `plane_cut`,
+`loop_cut`, `knife`, `subdivide`, `undo`, `open`, `check` and `export` take
+`verbosity`:
+
+```
+verbosity: "silent"     {"ok":true}: no counts, no ids, no warnings; the change is made all the same
+verbosity: "summary"    the result as above, each kind of four or more on one line (the default)
+verbosity: "full"       the same, with every warning one per line
+```
+
+`check` at `silent` answers its own `ok` (`{"ok":false}` on a broken mesh), and
+`export` answers the same JSON although its result is otherwise a line of text. A
+tool error is returned whole at every level, and any other value is a tool error.
+
+The tools that change the model or write a file take it too, on the same three
+levels: `define_part`, `keep_level`, `define_group`, `set_colour`,
+`define_material`, `set_material`, `set_shading`, `mark_edges`, `set_uvs`,
+`project_uvs`, `define_skeleton`, `set_weights`, `weigh`, `define_clip`,
+`delete_clip`, `define_target`, `delete_target`, `save`, `bake` and `displace`.
+At `silent` each answers `{"ok":true}` with the change made (the file written, for
+`save` and `bake`); `summary` is the result as it was, and `full` the same, since
+none of these but `displace` shortens a list of warnings; `displace` groups its
+mesh report at `summary`, and its `full` lists every warning. The tools that only read (`get_mesh`,
+`get_parts`, `get_skeleton`, `get_weights`, `get_clips`, `select`, `render`,
+`render_glb`, `help`) take none.
+
+`unwrap` takes `verbosity` too, and answers a summary, not every island: the
+count (`islands`, with `single_face_islands`), `fill`, `scale`, the worst
+`stretch` named by its island's lowest face, the `flipped` total and `largest`,
+the five largest islands by face count. `full` adds `all`, every island.
+
+Measured through the real `carve` on fps-arms' cage and tool sources
+(`DenseRunProcessTests`), characters of the result text at `summary`, the
+default; every result is within the 2,000-character budget, and at `silent` each
+is `{"ok":true}` (`check` its own `ok`):
+
+| Call | Characters | Planning (`main`) |
+|---|---|---|
+| `open` the cage | 248 | 1,156 |
+| `check` the cage | 730 | 1,434 |
+| `export`, skinned: now after two subdivides and a move, at planning the 590-face cage | 1,039 | 2,038 |
+| `subdivide`, once then twice | 319, 332 | 373, 386 |
+| `check` after two (reads `ok: true`) | 766 | 1,467 |
+| `delete` 200 faces (798 open edges) | 1,119 | 41,310 |
+| `check` after it | 873 | |
+| `check` after `project_uvs box` (280 overlapping pairs) | 849 | 43,700 |
+| `unwrap` wrench, cutter, toolkit, scanner | 787, 794, 790, 786 | 4,778, 11,371, 16,086, 8,089 |
+
+`verbosity: "full"` lists every warning (40,389 characters for the 798 open
+edges); the exported cage holds 18,976 triangles.
+
 ## Cutting
 
 Each of these edits the mesh in place and appends new ids at the end; each example is on a fresh `define_mesh` unit cube unless it says otherwise. A cut is refused, with the point and its distance, when a knife point is off the surface.
@@ -145,7 +218,7 @@ A face's UVs are one `[u, v]` per corner. They run as in glTF: (0, 0) is the tex
 
 - `set_uvs` gives faces UVs by coordinates. On the unit cube this maps face 0 (corners `[0,3,2,1]`) to the whole texture: `{"faces":[{"face":0,"uv":[[0,0],[0,1],[1,1],[1,0]]}]}`.
 - `project_uvs` projects faces: `planar` (one side of a thing), `box` (crates, rooms) or `cylindrical` (barrels, posts): `{"method":"box"}`, or `{"method":"planar","view":"+y","faces":[3],"into":[0,0,0.5,1]}` for the top into the left half.
-- `unwrap` cuts the faces at their seams, flattens each island and packs them: `{}`. Mark the seams first with `mark_edges` and `seam`: `{"edges":[[0,3]],"seam":true}`. Each island must lie flat, so a closed box needs enough seams to unfold, and a cylinder needs one down its side and one round each rim. `unwrap`'s description works through a barrel.
+- `unwrap` cuts the faces at their seams, flattens each island and packs them: `{}`. Mark the seams first with `mark_edges` and `seam`: `{"edges":[[0,3]],"seam":true}`. Each island must lie flat, so a closed box needs enough seams to unfold, and a cylinder needs one down its side and one round each rim. `unwrap` answers the island count, the worst stretch and its five largest islands (`verbosity: "full"` adds every island); its description works through a barrel.
 - `render` with `mode` `checker` draws a checker at each face's UVs, with unmapped faces magenta. `mode` `uvs` draws the layout flat, with seams in yellow.
 - `check` warns of unmapped, flipped, zero-area and overlapping UV faces.
 

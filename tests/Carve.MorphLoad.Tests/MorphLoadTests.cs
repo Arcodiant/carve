@@ -110,23 +110,24 @@ public class MorphLoadTests
     public void The_export_is_clean()
     {
         var result = File.ReadAllText(Path.Combine(RunFolder, "work", "export-arm.glb.txt"));
-        // Only not-planar warnings (the person's ruling of 2026-11-18), folded by T-72: the named faces and the fold add up to select's count.
+        // The arm is smooth, so its not-planar faces are no warning (T-198): the export has none, and check's note counts select's faces.
         Assert.DoesNotContain("replaced", result);
-        var selected = File.ReadAllText(Path.Combine(RunFolder, "work", "select-non-planar-mesh.txt"));
-        var faces = System.Text.Json.JsonDocument.Parse(selected).RootElement.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
-        Assert.Null(NotPlanarFold.CheckExport(result, new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = faces }));
+        var faces = Faces();
+        Assert.Null(NotPlanarFold.CheckSmoothExport(result, faces.Count));
+        Assert.Null(NotPlanarFold.CheckSmoothNote(File.ReadAllText(Path.Combine(RunFolder, "work", "check-mesh.txt")), faces));
     }
 
+    private List<int> Faces() => System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(RunFolder, "work", "select-non-planar-mesh.txt"))).RootElement
+        .GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
+
     [SkippableOrRun]
-    public void A_wrong_count_of_not_planar_faces_fails_the_fold_check()
+    public void A_wrong_count_of_not_planar_faces_fails_the_note_check()
     {
-        var result = File.ReadAllText(Path.Combine(RunFolder, "work", "export-arm.glb.txt"));
-        var faces = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(RunFolder, "work", "select-non-planar-mesh.txt"))).RootElement
-            .GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
-        var warnings = result[(result.IndexOf("warning(s): ", StringComparison.Ordinal) + "warning(s): ".Length)..];
-        Assert.NotNull(NotPlanarFold.Check(warnings, new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = [.. faces, faces.Max() + 1] }));
-        Assert.NotNull(NotPlanarFold.Check(warnings, new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = faces[1..] }));
-        Assert.NotNull(NotPlanarFold.Check(warnings + "; the model has 6000 triangles, above the 5000 a game character should keep to", new Dictionary<string, IReadOnlyList<int>> { ["mesh"] = faces }));
+        var check = File.ReadAllText(Path.Combine(RunFolder, "work", "check-mesh.txt"));
+        var faces = Faces();
+        Assert.NotNull(NotPlanarFold.CheckSmoothNote(check, [.. faces, faces.Max() + 1]));
+        Assert.NotNull(NotPlanarFold.CheckSmoothNote(check, faces[1..]));
+        Assert.NotNull(NotPlanarFold.CheckSmoothExport(File.ReadAllText(Path.Combine(RunFolder, "work", "export-arm.glb.txt")) + "; warning(s): faces[3]: face is not planar: x", faces.Count));
     }
 
     [SkippableOrRun]

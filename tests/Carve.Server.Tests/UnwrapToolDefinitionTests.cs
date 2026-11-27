@@ -14,7 +14,7 @@ public sealed class UnwrapToolDefinitionTests
         using var carve = new ToolHarness();
         await carve.InitializeAsync();
         var tool = (await carve.ListToolsAsync()).EnumerateArray().Single(t => t.GetProperty("name").GetString() == "unwrap");
-        Assert.Equal(["faces", "into", "margin", "mesh"], tool.GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order());
+        Assert.Equal(["faces", "into", "margin", "mesh", "verbosity"], tool.GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order());
         var text = tool.GetProperty("description").GetString()!;
         Assert.Contains("one seam down its side", text);
         Assert.Contains("[[2,10],[10,18],[18,26],[26,34]]", text);

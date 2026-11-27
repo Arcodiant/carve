@@ -40,7 +40,7 @@ public class CheckToolTests
         Assert.Equal(
             TestMeshes.LeakyShedProblems,
             body.GetProperty("problems").EnumerateArray().Select(p => (p.GetProperty("check").GetString()!, p.GetProperty("element").GetString()!, p.GetProperty("message").GetString()!)));
-        Assert.Equal(TestMeshes.LeakyShedWarnings, body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!));
+        Assert.Equal(TestMeshes.LeakyShedLines, body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!));
         Assert.Equal(TestMeshes.LeakyShedNotes, body.GetProperty("notes").EnumerateArray().Select(n => n.GetString()!));
 
         var stats = body.GetProperty("stats");

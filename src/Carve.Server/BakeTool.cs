@@ -72,13 +72,13 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
         + "a mesh, group or material name that a file name cannot hold; a folder that cannot be a path (said once, as folder). "
         + "A file that cannot be written (held open by another program, a full disk) stops the bake there: the error names the files written before it, which replaced any file of their name, and those not written. ";
 
-    private static readonly string[] Known = ["mesh", "folder", "size", "padding", "maps", "surface", "curvature", "occlusion", "bevel"];
+    private static readonly string[] Known = ["mesh", "folder", "size", "padding", "maps", "surface", "curvature", "occlusion", "bevel", "verbosity"];
 
     private static readonly string[] OcclusionKnown = ["rays", "reach", "occluders"];
 
     private static readonly string[] SurfaceKnown = ["base_colour", "roughness", "metallic"];
 
-    public static McpServerTool Create() => MeshToolSupport.Create<BakeTool>("bake", Text, new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<BakeTool>("bake", Text, WithVerbosity(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -138,7 +138,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
                 ["additionalProperties"] = false,
             },
         },
-    });
+    }));
 
     /// <summary>One surface entry: the name it is keyed by and the fields it gave.</summary>
     private sealed record SurfaceEntry(string Name, string? BaseColour, float? Roughness, float? Metallic);
@@ -151,9 +151,10 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? folder = null,
         JsonElement? size = null, JsonElement? padding = null, JsonElement? maps = null, JsonElement? surface = null, JsonElement? curvature = null,
-        JsonElement? occlusion = null, JsonElement? bevel = null)
+        JsonElement? occlusion = null, JsonElement? bevel = null, JsonElement? verbosity = null)
     {
         var errors = UnknownArguments("bake", context, Known);
+        var level = ReadVerbosity(verbosity, errors);
         var meshName = MeshName(mesh, errors);
         var folderText = OptionalString("folder", folder, errors) ?? DefaultFolder;
         var folderOk = true;
@@ -293,7 +294,7 @@ public sealed class BakeTool(ModelStore store, ToolFolder toolFolder)
 
         if (layout.Unmapped.Count > 0)
             warnings.Add($"{named.Name}: {layout.Unmapped.Count} face(s) have no UVs and were skipped: {string.Join(", ", layout.Unmapped.Take(10))}{(layout.Unmapped.Count > 10 ? ", ..." : "")}");
-        return Ok(new { files, skipped_faces = layout.Unmapped, warnings });
+        return Quiet(Ok(new { files, skipped_faces = layout.Unmapped, warnings }), level);
     }
 
     /// <summary>A whole number argument, or its default; null with the problem added to <paramref name="errors"/>.</summary>

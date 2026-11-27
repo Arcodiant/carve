@@ -44,12 +44,13 @@ public class MaterialToolTests : FileToolTests
         Assert.False(check.GetProperty("stats").TryGetProperty("uvs", out _));
 
         // A partly mapped mesh: the textured faces keep the new warning in place of the generic one, the rest get the generic one.
-        Ok(await carve.CallToolAsync("project_uvs", """{"method":"box","faces":[0,1]}"""));
+        // Faces 0 to 2 are mapped, so three are unmapped and listed one per line (T-197 groups 4 or more).
+        Ok(await carve.CallToolAsync("project_uvs", """{"method":"box","faces":[0,1,2]}"""));
         var partly = Strings(Body(Ok(await carve.CallToolAsync("check", "{}"))).GetProperty("warnings"));
         Assert.Equal(1, partly.Count(w => w.StartsWith("faces[4]:")));
         Assert.Equal($"faces[4]: {text}", partly.Single(w => w.StartsWith("faces[4]:")));
         Assert.DoesNotContain(partly, w => w.StartsWith("faces[1]:") && w.Contains("no UVs"));
-        Assert.Equal("faces[2]: no UVs, so the face samples the texture's corner", partly.Single(w => w.StartsWith("faces[2]:")));
+        Assert.Equal("faces[3]: no UVs, so the face samples the texture's corner", partly.Single(w => w.StartsWith("faces[3]:")));
     }
 
     [Fact]

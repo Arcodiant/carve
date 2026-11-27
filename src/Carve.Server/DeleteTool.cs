@@ -24,7 +24,7 @@ public sealed class DeleteTool(ModelStore store)
         + "Worked example on define_mesh's unit cube: deleting the top face (face 3, y = 1) leaves an open box, deleted:{vertices:[], faces:[3]}:\n"
         + ExampleMarker + """{"faces":[3]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DeleteTool>("delete", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<DeleteTool>("delete", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -42,17 +42,18 @@ public sealed class DeleteTool(ModelStore store)
                 ["items"] = new JsonObject { ["type"] = "integer" },
             },
         },
-    }));
+    })));
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
-        JsonElement? vertices = null, JsonElement? faces = null, JsonElement? mesh = null)
+        JsonElement? vertices = null, JsonElement? faces = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("delete", context, "vertices", "faces", "mesh");
+        var errors = UnknownArguments("delete", context, "vertices", "faces", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var v = Ids("vertices", vertices, errors);
         var f = Ids("faces", faces, errors);
         if (errors.Count > 0) return Failed("delete", errors);
 
-        return Edit(store, "delete", name, m => MeshDelete.Delete(m, v, f), (_, _) => { });
+        return Edit(store, "delete", name, m => MeshDelete.Delete(m, v, f), (_, _) => { }, level);
     }
 }

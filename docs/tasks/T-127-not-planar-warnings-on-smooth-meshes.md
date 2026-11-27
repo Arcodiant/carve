@@ -4,7 +4,7 @@ description: >-
 ---
 # T-127 — Not-planar warnings on smooth meshes
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P2
 
@@ -37,3 +37,7 @@ warning is not lost among them.
 - Same flood as M-18's soft gardener (T-44, RV-27) and M-19's T-72.
 - **Open rules: stop and ask.** The rule itself is the person's.
 - **Taken into M-23 (2026-11-24)** as T-198, on the person's ruling at M-23's planning: on a smooth mesh a not-planar face is a note in `check` and no warning. Close this when T-198 lands.
+
+### As built
+
+Answered by M-23's T-198 (2026-11-26), on the person's ruling 2 of M-23's planning: a smooth-shaded mesh gives no not-planar warning from any tool, `check` gives one note with the count and the worst face and can read `ok`, `select faces where non_planar` names every face either way, and `PlanarityTolerance` is unchanged. No code under this id.

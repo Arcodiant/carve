@@ -283,7 +283,7 @@ public sealed class TargetToolTests() : TempFolderTests("carve-targets")
         var define = ToolList.Tool(tools, "define_target");
         var schema = define.GetProperty("inputSchema");
         var props = schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray();
-        Assert.Equal(["file", "file_mesh", "mesh", "name", "positions"], props);
+        Assert.Equal(["file", "file_mesh", "mesh", "name", "positions", "verbosity"], props);
         Assert.Equal(["name"], Names(schema.GetProperty("required")));
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
         Assert.All(props, p => Assert.False(string.IsNullOrWhiteSpace(schema.GetProperty("properties").GetProperty(p).GetProperty("description").GetString())));
@@ -293,7 +293,7 @@ public sealed class TargetToolTests() : TempFolderTests("carve-targets")
         foreach (var word in new[] { "ABSOLUTE", "replaced", "largest_move", "FIRST difference", "delete_target" })
             Assert.Contains(word, ToolList.Description(tools, "define_target"));
         Assert.Contains("drop_targets", ToolList.Description(tools, "define_mesh"));
-        Assert.Equal(["drop_targets", "faces", "name", "vertices"],
+        Assert.Equal(["drop_targets", "faces", "name", "verbosity", "vertices"],
             ToolList.Tool(tools, "define_mesh").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray());
         Assert.Equal(["faces", "include", "level", "mesh", "target"], ToolList.Tool(tools, "get_mesh").GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).Order().ToArray());
         Assert.Contains("targets:[{name, vertices}]", ToolList.Description(tools, "get_mesh"));

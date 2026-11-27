@@ -57,9 +57,10 @@ internal static class MeshToolSupport
     /// <paramref name="text"/> and <paramref name="meshName"/> set, or the failed result naming every problem.
     /// </summary>
     public static CallToolResult? PathAndMeshArguments(string tool, RequestContext<CallToolRequestParams> context, JsonElement? path, JsonElement? mesh,
-        out string? text, out string? meshName)
+        JsonElement? verbosity, out string? text, out string? meshName, out Verbosity level)
     {
-        var errors = UnknownArguments(tool, context, "path", "mesh");
+        var errors = UnknownArguments(tool, context, "path", "mesh", "verbosity");
+        level = ReadVerbosity(verbosity, errors);
         text = RequiredString("path", path, errors);
         meshName = MeshName(mesh, errors);
         return errors.Count > 0 ? Failed(tool, errors) : null;
@@ -156,8 +157,59 @@ internal static class MeshToolSupport
     public static object[] Split(IReadOnlyList<SplitFace> split) =>
         [.. split.Select(s => new { face = s.Face, pieces = s.Pieces })];
 
+    /// <summary>The levels of the <c>verbosity</c> argument (M-23's ruling 3), read by <see cref="ReadVerbosity"/>.</summary>
+    public enum Verbosity { Summary, Silent, Full }
+
+    /// <summary>The schema description of <c>verbosity</c>, which the client does not cut; no tool description grows for it (T-200).</summary>
+    public const string VerbositySchemaText =
+        "How much the result says. \"summary\", the default: the result as always, a kind of warning with 4 or more listed as one line "
+        + "(its count, the worst case, three samples and the select query that names them all). "
+        + "\"full\": the same, with every warning one per line. "
+        + "\"silent\": only {\"ok\":true}, no counts, ids or warnings, and the change is made all the same (one undo step); "
+        + "check answers {\"ok\":<its own ok>}, and export answers that JSON though its result is otherwise a line of text. "
+        + "A tool error is returned whole at every level. Any other value is a tool error.";
+
+    /// <summary>Adds the <c>verbosity</c> argument to <paramref name="schema"/> (an empty object schema when null); returns it.</summary>
+    public static JsonObject WithVerbosity(JsonObject? schema)
+    {
+        schema ??= new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() };
+        schema["properties"]!.AsObject()["verbosity"] = new JsonObject
+        {
+            ["description"] = VerbositySchemaText,
+            ["type"] = "string",
+            ["enum"] = new JsonArray("silent", "summary", "full"),
+        };
+        return schema;
+    }
+
+    /// <summary>The optional <c>verbosity</c> argument: summary when absent; anything but the three names is a problem.</summary>
+    public static Verbosity ReadVerbosity(JsonElement? value, List<string> errors)
+    {
+        if (Absent(value)) return Verbosity.Summary;
+        switch (value!.Value.ValueKind == JsonValueKind.String ? value.Value.GetString() : null)
+        {
+            case "silent": return Verbosity.Silent;
+            case "summary": return Verbosity.Summary;
+            case "full": return Verbosity.Full;
+        }
+        var got = value.Value.ValueKind == JsonValueKind.String ? JsonSerializer.Serialize(value.Value.GetString()) : Describe(value.Value);
+        errors.Add($"verbosity: expected \"silent\", \"summary\" or \"full\", got {got}");
+        return Verbosity.Summary;
+    }
+
+    /// <summary>A mesh's warnings as result lines: grouped by kind (T-197), or at <c>full</c> every warning one per line.</summary>
+    public static IReadOnlyList<string> WarningLines(IReadOnlyList<MeshWarning> warnings, Verbosity level) =>
+        level == Verbosity.Full ? [.. warnings.Select(w => w.ToString())] : MeshWarningGroups.Lines(warnings);
+
+    /// <summary>What a success answers at <c>silent</c>.</summary>
+    private const string SilentOk = """{"ok":true}""";
+
+    /// <summary>The result at <paramref name="level"/>: at <c>silent</c> a success is <c>{"ok":true}</c>; a tool error is always whole.</summary>
+    public static CallToolResult Quiet(CallToolResult result, Verbosity level) =>
+        level == Verbosity.Silent && result.IsError != true ? Line(SilentOk) : result;
+
     /// <summary>The report fields every tool returns: vertices, faces, edges, closed, bounds, warnings.</summary>
-    public static Dictionary<string, object> Report(PolygonMesh mesh)
+    public static Dictionary<string, object> Report(PolygonMesh mesh, Verbosity level = Verbosity.Summary)
     {
         var report = MeshReport.Create(mesh);
         return new Dictionary<string, object>
@@ -167,7 +219,7 @@ internal static class MeshToolSupport
             ["edges"] = report.EdgeCount,
             ["closed"] = report.Closed,
             ["bounds"] = new { min = Array(report.BoundsMin), max = Array(report.BoundsMax) },
-            ["warnings"] = MeshWarningFold.Lines(report.Warnings).ToArray(),
+            ["warnings"] = WarningLines(report.Warnings, level).ToArray(),
         };
     }
 
@@ -176,14 +228,15 @@ internal static class MeshToolSupport
     /// plus <c>created</c> and whatever <paramref name="addIds"/> adds.
     /// </summary>
     public static CallToolResult Edit(ModelStore store, string tool, string? mesh, Func<PolygonMesh, EditResult> edit,
-        Action<Dictionary<string, object>, EditResult> addIds)
+        Action<Dictionary<string, object>, EditResult> addIds, Verbosity level = Verbosity.Summary)
     {
         var snapshot = store.Edit(tool, mesh, edit, out var result, out var problem);
         if (problem is not null) return Failed(tool, [problem]);
         if (snapshot is null) return Error($"{tool}: " + NoMesh);
         if (!result!.Succeeded) return Failed(tool, result.Errors.Select(x => x.ToString()));
 
-        var body = Report(snapshot.Model.Find(mesh ?? snapshot.Model.Meshes[0].Name)!);
+        if (level == Verbosity.Silent) return Line(SilentOk);
+        var body = Report(snapshot.Model.Find(mesh ?? snapshot.Model.Meshes[0].Name)!, level);
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
         body["deleted"] = Deleted(result.Deleted);
         body["split"] = Split(result.Split);

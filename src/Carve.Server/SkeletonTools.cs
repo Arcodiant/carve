@@ -54,7 +54,7 @@ public sealed class DefineSkeletonTool(ModelStore store)
     private const string BonesText =
         "The bones in order, each {name: string, parent: string or null (a root), position: [x, y, z] local to the parent, rotation: [x, y, z, w] unit quaternion local to the parent}. A bone's parent must come before it.";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<DefineSkeletonTool>("define_skeleton", Text, Schema());
+    public static McpServerTool Create() => MeshToolSupport.Create<DefineSkeletonTool>("define_skeleton", Text, WithVerbosity(Schema()));
 
     private static JsonObject Schema() => new()
     {
@@ -94,9 +94,10 @@ public sealed class DefineSkeletonTool(ModelStore store)
         ["required"] = new JsonArray("bones"),
     };
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? bones = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? bones = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("define_skeleton", context, "bones");
+        var errors = UnknownArguments("define_skeleton", context, "bones", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         if (Absent(bones)) errors.Add("bones: required but missing");
         else if (bones!.Value.ValueKind != JsonValueKind.Array) errors.Add($"bones: expected an array, got {Describe(bones.Value)}");
 
@@ -118,7 +119,7 @@ public sealed class DefineSkeletonTool(ModelStore store)
             if (errors.Count == 0)
             {
                 if (store.DefineSkeleton(skeleton!, "define_skeleton", out var refusal) is null) return Failed("define_skeleton", [refusal!]);
-                return Ok(new { bones = skeleton!.Bones.Count, names = skeleton.Names.ToArray() });
+                return Quiet(Ok(new { bones = skeleton!.Bones.Count, names = skeleton.Names.ToArray() }), level);
             }
         }
         return Failed("define_skeleton", errors);

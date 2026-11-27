@@ -123,4 +123,44 @@ public class HelpToolTests : FileToolTests
         using var _ = carve;
         foreach (var example in ToolList.Examples(tools, "help")) Ok(await carve.CallToolAsync("help", example));
     }
+
+    [Fact]
+    public async Task The_warnings_topic_is_returned_whole_and_help_lists_it()
+    {
+        var (carve, _) = await StartAsync(mesh: null);
+        using var _ = carve;
+        var topic = carve::Carve.Server.HelpTool.Topic("warnings")!;
+        Assert.Equal(topic, Ok(await carve.CallToolAsync("help", """{"topic":"warnings"}""")));
+        Assert.Contains("topic warnings: ", Ok(await carve.CallToolAsync("help", "{}")));
+        foreach (var kind in Enum.GetNames<global::Carve.Core.MeshWarningKind>()) Assert.Contains(kind + ": ", topic);
+        foreach (var said in new[] { "faces[0], faces[1], faces[2]; select faces where non_planar names them", "expected on a smooth mesh", "{\"ok\":true}", "\"full\"", "Graph material warnings", "a part leaving its envelope" })
+            Assert.Contains(said, topic);
+    }
+
+    [Fact]
+    public async Task A_bad_topic_or_both_arguments_or_a_non_string_is_refused_in_the_messages_words()
+    {
+        var (carve, _) = await StartAsync(mesh: null);
+        using var _ = carve;
+        Assert.Equal("help: there is no topic 'nonesuch'; the topics are warnings", TextOf(await carve.CallToolAsync("help", """{"topic":"nonesuch"}""")));
+        var entries = string.Join(", ", carve::Carve.Server.HelpTool.Tools);
+        Assert.Equal($"help: give tool or topic, not both; the entries are {entries}; the topics are warnings", TextOf(await carve.CallToolAsync("help", """{"tool":"check","topic":"warnings"}""")));
+        var nonString = TextOf(await carve.CallToolAsync("help", """{"topic":3}"""));
+        Assert.Contains("topic: expected a string", nonString);
+        Assert.EndsWith("; the topics are warnings", nonString);
+        Assert.True(IsError(await carve.CallToolAsync("help", """{"topic":"nonesuch"}""")));
+        Assert.True(IsError(await carve.CallToolAsync("help", """{"tool":"check","topic":"warnings"}""")));
+    }
+
+    [Fact]
+    public async Task Every_topic_is_named_by_a_description_and_every_topic_a_description_names_exists()
+    {
+        var (carve, tools) = await StartAsync(mesh: null);
+        using var _ = carve;
+        var named = tools.EnumerateArray().SelectMany(t => System.Text.RegularExpressions.Regex.Matches(t.GetProperty("description").GetString()!, """help \{"topic":"([a-z_]+)"\}""").Select(m => m.Groups[1].Value)).ToHashSet();
+        foreach (var topic in carve::Carve.Server.HelpTool.TopicNames) Assert.Contains(topic, named);
+        foreach (var topic in named) Assert.Contains(topic, carve::Carve.Server.HelpTool.TopicNames);
+        foreach (var tool in new[] { "check", "open", "export" }) Assert.Contains("""help {"topic":"warnings"}""", Description(tools, tool));
+        Assert.Contains("warnings", Description(tools, "help"));
+    }
 }

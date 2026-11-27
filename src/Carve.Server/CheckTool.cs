@@ -11,26 +11,23 @@ public sealed class CheckTool(ModelStore store)
 {
     public const string Text =
         "Checks the current mesh's health: what is wrong by element id, what it measures, and what a game will make of it. Call it before you export or call a model done. "
-        + "Takes the optional argument mesh (the name of the mesh to check, which may be left out while the model has one mesh) and the optional targets; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
+        + "Takes the optional argument mesh (the name of the mesh to check, which may be left out while the model has one mesh), the optional targets and verbosity; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
         + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{...}}, the stats as the example shows. "
         + "ok is true when there are no problems and no warnings; notes never make it false. "
         + """Problems, each with its fix: inside-out (a closed shell wound the wrong way round, so a game culls it and it is invisible: reverse every face loop of that shell and call define_mesh again), coincident-vertices (two vertices at exactly the same position, so they z-fight: call define_mesh again with one vertex), duplicate-face (two faces with the same vertices, which z-fight: call define_mesh again without the extra face). With morph targets it is also checked at weight 1 against the rest mesh: target-flips-face, target-collapses-face, target-opens-mesh. """
         + "The optional targets, an object of target name to weight 0 to 1 as render takes, checks the mesh morphed to those weights. "
-        + """Warnings, the same ones define_mesh and the edits report: "edge belongs to only one face" (a hole; collision breaks later), "edge is shared by N faces" (non-manifold: call define_mesh again without the extra face), "two faces cross this edge in the same direction" (inconsistent winding: reverse that face's loop and call define_mesh again), "face is not planar" (move the vertex back with move), "no face uses this vertex" (call define_mesh again without it). """
-        + """UV warnings, only for a mesh that has UVs on some face, each by face id: "no UVs, so the face samples the texture's corner" (project_uvs, unwrap or set_uvs it), "UVs flipped" (set_uvs, or project_uvs again), "UVs of zero area" (project_uvs or unwrap it), "UVs overlap faces[m]" (two faces show the same texels: unwrap). """
-        + "Model warnings: an occlusion strength other than 1 with no occlusion_texture does nothing (give the texture or leave it at 1); a part leaving its envelope (move the part or widen the envelope with define_part). "
-        + """Graph material warnings, by material (materials['iron'].base_colour_texture): each graph slot of a material the mesh uses that cannot be baked as the model is now, in the words render gives (a missing graph file, a fault in the graph naming its node, an output the graph lacks or the slot cannot take), and for a graph that reads the mesh, no UVs, UVs that overlap, a mesh_mask naming a group or material the mesh lacks, and "faces[2, 3] of 'barrel' are unmapped, so 'iron' bakes nothing onto them". Fix the graph file or define_material again, or give the mesh UVs that do not overlap. check casts no rays and evaluates no graph, so it is quick. """
+        + "Warnings are the ones define_mesh and the edits report, plus the UV and material ones, the model's and the graph materials'. "
         + "To remove a vertex or a face, call delete, which keeps every id. "
         + "Notes: size in metres (1 unit = 1 m), the base (a prop stands on y = 0), the origin, more than one shell. "
         + "Worked example on define_mesh's unit cube:\n"
         + ExampleMarker + "{}\n"
         + """Output: {"ok":true,"problems":[],"warnings":[],"notes":["size 1 x 1 x 1 m","base at y = 0","origin inside the bounds"],"stats":{"vertices":8,"faces":6,"edges":12,"triangles":12,"shells":1,"closed":true,"bounds":{"min":[0,0,0],"max":[1,1,1]},"size":[1,1,1],"area":6,"volume":1}}""" + "\n"
-        + """More: help {"tool":"check"} gives the thresholds, the target and UV rules, every warning in full, the notes and the stats.""";
+        + """More: help {"tool":"check"} gives the thresholds, the target and UV rules, every warning in full, the notes and the stats; help {"topic":"warnings"} gives every warning, its fix and how warnings are grouped.""";
 
     /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"check"}</c> gives it.</summary>
     public const string Reference =
-        "Takes the optional argument mesh, the name of the mesh to check, which may be left out while the model has one mesh, and the optional targets; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
-        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume, uvs:{mapped, unmapped}}}. "
+        "Takes the optional argument mesh, the name of the mesh to check, which may be left out while the model has one mesh, the optional targets and verbosity; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
+        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume, uvs:{mapped, unmapped}}}; at verbosity silent only {\"ok\":true} or {\"ok\":false}, check's own ok, and at full every warning one per line. "
         + "A shell is a set of faces joined by shared edges; shells[k] counts from the shell with the lowest face id. "
         + "Problems, with what each means for a game and the fix. "
         + "inside-out: a closed shell wound the wrong way round, so a game culls its faces and it is invisible. It is reported when the shell's signed volume is below -1e-6 times the cube of its bounds' diagonal, so a flat two-sided sheet, whose volume is rounding noise of either sign, is not. Reverse every face loop of that shell and call define_mesh again. "
@@ -41,11 +38,11 @@ public sealed class CheckTool(ModelStore store)
         + "target-collapses-face: a face with no area at weight 1 (below 1e-9 times the square of its bounds' diagonal) that has some at rest; "
         + "target-opens-mesh: two vertices at exactly the same position at rest, which coincident-vertices names, that are apart at weight 1, so the surface cracks. "
         + "The optional targets, an object of target name to weight 0 to 1 as render takes (a name no mesh has, or a weight outside 0 to 1, is a tool error), checks the mesh morphed to those weights: its stats and every other check are of that shape, while the target rules above still compare weight 1 with the rest mesh. "
-        + "Warnings, the same ones define_mesh and the edits report. "
+        + "Warnings, the same ones define_mesh and the edits report, then the UV and material ones only check gives; a kind past 3 is one line: count, worst, 3 ids, select query. "
         + "\"edge belongs to only one face\": an open edge, a hole; collision built from the mesh breaks later. "
         + "\"edge is shared by N faces\": a non-manifold edge, which breaks collision the same way; call define_mesh again without the extra face. "
         + "\"two faces cross this edge in the same direction\": inconsistent winding, so a face points the wrong way and is culled; reverse that face's loop and call define_mesh again. An edge with this warning and a non-manifold one usually means a duplicate face, not a flipped one. "
-        + "\"face is not planar\": a lifted corner, so the face folds along a diagonal the game chooses; move the vertex back onto the plane with move. Up to 10 such faces are listed, the lowest ids first; past 10 the rest are one line, \"and N more faces are not planar; select faces where non_planar names them\". "
+        + "\"face is not planar\": a lifted corner, so the face folds along a diagonal the game chooses; move the vertex back onto the plane with move. On a smooth mesh (set_shading) it is a note, never a warning, so ok can be true. "
         + "\"no face uses this vertex\": a stray that a game loads for nothing; call define_mesh again without it. "
         + "UV warnings, only for a mesh that has UVs on some face (a mesh with none gets none, and no uvs in stats; uvs counts the faces with and without UVs), each by face id. "
         + "\"no UVs, so the face samples the texture's corner\": the face is unmapped; project_uvs or unwrap it, or set_uvs it. "
@@ -60,11 +57,11 @@ public sealed class CheckTool(ModelStore store)
         + "Notes. 1 unit = 1 m, so size is the model's size in metres. A prop stands on y = 0, so the base note says where this one stands. The origin is where a game places the model, so it belongs inside the bounds (on them counts). More than one shell is noted because a model is usually one, though a detached part may be meant. "
         + "Stats. bounds and size are of the vertices faces use, closed is true when every edge has exactly two faces, triangles are what a game draws, area is the sum of the face areas in square metres, and volume is in cubic metres: the sum of the shells' signed volumes, null unless every shell is closed and consistently wound, and an inside-out shell's counts as negative. ";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<CheckTool>("check", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<CheckTool>("check", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject { ["targets"] = TargetWeightsArgument.Schema() },
-    }));
+    })));
 
     /// <summary>The warnings of the graph materials <paramref name="target"/> uses (T-166): what stops each slot baking, then what stops it on this mesh. No ray is cast and no graph evaluated.</summary>
     private static IEnumerable<string> GraphMaterialWarnings(Model model, PolygonMesh target)
@@ -75,9 +72,10 @@ public sealed class CheckTool(ModelStore store)
                 yield return w;
     }
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? targets = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? mesh = null, JsonElement? targets = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("check", context, "mesh", "targets");
+        var errors = UnknownArguments("check", context, "mesh", "targets", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         // One snapshot for the whole call: the mesh, its materials and the envelopes all come from the same model (RV-71).
         var model = store.Current.Model;
@@ -104,12 +102,15 @@ public sealed class CheckTool(ModelStore store)
         };
         var envelope = model.EnvelopeWarnings().Select(w => w.Message).Concat(GraphMaterialWarnings(model, target)).ToArray();
         if (stats.Uvs is { } uvs) shown["uvs"] = new { mapped = uvs.Mapped, unmapped = uvs.Unmapped };
+        var ok = health.Ok && envelope.Length == 0;
+        // Silent answers check's own ok, not true: true over a broken mesh would mislead (M-23's ruling 3).
+        if (level == Verbosity.Silent) return Ok(new { ok });
         return Ok(new
         {
-            ok = health.Ok && envelope.Length == 0,
+            ok,
             problems = health.Problems.Select(p => new { check = p.Check, element = p.Element, message = p.Message }).ToArray(),
             // The model's envelope warnings (T-91) come after the mesh's own; a model with no envelopes has none, so its output is as before.
-            warnings = MeshWarningFold.Lines(health.Warnings).Concat(envelope).ToArray(),
+            warnings = WarningLines(health.Warnings, level).Concat(envelope).ToArray(),
             notes = health.Notes,
             stats = shown,
         });

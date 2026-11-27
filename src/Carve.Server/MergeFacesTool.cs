@@ -33,7 +33,7 @@ public sealed class MergeFacesTool(ModelStore store)
         + DefineMarker + CutCube + "\n"
         + ExampleMarker + """{"faces":[1,7]}""";
 
-    public static McpServerTool Create() => MeshToolSupport.Create<MergeFacesTool>("merge_faces", Text, WithMesh(new JsonObject
+    public static McpServerTool Create() => MeshToolSupport.Create<MergeFacesTool>("merge_faces", Text, WithVerbosity(WithMesh(new JsonObject
     {
         ["type"] = "object",
         ["properties"] = new JsonObject
@@ -47,11 +47,12 @@ public sealed class MergeFacesTool(ModelStore store)
             },
         },
         ["required"] = new JsonArray("faces"),
-    }));
+    })));
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? faces = null, JsonElement? mesh = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? faces = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("merge_faces", context, "faces", "mesh");
+        var errors = UnknownArguments("merge_faces", context, "faces", "mesh", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var unknown = errors.Count;
         var f = Ids("faces", faces, errors);
@@ -60,6 +61,6 @@ public sealed class MergeFacesTool(ModelStore store)
 
         IReadOnlyList<string> warnings = [];
         return Edit(store, "merge_faces", name, m => FaceMerge.Merge(m, f!, out warnings),
-            (body, _) => body["warnings"] = ((string[])body["warnings"]).Concat(warnings).ToArray());
+            (body, _) => body["warnings"] = ((string[])body["warnings"]).Concat(warnings).ToArray(), level);
     }
 }

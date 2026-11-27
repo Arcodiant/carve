@@ -82,7 +82,7 @@ public sealed class DefineMeshTool(ModelStore store)
     /// every problem comes back as one tool error naming the element; the published schema is written out here
     /// and is what a typed <c>double[][]</c>, <c>int[][]</c> signature would have produced.
     /// </summary>
-    public static McpServerTool Create() => MeshToolSupport.Create<DefineMeshTool>("define_mesh", Text, Schema());
+    public static McpServerTool Create() => MeshToolSupport.Create<DefineMeshTool>("define_mesh", Text, WithVerbosity(Schema()));
 
     private static JsonObject Schema() => new()
     {
@@ -136,9 +136,10 @@ public sealed class DefineMeshTool(ModelStore store)
         ["required"] = new JsonArray("vertices", "faces"),
     };
 
-    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? vertices = null, JsonElement? faces = null, JsonElement? name = null, JsonElement? drop_targets = null)
+    public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? vertices = null, JsonElement? faces = null, JsonElement? name = null, JsonElement? drop_targets = null, JsonElement? verbosity = null)
     {
-        var errors = UnknownArguments("define_mesh", context, "name", "vertices", "faces", "drop_targets");
+        var errors = UnknownArguments("define_mesh", context, "name", "vertices", "faces", "drop_targets", "verbosity");
+        var level = ReadVerbosity(verbosity, errors);
         var dropTargets = OptionalBool("drop_targets", drop_targets, errors);
         var meshName = DefinedName(name, errors);
         var shapeBad = new HashSet<string>();
@@ -187,10 +188,10 @@ public sealed class DefineMeshTool(ModelStore store)
                     : null,
                 out var refusal) is null)
             return Failed("define_mesh", [refusal!]);
-        var body = Report(mesh);
+        var body = Report(mesh, level);
         body["deleted"] = Deleted(DeletedElements.None);
         body["split"] = Split([]);
-        return Ok(body);
+        return Quiet(Ok(body), level);
     }
 
     /// <summary>The name argument: the default when absent; null, with the problem added, when it is not a non-empty string.</summary>

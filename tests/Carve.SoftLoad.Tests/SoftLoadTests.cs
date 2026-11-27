@@ -113,16 +113,18 @@ public class SoftLoadTests
     }
 
     [SkippableOrRun]
-    public void The_flat_export_is_clean_and_the_soft_ones_warnings_name_ten_faces_per_mesh_and_fold_the_rest_to_what_select_finds()
+    public void The_flat_export_is_clean_and_the_soft_ones_warnings_group_each_mesh_s_faces_in_one_line_counting_what_select_finds()
     {
         Assert.DoesNotContain("warning(s)", File.ReadAllText(Path.Combine(RunFolder, "export-flat-result.txt")));
         var soft = File.ReadAllText(Path.Combine(RunFolder, "export-result.txt"));
-        var at = soft.IndexOf("warning(s): ", StringComparison.Ordinal);
-        Assert.True(at >= 0, "subdivide leaves faces that are not planar; the export names 10 per mesh and folds the rest");
-        // Per mesh: the 10 named lines and the folded count add up to what select finds non_planar, and nothing else warns (T-72).
-        var counts = new[] { "Body", "Hat" }.ToDictionary(name => name, name => System.Text.Json.JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(RunFolder, $"select-non-planar-{name}.txt"))).RootElement.GetProperty("count").GetInt32());
-        Assert.Null(Carve.Scenario.Soft.NotPlanarFold.Check(soft[(at + "warning(s): ".Length)..], counts));
+        // Both meshes are smooth: no warning in the export, and check's note counts what select finds (T-198).
+        foreach (var name in new[] { "Body", "Hat" })
+        {
+            var ids = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(RunFolder, $"select-non-planar-{name}.txt")))
+                .RootElement.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToList();
+            Assert.Null(Carve.Scenario.Soft.NotPlanarFold.CheckSmoothExport(soft, ids.Count));
+            Assert.Null(Carve.Scenario.Soft.NotPlanarFold.CheckSmoothNote(File.ReadAllText(Path.Combine(RunFolder, $"check-{name}.txt")), ids));
+        }
     }
 }
 

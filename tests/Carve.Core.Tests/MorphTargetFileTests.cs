@@ -193,10 +193,14 @@ public sealed class MorphTargetFileTests
             Assert.Equal(read.Model!.Meshes.Any(m => m.Mesh.Targets is not null), read.Version == 8);
             if (read.Version == 1) continue; // read only; written as version 2
             var written = CarveFile.Write(read.Model, folder);
-            Assert.True(committed == written, path + " is not written back byte for byte");
-            Assert.Equal(committed, CarveFile.Write(CarveFile.Read(written, folder).Model!, folder));
+            // T-197: fps-arms wrote these four, minified, and they stay byte for byte as copied; Carve's own writing of them must still reread equal.
+            if (!CopiedFromFpsArms.Contains(Path.GetFileName(path)))
+                Assert.True(committed == written, path + " is not written back byte for byte");
+            Assert.Equal(written, CarveFile.Write(CarveFile.Read(written, folder).Model!, folder));
         }
     }
+
+    private static readonly HashSet<string> CopiedFromFpsArms = ["arms-cage.carve", "cutter-src.carve", "toolkit-src.carve", "scanner-src.carve"];
 
     private static string RepoRoot()
     {

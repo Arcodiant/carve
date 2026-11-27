@@ -37,7 +37,7 @@ public sealed class ExportToolDefinitionTests() : FileToolTests("carve-export")
         using var _carve = carve;
         var schema = Tool(tools, "export").GetProperty("inputSchema");
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal(["path", "allow_unweighted", "limits", "mode", "meshes", "overwrite", "write_limits"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal(["path", "allow_unweighted", "limits", "mode", "meshes", "overwrite", "write_limits", "verbosity"], schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToArray());
         Assert.Contains("unknown: not an argument of export; its arguments are path, allow_unweighted, limits, mode, meshes, overwrite, write_limits", Refused(await carve.CallToolAsync("export", """{"path":"a.glb","unknown":1}""")));
     }
 }

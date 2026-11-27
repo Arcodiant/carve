@@ -4,7 +4,7 @@ description: >-
 ---
 # T-204 — open, save, select, get_mesh and define_mesh described under the cut
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -30,6 +30,10 @@ description: >-
 - **`README.md`**: the new topics on the `help` line; otherwise as T-203.
 
 ## Notes
+
+### As built
+
+Delivered by M-29's T-207 (and B-10 for get_mesh); dropped from M-23.
 
 - Runs beside T-203 and T-205, sharing what T-203's Notes list; keep both sides of each conflict.
 - Move text, cut repetition; a sentence that states a rule keeps its words.
