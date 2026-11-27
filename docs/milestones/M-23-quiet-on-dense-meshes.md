@@ -4,7 +4,7 @@ description: >-
 ---
 # M-23 — Quiet on dense meshes
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *Open, check, subdivide, unwrap and export report repeated warnings as counts with samples, so a dense cage costs hundreds of tokens and not thousands*
 
