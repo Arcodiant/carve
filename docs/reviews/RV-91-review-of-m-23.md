@@ -146,7 +146,7 @@ README says `displace` is the one of the twenty whose `full` lists every warning
 
 **Outcome:** fixed
 
-The Measured row and the README row now say plainly which cage each export number is of; the Retrospective's silent sentence notes `check`'s `{"ok":false}`. `DenseRunProcessTests` was run again after these fixes and its `dense-run.tsv` committed at `artifacts/M-23/T-206/dense-run.tsv`, the path the milestone cites. The UV-overlap fix made the summary count both faces of each pair (372 faces for 280 pairs), so the test's `full` check counts the distinct faces the overlap lines name, not the lines. The re-measure moved `open` the cage from 244 to 248 and `check` after `project_uvs box` from 848 to 849, in the Measured table, the Retrospective and the README; every result at `summary` is 1,119 or less, and the largest description is still 3,684.
+The Measured row and the README row now say plainly which cage each export number is of; the Retrospective's silent sentence notes `check`'s `{"ok":false}`. `DenseRunProcessTests` was run again after these fixes and its `dense-run.tsv` copied to `artifacts/M-23/T-206/dense-run.tsv`, the path the milestone cites (`artifacts/` is kept across finishes and never committed, by `.gitignore`). The UV-overlap fix made the summary count both faces of each pair (372 faces for 280 pairs), so the test's `full` check counts the distinct faces the overlap lines name, not the lines. The re-measure moved `open` the cage from 244 to 248 and `check` after `project_uvs box` from 848 to 849, in the Measured table, the Retrospective and the README; every result at `summary` is 1,119 or less, and the largest description is still 3,684.
 
 ## Summary
 
