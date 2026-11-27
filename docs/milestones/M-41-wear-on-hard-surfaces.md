@@ -116,7 +116,13 @@ Written 2026-11-27, before the person's go. The rebase onto `main`, the refactor
 **Known and left.**
 
 - `ExportToolTests.Other_tools_answer_while_an_export_runs` (`Patina.Server.Tests`, a timing test) failed once during
-  T-238's first verify and passed on rerun. It is unrelated to this milestone and was not filed.
+  T-238's first verify and passed on rerun. It is unrelated to this milestone.
+- **The test report** (`cairn test report --since 1d`, 2026-11-27) shows flakes and nothing else to file:
+  - `patina-unit`: 1 flaky and 2 failed runs;
+  - `scenario-patina-library-1` and `-2`: 1 flaky and 1 failed run each.
+
+  Filed as [B-14](../bugs/B-14-flaky-in-patina-unit-and-the-patina-library-scenarios.md), off-milestone. No suite
+  stood out as costly for what it caught, and no launch could be shared.
 - `finish` could not remove the folders `branches/task/T-237`, `T-238` and `T-239` (each in use). git no longer tracks
   them, so they can be deleted by hand.
 - `falloff` on `displace` stays out, as planned.
