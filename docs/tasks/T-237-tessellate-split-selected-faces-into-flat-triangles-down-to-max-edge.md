@@ -60,3 +60,31 @@ existing vertex, and keeps the mesh closed.
   selection and `max_edge` and does not smooth. Recommended in discussion; not separately ruled on.
 - Triangles are required, not just allowed (see Goal).
 - Not tested by the requester: `subdivide` with every edge hard as a stand-in, and `subdivide` on holed faces.
+
+### Hand-off
+
+Ran on Claude Opus 5.5; handed off at the 60-call checkpoint, everything below committed on `task/T-237`.
+
+- **Done.** Core: `src/Carve.Core/Tessellation.cs` (`Tessellation.Tessellate(mesh, maxEdge, faces?)`) on a new
+  `src/Carve.Core/ConstrainedDelaunay.cs` (incremental Delaunay with Lawson flips, Sloan constraint recovery by
+  flipping, parity classification for holes, midpoint refinement of any inner edge over `max_edge`). Edge points by each
+  edge's own length, carried into neighbours' loops with `FaceSplit.Insert` (made internal); inner points an
+  equilateral lattice at `max_edge`, kept 0.5 `max_edge` clear of the loops, positioned and blended (UVs, weights) from
+  the face's own ear-clip triangles; provenance as `FaceSplit`'s, so groups, colour, material, hard edges and seams
+  carry. Server: `src/Carve.Server/TessellateTool.cs`, registered after `displace` in `CarveServer.cs`; `created`
+  as subdivide's blocks. Fixture: `TestMeshes.Dais()` (with `DaisVertices`, `DaisFaces`, `DaisGroup`, `DaisMaxEdge`,
+  `DaisDefineMesh()` for the server tests) in `tests/Carve.Core.Tests/TestMeshes.cs`, which `Carve.Server.Tests`
+  links. Tests: `tests/Carve.Core.Tests/TessellateTests.cs` (11, pass: quad, 127 x 2 strip, hole, border, UVs,
+  attributes and hard edges, refusals, the dais at 0.75 closed with no warning, every vertex unmoved, only 0 and 1
+  split, no angle under 10 degrees) and `tests/Carve.Server.Tests/TessellateToolTests.cs` (10, pass: example and undo,
+  each error leaves the mesh, the dais through the tools). `VerbosityToolTests` row and `PartToolsListTests`'
+  part-space list take `tessellate`; those classes, `HelpToolTests` and `EditToolDefinitionTests` pass. Content:
+  `scenarios/Carve.Scenario.Cuts/TessellateStage.cs` and its line in `CutsStages.cs`; it builds.
+- **Left.** README's tool list (not yet touched); the `TessellateStage` run (`cairn task T-237 verify`, which runs
+  `scenario-cuts`) and the frame review of `tessellate-slab-wireframe` by a subagent; any `CLAUDE.md` Layout line for
+  the stage (the Cuts row lists each stage file); `### As built`; `cairn lint`; `finish`.
+- **Not checked.** The full `core-unit` and `server-unit` suites (only the classes above were run); the stage has not
+  run, so its probe count (Look notes under 40) and line checks are unproven.
+- **Surprising.** On the strip the 26 edge-point rectangles are co-circular and their diagonals (5.28) exceed
+  `max_edge` 5, so refinement puts one point on the middle line of each: the edges are cut along the length only, but
+  points are added inside. Colour and material are exclusive on a face (`WithColour` drops the material).
