@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "size": 256,
+  "seed": 224,
+  "nodes": {
+    "base_out": { "type": "output", "inputs": { "in": "stone" }, "params": { "role": "base_colour" } },
+    "bevel": { "type": "image", "params": { "kind": "normal", "path": "bakes/slabs.normal.png" } },
+    "bump": { "type": "height_to_normal", "inputs": { "height": "grain" }, "params": { "strength": 0.08 } },
+    "grain": { "type": "fbm", "params": { "basis": "gradient", "cells": [8, 8], "octaves": 5, "seed": 7 } },
+    "mottle": { "type": "fbm", "params": { "basis": "value", "cells": [4, 4], "octaves": 3, "seed": 3 } },
+    "normal": { "type": "normal_blend", "inputs": { "base": "bevel", "detail": "bump" }, "params": { "strength": 0.8 } },
+    "normal_out": { "type": "output", "inputs": { "in": "normal" }, "params": { "role": "normal" } },
+    "rough": { "type": "levels", "inputs": { "in": "grain" }, "params": { "out_high": 0.9, "out_low": 0.65 } },
+    "rough_out": { "type": "output", "inputs": { "in": "rough" }, "params": { "role": "roughness" } },
+    "stone": { "type": "gradient_map", "inputs": { "in": "mottle" }, "params": { "colours": ["#77736c", "#8c8880", "#a19c93"], "positions": [0, 0.5, 1] } }
+  }
+}
