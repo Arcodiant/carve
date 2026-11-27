@@ -197,11 +197,11 @@ internal static class MeshToolSupport
         return Verbosity.Summary;
     }
 
-    /// <summary>A mesh's warnings as result lines: grouped by kind (T-197), or at <c>full</c> every warning one per line.</summary>
     /// <summary>The <c>moved</c> field: the whole id list at full, otherwise <c>{count, first}</c> with the first 10 ids.</summary>
     public static object Moved(IReadOnlyList<int> ids, Verbosity level) =>
         level == Verbosity.Full ? ids : new { count = ids.Count, first = ids.Take(10).ToArray() };
 
+    /// <summary>A mesh's warnings as result lines: grouped by kind (T-197), or at <c>full</c> every warning one per line.</summary>
     public static IReadOnlyList<string> WarningLines(IReadOnlyList<MeshWarning> warnings, Verbosity level) =>
         level == Verbosity.Full ? [.. warnings.Select(w => w.ToString())] : MeshWarningGroups.Lines(warnings);
 
@@ -333,6 +333,19 @@ internal static class MeshToolSupport
     public static string NoGroup(FaceStyle? style, string name) => style is null || style.Groups.Count == 0
         ? $"group: no group named '{name}'; the mesh has no groups yet, define one with define_group"
         : $"group: no group named '{name}'; the mesh's groups are {style.GroupNames}";
+
+    /// <summary>
+    /// The faces an edit given <c>faces</c> or <c>group</c> works on, read inside the store's lock on the mesh the edit is
+    /// given: <paramref name="faces"/>, or the group's. An unknown group sets <paramref name="noGroup"/> and gives an empty
+    /// list, so the Core refuses without trying the edit.
+    /// </summary>
+    public static List<int>? FacesOrGroup(PolygonMesh mesh, List<int>? faces, string? groupName, ref string? noGroup)
+    {
+        if (groupName is null) return faces;
+        if (mesh.Style?.FacesOf(groupName) is { } grouped) return [.. grouped];
+        noGroup = NoGroup(mesh.Style, groupName);
+        return [];
+    }
 
     /// <summary>An optional list of integer ids; null when absent.</summary>
     public static List<int>? Ids(string name, JsonElement? value, List<string> errors)
