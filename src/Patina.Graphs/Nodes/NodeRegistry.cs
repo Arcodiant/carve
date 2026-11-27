@@ -27,6 +27,7 @@ public sealed class NodeRegistry
         new GradientMapNode(),
         new InputNode(),
         new NestedGraphNode(),
+        new ImageNode(),
         new TransformNode(),
         new DistanceNode(),
     ]);

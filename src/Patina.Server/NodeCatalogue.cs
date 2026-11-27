@@ -30,6 +30,7 @@ public static class NodeCatalogue
         ["blur"] = "a box blur that wraps (so it tiles): radius is a part of the image's width, 0 to 0.1; quality box is one pass over 2r + 1 texels, smooth three passes (close to a Gaussian); greyscale or colour in, the same out; radius 0 is the input; a large radius on a large image is slow",
         ["gradient_map"] = "colours a greyscale in through positions (2 to 8 numbers from 0 to 1, low to high) and colours (as many \"#rrggbb\"): linear between stops in sRGB, the first colour below the first stop and the last above the last; a count mismatch or positions out of order is a fault",
         ["graph"] = "another .texgraph used as one node (version 2): path is relative to this graph's file (a graph never saved: the tool folder); its other params are the nested graph's exposed parameters by name, checked against their ranges (an exposed parameter of this graph may drive one, as \"wall.mortar\", taking its range); its inputs are the nested graph's input nodes by name, and its outputs the nested graph's outputs by role or name (wall.base_colour). It is expanded inline when validated, its nodes renamed <node>/<id> (wall/layout), so a fault inside names that path and the file; the outer graph's size and seed rule, and the nested graph's own are not used; nesting goes 8 files deep, and a cycle through files is a fault",
+        ["image"] = "a PNG read into the graph (version 2): path is relative to this graph's file (a graph never saved: the tool folder), no extension added; kind colour (r, g, b / 255), grey (r / 255) or normal (each of r, g, b as 2c / 255 - 1, made unit length: a tangent-space normal as height_to_normal gives, for a baked normal map); alpha is not read. The image covers the whole square at any size, read texel for texel at the graph's size and bilinear, wrapping, at others; a missing file or one it cannot read (16-bit, palette, interlaced) is a fault on path",
         ["input"] = "one of the graph's image inputs (version 2), a port of a graph node that uses this graph: name is the port, kind grey or colour, default the value used when the graph is evaluated on its own (a number 0 to 1, or \"#rrggbb\"); a graph with an input lacking a default saves but cannot be evaluated on its own. Its value input is wired only by the graph node using it, so leave it unconnected",
         ["transform"] = "moves, repeats, mirrors, turns and scales in, about the image centre, applied in this order: tile [x, y] whole repeats; scale the image's size (2 doubles it so a half shows, 0.5 halves it so it shows twice); rotation degrees clockwise as seen; mirror none, u (left for right), v (top for bottom) or both; offset [u, v] fractions of the image, wrapping (positive u moves it right); filter bilinear or nearest, reading wrapping. It still tiles at a whole number of quarter turns (0, 90, 180, 270, -90 ...) with scale 1 or 1/n (0.5, 0.25: n repeats); a whole-number scale above 1 zooms in and does not tile, and any other rotation or scale generally does not tile, and check's seam rule reports it",
         ["distance"] = "each texel's distance to the edge of the mask in (inside at 0.5 or more), from its centre to the nearest texel centre on the other side, as a fraction of range (a part of the image width, 0 to 0.25), clamped to 1; side inside (outside texels 0), outside (inside texels 0) or both; exact Euclidean and wrapping, so it tiles: a bevel is the inside distance",
@@ -58,6 +59,7 @@ public static class NodeCatalogue
         ["blur"] = "a wrapping blur",
         ["gradient_map"] = "colour a greyscale through stops",
         ["graph"] = "another .texgraph as a node",
+        ["image"] = "a PNG read in",
         ["input"] = "an image input of this graph",
         ["transform"] = "move, repeat, mirror, turn, scale",
         ["distance"] = "distance to a mask's edge",
@@ -105,6 +107,9 @@ public static class NodeCatalogue
     public const string WorkedMeshPosition =
         """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"where":{"type":"mesh_position"},"out":{"type":"output","inputs":{"in":"where"},"params":{"role":"base_colour"}}}}}""";
 
+    public const string WorkedImage =
+        """{"graph":{"version":2,"size":256,"seed":0,"nodes":{"baked":{"type":"image","params":{"path":"bricks/normal.png","kind":"normal"}},"out":{"type":"output","inputs":{"in":"baked"},"params":{"role":"normal"}}}}}""";
+
     /// <summary>What a fault-free define_graph of <paramref name="nodes"/> nodes at size 256 returns.</summary>
     public static string Evaluates(int nodes) => $"define_graph: the open graph is now {nodes} nodes, size 256, seed 0; no faults: it evaluates";
 
@@ -126,6 +131,7 @@ public static class NodeCatalogue
             ("bricks.texgraph (beside the graph, or in the tool folder for a graph never saved) as the node wall, mortar 0.06 set on it by name, its base_colour and roughness outputs taken as wall.base_colour and wall.roughness", DefineGraphTool.WorkedNested, DefineGraphTool.WorkedNestedResult),
             ("the same with mortar an exposed parameter of this graph driving \"wall.mortar\", taking bricks' range for it, 0 to 0.45 (swatch and export then set it by name)", DefineGraphTool.WorkedPassThrough, DefineGraphTool.WorkedNestedResult),
         ],
+        "image" => [("a normal map read from bricks/normal.png (beside the graph, or in the tool folder for a graph never saved) as the graph's normal", WorkedImage, Evaluates(2))],
         "input" => [("a filter darkening its input in (a graph node using this file connects it; on its own it evaluates at the default)", WorkedInput, Evaluates(3))],
         "transform" => [("stripes turned 30 degrees. It evaluates, but a turn that is not a quarter turn does not tile, so the image shows a seam where it repeats and check's seam rule reports it; rotation 90 would tile", DefineGraphTool.WorkedTurn, DefineGraphTool.WorkedTurnResult)],
         "distance" => [("a bevel inside each tile, written as the named output bevel", WorkedDistance, Evaluates(3))],

@@ -44,14 +44,34 @@ public static class GraphValidator
     public static IReadOnlyList<NestedGraphUse> Uses(TextureGraph graph, NodeRegistry? registry = null) =>
         [.. Analyse(graph, registry ?? NodeRegistry.BuiltIn).Uses.OrderBy(u => u.Key, StringComparer.Ordinal).Select(u => u.Value.Public)];
 
+    /// <summary>
+    /// Every file validation reads (T-240), all levels down, each once, in the order read: each <c>graph</c> node's
+    /// nested files, then each <c>image</c> node's PNG (a nested graph's among its files). carve's bake hashes them, and
+    /// open names them. A PNG is listed when it is there, never read or decoded (RV-94: carve asks on every render), so one that is there but cannot be read is listed though validation faults it.
+    /// </summary>
+    public static IReadOnlyList<string> Files(TextureGraph graph, NodeRegistry? registry = null) =>
+        [.. Analyse(graph, registry ?? NodeRegistry.BuiltIn, [], 0, new NodeBudget(graph.Nodes.Count) { ListOnly = true })
+            .Files.Distinct(StringComparer.OrdinalIgnoreCase)];
+
+    /// <summary>Each of the graph's own <c>image</c> nodes (T-240) as validation read it, in id order: its file (null when its path is not one) and the image's size (0 when it was not read; its faults say why). get_graph shows them.</summary>
+    public static IReadOnlyList<ImageUse> Images(TextureGraph graph, NodeRegistry? registry = null)
+    {
+        var a = Analyse(graph, registry ?? NodeRegistry.BuiltIn);
+        return [.. a.Images.Where(i => !a.Expanded.Contains(i.Key)).OrderBy(i => i.Key, StringComparer.Ordinal)
+            .Select(i => new ImageUse(i.Key, i.Value.File, i.Value.Image?.Width ?? 0, i.Value.Image?.Height ?? 0))];
+    }
+
     /// <summary>The absolute path a <c>graph</c> node's <paramref name="path"/> names: against <see cref="TextureGraph.Folder"/> (the working directory when null), <c>.texgraph</c> added when missing; null for a path that is not one, or is not relative (<see cref="ParamSpec.IsRelativePath"/>).</summary>
-    public static string? ResolvePath(TextureGraph graph, string path)
+    public static string? ResolvePath(TextureGraph graph, string path) =>
+        Resolve(graph, path.EndsWith(TexGraphFile.Extension, StringComparison.OrdinalIgnoreCase) ? path : path + TexGraphFile.Extension);
+
+    /// <summary>The absolute path <paramref name="path"/> names against <see cref="TextureGraph.Folder"/>, as it is (an <c>image</c> node's, T-240); null as for <see cref="ResolvePath"/>.</summary>
+    public static string? Resolve(TextureGraph graph, string path)
     {
         if (!ParamSpec.IsRelativePath(path)) return null;
-        var text = path.EndsWith(TexGraphFile.Extension, StringComparison.OrdinalIgnoreCase) ? path : path + TexGraphFile.Extension;
         try
         {
-            return Path.GetFullPath(Path.Combine(graph.Folder ?? Directory.GetCurrentDirectory(), text));
+            return Path.GetFullPath(Path.Combine(graph.Folder ?? Directory.GetCurrentDirectory(), path));
         }
         catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
         {
@@ -72,6 +92,12 @@ public static class GraphValidator
 
         /// <summary>The nested files read for drives, by the chain of files above and the file: what <see cref="NestedParameters"/> gave.</summary>
         public Dictionary<string, NestedParameterSet?> Read { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Each PNG decoded so far, by its full path (RV-94): one file read by several image nodes, or by a graph used many times, is decoded and held once.</summary>
+        public Dictionary<string, PngImage> Images { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>For <see cref="Files"/>: an image node's PNG is listed when it is there, never read or decoded.</summary>
+        public bool ListOnly { get; init; }
     }
 
     private static GraphAnalysis Analyse(TextureGraph graph, NodeRegistry registry, IReadOnlyList<string> chain, int depth, NodeBudget budget)
@@ -126,7 +152,10 @@ public static class GraphValidator
                 else if (spec.Check(value) is { } wrong)
                     a.Fault(id, null, name, $"node '{id}' parameter '{name}' {wrong}");
             }
-            var resolved = new ResolvedNode(id, type, new NodeParameters(type, values), values);
+            PngImage? image = null;
+            if (type is ImageNode)
+                image = isExpanded ? a.Images.GetValueOrDefault(id).Image : ReadImage(a, id, graph, node, budget);
+            var resolved = new ResolvedNode(id, type, new NodeParameters(type, values) { Image = image }, values);
             if (a.Faults.Count == faultsBeforeParameters)
                 foreach (var (parameter, message) in type.CheckParameters(resolved.Parameters))
                     a.Fault(id, null, parameter, parameter is null ? $"node '{id}': {message}" : $"node '{id}' parameter '{parameter}': {message}");
@@ -235,6 +264,62 @@ public static class GraphValidator
             a.Faults.Add(new(id, null, "default", $"node '{id}' parameter 'default': input '{port}' has no default, so the graph cannot be evaluated on its own; give it a default, or use the graph as a graph node that connects '{port}'") { OnItsOwn = true });
     }
 
+    /// <summary>
+    /// An image node's PNG (T-240) read and decoded, or a fault on its <c>path</c> naming the file: no path, a file that is
+    /// not there or cannot be read, and one <see cref="PngReader"/> does not decode or does not read. A path at fault as a
+    /// value has its own fault already.
+    /// </summary>
+    private static PngImage? ReadImage(GraphAnalysis a, string id, TextureGraph graph, GraphNode node, NodeBudget budget)
+    {
+        if (!node.Params.TryGetValue("path", out var pathValue))
+        {
+            a.Fault(id, null, "path", $"node '{id}' parameter 'path': an image node needs path, the .png it reads, relative to this graph's file");
+            return null;
+        }
+        if (ParamSpec.FilePath("path").Check(pathValue) is not null) return null;
+        var full = Resolve(graph, pathValue.Text!);
+        a.Images[id] = (full, null);
+        if (full is null)
+        {
+            a.Fault(id, null, "path", $"node '{id}' parameter 'path' is {pathValue}, which is not a path");
+            return null;
+        }
+        if (!File.Exists(full))
+        {
+            a.Fault(id, null, "path", $"node '{id}' parameter 'path': {Missing(full, ".png")}");
+            return null;
+        }
+        var known = budget.Images.GetValueOrDefault(full);
+        if (budget.ListOnly || known is not null)
+        {
+            a.Files.Add(full);
+            a.Images[id] = (full, known);
+            return known;
+        }
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(full);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            a.Fault(id, null, "path", $"node '{id}' parameter 'path': could not read {full}: {e.Message}");
+            return null;
+        }
+        a.Files.Add(full);
+        try
+        {
+            var image = budget.Images[full] = PngReader.Decode(bytes);
+            a.Images[id] = (full, image);
+            return image;
+        }
+        catch (PngReadException e)
+        {
+            a.Fault(id, null, "path", $"node '{id}' parameter 'path': {full} is not a PNG patina reads: {e.Message}");
+            return null;
+        }
+    }
+
     /// <summary>Two input nodes of one name.</summary>
     private static void InputNames(GraphAnalysis a)
     {
@@ -285,7 +370,7 @@ public static class GraphValidator
         }
         if (!File.Exists(full))
         {
-            Fault(null, "path", $"node '{id}' parameter 'path': {Missing(full)}");
+            Fault(null, "path", $"node '{id}' parameter 'path': {Missing(full, TexGraphFile.Extension)}");
             return use;
         }
         string text;
@@ -384,11 +469,11 @@ public static class GraphValidator
             var (from, port) = inner.Nodes[inner.Outputs[output]].Sources["in"];
             use.Outputs[output] = ($"{id}/{from}", port);
         }
+        foreach (var (nestedId, image) in inner.Images) a.Images[$"{id}/{nestedId}"] = image;
         use.Failed = false;
         return use;
     }
 
-    /// <summary>A missing nested file, as open's missing file (and carve's missing texture, T-81) gives it: the path and the .texgraph files in its folder.</summary>
     /// <summary>
     /// A nested graph's fault named from the level above, in the form the graph node's own faults take (the person's
     /// ruling, 2026-11-20): <c>node 'layout' parameter 'gap' is ...</c> becomes <c>nodes['wall/layout'].params['gap']: is ...</c>,
@@ -451,7 +536,8 @@ public static class GraphValidator
         }
     }
 
-    private static string Missing(string full)
+    /// <summary>A missing nested file, as open's missing file (and carve's missing texture, T-81) gives it: the path and the files of <paramref name="extension"/> in its folder.</summary>
+    private static string Missing(string full, string extension)
     {
         const int limit = 20;
         var where = Path.GetDirectoryName(full)!;
@@ -460,15 +546,15 @@ public static class GraphValidator
         List<string> names;
         try
         {
-            names = [.. Directory.GetFiles(where, "*" + TexGraphFile.Extension).Select(f => Path.GetFileName(f)!).Order(StringComparer.Ordinal)];
+            names = [.. Directory.GetFiles(where, "*" + extension).Select(f => Path.GetFileName(f)!).Order(StringComparer.Ordinal)];
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             return head + $"the folder {where} could not be listed: {e.Message}";
         }
-        if (names.Count == 0) return head + $"there are no .texgraph files in {where}";
+        if (names.Count == 0) return head + $"there are no {extension} files in {where}";
         var shown = string.Join(", ", names.Take(limit)) + (names.Count > limit ? $" and {names.Count - limit} more" : "");
-        return head + $"the .texgraph files in {where} ({names.Count}) are: {shown}";
+        return head + $"the {extension} files in {where} ({names.Count}) are: {shown}";
     }
 
     private static void Cycles(GraphAnalysis a)
@@ -667,8 +753,11 @@ internal sealed class GraphAnalysis
     /// <summary>Each nested input node a graph node's input was wired to: the graph node, the input's name, the nested file's name.</summary>
     public Dictionary<string, (string Node, string Input, string FileName)> PassThrough { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>Every nested file read, all levels down, in the order read.</summary>
+    /// <summary>Every nested file read, all levels down, in the order read: graph nodes' files and image nodes' PNGs (T-240).</summary>
     public List<string> Files { get; } = [];
+
+    /// <summary>Each image node (T-240), the graph's own and expanded ones, to the file its path names and the image decoded from it (null at fault).</summary>
+    public Dictionary<string, (string? File, PngImage? Image)> Images { get; } = new(StringComparer.Ordinal);
 
     /// <summary>
     /// The graph as plain nodes for a graph using it to take in (T-140): every node but the outputs, its sources resolved
@@ -715,6 +804,9 @@ internal sealed class ResolvedNode(string id, NodeType type, NodeParameters para
     /// <summary>An input of this node is at fault (a bad port, source or a required one missing) or names a node of unknown type, so the node is not put in the evaluation order.</summary>
     public bool InputsAtFault { get; set; }
 }
+
+/// <summary>An <c>image</c> node as validation read it (T-240), for get_graph: the file its path names (null when it is not one), and the image's size (0 by 0 when it was not read).</summary>
+public sealed record ImageUse(string Node, string? File, int Width, int Height);
 
 /// <summary>A nested graph's input port (T-140): its name, kind, and whether it has a default (one without must be connected).</summary>
 public sealed record NestedGraphInput(string Name, PortKind Kind, bool HasDefault);

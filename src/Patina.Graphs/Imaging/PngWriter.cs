@@ -262,6 +262,9 @@ public static class PngWriter
         return table;
     }
 
+    /// <summary>A chunk's CRC-32 over <paramref name="data"/> (its type and data), as <see cref="PngReader"/> checks it.</summary>
+    internal static uint Crc32(ReadOnlySpan<byte> data) => Crc(0xFFFFFFFF, data) ^ 0xFFFFFFFF;
+
     private static uint Crc(uint crc, ReadOnlySpan<byte> data)
     {
         foreach (var b in data) crc = CrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);

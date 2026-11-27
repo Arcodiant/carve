@@ -126,7 +126,7 @@ internal sealed class LibraryStage : IPatinaStage
         var opened = await checks.CallAsync("open", JsonSerializer.Serialize(new { path = graphPath }));
         checks.Check(opened.Contains("no faults: it evaluates", StringComparison.Ordinal), $"library: {s.Name} opened with faults: {opened}");
         if (s.Name == "old-wall")
-            checks.Check(opened.Contains("read 2 nested files for its graph nodes", StringComparison.Ordinal) && opened.Contains("grime.texgraph", StringComparison.Ordinal) && opened.Contains("bricks.texgraph", StringComparison.Ordinal),
+            checks.Check(opened.Contains("read 2 nested files for its graph and image nodes", StringComparison.Ordinal) && opened.Contains("grime.texgraph", StringComparison.Ordinal) && opened.Contains("bricks.texgraph", StringComparison.Ordinal),
                 "library: open did not name old-wall's nested files: " + opened);
 
         // check: clean.

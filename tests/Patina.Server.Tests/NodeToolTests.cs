@@ -51,6 +51,8 @@ public class NodeToolTests
     {
         using var folder = new TempFolder();
         File.Copy(Path.Combine(Paths.RepoRoot, "samples", "graphs", "bricks.texgraph"), Path.Combine(folder.Path, "bricks.texgraph"));
+        Directory.CreateDirectory(Path.Combine(folder.Path, "bricks"));
+        File.Copy(Path.Combine(Paths.RepoRoot, "samples", "graphs", "bricks", "normal.png"), Path.Combine(folder.Path, "bricks", "normal.png")); // image's example (T-240)
         await using var patina = await PatinaHarness.StartAsync(folder.Path);
         foreach (var name in Program.Registry.Names)
             foreach (var (_, graph, returns) in NodeCatalogue.Examples(name))

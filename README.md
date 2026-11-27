@@ -336,7 +336,9 @@ range, default) and a worked example; `nodes {"type":"tiles"}` gives one.
 - Sources: `noise` (value noise), `worley` (cells), `fbm` (layered noise),
   `gradient`, `colour`, and the patterns `tiles` (tiles and bricks, with gaps,
   bevel and jitter), `stripes` and `shape` (a circle, square, ring, diamond or
-  polygon in each cell of a grid).
+  polygon in each cell of a grid), and `image` (a PNG read in by `path`,
+  relative to the graph's file, as `colour`, `grey` or `normal`: a map carve's
+  `bake` wrote, such as a bevel normal, beside the generated ones).
 - Filters: `levels`, `blend` (`mix`, `multiply`, `add`, `subtract`,
   `difference`, `min`, `max`; `difference` against a flat level draws a thin
   line where a noise crosses it), `warp` (domain warp), `blur`, `gradient_map`,
@@ -374,7 +376,18 @@ graph that uses it (a graph never saved: patina's working directory). Its other
 parameters are the nested graph's exposed parameters by name; its inputs are
 the nested graph's `input` nodes, so a reusable graph can be a filter; its
 outputs are the nested graph's outputs (`wall.base_colour`). Graphs that use
-these are format version 2; every other file is written as version 1.
+these, or an `image` node, are format version 2; every other file is written as
+version 1.
+
+An `image` node covers the whole square whatever the PNG's size: at the graph's
+size it is read texel for texel, at any other bilinear and wrapping, so it
+tiles (below half the graph's size it reads the 2x2 texels around each centre,
+so a line one texel thin can drop out). `kind: normal` decodes each channel as
+2c / 255 - 1 and makes the vector unit length, as `height_to_normal` gives it. It reads 8-bit greyscale, grey +
+alpha, RGB and RGBA PNGs, not interlaced, and ignores alpha; a missing file or
+one it does not read is a fault on its `path`. `open` and `get_graph` name the
+file it reads, and a carve material's graph slot is baked again when the PNG
+changes.
 
 ### Looking: swatch
 

@@ -59,7 +59,7 @@ public class NestedGraphToolTests
         await using var patina = await PatinaHarness.StartAsync(folder.Path);
 
         var opened = folder.Normalise(await patina.Ok("open", """{"path":"old-wall.texgraph"}"""));
-        Assert.Contains("\nread 2 nested files for its graph nodes: <folder>/grime.texgraph, <folder>/bricks.texgraph", opened);
+        Assert.Contains("\nread 2 nested files for its graph and image nodes: <folder>/grime.texgraph, <folder>/bricks.texgraph", opened);
 
         await patina.Ok("save", """{"path":"copy.texgraph"}""");
         // By text, line endings aside: a checkout may give the sample CRLF.
@@ -166,5 +166,53 @@ public class NestedGraphToolTests
         foreach (var role in new[] { "base_colour", "normal", "roughness", "occlusion" })
             Assert.Equal(File.ReadAllBytes(Path.Combine(Sample("old-wall"), role + ".png")), File.ReadAllBytes(Path.Combine(folder.Path, "out", role + ".png")));
 
+    }
+    [Fact]
+    public async Task An_image_nodes_png_is_named_by_get_graph_and_open_and_judged_by_save()
+    {
+        // T-240: image's worked example reads bricks/normal.png beside the graph; get_graph and open name it, save writes
+        // it never, and a save into a folder holding another PNG of that name is refused naming both.
+        using var folder = new TempFolder();
+        Directory.CreateDirectory(Path.Combine(folder.Path, "bricks"));
+        File.Copy(Path.Combine(Sample("bricks"), "normal.png"), Path.Combine(folder.Path, "bricks", "normal.png"));
+        await using var patina = await PatinaHarness.StartAsync(folder.Path);
+        Assert.Equal(NodeCatalogue.Evaluates(2), await patina.Ok("define_graph", NodeCatalogue.WorkedImage));
+
+        var graph = folder.Normalise(await patina.Ok("get_graph", "{}"));
+        Assert.Contains("image nodes (1), paths resolved against the tool folder <folder> (the graph has never been saved):\n- baked: <folder>/bricks/normal.png; 256x256\n", graph);
+
+        await patina.Ok("save", """{"path":"wall.texgraph"}""");
+        var opened = folder.Normalise(await patina.Ok("open", """{"path":"wall.texgraph"}"""));
+        Assert.Contains("\nread 1 nested file for its graph and image nodes: <folder>/bricks/normal.png", opened);
+
+        Directory.CreateDirectory(Path.Combine(folder.Path, "materials", "bricks"));
+        File.Copy(Path.Combine(Sample("bricks"), "roughness.png"), Path.Combine(folder.Path, "materials", "bricks", "normal.png"));
+        var refused = folder.Normalise(await patina.Refused("save", """{"path":"materials/wall.texgraph"}"""));
+        Assert.StartsWith("save: refused: the graph saved in <folder>/materials would use other files than it does now: image node 'baked' would read <folder>/materials/bricks/normal.png, which differs from <folder>/bricks/normal.png, the file it reads now", refused);
+
+        File.Copy(Path.Combine(Sample("bricks"), "normal.png"), Path.Combine(folder.Path, "materials", "bricks", "normal.png"), overwrite: true);
+        Assert.StartsWith("save: saved wall.texgraph", await patina.Ok("save", """{"path":"materials/wall.texgraph"}"""));
+    }
+
+    [Fact]
+    public async Task A_nested_graphs_png_is_judged_by_its_bytes_when_save_moves_the_graph()
+    {
+        // RV-94: a graph node whose file reads a PNG; saved into materials/ beside copies of both, the same bytes save, other bytes refuse.
+        using var folder = new TempFolder();
+        const string Inner = """{ "version": 2, "size": 256, "seed": 0, "nodes": { "i": { "type": "image", "params": { "path": "bake.png" } }, "o": { "type": "output", "inputs": { "in": "i" }, "params": { "role": "base_colour" } } } }""";
+        foreach (var where in new[] { folder.Path, Path.Combine(folder.Path, "materials") })
+        {
+            Directory.CreateDirectory(where);
+            File.WriteAllText(Path.Combine(where, "inner.texgraph"), Inner);
+            File.Copy(Path.Combine(Sample("bricks"), "normal.png"), Path.Combine(where, "bake.png"));
+        }
+        await using var patina = await PatinaHarness.StartAsync(folder.Path);
+        await patina.Ok("define_graph", """{"graph":{"version":2,"size":256,"seed":0,"nodes":{"g":{"type":"graph","params":{"path":"inner"}},"out":{"type":"output","inputs":{"in":"g.base_colour"},"params":{"role":"base_colour"}}}}}""");
+
+        File.Copy(Path.Combine(Sample("bricks"), "roughness.png"), Path.Combine(folder.Path, "materials", "bake.png"), overwrite: true);
+        var refused = folder.Normalise(await patina.Refused("save", """{"path":"materials/a.texgraph"}"""));
+        Assert.Contains("graph node 'g' would read <folder>/materials/bake.png, which differs from <folder>/bake.png, the file it reads now", refused);
+        File.Copy(Path.Combine(Sample("bricks"), "normal.png"), Path.Combine(folder.Path, "materials", "bake.png"), overwrite: true);
+        Assert.StartsWith("save: saved a.texgraph", await patina.Ok("save", """{"path":"materials/a.texgraph"}"""));
     }
 }

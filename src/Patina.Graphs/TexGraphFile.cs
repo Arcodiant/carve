@@ -16,7 +16,7 @@ namespace Patina.Graphs;
 /// <para><b>Versions.</b> A file is written in the lowest version that holds the graph, as the Carve file is: version 1
 /// unless the graph uses something a later version adds, which a <see cref="TexGraphFormat"/> lists (a top-level
 /// <see cref="TexGraphField"/>, written after <c>seed</c> in the format's order, or a node type). Version 2 is reserved for
-/// T-139's <c>parameters</c> (<see cref="ParametersField"/>) and T-140's <c>graph</c> and <c>input</c> nodes;
+/// T-139's <c>parameters</c> (<see cref="ParametersField"/>), T-140's <c>graph</c> and <c>input</c> nodes and T-240's <c>image</c>;
 /// <see cref="TexGraphFormat.Current"/> holds <c>parameters</c>. A node parameter an exposed parameter drives is not
 /// written (its own value is ignored); <see cref="WriteShowingDriven"/> writes it as <c>{"driven_by": "name"}</c>, which
 /// is read back too. Both versions are read; a file that uses what its version does not hold is a <see cref="GraphLoadError"/>.</para>
@@ -425,7 +425,7 @@ public sealed class TexGraphFormat
     public static TexGraphFormat Version1 { get; } = new([], ImmutableSortedDictionary.Create<string, int>(StringComparer.Ordinal));
 
     /// <summary>The format this build uses: version 2 adds <c>parameters</c> (T-139).</summary>
-    public static TexGraphFormat Current { get; } = Version1.With(ParametersField.Instance).WithNodeType(NestedGraphNode.TypeName, 2).WithNodeType(InputNode.TypeName, 2);
+    public static TexGraphFormat Current { get; } = Version1.With(ParametersField.Instance).WithNodeType(NestedGraphNode.TypeName, 2).WithNodeType(InputNode.TypeName, 2).WithNodeType(ImageNode.TypeName, 2);
 
     public ImmutableArray<TexGraphField> Fields { get; }
 

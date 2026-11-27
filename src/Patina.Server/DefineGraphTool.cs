@@ -63,7 +63,7 @@ public sealed class DefineGraphTool(GraphStore store, NodeRegistry registry)
     public static string Text(NodeRegistry registry) =>
         "Replaces the open texture graph with a whole new one: graph is the body of a .texgraph file, as JSON (patina holds one graph per session). "
         + "It clears the snapshot stack (push_snapshot) and the graph's path (save gives it one). A graph with faults is still taken, so edit_graph can fix it; save refuses it until it has none. "
-        + "A graph is {\"version\": 1, \"size\": S, \"seed\": N, \"nodes\": {id: node}}: version 1, or 2 for exposed parameters and input and graph nodes; size is the size the images are evaluated at, "
+        + "A graph is {\"version\": 1, \"size\": S, \"seed\": N, \"nodes\": {id: node}}: version 1, or 2 for exposed parameters and input, graph and image nodes; size is the size the images are evaluated at, "
         + TextureGraph.SizesText + "; seed, 0 to 4294967295, is added to every noise's own seed, so the same graph gives the same pixels on every run. "
         + "Ids and port names are [a-z][a-z0-9_]*. A node is {\"type\": T, \"inputs\": {port: source}, \"params\": {name: value}}, inputs and params left out when empty; "
         + "a source is another node's id (\"id.port\" for a type with several outputs); a parameter left out takes its default. "

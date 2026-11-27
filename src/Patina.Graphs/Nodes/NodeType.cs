@@ -184,8 +184,11 @@ public sealed class ParamSpec
     /// <summary>An optional grey value from 0 to 1 or a colour <c>"#rrggbb"</c>, with no default (an <c>input</c>'s <c>default</c>, T-140).</summary>
     public static ParamSpec GreyOrColour(string name) => new(name, ParamKind.GreyOrColour, 0, 1, [], ParamValue.Of(0), optional: true);
 
-    /// <summary>A path to a <c>.texgraph</c> file (a <c>graph</c> node's <c>path</c>, T-140), with no default.</summary>
-    public static ParamSpec FilePath(string name) => new(name, ParamKind.FilePath, 0, 0, [], ParamValue.Of(""), optional: true);
+    /// <summary>A path to a <c>.texgraph</c> file (a <c>graph</c> node's <c>path</c>, T-140), or to a file of <paramref name="file"/> (an <c>image</c> node's PNG, T-240), with no default.</summary>
+    public static ParamSpec FilePath(string name, string file = "a .texgraph file") =>
+        new(name, ParamKind.FilePath, 0, 0, [], ParamValue.Of(""), optional: true) { _file = file };
+
+    private string _file = "";
 
     /// <summary>Optional free text, not empty, with no default (a carve group or material name, M-29's <c>mesh_mask</c>, T-161).</summary>
     public static ParamSpec Text(string name) => new(name, ParamKind.Text, 0, 0, [], ParamValue.Of(""), optional: true);
@@ -201,7 +204,7 @@ public sealed class ParamSpec
         ParamKind.Colours => $"a list of {Count()} colours [\"#rrggbb\", ...]",
         ParamKind.Name => $"a name, {GraphNames.Pattern} (lower case letters, digits and _, starting with a letter)",
         ParamKind.GreyOrColour => $"a number from {N(Min)} to {N(Max)} for a grey input, or a colour \"#rrggbb\" for a colour one",
-        ParamKind.FilePath => "a path to a .texgraph file, relative to this graph's file",
+        ParamKind.FilePath => $"a path to {_file}, relative to this graph's file",
         ParamKind.Text => "text, not empty",
         _ => "a colour \"#rrggbb\"",
     };
@@ -270,6 +273,9 @@ public sealed class NodeParameters
         _type = type;
         _values = values;
     }
+
+    /// <summary>An <c>image</c> node's PNG (T-240), decoded at validation from the file its <c>path</c> names; null for every other node.</summary>
+    internal PngImage? Image { get; init; }
 
     public ParamValue Value(string name)
     {
