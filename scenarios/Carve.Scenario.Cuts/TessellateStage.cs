@@ -138,7 +138,7 @@ internal sealed class TessellateStage : ICutsStage
             if (!inside.Contains(f)) SameList($"displace: faces[{f}] corners kept", cut.Faces[f].Loop.Select(v => $"{v}"), after.Faces[f].Loop.Select(v => $"{v}"));
 
         var wornWire = await driver.CaptureAsync("tessellate-slab-worn", new { direction = Front, mode = "wireframe" });
-        Caption(wornWire, $"512x512, direction (0.6, 0.35, 1), wireframe, pinned, {after.Vertices.Length} vertices");
+        Caption(wornWire, $"512x512, direction (0.6, 0.35, 1), wireframe, {after.Vertices.Length} vertices, {after.Faces.Length} faces");
         Size(wornWire, 512, 512);
         Corners(wornWire);
         // The faces round the front are unmoved, so their probes still hold; the front's own are not asked about.
