@@ -22,6 +22,12 @@ internal sealed class TessellateStage : ICutsStage
 
     private const float MaxEdge = 0.25f;
 
+    /// <summary>
+    /// The edge colour over the fill at 3 of 4 samples, in linear: at some slopes (upright, 45 degrees, 2:1, flat) 4x MSAA
+    /// never gives a 1-pixel line all four, so its brightest pixel is this blend; the person chose to accept it here (T-237).
+    /// </summary>
+    private static readonly (int R, int G, int B) ThreeQuarters = Srgb(0.75 * 0.85 + 0.25 * 0.09, 0.75 * 0.85 + 0.25 * 0.095, 0.75 * 0.85 + 0.25 * 0.10);
+
     /// <summary>The box, then the socket's rim on the front (clockwise seen from the front, as a hole) and its floor ring.</summary>
     private static readonly double[][] Vertices =
     [
@@ -108,7 +114,10 @@ internal sealed class TessellateStage : ICutsStage
         foreach (var (lo, hi) in cut.Edges(pieces))
         {
             var (a, b) = (cut.Vertices[lo], cut.Vertices[hi]);
-            Line(wire, camera.Project(Vector3.Lerp(a, b, 0.3f)), camera.Project(Vector3.Lerp(a, b, 0.7f)), Edge, $"the piece edge {lo}-{hi}");
+            var (from, to) = (camera.Project(Vector3.Lerp(a, b, 0.3f)), camera.Project(Vector3.Lerp(a, b, 0.7f)));
+            var (full, part) = (Closest(wire, from, to, Edge), Closest(wire, from, to, ThreeQuarters));
+            if (full.Off > 10 && part.Off > 10)
+                Note($"{wire.Name}: the piece edge {lo}-{hi}, {from} to {to}: the closest pixel to {Edge} or {ThreeQuarters} is {full.P} at ({full.X}, {full.Y})");
         }
     }
 }

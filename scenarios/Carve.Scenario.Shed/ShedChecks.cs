@@ -163,7 +163,7 @@ internal static class Checks
         }
     }
 
-    private static (int Off, int X, int Y, (byte R, byte G, byte B, byte A) P) Closest(ScenarioFrame frame, Vector2 from, Vector2 to, Rgb colour)
+    internal static (int Off, int X, int Y, (byte R, byte G, byte B, byte A) P) Closest(ScenarioFrame frame, Vector2 from, Vector2 to, Rgb colour)
     {
         const int Steps = 16;
         var best = (Off: int.MaxValue, X: 0, Y: 0, P: default((byte R, byte G, byte B, byte A)));
