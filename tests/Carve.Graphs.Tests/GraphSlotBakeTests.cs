@@ -217,6 +217,26 @@ public sealed class GraphSlotBakeTests : IDisposable
     }
 
     [Fact]
+    public void The_files_hash_changes_when_only_an_image_nodes_png_does()
+    {
+        // T-240: the PNG an image node reads, the graph's own and a nested graph's, is among the files hashed.
+        var grey = new byte[32 * 32 * 4];
+        File.WriteAllBytes(Path.Combine(_dir, "bake.png"), PngWriter.Encode(grey, 32, 32));
+        Write("inner.texgraph", """ "i": { "type": "image", "params": { "path": "bake.png" } }, "o": { "type": "output", "inputs": { "in": "i" }, "params": { "role": "base_colour" } } """);
+        var own = Write("own.texgraph", """ "i": { "type": "image", "params": { "path": "bake.png" } }, "o": { "type": "output", "inputs": { "in": "i" }, "params": { "role": "base_colour" } } """);
+        var nested = Write("outer.texgraph", """ "g": { "type": "graph", "params": { "path": "inner.texgraph" } }, "o": { "type": "output", "inputs": { "in": "g.base_colour" }, "params": { "role": "base_colour" } } """);
+        var before = (Own: GraphSlotBake.Read(own), Nested: GraphSlotBake.Read(nested));
+        Assert.Equal([Path.Combine(_dir, "bake.png")], before.Own.Files);
+        Assert.Contains(Path.Combine(_dir, "bake.png"), before.Nested.Files);
+
+        grey[0] = 1;
+        File.WriteAllBytes(Path.Combine(_dir, "bake.png"), PngWriter.Encode(grey, 32, 32));
+        Assert.NotEqual(before.Own.Hash, GraphSlotBake.Read(own).Hash);
+        Assert.NotEqual(before.Nested.Hash, GraphSlotBake.Read(nested).Hash);
+        Assert.False(GraphSlotBake.Unchanged(before.Own));
+    }
+
+    [Fact]
     public void Validate_refuses_a_mesh_parameter_every_bake_would()
     {
         // RV-82's probe: width 0 and a bare mesh_mask passed Validate, then failed the bake.

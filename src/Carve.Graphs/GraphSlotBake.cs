@@ -10,7 +10,7 @@ using Patina.Graphs.Nodes;
 
 namespace Carve.Graphs;
 
-/// <summary>What a graph slot's file reads (T-163): the file, every nested file all levels down, a hash of all their bytes, and whether the expanded graph has a mesh node.</summary>
+/// <summary>What a graph slot's file reads (T-163): the file, every nested file all levels down (image nodes' PNGs too, T-240), a hash of all their bytes, and whether the expanded graph has a mesh node.</summary>
 public sealed record GraphSlotFiles(string Path, IReadOnlyList<string> Files, string Hash, bool ReadsMesh);
 
 /// <summary>A graph slot that cannot be baked for a reason of its own: the file gone or unreadable, or an output the slot cannot take.</summary>
@@ -48,7 +48,7 @@ public static class GraphSlotBake
     public static GraphSlotFiles Read(string path)
     {
         var graph = Load(path, Unbound);
-        var nested = GraphValidator.Uses(graph, Unbound).SelectMany(u => u.Files).Distinct().Order(StringComparer.Ordinal).ToList();
+        var nested = GraphValidator.Files(graph, Unbound).Order(StringComparer.Ordinal).ToList();
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var readsMesh = HasMeshNode(graph);
         var folder = Path.GetDirectoryName(Path.GetFullPath(path))!;
@@ -66,7 +66,7 @@ public static class GraphSlotBake
             // Relative to the top file's folder (RV-82): the nesting is in the key, the folder's place is not.
             hash.AppendData(Encoding.UTF8.GetBytes(Path.GetRelativePath(folder, Path.GetFullPath(file)) + "\n" + bytes.Length + "\n"));
             hash.AppendData(bytes);
-            if (file != path && TexGraphFile.ReadFile(file, Unbound).Graph is { } inner && HasMeshNode(inner)) readsMesh = true;
+            if (file != path && IsGraphFile(file) && TexGraphFile.ReadFile(file, Unbound).Graph is { } inner && HasMeshNode(inner)) readsMesh = true;
         }
         return new(path, nested, Convert.ToHexString(hash.GetHashAndReset()), readsMesh);
     }
@@ -188,7 +188,7 @@ public static class GraphSlotBake
     public static IReadOnlyList<(string Node, MaskSource Source, string Name)> MaskNames(GraphSlotFiles files)
     {
         var names = new List<(string, MaskSource, string)>();
-        foreach (var file in files.Files.Prepend(files.Path))
+        foreach (var file in files.Files.Where(IsGraphFile).Prepend(files.Path))
             foreach (var (id, node) in TexGraphFile.ReadFile(file, Unbound).Graph?.Nodes ?? ImmutableSortedDictionary<string, GraphNode>.Empty)
             {
                 if (node.Type != MeshMaskNode.TypeName) continue;
@@ -204,6 +204,9 @@ public static class GraphSlotBake
         var read = TexGraphFile.ReadFile(path, registry);
         return read.Graph ?? throw new GraphSlotException($"the graph file '{path}' cannot be read: {read.Error}");
     }
+
+    /// <summary>A .texgraph among the files, not an image node's PNG (T-240).</summary>
+    private static bool IsGraphFile(string file) => file.EndsWith(TexGraphFile.Extension, StringComparison.OrdinalIgnoreCase);
 
     private static bool HasMeshNode(TextureGraph graph) => graph.Nodes.Values.Any(n => MeshNodes.TypeNames.Contains(n.Type));
 

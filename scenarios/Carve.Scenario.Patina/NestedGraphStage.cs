@@ -17,7 +17,7 @@ internal sealed class NestedGraphStage : IPatinaStage
     {
         var samples = Path.Combine(SwatchStage.RepoRoot(), "samples", "graphs");
         var opened = await checks.CallAsync("open", JsonSerializer.Serialize(new { path = Path.Combine(samples, "old-wall.texgraph") }));
-        checks.Check(opened.Contains($"read 2 nested files for its graph nodes: {Path.Combine(samples, "grime.texgraph")}, {Path.Combine(samples, "bricks.texgraph")}", StringComparison.Ordinal),
+        checks.Check(opened.Contains($"read 2 nested files for its graph and image nodes: {Path.Combine(samples, "grime.texgraph")}, {Path.Combine(samples, "bricks.texgraph")}", StringComparison.Ordinal),
             "nested: open did not name the nested files it read: " + opened);
         checks.Check(opened.Contains("no faults: it evaluates", StringComparison.Ordinal), "nested: old-wall opened with faults: " + opened);
 
