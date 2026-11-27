@@ -117,7 +117,7 @@ Measured by T-206 on Claude Sonnet 5.5, the real `carve` over stdio at `summary`
 |---|---|---|
 | `open` the cage | 1,156 | 244 |
 | `check` the cage | 1,434 | 730 |
-| `export` the cage, skinned | 2,038 | 1,039 |
+| `export`, skinned (at planning the 590-face cage; now after two subdivides and a move) | 2,038 | 1,039 |
 | `subdivide` once, twice | 373, 386 | 319, 332 |
 | `check` after two | 1,467 | 766 (ok: true) |
 | `delete` 200 faces | 41,310 | 1,119 |
@@ -160,7 +160,7 @@ Done with no branch of their own, so not required members (2026-11-26; T-203's r
 
 **As planned.**
 
-- **Every result on the fps-arms files is under the 2,000-character budget at `summary`** (T-206, the real `carve` over stdio, `### Measured` above). For example, `delete` of 200 faces went from 41,310 to 1,119 characters, `check` after `project_uvs` from 43,700 to 848, and `unwrap` on the toolkit from 16,086 to 790. At `silent` every result is `{"ok":true}`, and at `full` every warning is listed (40,389 characters for the 798 open edges). After two subdivides the cage reads `ok: true`, and its export holds 18,976 triangles.
+- **Every result on the fps-arms files is under the 2,000-character budget at `summary`** (T-206, the real `carve` over stdio, `### Measured` above). For example, `delete` of 200 faces went from 41,310 to 1,119 characters, `check` after `project_uvs` from 43,700 to 848, and `unwrap` on the toolkit from 16,086 to 790. At `silent` every result is `{"ok":true}`, except `check` on a broken mesh, which answers `{"ok":false}`, and at `full` every warning is listed (40,389 characters for the 798 open edges). After two subdivides the cage reads `ok: true`, and its export holds 18,976 triangles.
 - **T-197** grouped a repeated warning into one line per kind, as the person agreed: the count, the worst case, three samples and the `select` query. It replaced `MeshWarningFold` and subdivide's own fold, and copied the four fps-arms files into `samples/` byte for byte. `DenseMeshBudgetTests` holds the budget in `unit`.
 - **T-198**: a smooth mesh no longer warns of not-planar faces. `check` gives one note instead, and `select` still names every face. This answers T-127, closed as Done in the same commit as this retrospective.
 - **T-200** added `verbosity` (`silent`, `summary`, `full`) and its helper in `MeshToolSupport`. **T-201** used the helper on twenty more tools, and a guard over tools/list now holds every tool that changes the model to having it.

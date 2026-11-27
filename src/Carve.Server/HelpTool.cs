@@ -73,7 +73,7 @@ public sealed class HelpTool
     {
         var errors = UnknownArguments("help", context, "tool", "topic");
         if (!Absent(tool) && tool!.Value.ValueKind != JsonValueKind.String) errors.Add($"tool: expected a string, got {Describe(tool.Value)}");
-        if (!Absent(topic) && topic!.Value.ValueKind != JsonValueKind.String) errors.Add($"topic: expected a string, got {Describe(topic.Value)}");
+        if (!Absent(topic) && topic!.Value.ValueKind != JsonValueKind.String) errors.Add($"topic: expected a string, got {Describe(topic.Value)}; the topics are {string.Join(", ", TopicNames)}");
         if (errors.Count > 0) return Failed("help", errors);
         if (!Absent(tool) && !Absent(topic)) return Error($"help: give tool or topic, not both; the entries are {string.Join(", ", Tools)}; the topics are {string.Join(", ", TopicNames)}");
         if (!Absent(topic))

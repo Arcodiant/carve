@@ -147,7 +147,8 @@ levels: `define_part`, `keep_level`, `define_group`, `set_colour`,
 `delete_clip`, `define_target`, `delete_target`, `save`, `bake` and `displace`.
 At `silent` each answers `{"ok":true}` with the change made (the file written, for
 `save` and `bake`); `summary` is the result as it was, and `full` the same, since
-none of these shortens a list of warnings. The tools that only read (`get_mesh`,
+none of these but `displace` shortens a list of warnings; `displace` groups its
+mesh report at `summary`, and its `full` lists every warning. The tools that only read (`get_mesh`,
 `get_parts`, `get_skeleton`, `get_weights`, `get_clips`, `select`, `render`,
 `render_glb`, `help`) take none.
 
@@ -165,7 +166,7 @@ is `{"ok":true}` (`check` its own `ok`):
 |---|---|---|
 | `open` the cage | 244 | 1,156 |
 | `check` the cage | 730 | 1,434 |
-| `export` the cage, skinned | 1,039 | 2,038 |
+| `export`, skinned: now after two subdivides and a move, at planning the 590-face cage | 1,039 | 2,038 |
 | `subdivide`, once then twice | 319, 332 | 373, 386 |
 | `check` after two (reads `ok: true`) | 766 | 1,467 |
 | `delete` 200 faces (798 open edges) | 1,119 | 41,310 |
