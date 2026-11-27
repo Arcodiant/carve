@@ -59,6 +59,7 @@ public sealed class VerbosityToolTests
         { "delete_target", ["define_mesh " + Cube, "define_target " + Bulge], """{"name":"Bulge"}""", """{"name":"zz"}""" },
         { "save", ["define_mesh " + Cube], """{"path":"v.carve"}""", """{"path":"v.txt"}""" },
         { "bake", ["define_mesh " + Cube, """project_uvs {"method":"box"}"""], """{"size":64,"padding":0,"maps":["normal"],"bevel":{"width":0.1}}""", """{"size":64,"maps":["nope"]}""" },
+        { "tessellate", ["define_mesh " + Cube], """{"max_edge":0.5,"faces":[1]}""", """{"max_edge":0}""" },
         { "displace", ["define_mesh " + Cube, """subdivide {"levels":2}"""], """{"source":{"noise":{"seed":7,"scale":0.35,"octaves":5}},"amount":0.6}""", """{"amount":"x"}""" },
     };
 

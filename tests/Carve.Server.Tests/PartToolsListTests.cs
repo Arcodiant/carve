@@ -18,7 +18,7 @@ public class PartToolsListTests
         await carve.InitializeAsync();
         var texts = (await carve.ListToolsAsync()).EnumerateArray()
             .ToDictionary(t => t.GetProperty("name").GetString()!, t => t.GetProperty("description").GetString()!);
-        string[] partSpace = ["bridge", "define_target", "delete", "extrude", "knife", "loop_cut", "merge_faces", "move", "plane_cut", "project_uvs", "select", "subdivide", "displace"];
+        string[] partSpace = ["bridge", "define_target", "delete", "extrude", "knife", "loop_cut", "merge_faces", "move", "plane_cut", "project_uvs", "select", "subdivide", "displace", "tessellate"];
         string[] partTarget = ["define_group", "delete_target", "get_weights", "mark_edges", "set_colour", "set_material", "set_shading", "set_uvs", "set_weights", "unwrap", "weigh"];
         foreach (var (name, text) in texts)
         {
