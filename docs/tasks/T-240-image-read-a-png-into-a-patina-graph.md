@@ -4,7 +4,7 @@ description: >-
 ---
 # T-240 — image: read a PNG into a Patina graph
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
