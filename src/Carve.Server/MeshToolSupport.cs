@@ -201,9 +201,12 @@ internal static class MeshToolSupport
     public static IReadOnlyList<string> WarningLines(IReadOnlyList<MeshWarning> warnings, Verbosity level) =>
         level == Verbosity.Full ? [.. warnings.Select(w => w.ToString())] : MeshWarningGroups.Lines(warnings);
 
+    /// <summary>What a success answers at <c>silent</c>.</summary>
+    private const string SilentOk = """{"ok":true}""";
+
     /// <summary>The result at <paramref name="level"/>: at <c>silent</c> a success is <c>{"ok":true}</c>; a tool error is always whole.</summary>
     public static CallToolResult Quiet(CallToolResult result, Verbosity level) =>
-        level == Verbosity.Silent && result.IsError != true ? Line("""{"ok":true}""") : result;
+        level == Verbosity.Silent && result.IsError != true ? Line(SilentOk) : result;
 
     /// <summary>The report fields every tool returns: vertices, faces, edges, closed, bounds, warnings.</summary>
     public static Dictionary<string, object> Report(PolygonMesh mesh, Verbosity level = Verbosity.Summary)
@@ -232,7 +235,7 @@ internal static class MeshToolSupport
         if (snapshot is null) return Error($"{tool}: " + NoMesh);
         if (!result!.Succeeded) return Failed(tool, result.Errors.Select(x => x.ToString()));
 
-        if (level == Verbosity.Silent) return Quiet(Ok(new { }), level);
+        if (level == Verbosity.Silent) return Line(SilentOk);
         var body = Report(snapshot.Model.Find(mesh ?? snapshot.Model.Meshes[0].Name)!, level);
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
         body["deleted"] = Deleted(result.Deleted);

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using static Carve.Server.Tests.VerbosityCalls;
 
 namespace Carve.Server.Tests;
 
@@ -67,14 +68,6 @@ public sealed class VerbosityToolTests
         """{"name":"wave","duration":1,"loop":true,"channels":{"joint":{"rotation":{"interpolation":"LINEAR","keys":[{"time":0,"value":[0,0,0,1]},{"time":0.5,"value":[0,0,0.70710677,0.70710677]},{"time":1,"value":[0,0,0,1]}]}}}}""";
 
     private const string Bulge = """{"name":"Bulge","positions":{"2":[1.1,1.3,-0.1],"3":[-0.1,1.3,-0.1],"6":[1.1,1.3,1.1],"7":[-0.1,1.3,1.1]}}""";
-
-    private static string With(string arguments, string verbosity) =>
-        arguments.TrimEnd()[..^1] + (arguments.Trim() == "{}" ? "" : ",") + $"\"verbosity\":\"{verbosity}\"}}";
-
-    private static string Text(JsonElement result) =>
-        string.Concat(result.GetProperty("content").EnumerateArray().Select(c => c.GetProperty("text").GetString()));
-
-    private static bool IsError(JsonElement result) => result.TryGetProperty("isError", out var e) && e.GetBoolean();
 
     /// <summary>A fresh carve in its own folder, set up by <paramref name="setup"/> ("tool {arguments}" each).</summary>
     private static async Task<ToolHarness> Start(string folder, string[] setup)

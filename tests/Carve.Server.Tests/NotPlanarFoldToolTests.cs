@@ -1,5 +1,6 @@
 using System.Text.Json;
 using static Carve.Server.Tests.CarveProcess;
+using static Carve.Server.Tests.VerbosityCalls;
 
 namespace Carve.Server.Tests;
 
@@ -11,14 +12,6 @@ namespace Carve.Server.Tests;
 public sealed class NotPlanarFoldToolTests() : FileToolTests("carve-fold")
 {
     private const string Fold = "select faces where non_planar names them";
-
-    /// <summary>A row of <paramref name="quads"/> separate quads, each with one corner lifted off its plane.</summary>
-    private static string Row(int quads)
-    {
-        var vertices = Enumerable.Range(0, quads).SelectMany(i => new[] { [i * 2, 0, 0], [i * 2 + 1, 0, 0], [i * 2 + 1, 1, 0], new float[] { i * 2, 1, 0.5f } }).ToArray();
-        var faces = Enumerable.Range(0, quads).Select(i => new[] { i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 3 });
-        return JsonSerializer.Serialize(new { vertices, faces });
-    }
 
     private static string[] Warnings(string json) =>
         JsonDocument.Parse(json).RootElement.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToArray();

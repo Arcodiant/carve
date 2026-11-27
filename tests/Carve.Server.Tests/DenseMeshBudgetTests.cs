@@ -1,4 +1,5 @@
 using System.Text.Json;
+using static Carve.Server.Tests.VerbosityCalls;
 
 namespace Carve.Server.Tests;
 
@@ -22,13 +23,10 @@ public sealed class DenseMeshBudgetTests
     /// <summary>The tools of the run that take verbosity (T-200); project_uvs gets it in T-201.</summary>
     private static readonly string[] Quietened = ["open", "check", "subdivide", "export", "delete", "undo"];
 
-    private static string TextOf(JsonElement result) =>
-        string.Concat(result.GetProperty("content").EnumerateArray().Select(c => c.GetProperty("text").GetString()));
-
     private async Task<JsonElement> Call(ToolHarness carve, string tool, string arguments)
     {
         var result = await carve.CallToolAsync(tool, arguments);
-        var text = TextOf(result);
+        var text = Text(result);
         Assert.False(result.TryGetProperty("isError", out var error) && error.GetBoolean(), $"{tool}: {text}");
         _seen.Add(($"{tool} {arguments}", text.Length));
         Assert.True(text.Length <= Budget, $"{tool} {arguments}: {text.Length} characters, over {Budget}: {text[..Math.Min(text.Length, 600)]}");
@@ -36,11 +34,10 @@ public sealed class DenseMeshBudgetTests
         if (_silent is not null)
         {
             var quiet = Quietened.Contains(tool);
-            var silent = await _silent.CallToolAsync(tool, quiet ? arguments[..^1] + (arguments == "{}" ? "" : ",") + "\"verbosity\":\"silent\"}" : arguments);
-            Assert.False(silent.TryGetProperty("isError", out var e) && e.GetBoolean(), $"{tool} silent: {TextOf(silent)}");
+            var silent = await _silent.CallToolAsync(tool, quiet ? With(arguments, "silent") : arguments);
+            Assert.False(silent.TryGetProperty("isError", out var e) && e.GetBoolean(), $"{tool} silent: {Text(silent)}");
             // check answers its own ok (M-23's ruling 3, read in T-200); every other result is exactly {"ok":true}.
-            var expected = tool == "check" ? $"{{\"ok\":{(body.GetProperty("ok").GetBoolean() ? "true" : "false")}}}" : """{"ok":true}""";
-            if (quiet) Assert.Equal(expected, TextOf(silent));
+            if (quiet) Assert.Equal(Silent(tool, tool == "check" && body.GetProperty("ok").GetBoolean()), Text(silent));
         }
         return body;
     }
@@ -84,7 +81,7 @@ public sealed class DenseMeshBudgetTests
             await Call(carve, "check", "{}");
 
             // The silent run made the same changes.
-            Assert.Equal(TextOf(await carve.CallToolAsync("check", "{}")), TextOf(await silent.CallToolAsync("check", "{}")));
+            Assert.Equal(Text(await carve.CallToolAsync("check", "{}")), Text(await silent.CallToolAsync("check", "{}")));
         }
         finally
         {
