@@ -4,7 +4,7 @@ description: >-
 ---
 # T-237 — tessellate: split selected faces into flat triangles down to max_edge
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P2
 
