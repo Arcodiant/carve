@@ -76,7 +76,7 @@ public sealed class ShedScenario : IScenario
         // 4. A selection feeds an edit.
         var chimneyFaces = chimney.GetProperty("faces").EnumerateArray().Select(f => f.GetInt32()).ToArray();
         var moved = await CallJsonAsync(driver, "move", new { faces = chimneyFaces, by = new[] { 0.0, 0.5, 0.0 } });
-        SameList("move: moved", Enumerable.Range(16, 8).Select(i => $"{i}"), moved.GetProperty("moved").EnumerateArray().Select(v => $"{v.GetInt32()}"));
+        SameList("move: moved", Enumerable.Range(16, 8).Select(i => $"{i}"), moved.GetProperty("moved").GetProperty("first").EnumerateArray().Select(v => $"{v.GetInt32()}"));
         var after = await CallJsonAsync(driver, "check", new { });
         Equal("check after the move: shells", 2, after.GetProperty("stats").GetProperty("shells").GetInt32());
         Equal("check after the move: the problems", problems, after.GetProperty("problems").GetRawText());

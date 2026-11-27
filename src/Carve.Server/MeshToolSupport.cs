@@ -198,6 +198,10 @@ internal static class MeshToolSupport
     }
 
     /// <summary>A mesh's warnings as result lines: grouped by kind (T-197), or at <c>full</c> every warning one per line.</summary>
+    /// <summary>The <c>moved</c> field: the whole id list at full, otherwise <c>{count, first}</c> with the first 10 ids.</summary>
+    public static object Moved(IReadOnlyList<int> ids, Verbosity level) =>
+        level == Verbosity.Full ? ids : new { count = ids.Count, first = ids.Take(10).ToArray() };
+
     public static IReadOnlyList<string> WarningLines(IReadOnlyList<MeshWarning> warnings, Verbosity level) =>
         level == Verbosity.Full ? [.. warnings.Select(w => w.ToString())] : MeshWarningGroups.Lines(warnings);
 

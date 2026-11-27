@@ -50,7 +50,8 @@ public sealed class DisplaceToolTests() : FileToolTests("carve-displace")
         Assert.Equal(386, body.GetProperty("vertices").GetInt32());
         Assert.Equal(384, body.GetProperty("faces").GetInt32());
         Assert.True(body.GetProperty("closed").GetBoolean());
-        Assert.Equal(386, body.GetProperty("moved").GetArrayLength());
+        Assert.Equal(386, body.GetProperty("moved").GetProperty("count").GetInt32());
+        Assert.Equal(Enumerable.Range(0, 10), body.GetProperty("moved").GetProperty("first").EnumerateArray().Select(x => x.GetInt32()));
         Assert.InRange(body.GetProperty("largest").GetDouble(), 0.08, 0.3);
         Assert.DoesNotContain(body.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.Contains("too coarse"));
         var nonPlanar = Ok(await carve.CallToolAsync("select", """{"kind":"faces","where":"non_planar"}""")).GetProperty("count").GetInt32();
@@ -154,6 +155,6 @@ public sealed class DisplaceToolTests() : FileToolTests("carve-displace")
         using var __ = carve;
         Ok(await carve.CallToolAsync("define_group", """{"name":"top","faces":[3]}"""));
         var body = Ok(await carve.CallToolAsync("displace", """{"source":{"noise":{"seed":3}},"amount":0.2,"group":"top","axis":[0,1,0]}"""));
-        Assert.Equal("[2,3,6,7]", body.GetProperty("moved").GetRawText());
+        Assert.Equal("""{"count":4,"first":[2,3,6,7]}""", body.GetProperty("moved").GetRawText());
     }
 }
