@@ -4,7 +4,7 @@ description: >-
 ---
 # T-239 — moved is short at summary verbosity
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
