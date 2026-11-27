@@ -1,5 +1,6 @@
 using System.Numerics;
 using Carve.Core.Baking;
+using StbImageSharp;
 using Xunit;
 
 namespace Carve.Core.Tests;
@@ -33,6 +34,24 @@ public class BevelNormalTests
 
     private static void Near(Vector3 expected, Vector3 actual, float tolerance) =>
         Assert.True(Vector3.Distance(expected, actual) <= tolerance, $"expected {expected}, got {actual}");
+
+    /// <summary>
+    /// T-224: samples/graphs/bakes/slabs.normal.png, the base of the bevelled-slabs graph, is what bake normal makes of
+    /// slabs.carve beside it (256, bevel.width 0.02, padding 8), byte for byte; remake it with those arguments when this fails.
+    /// </summary>
+    [Fact]
+    public void The_bevelled_slabs_bake_is_what_bake_makes_of_its_model()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(dir.FullName, "Carve.slnx"))) dir = dir.Parent!;
+        var folder = Path.Combine(dir.FullName, "samples", "graphs", "bakes");
+        var read = CarveFile.Read(File.ReadAllText(Path.Combine(folder, "slabs.carve")), folder);
+        Assert.NotNull(read.Model);
+        var layout = BakeLayout.Create(Assert.Single(read.Model!.Meshes).Mesh, 256).Layout!;
+        var made = Bake.Pad(Bake.BevelNormal(layout, 0.02), layout, 8).Values.ToArray().Select(Q).ToArray();
+        var committed = ImageResult.FromMemory(File.ReadAllBytes(Path.Combine(folder, "slabs.normal.png")), ColorComponents.RedGreenBlue).Data;
+        Assert.True(made.AsSpan().SequenceEqual(committed), "slabs.normal.png is not bake normal of slabs.carve");
+    }
 
     [Fact]
     public void On_a_box_the_top_edge_takes_the_mean_normal_and_a_texel_at_the_width_or_farther_the_face_normal()

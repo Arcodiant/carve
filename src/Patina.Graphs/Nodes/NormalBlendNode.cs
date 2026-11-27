@@ -24,12 +24,14 @@ public sealed class NormalBlendNode : NodeType
 
     public static (float X, float Y, float Z) Blend((float X, float Y, float Z) b, (float X, float Y, float Z) d, float strength)
     {
-        // The detail moved toward (0, 0, 1) by strength. r below is linear in u, so the one renormalisation at the end
+        // The detail moved toward (0, 0, 1) by strength. r below is linear in u, so the renormalisation at the end
         // also renormalises this lerp.
         float ux = -d.X * strength, uy = -d.Y * strength, uz = 1f + (d.Z - 1f) * strength;
+        // RNM needs a unit base: one short of it (a mix, a blur or a fractional shift of normals) turns the detail too far.
+        b = Unit(b.X, b.Y, b.Z);
         // RNM: t = base + (0, 0, 1), u = detail with x and y negated, r = t * dot(t, u) / t.z - u.
         float tx = b.X, ty = b.Y, tz = b.Z + 1f;
-        if (tz <= 1e-6f) return Unit(b.X, b.Y, b.Z); // a base facing straight into the surface has no frame
+        if (tz <= 1e-6f) return b; // a base facing straight into the surface has no frame
         var k = (tx * ux + ty * uy + tz * uz) / tz;
         return Unit(tx * k - ux, ty * k - uy, tz * k - uz);
     }

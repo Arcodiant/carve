@@ -15,6 +15,7 @@
           "dotnet-closure": "tests/Carve.Core.Tests/Carve.Core.Tests.csproj"
         },
         "samples/*.carve",
+        "samples/graphs/bakes/*",
         "tests/Carve.Core.Tests/Fixtures/*.carve",
         "scenarios/Carve.Scenario.Morph/ArmPlan.cs",
         "scenarios/Carve.Scenario.Soft/NotPlanarFold.cs",

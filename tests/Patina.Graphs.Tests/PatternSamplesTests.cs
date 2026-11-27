@@ -136,7 +136,7 @@ public class PatternSamplesTests(ITestOutputHelper output)
 
     /// <summary>
     /// T-224: the slabs' normal carries both the baked bevel and the bump. Along each slab's left and right edges (the bake's
-    /// strips, x tilted past 0.3 in samples/graphs/bakes/slabs.normal.png, which the graph moves an eighth of the image right
+    /// strips, x tilted past 0.3 in samples/graphs/bakes/slabs.normal.png, and its top and bottom edges in y, which the graph moves an eighth of the image right
     /// and down) the committed normal tilts the same way in 98% of texels or more (99.7% measured: the rest is where the bump's
     /// own tilt is the larger); on the flat middle of the slabs (the bake within 0.02 of flat) it is the bump, off flat in most texels.
     /// </summary>
@@ -146,16 +146,18 @@ public class PatternSamplesTests(ITestOutputHelper output)
         var bake = ImageResult.FromMemory(File.ReadAllBytes(Path.Combine(Root(), "samples", "graphs", "bakes", "slabs.normal.png")), ColorComponents.RedGreenBlueAlpha).Data;
         var px = Committed("bevelled-slabs", OutputRole.Normal);
         static double C(byte b) => b / 255.0 * 2 - 1;
-        int strip = 0, same = 0, middle = 0, bumped = 0;
+        int strip = 0, same = 0, stripY = 0, sameY = 0, middle = 0, bumped = 0;
         for (var i = 0; i < px.Length; i += 4)
         {
             int x = i / 4 % Size, y = i / 4 / Size, from = (((y - Size / 8 + Size) % Size) * Size + (x - Size / 8 + Size) % Size) * 4;
             double bx = C(bake[from]), by = C(bake[from + 1]), nx = C(px[i]), ny = C(px[i + 1]);
             if (Math.Abs(bx) > 0.3) { strip++; if (Math.Sign(nx) == Math.Sign(bx)) same++; }
+            if (Math.Abs(by) > 0.3) { stripY++; if (Math.Sign(ny) == Math.Sign(by)) sameY++; }
             else if (Math.Abs(bx) < 0.02 && Math.Abs(by) < 0.02) { middle++; if (Math.Max(Math.Abs(nx), Math.Abs(ny)) > 0.02) bumped++; }
         }
-        output.WriteLine($"bevelled-slabs: {same}/{strip} strip texels keep the bevel's tilt, {bumped}/{middle} middle texels carry the bump");
+        output.WriteLine($"bevelled-slabs: {same}/{strip} strip texels keep the bevel's tilt in x and {sameY}/{stripY} in y, {bumped}/{middle} middle texels carry the bump");
         Assert.True(strip > 1000 && same >= strip * 0.98, $"only {same} of {strip} bevel texels keep its tilt");
+        Assert.True(stripY > 1000 && sameY >= stripY * 0.98, $"only {sameY} of {stripY} bevel texels keep its tilt in y");
         Assert.True(middle > 10000 && bumped >= middle * 0.6, $"only {bumped} of {middle} middle texels carry the bump");
     }
 

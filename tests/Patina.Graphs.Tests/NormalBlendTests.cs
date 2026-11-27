@@ -101,7 +101,8 @@ public class NormalBlendTests
     /// A detail tilted along y, (0, 0.6, 0.8): t = (0.6, 0, 1.8), u = (0, -0.6, 0.8), dot 1.44, r = 0.8 t - u = (0.48, 0.6, 0.64).
     /// The same tilt again, (0.6, 0, 0.8): u = (-0.6, 0, 0.8), dot 1.08, r = 0.6 t - u = (0.96, 0, 0.28), the angle doubled.
     /// At strength 0.5 the detail (0.6, 0, 0.8) is (0.3, 0, 0.9) / 0.948683; on a flat base that is the output.
-    /// A base short of unit length, 0.9 (0.6, 0, 0.8), under a flat detail: k = 1, r = t - u = 0.9 (0.6, 0, 0.8), renormalised.
+    /// A base short of unit length, 0.9 (0.6, 0, 0.8) or 0.5 (0.6, 0, 0.8), is renormalised first: under a flat detail it gives
+    /// (0.6, 0, 0.8), and under the same tilt again the doubled tilt (0.96, 0, 0.28), as a unit base does (unnormalised, 0.5 gives 80.1 degrees, not 73.7).
     /// </summary>
     private static void CheckByHand(BlendFn blend)
     {
@@ -110,6 +111,7 @@ public class NormalBlendTests
         Near((0.3162278f, 0, 0.9486833f), blend((0, 0, 1), (0.6f, 0, 0.8f), 0.5f));
         Near((0.6f, 0, 0.8f), blend((0.6f, 0, 0.8f), (0, 0.6f, 0.8f), 0));
         Near((0.6f, 0, 0.8f), blend((0.54f, 0, 0.72f), (0, 0, 1), 1));
+        Near((0.96f, 0, 0.28f), blend((0.3f, 0, 0.4f), (0.6f, 0, 0.8f), 1));
     }
 
     /// <summary>RNM written out with no renormalisation, for the broken copies.</summary>
@@ -131,6 +133,7 @@ public class NormalBlendTests
             ("detail's x and y not negated", (b, d, s) => { var (x, y, z) = Raw(b, d, s, sign: 1); return Unit(x, y, z); }),
             ("strength ignored", (b, d, s) => NormalBlendNode.Blend(b, d, 1)),
             ("not renormalised", (b, d, s) => Raw(b, d, s)),
+            ("base not renormalised first", (b, d, s) => { var (x, y, z) = Raw(b, d, s); return Unit(x, y, z); }),
         };
         foreach (var (name, blend) in breaks)
             Assert.True(Throws(() => CheckByHand(blend)), $"the broken copy '{name}' was not caught");
