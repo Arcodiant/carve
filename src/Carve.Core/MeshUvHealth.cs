@@ -68,7 +68,8 @@ internal static class MeshUvHealth
                         common += Intersection(s, t);
                 if (common > OverlapTolerance)
                     warnings.Add(new(MeshWarningKind.UvOverlap, $"faces[{ids[i]}]",
-                        $"UVs overlap faces[{ids[j]}], so the two faces show the same texels; mirrored halves sharing a texture area are deliberate and still warned of"));
+                        $"UVs overlap faces[{ids[j]}], so the two faces show the same texels; mirrored halves sharing a texture area are deliberate and still warned of",
+                        Other: $"faces[{ids[j]}]"));
             }
         }
         return (warnings, new UvStats(mapped, live.Length - mapped));

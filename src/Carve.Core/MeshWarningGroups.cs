@@ -19,12 +19,14 @@ public static class MeshWarningGroups
     public static IReadOnlyList<string> Lines(IReadOnlyList<MeshWarning> warnings)
     {
         var groups = warnings.GroupBy(w => w.Kind).ToDictionary(g => g.Key, g => g.ToList());
+        // Grouping is decided on the count the line reports: the elements, both faces of each UV overlap.
+        var counts = groups.ToDictionary(g => g.Key, g => ElementsOf(g.Value).Count());
         var lines = new List<string>(warnings.Count);
         var done = new HashSet<MeshWarningKind>();
         foreach (var w in warnings)
         {
             var kind = groups[w.Kind];
-            if (kind.Count <= ListedLimit) lines.Add(w.ToString());
+            if (counts[w.Kind] <= ListedLimit) lines.Add(w.ToString());
             else if (done.Add(w.Kind)) lines.Add(Grouped(w.Kind, kind));
         }
         return lines;
@@ -37,10 +39,9 @@ public static class MeshWarningGroups
     private static string Grouped(MeshWarningKind kind, List<MeshWarning> all)
     {
         var sorted = all.OrderBy(w => Key(w.Element).A).ThenBy(w => Key(w.Element).B).ThenBy(w => w.Element, StringComparer.Ordinal).ToList();
-        // A face can warn more than once (a UV overlap per other face), so the count and the samples are of elements.
-        var elements = sorted.Select(w => w.Element).Distinct().ToList();
-        var (noun, wrong, query) = Says(kind);
-        var line = string.Create(CultureInfo.InvariantCulture, $"{elements.Count} {noun} {wrong}: ");
+        var elements = ElementsOf(all).OrderBy(e => Key(e).A).ThenBy(e => Key(e).B).ThenBy(e => e, StringComparer.Ordinal).ToList();
+        var (one, many, query) = Says(kind);
+        var line = elements.Count == 1 ? $"1 {one}: " : string.Create(CultureInfo.InvariantCulture, $"{elements.Count} {many}: ");
         if (kind is MeshWarningKind.NonPlanarFace or MeshWarningKind.NonManifoldEdge)
         {
             var worst = sorted[0];
@@ -54,20 +55,24 @@ public static class MeshWarningGroups
         return query is null ? line : line + $"; select {query} names them";
     }
 
+    /// <summary>The distinct elements warned of: a face can warn more than once (a UV overlap per other face), and an overlap names both faces.</summary>
+    private static IEnumerable<string> ElementsOf(IEnumerable<MeshWarning> warnings) =>
+        warnings.SelectMany(w => w.Other is null ? [w.Element] : new[] { w.Element, w.Other }).Distinct();
+
     private static double Severity(MeshWarning w) => w.Limit > 0 ? w.Measure / w.Limit : w.Measure;
 
-    private static (string Noun, string Wrong, string? Query) Says(MeshWarningKind kind) => kind switch
+    private static (string One, string Many, string? Query) Says(MeshWarningKind kind) => kind switch
     {
-        MeshWarningKind.OpenEdge => ("edges", "belong to only one face", "edges where open"),
-        MeshWarningKind.NonManifoldEdge => ("edges", "are shared by more than two faces", "edges where nonmanifold"),
-        MeshWarningKind.InconsistentWinding => ("edges", "have two faces crossing them in the same direction", null),
-        MeshWarningKind.NonPlanarFace => ("faces", "are not planar", "faces where non_planar"),
-        MeshWarningKind.UnusedVertex => ("vertices", "are used by no face", "vertices where unattached"),
-        MeshWarningKind.UvUnmapped => ("faces", "have no UVs, so they sample the texture's corner", null),
-        MeshWarningKind.UvFlipped => ("faces", "have flipped UVs, so the texture is mirrored on them", null),
-        MeshWarningKind.UvZeroArea => ("faces", "have UVs of zero area, so each is one smeared texel", null),
-        MeshWarningKind.UvOverlap => ("faces", "have UVs that overlap another face", null),
-        MeshWarningKind.MaterialNoEffect => ("materials", "set occlusion that has no effect without an occlusion_texture", null),
+        MeshWarningKind.OpenEdge => ("edge belongs to only one face", "edges belong to only one face", "edges where open"),
+        MeshWarningKind.NonManifoldEdge => ("edge is shared by more than two faces", "edges are shared by more than two faces", "edges where nonmanifold"),
+        MeshWarningKind.InconsistentWinding => ("edge has two faces crossing it in the same direction", "edges have two faces crossing them in the same direction", null),
+        MeshWarningKind.NonPlanarFace => ("face is not planar", "faces are not planar", "faces where non_planar"),
+        MeshWarningKind.UnusedVertex => ("vertex is used by no face", "vertices are used by no face", "vertices where unattached"),
+        MeshWarningKind.UvUnmapped => ("face has no UVs, so it samples the texture's corner", "faces have no UVs, so they sample the texture's corner", null),
+        MeshWarningKind.UvFlipped => ("face has flipped UVs, so the texture is mirrored on it", "faces have flipped UVs, so the texture is mirrored on them", null),
+        MeshWarningKind.UvZeroArea => ("face has UVs of zero area, so it is one smeared texel", "faces have UVs of zero area, so each is one smeared texel", null),
+        MeshWarningKind.UvOverlap => ("face has UVs that overlap another face", "faces have UVs that overlap another face", null),
+        MeshWarningKind.MaterialNoEffect => ("material sets occlusion that has no effect without an occlusion_texture", "materials set occlusion that has no effect without an occlusion_texture", null),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

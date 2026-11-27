@@ -11,12 +11,12 @@ public sealed class CheckTool(ModelStore store)
 {
     public const string Text =
         "Checks the current mesh's health: what is wrong by element id, what it measures, and what a game will make of it. Call it before you export or call a model done. "
-        + "Takes the optional argument mesh (the name of the mesh to check, which may be left out while the model has one mesh) and the optional targets; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
+        + "Takes the optional argument mesh (the name of the mesh to check, which may be left out while the model has one mesh), the optional targets and verbosity; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
         + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{...}}, the stats as the example shows. "
         + "ok is true when there are no problems and no warnings; notes never make it false. "
         + """Problems, each with its fix: inside-out (a closed shell wound the wrong way round, so a game culls it and it is invisible: reverse every face loop of that shell and call define_mesh again), coincident-vertices (two vertices at exactly the same position, so they z-fight: call define_mesh again with one vertex), duplicate-face (two faces with the same vertices, which z-fight: call define_mesh again without the extra face). With morph targets it is also checked at weight 1 against the rest mesh: target-flips-face, target-collapses-face, target-opens-mesh. """
         + "The optional targets, an object of target name to weight 0 to 1 as render takes, checks the mesh morphed to those weights. "
-        + "Warnings are the ones define_mesh and the edits report, plus the model's and the graph materials'. "
+        + "Warnings are the ones define_mesh and the edits report, plus the UV and material ones, the model's and the graph materials'. "
         + "To remove a vertex or a face, call delete, which keeps every id. "
         + "Notes: size in metres (1 unit = 1 m), the base (a prop stands on y = 0), the origin, more than one shell. "
         + "Worked example on define_mesh's unit cube:\n"
@@ -26,8 +26,8 @@ public sealed class CheckTool(ModelStore store)
 
     /// <summary>What left the description (T-207), in the same words: <c>help {"tool":"check"}</c> gives it.</summary>
     public const string Reference =
-        "Takes the optional argument mesh, the name of the mesh to check, which may be left out while the model has one mesh, and the optional targets; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
-        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume, uvs:{mapped, unmapped}}}. "
+        "Takes the optional argument mesh, the name of the mesh to check, which may be left out while the model has one mesh, the optional targets and verbosity; any other argument is a tool error. It changes nothing: the mesh, its ids and undo are as they were. With no mesh yet it is a tool error saying to call define_mesh or open. "
+        + "Returns JSON {ok, problems:[{check, element, message}], warnings:[\"element: message\"], notes:[], stats:{vertices, faces, edges, triangles, shells, closed, bounds:{min,max}, size:[x,y,z], area, volume, uvs:{mapped, unmapped}}}; at verbosity silent only {\"ok\":true} or {\"ok\":false}, check's own ok, and at full every warning one per line. "
         + "A shell is a set of faces joined by shared edges; shells[k] counts from the shell with the lowest face id. "
         + "Problems, with what each means for a game and the fix. "
         + "inside-out: a closed shell wound the wrong way round, so a game culls its faces and it is invisible. It is reported when the shell's signed volume is below -1e-6 times the cube of its bounds' diagonal, so a flat two-sided sheet, whose volume is rounding noise of either sign, is not. Reverse every face loop of that shell and call define_mesh again. "
@@ -38,11 +38,11 @@ public sealed class CheckTool(ModelStore store)
         + "target-collapses-face: a face with no area at weight 1 (below 1e-9 times the square of its bounds' diagonal) that has some at rest; "
         + "target-opens-mesh: two vertices at exactly the same position at rest, which coincident-vertices names, that are apart at weight 1, so the surface cracks. "
         + "The optional targets, an object of target name to weight 0 to 1 as render takes (a name no mesh has, or a weight outside 0 to 1, is a tool error), checks the mesh morphed to those weights: its stats and every other check are of that shape, while the target rules above still compare weight 1 with the rest mesh. "
-        + "Warnings, the same ones define_mesh and the edits report. "
+        + "Warnings, the same ones define_mesh and the edits report, then the UV and material ones only check gives; a kind past 3 is one line: count, worst, 3 ids, select query. "
         + "\"edge belongs to only one face\": an open edge, a hole; collision built from the mesh breaks later. "
         + "\"edge is shared by N faces\": a non-manifold edge, which breaks collision the same way; call define_mesh again without the extra face. "
         + "\"two faces cross this edge in the same direction\": inconsistent winding, so a face points the wrong way and is culled; reverse that face's loop and call define_mesh again. An edge with this warning and a non-manifold one usually means a duplicate face, not a flipped one. "
-        + "\"face is not planar\": a lifted corner, so the face folds along a diagonal the game chooses; move the vertex back onto the plane with move. On a smooth mesh (set_shading) it is a note, never a warning, so ok can be true; past 3 faces it is one line: count, worst, 3 ids, select query. "
+        + "\"face is not planar\": a lifted corner, so the face folds along a diagonal the game chooses; move the vertex back onto the plane with move. On a smooth mesh (set_shading) it is a note, never a warning, so ok can be true. "
         + "\"no face uses this vertex\": a stray that a game loads for nothing; call define_mesh again without it. "
         + "UV warnings, only for a mesh that has UVs on some face (a mesh with none gets none, and no uvs in stats; uvs counts the faces with and without UVs), each by face id. "
         + "\"no UVs, so the face samples the texture's corner\": the face is unmapped; project_uvs or unwrap it, or set_uvs it. "

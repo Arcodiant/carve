@@ -175,6 +175,36 @@ public sealed class VerbosityToolTests
         Assert.All(full.EnumerateArray(), w => Assert.DoesNotContain("e.g.", w.GetString()));
     }
 
+    /// <summary>unwrap is not a row of the theory (its full adds all, not warnings), so its silent is held here as the theory holds the rows'.</summary>
+    [Fact]
+    public async Task Unwrap_at_silent_makes_the_same_change_and_an_error_comes_back_whole()
+    {
+        var root = Directory.CreateTempSubdirectory("carve-unwrap-silent-").FullName;
+        try
+        {
+            async Task<(string Text, string Before, string After)> Run(string arguments)
+            {
+                var folder = Path.Combine(root, "run");
+                if (Directory.Exists(folder)) Directory.Delete(folder, true);
+                Directory.CreateDirectory(folder);
+                await using var carve = await Start(folder, ["define_mesh " + Squares]);
+                var before = await State(carve, folder);
+                var text = Text(await carve.CallToolAsync("unwrap", arguments));
+                return (text, before, await State(carve, folder));
+            }
+            var plain = await Run("{}");
+            var silent = await Run("""{"verbosity":"silent"}""");
+            Assert.Equal("""{"ok":true}""", silent.Text);
+            Assert.NotEqual(silent.Before, silent.After);
+            Assert.Equal(plain.After, silent.After);
+            Assert.Equal((await Run("""{"faces":[99]}""")).Text, (await Run("""{"faces":[99],"verbosity":"silent"}""")).Text);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     [Fact]
     public async Task Check_at_silent_answers_its_own_ok_on_a_broken_mesh()
     {
@@ -191,22 +221,51 @@ public sealed class VerbosityToolTests
         Assert.Contains("verbosity: expected \"silent\", \"summary\" or \"full\", got 2", Text(result));
     }
 
+    /// <summary>
+    /// full on the tools whose level matters, on a mesh with 798 open edges: each lists every edge, so a tool that drops its
+    /// level (and falls back to summary's grouped line) fails. export is the skinned path, whose lines are per mesh.
+    /// </summary>
     [Fact]
     public async Task Full_on_the_holed_cage_lists_every_open_edge()
     {
-        await using var carve = await Start(Path.GetTempPath(), []);
-        var cage = Path.Combine(Paths.RepoRoot, "samples", "arms-cage.carve");
-        foreach (var (tool, args) in new[] { ("open", JsonSerializer.Serialize(new { path = cage })), ("subdivide", """{"levels":1}"""), ("subdivide", """{"levels":1}""") })
-            Assert.False(IsError(await carve.CallToolAsync(tool, args)));
-        var faces = JsonSerializer.Serialize(Enumerable.Range(0, 200).Select(i => i * 2));
-
-        var deleted = JsonDocument.Parse(Text(await carve.CallToolAsync("delete", $$"""{"faces":{{faces}},"verbosity":"full"}"""))).RootElement;
-        var check = JsonDocument.Parse(Text(await carve.CallToolAsync("check", """{"verbosity":"full"}"""))).RootElement;
-        foreach (var body in new[] { deleted, check })
+        var folder = Directory.CreateTempSubdirectory("carve-full-").FullName;
+        try
         {
-            var lines = body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToList();
-            Assert.Equal(798, lines.Count(w => System.Text.RegularExpressions.Regex.IsMatch(w, @"^edges\[\d+-\d+\]: edge belongs to only one face$")));
-            Assert.DoesNotContain(lines, w => w.Contains(" edges belong to only one face"));
+            await using var carve = await Start(folder, []);
+            var cage = Path.Combine(Paths.RepoRoot, "samples", "arms-cage.carve");
+            foreach (var (tool, args) in new[] { ("open", JsonSerializer.Serialize(new { path = cage })), ("subdivide", """{"levels":1}"""), ("subdivide", """{"levels":1}""") })
+                Assert.False(IsError(await carve.CallToolAsync(tool, args)));
+            var faces = JsonSerializer.Serialize(Enumerable.Range(0, 200).Select(i => i * 2));
+
+            var calls = new (string Tool, string Arguments)[]
+            {
+                ("delete", $$"""{"faces":{{faces}},"verbosity":"full"}"""),
+                ("check", """{"verbosity":"full"}"""),
+                ("export", """{"path":"holed.glb","verbosity":"full"}"""),
+                ("save", """{"path":"holed.carve"}"""),
+                ("open", """{"path":"holed.carve","verbosity":"full"}"""),
+                ("move", """{"vertices":[0],"by":[0,0.001,0],"verbosity":"full"}"""),
+                ("undo", """{"verbosity":"full"}"""),
+            };
+            foreach (var (tool, arguments) in calls)
+            {
+                var result = await carve.CallToolAsync(tool, arguments);
+                Assert.False(IsError(result), $"{tool}: {Text(result)}");
+                if (tool == "save") continue;
+                // export answers text ("N warning(s): a; b"), the others JSON, so the lines are counted in the text; export's are per mesh.
+                var text = Text(result);
+                var pattern = (tool == "export" ? "mesh '[^']+': " : "") + @"edges\[\d+-\d+\]: edge belongs to only one face";
+                Assert.True(798 == System.Text.RegularExpressions.Regex.Count(text, pattern), $"{tool}: {text[..Math.Min(400, text.Length)]}");
+                Assert.DoesNotContain(" edges belong to only one face", text);
+            }
+
+            // At summary the skinned export groups per mesh, under its mesh's name, on real output.
+            var export = Text(await carve.CallToolAsync("export", """{"path":"holed2.glb"}"""));
+            Assert.Matches(@"mesh '[^']+': 798 edges belong to only one face: e\.g\. edges\[\d+-\d+\], edges\[\d+-\d+\], edges\[\d+-\d+\]; select edges where open names them", export);
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
         }
     }
 

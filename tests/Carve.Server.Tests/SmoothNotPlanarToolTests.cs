@@ -56,6 +56,21 @@ public sealed class SmoothNotPlanarToolTests() : FileToolTests("carve-smooth")
     }
 
     [Fact]
+    public async Task Export_of_a_flat_mesh_beside_a_smooth_one_warns_of_the_flat_mesh_s_faces()
+    {
+        // Ruling 2 is per mesh: the joined mesh export reports on is smooth if any mesh is, but a flat mesh still warns.
+        var (carve, _) = await StartAsync(null);
+        using var _c = carve;
+        Ok(await carve.CallToolAsync("define_mesh", Row(4).Insert(1, "\"name\":\"a\",")));
+        Ok(await carve.CallToolAsync("define_mesh", Row(1).Insert(1, "\"name\":\"b\",")));
+        Ok(await carve.CallToolAsync("set_shading", """{"mesh":"b","shading":"smooth"}"""));
+        var export = Ok(await carve.CallToolAsync("export", """{"path":"out/mixed.glb","verbosity":"full"}"""));
+        Assert.Equal(4, export.Split("face is not planar").Length - 1);
+        var grouped = Ok(await carve.CallToolAsync("export", """{"path":"out/mixed2.glb"}"""));
+        Assert.Contains("4 faces are not planar: worst faces[", grouped);
+    }
+
+    [Fact]
     public async Task Set_shading_changes_the_answer_either_way_and_a_subdivided_mesh_reads_ok()
     {
         var (carve, _) = await Start(1, false);

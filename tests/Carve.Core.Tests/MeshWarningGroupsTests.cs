@@ -74,12 +74,34 @@ public class MeshWarningGroupsTests
     }
 
     [Fact]
-    public void A_face_warned_twice_counts_once()
+    public void A_uv_overlap_counts_both_faces_of_each_pair_once()
     {
-        MeshWarning Overlap(int f, int g) => new(MeshWarningKind.UvOverlap, $"faces[{f}]", $"UVs overlap faces[{g}], so the two faces show the same texels");
         var line = Assert.Single(Lines(Overlap(3, 7), Overlap(3, 12), Overlap(7, 12), Overlap(12, 20), Overlap(20, 21)));
-        Assert.Equal("4 faces have UVs that overlap another face: e.g. faces[3], faces[7], faces[12]", line);
+        Assert.Equal("5 faces have UVs that overlap another face: e.g. faces[3], faces[7], faces[12]", line);
     }
+
+    [Fact]
+    public void One_face_overlapping_four_groups_on_the_five_faces()
+    {
+        var line = Assert.Single(Lines(Overlap(0, 1), Overlap(0, 2), Overlap(0, 3), Overlap(0, 4)));
+        Assert.Equal("5 faces have UVs that overlap another face: e.g. faces[0], faces[1], faces[2]", line);
+    }
+
+    [Fact]
+    public void Overlaps_among_three_faces_stay_listed()
+    {
+        MeshWarning[] warnings = [Overlap(0, 1), Overlap(0, 2), Overlap(1, 2)];
+        Assert.Equal(warnings.Select(w => w.ToString()), Lines(warnings));
+    }
+
+    [Fact]
+    public void A_note_of_one_face_is_singular()
+    {
+        Assert.StartsWith("1 face is not planar: worst faces[4]", MeshWarningGroups.SmoothNote([Planar(4)]));
+    }
+
+    private static MeshWarning Overlap(int f, int g) =>
+        new(MeshWarningKind.UvOverlap, $"faces[{f}]", $"UVs overlap faces[{g}], so the two faces show the same texels", Other: $"faces[{g}]");
 
     [Fact]
     public void Two_kinds_group_each_where_its_first_warning_stood_and_a_short_kind_stays_listed()

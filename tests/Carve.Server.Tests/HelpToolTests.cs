@@ -145,7 +145,9 @@ public class HelpToolTests : FileToolTests
         Assert.Equal("help: there is no topic 'nonesuch'; the topics are warnings", TextOf(await carve.CallToolAsync("help", """{"topic":"nonesuch"}""")));
         var entries = string.Join(", ", carve::Carve.Server.HelpTool.Tools);
         Assert.Equal($"help: give tool or topic, not both; the entries are {entries}; the topics are warnings", TextOf(await carve.CallToolAsync("help", """{"tool":"check","topic":"warnings"}""")));
-        Assert.Contains("topic: expected a string", TextOf(await carve.CallToolAsync("help", """{"topic":3}""")));
+        var nonString = TextOf(await carve.CallToolAsync("help", """{"topic":3}"""));
+        Assert.Contains("topic: expected a string", nonString);
+        Assert.EndsWith("; the topics are warnings", nonString);
         Assert.True(IsError(await carve.CallToolAsync("help", """{"topic":"nonesuch"}""")));
         Assert.True(IsError(await carve.CallToolAsync("help", """{"tool":"check","topic":"warnings"}""")));
     }

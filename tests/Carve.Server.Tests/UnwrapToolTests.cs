@@ -87,13 +87,12 @@ public sealed class UnwrapToolTests
     [Fact]
     public async Task Summary_counts_the_islands_and_lists_the_five_largest_and_full_adds_every_one()
     {
-        // 8 islands: a strip of 7 two-face blocks and one single, cut by seams on every vertical edge between them.
+        // 8 islands: separate strips of 1 to 4 quads, a gap between each, so no seams are needed.
         using var carve = new ToolHarness();
         await carve.InitializeAsync();
         var vertices = new List<int[]>();
         var faces = new List<int[]>();
         int[] sizes = [1, 3, 2, 3, 1, 4, 2, 1];
-        var seams = new List<int[]>();
         var x = 0;
         foreach (var n in sizes)
         {
@@ -112,6 +111,13 @@ public sealed class UnwrapToolTests
         var full = Ok(await carve.CallToolAsync("unwrap", """{"verbosity":"full"}"""));
         var all = full.GetProperty("all").EnumerateArray().ToArray();
         Assert.Equal(8, all.Length);
+        // Each entry of all is an island in the same form as largest's, with every field, and largest's are the same entries.
+        string[] fields = ["faces", "lowest_face", "rect", "stretch", "flipped"];
+        Assert.All(all, i => Assert.All(fields, f => Assert.True(i.TryGetProperty(f, out _), $"{f} missing from {i}")));
+        Assert.All(all, i => Assert.Equal(full.GetProperty("largest")[0].EnumerateObject().Select(p => p.Name), i.EnumerateObject().Select(p => p.Name)));
+        Assert.Equal(sizes.OrderBy(n => n).Sum(), all.Sum(i => i.GetProperty("faces").GetInt32()));
+        foreach (var island in summary.GetProperty("largest").EnumerateArray())
+            Assert.Equal(island.GetRawText(), all.Single(i => i.GetProperty("lowest_face").GetInt32() == island.GetProperty("lowest_face").GetInt32()).GetRawText());
         Assert.Equal(all.Select(i => i.GetProperty("lowest_face").GetInt32()).Order(), all.Select(i => i.GetProperty("lowest_face").GetInt32()));
         Assert.Equal(summary.GetProperty("flipped").GetInt32(), all.Sum(i => i.GetProperty("flipped").GetInt32()));
         var worst = all.OrderByDescending(i => i.GetProperty("stretch").GetDouble()).ThenBy(i => i.GetProperty("lowest_face").GetInt32()).First();

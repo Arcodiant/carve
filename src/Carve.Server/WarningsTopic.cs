@@ -8,7 +8,7 @@ namespace Carve.Server;
 public static class WarningsTopic
 {
     public const string Text =
-        "Warnings, the same ones define_mesh and the edits report. A warning says what a game will make of the mesh and how to fix it; ok is false while there is any, and notes never make it false.\n"
+        "Warnings. The mesh warnings are the ones define_mesh, open and the edits report; the UV, material, model and graph material warnings only check gives. A warning says what a game will make of the mesh and how to fix it; ok is false while there is any, and notes never make it false.\n"
         + "\n"
         + "Mesh warnings, by kind (the heading is the kind's name; each warning is by element id):\n"
         + "OpenEdge: \"edge belongs to only one face\" (a hole; collision built from the mesh breaks later). Fix: close the hole with define_mesh, extrude or bridge. Names them all: select edges where open.\n"
@@ -21,9 +21,10 @@ public static class WarningsTopic
         + "UvFlipped: \"UVs flipped, so the texture is mirrored on the face\". Fix: set_uvs, or project_uvs again.\n"
         + "UvZeroArea: \"UVs of zero area, so the face is one smeared texel\". Fix: project_uvs or unwrap it, or set_uvs corners that span an area.\n"
         + "UvOverlap: \"UVs overlap faces[m], so the two faces show the same texels\" (painting one paints the other; each pair is listed once, under the lower id; sharing an edge is not an overlap; faces whose two materials differ are not warned of). Fix: unwrap, which separates islands; mirrored halves sharing a texture area are deliberate, so read the pair first.\n"
+        + "Material warning, for a material the mesh uses, with UVs or without:\n"
         + "MaterialNoEffect: \"occlusion is 0.5 but the material has no occlusion_texture, so it has no effect (glTF scales only the map)\", by material. Fix: give the material an occlusion_texture with define_material, or leave the strength at 1.\n"
         + "\n"
-        + "Model warnings, which check adds: a part leaving its envelope (move the part or widen the envelope with define_part); an occlusion strength other than 1 with no occlusion_texture does nothing (give the texture or leave it at 1).\n"
+        + "Model warnings, which check adds: a part leaving its envelope (move the part or widen the envelope with define_part).\n"
         + "Graph material warnings, by material (materials['iron'].base_colour_texture): each graph slot of a material the mesh uses that cannot be baked as the model is now, in the words render gives (a missing graph file, a fault in the graph naming its node, an output the graph lacks or the slot cannot take), and for a graph that reads the mesh, no UVs, UVs that overlap, a mesh_mask naming a group or material the mesh lacks, and \"faces[2, 3] of 'barrel' are unmapped, so 'iron' bakes nothing onto them\". Fix the graph file or define_material again, or give the mesh UVs that do not overlap. check casts no rays and evaluates no graph, so it is quick.\n"
         + "Export's limit warnings and the clip warnings are in those tools' own entries.\n"
         + "\n"
