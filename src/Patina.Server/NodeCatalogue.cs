@@ -21,6 +21,7 @@ public static class NodeCatalogue
         ["levels"] = "remaps in_low..in_high to out_low..out_high with gamma, clamped; out_low above out_high inverts; greyscale or colour in, the same out",
         ["blend"] = "combines a and b by mode at opacity; colour if either input is (grey spread to grey); in mix the mask takes a where it is 0 and b where it is 1; difference is |a - b|, so a noise against a flat colour at a level is dark in a thin line where the noise crosses it (veins, cracks: levels it to widen or invert)",
         ["height_to_normal"] = "a tangent-space normal (glTF: green up) from a greyscale height, strength the slope per image width at height 1, wrapping at the edges",
+        ["normal_blend"] = "a detail normal laid over a base normal by reoriented normal mapping: the detail is turned into the base's frame, so a bump on a bevel keeps its tilt (adding the x and y would flatten it). base and detail are colour normals in -1..1 as height_to_normal gives them; strength 0..1 moves the detail toward flat, so 0 is the base; the result is unit length",
         ["tiles"] = "a layout of tiles or bricks across the image, every size relative: count [x, y] tiles; stagger shifts every second row by that many tiles (0.5 is running bond); gap and bevel are parts of a tile's width (gap 0 to 0.45; the bevel is the ramp inside each edge); jitter moves each tile's size and place by the hash, inside its slot; orientation rows or columns. Outputs: mask (1 on a tile, 0 in the gap), height (0 in the gap, rising over the bevel to 1), random (one value per tile), uv (colour: each texel's place in its tile, red and green 0..1, for a pattern laid inside each tile)",
         ["stripes"] = "greyscale stripes, 1 on a stripe: count whole stripes across the image, axis u (upright stripes), v (lying stripes) or diagonal (count along each axis), width a part of a period, softness the edge ramp's reach each side of the edge as a part of a period (the ramp is twice it); a stripe is centred on each multiple of 1/count",
         ["shape"] = "greyscale, one shape per cell of count [x, y] cells, 1 inside: kind circle, square, ring, diamond or polygon (sides 3 to 12), size the part of the cell's shorter side it spans, softness 0..1 the ramp inward from the edge, rotation in degrees inside the cell",
@@ -50,6 +51,7 @@ public static class NodeCatalogue
         ["levels"] = "remap a range",
         ["blend"] = "combine two by a mode",
         ["height_to_normal"] = "a normal from a height",
+        ["normal_blend"] = "a bump over a normal",
         ["tiles"] = "tiles or bricks",
         ["stripes"] = "stripes",
         ["shape"] = "a shape per cell",
@@ -79,6 +81,9 @@ public static class NodeCatalogue
 
     public const string WorkedNormal =
         """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"layout":{"type":"tiles","params":{"count":[4,4],"gap":0.05,"bevel":0.15}},"bump":{"type":"height_to_normal","inputs":{"height":"layout.height"},"params":{"strength":2}},"out":{"type":"output","inputs":{"in":"bump"},"params":{"role":"normal"}}}}}""";
+
+    public const string WorkedNormalBlend =
+        """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"layout":{"type":"tiles","params":{"count":[4,4],"gap":0.05,"bevel":0.15}},"bevel":{"type":"height_to_normal","inputs":{"height":"layout.height"},"params":{"strength":2}},"grain":{"type":"fbm","params":{"cells":[16,16]}},"bump":{"type":"height_to_normal","inputs":{"height":"grain"},"params":{"strength":0.1}},"both":{"type":"normal_blend","inputs":{"base":"bevel","detail":"bump"},"params":{"strength":0.8}},"out":{"type":"output","inputs":{"in":"both"},"params":{"role":"normal"}}}}}""";
 
     public const string WorkedStripes =
         """{"graph":{"version":1,"size":256,"seed":0,"nodes":{"weft":{"type":"stripes","params":{"count":16,"axis":"v","width":0.4,"softness":0.2}},"out":{"type":"output","inputs":{"in":"weft"},"params":{"role":"base_colour"}}}}}""";
@@ -120,6 +125,7 @@ public static class NodeCatalogue
         "gradient" => [("two triangle ramps down v", WorkedGradient, Evaluates(2))],
         "levels" => [("noise narrowed and lifted into a roughness of 0.5 to 0.9", WorkedLevels, Evaluates(3))],
         "height_to_normal" => [("a normal from a tile layout's bevelled height", WorkedNormal, Evaluates(3))],
+        "normal_blend" => [("an fbm bump laid over the bevels of a tile layout, both made by height_to_normal", WorkedNormalBlend, Evaluates(6))],
         "tiles" => [("a running-bond brick layout, 4 bricks across and 8 rows, every second row shifted half a brick, its height as the base colour (a type with several outputs is named \"id.port\")", DefineGraphTool.WorkedTiles, DefineGraphTool.WorkedTilesResult)],
         "stripes" => [("16 soft lying stripes", WorkedStripes, Evaluates(2))],
         "shape" => [("a 6 x 6 grid of soft round studs", WorkedShape, Evaluates(2))],

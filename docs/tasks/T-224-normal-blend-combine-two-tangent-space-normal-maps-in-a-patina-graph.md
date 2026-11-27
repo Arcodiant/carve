@@ -12,7 +12,7 @@ description: >-
 
 **Batch:** — (standalone)
 
-**Depends on:** — (none)
+**Depends on:** [T-240](T-240-image-read-a-png-into-a-patina-graph.md)
 
 ## Goal
 

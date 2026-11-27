@@ -343,7 +343,9 @@ range, default) and a worked example; `nodes {"type":"tiles"}` gives one.
   `difference`, `min`, `max`; `difference` against a flat level draws a thin
   line where a noise crosses it), `warp` (domain warp), `blur`, `gradient_map`,
   `transform` (offset, tile, mirror, free rotation and scale), `distance` (from
-  a mask's edge) and `height_to_normal`.
+  a mask's edge), `height_to_normal` and `normal_blend` (a detail normal laid
+  over a base normal by reoriented normal mapping, so a bump keeps its tilt on a
+  bevel; `strength` 0 to 1 fades the detail).
 - Structure: `output` (one per role), `input` (an image input of a graph used
   as a node) and `graph` (another `.texgraph` used as one node).
 

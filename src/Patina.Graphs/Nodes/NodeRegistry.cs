@@ -17,6 +17,7 @@ public sealed class NodeRegistry
         new LevelsNode(),
         new BlendNode(),
         new HeightToNormalNode(),
+        new NormalBlendNode(),
         new TilesNode(),
         new StripesNode(),
         new ShapeNode(),
