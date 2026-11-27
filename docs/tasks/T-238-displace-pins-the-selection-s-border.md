@@ -4,7 +4,7 @@ description: >-
 ---
 # T-238 — displace pins the selection's border
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
