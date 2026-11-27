@@ -6,7 +6,9 @@ namespace Carve.Core;
 /// The warnings as lines of text, one line per kind past <see cref="ListedLimit"/> (the person's ruling, 2026-11-24, which
 /// replaced T-72's "Name 10, fold the rest"). A kind with 1 to 3 warnings is listed one per line as the warnings say it; a kind
 /// with more is one line where its first warning stood: the count, the worst case where the kind measures one, three samples
-/// (the lowest ids), and the <c>select</c> query that names them all where <c>select</c> has the predicate.
+/// (the lowest ids), and the <c>select</c> query that names them all where <c>select</c> has the predicate. Grouping is decided
+/// by the warnings, so a UV overlap is decided by its pairs (one warning each), while its grouped line counts and samples the
+/// faces involved, both faces of each pair, distinct (the ruling of 2026-11-27, RV-92).
 /// </summary>
 public static class MeshWarningGroups
 {
@@ -19,14 +21,12 @@ public static class MeshWarningGroups
     public static IReadOnlyList<string> Lines(IReadOnlyList<MeshWarning> warnings)
     {
         var groups = warnings.GroupBy(w => w.Kind).ToDictionary(g => g.Key, g => g.ToList());
-        // Grouping is decided on the count the line reports: the elements, both faces of each UV overlap.
-        var counts = groups.ToDictionary(g => g.Key, g => ElementsOf(g.Value).Count());
         var lines = new List<string>(warnings.Count);
         var done = new HashSet<MeshWarningKind>();
         foreach (var w in warnings)
         {
             var kind = groups[w.Kind];
-            if (counts[w.Kind] <= ListedLimit) lines.Add(w.ToString());
+            if (kind.Count <= ListedLimit) lines.Add(w.ToString());
             else if (done.Add(w.Kind)) lines.Add(Grouped(w.Kind, kind));
         }
         return lines;
