@@ -4,7 +4,7 @@ description: >-
 ---
 # M-41 — Wear on hard surfaces
 
-**Status:** Planned
+**Status:** Active
 
 **One-liner:** *Roughen part of a sharp-edged mesh in three calls (define_group, tessellate, displace) without rounding it or bending the faces around it*
 
