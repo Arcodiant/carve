@@ -68,10 +68,9 @@ public static class GraphValidator
     public static string? Resolve(TextureGraph graph, string path)
     {
         if (!ParamSpec.IsRelativePath(path)) return null;
-        var text = path;
         try
         {
-            return Path.GetFullPath(Path.Combine(graph.Folder ?? Directory.GetCurrentDirectory(), text));
+            return Path.GetFullPath(Path.Combine(graph.Folder ?? Directory.GetCurrentDirectory(), path));
         }
         catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
         {
