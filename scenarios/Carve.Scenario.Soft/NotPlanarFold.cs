@@ -15,7 +15,7 @@ public static partial class NotPlanarFold
     [GeneratedRegex(@"mesh '(?<mesh>[^']+)': (?<n>\d+) faces are not planar: worst faces\[(?<worst>\d+)\], [^;]+ off its plane \(limit [^;)]+\); e\.g\. faces\[(?<a>\d+)\], faces\[(?<b>\d+)\], faces\[(?<c>\d+)\]; select faces where non_planar names them")]
     private static partial Regex GroupLine();
 
-    [GeneratedRegex(@"^(?<n>\d+) faces are not planar: worst faces\[(?<worst>\d+)\], [^;]+ off its plane \(limit [^;)]+\); e\.g\. [^;]+; select faces where non_planar names them; expected on a smooth mesh, which export triangulates$")]
+    [GeneratedRegex(@"^(?<n>\d+) (?:faces are|face is) not planar: worst faces\[(?<worst>\d+)\], [^;]+ off its plane \(limit [^;)]+\); e\.g\. [^;]+; select faces where non_planar names them; expected on a smooth mesh, which export triangulates$")]
     private static partial Regex SmoothNote();
 
     [GeneratedRegex(@"^mesh '(?<mesh>[^']+)': faces\[(?<face>\d+)\]: face is not planar: ")]
