@@ -233,6 +233,22 @@ public sealed class ImageNodeTests : IDisposable
     }
 
     [Fact]
+    public void Files_does_not_decode_a_large_png()
+    {
+        // RV-95: a 4096 grey PNG decodes to 64 MiB of RGBA; listing it allocates next to nothing, validating it all of that.
+        File.WriteAllBytes(Path.Combine(_dir, "big.png"), TestPng.Make(4096, 4096, 0, new byte[4096 * 4096], _ => 0));
+        var read = TexGraphFile.Read("""{ "version": 2, "size": 32, "seed": 0, "nodes": { "t": { "type": "image", "params": { "path": "big.png" } }, "o": { "type": "output", "inputs": { "in": "t" } } } }""", folder: _dir);
+        long Allocated(Action run)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            run();
+            return GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+        Assert.InRange(Allocated(() => GraphValidator.Files(read.Graph!)), 0, 16L << 20);
+        Assert.InRange(Allocated(() => GraphValidator.Validate(read.Graph!)), 64L << 20, long.MaxValue);
+    }
+
+    [Fact]
     public void Files_lists_a_png_without_decoding_it()
     {
         // RV-94: carve asks for the files on every render, so Files only lists a PNG; a damaged one is listed, and its fault is validation's.

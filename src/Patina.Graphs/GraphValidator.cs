@@ -47,7 +47,7 @@ public static class GraphValidator
     /// <summary>
     /// Every file validation reads (T-240), all levels down, each once, in the order read: each <c>graph</c> node's
     /// nested files, then each <c>image</c> node's PNG (a nested graph's among its files). carve's bake hashes them, and
-    /// open names them. A PNG is listed when it is there, and not decoded (RV-94: carve asks on every render).
+    /// open names them. A PNG is listed when it is there, never read or decoded (RV-94: carve asks on every render), so one that is there but cannot be read is listed though validation faults it.
     /// </summary>
     public static IReadOnlyList<string> Files(TextureGraph graph, NodeRegistry? registry = null) =>
         [.. Analyse(graph, registry ?? NodeRegistry.BuiltIn, [], 0, new NodeBudget(graph.Nodes.Count) { ListOnly = true })

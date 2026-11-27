@@ -61,7 +61,7 @@ public static class GraphSlotBake
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                throw new GraphSlotException($"the graph file '{file}' cannot be read: {e.Message}");
+                throw new GraphSlotException($"the {(IsGraphFile(file) ? "graph" : "image")} file '{file}' cannot be read: {e.Message}");
             }
             // Relative to the top file's folder (RV-82): the nesting is in the key, the folder's place is not.
             hash.AppendData(Encoding.UTF8.GetBytes(Path.GetRelativePath(folder, Path.GetFullPath(file)) + "\n" + bytes.Length + "\n"));
