@@ -49,6 +49,8 @@ internal sealed class TessellateStage : ICutsStage
 
     private static readonly float[] Steps = [0.13f, 0.38f, 0.63f, 0.88f, 1.12f, 1.37f, 1.62f, 1.87f];
 
+    private static readonly float[] Other = [0.25f, 0.5f, 0.75f, 1.25f, 1.5f, 1.75f];
+
     private static readonly (string Name, Vector3 At)[] Probes =
     [
         .. Grid("the front (z = 0.2)", Steps, (u, v) => new Vector3(u, v, 0.2f)),
@@ -119,5 +121,28 @@ internal sealed class TessellateStage : ICutsStage
             if (full.Off > 10 && part.Off > 10)
                 Note($"{wire.Name}: the piece edge {lo}-{hi}, {from} to {to}: the closest pixel to {Edge} or {ThreeQuarters} is {full.P} at ({full.X}, {full.Y})");
         }
+
+        // T-238: the front's group displaced with pin_border, along z so the bumps show from the front: the faces outside it
+        // are held where they were, and the front's own border points with them.
+        var worn = await CallJsonAsync(driver, "displace", new { source = new { noise = new { seed = 3, scale = 0.4, octaves = 3 } }, amount = 0.12, axis = new[] { 0, 0, 1 }, group = "wear", pin_border = true });
+        Equal("displace: closed", true, worn.GetProperty("closed").GetBoolean());
+        var after = await Solid.ReadAsync(driver);
+        var inside = pieces.ToHashSet();
+        var held = Enumerable.Range(0, cut.Faces.Length).Where(f => !inside.Contains(f)).SelectMany(f => cut.Faces[f].Loop).ToHashSet();
+        var free = Enumerable.Range(0, cut.Vertices.Length).Where(v => !held.Contains(v)).ToArray();
+        foreach (var v in held) Equal($"displace: border vertex {v} unmoved", cut.Vertices[v], after.Vertices[v]);
+        Equal("displace: vertices moved", free.Count(v => after.Vertices[v] != cut.Vertices[v]), worn.GetProperty("moved").GetProperty("count").GetInt32());
+        True("displace: some inside vertex moved", free.Any(v => after.Vertices[v] != cut.Vertices[v]));
+        True("displace: largest within amount / 2", worn.GetProperty("largest").GetDouble() is > 0 and <= 0.0601);
+        for (var f = 0; f < cut.Faces.Length; f++)
+            if (!inside.Contains(f)) SameList($"displace: faces[{f}] corners kept", cut.Faces[f].Loop.Select(v => $"{v}"), after.Faces[f].Loop.Select(v => $"{v}"));
+
+        var wornWire = await driver.CaptureAsync("tessellate-slab-worn", new { direction = Front, mode = "wireframe" });
+        Caption(wornWire, $"512x512, direction (0.6, 0.35, 1), wireframe, pinned, {after.Vertices.Length} vertices");
+        Size(wornWire, 512, 512);
+        Corners(wornWire);
+        // The faces round the front are unmoved, so their probes still hold; the front's own are not asked about.
+        Look(wornWire, camera, after, [.. Probes.Where(p => !p.Name.StartsWith("the front") && !p.Name.StartsWith("the socket")),
+            .. Grid("the top (y = 2)", Other, (u, v) => new Vector3(u, 2, v / 10)), .. Grid("the right (x = 2)", Other, (u, v) => new Vector3(2, u, v / 10))], _ => Fill, [], "the worn slab, the faces round the front unmoved");
     }
 }

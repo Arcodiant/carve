@@ -24,6 +24,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         + "Or {noise: {seed, scale, octaves}}: seeded 3D gradient noise summed over octaves (1 to 8, default 4; each twice the detail at half the strength) at the vertex's position in the mesh's own coordinates, scale the size in metres of the largest bumps (default 1), seed a whole number from -2147483648 to 2147483647 (default 0); it needs no UVs and has no seams, and the same arguments always give the same positions. "
         + "amount is in metres and may be negative (dents instead of bumps); midlevel (0 to 1, default 0.5) is the height that does not move; axis [x, y, z], when given, replaces every normal with that one direction (for terrain). "
         + "Give vertices, faces (every corner) or group (a face group from define_group) to displace part of the mesh, or none of them for every vertex. "
+        + "pin_border (boolean, default false), with faces or group, leaves every vertex that is also a corner of a face outside them where it is, so the faces round a worn patch stay flat and unmoved and the patch's edge stays crisp; with vertices, or with no selection, it is an error (there is no border), and moved and largest count only the vertices that moved. "
         + "Ids, faces, UVs, groups, colours and weights are kept; only positions change. A vertex with no normal (on no face, or its faces facing opposite ways) stays without axis, and a warning names it. "
         + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[], moved: the vertices moved, {count, first: the first 10 ids, ascending} at the default summary verbosity and the whole ascending id list at full, largest: the largest offset in metres}; "
         + "a kind of warning past 3 is one line, as in every report, and a warning says when the mesh is too coarse for the source to show (fewer than two vertices to a bump). "
@@ -53,6 +54,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
                 ["minItems"] = 3,
                 ["maxItems"] = 3,
             },
+            ["pin_border"] = new JsonObject { ["description"] = "With faces or group: a vertex also on a face outside them does not move; default false.", ["type"] = "boolean" },
             ["vertices"] = new JsonObject { ["description"] = "Vertex ids to displace.", ["type"] = "array", ["items"] = new JsonObject { ["type"] = "integer" } },
             ["faces"] = new JsonObject { ["description"] = "Face ids whose corners to displace.", ["type"] = "array", ["items"] = new JsonObject { ["type"] = "integer" } },
             ["group"] = new JsonObject { ["description"] = "A face group from define_group whose corners to displace.", ["type"] = "string" },
@@ -62,10 +64,10 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? source = null, JsonElement? amount = null,
         JsonElement? midlevel = null, JsonElement? axis = null, JsonElement? vertices = null, JsonElement? faces = null,
-        JsonElement? group = null, JsonElement? mesh = null, JsonElement? verbosity = null)
+        JsonElement? group = null, JsonElement? pin_border = null, JsonElement? mesh = null, JsonElement? verbosity = null)
     {
         const string tool = "displace";
-        var errors = UnknownArguments(tool, context, "source", "amount", "midlevel", "axis", "vertices", "faces", "group", "mesh", "verbosity");
+        var errors = UnknownArguments(tool, context, "source", "amount", "midlevel", "axis", "vertices", "faces", "group", "pin_border", "mesh", "verbosity");
         var level = ReadVerbosity(verbosity, errors);
         var name = MeshName(mesh, errors);
         var by = Number("amount", amount, errors);
@@ -73,6 +75,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         Vector3? direction = Absent(axis) ? null : Vec3("axis", axis, errors);
         var v = Ids("vertices", vertices, errors);
         var f = Ids("faces", faces, errors);
+        var pin = OptionalBool("pin_border", pin_border, errors);
         var groupName = OptionalString("group", group, errors);
         if (groupName is not null && (v is not null || f is not null)) errors.Add("group: give group, or vertices and faces, not both");
         var from = Source(source, errors);
@@ -90,7 +93,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
                 if (chosen is null) noGroup = NoGroup(m.Style, groupName);
             }
             // An unknown group is refused below; an empty face list makes the Core refuse without trying the edit.
-            return Displacement.Displace(m, v, from!, by!.Value, mid, direction, out report, noGroup is null ? chosen : []);
+            return Displacement.Displace(m, v, from!, by!.Value, mid, direction, out report, noGroup is null ? chosen : [], pin);
         }, out var result, out var problem);
         if (problem is not null) return Failed(tool, [problem]);
         if (noGroup is not null) return Failed(tool, [noGroup]);
