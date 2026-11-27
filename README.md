@@ -429,8 +429,11 @@ export writes it. The rules:
 its swatch sheet in a folder of its name: `planks`, `cobblestones`, `bricks`
 (with mortar, tint and jitter exposed; `bricks/variants/grey/` is its grey stone
 variant), `fabric`, `marble` (veins by `blend`'s `difference`), `painted-metal`,
-`floor-tiles`, `grime` (a filter graph with an `input`) and `old-wall` (the
-bricks and the grime used as `graph` nodes).
+`floor-tiles`, `grime` (a filter graph with an `input`), `old-wall` (the
+bricks and the grime used as `graph` nodes) and `bevelled-slabs` (a stone bump
+laid by `normal_blend` over a bevel normal baked by carve's `bake`, read by an
+`image` node from `bakes/slabs.normal.png`; `bakes/slabs.carve` is the 4 x 4
+slabs it was baked from, `bake` `normal` at 256 with `bevel.width` 0.02).
 `weathered-iron` and `weathered-staves` read the mesh (`mesh_curvature`, `mesh_occlusion`,
 `mesh_mask`, `mesh_position`): patina has no mesh, so it evaluates those nodes on neutral
 stand-ins (curvature 0.5, occlusion 1, mask 1, position `#808080`) and says so in `get_graph`,

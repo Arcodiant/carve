@@ -4,7 +4,8 @@
   "seed": 224,
   "nodes": {
     "base_out": { "type": "output", "inputs": { "in": "stone" }, "params": { "role": "base_colour" } },
-    "bevel": { "type": "image", "params": { "kind": "normal", "path": "bakes/slabs.normal.png" } },
+    "bake": { "type": "image", "params": { "kind": "normal", "path": "bakes/slabs.normal.png" } },
+    "bevel": { "type": "transform", "inputs": { "in": "bake" }, "params": { "offset": [0.125, 0.125] } },
     "bump": { "type": "height_to_normal", "inputs": { "height": "grain" }, "params": { "strength": 0.08 } },
     "grain": { "type": "fbm", "params": { "basis": "gradient", "cells": [8, 8], "octaves": 5, "seed": 7 } },
     "mottle": { "type": "fbm", "params": { "basis": "value", "cells": [4, 4], "octaves": 3, "seed": 3 } },
