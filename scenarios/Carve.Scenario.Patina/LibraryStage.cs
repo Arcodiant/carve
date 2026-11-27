@@ -35,6 +35,7 @@ internal sealed class LibraryStage : IPatinaStage
         new("floor-tiles", "floor-tiles.texgraph", "floor-tiles", null, 2),
         new("old-wall", "old-wall.texgraph", "old-wall", null, 2),
         new("grime", "grime.texgraph", "grime", null, 2),
+        new("bevelled-slabs", "bevelled-slabs.texgraph", "bevelled-slabs", null, 2),
     ];
 
     private enum Kind { Plain, RoughnessOnly, MetallicOnly }

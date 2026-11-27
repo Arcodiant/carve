@@ -51,7 +51,7 @@ public class GraphFaultTests
 
     [Fact]
     public void AnUnknownTypeListsTheTypes() =>
-        Find("a", null, null, "unknown type 'nosie'; the types are blend, blur, box5, colour, distance, fbm, gradient, gradient_map, graph, hash, height_to_normal, image, input, levels, noise, output, shape, split, stripes, tiles, transform, warp, worley");
+        Find("a", null, null, "unknown type 'nosie'; the types are blend, blur, box5, colour, distance, fbm, gradient, gradient_map, graph, hash, height_to_normal, image, input, levels, noise, normal_blend, output, shape, split, stripes, tiles, transform, warp, worley");
 
     [Fact]
     public void AnUnknownParameterListsTheTypesParameters() => Find("b", null, "shade", "its parameters are colour");
