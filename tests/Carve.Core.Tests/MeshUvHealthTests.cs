@@ -111,6 +111,14 @@ public class MeshUvHealthTests
     private static PolygonMesh Overlapping(Func<FaceStyle, FaceStyle> style)
         => Mapped((0, Unflipped(0, 0, 1, 1)), (1, Unflipped(0, 0, 1, 1))).WithStyle(style(FaceStyle.None));
 
+    // RV-92: the grouped line counts both faces of each pair through Other, which ToString leaves out.
+    [Fact]
+    public void An_overlap_names_the_higher_face_as_its_other()
+    {
+        var overlap = Assert.Single(MeshHealth.Create(Overlapping(s => s)).Warnings, w => w.Kind == MeshWarningKind.UvOverlap);
+        Assert.Equal(("faces[0]", "faces[1]"), (overlap.Element, overlap.Other));
+    }
+
     // T-80's ruling 5: faces with different materials are not warned of, even were their materials to share a PNG.
     [Fact]
     public void An_overlap_between_two_different_materials_is_not_warned_of()

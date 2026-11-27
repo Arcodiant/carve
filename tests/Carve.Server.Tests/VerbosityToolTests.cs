@@ -269,6 +269,35 @@ public sealed class VerbosityToolTests
         }
     }
 
+    /// <summary>
+    /// RV-92: full on the theory's rows for the tools RV-92 names, each with four vertices no face uses
+    /// added to its start mesh (ids 8 to 11, after the rows' own), so a tool that drops its level returns the grouped line.
+    /// </summary>
+    [Fact]
+    public async Task Full_lists_four_unused_vertices_one_per_line_on_each_report_tool()
+    {
+        const string Strays = ",[0.2,0.2,0.5],[0.4,0.2,0.5],[0.6,0.2,0.5],[0.8,0.2,0.5]],\"faces\"";
+        static string WithStrays(string s) => s.Replace("[0,1,1]],\"faces\"", "[0,1,1]" + Strays);
+        string[] tools = ["define_mesh", "extrude", "merge_faces", "bridge", "knife", "loop_cut", "plane_cut", "project_uvs", "set_uvs"];
+        var seen = 0;
+        foreach (ITheoryDataRow row in Tools)
+        {
+            var data = row.GetData();
+            if (!tools.Contains((string)data[0]!)) continue;
+            seen++;
+            var tool = (string)data[0]!;
+            await using var carve = await Start(Path.GetTempPath(), [.. ((string[])data[1]!).Select(WithStrays)]);
+            var result = await carve.CallToolAsync(tool, With(WithStrays((string)data[2]!), "full"));
+            var text = Text(result);
+            Assert.False(IsError(result), $"{tool}: {text}");
+            Assert.DoesNotContain("e.g.", text);
+            // project_uvs and set_uvs answer with no mesh report, so full has no warnings to list (or to group) at all.
+            if (tool is "project_uvs" or "set_uvs") { Assert.DoesNotContain("warning", text); continue; }
+            Assert.True(4 == System.Text.RegularExpressions.Regex.Count(text, @"vertices\[\d+\]: no face uses this vertex"), $"{tool}: {text}");
+        }
+        Assert.Equal(tools.Length, seen);
+    }
+
     [Fact]
     public async Task Every_tool_has_verbosity_or_is_a_reader()
     {

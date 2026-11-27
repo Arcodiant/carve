@@ -94,6 +94,22 @@ public class MeshWarningGroupsTests
         Assert.Equal(warnings.Select(w => w.ToString()), Lines(warnings));
     }
 
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Two_or_three_disjoint_overlapping_pairs_stay_listed(int pairs)
+    {
+        var warnings = Enumerable.Range(0, pairs).Select(p => Overlap(2 * p, 2 * p + 1)).ToArray();
+        Assert.Equal(warnings.Select(w => w.ToString()), Lines(warnings));
+    }
+
+    [Fact]
+    public void Four_disjoint_overlapping_pairs_group_on_their_eight_faces()
+    {
+        var line = Assert.Single(Lines(Overlap(0, 1), Overlap(2, 3), Overlap(4, 5), Overlap(6, 7)));
+        Assert.Equal("8 faces have UVs that overlap another face: e.g. faces[0], faces[1], faces[2]", line);
+    }
+
     [Fact]
     public void A_note_of_one_face_is_singular()
     {
