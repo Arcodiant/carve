@@ -4,7 +4,7 @@ description: >-
 ---
 # T-224 — normal_blend: combine two tangent-space normal maps in a Patina graph
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P2
 
