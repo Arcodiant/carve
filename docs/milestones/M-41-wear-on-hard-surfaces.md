@@ -54,8 +54,76 @@ tests; the Shoalward file is not in this repo), with its top faces in a group `w
 
 ## Required tasks
 
-- [ ] [T-237](../tasks/T-237-tessellate-split-selected-faces-into-flat-triangles-down-to-max-edge.md) — A new edit that cuts selected faces into triangles on their own plane no longer than max_edge, keeping holes and moving no existing vertex, with the border points added to the neighbours' loops so the mesh stays closed
-- [ ] [T-238](../tasks/T-238-displace-pins-the-selection-s-border.md) — displace takes pin_border: a vertex also on a face outside the selected faces or group does not move, so the faces around a worn patch stay flat and unmoved
-- [ ] [T-239](../tasks/T-239-moved-is-short-at-summary-verbosity.md) — displace and move report moved as {count, first} at summary, the first 10 ids, and the whole list only at full
+- [x] [T-237](../tasks/T-237-tessellate-split-selected-faces-into-flat-triangles-down-to-max-edge.md) — A new edit that cuts selected faces into triangles on their own plane no longer than max_edge, keeping holes and moving no existing vertex, with the border points added to the neighbours' loops so the mesh stays closed
+- [x] [T-238](../tasks/T-238-displace-pins-the-selection-s-border.md) — displace takes pin_border: a vertex also on a face outside the selected faces or group does not move, so the faces around a worn patch stay flat and unmoved
+- [x] [T-239](../tasks/T-239-moved-is-short-at-summary-verbosity.md) — displace and move report moved as {count, first} at summary, the first 10 ids, and the whole list only at full
 
 ## Retrospective
+
+Written 2026-11-27, before the person's go. The rebase onto `main`, the refactor pass and the review are still to come.
+
+**As planned.**
+
+- **The three calls work end to end.** `define_group`, `tessellate` and `displace` with `pin_border` are now enough to
+  roughen part of a sharp-edged mesh. The Cuts scenario's `TessellateStage` does it on the real `carve`: a holed slab
+  with a group tessellated (frame `tessellate-slab-wireframe`), then displaced with its border pinned (frame
+  `tessellate-slab-worn`). The stage checks that every border vertex and every face outside the group is unmoved.
+- **The *Done when* is held by tests**, on `TestMeshes.Dais()`, a 40 x 30 x 6 mm slab shaped like `D-DAIS`: two holed
+  top faces in group `wear`, sockets, pegs, every edge hard.
+  - At `max_edge` 0.75, `tessellate` leaves the slab closed with no warning and every vertex unmoved. Only the two
+    `wear` faces are split, and no triangle has an edge over 0.75 or an angle under 10 degrees (T-237).
+  - `displace` on `wear` with `pin_border` then leaves every border vertex and every face outside the group unmoved,
+    and the mesh closed. The same displace unpinned moves the border, as before (T-238).
+  - Both are tested in Core and through the tools.
+- **The open question from planning is settled** (T-237). Points inside a face come from an equilateral lattice at
+  `max_edge`, kept half a spacing clear of the loops. The face is then triangulated as a constrained Delaunay mesh:
+  points added one at a time with Lawson flips, the loop edges restored by flipping, holes left out by parity. Any
+  inner edge still over `max_edge` is split at its midpoint. The code is `src/Carve.Core/ConstrainedDelaunay.cs`.
+- **The order held.** T-237 and T-239 ran side by side and did not collide; T-238 ran after T-237. Every rebase was
+  clean.
+- **`moved` is short at `summary`** (T-239): `displace` and `move` answer `{count, first}`.
+- **`cairn milestone M-41 verify`** (2026-11-27): every check passes but `review`, which is written after the person's
+  go. 3 of 3 members done and merged; 31 suites pass, 24 ran and 7 carried.
+- **Models:**
+
+  | Member | Model | Agents |
+  |---|---|---|
+  | T-237 | Opus 5.5 | 2 (a hand-off at the 60-call checkpoint) |
+  | T-239 | Sonnet 5.5 | 1 |
+  | T-238 | Sonnet 5.5 | 1 |
+
+  Sonnet held on both concrete members with no rework.
+
+**Not as planned.**
+
+- **The person ruled once** (T-237, Waystone review round 1, 2026-11-27). The shared wireframe line check (within 10 of
+  237) failed 17 edges in the tessellate stage: at some slopes 4x MSAA covers at most 3 of a 1-px line's 4 samples, so
+  those edges come out at 212. The person chose option A: in that stage only, a piece edge also passes within 10 of the
+  3/4-coverage blend over the fill. `ShedChecks.Line` is unchanged; `ShedChecks.Closest` became internal.
+- **T-239 widened its `**Verify:**` line** to `server-unit, scenario-cuts, scenario-shed`. The Cuts and Shed scenarios
+  read `moved` as an array, and `verify`'s coverage check refused the change without their suites.
+- **The 127 x 2 strip gets inner points.** At `max_edge` 5 its edge-point rectangles have 5.28 diagonals, so the
+  midpoint split puts one point on the middle line of each. Its edges are still cut along the length only, as scoped.
+
+**Never verified.**
+
+- Shoalward's own `D-DAIS` file: it is not in this repo, so only the look-alike fixture was tested.
+- Whether a real displacement looks good on T-237's uneven density. Triangles are finer between a socket and the
+  slab's edge, and there are a few narrow ones by a socket. `check` warns of neither. The worn frame's bumps are
+  small (+-0.06 at an oblique view), and the frame was judged only by a subagent.
+- No agent session has tried the three calls from a plain prompt.
+
+**Known and left.**
+
+- `ExportToolTests.Other_tools_answer_while_an_export_runs` (`Patina.Server.Tests`, a timing test) failed once during
+  T-238's first verify and passed on rerun. It is unrelated to this milestone and was not filed.
+- `finish` could not remove the folders `branches/task/T-237`, `T-238` and `T-239` (each in use). git no longer tracks
+  them, so they can be deleted by hand.
+- `falloff` on `displace` stays out, as planned.
+
+**For the next plan.**
+
+- Before a member adds a stage of 1-px lines at new slopes, measure the shared wireframe rule on those slopes. The
+  MSAA under-coverage was found only at the first scenario run.
+- When the scope changes the shape of a result that scenarios read, name those scenarios' suites in the member's
+  `**Verify:**` line at planning.
