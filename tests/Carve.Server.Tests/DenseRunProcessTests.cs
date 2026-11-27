@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using static Carve.Server.Tests.VerbosityCalls;
 
 namespace Carve.Server.Tests;
 
@@ -14,8 +15,6 @@ public sealed class DenseRunProcessTests
     private static readonly string[] Levels = ["summary", "silent", "full"];
 
     private static string Samples(string file) => Path.Combine(Paths.RepoRoot, "samples", file);
-
-    private static string With(string arguments, string level) => arguments[..^1] + (arguments == "{}" ? "" : ",") + $"\"verbosity\":\"{level}\"}}";
 
     /// <summary>The run: (label, tool, arguments), the same at every level. Floods are on the cage after two subdivides.</summary>
     private static List<(string Label, string Tool, string Arguments)> Sequence()
@@ -89,7 +88,7 @@ public sealed class DenseRunProcessTests
                                     .Select(w => Regex.Match(w.GetString()!, @"^(\d+) (edges belong|faces have UVs)")).Where(m => m.Success).Sum(m => int.Parse(m.Groups[1].Value));
                             break;
                         case "silent":
-                            Assert.Equal(tool == "check" ? $"{{\"ok\":{(oks[key] ? "true" : "false")}}}" : """{"ok":true}""", text);
+                            Assert.Equal(Silent(tool, tool == "check" && oks[key]), text);
                             break;
                         default:
                             if (counts.TryGetValue(key, out var n) && n > 0)
