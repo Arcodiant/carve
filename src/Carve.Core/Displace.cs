@@ -89,7 +89,7 @@ public static class Displacement
     /// vertices (those on a live face) when both are null. <paramref name="report"/> is set when the edit succeeds.
     /// </summary>
     public static EditResult Displace(PolygonMesh mesh, IReadOnlyCollection<int>? vertices, DisplaceSource source,
-        float amount, float midlevel, Vector3? axis, out DisplaceReport? report, IReadOnlyCollection<int>? faces = null)
+        float amount, float midlevel, Vector3? axis, out DisplaceReport? report, IReadOnlyCollection<int>? faces = null, bool pinBorder = false)
     {
         report = null;
         var errors = new List<MeshError>();
@@ -117,8 +117,16 @@ public static class Displacement
             selected.UnionWith((vertices ?? []).Where(v => mesh.VertexProblem(v) is null));
             selected.UnionWith((faces ?? []).Where(f => mesh.FaceProblem(f) is null).SelectMany(f => mesh.Faces[f].Corners));
         }
+        if (pinBorder && (vertices is not null || faces is null))
+            errors.Add(new MeshError("pin_border", "needs faces or group: a selection of vertices, or none, has no border"));
+        else if (pinBorder && errors.Count == 0)
+        {
+            // A corner of any live face outside the selected faces stays where it is.
+            var inside = faces!.ToHashSet();
+            selected.ExceptWith(mesh.LiveFaces.Where(f => !inside.Contains(f)).SelectMany(f => mesh.Faces[f].Corners));
+        }
         if (errors.Count == 0 && selected.Count == 0)
-            errors.Add(new MeshError("selection", "matches no vertex: nothing to displace"));
+            errors.Add(new MeshError("selection", pinBorder ? "matches no vertex off the border: nothing to displace" : "matches no vertex: nothing to displace"));
         if (errors.Count > 0) return EditResult.Refused(errors);
 
         // Normals are taken from the mesh before any vertex moves: each face's unit normal weighted by its area.

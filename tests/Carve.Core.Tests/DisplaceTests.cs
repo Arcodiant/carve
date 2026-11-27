@@ -154,4 +154,33 @@ public class DisplaceTests
         var lifted = Ok(Displacement.Displace(mesh, [8], Rough, 1, 0, Vector3.UnitY, out _));
         Assert.NotEqual(new Vector3(3, 3, 3), lifted.Vertices[8]);
     }
+
+    /// <summary>T-238, M-41's Done-when: the dais tessellated at 0.75, group wear displaced with the border pinned.</summary>
+    [Fact]
+    public void Pin_border_keeps_every_face_outside_the_group_unmoved_and_the_mesh_closed()
+    {
+        var mesh = Ok(Tessellation.Tessellate(TestMeshes.Dais(), TestMeshes.DaisMaxEdge, TestMeshes.Dais().Style!.FacesOf(TestMeshes.DaisGroup)!));
+        var wear = mesh.Style!.FacesOf(TestMeshes.DaisGroup)!;
+        var border = mesh.LiveFaces.Where(f => !wear.Contains(f)).SelectMany(f => mesh.Faces[f].Corners).ToHashSet();
+
+        var pinned = Ok(Displacement.Displace(mesh, null, Rough, 0.3f, 0.5f, null, out var report, wear, pinBorder: true));
+        foreach (var v in border) Assert.Equal(mesh.Vertices[v], pinned.Vertices[v]);
+        Assert.NotEqual(mesh.Vertices, pinned.Vertices);
+        Assert.True(MeshReport.Create(pinned).Closed);
+        Assert.True(report!.Largest > 0);
+        foreach (var f in mesh.LiveFaces.Where(f => !wear.Contains(f)))
+            Assert.Equal(mesh.Faces[f].Corners.Select(v => pinned.Vertices[v]), mesh.Faces[f].Corners.Select(v => mesh.Vertices[v]));
+
+        var loose = Ok(Displacement.Displace(mesh, null, Rough, 0.3f, 0.5f, null, out _, wear));
+        Assert.Contains(border, v => loose.Vertices[v] != mesh.Vertices[v]);
+    }
+
+    [Fact]
+    public void Pin_border_with_vertices_or_no_selection_is_refused_and_changes_nothing()
+    {
+        var mesh = Ok(Displacement.Displace(Cube(), null, Rough, 0.1f, 0.5f, null, out _));
+        Assert.False(Displacement.Displace(mesh, [0, 1], Rough, 0.3f, 0.5f, null, out _, null, true).Succeeded);
+        Assert.False(Displacement.Displace(mesh, null, Rough, 0.3f, 0.5f, null, out _, null, true).Succeeded);
+        Assert.False(Displacement.Displace(mesh, [0], Rough, 0.3f, 0.5f, null, out _, [0], true).Succeeded);
+    }
 }
