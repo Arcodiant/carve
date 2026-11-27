@@ -17,7 +17,7 @@ public sealed class MoveTool(ModelStore store)
         + "by is exactly three numbers [dx, dy, dz], in the same coordinates as define_mesh (1 unit = 1 m), Y up; a positive dy moves up. "
         + "At least one of vertices, edges, faces is required, and by must not be zero. "
         + "Moving adds and removes nothing, so the counts stay the same, but moving some corners of a face off its plane gives a non-planar warning on a flat mesh, none on a smooth one (select faces where non_planar). "
-        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[], moved:[vertex ids moved, ascending]}; "
+        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[], moved: the vertices moved, {count, first: the first 10 ids, ascending} at the default summary verbosity and the whole ascending id list at full}; "
         + "created, deleted and split are always empty for a move. "
         + "Bad input (an unknown vertex or face id, a pair that is not an edge, nothing listed, a zero or non-finite by, an argument move does not take) is a tool error "
         + "that lists every problem by element, e.g. faces[6]; the mesh is left unchanged and nothing is added to undo. "
@@ -82,6 +82,6 @@ public sealed class MoveTool(ModelStore store)
         if (errors.Count > 0) return Failed("move", errors);
 
         return Edit(store, "move", name, mesh => MeshEdits.Move(mesh, v, e, f, offset!.Value),
-            (body, result) => body["moved"] = result.MovedVertices, level);
+            (body, result) => body["moved"] = Moved(result.MovedVertices, level), level);
     }
 }

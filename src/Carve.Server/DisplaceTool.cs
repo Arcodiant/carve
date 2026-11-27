@@ -25,7 +25,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         + "amount is in metres and may be negative (dents instead of bumps); midlevel (0 to 1, default 0.5) is the height that does not move; axis [x, y, z], when given, replaces every normal with that one direction (for terrain). "
         + "Give vertices, faces (every corner) or group (a face group from define_group) to displace part of the mesh, or none of them for every vertex. "
         + "Ids, faces, UVs, groups, colours and weights are kept; only positions change. A vertex with no normal (on no face, or its faces facing opposite ways) stays without axis, and a warning names it. "
-        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[], moved:[vertex ids, ascending], largest: the largest offset in metres}; "
+        + "Returns JSON {vertices, faces, edges, closed, bounds:{min,max}, warnings:[], created:{vertices:[],faces:[]}, deleted:{vertices:[], faces:[]}, split:[], moved: the vertices moved, {count, first: the first 10 ids, ascending} at the default summary verbosity and the whole ascending id list at full, largest: the largest offset in metres}; "
         + "a kind of warning past 3 is one line, as in every report, and a warning says when the mesh is too coarse for the source to show (fewer than two vertices to a bump). "
         + "Errors, each a tool error that changes nothing: no source, or both graph and noise; a graph file that is missing (the error lists the .texgraph files in its folder), will not read or has faults; an output the graph has not, or a colour one; a mesh without UVs for a graph; amount missing or zero; midlevel outside 0 to 1; a zero axis; octaves outside 1 to 8; scale not above 0; an unknown vertex, face or group; a selection that matches no vertex; a face that would cross itself. "
         + "Needs a mesh, from define_mesh or open, first; when the model has several meshes, mesh names the one to displace. "
@@ -103,7 +103,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
         body["created"] = new { vertices = result.NewVertices, faces = result.NewFaces };
         body["deleted"] = Deleted(result.Deleted);
         body["split"] = Split(result.Split);
-        body["moved"] = result.MovedVertices;
+        body["moved"] = Moved(result.MovedVertices, level);
         body["largest"] = Math.Round(report.Largest, 6);
         return Quiet(Ok(body), level);
     }
