@@ -408,20 +408,6 @@ public sealed class ModelStore
         }
     }
 
-    /// <summary>
-    /// The seam for a step made of several calls (T-233's run_script): <paramref name="change"/> as <see cref="Change(string, Func{Model, ValueTuple{Model, string}}, out string)"/>,
-    /// journalled as <paramref name="entries"/> instead of the call under way, appended, or starting a new journal when
-    /// <paramref name="restart"/>. Still one step, which one undo takes back with all its entries.
-    /// </summary>
-    public ModelSnapshot? Change(string tool, Func<Model, (Model? Next, string? Problem)> change, IReadOnlyList<JournalEntry> entries, bool restart, out string? problem)
-    {
-        lock (_write)
-        {
-            (var next, problem) = change(_current.Model);
-            return next is null ? null : PushLocked(next, tool, restart, entries);
-        }
-    }
-
     /// <summary>Steps back one change, or null when there is nothing older.</summary>
     public UndoResult? Undo()
     {
