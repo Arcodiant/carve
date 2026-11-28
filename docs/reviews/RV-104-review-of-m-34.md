@@ -110,7 +110,7 @@ scenarios/Carve.Scenario.Replay/EveryToolStage.cs:~137 (`Same(before.Pixels, aft
 
 **Outcome:** fixed
 
-How: stage 1's front frame must show something at its centre unlike the sky at its corner (`before.Pixel(centre) != before.Pixel(0, 0)`). Scenario-side check, needs a GPU run; not shown failing.
+How: stage 1's front frame must show drawn pixels: `EveryToolStage.cs` counts the pixels whose summed R, G, B difference from the pixel at the left edge of their own row is over 40, and notes a failure when fewer than 1 % of the frame's pixels do. Scenario-side check, needs a GPU run; not shown failing.
 
 ### Stage 3 token checks are substring matches
 
@@ -126,7 +126,7 @@ scenarios/Carve.Scenario.Replay/AtomicStage.cs:~64 (the refused run_script, save
 
 **Outcome:** fixed
 
-How: stage 4's three refused-run cases also check the journal is unchanged; stage 5's break counts as caught by a refusal only if it names a line; BreaksStage `Find` notes a missing statement and stops rather than throwing. Not changed: the static fields stages 3 and 5 read from stage 1, which `ReplayStages.cs`'s order already makes safe. Not shown failing (scenario run).
+How: stage 4's three refused-run cases also check the journal is unchanged; stage 5's break counts as caught by a refusal only if it names a line; BreaksStage `Find` notes a missing statement and stops rather than throwing. Not changed: the static fields stages 3 and 5 read from stage 1, which `ReplayStages.cs`'s order already makes safe; and the "or a following undo" half of finding 13 for the refused runs: `AtomicStage.cs` (57-61) checks the model and the journal are unchanged after each refusal, but adds no undo check (the refusals come up front, so nothing ran that an undo would have to take back). Not shown failing (scenario run).
 
 ### Journal stage read-only calls are not checked as accepted
 

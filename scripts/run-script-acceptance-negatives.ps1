@@ -68,6 +68,19 @@ Copy-Item (Join-Path $d 'prop.carvescript') (Join-Path $d 'prop-edited.carvescri
 Copy-Item (Join-Path $d 'prop.carve') (Join-Path $d 'prop-edited.carve') -Force
 Run-Checks 'measurement off (edited pair is the exported pair)' $d
 
+# 4. the session's cwd is C:\ (the file-tool paths are left as they were)
+$d = New-Copy 'cwd'
+$t = Join-Path $d 'transcript.jsonl'
+$cwdLine = [regex]'"cwd":"[^"]*"'
+[IO.File]::WriteAllText($t, $cwdLine.Replace([IO.File]::ReadAllText($t), '"cwd":"C:\\"'))
+Run-Checks 'session cwd is C:' $d
+
+# 5. the file the agent wrote is not a file of the round
+$d = New-Copy 'missing'
+$t = Join-Path $d 'transcript.jsonl'
+[IO.File]::WriteAllText($t, [IO.File]::ReadAllText($t).Replace('prop-edited.carvescript"', 'prop-elsewhere.carvescript"'))
+Run-Checks 'written file missing from the round' $d
+
 $rows | Format-Table -AutoSize | Out-String | Write-Host
 New-Item -ItemType Directory -Force (Join-Path (Resolve-Path $Round).Path 'acceptance') | Out-Null
 $rows | ConvertTo-Csv -Delimiter "`t" -NoTypeInformation | Set-Content (Join-Path (Resolve-Path $Round).Path 'acceptance/negatives.tsv')

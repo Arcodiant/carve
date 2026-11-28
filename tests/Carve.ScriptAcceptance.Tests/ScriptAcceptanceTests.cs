@@ -70,10 +70,11 @@ public sealed class ScriptAcceptanceTests
     }
 
     [Run]
-    public void Every_file_tool_path_is_inside_the_sessions_folder()
+    public void Every_file_tool_path_is_under_the_sessions_folder_and_a_file_of_the_round()
     {
         string? cwd = null;
         var outside = new List<string>();
+        var paths = new List<(string Name, string Full)>();
         foreach (var line in File.ReadLines(In("transcript.jsonl")).Where(l => l.Length > 0))
         {
             using var doc = JsonDocument.Parse(line);
@@ -87,11 +88,17 @@ public sealed class ScriptAcceptanceTests
                 var path = use.GetProperty("input").TryGetProperty("file_path", out var p) ? p.GetString() : null;
                 if (cwd is null || path is null || !Path.GetFullPath(path, cwd).StartsWith(cwd + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                     outside.Add($"{name} {path}");
+                else paths.Add((name, Path.GetFullPath(path, cwd)));
             }
         }
 
         Assert.NotNull(cwd);
         Assert.Empty(outside);
+        // Ruled 2026-11-28 (A): the session ran from a copy, so tie its folder to the round by name and by content: the same
+        // folder name, and every file the agent touched is at the same relative path in the round.
+        Assert.True(string.Equals(Path.GetFileName(cwd), Path.GetFileName(Path.GetFullPath(Round).TrimEnd(Path.DirectorySeparatorChar, '/')), StringComparison.OrdinalIgnoreCase),
+            $"the session's folder {cwd} is not the round's ({Round})");
+        Assert.Empty(paths.Where(p => !File.Exists(In(Path.GetRelativePath(cwd, p.Full)))).Select(p => $"{p.Name} {p.Full}"));
     }
 
     private static IReadOnlyList<ScriptStatement> Statements(string name)
