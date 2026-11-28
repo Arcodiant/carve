@@ -93,7 +93,7 @@ The project is a `dotnet-closure` input of `server-unit` and is in `Carve.slnx`.
 | The session's `cwd` is the folder above its own (it holds every path, under another name) | file-tool paths, by the folder-name assert |
 | The file the agent wrote is not a file of the round (the transcript names `prop-elsewhere.carvescript`) | file-tool paths, by the file-exists assert |
 
-Run on a copy of round 1 (RV-106 round 3): each broken copy sits at `%TEMP%\carve-script-acceptance-negatives\<name>ound-1`, so the name tie holds for all but the `cwd` break. The first three break more than one check, as the Fails column lists; the last two break the one path check, each at its own assert.
+Run on a copy of round 1 (RV-106 round 3): each broken copy sits at `%TEMP%\carve-script-acceptance-negatives\<name>ound-1`, so the name tie holds for all but the `cwd` break. The first three break more than one check, as the Fails column lists; the last two break the one path check, each at its own assert.
 
 **Frames.** The only frames are the agent's two renders, taken out of the transcript (`render-1.png`, `render-2.png`). A subagent reviewed them: 3 and then 4 compartments, equal in height, the right colours, depth that reads, no defect. Neither frame carries a choice. This task adds no golden.
 
