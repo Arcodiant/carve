@@ -4,7 +4,7 @@ description: >-
 ---
 # T-231 — The call journal in ModelStore, and clear
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
