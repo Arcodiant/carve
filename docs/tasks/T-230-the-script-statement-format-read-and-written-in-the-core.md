@@ -4,7 +4,7 @@ description: >-
 ---
 # T-230 — The script statement format, read and written, in the Core
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
