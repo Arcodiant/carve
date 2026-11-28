@@ -4,7 +4,7 @@ description: >-
 ---
 # M-34 — Say it again
 
-**Status:** Active
+**Status:** Done
 
 **One-liner:** *A session's calls are kept as a journal, exported as a script, and run again to give the same model*
 
