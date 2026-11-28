@@ -88,6 +88,7 @@ public class ScriptReaderTests
         { "f\n(a: 1)", 1, 2, "expected '(' on the line of the tool name 'f': a statement may not break before its '('" },
         // the column counts characters, not bytes, and CRLF does not move it
         { "f(s: \"\u00e9\u00e9\u00e9\" b: 1)", 1, 12, "expected ',' or ')' after the value of 's'" },
+        { "f\r\n(a: 1)", 1, 2, "expected '(' on the line of the tool name 'f': a statement may not break before its '('" },
         { "f()\r\ng(b 2)", 2, 5, "expected ':' after the argument name 'b'" },
         { "\uFEFF#", 1, 1, "unknown character '#': expected a tool name" },
     };

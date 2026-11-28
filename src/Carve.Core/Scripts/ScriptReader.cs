@@ -173,6 +173,8 @@ public static class ScriptReader
         {
             var line = Line(offset);
             var start = lineStarts[line - 1];
+            if (offset > start && offset < b.Length && b[offset] == '\n' && b[offset - 1] == '\r')
+                offset--; // an error at a CRLF is at its '\r', as it is at an LF's '\n'
             return new Refusal(new ScriptError(line, Encoding.UTF8.GetCharCount(b, start, offset - start) + 1, message));
         }
 
