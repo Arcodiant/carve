@@ -105,6 +105,24 @@ Written 2026-11-27, before the person's go. The rebase onto `main`, the refactor
 - **The 127 x 2 strip gets inner points.** At `max_edge` 5 its edge-point rectangles have 5.28 diagonals, so the
   midpoint split puts one point on the middle line of each. Its edges are still cut along the length only, as scoped.
 
+- **The review took four rounds** after the person's go: two reviewers in round 1, then one per round (RV-100 to RV-103, all claude-opus-5-5).
+  - **The rebase and the refactor pass:** the rebase onto `main` was clean (Sonnet 5.5). The refactor pass (Opus 5.5) folded the faces-or-group lookup into `MeshToolSupport.FacesOrGroup` and changed no behaviour.
+  - **Round 1:** nine findings.
+  - **The person's two rulings** (2026-11-27, recorded in T-237):
+    - `split`'s `pieces` are short at `summary`;
+    - a 200,000 new-vertex budget, refused before any work, with the lattice filter made linear (9.7 s to 3.1 s near the budget).
+  - **Round 2:** three findings.
+    - The prediction under-counted narrow faces by up to 1.85x.
+    - `split` still grew with the number of faces.
+    - Thin rotated strips were refused with an internal message.
+  - **Three answers from Waystone's filter, not the person** (2026-11-27, recorded in T-237 for the person to confirm or overturn):
+    - `split` is `{count, first}` over faces at `summary`;
+    - thin strips get a plain refusal, and the tolerance is filed as [B-15](../bugs/B-15-thin-faces-turned-off-the-axes-are-refused-by-the-triangulation.md);
+    - the prediction keeps a margin of 3.5 points per `max_edge` of loop and is the gate, so some calls that would fit are refused (a 40 x 0.01 m strip at 0.0025: predicted about 218k, made 196k). A hard stop is only a backstop.
+  - **Round 3:** one Nit, a wall-clock assert in a `unit` test, replaced by a timing-free one.
+  - **Round 4:** nothing.
+- Every round's fixes came from one agent on Opus 5.5, except round 3's (Sonnet 5.5).
+
 **Never verified.**
 
 - Shoalward's own `D-DAIS` file: it is not in this repo, so only the look-alike fixture was tested.
