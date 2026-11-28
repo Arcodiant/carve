@@ -11,6 +11,37 @@ public class ModelStoreTests
         TestMeshes.Make([Vector3.Zero, Vector3.UnitX, Vector3.UnitY], [[0, 1, 2]]);
 
     [Fact]
+    public void A_batch_is_one_step_and_one_version_that_another_thread_sees_only_when_done_and_a_failed_one_leaves_all()
+    {
+        var store = new ModelStore();
+        store.Push(Triangle(), "define_mesh");
+        var before = store.Current;
+        ModelSnapshot? seen = null;
+        var batch = store.Batch("run_script", () =>
+        {
+            store.Push(Triangle(), "move");
+            store.Push(Triangle(), "move");
+            // A thread that does not share this flow, as the frame thread does not.
+            Thread other;
+            using (ExecutionContext.SuppressFlow()) { other = new Thread(() => seen = store.Current); other.Start(); }
+            other.Join();
+            Assert.Equal(before.Version + 2, store.Current.Version);
+            return null;
+        }, out var problem);
+        Assert.Null(problem);
+        Assert.Same(before, seen);
+        Assert.Equal(before.Version + 1, batch!.Version);
+        Assert.Equal("run_script", store.Undo()!.Undone);
+        Assert.Same(before.Model, store.Current.Model);
+
+        var now = store.Current;
+        Assert.Null(store.Batch("run_script", () => { store.Push(Triangle(), "move"); return "line 2: no"; }, out problem));
+        Assert.Equal("line 2: no", problem);
+        Assert.Same(now, store.Current);
+        Assert.Null(store.Undo());
+    }
+
+    [Fact]
     public void A_define_with_a_refusal_decides_under_the_write_lock_and_pushes_nothing_when_refused()
     {
         var store = new ModelStore();

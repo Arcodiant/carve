@@ -14,6 +14,7 @@
   <Project Path="scenarios/Carve.Scenario.Soft/Carve.Scenario.Soft.csproj" />
   <Project Path="scenarios/Carve.Scenario.Acceptance/Carve.Scenario.Acceptance.csproj" />
   <Project Path="scenarios/Carve.Scenario.Orcward/Carve.Scenario.Orcward.csproj" />
+  <Project Path="scenarios/Carve.Scenario.Replay/Carve.Scenario.Replay.csproj" />
   <Project Path="scenarios/Carve.Scenario.Rig/Carve.Scenario.Rig.csproj" />
   <Project Path="scenarios/Carve.Scenario.Cuts/Carve.Scenario.Cuts.csproj" />
   <Project Path="scenarios/Carve.Scenario.Parts/Carve.Scenario.Parts.csproj" />
@@ -32,6 +33,7 @@
   <Project Path="tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj" />
   <Project Path="tests/Carve.GatehouseLoad.Tests/Carve.GatehouseLoad.Tests.csproj" />
   <Project Path="tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj" />
+  <Project Path="tests/Carve.ScriptAcceptance.Tests/Carve.ScriptAcceptance.Tests.csproj" />
   <Project Path="tests/Carve.OrcwardLoad.Tests/Carve.OrcwardLoad.Tests.csproj" />
   <Project Path="tests/Carve.MorphLoad.Tests/Carve.MorphLoad.Tests.csproj" />
   <Project Path="spikes/Carve.ModelViewer/Carve.ModelViewer.csproj" />

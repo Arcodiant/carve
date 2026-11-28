@@ -4,7 +4,7 @@ description: >-
 ---
 # T-233 — run_script replays a script as one undo step
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -45,3 +45,39 @@ An agent calls `run_script {path}` and the script's statements run as tool calls
 - Read the milestone's *Decided at planning (2026-11-26)* first.
 - **Ask, don't land.** A rule neither this file nor the milestone settles, or a check that would be loosened, goes back to the person. Search `tests/` and `scenarios/` for what reads what you change before changing it. Show each new check failing on a wrong input, as a table in `### As built`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Built by one agent on Opus 5.5 (`claude-opus-5-5`), with no hand-off.
+
+**The batch** (`ModelStore.Batch(string tool, Func<string?> run, out string? problem)`): it holds the store's **write lock** for the whole run, so no other call interleaves; the statement tools take the same lock again (it is re-entrant on the thread). The store now keeps its working state (`_current`, `_journal`) apart from what it publishes (`_published`, `_publishedJournal`). An `AsyncLocal` marks the run's flow: inside it, `Current` and `Journal` are the working state, so each statement sees the one before; every other flow (the frame thread, another call) reads the published state, which a batch does not touch until it ends. Each statement pushes its step as usual. At the end, history, model and journal are put back as they were (a copy of the history, at most 101 entries), and then on success the final model is pushed as **one** step of `run_script`, journalled with the run's entries in place (`restart: true` with the whole working journal, so a `clear()` or whole-model `open` among the statements restarts it where it stood). One undo step, one published version. On a problem or an exception nothing is pushed.
+
+**The runner, for M-35** (`RunScriptTool.RunStatements(IServiceProvider services, McpServer server, JsonRpcRequest request, string folder, CarveScript script, out int ran) → string?`): it first checks every statement against `RunScriptTool.Refused` and the served tools, then invokes each through the served `McpServerTool` (`services.GetServices<McpServerTool>()`, the same `JournalledTool` instances as a direct call, so the same checks, refusals and journalling), with a `RequestContext` built on the outer call's server and request. It returns null when every statement succeeded, otherwise the first failure as `line N: <tool's own message>` (prefixed with `tool: ` when the message does not already start with it). It must run inside `ModelStore.Batch` to be all or nothing. **The file base** is changed in one place: the statements' `Services` is a wrapper that answers `ToolFolder` with the script's folder and delegates everything else, so every tool that takes `ToolFolder` resolves against the script without any tool changing. Each argument is re-serialised compact (raw numbers kept, relaxed escaping), so the journal entry reads as a direct call's. Every statement tool is synchronous; the runner throws if one is not (render and render_glb, the async ones, are refused).
+
+**Refused statements**: an explicit table (`RunScriptTool.Refused`), since whether a tool pushes is only known by running it: `run_script` (one script does not run another), `undo` (a run is taken back by undo after it), and `save`, `save_script`, `export`, `bake`, `render`, `render_glb`, `select`, `check`, `help` and the five `get_` tools (`it changes nothing in the model`). A test holds it equal to `VerbosityToolTests.Readers` + `JournalToolTests.NoStep` + undo + run_script and to tools/list, so a new tool is a deliberate row. An unknown tool is `line N: carve has no tool 'x'`. Both are refused before anything runs. An empty script is a run of nothing, still one step, as clear on an empty model is.
+
+**Errors**: a format error is `run_script: <file>: line L, column C: <reader's message>; nothing ran`; a failed statement is `line N: ...` then `; nothing of <file> was kept, the model is as before the call`.
+
+**Result**: `{"statements":N,"meshes":[{name, vertices, faces, edges, closed, bounds, warnings}]}` (warnings folded by `Report` at the given level), `{"ok":true}` at silent. The worked example (a two-statement slab file) is run as written by `RunScriptToolTests`, which also checks the description, the scripts topic and README quote it.
+
+**Content**: `clear` then `run_script samples/gatehouse.carvescript` in `ToolHarness`, then `save`, is byte for byte `samples/gatehouse.carve` (it was already byte-equal, so nothing was re-taken). The gatehouse scenario does the same last, after its export, running the script it wrote in its run folder and saving `replayed.carve`; it takes no frame there, so no frame changed and no capture review was needed. `samples/gatehouse.*` and `README.md` added to server-unit's inputs.
+
+**Pins re-taken**: `ToolHarnessTests` tool count 47 to 48 (only `run_script`). `VerbosityToolTests.Tools` gained a `run_script` row, and `JournalToolTests`' every-tool test a `run_script` case (it gets the script's statement, not its own call). `JournalToolTests.NoStep` became `internal` so the refused-list test can read it. `help`'s `scripts` topic gained one paragraph on running; `undo`'s text is unchanged.
+
+**README**: `run_script` in the verbosity list, a paragraph with the worked call and its result, the gatehouse replay line, and the explore-then-keep-the-steps loop.
+
+**Tests** (`RunScriptToolTests`, 12, `unit`; and one in `ModelStoreTests`): the worked example and silent; the gatehouse; a run on a non-empty model adds to it and undo takes all of it back in one step; a failing statement at line 1, 2 and 3 leaves model, version, journal and history, and the next call builds on the old model at the next version; each refused kind and an unknown tool, by line; line 7 `save` with the exact message; the refused table against tools/list; a format error; a relative texture from a script in a subfolder (and the same call made directly refused); save_script after a run and a move writes the statements then the move, and running that from clear saves the same file byte for byte; a clear in a script restarts the journal; the batch seen from a thread outside the flow, and a failed batch.
+
+**Break table** (each planted alone, `RunScriptToolTests` and the batch test run, then reverted):
+
+| Planted fault | Fails |
+|---|---|
+| A. A batch's working model and journal not put back | failing statement at lines 2 and 3, undo of a run, the batch test |
+| B. Steps inside a batch published to other flows | the batch test, failing statement at lines 2 and 3 |
+| C. Statements given the server's services, not the script folder's | relative texture |
+| D. The refused table not checked | each refused kind |
+| E. The run's entries appended to the journal instead of put in place | undo of a run, clear in a script restarts |
+
+The first version of the failing-statement test did not catch A (the published state was right; only the working state was wrong); it now makes a call after the failed run, which does.
+
+**Not checked**: a real MCP client calling `run_script` beyond the gatehouse scenario; two calls truly at once against a running batch (the lock is argued, not raced in a test); a `define_material` graph slot or `displace` graph resolved from a script's folder (the same `ToolFolder` path as the texture).

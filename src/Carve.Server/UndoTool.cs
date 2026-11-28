@@ -8,7 +8,8 @@ namespace Carve.Server;
 public sealed class UndoTool(ModelStore store)
 {
     public const string Text =
-        "Steps the model back one change: the last define_mesh, open, move, extrude, subdivide, define_group, set_colour, define_skeleton, set_weights, define_clip or delete_clip is taken back and the model before it is current again, its meshes with the ids they had. "
+        "Steps the model back one change: the last define_mesh, open, move, extrude, subdivide, define_group, set_colour, define_skeleton, set_weights, define_clip, delete_clip or clear is taken back and the model before it is current again, its meshes with the ids they had. "
+        + "Undo also takes the step out of the list of calls save_script writes. "
         + "So undo after set_colour takes back the colour, and after set_weights the weights, not the last mesh edit. "
         + "The ids the undone step created are free again and the next edit gives them out to new vertices and faces, so forget any you kept from its report. "
         + "Takes only verbosity; any other is a tool error. The last 100 changes can be undone, one call each; there is no redo, and an undo cannot itself be undone. "
@@ -35,12 +36,7 @@ public sealed class UndoTool(ModelStore store)
             ? Report(model.Meshes[0].Mesh, level)
             : new Dictionary<string, object>
             {
-                ["meshes"] = model.Meshes.Select(m =>
-                {
-                    var one = new Dictionary<string, object> { ["name"] = m.Name };
-                    foreach (var (k, v) in Report(m.Mesh, level)) one[k] = v;
-                    return one;
-                }).ToArray(),
+                ["meshes"] = Reports(model.Meshes, level),
             };
         body["undone"] = undo.Undone;
         return Quiet(Ok(body), level);

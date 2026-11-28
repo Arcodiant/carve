@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- T-235's checks on a script acceptance round folder (CARVE_SCRIPT_ACCEPTANCE_RUN); skipped when it is unset. -->
+  <PropertyGroup>
+    <RootNamespace>Carve.ScriptAcceptance.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
+    <PackageReference Include="xunit.v3" Version="$(XunitV3Version)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The unit harness serves carve's real tools in this process; it is linked, with the two names it needs from CarveProcess.cs in Harness.cs. -->
+    <ProjectReference Include="../../src/Carve.Server/Carve.Server.csproj" Aliases="carve" />
+    <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
+    <Compile Include="../Carve.Server.Tests/ToolHarness.cs" Link="ToolHarness.cs" />
+  </ItemGroup>
+
+</Project>

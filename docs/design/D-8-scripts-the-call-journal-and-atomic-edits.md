@@ -72,8 +72,20 @@ A script runs as one undo step. An error names the script's line and leaves the 
 
 Raw postfix as the syntax an agent writes is not an option under consideration: an exported tool call has named arguments, and the request asks for named parameters, loops and small functions.
 
-**Working assumption:** a conventional surface syntax (calls with named arguments, `let`, `for`, functions). M-34 needs only the statement format, which every option shares.
+**Working assumption:** a conventional surface syntax (calls with named arguments, `let`, `for`, functions). M-34 needs only [the statement format](#the-statement-format), which every option shares.
 **Decided by:** M-35's planning, with M-34's exported scripts as examples to write in each candidate. The person's call.
+
+### The statement format
+
+**Certainty:** Settled for M-34's statements · **Strictness:** Rule
+
+A `.carvescript` is statements separated by newlines, each one tool call: `tool(name: <json>, name: <json>, ...)`, or `tool()` with no arguments. The tool name is `[a-z_][a-z0-9_]*`, as is each argument name; each value is one JSON value (RFC 8259), written as the MCP call took it, its numbers kept as their raw text. Whitespace, newlines included, may stand between any two tokens, so a statement may span lines, but two statements never share one; the one exception is that a newline may not stand between the tool name and its `(`, which the reader refuses. Nothing else is in the grammar: no comments, variables, keywords, loops or expressions, and no trailing comma. The person ruled the format on 2026-11-26 (M-34's planning); refusing a trailing comma and refusing a newline before the `(` are the implementer's defaults under T-230's Notes (refuse what the spec does not settle), not rulings, and open to loosening; `Carve.Core.Scripts` reads and writes it (T-230), the writer keeping a statement of 120 characters or less on one line and a longer one an argument a line.
+
+M-35 decides everything around it ([The language](#the-language)): whether a statement may name its result, what a variable or loop looks like, and comments.
+
+**Alternatives:** the JSON of a `tools/call` per line (no new syntax, but a name for every value twice over and hard to edit by hand); positional arguments.
+**Would change if:** M-35's language needs a statement form this one cannot be written in.
+**Enforced by:** `ScriptReaderTests` and `ScriptWriterTests` in `tests/Carve.Core.Tests/Scripts/`.
 
 ### Addressing in a script
 

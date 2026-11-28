@@ -136,12 +136,17 @@
           "dotnet-closure": "tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj"
         },
         {
+          "dotnet-closure": "tests/Carve.ScriptAcceptance.Tests/Carve.ScriptAcceptance.Tests.csproj"
+        },
+        {
           "dotnet-closure": "tests/Carve.PartsAcceptance.Tests/Carve.PartsAcceptance.Tests.csproj"
         },
         {
           "dotnet-closure": "tests/Carve.WeatheringAcceptance.Tests/Carve.WeatheringAcceptance.Tests.csproj"
         },
         "tests/Carve.Server.Tests/Fixtures/*.png",
+        "samples/gatehouse.*",
+        "README.md",
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "tests/Carve.Core.Tests/RoverSpec.cs",
         "tests/Carve.Core.Tests/RoverSpec.Model.cs",
@@ -629,6 +634,29 @@
       "est-seconds": 30
     },
     {
+      "id": "scenario-replay",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 replay -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Replay/Carve.Scenario.Replay.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "samples/textures/iron-base.png",
+        "samples/graphs/floor-tiles.texgraph",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
+    },
+    {
       "id": "scenario-parts",
       "tier": "regression",
       "build": "solution",
@@ -720,6 +748,7 @@
         "tests/Carve.CharacterLoad.Tests/RunContent.cs",
         "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "samples/gatehouse.carve",
+        "samples/gatehouse.carvescript",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1",
         "scripts/run-gatehouse-scenario.ps1"

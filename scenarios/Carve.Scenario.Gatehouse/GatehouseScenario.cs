@@ -137,12 +137,47 @@ public sealed class GatehouseScenario : IScenario
         Equal("check: no warnings", 0, check.GetProperty("warnings").GetArrayLength());
         await frames.StageAsync(7, "bridged", beforeWindows, doorFace: doorFace, last: true);
 
+        await SaveScriptAsync(driver, work);
         await SaveOpenExportAsync(driver, work);
+        await ReplayAsync(driver, work);
 
         if (Failures.Count > 0)
         {
             driver.Fail($"{Failures.Count} check(s) failed:\n" + string.Join("\n", Failures.Select(f => "  " + f)));
         }
+    }
+
+    /// <summary>
+    /// The session's calls written as a script (T-232) before the save and reopen start a new journal, and compared byte for byte
+    /// with the committed <c>samples/gatehouse.carvescript</c>. No frame is taken here.
+    /// </summary>
+    private static async Task SaveScriptAsync(ScenarioDriver driver, string work)
+    {
+        var path = Path.Combine(work, "gatehouse.carvescript");
+        var saved = await CallTextAsync(driver, "save_script", new { path });
+        Equal("save_script: a new gatehouse.carvescript", true, saved.Contains("gatehouse.carvescript") && !saved.Contains("replaced"));
+        driver.AssertBytesEqual("gatehouse.carvescript against samples/gatehouse.carvescript", await File.ReadAllBytesAsync(Sample("gatehouse.carvescript")), await File.ReadAllBytesAsync(path));
+    }
+
+    private static string Sample(string name)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Carve.slnx"))) directory = directory.Parent;
+        return Path.Combine(directory?.FullName ?? throw new InvalidOperationException("Carve.slnx was not found above " + AppContext.BaseDirectory), "samples", name);
+    }
+
+    /// <summary>
+    /// The script the session wrote, run after clear (T-233) as one step, saved, and compared byte for byte with the committed
+    /// <c>samples/gatehouse.carve</c>. Last, after the export, and no frame is taken here.
+    /// </summary>
+    private static async Task ReplayAsync(ScenarioDriver driver, string work)
+    {
+        await CallJsonAsync(driver, "clear", new { });
+        var ran = await CallJsonAsync(driver, "run_script", new { path = Path.Combine(work, "gatehouse.carvescript") });
+        Equal("run_script: 14 statements", 14, ran.GetProperty("statements").GetInt32());
+        var path = Path.Combine(work, "replayed.carve");
+        await CallTextAsync(driver, "save", new { path });
+        driver.AssertBytesEqual("replayed.carve against samples/gatehouse.carve", await File.ReadAllBytesAsync(Sample("gatehouse.carve")), await File.ReadAllBytesAsync(path));
     }
 
     /// <summary>

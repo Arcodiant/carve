@@ -221,6 +221,15 @@ internal static class MeshToolSupport
     public static CallToolResult Quiet(CallToolResult result, Verbosity level) =>
         level == Verbosity.Silent && result.IsError != true ? Line(SilentOk) : result;
 
+    /// <summary>Each mesh's <see cref="Report"/> after its name, for a result's <c>meshes</c> list.</summary>
+    public static Dictionary<string, object>[] Reports(IEnumerable<NamedMesh> meshes, Verbosity level) =>
+        [.. meshes.Select(m =>
+        {
+            var one = new Dictionary<string, object> { ["name"] = m.Name };
+            foreach (var (k, v) in Report(m.Mesh, level)) one[k] = v;
+            return one;
+        })];
+
     /// <summary>The report fields every tool returns: vertices, faces, edges, closed, bounds, warnings.</summary>
     public static Dictionary<string, object> Report(PolygonMesh mesh, Verbosity level = Verbosity.Summary)
     {
@@ -259,9 +268,11 @@ internal static class MeshToolSupport
 
     /// <summary>
     /// Registers a tool whose arguments are bound raw, with a hand-written schema (an empty object when null, for a tool
-    /// that takes no arguments). The schema is closed: <c>additionalProperties: false</c>.
+    /// that takes no arguments). The schema is closed: <c>additionalProperties: false</c>. Each call is journalled if it
+    /// pushes a step (<see cref="ModelStore.Journal"/>); <paramref name="reads"/> are the arguments naming a file the tool
+    /// reads (<c>name</c>, or <c>name.property</c> in an object argument), whose resolved paths the entry keeps.
     /// </summary>
-    public static McpServerTool Create<T>(string name, string description, JsonObject? schema) where T : class
+    public static McpServerTool Create<T>(string name, string description, JsonObject? schema, params string[] reads) where T : class
     {
         var tool = McpServerTool.Create(
             typeof(T).GetMethod("Run")!,
@@ -270,7 +281,7 @@ internal static class MeshToolSupport
         schema ??= new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() };
         schema["additionalProperties"] = false;
         tool.ProtocolTool.InputSchema = JsonSerializer.SerializeToElement(schema);
-        return tool;
+        return new JournalledTool(tool, reads);
     }
 
     /// <summary>The same schema with <c>additionalProperties: false</c>, for a tool whose schema the SDK generated.</summary>

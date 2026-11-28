@@ -51,6 +51,9 @@ internal sealed class ToolHarness : IToolCaller, IDisposable, IAsyncDisposable
     }
 
     /// <summary>The model store the tools share.</summary>
+    /// <summary>The tools as registered, for what tools/list does not show (T-231: the arguments each declares it reads).</summary>
+    public IEnumerable<ModelContextProtocol.Server.McpServerTool> Tools => _host.Services.GetServices<ModelContextProtocol.Server.McpServerTool>();
+
     public carve::Carve.Server.ModelStore Store => _host.Services.GetRequiredService<carve::Carve.Server.ModelStore>();
 
     /// <summary>Starts the host and the client's session; the initialize result, as the process's <c>InitializeAsync</c> gives the response.</summary>
