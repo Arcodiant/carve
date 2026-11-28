@@ -28,6 +28,31 @@ namespace Carve.Core;
 /// </remarks>
 public static class Tessellation
 {
+    /// <summary>The most new vertices one call may add (the person's ruling, 2026-11-27); a call predicted over it is refused.</summary>
+    public const int Budget = 200_000;
+
+    /// <summary>
+    /// The new vertices a call is predicted to add, before any work: each edge's points plus each face's area over the
+    /// lattice's cell (max_edge squared times sqrt 3 / 2). In doubles, so a tiny max_edge cannot overflow.
+    /// </summary>
+    public static double Predicted(PolygonMesh mesh, IReadOnlyList<int> faces, double maxEdge)
+    {
+        var edges = new HashSet<(int, int)>();
+        double count = 0;
+        foreach (var f in faces)
+        {
+            count += mesh.FaceArea(f) / (maxEdge * maxEdge * Math.Sqrt(3) / 2);
+            foreach (var loop in mesh.Faces[f].Holes.Prepend(mesh.Faces[f].Loop))
+                for (var i = 0; i < loop.Count; i++)
+                {
+                    var (a, b) = (loop[i], loop[(i + 1) % loop.Count]);
+                    if (edges.Add(a < b ? (a, b) : (b, a)))
+                        count += Math.Max(0, Math.Ceiling(Length(D(mesh.Vertices[b]) - D(mesh.Vertices[a])) / maxEdge - 1e-9) - 1);
+                }
+        }
+        return count;
+    }
+
     public static EditResult Tessellate(PolygonMesh mesh, double maxEdge, IReadOnlyList<int>? faces = null)
     {
         var errors = new List<MeshError>();
@@ -37,6 +62,10 @@ public static class Tessellation
         if (errors.Count > 0) return EditResult.Refused(errors);
         var selected = (faces ?? mesh.LiveFaces.ToList()).Distinct().Order().ToList();
         if (selected.Count == 0) return EditResult.Refused([new MeshError("faces", "list at least one face")]);
+        var predicted = Predicted(mesh, selected, maxEdge);
+        if (predicted > Budget)
+            return EditResult.Refused([new MeshError("max_edge", MeshEdits.Invariant(
+                $"{maxEdge:G6} would add about {predicted:N0} new vertices, over the budget of {Budget:N0}; give a larger max_edge or fewer faces"))]);
 
         var verts = mesh.Vertices;
         var added = new List<Vector3>();
@@ -145,18 +174,11 @@ public static class Tessellation
                 ids.Add(v);
             }
 
-        // The loop edges in the plane z = 0, for PlaneGeometry's segment distance.
-        static Vector3D Flat(Vector2D p) => new(p.X, p.Y, 0);
-        var segments = loops.SelectMany(l => l.Select((v, i) => (A: Flat(Of(v)), B: Flat(Of(l[(i + 1) % l.Count]))))).ToArray();
-        var row = maxEdge * Math.Sqrt(3) / 2;
-        for (var j = 0; minY + j * row < maxY; j++)
-            for (var x = minX + (j % 2) * maxEdge / 2; x < maxX; x += maxEdge)
-            {
-                var p = new Vector2D(x, minY + j * row);
-                if (!Inside(loops, Of, p) || segments.Any(s => SegmentDistance(Flat(p), s.A, s.B) < maxEdge / 2)) continue;
-                cdt.Add(p);
-                ids.Add(-1);
-            }
+        foreach (var p in Lattice(loops.Select(l => l.Select(Of).ToArray()).ToArray(), maxEdge))
+        {
+            cdt.Add(p);
+            ids.Add(-1);
+        }
 
         foreach (var loop in loops)
             for (var i = 0; i < loop.Count; i++) cdt.Constrain(index[loop[i]], index[loop[(i + 1) % loop.Count]]);
@@ -191,5 +213,66 @@ public static class Tessellation
             added.Add(new Vector3((float)position.X, (float)position.Y, (float)position.Z));
         }
         return cdt.Inside().Select(t => (vertexOf[t.A], vertexOf[t.B], vertexOf[t.C])).ToList();
+    }
+
+    /// <summary>
+    /// The equilateral lattice at <paramref name="maxEdge"/> over a face's projected loops (<paramref name="loops"/>[0] the
+    /// outer), each point kept only inside the face and at least half the spacing clear of every loop segment, in row order.
+    /// RV-100: the same points as testing <see cref="PlaneGeometry.Inside"/> and every segment per point, found in about
+    /// linear time: a row's loop crossings are worked once, and the segments are bucketed in a grid of half the spacing.
+    /// </summary>
+    internal static List<Vector2D> Lattice(Vector2D[][] loops, double maxEdge)
+    {
+        var outer = loops[0];
+        var (minX, minY, maxX, maxY) = (outer.Min(p => p.X), outer.Min(p => p.Y), outer.Max(p => p.X), outer.Max(p => p.Y));
+        var clear = maxEdge / 2;
+        static Vector3D Flat(Vector2D p) => new(p.X, p.Y, 0);
+        (int, int) Cell(double x, double y) => ((int)Math.Floor((x - minX) / clear), (int)Math.Floor((y - minY) / clear));
+        var grid = new Dictionary<(int, int), List<(Vector3D A, Vector3D B)>>();
+        foreach (var loop in loops)
+            for (var i = 0; i < loop.Length; i++)
+            {
+                var (a, b) = (loop[i], loop[(i + 1) % loop.Length]);
+                var (lo, hi) = (Cell(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y)), Cell(Math.Max(a.X, b.X), Math.Max(a.Y, b.Y)));
+                for (var cx = lo.Item1; cx <= hi.Item1; cx++)
+                    for (var cy = lo.Item2; cy <= hi.Item2; cy++)
+                    {
+                        if (!grid.TryGetValue((cx, cy), out var list)) grid[(cx, cy)] = list = [];
+                        list.Add((Flat(a), Flat(b)));
+                    }
+            }
+
+        var kept = new List<Vector2D>();
+        var crossings = loops.Select(_ => new List<double>()).ToArray();
+        // A point is in a loop when an odd number of the row's crossings lie to its right, as PlaneGeometry.InPolygon counts.
+        static bool In(List<double> row, double x) => row.Count(c => x < c) % 2 == 1;
+        var rowStep = maxEdge * Math.Sqrt(3) / 2;
+        for (var j = 0; minY + j * rowStep < maxY; j++)
+        {
+            var y = minY + j * rowStep;
+            for (var l = 0; l < loops.Length; l++)
+            {
+                crossings[l].Clear();
+                var loop = loops[l];
+                for (var i = 0; i < loop.Length; i++)
+                {
+                    var (a, b) = (loop[i], loop[(i + 1) % loop.Length]);
+                    if ((a.Y > y) != (b.Y > y)) crossings[l].Add(a.X + (y - a.Y) * (b.X - a.X) / (b.Y - a.Y));
+                }
+            }
+            for (var x = minX + (j % 2) * maxEdge / 2; x < maxX; x += maxEdge)
+            {
+                if (!In(crossings[0], x) || crossings.Skip(1).Any(c => In(c, x))) continue;
+                var p = new Vector2D(x, y);
+                // A segment nearer than `clear` overlaps the 3 x 3 cells round p; one more ring covers rounding at the cell edges.
+                var (px, py) = Cell(x, y);
+                var near = false;
+                for (var cx = px - 2; cx <= px + 2 && !near; cx++)
+                    for (var cy = py - 2; cy <= py + 2 && !near; cy++)
+                        near = grid.TryGetValue((cx, cy), out var list) && list.Any(s => SegmentDistance(Flat(p), s.A, s.B) < clear);
+                if (!near) kept.Add(p);
+            }
+        }
+        return kept;
     }
 }

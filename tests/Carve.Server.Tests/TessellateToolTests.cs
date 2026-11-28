@@ -49,7 +49,9 @@ public sealed class TessellateToolTests() : TempFolderTests("carve-tessellate")
         Assert.Equal(body.GetProperty("faces").GetInt32() - 6, created.GetProperty("faces").GetProperty("count").GetInt32());
         var split = body.GetProperty("split").EnumerateArray().Single();
         Assert.Equal(3, split.GetProperty("face").GetInt32());
-        Assert.Equal(1 + created.GetProperty("faces").GetProperty("count").GetInt32(), split.GetProperty("pieces").GetArrayLength());
+        var pieces = split.GetProperty("pieces");
+        Assert.Equal(1 + created.GetProperty("faces").GetProperty("count").GetInt32(), pieces.GetProperty("count").GetInt32());
+        Assert.Equal([3, 6, 7, 8, 9, 10, 11, 12, 13, 14], pieces.GetProperty("first").EnumerateArray().Select(i => i.GetInt32()));
 
         // The four side faces took three points each on their top edge, and the bottom none.
         var mesh = JsonDocument.Parse(TextOf(await carve.CallToolAsync("get_mesh", "{}"))).RootElement;
@@ -71,6 +73,9 @@ public sealed class TessellateToolTests() : TempFolderTests("carve-tessellate")
     [InlineData("""{"max_edge":0.5,"group":"nope"}""", "nope")]
     [InlineData("""{"max_edge":0.5,"group":"top","faces":[3]}""", "group: give group or faces, not both")]
     [InlineData("""{"max_edge":0.5,"levels":2}""", "levels")]
+    [InlineData("""{"max_edge":0.5,"faces":[]}""", "faces: list at least one face")]
+    [InlineData("""{"max_edge":0.001,"faces":[3]}""", "over the budget of 200,000")]
+    [InlineData("""{"max_edge":1e-14,"faces":[3]}""", "new vertices, over the budget")]
     public async Task Bad_input_is_a_tool_error_that_changes_nothing(string arguments, string says)
     {
         var (carve, tools) = await StartAsync();
