@@ -720,6 +720,7 @@
         "tests/Carve.CharacterLoad.Tests/RunContent.cs",
         "scenarios/Carve.Scenario.Crate/ColourRule.cs",
         "samples/gatehouse.carve",
+        "samples/gatehouse.carvescript",
         "scripts/run-scenario.ps1",
         "scripts/bounded-run.ps1",
         "scripts/run-gatehouse-scenario.ps1"

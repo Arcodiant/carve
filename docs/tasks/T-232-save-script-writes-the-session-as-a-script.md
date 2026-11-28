@@ -4,7 +4,7 @@ description: >-
 ---
 # T-232 — save_script writes the session as a script
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -43,3 +43,27 @@ An agent calls `save_script {path}` and gets a `.carvescript` file holding what 
 - Read the milestone's *Decided at planning (2026-11-26)* first.
 - **Ask, don't land.** A rule neither this file nor the milestone settles, or a check that would be loosened, goes back to the person. Search `tests/` and `scenarios/` for what reads what you change before changing it. Show each new check failing on a wrong input, as a table in `### As built`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Built by one agent on Sonnet 5.5 (`claude-sonnet-5-5`), with no hand-off.
+
+- **`save_script`** (`SaveScriptTool.cs`, registered after `clear`): `path` (`.carvescript`, `ToolPaths.Resolve` and `ToolPaths.Write` as `save` uses them) and `verbosity`. It turns each `ModelStore.Journal` entry into a `ScriptStatement`, with each declared file (`JournalEntry.Files`) written as `Path.GetRelativePath(script folder, file)` with `/`, and writes them with `ScriptWriter`. A file argument that is an object field (`normal_texture.graph`) is rebuilt with only that string replaced (other properties via `JsonElement.WriteTo`, so numbers stay raw). It is not journalled (no step). Result: `saved <file> to <path>: N statements, M lines`; an empty journal says `no statements (the session has made no step), an empty file`. Lines are LF.
+- **Path rule**: a file with no relative path (another drive) refuses the whole save before anything is written: `save_script: statement 1 (open), argument path: the file '...' has no path relative to '...' (it is on another drive); ...`.
+- **`help {"topic":"scripts"}`** (`ScriptsTopic.cs`): grammar, what is written, path rule, literal ids, the worked example. T-233 extends it.
+- **Sample**: `samples/gatehouse.carvescript` is 14 statements, 42 lines (define_mesh, loop_cut, extrude, 3 merge_faces, 2 plane_cut, 3 knife, set_colour, delete, bridge). It reads as editable: one call a line, the slab's vertices and faces one a line as the Carve file has them, the knives' long point lists wrapped one point a line only past 120 characters. The ids are literal, so a person editing it works from the end (the topic says so). Written from the scenario's first run, then compared byte for byte on every run (`SaveScriptAsync` in `GatehouseScenario.cs`, before its own save and reopen). Added to scenario-gatehouse's inputs in `tests.json`; `samples/.gitattributes` has `*.carvescript text eol=lf`; the Gatehouse and `samples/` rows of `CLAUDE.md` and `README.md` updated (worked call, the sample).
+- **Pins re-taken**: `ToolHarnessTests` tool count 46 to 47 (only `save_script`); `HelpToolTests`' three "the topics are warnings" messages now end `warnings, scripts` (only the new topic); `VerbosityToolTests.Tools` gained a `save_script` row and `JournalToolTests.NoStep` names it.
+- **Frames**: the scenario takes every frame before `save_script`, and the call only reads the journal; I did not compare frame hashes against a baseline run, and no frame was looked at.
+- **Tests** (`SaveScriptToolTests`, `unit`, 9): the worked example run as written and equal to the description's and topic's text; a 15-call session across the edit families read back by `ScriptReader` to the journal's tools, argument names and values; awkward numbers; `open` of `models/x.carve` as `../models/x.carve`; a texture relative to a script two folders down; another drive refused and nothing written (ran here: this machine has C: and D:; it skips with a reason on one drive); empty journal; undo and clear reflected, save_script not journalled; the path refusals of `save`, silent and replaced.
+
+**Break table** (each planted alone in `SaveScriptTool.cs`, `SaveScriptToolTests` run, then reverted):
+
+| Planted fault | Fails |
+|---|---|
+| File written as the absolute path | sibling-folder open, texture subfolder |
+| Rooted relative path not refused | another drive |
+| Statements written in reverse | every-family read-back, undo/clear, worked example |
+| Only the first journal entry written | 5 tests |
+| Line count taken as the statement count | worked example |
+
+**Not checked**: a `define_material` graph slot object (`normal_texture.graph`) or `displace`'s `source.graph` written relative end to end (the code path is shared with the texture string and covered only by that); frames compared by hash.

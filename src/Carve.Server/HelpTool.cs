@@ -38,6 +38,7 @@ public sealed class HelpTool
     private static readonly (string Topic, string Covers, string Text)[] Topics =
     [
         ("warnings", "every warning of a mesh, its fix, how warnings are grouped and the verbosity levels", WarningsTopic.Text),
+        ("scripts", "the .carvescript statement format, the path rule, literal ids and what is journalled", ScriptsTopic.Text),
     ];
 
     /// <summary>The names of the topics, in the order <c>help {}</c> lists them.</summary>
