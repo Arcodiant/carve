@@ -98,6 +98,34 @@ made an undo step, with its arguments as sent, for `save_script`: `undo` takes
 the call back out, and `clear` or a whole-model `open` starts the list again.
 `save` leaves it alone and the `.carve` file never holds it.
 
+`save_script` writes that list as a `.carvescript` file, one statement per call, that a person or an agent can read and edit; `help {"topic":"scripts"}` gives the format. A file a call read (`open`'s path, a texture, a graph) is written as a path relative to the script, and one with no such path (another drive) refuses the save. Ids are as the calls gave them, so an edit that changes the topology shifts the ids a later line names. The worked call, on `define_mesh`'s unit cube and then `extrude` `{"mesh":"mesh","faces":[1],"distance":0.5}`, is `save_script` `{"path":"cube.carvescript"}`, which writes:
+
+```
+define_mesh(
+  vertices: [
+    [0, 0, 0],
+    [1, 0, 0],
+    [1, 1, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [1, 0, 1],
+    [1, 1, 1],
+    [0, 1, 1]
+  ],
+  faces: [
+    [0, 3, 2, 1],
+    [4, 5, 6, 7],
+    [0, 1, 5, 4],
+    [3, 7, 6, 2],
+    [0, 4, 7, 3],
+    [1, 2, 6, 5]
+  ]
+)
+extrude(mesh: "mesh", faces: [1], distance: 0.5)
+```
+
+`samples/gatehouse.carvescript` is the gatehouse scenario's session as such a script: 14 statements, 42 lines, from the slab to the bridge of the window loops.
+
 ## Asking the mesh
 
 An agent can question a mesh instead of reading every id out of `get_mesh`.
@@ -133,7 +161,7 @@ open`, `edges where nonmanifold`, `vertices where unattached`.
 On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-planar face is not a warning: `check` gives one note with the count and the worst case ("...; expected on a smooth mesh, which export triangulates"), every other tool says nothing, and `ok` can be true. `select faces where non_planar` names every one either way, and a flat mesh warns as above.
 
 `define_mesh`, `move`, `extrude`, `delete`, `merge_faces`, `bridge`, `plane_cut`,
-`loop_cut`, `knife`, `subdivide`, `tessellate`, `displace`, `undo`, `clear`, `open`, `check` and `export` take
+`loop_cut`, `knife`, `subdivide`, `tessellate`, `displace`, `undo`, `clear`, `save_script`, `open`, `check` and `export` take
 `verbosity`:
 
 ```
