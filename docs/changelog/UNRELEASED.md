@@ -5,3 +5,4 @@
 - T-232: save_script writes the session's journal as a .carvescript, paths relative to the script, and the gatehouse scenario's session is committed as samples/gatehouse.carvescript
 - T-233: run_script runs a script on the current model as one undo step, names the line of an error and leaves the model as it was, and answers counts and bounds for each mesh
 - T-234: scenario-replay calls every model-changing tool on small models of its own, saves, replays the exported script and compares the files byte for byte, and shows planted breaks caught
+- T-235: A fresh agent builds a prop through the tools, exports it as a script, changes a number by hand and runs it again
