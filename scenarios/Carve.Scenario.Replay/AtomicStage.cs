@@ -57,6 +57,7 @@ internal sealed class AtomicStage : IReplayStage
             await File.WriteAllTextAsync(P("refused"), "move(mesh: \"cube\", faces: [1], by: [0, 0.1, 0])\n" + statement + "\n");
             await Refused(d, "run_script", new { path = P("refused") }, "line 2", tool);
             Equal($"{tool} in a script: the model", model, await Ok(d, "get_mesh", new { mesh = "cube" }));
+            Equal($"{tool} in a script: the journal", journal, await Script(d, P("atomic-r")));
         }
 
         // Not in this stage's own script: a statement that is not a call at all.

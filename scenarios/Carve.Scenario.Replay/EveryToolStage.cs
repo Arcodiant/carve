@@ -132,6 +132,12 @@ internal sealed class EveryToolStage : IReplayStage
         Equal("replay: B has A's length", a.Length, b.Length);
         if (!Same(a, b)) Note($"replay: b.carve differs from a.carve (first at byte {a.AsSpan().CommonPrefixLength(b)})");
         var after = await d.CaptureAsync("replay-after", new { view = "front" });
+        // Two empty frames are byte-equal too: some 1 % of the frame must differ by over 40 from the sky at its row's left edge.
+        var drawn = 0;
+        for (var y = 0; y < before.Height; y++)
+            for (var x = 0; x < before.Width; x++)
+                if (Math.Abs(before.Pixel(x, y).R - before.Pixel(0, y).R) + Math.Abs(before.Pixel(x, y).G - before.Pixel(0, y).G) + Math.Abs(before.Pixel(x, y).B - before.Pixel(0, y).B) > 40) drawn++;
+        if (drawn < before.Width * before.Height / 100) Note($"replay: the front render shows little or nothing drawn ({drawn} pixels differ from the sky)");
         if (!Same(before.Pixels, after.Pixels)) Note("replay: the front render after replay differs from before");
     }
 }

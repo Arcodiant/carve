@@ -70,7 +70,7 @@ public sealed class ScriptAcceptanceTests
     }
 
     [Run]
-    public void Every_file_tool_path_is_inside_the_round_folder()
+    public void Every_file_tool_path_is_inside_the_sessions_folder()
     {
         string? cwd = null;
         var outside = new List<string>();
