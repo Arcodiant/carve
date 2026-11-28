@@ -147,7 +147,7 @@ public sealed class DefineMaterialTool(ModelStore store, ToolFolder toolFolder)
             ["occlusion_texture"] = Slot("A .png path; linear, occlusion in R."),
         },
         ["required"] = new JsonArray("name"),
-    }));
+    }), "base_colour_texture", "base_colour_texture.graph", "metallic_roughness_texture", "metallic_roughness_texture.graph", "normal_texture", "normal_texture.graph", "emissive_texture", "emissive_texture.graph", "occlusion_texture", "occlusion_texture.graph");
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context,
         JsonElement? name = null, JsonElement? base_colour = null, JsonElement? metallic = null, JsonElement? roughness = null,

@@ -109,7 +109,7 @@ public sealed class DefineTargetTool(ModelStore store, ToolFolder toolFolder)
             },
         },
         ["required"] = new JsonArray("name"),
-    })));
+    })), "file");
 
     private static JsonObject Position() => new()
     {

@@ -60,7 +60,7 @@ public sealed class DisplaceTool(ModelStore store, ToolFolder toolFolder)
             ["group"] = new JsonObject { ["description"] = "A face group from define_group whose corners to displace.", ["type"] = "string" },
         },
         ["required"] = new JsonArray("source", "amount"),
-    })));
+    })), "source.graph");
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? source = null, JsonElement? amount = null,
         JsonElement? midlevel = null, JsonElement? axis = null, JsonElement? vertices = null, JsonElement? faces = null,
