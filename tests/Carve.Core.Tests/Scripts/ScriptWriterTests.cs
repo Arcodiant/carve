@@ -172,6 +172,10 @@ public class ScriptWriterTests
         Assert.Throws<ArgumentException>(() => ScriptWriter.Write(S(tool, (argument, "1"))));
 
     [Fact]
+    public void A_lone_surrogate_in_a_string_is_refused_as_an_argument_exception() =>
+        Assert.Throws<ArgumentException>(() => ScriptWriter.Write(S("f", ("s", "\"\\ud800\""))));
+
+    [Fact]
     public void A_repeated_argument_is_refused() =>
         Assert.Throws<ArgumentException>(() => ScriptWriter.Write(S("f", ("a", "1"), ("a", "2"))));
 }

@@ -17,7 +17,7 @@ public static class ScriptWriter
     private static readonly JsonSerializerOptions StringOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     /// <summary>The script's text: one statement after another, LF line ends and a final newline; empty for no statements.</summary>
-    /// <exception cref="ArgumentException">A tool or argument name is not a name (<c>[a-z_][a-z0-9_]*</c>), or one statement repeats an argument, so the text would not read back.</exception>
+    /// <exception cref="ArgumentException">A tool or argument name is not a name (<c>[a-z_][a-z0-9_]*</c>), one statement repeats an argument, or a string holds a lone surrogate, so the text would not read back.</exception>
     public static string Write(CarveScript script)
     {
         ArgumentNullException.ThrowIfNull(script);
@@ -35,6 +35,19 @@ public static class ScriptWriter
     {
         ArgumentNullException.ThrowIfNull(statement);
         Check(statement);
+        try
+        {
+            return Render(statement);
+        }
+        catch (InvalidOperationException e)
+        {
+            // JsonElement.GetString refuses a lone-surrogate escape such as "\ud800".
+            throw new ArgumentException($"a string in '{statement.Tool}' holds a lone surrogate, so the text would not read back", nameof(statement), e);
+        }
+    }
+
+    private static string Render(ScriptStatement statement)
+    {
         var line = $"{statement.Tool}({string.Join(", ", statement.Arguments.Select(a => $"{a.Name}: {Compact(a.Value)}"))})";
         if (line.Length <= Width)
             return line;
