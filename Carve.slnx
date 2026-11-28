@@ -33,6 +33,7 @@
   <Project Path="tests/Carve.SoftLoad.Tests/Carve.SoftLoad.Tests.csproj" />
   <Project Path="tests/Carve.GatehouseLoad.Tests/Carve.GatehouseLoad.Tests.csproj" />
   <Project Path="tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj" />
+  <Project Path="tests/Carve.ScriptAcceptance.Tests/Carve.ScriptAcceptance.Tests.csproj" />
   <Project Path="tests/Carve.OrcwardLoad.Tests/Carve.OrcwardLoad.Tests.csproj" />
   <Project Path="tests/Carve.MorphLoad.Tests/Carve.MorphLoad.Tests.csproj" />
   <Project Path="spikes/Carve.ModelViewer/Carve.ModelViewer.csproj" />
