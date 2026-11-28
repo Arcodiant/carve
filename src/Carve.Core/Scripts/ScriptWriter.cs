@@ -67,7 +67,7 @@ public static class ScriptWriter
             : Compact(value);
 
     /// <summary>A JSON value on one line with <c>, </c> and <c>: </c> between items; numbers, <c>true</c>, <c>false</c> and <c>null</c> as their raw tokens.</summary>
-    internal static string Compact(JsonElement value) => value.ValueKind switch
+    private static string Compact(JsonElement value) => value.ValueKind switch
     {
         JsonValueKind.Array => "[" + string.Join(", ", value.EnumerateArray().Select(Compact)) + "]",
         JsonValueKind.Object => "{" + string.Join(", ", value.EnumerateObject().Select(p => Text(p.Name) + ": " + Compact(p.Value))) + "}",
