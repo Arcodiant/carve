@@ -94,6 +94,12 @@ public sealed class RunScriptToolTests() : TempFolderTests("carve-run-script")
         Assert.Same(model, carve.Store.Current.Model);
         Assert.Equal(version, carve.Store.Current.Version);
         Assert.Equal(journal, Calls(carve));
+        // The next call builds on the model as it was, at the next version.
+        await Say(carve, "move", """{"faces":[3],"by":[0,0.1,0]}""");
+        Assert.Equal(version + 1, carve.Store.Current.Version);
+        Assert.Equal([.. journal, "move faces=[3] by=[0,0.1,0]"], Calls(carve));
+        Assert.Contains("\"undone\":\"move\"", await Say(carve, "undo", "{}"));
+        Assert.Same(model, carve.Store.Current.Model);
         Assert.Contains("\"undone\":\"extrude\"", await Say(carve, "undo", "{}"));
     }
 
