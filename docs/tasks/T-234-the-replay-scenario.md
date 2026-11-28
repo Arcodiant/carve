@@ -99,6 +99,8 @@ Built by one agent on Sonnet 5.5 (`claude-sonnet-5-5`), with no hand-off.
 
 **Findings**: no product bug in T-231..T-233 found. One limit: `1e308` cannot go in a script, because every tool keeps floats and refuses it (`define_part` scale, `define_clip` time); stage 3 uses `1e38` for the clip's duration and keeps `0.1`, `0.30000000000000004`, `-0`, `5e-324` (vertices) and unicode names; the format-level `1e308` is T-230's test. Stage 2 uses `undo` twice, since `undo` has no `steps`. The "version unchanged" part of stage 4 is checked through the model, the saved file, the journal and what undo then does, since no tool shows the version.
 
+**1e38 kept (the person, 2026-11-28, Waystone review, option A)**: stage 3 keeps `1e38` and not `1e308`; every tool stores floats and refuses `1e308`, so no session's script can carry it, and the format's bit-exactness on `1e308` is held by T-230's Core tests.
+
 **Frame review**: one subagent looked at the frame (identical bytes, so one opened): non-empty model, three objects visible (a box, a bumpy box, a red-topped plate), no defect; the others overlap or sit behind in the front view, and the group is small in the frame. No golden or choice for the person.
 
 **Not checked**: the gatehouse suite's measured time; the `scenario-replay` run on another machine than the verify farm and this one.
