@@ -137,12 +137,28 @@ public sealed class GatehouseScenario : IScenario
         Equal("check: no warnings", 0, check.GetProperty("warnings").GetArrayLength());
         await frames.StageAsync(7, "bridged", beforeWindows, doorFace: doorFace, last: true);
 
+        await SaveScriptAsync(driver, work);
         await SaveOpenExportAsync(driver, work);
 
         if (Failures.Count > 0)
         {
             driver.Fail($"{Failures.Count} check(s) failed:\n" + string.Join("\n", Failures.Select(f => "  " + f)));
         }
+    }
+
+    /// <summary>
+    /// The session's calls written as a script (T-232) before the save and reopen start a new journal, and compared byte for byte
+    /// with the committed <c>samples/gatehouse.carvescript</c>. No frame is taken here.
+    /// </summary>
+    private static async Task SaveScriptAsync(ScenarioDriver driver, string work)
+    {
+        var path = Path.Combine(work, "gatehouse.carvescript");
+        var saved = await CallTextAsync(driver, "save_script", new { path });
+        Equal("save_script: a new gatehouse.carvescript", true, saved.Contains("gatehouse.carvescript") && !saved.Contains("replaced"));
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Carve.slnx"))) directory = directory.Parent;
+        var sample = Path.Combine(directory?.FullName ?? throw new InvalidOperationException("Carve.slnx was not found above " + AppContext.BaseDirectory), "samples", "gatehouse.carvescript");
+        driver.AssertBytesEqual("gatehouse.carvescript against samples/gatehouse.carvescript", await File.ReadAllBytesAsync(sample), await File.ReadAllBytesAsync(path));
     }
 
     /// <summary>
