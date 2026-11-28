@@ -39,6 +39,7 @@ public sealed class VerbosityToolTests
         { "undo", ["define_mesh " + Cube, """move {"faces":[3],"by":[0,0.5,0]}"""], "{}", """{"steps":2}""" },
         { "clear", ["define_mesh " + Cube], "{}", """{"mesh":"x"}""" },
         { "save_script", ["define_mesh " + Cube], """{"path":"s.carvescript"}""", """{"path":"s.carve"}""" },
+        { "run_script", ["define_mesh " + Cube, """save_script {"path":"s.carvescript"}""", """move {"faces":[3],"by":[0,0.5,0]}"""], """{"path":"s.carvescript"}""", """{"path":"s.carve"}""" },
         { "open", ["define_mesh " + Cube, """save {"path":"v.carve"}""", """move {"faces":[3],"by":[0,0.5,0]}"""], """{"path":"v.carve"}""", """{"path":"missing.carve"}""" },
         { "check", ["define_mesh " + Cube], "{}", """{"mesh":"nope"}""" },
         { "export", ["define_mesh " + Cube], """{"path":"v.glb"}""", """{"path":"v.txt"}""" },

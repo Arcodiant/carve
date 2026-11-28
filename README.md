@@ -124,7 +124,18 @@ define_mesh(
 extrude(mesh: "mesh", faces: [1], distance: 0.5)
 ```
 
-`samples/gatehouse.carvescript` is the gatehouse scenario's session as such a script: 14 statements, 42 lines, from the slab to the bridge of the window loops.
+`samples/gatehouse.carvescript` is the gatehouse scenario's session as such a script: 14 statements, 42 lines, from the slab to the bridge of the window loops; `clear` then `run_script` of it saves `samples/gatehouse.carve` byte for byte.
+
+`run_script` runs such a file on the current model: each statement is a call of its tool, with the same checks, and a relative file argument resolves against the script's folder. It is all or nothing and one undo step: a statement its tool refuses is a tool error naming its line, the tool and the tool's message, and leaves the model, undo history and the list of calls as they were. Tools that change nothing (`save`, `export`, `render`, the queries) and `undo` and `run_script` are refused as statements. The list of calls gets the script's statements, so `save_script` afterwards writes them. The worked call, on an empty model with `slab.carvescript` holding
+
+```
+define_mesh(vertices: [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], faces: [[0, 1, 2, 3]])
+extrude(faces: [0], distance: 0.5)
+```
+
+is `run_script` `{"path":"slab.carvescript"}`, which returns `{"statements":2,"meshes":[{"name":"mesh","vertices":8,"faces":5,"edges":12,"closed":false,"bounds":{"min":[0,0,0],"max":[1,1,0.5]},"warnings":[...]}]}`.
+
+The loop this is for: explore with calls and renders, `save_script` to keep the steps, edit the script (from the end, since ids are literal), then `clear` and `run_script` it to rebuild the model in one step.
 
 ## Asking the mesh
 
@@ -161,7 +172,7 @@ open`, `edges where nonmanifold`, `vertices where unattached`.
 On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-planar face is not a warning: `check` gives one note with the count and the worst case ("...; expected on a smooth mesh, which export triangulates"), every other tool says nothing, and `ok` can be true. `select faces where non_planar` names every one either way, and a flat mesh warns as above.
 
 `define_mesh`, `move`, `extrude`, `delete`, `merge_faces`, `bridge`, `plane_cut`,
-`loop_cut`, `knife`, `subdivide`, `tessellate`, `displace`, `undo`, `clear`, `save_script`, `open`, `check` and `export` take
+`loop_cut`, `knife`, `subdivide`, `tessellate`, `displace`, `undo`, `clear`, `save_script`, `run_script`, `open`, `check` and `export` take
 `verbosity`:
 
 ```

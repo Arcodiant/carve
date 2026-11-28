@@ -29,19 +29,24 @@ public sealed class ModelStore
     private ModelSnapshot _current = new(Model.Empty, 0);
     private ImmutableList<JournalEntry> _journal = [];
 
+    // What another flow sees: _current and _journal as of the last step outside a batch (T-233), so a render never sees a half-run script.
+    private ModelSnapshot _published = new(Model.Empty, 0);
+    private ImmutableList<JournalEntry> _publishedJournal = [];
+    private readonly AsyncLocal<bool> _inBatch = new();
+
     /// <summary>
     /// The calls that made the current model (T-231): every tool call that pushed a step, since the last whole-model
     /// <c>open</c> or <c>clear</c> (which is the first entry), or since the process started. Undo takes the step's entries
     /// out again. Not capped at <see cref="UndoDepth"/>; never saved. Immutable, so safe to read from any thread.
     /// </summary>
-    public IReadOnlyList<JournalEntry> Journal => Volatile.Read(ref _journal);
+    public IReadOnlyList<JournalEntry> Journal => _inBatch.Value ? _journal : Volatile.Read(ref _publishedJournal);
 
     /// <summary>
     /// The current mesh (null until the first success) and its version. Version is 0 while empty and
     /// rises by exactly 1 on every change, an undo included; a reader that kept the last version it drew
     /// redraws when <c>Version</c> differs. Safe to read from any thread, never torn.
     /// </summary>
-    public ModelSnapshot Current => Volatile.Read(ref _current);
+    public ModelSnapshot Current => _inBatch.Value ? _current : Volatile.Read(ref _published);
 
     /// <summary>
     /// Puts <paramref name="mesh"/> in the model under <paramref name="name"/> as the result of <paramref name="tool"/>:
@@ -426,8 +431,7 @@ public sealed class ModelStore
             var undone = _history[^1].Tool;
             _history.RemoveAt(_history.Count - 1);
             var next = new ModelSnapshot(_history[^1].Model, _current.Version + 1);
-            Volatile.Write(ref _journal, _history[^1].Journal);
-            Volatile.Write(ref _current, next);
+            Set(next, _history[^1].Journal);
             return new UndoResult(undone, next);
         }
     }
@@ -447,11 +451,53 @@ public sealed class ModelStore
         entries ??= call is null ? [] : [call.Entry()];
         var journal = (restart ? ImmutableList<JournalEntry>.Empty : _journal).AddRange(entries);
         _history.Add((model, tool, journal));
-        Volatile.Write(ref _journal, journal);
         if (_history.Count > UndoDepth + 1) _history.RemoveAt(0);
         var next = new ModelSnapshot(model, _current.Version + 1);
-        Volatile.Write(ref _current, next);
+        Set(next, journal);
         return next;
+    }
+
+    /// <summary>Makes <paramref name="next"/> and <paramref name="journal"/> current, and publishes them to other flows unless a batch is under way on this one.</summary>
+    private void Set(ModelSnapshot next, ImmutableList<JournalEntry> journal)
+    {
+        _current = next;
+        _journal = journal;
+        if (_inBatch.Value) return;
+        Volatile.Write(ref _publishedJournal, journal);
+        Volatile.Write(ref _published, next);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="run"/> as one step of <paramref name="tool"/>, all or nothing (T-233's run_script). It holds the
+    /// write lock throughout, so no other call interleaves, and <paramref name="run"/> must finish on this thread (the lock
+    /// is the thread's: the tools it calls take it again). Inside, each call's step is pushed as usual and seen by this flow
+    /// only; no other flow (the frame thread, another call) sees any of it. When <paramref name="run"/> gives a problem or
+    /// throws, the model, history, journal and version are put back as they were; otherwise the steps are folded into one,
+    /// journalled as the entries they made (a clear or whole-model open among them restarting it), published as one version.
+    /// </summary>
+    public ModelSnapshot? Batch(string tool, Func<string?> run, out string? problem)
+    {
+        lock (_write)
+        {
+            if (_inBatch.Value) throw new InvalidOperationException($"{tool}: a batch inside a batch");
+            var (current, journal, history) = (_current, _journal, _history.ToList());
+            Model model;
+            ImmutableList<JournalEntry> entries;
+            try
+            {
+                _inBatch.Value = true;
+                problem = run();
+            }
+            finally
+            {
+                _inBatch.Value = false;
+                (model, entries) = (_current.Model, _journal);
+                (_current, _journal) = (current, journal);
+                _history.Clear();
+                _history.AddRange(history);
+            }
+            return problem is null ? PushLocked(model, tool, restart: true, entries) : null;
+        }
     }
 }
 
