@@ -79,17 +79,19 @@ What the agent did:
 - Each script, run from `clear` in a linked `ToolHarness`, gives its `.carve` file byte for byte.
 - The edited script keeps every exported statement in order (`acceptance/script.diff`).
 - The measurement: 3 backs, then 4, at heights 0.34 and 0.245, with bounds (-0.4, 0, 0) to (0.4, 1.2, 0.3) (`acceptance/measure.tsv`).
-- Every file-tool path is inside the session's folder.
+- Every file-tool path (Read, Write, Edit) in `transcript.jsonl` is under the session's `cwd`, the `cwd`'s folder name is the round's, and each such file is at the same relative path in the round folder (the session ran from a copy under `%TEMP%`, so the tie is by name and by content; a session rooted at `C:\` or elsewhere fails). Found at RV-105; the first version only bounded paths by the first `cwd`.
 
 The project is a `dotnet-closure` input of `server-unit` and is in `Carve.slnx`. `ToolHarness.cs` is linked from the server tests; `Harness.cs` supplies the two names it takes from `CarveProcess.cs`.
 
-**Negatives** (`scripts/run-script-acceptance-negatives.ps1`, `acceptance/negatives.tsv`): all three are caught.
+**Negatives** (`scripts/run-script-acceptance-negatives.ps1`, `acceptance/negatives.tsv`): all five are caught.
 
 | Break | Fails |
 |---|---|
 | A byte changed in `prop.carve` | byte for byte, measurement |
 | The edited script swapped for the exported one | statements kept, edited byte for byte |
 | The measurement off (the edited pair is the exported pair) | statements kept, measurement |
+| The transcript's `cwd` is `C:\` | file-tool paths |
+| The file the agent wrote is not a file of the round (the transcript names `prop-elsewhere.carvescript`) | file-tool paths |
 
 **Frames.** The only frames are the agent's two renders, taken out of the transcript (`render-1.png`, `render-2.png`). A subagent reviewed them: 3 and then 4 compartments, equal in height, the right colours, depth that reads, no defect. Neither frame carries a choice. This task adds no golden.
 
