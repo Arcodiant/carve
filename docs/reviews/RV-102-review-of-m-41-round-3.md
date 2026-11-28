@@ -38,7 +38,9 @@ The `unit` test asserts `watch.ElapsedMilliseconds < 500` around the first `Tess
 
 To pin "refused at once" without timing, drop the stopwatch. If the "no work done" claim needs its own assert, call the internal overload with `stop` 0 and expect the "about" message, not "more than 0".
 
-**Outcome:** fixed: in 0a550017 the stopwatch assert is removed from the 40 x 0.01 strip test, and a second call with `stop` 0 asserts the "about ..." prediction error, not "more than 0", pinning that the gate refuses before any work.
+**Outcome:** fixed
+
+In 0a550017 the stopwatch assert is removed from the 40 x 0.01 strip test, and a second call with `stop` 0 asserts the "about ..." prediction error, not "more than 0", pinning that the gate refuses before any work.
 
 ## Summary
 
