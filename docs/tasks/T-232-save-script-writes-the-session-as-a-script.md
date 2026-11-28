@@ -4,7 +4,7 @@ description: >-
 ---
 # T-232 — save_script writes the session as a script
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
