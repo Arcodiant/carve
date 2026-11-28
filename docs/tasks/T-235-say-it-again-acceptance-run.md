@@ -40,7 +40,7 @@ A fresh agent, given only the plain `carve` server and a short brief, builds a s
 
 ### As built
 
-Orchestrated by Claude Opus 5.5 (`claude-opus-5-5`). The acceptance session ran on `claude-opus-5-5`, read from the transcript's init event, and was pinned with `--model`.
+Orchestrated by Claude Opus 5.5 (`claude-opus-5-5`), in two agents, both Opus 5.5: the first ran the round, the checks and the negatives and handed off at its 60-call checkpoint; the second ran `verify`, `lint` and `finish`. The acceptance session ran on `claude-opus-5-5`, read from the transcript's init event, and was pinned with `--model`.
 
 **Rulings (2026-11-28, through `mcp__waystone__review`).**
 
@@ -107,28 +107,8 @@ The project is a `dotnet-closure` input of `server-unit` and is in `Carve.slnx`.
 - `%TEMP%\carve-m34-t235\`: the publish and the run copy;
 - `%TEMP%\carve-script-acceptance-negatives\`.
 
+**Verify:** passes, with one warning: `CLAUDE.md` and `scripts/run-script-acceptance-negatives.ps1` are inputs of no suite.
+
+**Surprising:** the agent used `knife`, not `loop_cut`, so the plant never fired; and the Scope's `--tools ""` could not have worked, since editing by hand needs the file tools (ruled A).
+
 **Not checked:** a second round; the default model (`claude-fable-5-2`); `run_script`'s line error in a real session.
-
-### Hand-off
-
-Handed off at the 60-call checkpoint by the first agent (Claude Opus 5.5).
-
-**Done:**
-
-- the round, the rulings, the checks project and the negatives;
-- the `tests.json` input and the `Carve.slnx` and `CLAUDE.md` rows;
-- `### As built`.
-
-**Checked:** the checks project builds; 5 of 5 pass on round 1, and all three negatives are caught.
-
-**Left:**
-
-1. `cairn task T-235 verify` until clean. It has not been run yet; server-unit now compiles the new project.
-2. `cairn lint`.
-3. `cairn task T-235 finish` from inside this worktree. `finish` cannot delete the worktree that is the shell's cwd, which is expected.
-
-**Surprising:**
-
-- The agent used `knife`, not `loop_cut`.
-- The plant never fired.
-- The Scope's `--tools ""` could not have worked, since the agent needs file tools to edit by hand; ruled A.
