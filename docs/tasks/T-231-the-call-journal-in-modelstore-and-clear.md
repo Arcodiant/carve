@@ -65,7 +65,7 @@ Built by one agent on Opus 5.5 (`claude-opus-5-5`), with no hand-off.
 - Outside a tool call (tests that drive the store directly), a push journals nothing.
 
 **clear** (`ClearTool.cs`, registered after `undo`):
-- Its description is 701 characters. Its worked example is `{}` on the unit cube, and the clear test runs it as written.
+- Its worked example is `{}` on the unit cube, and the clear test runs it as written.
 - `undo` names `clear` and has one more sentence: undo also takes the step out of the list of calls `save_script` writes. Both descriptions pass `HelpToolTests`' 3,686 ceiling.
 - `README.md` adds `clear` to the verbosity list and has a paragraph on the session's calls.
 
