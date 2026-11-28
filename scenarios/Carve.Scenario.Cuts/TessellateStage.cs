@@ -71,7 +71,7 @@ internal sealed class TessellateStage : ICutsStage
         await CallJsonAsync(driver, "define_group", new { name = "wear", faces = new[] { 1 } });
         var before = await Solid.ReadAsync(driver);
 
-        var result = await CallJsonAsync(driver, "tessellate", new { max_edge = MaxEdge, group = "wear" });
+        var result = await CallJsonAsync(driver, "tessellate", new { max_edge = MaxEdge, group = "wear", verbosity = "full" });
         Equal("tessellate: closed", true, result.GetProperty("closed").GetBoolean());
         Equal("tessellate: warnings", 0, result.GetProperty("warnings").GetArrayLength());
         var split = result.GetProperty("split").EnumerateArray().ToArray();
