@@ -108,6 +108,8 @@ Ran on Claude Opus 5.5 (two agents; the first handed off at its 60-call checkpoi
   refinement puts one point on the middle line of each. The edges are still cut along the length only. Colour and
   material are exclusive on a face (`WithColour` drops the material).
 - RV-100, round 1 (Claude Opus 5.5, one agent), after the person's two rulings of 2026-11-27 above:
+  - The Cuts scenario's `TessellateStage` reads every piece, so it now asks for `verbosity: "full"`; its mesh and
+    frames are as before. `DefineMeshDefinitionTests`' published schema carries the new verbosity text.
   - `split` at summary: `MeshToolSupport.Split(split, level)` gives each face's `pieces` through `Moved`, used by
     `tessellate` only (`subdivide` and `displace` answer `split:[]` or few pieces and keep the whole list).
   - Budget: `Tessellation.Budget` (200,000) and `Tessellation.Predicted(mesh, faces, maxEdge)`: each distinct edge's
