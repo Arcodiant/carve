@@ -103,7 +103,7 @@ public sealed class SaveScriptTool(ModelStore store, ToolFolder toolFolder)
             var index = arguments.FindIndex(a => a.Key == parts[0]);
             arguments[index] = (parts[0], parts.Length == 1 ? Json(w => w.WriteStringValue(relative)) : Json(w => Replace(arguments[index].Value, parts[1], relative, w)));
         }
-        statement = new ScriptStatement(entry.Tool, arguments.Select(a => (a.Key, a.Value)).ToList());
+        statement = new ScriptStatement(entry.Tool, arguments);
         return true;
     }
 
