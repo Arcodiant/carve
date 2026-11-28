@@ -157,6 +157,15 @@ internal static class MeshToolSupport
     public static object[] Split(IReadOnlyList<SplitFace> split) =>
         [.. split.Select(s => new { face = s.Face, pieces = s.Pieces })];
 
+    /// <summary><see cref="Split(IReadOnlyList{SplitFace})"/> short at summary, as <see cref="Moved"/>: each face's pieces (RV-100's
+    /// ruling, 2026-11-27), and the list itself <c>{count, first}</c> with the first 10 faces (RV-101, the filter's answer of
+    /// 2026-11-27); the whole list at full.</summary>
+    public static object Split(IReadOnlyList<SplitFace> split, Verbosity level)
+    {
+        object[] Entries(IEnumerable<SplitFace> faces) => [.. faces.Select(s => new { face = s.Face, pieces = Moved(s.Pieces, level) })];
+        return level == Verbosity.Full ? Entries(split) : new { count = split.Count, first = Entries(split.Take(10)) };
+    }
+
     /// <summary>The levels of the <c>verbosity</c> argument (M-23's ruling 3), read by <see cref="ReadVerbosity"/>.</summary>
     public enum Verbosity { Summary, Silent, Full }
 
@@ -164,7 +173,7 @@ internal static class MeshToolSupport
     public const string VerbositySchemaText =
         "How much the result says. \"summary\", the default: the result as always, a kind of warning with 4 or more listed as one line "
         + "(its count, the worst case, three samples and the select query that names them all). "
-        + "\"full\": the same, with every warning one per line. "
+        + "\"full\": the same, with every warning one per line, and long id lists (moved, tessellate's split pieces), {count, first} with the first 10 ids at summary, whole. "
         + "\"silent\": only {\"ok\":true}, no counts, ids or warnings, and the change is made all the same (one undo step); "
         + "check answers {\"ok\":<its own ok>}, and export answers that JSON though its result is otherwise a line of text. "
         + "A tool error is returned whole at every level. Any other value is a tool error.";
@@ -196,6 +205,10 @@ internal static class MeshToolSupport
         errors.Add($"verbosity: expected \"silent\", \"summary\" or \"full\", got {got}");
         return Verbosity.Summary;
     }
+
+    /// <summary>A long id list (<c>moved</c>, tessellate's <c>split</c> pieces): the whole list at full, otherwise <c>{count, first}</c> with the first 10 ids.</summary>
+    public static object Moved(IReadOnlyList<int> ids, Verbosity level) =>
+        level == Verbosity.Full ? ids : new { count = ids.Count, first = ids.Take(10).ToArray() };
 
     /// <summary>A mesh's warnings as result lines: grouped by kind (T-197), or at <c>full</c> every warning one per line.</summary>
     public static IReadOnlyList<string> WarningLines(IReadOnlyList<MeshWarning> warnings, Verbosity level) =>
@@ -329,6 +342,19 @@ internal static class MeshToolSupport
     public static string NoGroup(FaceStyle? style, string name) => style is null || style.Groups.Count == 0
         ? $"group: no group named '{name}'; the mesh has no groups yet, define one with define_group"
         : $"group: no group named '{name}'; the mesh's groups are {style.GroupNames}";
+
+    /// <summary>
+    /// The faces an edit given <c>faces</c> or <c>group</c> works on, read inside the store's lock on the mesh the edit is
+    /// given: <paramref name="faces"/>, or the group's. An unknown group sets <paramref name="noGroup"/> and gives an empty
+    /// list, so the Core refuses without trying the edit.
+    /// </summary>
+    public static List<int>? FacesOrGroup(PolygonMesh mesh, List<int>? faces, string? groupName, ref string? noGroup)
+    {
+        if (groupName is null) return faces;
+        if (mesh.Style?.FacesOf(groupName) is { } grouped) return [.. grouped];
+        noGroup = NoGroup(mesh.Style, groupName);
+        return [];
+    }
 
     /// <summary>An optional list of integer ids; null when absent.</summary>
     public static List<int>? Ids(string name, JsonElement? value, List<string> errors)

@@ -5,4 +5,9 @@
     <RootNamespace>Carve.Core</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- RV-100: the lattice filter's equivalence test reaches Tessellation.Lattice and PlaneGeometry. -->
+    <InternalsVisibleTo Include="Carve.Core.Tests" />
+  </ItemGroup>
+
 </Project>

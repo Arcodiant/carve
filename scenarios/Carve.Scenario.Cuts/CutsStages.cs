@@ -20,5 +20,6 @@ internal static class CutsStages
         new LoopCutStage(),
         new KnifeStage(),
         new DisplaceStage(),
+        new TessellateStage(),
     ];
 }

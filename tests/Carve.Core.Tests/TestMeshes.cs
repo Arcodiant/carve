@@ -278,4 +278,89 @@ internal static class TestMeshes
         }
         return Make(vertices, faces);
     }
+
+    /// <summary>
+    /// The dais (T-237, M-41's fixture, shaped like Shoalward's <c>D-DAIS</c>): a slab in millimetres, x 0..40, y 0..6 (top),
+    /// z 0..30, its top two faces (0 and 1, split at x = 20) each holed by a 4 x 4 socket 3 deep (walls and a floor), its
+    /// bottom (face 2) holed by two 3 x 3 pegs 3 long under the sockets. Every edge is hard and the top faces are group
+    /// <c>wear</c>. Faces: 0, 1 top; 2 bottom; 3 front (+z, a pentagon through (20, 6, 30)); 4 back (-z, through
+    /// (20, 6, 0)); 5 left; 6 right; 7..11 the left socket (floor, then walls), 12..16 the right; 17..21 the left peg (walls,
+    /// then cap), 22..26 the right. 42 vertices: 0..9 the box, 10..17 and 18..25 the sockets (top ring, floor ring), 26..33
+    /// and 34..41 the pegs (bottom ring, cap ring). Closed, and <see cref="MeshReport"/> warns of nothing.
+    /// </summary>
+    public static PolygonMesh Dais()
+    {
+        var made = PolygonMesh.Create(DaisVertices, DaisFaces);
+        Assert.True(made.Succeeded, string.Join("; ", made.Errors));
+        var mesh = made.Mesh!;
+        return mesh.WithShade(MeshShade.Of(ShadingMode.Flat, mesh.Topology.Edges.Select(e => (e.Lo, e.Hi))))
+            .WithStyle(FaceStyle.None.WithGroup("wear", [0, 1]));
+    }
+
+    /// <summary>The dais's group: its top faces.</summary>
+    public const string DaisGroup = "wear";
+
+    /// <summary>The <c>max_edge</c> M-41 tessellates the dais at.</summary>
+    public const float DaisMaxEdge = 0.75f;
+
+    public static readonly Vector3[] DaisVertices = [.. DaisPoints()];
+
+    public static readonly Face[] DaisFaces = [.. DaisLoops()];
+
+    /// <summary>The dais as <c>define_mesh</c>'s arguments, for the server's tests (the hard edges and the group are not in it).</summary>
+    public static string DaisDefineMesh() => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        vertices = DaisVertices.Select(v => new[] { v.X, v.Y, v.Z }),
+        faces = DaisFaces.Select(f => f.HasHoles ? (object)new { loop = f.Loop, holes = f.Holes } : f.Loop),
+    });
+
+    private static IEnumerable<Vector3> DaisPoints()
+    {
+        Vector3[] box =
+        [
+            new(0, 0, 0), new(40, 0, 0), new(40, 0, 30), new(0, 0, 30),
+            new(0, 6, 0), new(20, 6, 0), new(40, 6, 0), new(40, 6, 30), new(20, 6, 30), new(0, 6, 30),
+        ];
+        foreach (var v in box) yield return v;
+        // A socket's rings (x0, z0), (x1, z0), (x1, z1), (x0, z1): clockwise seen from above, as a hole in the top.
+        foreach (var cx in new[] { 10f, 30f })
+            foreach (var y in new[] { 6f, 3f })
+            {
+                yield return new(cx - 2, y, 13); yield return new(cx + 2, y, 13);
+                yield return new(cx + 2, y, 17); yield return new(cx - 2, y, 17);
+            }
+        // A peg's rings (x0, z0), (x0, z1), (x1, z1), (x1, z0): clockwise seen from below, as a hole in the bottom.
+        foreach (var cx in new[] { 10f, 30f })
+            foreach (var y in new[] { 0f, -3f })
+            {
+                yield return new(cx - 1.5f, y, 13.5f); yield return new(cx - 1.5f, y, 16.5f);
+                yield return new(cx + 1.5f, y, 16.5f); yield return new(cx + 1.5f, y, 13.5f);
+            }
+    }
+
+    private static IEnumerable<Face> DaisLoops()
+    {
+        static int[] Ring(int first) => [first, first + 1, first + 2, first + 3];
+        yield return new Face([4, 9, 8, 5], [Ring(10)]);
+        yield return new Face([5, 8, 7, 6], [Ring(18)]);
+        yield return new Face([0, 1, 2, 3], [Ring(26), Ring(34)]);
+        yield return new Face([3, 2, 7, 8, 9]);
+        yield return new Face([0, 4, 5, 6, 1]);
+        yield return new Face([0, 3, 9, 4]);
+        yield return new Face([1, 6, 7, 2]);
+        foreach (var top in new[] { 10, 18 })
+        {
+            var bottom = top + 4;
+            yield return new Face([bottom, bottom + 3, bottom + 2, bottom + 1]);
+            for (var i = 0; i < 4; i++)
+                yield return new Face([top + (i + 1) % 4, top + i, bottom + i, bottom + (i + 1) % 4]);
+        }
+        foreach (var rim in new[] { 26, 34 })
+        {
+            var cap = rim + 4;
+            for (var i = 0; i < 4; i++)
+                yield return new Face([rim + (i + 1) % 4, rim + i, cap + i, cap + (i + 1) % 4]);
+            yield return new Face([cap, cap + 3, cap + 2, cap + 1]);
+        }
+    }
 }

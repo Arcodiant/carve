@@ -4,7 +4,7 @@ description: >-
 ---
 # T-239 — moved is short at summary verbosity
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P2
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** — (none)
 
-**Verify:** server-unit
+**Verify:** server-unit, scenario-cuts, scenario-shed
 
 ## Goal
 
@@ -40,3 +40,7 @@ A `displace` or `move` of thousands of vertices answers with a short result at t
   of vertices, so it would only repeat the selection given.
 - `created`/`deleted` on other edits are left as they are until one is found to be large; T-237's tessellate
   reports `created` in `subdivide`'s `{first, count}` form.
+
+### As built
+
+Ran on Sonnet 5.5. `MeshToolSupport.Moved` gives `{count, first}` (first 10 ids) at summary and the whole list at full; `displace` and `move` use it and their descriptions say so. Existing tests and the Cuts and Shed scenario stages that read `moved` as an array now read the new shape; Verify widened to scenario-cuts and scenario-shed for that. New test: 26-vertex move at summary and full (the under-10 case is the existing `[2,3,6,7]` group displace test). README: the `verbosity: "full"` line now mentions `moved`.

@@ -321,7 +321,7 @@ public static class FaceSplit
         return false;
     }
 
-    private static int[] Insert(IReadOnlyList<int> loop, Dictionary<(int Lo, int Hi), List<int>> chains, ref bool changed)
+    internal static int[] Insert(IReadOnlyList<int> loop, Dictionary<(int Lo, int Hi), List<int>> chains, ref bool changed)
     {
         var result = new List<int>();
         for (var i = 0; i < loop.Count; i++)

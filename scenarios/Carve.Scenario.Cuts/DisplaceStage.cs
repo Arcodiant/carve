@@ -37,7 +37,7 @@ internal sealed class DisplaceStage : ICutsStage
 
         var rough = await CallJsonAsync(driver, "displace", Rough);
         Summary("displace", rough, 386, 384, true);
-        Equal("displace: vertices moved", 386, rough.GetProperty("moved").GetArrayLength());
+        Equal("displace: vertices moved", 386, rough.GetProperty("moved").GetProperty("count").GetInt32());
         await SeeAsync(driver, "boulder-front", Front, rough, "the boulder");
         await SeeAsync(driver, "boulder-back", Back, rough, "the boulder from behind");
 

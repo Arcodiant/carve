@@ -127,13 +127,13 @@ open`, `edges where nonmanifold`, `vertices where unattached`.
 On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-planar face is not a warning: `check` gives one note with the count and the worst case ("...; expected on a smooth mesh, which export triangulates"), every other tool says nothing, and `ok` can be true. `select faces where non_planar` names every one either way, and a flat mesh warns as above.
 
 `define_mesh`, `move`, `extrude`, `delete`, `merge_faces`, `bridge`, `plane_cut`,
-`loop_cut`, `knife`, `subdivide`, `undo`, `open`, `check` and `export` take
+`loop_cut`, `knife`, `subdivide`, `tessellate`, `displace`, `undo`, `open`, `check` and `export` take
 `verbosity`:
 
 ```
 verbosity: "silent"     {"ok":true}: no counts, no ids, no warnings; the change is made all the same
 verbosity: "summary"    the result as above, each kind of four or more on one line (the default)
-verbosity: "full"       the same, with every warning one per line
+verbosity: "full"       the same, with every warning one per line, and `moved` (`displace`, `move`), `split` and each of its `pieces` (`tessellate`) as the whole list, not `{count, first}` with the first 10
 ```
 
 `check` at `silent` answers its own `ok` (`{"ok":false}` on a broken mesh), and
@@ -198,7 +198,8 @@ A model holds named meshes. `define_mesh` with a `name` adds a mesh, or replaces
 - `set_colour` colours faces, or a group, with sRGB hex: `{"colour":"#C8503C","faces":[0,1]}`. Export writes one matte material per colour.
 - `set_shading` makes a mesh `smooth` (or `flat`, the default): `{"shading":"smooth"}`. Under smooth, `mark_edges` keeps chosen edges creased: `{"edges":[[0,1]],"hard":true}`.
 - `subdivide` rounds a mesh off by Catmull-Clark, 1 to 3 levels: `{"levels":1}`. Every id stays, new ones are appended, and hard edges stay sharp.
-- `displace` roughens a mesh in its geometry: each vertex moves along its normal by `amount` x (h - `midlevel`), h read from a patina graph's greyscale output at the vertex's UVs (`{"source":{"graph":"rock.texgraph","output":"height"},"amount":0.1}`) or from seeded 3D noise at its position (`{"source":{"noise":{"seed":7,"scale":0.35,"octaves":5}},"amount":0.6}`). `axis` moves along one direction instead (terrain), and `vertices`, `faces` or `group` displace part of the mesh. Only positions change. `samples/boulder.carve` is the cube subdivided 3 levels, displaced by that noise and set smooth; `samples/boulder.png` is its front frame from scenario-cuts.
+- `tessellate` cuts faces into flat triangles no edge longer than `max_edge`, ready to displace without changing the shape: `{"max_edge":0.75,"group":"wear"}`. `faces` or `group` picks them (neither is every face); no existing vertex moves, holes stay holes, and a bordering face gains the new edge points in its loop, so the mesh stays closed.
+- `displace` roughens a mesh in its geometry: each vertex moves along its normal by `amount` x (h - `midlevel`), h read from a patina graph's greyscale output at the vertex's UVs (`{"source":{"graph":"rock.texgraph","output":"height"},"amount":0.1}`) or from seeded 3D noise at its position (`{"source":{"noise":{"seed":7,"scale":0.35,"octaves":5}},"amount":0.6}`). `axis` moves along one direction instead (terrain), and `vertices`, `faces` or `group` displace part of the mesh; `pin_border` (with `faces` or `group`) keeps every vertex also on a face outside them where it is, so a worn patch has a crisp edge and the faces round it stay flat. Only positions change. `samples/boulder.carve` is the cube subdivided 3 levels, displaced by that noise and set smooth; `samples/boulder.png` is its front frame from scenario-cuts.
 
 `render` and `export` draw the same normals, so a smooth mesh looks the same in the game.
 

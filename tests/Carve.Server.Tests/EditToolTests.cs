@@ -181,13 +181,30 @@ public class EditToolTests
     }
 
     [Fact]
+    public async Task Moved_is_count_and_first_ten_at_summary_and_the_whole_list_at_full()
+    {
+        var (carve, _) = await StartAsync();
+        using var _ = carve;
+        Ok(await carve.CallToolAsync("subdivide", """{"levels":2}"""));
+        var all = Enumerable.Range(0, 26).ToArray();
+        var ids = string.Join(",", all);
+
+        var summary = Ok(await carve.CallToolAsync("move", $$"""{"vertices":[{{ids}}],"by":[0,0.01,0]}""")).GetProperty("moved");
+        Assert.Equal(26, summary.GetProperty("count").GetInt32());
+        Assert.Equal(all.Take(10), summary.GetProperty("first").EnumerateArray().Select(x => x.GetInt32()));
+
+        var full = Ok(await carve.CallToolAsync("move", $$"""{"vertices":[{{ids}}],"by":[0,0.01,0],"verbosity":"full"}""")).GetProperty("moved");
+        Assert.Equal(all, full.EnumerateArray().Select(x => x.GetInt32()));
+    }
+
+    [Fact]
     public async Task Ids_written_as_whole_numbers_with_a_fraction_or_exponent_are_accepted_as_define_mesh_does()
     {
         var (carve, _) = await StartAsync();
         using var _ = carve;
 
         var moved = Ok(await carve.CallToolAsync("move", """{"faces":[3.0],"edges":[[0e0,1.00]],"by":[0,0.5,0]}"""));
-        Assert.Equal([0, 1, 2, 3, 6, 7], moved.GetProperty("moved").EnumerateArray().Select(x => x.GetInt32()));
+        Assert.Equal([0, 1, 2, 3, 6, 7], moved.GetProperty("moved").GetProperty("first").EnumerateArray().Select(x => x.GetInt32()));
         var extruded = Ok(await carve.CallToolAsync("extrude", """{"faces":[1e0],"distance":0.25}"""));
         Assert.Equal(1, extruded.GetProperty("extruded")[0].GetProperty("face").GetInt32());
     }

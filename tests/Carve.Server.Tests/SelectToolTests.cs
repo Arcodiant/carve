@@ -47,6 +47,9 @@ public class SelectToolTests
     /// <summary>A result's list as raw JSON, to be passed on untouched.</summary>
     private static string List(string result, string name) => JsonDocument.Parse(result).RootElement.GetProperty(name).GetRawText();
 
+    private static int[] MovedFirst(string result) =>
+        JsonDocument.Parse(result).RootElement.GetProperty("moved").GetProperty("first").EnumerateArray().Select(x => x.GetInt32()).ToArray();
+
     private static int[] Ints(string result, string name) =>
         JsonDocument.Parse(result).RootElement.GetProperty(name).EnumerateArray().Select(x => x.GetInt32()).ToArray();
 
@@ -62,8 +65,8 @@ public class SelectToolTests
         var selected = await OkAsync(carve, "select", Select(kind, where));
         var result = await OkAsync(carve, "move", $$"""{"{{argument}}":{{List(selected, kind)}},"by":[0.25,0,0]}""");
 
-        Assert.Equal(moved, Ints(result, "moved"));
-        if (kind == "vertices") Assert.Equal(Ints(selected, kind), Ints(result, "moved"));
+        Assert.Equal(moved, MovedFirst(result));
+        if (kind == "vertices") Assert.Equal(Ints(selected, kind), MovedFirst(result));
     }
 
     [Fact]

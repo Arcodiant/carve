@@ -146,7 +146,7 @@ public class EditToolDefinitionTests
         Assert.Equal(1.5f, body.GetProperty("bounds").GetProperty("max")[1].GetSingle());
         Assert.Empty(body.GetProperty("created").GetProperty("vertices").EnumerateArray());
         Assert.Empty(body.GetProperty("created").GetProperty("faces").EnumerateArray());
-        Assert.Equal([2, 3, 6, 7], body.GetProperty("moved").EnumerateArray().Select(x => x.GetInt32()));
+        Assert.Equal([2, 3, 6, 7], body.GetProperty("moved").GetProperty("first").EnumerateArray().Select(x => x.GetInt32()));
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Carve.Core.Tests;
 using static Carve.Server.Tests.CarveProcess;
 using static Carve.Server.Tests.ToolList;
 
@@ -50,7 +51,8 @@ public sealed class DisplaceToolTests() : FileToolTests("carve-displace")
         Assert.Equal(386, body.GetProperty("vertices").GetInt32());
         Assert.Equal(384, body.GetProperty("faces").GetInt32());
         Assert.True(body.GetProperty("closed").GetBoolean());
-        Assert.Equal(386, body.GetProperty("moved").GetArrayLength());
+        Assert.Equal(386, body.GetProperty("moved").GetProperty("count").GetInt32());
+        Assert.Equal(Enumerable.Range(0, 10), body.GetProperty("moved").GetProperty("first").EnumerateArray().Select(x => x.GetInt32()));
         Assert.InRange(body.GetProperty("largest").GetDouble(), 0.08, 0.3);
         Assert.DoesNotContain(body.GetProperty("warnings").EnumerateArray(), w => w.GetString()!.Contains("too coarse"));
         var nonPlanar = Ok(await carve.CallToolAsync("select", """{"kind":"faces","where":"non_planar"}""")).GetProperty("count").GetInt32();
@@ -154,6 +156,26 @@ public sealed class DisplaceToolTests() : FileToolTests("carve-displace")
         using var __ = carve;
         Ok(await carve.CallToolAsync("define_group", """{"name":"top","faces":[3]}"""));
         var body = Ok(await carve.CallToolAsync("displace", """{"source":{"noise":{"seed":3}},"amount":0.2,"group":"top","axis":[0,1,0]}"""));
-        Assert.Equal("[2,3,6,7]", body.GetProperty("moved").GetRawText());
+        Assert.Equal("""{"count":4,"first":[2,3,6,7]}""", body.GetProperty("moved").GetRawText());
+    }
+
+    [Fact]
+    public async Task Pin_border_on_the_tessellated_dais_moves_only_the_inside_and_the_errors_change_nothing()
+    {
+        var (carve, _) = await StartAsync();
+        using var __ = carve;
+        Ok(await carve.CallToolAsync("define_mesh", TestMeshes.DaisDefineMesh()));
+        Ok(await carve.CallToolAsync("define_group", """{"name":"wear","faces":[0,1]}"""));
+        Ok(await carve.CallToolAsync("tessellate", """{"max_edge":0.75,"group":"wear"}"""));
+        var before = TextOf(await carve.CallToolAsync("get_mesh", "{}"));
+        foreach (var bad in new[] { """{"source":{"noise":{}},"amount":0.3,"pin_border":true}""", """{"source":{"noise":{}},"amount":0.3,"pin_border":true,"vertices":[0]}""", """{"source":{"noise":{}},"amount":0.3,"pin_border":"yes","group":"wear"}""" })
+            Assert.NotEmpty(Refused(await carve.CallToolAsync("displace", bad)));
+        Assert.Equal(before, TextOf(await carve.CallToolAsync("get_mesh", "{}")));
+
+        var pinned = Ok(await carve.CallToolAsync("displace", """{"source":{"noise":{"seed":3}},"amount":0.3,"axis":[0,1,0],"group":"wear","pin_border":true,"verbosity":"full"}"""));
+        Ok(await carve.CallToolAsync("undo", "{}"));
+        var free = Ok(await carve.CallToolAsync("displace", """{"source":{"noise":{"seed":3}},"amount":0.3,"axis":[0,1,0],"group":"wear","verbosity":"full"}"""));
+        Assert.True(pinned.GetProperty("closed").GetBoolean());
+        Assert.True(pinned.GetProperty("moved").GetArrayLength() < free.GetProperty("moved").GetArrayLength());
     }
 }
