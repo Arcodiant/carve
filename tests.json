@@ -142,6 +142,8 @@
           "dotnet-closure": "tests/Carve.WeatheringAcceptance.Tests/Carve.WeatheringAcceptance.Tests.csproj"
         },
         "tests/Carve.Server.Tests/Fixtures/*.png",
+        "samples/gatehouse.*",
+        "README.md",
         "tests/Carve.Core.Tests/TestMeshes.cs",
         "tests/Carve.Core.Tests/RoverSpec.cs",
         "tests/Carve.Core.Tests/RoverSpec.Model.cs",

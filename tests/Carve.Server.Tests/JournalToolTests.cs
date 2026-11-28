@@ -16,7 +16,7 @@ public sealed class JournalToolTests() : TempFolderTests("carve-journal")
         """{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]],"faces":[[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]}""";
 
     /// <summary>The rows of <see cref="VerbosityToolTests.Tools"/> whose call makes no step: they write or look, or (undo) take one back.</summary>
-    private static readonly string[] NoStep = ["save", "save_script", "check", "export", "bake"];
+    internal static readonly string[] NoStep = ["save", "save_script", "check", "export", "bake"];
 
     private static string Call(carve::Carve.Server.JournalEntry e) =>
         e.Tool + " {" + string.Join(",", e.Arguments.Select(a => $"{JsonSerializer.Serialize(a.Key)}:{a.Value.GetRawText()}")) + "}";
@@ -62,6 +62,7 @@ public sealed class JournalToolTests() : TempFolderTests("carve-journal")
                 _ when NoStep.Contains(tool) => before,
                 "undo" => before[..^1],
                 "open" or "clear" => [$"{tool} {good}"],
+                "run_script" => [.. before, before[0]], // its row runs the script save_script wrote of the setup's define_mesh: the statement, not run_script
                 _ => [.. before, $"{tool} {good}"],
             };
             if (!after.SequenceEqual(expected)) wrong.Add($"{tool}: journal [{string.Join(" | ", after)}], expected [{string.Join(" | ", expected)}]");
