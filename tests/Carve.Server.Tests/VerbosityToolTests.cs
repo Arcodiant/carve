@@ -141,7 +141,7 @@ public sealed class VerbosityToolTests
             {
                 // A kind of 4 or more (delete's open edges, subdivide's faces) is one line at summary and every one at full; nothing else differs.
                 var (a, b) = (JsonDocument.Parse(plain.Text).RootElement, JsonDocument.Parse(full.Text).RootElement);
-                // moved, and each of split's pieces, is {count, first} at summary (the first 10 ids) and the whole list at full.
+                // moved, split and each of split's pieces is {count, first} at summary (the first 10) and the whole list at full.
                 static string[] Rest(JsonElement e, params string[] skip) => [.. e.EnumerateObject().Where(x => !skip.Contains(x.Name)).Select(x => x.ToString())];
                 Assert.Equal(Rest(a, "warnings", "moved", "split"), Rest(b, "warnings", "moved", "split"));
                 static void Short(JsonElement summary, JsonElement whole)
@@ -151,11 +151,15 @@ public sealed class VerbosityToolTests
                     Assert.Equal(ids.Take(10), summary.GetProperty("first").EnumerateArray().Select(i => i.GetInt32()));
                 }
                 if (b.TryGetProperty("moved", out var moved)) Short(a.GetProperty("moved"), moved);
-                if (b.TryGetProperty("split", out var split))
+                if (tool != "tessellate" && b.TryGetProperty("split", out var other))
+                    Assert.Equal(other.ToString(), a.GetProperty("split").ToString()); // split short only on tessellate
+                else if (b.TryGetProperty("split", out var split))
                 {
-                    var (shortSplit, wholeSplit) = (a.GetProperty("split").EnumerateArray().ToArray(), split.EnumerateArray().ToArray());
-                    Assert.Equal(wholeSplit.Length, shortSplit.Length);
-                    for (var i = 0; i < wholeSplit.Length; i++)
+                    // RV-101: split itself is {count, first} at summary, the first 10 faces, each with its pieces short.
+                    var (shortSplit, wholeSplit) = (a.GetProperty("split").GetProperty("first").EnumerateArray().ToArray(), split.EnumerateArray().ToArray());
+                    Assert.Equal(wholeSplit.Length, a.GetProperty("split").GetProperty("count").GetInt32());
+                    Assert.Equal(Math.Min(10, wholeSplit.Length), shortSplit.Length);
+                    for (var i = 0; i < shortSplit.Length; i++)
                     {
                         Assert.Equal(wholeSplit[i].GetProperty("face").GetInt32(), shortSplit[i].GetProperty("face").GetInt32());
                         Short(shortSplit[i].GetProperty("pieces"), wholeSplit[i].GetProperty("pieces"));

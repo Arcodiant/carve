@@ -133,7 +133,7 @@ On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-plana
 ```
 verbosity: "silent"     {"ok":true}: no counts, no ids, no warnings; the change is made all the same
 verbosity: "summary"    the result as above, each kind of four or more on one line (the default)
-verbosity: "full"       the same, with every warning one per line, and `moved` (`displace`, `move`) and each of `split`'s `pieces` (`tessellate`) as the whole id list, not `{count, first}` with the first 10
+verbosity: "full"       the same, with every warning one per line, and `moved` (`displace`, `move`), `split` and each of its `pieces` (`tessellate`) as the whole list, not `{count, first}` with the first 10
 ```
 
 `check` at `silent` answers its own `ok` (`{"ok":false}` on a broken mesh), and

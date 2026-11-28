@@ -157,9 +157,14 @@ internal static class MeshToolSupport
     public static object[] Split(IReadOnlyList<SplitFace> split) =>
         [.. split.Select(s => new { face = s.Face, pieces = s.Pieces })];
 
-    /// <summary><see cref="Split(IReadOnlyList{SplitFace})"/> with each face's pieces short at summary, as <see cref="Moved"/> (RV-100's ruling, 2026-11-27).</summary>
-    public static object[] Split(IReadOnlyList<SplitFace> split, Verbosity level) =>
-        [.. split.Select(s => new { face = s.Face, pieces = Moved(s.Pieces, level) })];
+    /// <summary><see cref="Split(IReadOnlyList{SplitFace})"/> short at summary, as <see cref="Moved"/>: each face's pieces (RV-100's
+    /// ruling, 2026-11-27), and the list itself <c>{count, first}</c> with the first 10 faces (RV-101, the filter's answer of
+    /// 2026-11-27); the whole list at full.</summary>
+    public static object Split(IReadOnlyList<SplitFace> split, Verbosity level)
+    {
+        object[] Entries(IEnumerable<SplitFace> faces) => [.. faces.Select(s => new { face = s.Face, pieces = Moved(s.Pieces, level) })];
+        return level == Verbosity.Full ? Entries(split) : new { count = split.Count, first = Entries(split.Take(10)) };
+    }
 
     /// <summary>The levels of the <c>verbosity</c> argument (M-23's ruling 3), read by <see cref="ReadVerbosity"/>.</summary>
     public enum Verbosity { Summary, Silent, Full }
