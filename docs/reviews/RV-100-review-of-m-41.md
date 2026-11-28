@@ -4,7 +4,7 @@ description: >-
 ---
 # RV-100 — Review of M-41
 
-**Status:** Open
+**Status:** Answered
 
 **Reviews:** M-41
 
@@ -38,7 +38,9 @@ The only bound on `max_edge` is that it must be above 0, and nothing stops the l
 
 Failing case: a unit quad at (1000..1001, 1000..1001) with `Tessellate(mesh, 1e-14)` was still running after 15 s. "No cap on how fine" in the Scope does not ask for a call that never ends.
 
-**Outcome:** —
+**Outcome:** fixed
+
+ (the person's ruling of 2026-11-27, budget and faster filter): `Tessellation.Predicted` is worked before any cut and a call over 200,000 predicted new vertices is refused, so this case is refused at once; tested by `A_call_predicted_over_the_budget_is_refused_at_once`. In 2a5d164d.
 
 ### Run time grows as N^1.5 at fine `max_edge`, with no budget
 
@@ -55,7 +57,9 @@ Each lattice candidate runs `PlaneGeometry.Inside` over every loop vertex, proje
 
 The triangulation itself took about 1.5 s of the 23 s case; the rest is this filter. Extrapolated, 1 mm on a 1 m face runs for tens of minutes inside the store's lock.
 
-**Outcome:** —
+**Outcome:** fixed
+
+ (the person's ruling of 2026-11-27, budget and faster filter): `Tessellation.Lattice` works row crossings once and buckets segments in a grid; the unit quad at 0.0025 (191,085 vertices) went from 9.7 s to 3.1 s in Release, with the same points (an equivalence test against the old rule; existing tests unchanged). In 2a5d164d.
 
 ### Border cases with no test: an unselected face with a hole, and UVs across a seam
 
@@ -64,7 +68,9 @@ The triangulation itself took about 1.5 s of the 23 s case; the rest is this fil
 - **An unselected face's hole loop on the border.** No test has one. Line 75 is reached only through the selected faces' own holes, so dropping hole insertion for unselected faces would pass every test. A probe shows the code is right today.
 - **UVs across a seam.** No test checks that an unselected neighbour across a UV seam takes its border-point UVs from its own corners.
 
-**Outcome:** —
+**Outcome:** fixed
+
+`An_unselected_faces_hole_on_the_border_takes_the_border_points` (the dais's bottom face round a peg: hole gains 8 points, outer loop unchanged, closed) and `Across_a_seam_the_unselected_neighbour_takes_its_border_uvs_from_its_own_corners`. In 2a5d164d.
 
 ### `pin_border`'s "nothing left off the border" refusal has no test, and the refusal tests do not name the error
 
@@ -73,7 +79,9 @@ The triangulation itself took about 1.5 s of the 23 s case; the rest is this fil
 - **Untested refusal.** A selection that is all border (for example one untessellated cube face) is refused, and no test covers it.
 - **Weak asserts.** The three refusal asserts check only `Succeeded == false`. They would still pass if the call were refused for some other reason.
 
-**Outcome:** —
+**Outcome:** fixed
+
+`Pin_border_on_a_selection_that_is_all_border_is_refused`, and the three refusal asserts check an error on `pin_border` saying "has no border". In 2a5d164d.
 
 ## Findings: the whole diff (claude-opus-5-5)
 
@@ -83,7 +91,9 @@ The triangulation itself took about 1.5 s of the 23 s case; the rest is this fil
 
 On the unit cube, `{"max_edge":0.05,"faces":[3]}` at `summary` answered 5,413 characters, 1,250 ids of them in `pieces`. `subdivide` answers `split:[]`. The Scope says "reported in `split`, as other edits do".
 
-**Outcome:** —
+**Outcome:** fixed
+
+ (the person's ruling of 2026-11-27, `split` is short at summary): each face's `pieces` is `{count, first}` at summary through `Moved`, whole at full; description and tests updated. In 2a5d164d.
 
 ### VerbosityToolTests: the "full has more warnings" assertion became an `if`
 
@@ -91,7 +101,9 @@ On the unit cube, `{"max_edge":0.05,"faces":[3]}` at `summary` answered 5,413 ch
 
 Before, any row whose `full` text differed from its `summary` text had to show more warnings at `full`. Now that check runs only when `full` happens to have more. Failing case: `delete` dropping its warnings to `[]` at `full` would pass. The new `moved` check also compares only `count` with the full list's length, never `first` with the first 10 ids.
 
-**Outcome:** —
+**Outcome:** fixed
+
+The unconditional "full shows more warnings" check is back for any row that differs in anything but `moved` and `split`, and `first` is checked against the first 10 ids of the full list for `moved` and each `split` pieces (tessellate's row now cuts more than 10 pieces). In 2a5d164d.
 
 ### The `verbosity` schema text and README's verbosity list don't match the new `moved`
 
@@ -100,7 +112,9 @@ Rubric points 1 and 7. A Nit.
 - `src/Carve.Server/MeshToolSupport.cs:164-167` (`VerbositySchemaText`) still says `full` is "the same, with every warning one per line".
 - `README.md:130-136`: the list of tools that take `verbosity` leaves out `displace`, which the new `moved` line names. This predates M-41.
 
-**Outcome:** —
+**Outcome:** fixed
+
+`VerbositySchemaText` says long id lists are short at summary and whole at full; README lists `displace` among the tools that take `verbosity` and names `split` beside `moved`. In 2a5d164d.
 
 ### The tessellate description's error list misses two refusals
 
@@ -108,7 +122,9 @@ Rubric points 1 and 7. A Nit.
 
 The Core also refuses an empty `faces: []` (`Tessellation.cs:39`) and a face that "cannot be tessellated" (`Tessellation.cs:90`). Neither is in the description's list of errors, and neither is in `Bad_input_is_a_tool_error_that_changes_nothing`.
 
-**Outcome:** —
+**Outcome:** fixed
+
+The description lists the empty `faces []`, "cannot be tessellated" and the budget; the test has the empty list and the budget. "cannot be tessellated" is not tested: no face `PolygonMesh.Create` accepts was found that triggers it. In 2a5d164d.
 
 ### No upper bound on how fine `max_edge` can go (unsure; the Scope asked for this)
 
@@ -116,7 +132,9 @@ The Core also refuses an empty `faces: []` (`Tessellation.cs:39`) and a face tha
 
 At 0.05 one unit face becomes 1,250 triangles; at 1e-4 about 10^8, inside the store's lock. Raised for the person: a guard on the expected piece count would turn it into an error that changes nothing. This is the same problem as the Core reviewer's first two findings.
 
-**Outcome:** —
+**Outcome:** fixed
+
+ (the person's ruling of 2026-11-27, budget and faster filter): the guard asked for, as the first finding. In 2a5d164d.
 
 ## Summary
 
