@@ -262,14 +262,16 @@ public class TessellateTests
         // the prediction is the gate, so it is refused before any work.
         var mesh = Square(40, 0.01f);
         Assert.InRange(Tessellation.Predicted(mesh, [0], 0.0025), 217_000, 219_000);
-        var watch = System.Diagnostics.Stopwatch.StartNew();
         var r = Tessellation.Tessellate(mesh, 0.0025);
-        Assert.True(watch.ElapsedMilliseconds < 500, $"{watch.ElapsedMilliseconds} ms");
         Assert.False(r.Succeeded);
         var error = r.Errors.Single();
         Assert.Equal("max_edge", error.Element);
         Assert.Matches("about 21[78],[0-9]{3} new vertices, over the budget of 200,000; give a larger max_edge", error.ToString());
         Assert.Equal(4, mesh.Vertices.Count);
+        // A hard stop of 0 would refuse at the first check; the prediction's message instead shows the gate came first.
+        var early = Tessellation.Tessellate(Square(40, 0.01f), 0.0025, null, 0);
+        Assert.Matches("about 21[78],[0-9]{3} new vertices", early.Errors.Single().ToString());
+        Assert.DoesNotContain("more than 0", early.Errors.Single().ToString());
     }
 
     [Theory]
