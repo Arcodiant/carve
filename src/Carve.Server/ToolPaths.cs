@@ -73,6 +73,7 @@ public static class ToolPaths
             return null;
         }
 
+        if (verb == "reads") JournalCall.Current?.Read(path, full);
         return new ToolPath(full, name);
     }
 

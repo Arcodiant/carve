@@ -20,7 +20,7 @@ public sealed class VerbosityToolTests
         """{"vertices":[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]],"faces":[[0,1,2,3],[4,7,6,5]]}""";
 
     /// <summary>The tools with no <c>verbosity</c>, whose whole result is what was asked for (ruling 3).</summary>
-    private static readonly string[] Readers =
+    internal static readonly string[] Readers =
         ["get_mesh", "get_parts", "get_skeleton", "get_weights", "get_clips", "select", "render", "render_glb", "help"];
 
     /// <summary>Each tool here: the calls that set it up, a call that succeeds, and a call that is a tool error.</summary>
@@ -37,6 +37,7 @@ public sealed class VerbosityToolTests
         { "knife", ["define_mesh " + Cube], """{"points":[[0.35,0,1],[0.35,0.7,1],[0.65,0.7,1],[0.65,0,1]]}""", """{"points":[[0.35,0,9],[0.35,0.7,9]]}""" },
         { "subdivide", ["define_mesh " + Cube], """{"levels":1}""", """{"levels":9}""" },
         { "undo", ["define_mesh " + Cube, """move {"faces":[3],"by":[0,0.5,0]}"""], "{}", """{"steps":2}""" },
+        { "clear", ["define_mesh " + Cube], "{}", """{"mesh":"x"}""" },
         { "open", ["define_mesh " + Cube, """save {"path":"v.carve"}""", """move {"faces":[3],"by":[0,0.5,0]}"""], """{"path":"v.carve"}""", """{"path":"missing.carve"}""" },
         { "check", ["define_mesh " + Cube], "{}", """{"mesh":"nope"}""" },
         { "export", ["define_mesh " + Cube], """{"path":"v.glb"}""", """{"path":"v.txt"}""" },
@@ -71,7 +72,7 @@ public sealed class VerbosityToolTests
     private const string Bulge = """{"name":"Bulge","positions":{"2":[1.1,1.3,-0.1],"3":[-0.1,1.3,-0.1],"6":[1.1,1.3,1.1],"7":[-0.1,1.3,1.1]}}""";
 
     /// <summary>A fresh carve in its own folder, set up by <paramref name="setup"/> ("tool {arguments}" each).</summary>
-    private static async Task<ToolHarness> Start(string folder, string[] setup)
+    internal static async Task<ToolHarness> Start(string folder, string[] setup)
     {
         var carve = new ToolHarness(folder);
         await carve.InitializeAsync();

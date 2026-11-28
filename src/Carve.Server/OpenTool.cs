@@ -56,7 +56,7 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
     {
         var schema = WithMesh(PathSchema("The .carve file to read, absolute or relative to carve's working directory."), OpenMeshText);
         schema["properties"]!.AsObject()["drop_targets"] = new JsonObject { ["description"] = DropTargetsText, ["type"] = "boolean" };
-        return MeshToolSupport.Create<OpenTool>("open", Text, WithVerbosity(schema));
+        return MeshToolSupport.Create<OpenTool>("open", Text, WithVerbosity(schema), "path");
     }
 
     public CallToolResult Run(RequestContext<CallToolRequestParams> context, JsonElement? path = null, JsonElement? mesh = null, JsonElement? drop_targets = null, JsonElement? verbosity = null)

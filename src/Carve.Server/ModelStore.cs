@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Carve.Core;
 
 namespace Carve.Server;
@@ -24,8 +25,16 @@ public sealed class ModelStore
     public const int UndoDepth = 100;
 
     private readonly object _write = new();
-    private readonly List<(Model Model, string Tool)> _history = [];
+    private readonly List<(Model Model, string Tool, ImmutableList<JournalEntry> Journal)> _history = [];
     private ModelSnapshot _current = new(Model.Empty, 0);
+    private ImmutableList<JournalEntry> _journal = [];
+
+    /// <summary>
+    /// The calls that made the current model (T-231): every tool call that pushed a step, since the last whole-model
+    /// <c>open</c> or <c>clear</c> (which is the first entry), or since the process started. Undo takes the step's entries
+    /// out again. Not capped at <see cref="UndoDepth"/>; never saved. Immutable, so safe to read from any thread.
+    /// </summary>
+    public IReadOnlyList<JournalEntry> Journal => Volatile.Read(ref _journal);
 
     /// <summary>
     /// The current mesh (null until the first success) and its version. Version is 0 while empty and
@@ -71,7 +80,7 @@ public sealed class ModelStore
         ArgumentNullException.ThrowIfNull(model);
         lock (_write)
         {
-            return PushLocked(model, tool);
+            return PushLocked(model, tool, restart: true);
         }
     }
 
@@ -85,7 +94,7 @@ public sealed class ModelStore
         lock (_write)
         {
             problem = refuse(_current.Model);
-            return problem is null ? PushLocked(model, tool) : null;
+            return problem is null ? PushLocked(model, tool, restart: true) : null;
         }
     }
 
@@ -385,6 +394,29 @@ public sealed class ModelStore
         }
     }
 
+    /// <summary>Empties the model (<see cref="Model.Empty"/>) as one step, an empty model included, and starts a new journal with the call (<c>clear</c>).</summary>
+    public ModelSnapshot Clear(string tool)
+    {
+        lock (_write)
+        {
+            return PushLocked(Model.Empty, tool, restart: true);
+        }
+    }
+
+    /// <summary>
+    /// The seam for a step made of several calls (T-233's run_script): <paramref name="change"/> as <see cref="Change(string, Func{Model, ValueTuple{Model, string}}, out string)"/>,
+    /// journalled as <paramref name="entries"/> instead of the call under way, appended, or starting a new journal when
+    /// <paramref name="restart"/>. Still one step, which one undo takes back with all its entries.
+    /// </summary>
+    public ModelSnapshot? Change(string tool, Func<Model, (Model? Next, string? Problem)> change, IReadOnlyList<JournalEntry> entries, bool restart, out string? problem)
+    {
+        lock (_write)
+        {
+            (var next, problem) = change(_current.Model);
+            return next is null ? null : PushLocked(next, tool, restart, entries);
+        }
+    }
+
     /// <summary>Steps back one change, or null when there is nothing older.</summary>
     public UndoResult? Undo()
     {
@@ -394,14 +426,28 @@ public sealed class ModelStore
             var undone = _history[^1].Tool;
             _history.RemoveAt(_history.Count - 1);
             var next = new ModelSnapshot(_history[^1].Model, _current.Version + 1);
+            Volatile.Write(ref _journal, _history[^1].Journal);
             Volatile.Write(ref _current, next);
             return new UndoResult(undone, next);
         }
     }
 
-    private ModelSnapshot PushLocked(Model model, string tool)
+    /// <summary>
+    /// Pushes the step, journalling <paramref name="entries"/> or else the tool call under way (none outside a call, as when
+    /// a test drives the store), appended or, when <paramref name="restart"/>, as a new journal. A call pushes at most once.
+    /// </summary>
+    private ModelSnapshot PushLocked(Model model, string tool, bool restart = false, IReadOnlyList<JournalEntry>? entries = null)
     {
-        _history.Add((model, tool));
+        var call = JournalCall.Current;
+        if (call is not null)
+        {
+            if (call.Pushed) throw new InvalidOperationException($"{call.Tool} pushed a second undo step in one call; a call makes at most one");
+            call.Pushed = true;
+        }
+        entries ??= call is null ? [] : [call.Entry()];
+        var journal = (restart ? ImmutableList<JournalEntry>.Empty : _journal).AddRange(entries);
+        _history.Add((model, tool, journal));
+        Volatile.Write(ref _journal, journal);
         if (_history.Count > UndoDepth + 1) _history.RemoveAt(0);
         var next = new ModelSnapshot(model, _current.Version + 1);
         Volatile.Write(ref _current, next);
