@@ -60,6 +60,15 @@ existing vertex, and keeps the mesh closed.
   selection and `max_edge` and does not smooth. Recommended in discussion; not separately ruled on.
 - Triangles are required, not just allowed (see Goal).
 - Not tested by the requester: `subdivide` with every edge hard as a stand-in, and `subdivide` on holed faces.
+- Ruled by the person on 2026-11-27 (RV-100, round 1): **`split` is short at summary.** At `summary` each face's
+  `pieces` in `split` is `{count, first}` (the first 10 ids, ascending), as T-239 made `moved`; the whole list only at
+  `full`.
+- Ruled by the person on 2026-11-27 (RV-100, round 1): **a budget and a faster filter.** `tessellate` refuses, as a
+  tool error that changes nothing, a call predicted to add over 200,000 new vertices, the error and the description
+  giving the predicted count and the budget. The prediction is worked before any cut, from edge lengths and face areas
+  over `max_edge`, so a `max_edge` too fine for a double (1e-14 on a quad at 1000..1001) is refused at once. The
+  lattice filter is made about linear, keeping exactly the points it kept before. This replaces the Scope's "no cap
+  on how fine".
 
 ### As built
 
@@ -98,3 +107,19 @@ Ran on Claude Opus 5.5 (two agents; the first handed off at its 60-call checkpoi
 - On the strip, the 26 edge-point rectangles are co-circular and their diagonals (5.28) exceed `max_edge` 5, so
   refinement puts one point on the middle line of each. The edges are still cut along the length only. Colour and
   material are exclusive on a face (`WithColour` drops the material).
+- RV-100, round 1 (Claude Opus 5.5, one agent), after the person's two rulings of 2026-11-27 above:
+  - `split` at summary: `MeshToolSupport.Split(split, level)` gives each face's `pieces` through `Moved`, used by
+    `tessellate` only (`subdivide` and `displace` answer `split:[]` or few pieces and keep the whole list).
+  - Budget: `Tessellation.Budget` (200,000) and `Tessellation.Predicted(mesh, faces, maxEdge)`: each distinct edge's
+    `ceil(length / max_edge) - 1` points plus each face's area over `max_edge^2 * sqrt 3 / 2`, in doubles. Over it the
+    call is refused on `max_edge` with "about N new vertices, over the budget of 200,000". On a unit quad the budget
+    falls between `max_edge` 0.0025 (about 186,000 predicted, 191,085 made) and 0.002.
+  - Filter: `Tessellation.Lattice` works each lattice row's loop crossings once (the same expression
+    `PlaneGeometry.InPolygon` uses, so the same parity) and buckets the loop segments in a grid of half the spacing,
+    testing `SegmentDistance` only on the 5 x 5 cells round a point. The unit quad at 0.0025 in Release took 9.7 s
+    before and 3.1 s after (the rest is the triangulation and blending). A test holds it to the old rule, copied into
+    the test, on a holed square, two holes, a concave comb and a slanted pentagon at five spacings. Core reaches
+    `Carve.Core.Tests` through `InternalsVisibleTo` for this.
+  - Tests added: an unselected face's hole on the border (the dais's bottom around a peg), UVs across a seam, the
+    budget refusal (Core and tool), the empty `faces: []`. The "cannot be tessellated" refusal is in the description
+    but untested: no face `PolygonMesh.Create` accepts was found to trigger it (a repeated corner is refused there).

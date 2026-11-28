@@ -157,6 +157,10 @@ internal static class MeshToolSupport
     public static object[] Split(IReadOnlyList<SplitFace> split) =>
         [.. split.Select(s => new { face = s.Face, pieces = s.Pieces })];
 
+    /// <summary><see cref="Split(IReadOnlyList{SplitFace})"/> with each face's pieces short at summary, as <see cref="Moved"/> (RV-100's ruling, 2026-11-27).</summary>
+    public static object[] Split(IReadOnlyList<SplitFace> split, Verbosity level) =>
+        [.. split.Select(s => new { face = s.Face, pieces = Moved(s.Pieces, level) })];
+
     /// <summary>The levels of the <c>verbosity</c> argument (M-23's ruling 3), read by <see cref="ReadVerbosity"/>.</summary>
     public enum Verbosity { Summary, Silent, Full }
 
@@ -164,7 +168,7 @@ internal static class MeshToolSupport
     public const string VerbositySchemaText =
         "How much the result says. \"summary\", the default: the result as always, a kind of warning with 4 or more listed as one line "
         + "(its count, the worst case, three samples and the select query that names them all). "
-        + "\"full\": the same, with every warning one per line. "
+        + "\"full\": the same, with every warning one per line, and long id lists (moved, tessellate's split pieces), {count, first} with the first 10 ids at summary, whole. "
         + "\"silent\": only {\"ok\":true}, no counts, ids or warnings, and the change is made all the same (one undo step); "
         + "check answers {\"ok\":<its own ok>}, and export answers that JSON though its result is otherwise a line of text. "
         + "A tool error is returned whole at every level. Any other value is a tool error.";
@@ -197,7 +201,7 @@ internal static class MeshToolSupport
         return Verbosity.Summary;
     }
 
-    /// <summary>The <c>moved</c> field: the whole id list at full, otherwise <c>{count, first}</c> with the first 10 ids.</summary>
+    /// <summary>A long id list (<c>moved</c>, tessellate's <c>split</c> pieces): the whole list at full, otherwise <c>{count, first}</c> with the first 10 ids.</summary>
     public static object Moved(IReadOnlyList<int> ids, Verbosity level) =>
         level == Verbosity.Full ? ids : new { count = ids.Count, first = ids.Take(10).ToArray() };
 

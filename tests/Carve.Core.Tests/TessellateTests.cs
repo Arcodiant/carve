@@ -198,4 +198,105 @@ public class TessellateTests
         Assert.All(m.Topology.Edges.Where(e => e.Faces.Select(u => u.Face).Distinct().Count(f => !pieces.Contains(f)) > 0),
             e => Assert.Contains((e.Lo, e.Hi), m.HardEdges));
     }
+
+    [Fact]
+    public void An_unselected_faces_hole_on_the_border_takes_the_border_points()
+    {
+        // The dais's left peg (walls 17..20, cap 21) stands in a hole of the bottom face (2), which is not selected.
+        var mesh = Dais();
+        var r = Tessellation.Tessellate(mesh, 1, [17, 18, 19, 20, 21]);
+        var m = Ok(r);
+        Assert.True(MeshReport.Create(m).Closed);
+        Assert.DoesNotContain(r.Split, s => s.Face == 2);
+        Assert.Equal(mesh.Faces[2].Loop, m.Faces[2].Loop);
+        // Each 3-long edge of the peg's bottom ring is cut in three: the hole gains two points an edge, all in y = 0.
+        var n = mesh.Vertices.Count;
+        var hole = m.Faces[2].Holes.Single(h => h.Any(v => v >= n));
+        Assert.Equal(4 + 8, hole.Count);
+        Assert.All(hole.Where(v => v >= n), v => Assert.Equal(0, m.Vertices[v].Y));
+        Assert.Equal(mesh.Faces[2].Holes.Single(h => h.All(hole.Contains)), hole.Where(v => v < n));
+    }
+
+    [Fact]
+    public void Across_a_seam_the_unselected_neighbour_takes_its_border_uvs_from_its_own_corners()
+    {
+        // The top (3) and the -z side (0, loop 0 3 2 1) share edge 3-2, a seam: each face has its own UVs there.
+        var mesh = Cube().WithUvs(MeshUvs.None
+            .WithFace(3, [new(0, 0), new(0, 1), new(1, 1), new(1, 0)])
+            .WithFace(0, [new(10, 0), new(10, 1), new(11, 1), new(11, 0)])
+            .WithSeams([(2, 3)], true));
+        var m = Ok(Tessellation.Tessellate(mesh, 0.25, [3]));
+        var loop = m.Faces[0].Loop;
+        var uv = m.Uvs!.Of(0)!;
+        Assert.Equal(7, loop.Count);
+        for (var i = 0; i < loop.Count; i++)
+        {
+            if (loop[i] < 8) continue;
+            // On edge 3 (0, 1, 0) to 2 (1, 1, 0), whose UVs on face 0 are (10, 1) and (11, 1).
+            var p = m.Vertices[loop[i]];
+            Assert.True(Vector2.Distance(uv[i], new Vector2(10 + p.X, 1)) < 1e-4, $"corner {i}: {uv[i]} at {p}");
+        }
+    }
+
+    [Fact]
+    public void A_call_predicted_over_the_budget_is_refused_at_once()
+    {
+        // RV-100: at 1e-14 on a quad far from the origin the old loops never ended; the prediction refuses it before any work.
+        var mesh = Make([new(1000, 1000, 0), new(1001, 1000, 0), new(1001, 1001, 0), new(1000, 1001, 0)], [[0, 1, 2, 3]]);
+        var r = Tessellation.Tessellate(mesh, 1e-14);
+        Assert.False(r.Succeeded);
+        var error = r.Errors.Single();
+        Assert.Equal("max_edge", error.Element);
+        Assert.Contains("over the budget of 200,000", error.ToString());
+        Assert.Matches("about [0-9,]+ new vertices", error.ToString());
+        // Just under: about 184,752 inside and 1,596 on the edges of a unit quad at 0.0025; over at 0.002.
+        Assert.InRange(Tessellation.Predicted(Square(1, 1), [0], 0.0025), 186_000, 187_000);
+        Assert.True(Tessellation.Predicted(Square(1, 1), [0], 0.002) > Tessellation.Budget);
+    }
+
+    /// <summary>The lattice filter before RV-100: <see cref="PlaneGeometry.Inside"/> and every segment, for every point.</summary>
+    private static List<PlaneGeometry.Vector2D> OldLattice(PlaneGeometry.Vector2D[][] loops, double maxEdge)
+    {
+        var outer = loops[0];
+        var (minX, minY, maxX, maxY) = (outer.Min(p => p.X), outer.Min(p => p.Y), outer.Max(p => p.X), outer.Max(p => p.Y));
+        var points = loops.SelectMany(l => l).ToArray();
+        var ids = new IReadOnlyList<int>[loops.Length];
+        for (int i = 0, first = 0; i < loops.Length; first += loops[i].Length, i++) ids[i] = Enumerable.Range(first, loops[i].Length).ToArray();
+        static Vector3D Flat(PlaneGeometry.Vector2D p) => new(p.X, p.Y, 0);
+        var segments = loops.SelectMany(l => l.Select((v, i) => (A: Flat(v), B: Flat(l[(i + 1) % l.Length])))).ToArray();
+        var kept = new List<PlaneGeometry.Vector2D>();
+        var row = maxEdge * Math.Sqrt(3) / 2;
+        for (var j = 0; minY + j * row < maxY; j++)
+            for (var x = minX + (j % 2) * maxEdge / 2; x < maxX; x += maxEdge)
+            {
+                var p = new PlaneGeometry.Vector2D(x, minY + j * row);
+                if (!PlaneGeometry.Inside(ids, v => points[v], p) || segments.Any(s => PlaneGeometry.SegmentDistance(Flat(p), s.A, s.B) < maxEdge / 2)) continue;
+                kept.Add(p);
+            }
+        return kept;
+    }
+
+    [Theory]
+    [InlineData("holed")]
+    [InlineData("two holes")]
+    [InlineData("comb")]
+    [InlineData("slanted")]
+    public void The_lattice_filter_keeps_the_same_points_as_the_rule_before_RV_100(string name)
+    {
+        static PlaneGeometry.Vector2D[] P(params double[] xy) => [.. xy.Chunk(2).Select(c => new PlaneGeometry.Vector2D(c[0], c[1]))];
+        PlaneGeometry.Vector2D[][] loops = name switch
+        {
+            "holed" => [P(0, 0, 4, 0, 4, 4, 0, 4), P(1, 1, 1, 3, 3, 3, 3, 1)],
+            "two holes" => [P(0, 0, 6, 0, 6, 3, 0, 3), P(0.5, 0.5, 0.5, 2.5, 2.5, 2.5, 2.5, 0.5), P(3.2, 1, 4, 2.6, 5.5, 0.4)],
+            // Concave: three teeth and two notches, one tooth leaning.
+            "comb" => [P(0, 0, 5, 0, 5, 3, 4, 3, 3.6, 1, 3, 1, 3, 3, 2, 3, 2, 1.2, 1, 1.2, 1.3, 3, 0, 3)],
+            _ => [P(0.1, 0.3, 3.7, -0.4, 4.9, 2.2, 2.1, 1.6, 0.6, 3.3)],
+        };
+        foreach (var maxEdge in new[] { 0.5, 0.3, 0.17, 0.1, 0.037 })
+        {
+            var expected = OldLattice(loops, maxEdge);
+            Assert.NotEmpty(expected);
+            Assert.Equal(expected, Tessellation.Lattice(loops, maxEdge));
+        }
+    }
 }

@@ -127,13 +127,13 @@ open`, `edges where nonmanifold`, `vertices where unattached`.
 On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-planar face is not a warning: `check` gives one note with the count and the worst case ("...; expected on a smooth mesh, which export triangulates"), every other tool says nothing, and `ok` can be true. `select faces where non_planar` names every one either way, and a flat mesh warns as above.
 
 `define_mesh`, `move`, `extrude`, `delete`, `merge_faces`, `bridge`, `plane_cut`,
-`loop_cut`, `knife`, `subdivide`, `tessellate`, `undo`, `open`, `check` and `export` take
+`loop_cut`, `knife`, `subdivide`, `tessellate`, `displace`, `undo`, `open`, `check` and `export` take
 `verbosity`:
 
 ```
 verbosity: "silent"     {"ok":true}: no counts, no ids, no warnings; the change is made all the same
 verbosity: "summary"    the result as above, each kind of four or more on one line (the default)
-verbosity: "full"       the same, with every warning one per line, and `moved` (`displace`, `move`) as the whole id list, not `{count, first}` with the first 10
+verbosity: "full"       the same, with every warning one per line, and `moved` (`displace`, `move`) and each of `split`'s `pieces` (`tessellate`) as the whole id list, not `{count, first}` with the first 10
 ```
 
 `check` at `silent` answers its own `ok` (`{"ok":false}` on a broken mesh), and

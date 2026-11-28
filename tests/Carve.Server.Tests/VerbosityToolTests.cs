@@ -59,7 +59,7 @@ public sealed class VerbosityToolTests
         { "delete_target", ["define_mesh " + Cube, "define_target " + Bulge], """{"name":"Bulge"}""", """{"name":"zz"}""" },
         { "save", ["define_mesh " + Cube], """{"path":"v.carve"}""", """{"path":"v.txt"}""" },
         { "bake", ["define_mesh " + Cube, """project_uvs {"method":"box"}"""], """{"size":64,"padding":0,"maps":["normal"],"bevel":{"width":0.1}}""", """{"size":64,"maps":["nope"]}""" },
-        { "tessellate", ["define_mesh " + Cube], """{"max_edge":0.5,"faces":[1]}""", """{"max_edge":0}""" },
+        { "tessellate", ["define_mesh " + Cube], """{"max_edge":0.25,"faces":[1]}""", """{"max_edge":0}""" },
         { "displace", ["define_mesh " + Cube, """subdivide {"levels":2}"""], """{"source":{"noise":{"seed":7,"scale":0.35,"octaves":5}},"amount":0.6}""", """{"amount":"x"}""" },
     };
 
@@ -141,11 +141,32 @@ public sealed class VerbosityToolTests
             {
                 // A kind of 4 or more (delete's open edges, subdivide's faces) is one line at summary and every one at full; nothing else differs.
                 var (a, b) = (JsonDocument.Parse(plain.Text).RootElement, JsonDocument.Parse(full.Text).RootElement);
-                // moved is {count, first} at summary and the whole list at full.
-                Assert.Equal(a.EnumerateObject().Where(x => x.Name is not ("warnings" or "moved")).Select(x => x.ToString()), b.EnumerateObject().Where(x => x.Name is not ("warnings" or "moved")).Select(x => x.ToString()));
-                if (b.TryGetProperty("moved", out var moved)) Assert.Equal(a.GetProperty("moved").GetProperty("count").GetInt32(), moved.GetArrayLength());
-                if (b.GetProperty("warnings").GetArrayLength() > a.GetProperty("warnings").GetArrayLength())
+                // moved, and each of split's pieces, is {count, first} at summary (the first 10 ids) and the whole list at full.
+                static string[] Rest(JsonElement e, params string[] skip) => [.. e.EnumerateObject().Where(x => !skip.Contains(x.Name)).Select(x => x.ToString())];
+                Assert.Equal(Rest(a, "warnings", "moved", "split"), Rest(b, "warnings", "moved", "split"));
+                static void Short(JsonElement summary, JsonElement whole)
+                {
+                    var ids = whole.EnumerateArray().Select(i => i.GetInt32()).ToArray();
+                    Assert.Equal(ids.Length, summary.GetProperty("count").GetInt32());
+                    Assert.Equal(ids.Take(10), summary.GetProperty("first").EnumerateArray().Select(i => i.GetInt32()));
+                }
+                if (b.TryGetProperty("moved", out var moved)) Short(a.GetProperty("moved"), moved);
+                if (b.TryGetProperty("split", out var split))
+                {
+                    var (shortSplit, wholeSplit) = (a.GetProperty("split").EnumerateArray().ToArray(), split.EnumerateArray().ToArray());
+                    Assert.Equal(wholeSplit.Length, shortSplit.Length);
+                    for (var i = 0; i < wholeSplit.Length; i++)
+                    {
+                        Assert.Equal(wholeSplit[i].GetProperty("face").GetInt32(), shortSplit[i].GetProperty("face").GetInt32());
+                        Short(shortSplit[i].GetProperty("pieces"), wholeSplit[i].GetProperty("pieces"));
+                    }
+                }
+                // A row that differs in anything but moved and split differs in its warnings, and full shows more of them.
+                if (!Rest(a, "moved", "split").SequenceEqual(Rest(b, "moved", "split")))
+                {
+                    Assert.True(b.GetProperty("warnings").GetArrayLength() > a.GetProperty("warnings").GetArrayLength(), $"{tool}: full does not show more warnings");
                     Assert.All(b.GetProperty("warnings").EnumerateArray(), w => Assert.Matches(@"^[a-z]+\[[0-9-]+\]: ", w.GetString()!));
+                }
             }
 
             var refused = await Run("", bad);

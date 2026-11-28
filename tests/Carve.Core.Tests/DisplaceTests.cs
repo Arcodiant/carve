@@ -179,8 +179,23 @@ public class DisplaceTests
     public void Pin_border_with_vertices_or_no_selection_is_refused_and_changes_nothing()
     {
         var mesh = Ok(Displacement.Displace(Cube(), null, Rough, 0.1f, 0.5f, null, out _));
-        Assert.False(Displacement.Displace(mesh, [0, 1], Rough, 0.3f, 0.5f, null, out _, null, true).Succeeded);
-        Assert.False(Displacement.Displace(mesh, null, Rough, 0.3f, 0.5f, null, out _, null, true).Succeeded);
-        Assert.False(Displacement.Displace(mesh, [0], Rough, 0.3f, 0.5f, null, out _, [0], true).Succeeded);
+        const string noBorder = "has no border";
+        RefusedFor(Displacement.Displace(mesh, [0, 1], Rough, 0.3f, 0.5f, null, out _, null, true), "pin_border", noBorder);
+        RefusedFor(Displacement.Displace(mesh, null, Rough, 0.3f, 0.5f, null, out _, null, true), "pin_border", noBorder);
+        RefusedFor(Displacement.Displace(mesh, [0], Rough, 0.3f, 0.5f, null, out _, [0], true), "pin_border", noBorder);
+    }
+
+    [Fact]
+    public void Pin_border_on_a_selection_that_is_all_border_is_refused()
+    {
+        // One untessellated cube face: each of its corners is on a face outside the selection, so none may move.
+        RefusedFor(Displacement.Displace(Cube(), null, Rough, 0.3f, 0.5f, null, out _, [3], true), "selection", "matches no vertex off the border");
+    }
+
+    /// <summary>The call was refused, and for this reason: an error on <paramref name="element"/> saying <paramref name="text"/>.</summary>
+    private static void RefusedFor(EditResult r, string element, string text)
+    {
+        Assert.False(r.Succeeded);
+        Assert.Contains(r.Errors, e => e.Element == element && e.ToString().Contains(text));
     }
 }
