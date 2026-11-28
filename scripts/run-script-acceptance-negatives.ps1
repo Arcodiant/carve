@@ -29,8 +29,11 @@ if (Test-Path $work) { Remove-Item $work -Recurse -Force }
 New-Item -ItemType Directory $work | Out-Null
 
 function New-Copy([string]$name) {
-    $d = Join-Path $work $name
-    Copy-Item (Resolve-Path $Round).Path $d -Recurse
+    # each copy keeps the round's folder name, which the path check ties the session's folder to
+    $src = (Resolve-Path $Round).Path.TrimEnd([char[]]@([char]92, '/'))
+    $d = Join-Path (Join-Path $work $name) (Split-Path $src -Leaf)
+    New-Item -ItemType Directory (Split-Path $d -Parent) | Out-Null
+    Copy-Item $src $d -Recurse
     return $d
 }
 
@@ -68,12 +71,15 @@ Copy-Item (Join-Path $d 'prop.carvescript') (Join-Path $d 'prop-edited.carvescri
 Copy-Item (Join-Path $d 'prop.carve') (Join-Path $d 'prop-edited.carve') -Force
 Run-Checks 'measurement off (edited pair is the exported pair)' $d
 
-# 4. the session's cwd is C:\ (the file-tool paths are left as they were)
+# 4. the session's cwd is the folder above the session's own (it still holds every written path, but its name is not the round's)
 $d = New-Copy 'cwd'
 $t = Join-Path $d 'transcript.jsonl'
-$cwdLine = [regex]'"cwd":"[^"]*"'
-[IO.File]::WriteAllText($t, $cwdLine.Replace([IO.File]::ReadAllText($t), '"cwd":"C:\\"'))
-Run-Checks 'session cwd is C:' $d
+$cwdLine = [regex]'"cwd":"([^"]*)"'
+$text = [IO.File]::ReadAllText($t)
+$bs = [string][char]92
+$parent = (Split-Path $cwdLine.Match($text).Groups[1].Value.Replace($bs + $bs, $bs) -Parent).Replace($bs, $bs + $bs)
+[IO.File]::WriteAllText($t, $cwdLine.Replace($text, '"cwd":"' + $parent + '"'))
+Run-Checks 'session cwd has another folder name' $d
 
 # 5. the file the agent wrote is not a file of the round
 $d = New-Copy 'missing'
