@@ -23,10 +23,13 @@ internal sealed class JournalStage : IReplayStage
         Equal("a fresh model: clear, define_mesh", "clear define_mesh", plain);
 
         // Read-only, not-a-step and refused calls add nothing.
-        foreach (var tool in new[] { "get_mesh", "get_parts", "get_skeleton", "get_weights", "get_clips", "check" })
+        // Each must be accepted, or "leaves no line" holds for a refused call too. get_skeleton and get_weights have no skeleton to read here and answer so.
+        foreach (var tool in new[] { "get_mesh", "get_parts", "get_clips", "check" })
+            await Ok(d, tool, new { });
+        foreach (var tool in new[] { "get_skeleton", "get_weights" })
             await d.CallAsync(tool, new { });
-        await d.CallAsync("select", new { mesh = "cube", faces = new { y_above = 0.5 } });
-        await d.CallAsync("render", new { view = "front" });
+        await Ok(d, "select", new { mesh = "cube", kind = "faces", where = "normal.y > 0.9" });
+        await Ok(d, "render", new { view = "front" });
         await Ok(d, "save", new { path = System.IO.Path.Combine(d.RunFolder, "work", "j.carve") });
         await Refused(d, "move", new { mesh = "cube", faces = new[] { 99 }, by = new[] { 0, 1, 0 } });
         await Refused(d, "extrude", new { mesh = "cube", faces = new[] { 99 }, distance = 1 });

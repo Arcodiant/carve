@@ -24,7 +24,7 @@ internal sealed class NumbersPathsStage : IReplayStage
         var a = await Save(d, System.IO.Path.Combine(work, "numbers-a.carve"));
         var text = await Script(d, System.IO.Path.Combine(d.RunFolder, "scripts", "numbers.carvescript"));
         foreach (var token in new[] { "0.1", "0.30000000000000004", "-0", "5e-324", "1e38", "é名前", "ünï" })
-            if (!text.Contains(token, StringComparison.OrdinalIgnoreCase)) Note($"numbers: the script does not hold '{token}' as written");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(text, @"(?<![\w.+-])" + System.Text.RegularExpressions.Regex.Escape(token) + @"(?![\w.+-])", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) Note($"numbers: the script does not hold '{token}' as written");
         await Ok(d, "clear", new { });
         await Ok(d, "run_script", new { path = System.IO.Path.Combine(d.RunFolder, "scripts", "numbers.carvescript") });
         var b = await Save(d, System.IO.Path.Combine(work, "numbers-b.carve"));

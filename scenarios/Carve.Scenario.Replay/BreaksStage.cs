@@ -16,7 +16,16 @@ internal sealed class BreaksStage : IReplayStage
         var scripts = Dir(d, "scripts");
         var statements = Statements(EveryToolStage.ScriptText);
         string Join(IEnumerable<string> s) => string.Concat(s);
-        int Find(string tool, int nth = 0) => statements.Select((s, i) => (s, i)).Where(x => x.s.StartsWith(tool + "(")).Skip(nth).First().i;
+        int Find(string tool, int nth = 0)
+        {
+            var hits = statements.Select((s, i) => (s, i)).Where(x => x.s.StartsWith(tool + "(")).Skip(nth).ToList();
+            if (hits.Count > 0) return hits[0].i;
+            Note($"breaks: stage 1's script has no '{tool}' statement");
+            return -1;
+        }
+
+        // Without stage 1's script there is nothing to damage: note it and stop, rather than throw and abort the run.
+        if (new[] { "move", "loop_cut", "extrude", "project_uvs" }.Any(t => Find(t) < 0)) return;
 
         var move = Find("move");
         var loopCut = Find("loop_cut");
@@ -67,6 +76,7 @@ internal sealed class BreaksStage : IReplayStage
             {
                 caught = true;
                 result = "run_script refused: " + Text(run).Split('\n')[0];
+                if (must && !System.Text.RegularExpressions.Regex.IsMatch(result, @"line \d+")) Note($"breaks: '{name}' was refused without naming a line: {result}");
             }
             else
             {
