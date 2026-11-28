@@ -80,16 +80,10 @@ public sealed class RunScriptTool(ModelStore store, ToolFolder toolFolder)
         if (store.Batch("run_script", () => RunStatements(context.Services!, context.Server, context.JsonRpcRequest, Path.GetDirectoryName(target.FullPath)!, script, out ran), out var problem) is null)
             return Error(problem! + unchanged);
 
-        var model = store.Current.Model;
         var body = new Dictionary<string, object>
         {
             ["statements"] = ran,
-            ["meshes"] = model.Meshes.Select(m =>
-            {
-                var one = new Dictionary<string, object> { ["name"] = m.Name };
-                foreach (var (k, v) in Report(m.Mesh, level)) one[k] = v;
-                return one;
-            }).ToArray(),
+            ["meshes"] = Reports(store.Current.Model.Meshes, level),
         };
         return Quiet(Ok(body), level);
     }

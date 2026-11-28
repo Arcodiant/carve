@@ -36,12 +36,7 @@ public sealed class UndoTool(ModelStore store)
             ? Report(model.Meshes[0].Mesh, level)
             : new Dictionary<string, object>
             {
-                ["meshes"] = model.Meshes.Select(m =>
-                {
-                    var one = new Dictionary<string, object> { ["name"] = m.Name };
-                    foreach (var (k, v) in Report(m.Mesh, level)) one[k] = v;
-                    return one;
-                }).ToArray(),
+                ["meshes"] = Reports(model.Meshes, level),
             };
         body["undone"] = undo.Undone;
         return Quiet(Ok(body), level);
