@@ -136,6 +136,9 @@
           "dotnet-closure": "tests/Carve.AcceptanceLoad.Tests/Carve.AcceptanceLoad.Tests.csproj"
         },
         {
+          "dotnet-closure": "tests/Carve.ScriptAcceptance.Tests/Carve.ScriptAcceptance.Tests.csproj"
+        },
+        {
           "dotnet-closure": "tests/Carve.PartsAcceptance.Tests/Carve.PartsAcceptance.Tests.csproj"
         },
         {
