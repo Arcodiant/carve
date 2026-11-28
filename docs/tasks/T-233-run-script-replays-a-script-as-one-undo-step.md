@@ -4,7 +4,7 @@ description: >-
 ---
 # T-233 — run_script replays a script as one undo step
 
-**Status:** Open
+**Status:** In Progress
 
 **Pri:** P1
 
