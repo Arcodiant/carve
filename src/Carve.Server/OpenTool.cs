@@ -105,12 +105,7 @@ public sealed class OpenTool(ModelStore store, ToolFolder toolFolder)
         if (shown.Count == 1)
             foreach (var (key, value) in Report(shown[0].Mesh, level)) body[key] = value;
         else
-            body["meshes"] = shown.Select(m =>
-            {
-                var one = new Dictionary<string, object> { ["name"] = m.Name };
-                foreach (var (k, v) in Report(m.Mesh, level)) one[k] = v;
-                return one;
-            }).ToArray();
+            body["meshes"] = Reports(shown, level);
         if (model.Skeleton is { } skeleton)
         {
             body["bones"] = skeleton.Bones.Count;

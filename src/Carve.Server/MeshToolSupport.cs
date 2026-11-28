@@ -221,6 +221,15 @@ internal static class MeshToolSupport
     public static CallToolResult Quiet(CallToolResult result, Verbosity level) =>
         level == Verbosity.Silent && result.IsError != true ? Line(SilentOk) : result;
 
+    /// <summary>Each mesh's <see cref="Report"/> after its name, for a result's <c>meshes</c> list.</summary>
+    public static Dictionary<string, object>[] Reports(IEnumerable<NamedMesh> meshes, Verbosity level) =>
+        [.. meshes.Select(m =>
+        {
+            var one = new Dictionary<string, object> { ["name"] = m.Name };
+            foreach (var (k, v) in Report(m.Mesh, level)) one[k] = v;
+            return one;
+        })];
+
     /// <summary>The report fields every tool returns: vertices, faces, edges, closed, bounds, warnings.</summary>
     public static Dictionary<string, object> Report(PolygonMesh mesh, Verbosity level = Verbosity.Summary)
     {
