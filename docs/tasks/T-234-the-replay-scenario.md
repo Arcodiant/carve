@@ -4,7 +4,7 @@ description: >-
 ---
 # T-234 — The replay scenario
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
