@@ -92,6 +92,12 @@ the paths relative to the folder carve was started in (its working directory):
 The tool descriptions carry the same sequence, so an agent that has only the
 tool list can follow it.
 
+`clear` empties the model (meshes, parts, materials, skeleton, clips) as one
+step, which `undo` takes back. For the session, carve keeps every call that
+made an undo step, with its arguments as sent, for `save_script`: `undo` takes
+the call back out, and `clear` or a whole-model `open` starts the list again.
+`save` leaves it alone and the `.carve` file never holds it.
+
 ## Asking the mesh
 
 An agent can question a mesh instead of reading every id out of `get_mesh`.
@@ -127,7 +133,7 @@ open`, `edges where nonmanifold`, `vertices where unattached`.
 On a smooth-shaded mesh (`set_shading`), which a subdivided cage is, a not-planar face is not a warning: `check` gives one note with the count and the worst case ("...; expected on a smooth mesh, which export triangulates"), every other tool says nothing, and `ok` can be true. `select faces where non_planar` names every one either way, and a flat mesh warns as above.
 
 `define_mesh`, `move`, `extrude`, `delete`, `merge_faces`, `bridge`, `plane_cut`,
-`loop_cut`, `knife`, `subdivide`, `tessellate`, `displace`, `undo`, `open`, `check` and `export` take
+`loop_cut`, `knife`, `subdivide`, `tessellate`, `displace`, `undo`, `clear`, `open`, `check` and `export` take
 `verbosity`:
 
 ```

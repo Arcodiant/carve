@@ -4,7 +4,7 @@ description: >-
 ---
 # T-231 — The call journal in ModelStore, and clear
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -45,3 +45,55 @@ The server keeps, for the session, every successful call that changed the model 
 - Read the milestone's *Decided at planning (2026-11-26)* first.
 - **Ask, don't land.** A rule neither this file nor the milestone settles, or a check that would be loosened, goes back to the person. Show each new check failing on a wrong input, as a table in `### As built`.
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Built by one agent on Opus 5.5 (`claude-opus-5-5`), with no hand-off.
+
+**The mechanism** is the planner's shape. `MeshToolSupport.Create<T>(name, description, schema, params string[] reads)` returns a `JournalledTool` (a `DelegatingMcpServerTool`). For the length of each call, it sets an `AsyncLocal` `JournalCall`: the tool, its arguments, and the arguments it reads. `ModelStore.PushLocked` journals that call. `ToolPaths.Resolve(..., verb: "reads")` notes each path it resolves on the call. No tool's `Run` changed.
+
+**The API, for T-232 and T-233** (`src/Carve.Server/Journal.cs`, `ModelStore.cs`):
+
+- `ModelStore.Journal`: an `IReadOnlyList<JournalEntry>`. It is an `ImmutableList` published with `Volatile`, so it can be read from any thread while a call writes.
+- `JournalEntry(string Tool, IReadOnlyList<KeyValuePair<string, JsonElement>> Arguments, IReadOnlyDictionary<string, string> Files)`:
+  - `Arguments` are in the order sent. Each is a cloned raw `JsonElement`, so `GetRawText()` gives the text sent (`0.30000000000000004`, `-0`), and `verbosity` is kept like any other argument.
+  - `Files` maps where an argument is (`path`, `file`, `normal_texture`, `normal_texture.graph`, `source.graph`) to the absolute path `Resolve` gave for it.
+- `ModelStore.Clear(tool)`: `Model.Empty` as one step, which starts a new journal.
+- **The seam for several entries in one step**: `ModelStore.Change(tool, change, IReadOnlyList<JournalEntry> entries, bool restart, out problem)`. It pushes one step and journals `entries` in place of the call under way. They are appended, or start a new journal when `restart` is true. One undo takes them all back. Each history entry keeps the journal as it stood after its step, and undo puts back the one before.
+- **Declared file arguments**: open `path`; define_target `file`; define_material each of its five texture fields and `<field>.graph`; displace `source.graph`. `JournalCall.Entry()` throws when a call resolved a read path that no declared argument holds, so a new file-reading argument has to be declared.
+- **At most one push per call**: a second `PushLocked` in one call throws `InvalidOperationException`, and the call comes back as a tool error.
+- Outside a tool call (tests that drive the store directly), a push journals nothing.
+
+**clear** (`ClearTool.cs`, registered after `undo`):
+- Its worked example is `{}` on the unit cube, and the clear test runs it as written.
+- `undo` names `clear` and has one more sentence: undo also takes the step out of the list of calls `save_script` writes. Both descriptions pass `HelpToolTests`' 3,686 ceiling.
+- `README.md` adds `clear` to the verbosity list and has a paragraph on the session's calls.
+
+**Pins re-taken**: one. `ToolHarnessTests.ListsEveryToolWithAClosedSchema`'s count went from 45 to 46, and the only change is `clear`. Searching `tests/` and `scenarios/` found no other exact tool list, and scenario-patina's list is untouched. `VerbosityToolTests.Tools` gained a `clear` row, and its guard puts `clear` among the tools that take `verbosity`.
+
+**Tests**: `JournalToolTests` (`unit`).
+- The per-tool check is a `[Fact]` over tools/list, not an xUnit theory, because the list is only known once a harness is running. Each reader is called and must add no entry. Every other tool runs `VerbosityToolTests.Tools`' working call for it after that row's setup:
+  - save, check, export and bake must add nothing;
+  - undo must drop the last entry;
+  - open and clear must leave exactly their own call;
+  - every other tool must add its own call, exactly as sent;
+  - then that row's refused call must leave the journal unchanged;
+  - a tool in neither column fails the test.
+- Those rows are the calls M-23's verbosity test already runs, not each description's worked example. For unwrap, which has no row there, the row is one face of the cube.
+
+**Break table**: each break was applied to the committed code, `JournalToolTests` and `TargetToolTests` were run, and the break was reverted.
+
+| Break | Fails |
+|---|---|
+| A. undo does not restore the journal | every-tool, undo, open/clear-restore, 105 moves |
+| B. open and clear append instead of restarting | every-tool, open/clear, clear, file path |
+| C. arguments sorted by name instead of order sent | order and raw text, every-tool, undo |
+| D. define_target's `file` not declared | the reads table, and both of TargetToolTests' file tests (the undeclared-read throw) |
+| E. clear pushes twice | every-tool, clear, open/clear (the double-push throw) |
+| H. journal capped at UndoDepth+1 | 105 moves |
+| I. Resolve records the path as given, not the absolute one | file path |
+| J. arguments re-serialised, not raw | order and raw text, and every test that compares calls |
+
+**Not checked**: the description's worked example for each model-changing tool, one by one (the rows stand in for them, as above); a real MCP client calling `clear`, beyond `server-regression`'s harness-against-process comparisons; texture or graph `Files` entries (they are covered only by the undeclared-read throw, which the existing material and displace tests would set off).
+
+**M-23 as landed**: it differs from its first plan (T-203 merged into T-199, T-204 and T-205 dropped), but the person ruled those changes and they are recorded in M-23. Nothing T-231 relies on differs from what was ruled.

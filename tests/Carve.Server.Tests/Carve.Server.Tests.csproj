@@ -43,6 +43,7 @@
     <ProjectReference Include="../../src/Carve.Core/Carve.Core.csproj" />
     <ProjectReference Include="../../src/Carve.Graphs/Carve.Graphs.csproj" />
     <Compile Include="../../src/Carve.Server/ModelStore.cs" Link="ModelStore.cs" />
+    <Compile Include="../../src/Carve.Server/Journal.cs" Link="Journal.cs" />
     <Compile Include="../../src/Carve.Server/MeshBridge.cs" Link="MeshBridge.cs" />
     <Compile Include="../../src/Carve.Server/ViewFraming.cs" Link="ViewFraming.cs" />
     <Compile Include="../../src/Carve.Server/RenderQueue.cs" Link="RenderQueue.cs" />
