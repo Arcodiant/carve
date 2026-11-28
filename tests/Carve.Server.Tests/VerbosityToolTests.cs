@@ -66,7 +66,7 @@ public sealed class VerbosityToolTests
         { "displace", ["define_mesh " + Cube, """subdivide {"levels":2}"""], """{"source":{"noise":{"seed":7,"scale":0.35,"octaves":5}},"amount":0.6}""", """{"amount":"x"}""" },
     };
 
-    private const string Rig = """{"bones":[{"name":"base","parent":null,"position":[0,0,0],"rotation":[0,0,0,1]},{"name":"joint","parent":"base","position":[0,1,0],"rotation":[0,0,0,1]}]}""";
+    internal const string Rig = """{"bones":[{"name":"base","parent":null,"position":[0,0,0],"rotation":[0,0,0,1]},{"name":"joint","parent":"base","position":[0,1,0],"rotation":[0,0,0,1]}]}""";
 
     private const string Wave =
         """{"name":"wave","duration":1,"loop":true,"channels":{"joint":{"rotation":{"interpolation":"LINEAR","keys":[{"time":0,"value":[0,0,0,1]},{"time":0.5,"value":[0,0,0.70710677,0.70710677]},{"time":1,"value":[0,0,0,1]}]}}}}""";

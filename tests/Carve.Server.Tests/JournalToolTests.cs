@@ -45,9 +45,14 @@ public sealed class JournalToolTests() : TempFolderTests("carve-journal")
             var folder = Directory.CreateDirectory(Path.Combine(Root, tool)).FullName;
             if (VerbosityToolTests.Readers.Contains(tool))
             {
-                await using var reader = await VerbosityToolTests.Start(folder, ["define_mesh " + Cube]);
-                await reader.CallToolAsync(tool, "{}");
-                if (reader.Store.Journal.Count != 1) wrong.Add($"{tool}: a reader, but the journal has {reader.Store.Journal.Count} entries");
+                // A call each reader accepts: `{}` is refused by some, and a refused call journals nothing whatever the code does.
+                // render and render_glb need the engine, which this harness has none of, so theirs is refused here and only the count is held.
+                var skeleton = tool is "get_skeleton" or "get_weights";
+                await using var reader = await VerbosityToolTests.Start(folder, skeleton ? ["define_mesh " + Cube, "define_skeleton " + VerbosityToolTests.Rig] : ["define_mesh " + Cube]);
+                var entries = reader.Store.Journal.Count;
+                var read = await reader.CallToolAsync(tool, tool == "select" ? """{"kind":"faces","where":"normal.y > 0.9"}""" : "{}");
+                if (IsError(read) && tool is not ("render" or "render_glb")) { wrong.Add($"{tool}: a reader, but its call was refused: {Text(read).ReplaceLineEndings(" ")}"); continue; }
+                if (reader.Store.Journal.Count != entries) wrong.Add($"{tool}: a reader, but the journal went from {entries} to {reader.Store.Journal.Count} entries");
                 continue;
             }
             if (!rows.TryGetValue(tool, out var row)) { wrong.Add($"{tool}: in neither column (a row in VerbosityToolTests.Tools, or a reader)"); continue; }

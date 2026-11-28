@@ -77,13 +77,14 @@ public sealed class RunScriptTool(ModelStore store, ToolFolder toolFolder)
         if (script is null) return Error($"run_script: {target.FullPath}: {formatError}; nothing ran");
 
         var ran = 0;
-        if (store.Batch("run_script", () => RunStatements(context.Services!, context.Server, context.JsonRpcRequest, Path.GetDirectoryName(target.FullPath)!, script, out ran), out var problem) is null)
+        var pushed = store.Batch("run_script", () => RunStatements(context.Services!, context.Server, context.JsonRpcRequest, Path.GetDirectoryName(target.FullPath)!, script, out ran), out var problem);
+        if (pushed is null)
             return Error(problem! + unchanged);
 
         var body = new Dictionary<string, object>
         {
             ["statements"] = ran,
-            ["meshes"] = Reports(store.Current.Model.Meshes, level),
+            ["meshes"] = Reports(pushed.Model.Meshes, level),
         };
         return Quiet(Ok(body), level);
     }

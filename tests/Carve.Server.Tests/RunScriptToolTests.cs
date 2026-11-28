@@ -124,6 +124,15 @@ public sealed class RunScriptToolTests() : TempFolderTests("carve-run-script")
     }
 
     [Fact]
+    public async Task A_refused_statement_is_named_even_when_an_earlier_one_would_fail_because_the_check_is_up_front()
+    {
+        await using var carve = await Start("define_mesh " + Cube);
+        Write("s.carvescript", "extrude(faces: [999], distance: 0.5)\nsave(path: \"x.carve\")\n");
+        Assert.StartsWith("line 2: save is not a statement a script can run",
+            await Say(carve, "run_script", """{"path":"s.carvescript"}""", refused: true), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task The_refused_tools_are_the_ones_that_make_no_step_and_every_other_tool_may_run()
     {
         await using var carve = await Start();

@@ -1,6 +1,6 @@
 namespace Carve.Server;
 
-/// <summary>help {"topic":"scripts"} (M-34, T-232): the .carvescript format and what save_script writes. and how run_script (T-233) runs one.</summary>
+/// <summary>help {"topic":"scripts"} (M-34, T-232): the .carvescript format and what save_script writes, and how run_script (T-233) runs one.</summary>
 public static class ScriptsTopic
 {
     public const string Text =
