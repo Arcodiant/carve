@@ -4,7 +4,7 @@ description: >-
 ---
 # T-234 — The replay scenario
 
-**Status:** Open
+**Status:** Done
 
 **Pri:** P1
 
@@ -14,7 +14,7 @@ description: >-
 
 **Depends on:** T-233
 
-**Verify:** server-unit
+**Verify:** server-unit, scenario-replay
 
 **Perf:** skip: Carve declares no heavy suites
 
@@ -72,3 +72,34 @@ coverage: tools/list minus {read-only list}
 - Read the milestone's *Decided at planning (2026-11-26)* first.
 - **Ask, don't land.** A rule neither this file nor the milestone settles, or a check that would be loosened, goes back to the person. Show each new check failing on a wrong input (stage 5 is the scenario's own; give the table).
 - Run `finish` from inside the worktree and leave the folder.
+
+### As built
+
+Built by one agent on Sonnet 5.5 (`claude-sonnet-5-5`), with no hand-off.
+
+**Suite** `scenario-replay` (`regression`, `gpu`) in `tests.json` and `Carve.slnx`; `Verify:` now lists it; a layout row in `CLAUDE.md`. Project `scenarios/Carve.Scenario.Replay`: `ReplayStages.cs` (order), `EveryToolStage`, `JournalStage`, `NumbersPathsStage`, `AtomicStage`, `BreaksStage`, shared `Replay.cs`.
+
+**Time**: the scenario runs in about 4 s locally (`run-scenario.ps1 replay -NoBuild`), and the suite took 21 s on the verify farm (2 s queued). scenario-gatehouse's declared estimate is 60 s; I did not get a measured gatehouse time here (its wrapper script failed at once with `-NoBuild` in this worktree, not looked into), so the comparison is replay's 21 s against that estimate.
+
+**Stage 1** calls 32 model-changing tools (one session: a cube opened from a file with `mesh`, a plate, a cut and a knifed and a holed and a bridged cube, a subdivided and displaced cube (noise), a tessellated one displaced from `floor-tiles.texgraph`, an unwrapped one, a morph cube with a position target, a file target and a deleted one, a 3-bone rig with weights, `weigh`, two clips and one deleted, a part instance and `keep_level`, a material with an `iron-base.png`). Inputs are copied to `inputs/`. A == B byte for byte on the first run, and the front renders (`replay-before`, `replay-after`) have the same hash. Coverage: `ModelChanging` and `NotModelChanging` lists against tools/list, and every `ModelChanging` tool a statement of the exported script; shown failing by taking `tessellate` out of the list (failed naming it, twice), then restored.
+
+**Breaks** (`breaks.tsv`, run 4):
+
+| Break | Result | Caught |
+|---|---|---|
+| control: script as exported | file equals A | no (as meant) |
+| the cube's move dropped | file differs from A | yes |
+| the plate's extrude dropped | refused at line 8 (define_group) | yes |
+| loop_cut and merge_faces swapped | refused at line 3 | yes |
+| define_mesh plate and extrude swapped | refused at line 6 | yes |
+| the move's 0.5 changed to 0.25 | file differs from A | yes |
+| control: whitespace only changed | file equals A | no (as meant) |
+
+**Coverage lists**: model-changing (all in the script): define_mesh, move, extrude, delete, merge_faces, bridge, plane_cut, loop_cut, knife, subdivide, tessellate, displace, unwrap, project_uvs, set_uvs, set_colour, define_material, set_material, set_shading, mark_edges, define_group, define_part, keep_level, define_skeleton, set_weights, weigh, define_clip, delete_clip, define_target, delete_target, open, clear. Not statements: undo, run_script, save, save_script, export, bake, check, select, render, render_glb, help, the five get_ tools.
+
+**Findings**: no product bug in T-231..T-233 found. One limit: `1e308` cannot go in a script, because every tool keeps floats and refuses it (`define_part` scale, `define_clip` time); stage 3 uses `1e38` for the clip's duration and keeps `0.1`, `0.30000000000000004`, `-0`, `5e-324` (vertices) and unicode names; the format-level `1e308` is T-230's test. Stage 2 uses `undo` twice, since `undo` has no `steps`. The "version unchanged" part of stage 4 is checked through the model, the saved file, the journal and what undo then does, since no tool shows the version.
+
+**Frame review**: one subagent looked at the frame (identical bytes, so one opened): non-empty model, three objects visible (a box, a bumpy box, a red-topped plate), no defect; the others overlap or sit behind in the front view, and the group is small in the frame. No golden or choice for the person.
+
+**Not checked**: the gatehouse suite's measured time; the `scenario-replay` run on another machine than the verify farm and this one.
+

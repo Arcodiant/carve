@@ -631,6 +631,29 @@
       "est-seconds": 30
     },
     {
+      "id": "scenario-replay",
+      "tier": "regression",
+      "build": "solution",
+      "run": "pwsh -NoProfile -File scripts/run-scenario.ps1 replay -NoBuild",
+      "inputs": [
+        {
+          "dotnet-closure": "scenarios/Carve.Scenario.Replay/Carve.Scenario.Replay.csproj"
+        },
+        {
+          "dotnet-closure": "src/Carve.Server/Carve.Server.csproj"
+        },
+        "samples/textures/iron-base.png",
+        "samples/graphs/floor-tiles.texgraph",
+        "scripts/run-scenario.ps1",
+        "scripts/bounded-run.ps1"
+      ],
+      "resources": "gpu",
+      "requires": [
+        "vulkan"
+      ],
+      "est-seconds": 30
+    },
+    {
       "id": "scenario-parts",
       "tier": "regression",
       "build": "solution",
