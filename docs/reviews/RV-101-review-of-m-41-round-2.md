@@ -46,6 +46,8 @@ The last two pass the check. The only test of `Predicted` is on the unit quad.
 
 Within the person's ruling 2. `Predicted` now adds `Tessellation.StripPoints`, 3.5 points per `max_edge` of each selected face's loops (measured at 0.8 to 3.0). On the table: unit quad 191,948 predicted (191,085 made), 40 x 0.01 217,933 (196,325), 125 x 0.004 542,387 (268,339), 75 x 0.01 408,596 (368,134); made counts are this table's, the algorithm being unchanged, and the last three are now refused (the 40 x 0.01 strip, under the budget when made, is refused by the margin). A hard stop also refuses, with the budget error and before anything is committed, a call whose made vertices would pass the budget (after the edge points, after the lattice, or in `ConstrainedDelaunay.Refine`'s new point cap). Tests: `The_prediction_is_not_under_the_vertices_made` on scaled-down copies (a 0.25 quad, strips 2 x 0.01, 2 x 0.004 and 3 x 0.01 at 0.0025, each the table's width in `max_edge`), and `A_call_that_makes_more_than_the_hard_stop_is_refused_and_changes_nothing`, with the stop set under the made count through an internal overload. In 9f5722ad (claude-opus-5-5).
 
+The margin stands by Waystone's filter's answer of 2026-11-27 (for the person to confirm): it refuses some calls that would have fit, such as the 40 x 0.01 strip (196,325 made, about 218,000 predicted), refused at once with no work done; the hard stop is only a backstop. Pinned by `The_40_by_0_01_strip_that_would_fit_is_refused_at_once_by_the_margin`.
+
 ### `split` at summary still grows with the number of faces, so a whole-mesh tessellate breaks the 2,000-character budget
 
 `src/Carve.Server/MeshToolSupport.cs:161-162`, `src/Carve.Server/TessellateTool.cs:77`. Rubric point 1 (M-23's ruling 5).
