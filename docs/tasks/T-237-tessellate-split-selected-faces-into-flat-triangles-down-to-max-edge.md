@@ -79,6 +79,11 @@ existing vertex, and keeps the mesh closed.
 - RV-101's third finding (the prediction under-counting narrow faces) was fixed within the person's ruling 2 above:
   the prediction counts the strip refinement adds along the loops, and a hard stop refuses a call whose made count
   passes the budget anyway, before anything is committed.
+- Answered by Waystone's filter, not the person, on 2026-11-27 (RV-101, round 2), for the person to confirm or
+  overturn: **keep the 3.5 strip margin.** The prediction counts 3.5 points per `max_edge` of each face's loops, so it
+  refuses some calls that would have fit, such as the 40 x 0.01 m strip at 0.0025, which makes 196,325 but is
+  predicted at about 218,000. The prediction is the gate (a refused call is refused at once with no work done); the
+  hard stop is only a backstop.
 
 ### As built
 
@@ -145,7 +150,8 @@ Ran on Claude Opus 5.5 (two agents; the first handed off at its 60-call checkpoi
     Measured (Release) the strip's points per `max_edge` of loop are 0.8 (strips 1.6 `max_edge` wide) to 3.0 (the unit
     quad at 0.0025). On RV-101's table the prediction is now 191,948 (made 191,085), 217,933 (196,325), 542,387
     (268,339) and 408,596 (368,134), the made counts RV-101's, the algorithm being unchanged; so the 40 x 0.01 strip,
-    which makes 196,325, is now refused. `The_prediction_is_not_under_the_vertices_made` holds it on scaled-down copies
+    which makes 196,325, is now refused: the filter's answer above keeps the margin (for the person to confirm or
+    overturn), pinned by `The_40_by_0_01_strip_that_would_fit_is_refused_at_once_by_the_margin`. `The_prediction_is_not_under_the_vertices_made` holds it on scaled-down copies
     (a 0.25 quad and strips 2 x 0.01, 2 x 0.004, 3 x 0.01 at 0.0025, each under 0.7 s in Debug).
   - Hard stop: `Tessellate` stops once its new vertices would pass the budget (after the edge points, the lattice, or
     inside `ConstrainedDelaunay.Refine(limit, maxPoints)`, which now returns false at its cap) and refuses on

@@ -255,6 +255,23 @@ public class TessellateTests
         Assert.True(Tessellation.Predicted(Square(1, 1), [0], 0.002) > Tessellation.Budget);
     }
 
+    [Fact]
+    public void The_40_by_0_01_strip_that_would_fit_is_refused_at_once_by_the_margin()
+    {
+        // RV-101, the filter's answer of 2026-11-27: the 3.5 strip margin stands though this strip makes only 196,325;
+        // the prediction is the gate, so it is refused before any work.
+        var mesh = Square(40, 0.01f);
+        Assert.InRange(Tessellation.Predicted(mesh, [0], 0.0025), 217_000, 219_000);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var r = Tessellation.Tessellate(mesh, 0.0025);
+        Assert.True(watch.ElapsedMilliseconds < 500, $"{watch.ElapsedMilliseconds} ms");
+        Assert.False(r.Succeeded);
+        var error = r.Errors.Single();
+        Assert.Equal("max_edge", error.Element);
+        Assert.Matches("about 21[78],[0-9]{3} new vertices, over the budget of 200,000; give a larger max_edge", error.ToString());
+        Assert.Equal(4, mesh.Vertices.Count);
+    }
+
     [Theory]
     // RV-101's table scaled down to run in well under a second, each the same width in max_edge: a quad 100 max_edge
     // across (the unit quad at 0.0025 is 400), and strips 4, 1.6 and 4 max_edge wide (40 x 0.01, 125 x 0.004, 75 x 0.01).
