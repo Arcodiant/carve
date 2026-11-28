@@ -4,7 +4,7 @@ description: >-
 ---
 # T-235 — Say it again acceptance run
 
-**Status:** In Progress
+**Status:** Done
 
 **Pri:** P1
 
