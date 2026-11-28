@@ -39,7 +39,7 @@ Fix: make each copy `$work\<name>\<round leaf>`. For negative 4, use a `cwd` tha
 
 **Outcome:** fixed
 
-**How:** `New-Copy` now puts each copy at `$work<name>ound-1`; the `cwd` negative sets the session cwd to the folder above its own (holds every path, other name). Ran `scripts/run-script-acceptance-negatives.ps1` on a copy of round 1 and read `negatives.tsv`: byte fails the prop.carve replay and measurement; swapped fails statements-kept and edited byte for byte; measure fails measurement and statements-kept; cwd fails the path check by the folder-name assert; missing fails the path check by the file-exists assert. `dotnet test` on the good copy: 5 of 5 pass. T-235 table corrected to this.
+**How:** `New-Copy` now puts each copy at `$work\<name>\round-1`; the `cwd` negative sets the session cwd to the folder above its own (holds every path, other name). Ran `scripts/run-script-acceptance-negatives.ps1` on a copy of round 1 and read `negatives.tsv`: byte fails the prop.carve replay and measurement; swapped fails statements-kept and edited byte for byte; measure fails measurement and statements-kept; cwd fails the path check by the folder-name assert; missing fails the path check by the file-exists assert. `dotnet test` on the good copy: 5 of 5 pass. T-235 table corrected to this.
 
 ## Summary
 
