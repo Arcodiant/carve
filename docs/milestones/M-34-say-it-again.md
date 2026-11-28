@@ -94,3 +94,71 @@ T-230, T-231 and T-233 are design-heavy and decide what others build on (a forma
 - [ ] [T-235](../tasks/T-235-say-it-again-acceptance-run.md) — A fresh agent builds a prop through the tools, exports it as a script, changes a number by hand and runs it again
 
 ## Retrospective
+
+Written 2026-11-28, before the person's go. The rebase onto `main`, the refactor pass and the review are still to come.
+
+**As planned.**
+
+- **The claim holds end to end.** An agent builds through the tools, `save_script` writes the session, and `run_script` replays it to the same model:
+  - `samples/gatehouse.carvescript` (14 statements, 42 lines) replays after `clear` to `samples/gatehouse.carve` byte for byte. The unit tests and scenario-gatehouse on the real `carve` both check it.
+  - scenario-replay (T-234) calls all 32 model-changing tools. The file saved after replay equals the one saved before it, and the two front renders are byte-equal.
+  - A fresh Opus 5.5 agent (T-235) took a bookshelf from 3 to 4 compartments by editing its script. It needed no `help` call and made no guess or probe.
+- **The members, in the planned waves, with no rework between them:**
+  - **T-230**: `Carve.Core.Scripts` (reader, writer, statement, error). Numbers are copied as raw text, never through `double`. D-8 gains *The statement format* (Settled for M-34, Rule).
+  - **T-231**: the journal is recorded by `MeshToolSupport.Create`'s wrapper; no tool changed. `clear` is new. `ModelStore.Change` takes several entries for one step.
+  - **T-232**: `save_script`, the path rule, `help {"topic":"scripts"}`, the gatehouse sample.
+  - **T-233**: `run_script` as one undo step under `ModelStore.Batch`. A failure puts back the model, undo history, journal and version. `RunScriptTool.RunStatements` is M-35's seam.
+  - **T-234**: scenario-replay. Its coverage list fails on a tool in neither of its two lists, and its five breaks were all caught.
+  - **T-235**: `tests/Carve.ScriptAcceptance.Tests`, with three negatives all caught.
+- **Pins:** only the tool count was re-taken, 45 to 48: `clear`, `save_script`, `run_script`. The help-topic messages were re-taken for `scripts`. `undo`'s text gained the one sentence the plan allowed.
+- **`cairn milestone M-34 verify`** (2026-11-28): every check passes but `review`, which comes after the go. 6 of 6 members are done and merged. 32 suites passed, 29 ran and 3 carried, every scenario, `server-regression` and `patina-regression` among them.
+- **Models:**
+
+  | Member | Model | Agents |
+  |---|---|---|
+  | T-230 | Opus 5.5 | 1 |
+  | T-231 | Opus 5.5 | 1 |
+  | T-232 | Sonnet 5.5 | 1 |
+  | T-233 | Opus 5.5 | 1 |
+  | T-234 | Sonnet 5.5 | 1 |
+  | T-235 | Opus 5.5 | 2 (a hand-off at 60 calls, the round done) |
+
+  No rework was traced to the Sonnet members.
+- No engine need was recorded. Only frame review was done: subagents reviewed the replay pair and T-235's two renders, and none of the frames carried a choice for the person.
+
+**Not as planned.**
+
+- **T-235's run conditions changed.** The Scope's `--tools ""` left the agent no way to edit a script. The person agreed to `--tools "Read,Write,Edit"`, with a check that every path stays in the round folder.
+- **T-235's planted fault was not hit.** The agent worked the shifted ids out ahead and its edited script ran first time. So no fresh agent has met `run_script`'s line error. The filter first answered "pass if the transcript explains the shift"; the transcript does not, and the person ruled pass anyway, on the correct ids.
+- **The script check was loosened to the Scope's wording** (added statements allowed), by the person's ruling A. The draft's stricter "same tools in the same order" had failed round 1.
+- **`1e308` cannot appear in a script**, because every tool takes floats and refuses it. scenario-replay uses `1e38`. The format itself keeps it bit-exact (T-230's tests).
+- **Rules the members settled themselves** under the Notes' defaults:
+  - a trailing comma and a newline before `(` are refused;
+  - argument names follow the tool-name rule;
+  - the width is 120;
+  - an empty script is one undo step that changes nothing.
+
+**Never verified.**
+
+- Only the gatehouse scenario and the T-235 round have driven `run_script` through a real client.
+- No test runs two calls against a batch at the same time; that the lock keeps them apart is argued.
+- No test writes a graph path (`normal_texture`, `displace`) or a `define_target` file relative to a script and back. They share the texture's route, which is tested.
+- T-232 did not compare the gatehouse frames' hashes with a baseline run. It argues they are taken before `save_script`, and scenario-gatehouse passed.
+- T-234 has no measured time for scenario-gatehouse: its wrapper failed with `-NoBuild`, not looked into. scenario-replay ran in 20 s on the runners, scenario-gatehouse in 8 s in this verify.
+- Only one T-235 round was run, on Opus 5.5, not on the default model.
+- A surrogate pair counts as two columns in an error, and a lone surrogate escape would throw in the writer (T-230).
+
+**Known and left.**
+
+- T-235's two findings, proposed as follow-on tasks for the person and not reserved:
+  1. a round where the agent meets `run_script`'s line error;
+  2. a count-changing edit needs every coordinate worked again, which is D-8's open variables and loops, for M-35.
+- `run_script` refuses `render` and `render_glb` as statements, and its runner throws if a statement tool does not finish at once. A statement tool that ever became async would need the runner changed.
+- `CLAUDE.md`, `samples/.gitattributes` and `scripts/run-script-acceptance-negatives.ps1` are inputs of no suite (verify's `uncovered` warning).
+- `finish` could not delete the worktree folders `branches/task/T-231` to `T-235`, each its agent's shell directory. Git no longer tracks them, and they are left to delete by hand.
+
+**For the next plan.**
+
+- Give an acceptance plant that the agent cannot foresee from the descriptions. M-2, M-4, M-5 and now M-34 show a careful agent avoids the obvious one. Make the fault one that only a run reveals, or plant it in the files rather than in the request.
+- An acceptance brief that edits a file needs the file tools, and says so at planning, not at the run.
+- A subagent that runs `finish` from inside its worktree cannot let it delete that worktree. Brief it to `cd` out first, or have cairn step out itself.
