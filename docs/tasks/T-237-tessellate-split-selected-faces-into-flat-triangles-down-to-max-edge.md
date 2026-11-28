@@ -69,6 +69,16 @@ existing vertex, and keeps the mesh closed.
   over `max_edge`, so a `max_edge` too fine for a double (1e-14 on a quad at 1000..1001) is refused at once. The
   lattice filter is made about linear, keeping exactly the points it kept before. This replaces the Scope's "no cap
   on how fine".
+- Answered by Waystone's filter, not the person, on 2026-11-27 (RV-101, round 2), for the person to confirm or
+  overturn: **`split` itself is short at summary.** At `summary` `split` is `{count, first}`, the number of faces cut
+  and the first 10 entries, each `{face, pieces:{count, first}}`; the whole list only at `full`.
+- Answered by Waystone's filter, not the person, on 2026-11-27 (RV-101, round 2), for the person to confirm or
+  overturn: **thin rotated strips.** In M-41 a test pins the refusal of a thin face turned off the axes and its message
+  is a plain one ("is too thin for max_edge ..."), a tool error that changes nothing; the triangulation's tolerance is
+  not changed here. The cause goes to an off-milestone bug, B-15.
+- RV-101's third finding (the prediction under-counting narrow faces) was fixed within the person's ruling 2 above:
+  the prediction counts the strip refinement adds along the loops, and a hard stop refuses a call whose made count
+  passes the budget anyway, before anything is committed.
 
 ### As built
 
@@ -125,3 +135,22 @@ Ran on Claude Opus 5.5 (two agents; the first handed off at its 60-call checkpoi
   - Tests added: an unselected face's hole on the border (the dais's bottom around a peg), UVs across a seam, the
     budget refusal (Core and tool), the empty `faces: []`. The "cannot be tessellated" refusal is in the description
     but untested: no face `PolygonMesh.Create` accepts was found to trigger it (a repeated corner is refused there).
+- RV-101, round 2 (Claude Opus 5.5, one agent):
+  - `split` at summary (the filter's answer above): `MeshToolSupport.Split(split, level)` gives `{count, first}` with
+    the first 10 entries through the same `Moved` for each entry's `pieces`; at `full` the whole list as before. The
+    Cuts `TessellateStage` already asks for `full` and is unchanged. `TessellateToolTests` tessellates a whole mesh of
+    40 unit quads at 0.3 and holds the summary result to 2,000 characters; `VerbosityToolTests` reads the short `split`
+    on tessellate only (other tools' `split` is the same at both levels).
+  - Prediction: `Predicted` adds `Tessellation.StripPoints` (3.5) points per `max_edge` of each selected face's loops.
+    Measured (Release) the strip's points per `max_edge` of loop are 0.8 (strips 1.6 `max_edge` wide) to 3.0 (the unit
+    quad at 0.0025). On RV-101's table the prediction is now 191,948 (made 191,085), 217,933 (196,325), 542,387
+    (268,339) and 408,596 (368,134), the made counts RV-101's, the algorithm being unchanged; so the 40 x 0.01 strip,
+    which makes 196,325, is now refused. `The_prediction_is_not_under_the_vertices_made` holds it on scaled-down copies
+    (a 0.25 quad and strips 2 x 0.01, 2 x 0.004, 3 x 0.01 at 0.0025, each under 0.7 s in Debug).
+  - Hard stop: `Tessellate` stops once its new vertices would pass the budget (after the edge points, the lattice, or
+    inside `ConstrainedDelaunay.Refine(limit, maxPoints)`, which now returns false at its cap) and refuses on
+    `max_edge` with "more than 200,000 new vertices, over the budget of 200,000" before anything is committed. An
+    internal overload takes the stop so a test can set it under a call's made count.
+  - Thin faces (the filter's answer above): any `InvalidOperationException` from the triangulation is now
+    `faces[N]: is too thin for max_edge M; give a larger max_edge, or cut the face across first`, pinned on a 20 x 0.002
+    quad turned 10° at 0.002 (`A_thin_strip_turned_off_the_axes_is_refused_plainly`). Bug B-15 holds the cause.

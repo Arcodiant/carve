@@ -128,8 +128,9 @@ internal sealed class ConstrainedDelaunay
         for (var t = 0; t < TriangleCount; t++) _inside[t] = depth[t] % 2 == 1;
     }
 
-    /// <summary>Splits every unconstrained edge inside that is longer than <paramref name="limit"/> at its midpoint, longest first, until none is.</summary>
-    public void Refine(double limit)
+    /// <summary>Splits every unconstrained edge inside that is longer than <paramref name="limit"/> at its midpoint, longest first, until none is.
+    /// Stops and returns false once the points reach <paramref name="maxPoints"/> (T-237's hard stop, RV-101).</summary>
+    public bool Refine(double limit, int maxPoints = int.MaxValue)
     {
         var over = limit * (1 + 1e-9);
         for (var pass = 0; ; pass++)
@@ -144,11 +145,12 @@ internal sealed class ConstrainedDelaunay
                     var length = Math.Sqrt(d.X * d.X + d.Y * d.Y);
                     if (length > over) longEdges.Add((length, a, b));
                 }
-            if (longEdges.Count == 0) return;
+            if (longEdges.Count == 0) return true;
             if (pass > 200) throw new InvalidOperationException("refinement did not settle");
             foreach (var (_, a, b) in longEdges.OrderByDescending(e => e.Length).ThenBy(e => e.A).ThenBy(e => e.B))
             {
                 if (FindEdge(a, b) is not { } e) continue; // flipped away by an earlier split
+                if (_p.Count >= maxPoints) return false;
                 var i = _p.Count;
                 _p.Add((_p[a] + _p[b]) * 0.5);
                 _vt.Add(e.T);

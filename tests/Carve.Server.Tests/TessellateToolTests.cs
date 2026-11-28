@@ -47,7 +47,8 @@ public sealed class TessellateToolTests() : TempFolderTests("carve-tessellate")
         Assert.Equal(body.GetProperty("vertices").GetInt32() - 8, created.GetProperty("vertices").GetProperty("count").GetInt32());
         Assert.Equal(6, created.GetProperty("faces").GetProperty("first").GetInt32());
         Assert.Equal(body.GetProperty("faces").GetInt32() - 6, created.GetProperty("faces").GetProperty("count").GetInt32());
-        var split = body.GetProperty("split").EnumerateArray().Single();
+        Assert.Equal(1, body.GetProperty("split").GetProperty("count").GetInt32());
+        var split = body.GetProperty("split").GetProperty("first").EnumerateArray().Single();
         Assert.Equal(3, split.GetProperty("face").GetInt32());
         var pieces = split.GetProperty("pieces");
         Assert.Equal(1 + created.GetProperty("faces").GetProperty("count").GetInt32(), pieces.GetProperty("count").GetInt32());
@@ -92,6 +93,25 @@ public sealed class TessellateToolTests() : TempFolderTests("carve-tessellate")
         Assert.Equal("define_group", Ok(await carve.CallToolAsync("undo", "{}")).GetProperty("undone").GetString());
     }
 
+    /// <summary>RV-101: a whole mesh of 40 faces at summary is within the 2,000-character budget, split short as the filter answered.</summary>
+    [Fact]
+    public async Task A_whole_mesh_of_40_faces_at_summary_is_within_the_result_budget()
+    {
+        var (carve, _) = await StartAsync();
+        using var __ = carve;
+        var vertices = Enumerable.Range(0, 41).SelectMany(i => new[] { $"[{i},0,0]", $"[{i},1,0]" });
+        var faces = Enumerable.Range(0, 40).Select(i => $"[{2 * i},{2 * i + 2},{2 * i + 3},{2 * i + 1}]");
+        Ok(await carve.CallToolAsync("define_mesh", $$"""{"vertices":[{{string.Join(",", vertices)}}],"faces":[{{string.Join(",", faces)}}]}"""));
+
+        var result = await carve.CallToolAsync("tessellate", """{"max_edge":0.3}""");
+
+        var text = TextOf(result);
+        Assert.True(text.Length <= DenseMeshBudgetTests.Budget, $"{text.Length} characters: {text[..Math.Min(600, text.Length)]}");
+        var split = Ok(result).GetProperty("split");
+        Assert.Equal(40, split.GetProperty("count").GetInt32());
+        Assert.Equal(Enumerable.Range(0, 10), split.GetProperty("first").EnumerateArray().Select(s => s.GetProperty("face").GetInt32()));
+    }
+
     /// <summary>M-41's Done-when, the tessellate half, through the tools: the dais's group wear at 0.75.</summary>
     [Fact]
     public async Task The_dais_group_tessellates_closed_with_no_warning_and_only_its_faces_split()
@@ -106,7 +126,7 @@ public sealed class TessellateToolTests() : TempFolderTests("carve-tessellate")
 
         Assert.True(body.GetProperty("closed").GetBoolean());
         Assert.Empty(body.GetProperty("warnings").EnumerateArray());
-        Assert.Equal([0, 1], body.GetProperty("split").EnumerateArray().Select(s => s.GetProperty("face").GetInt32()));
+        Assert.Equal([0, 1], body.GetProperty("split").GetProperty("first").EnumerateArray().Select(s => s.GetProperty("face").GetInt32()));
         var after = JsonDocument.Parse(TextOf(await carve.CallToolAsync("get_mesh", "{}"))).RootElement;
         var (was, now) = (before.GetProperty("vertices").EnumerateArray().ToArray(), after.GetProperty("vertices").EnumerateArray().ToArray());
         for (var v = 0; v < was.Length; v++) Assert.Equal(was[v].GetRawText(), now[v].GetRawText());

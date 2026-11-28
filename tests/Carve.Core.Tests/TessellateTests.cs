@@ -249,9 +249,61 @@ public class TessellateTests
         Assert.Equal("max_edge", error.Element);
         Assert.Contains("over the budget of 200,000", error.ToString());
         Assert.Matches("about [0-9,]+ new vertices", error.ToString());
-        // Just under: about 184,752 inside and 1,596 on the edges of a unit quad at 0.0025; over at 0.002.
-        Assert.InRange(Tessellation.Predicted(Square(1, 1), [0], 0.0025), 186_000, 187_000);
+        // Just under: about 184,752 inside, 1,596 on the edges and 5,600 in the strip by the loops of a unit quad at 0.0025
+        // (191,085 made, RV-101); over at 0.002.
+        Assert.InRange(Tessellation.Predicted(Square(1, 1), [0], 0.0025), 191_085, 193_000);
         Assert.True(Tessellation.Predicted(Square(1, 1), [0], 0.002) > Tessellation.Budget);
+    }
+
+    [Theory]
+    // RV-101's table scaled down to run in well under a second, each the same width in max_edge: a quad 100 max_edge
+    // across (the unit quad at 0.0025 is 400), and strips 4, 1.6 and 4 max_edge wide (40 x 0.01, 125 x 0.004, 75 x 0.01).
+    [InlineData(0.25f, 0.25f)]
+    [InlineData(2f, 0.01f)]
+    [InlineData(2f, 0.004f)]
+    [InlineData(3f, 0.01f)]
+    public void The_prediction_is_not_under_the_vertices_made(float w, float h)
+    {
+        var mesh = Square(w, h);
+        var r = Tessellation.Tessellate(mesh, 0.0025);
+        Assert.True(r.Succeeded, string.Join("; ", r.Errors));
+        var made = r.Mesh!.Vertices.Count - mesh.Vertices.Count;
+        Assert.True(Tessellation.Predicted(mesh, [0], 0.0025) >= made, $"predicted {Tessellation.Predicted(mesh, [0], 0.0025):N0}, made {made:N0}");
+    }
+
+    [Theory]
+    [InlineData(0.05)]
+    [InlineData(0.0125)]
+    public void A_call_that_makes_more_than_the_hard_stop_is_refused_and_changes_nothing(double maxEdge)
+    {
+        // A call the prediction lets through but that makes more than the budget: the hard stop set one under the made count.
+        var mesh = Square(1, 1);
+        var made = Tessellation.Tessellate(mesh, maxEdge).Mesh!.Vertices.Count - mesh.Vertices.Count;
+        foreach (var stop in new[] { made - 1, made / 2, 10 })
+        {
+            var r = Tessellation.Tessellate(mesh, maxEdge, null, stop);
+            Assert.False(r.Succeeded);
+            var error = r.Errors.Single();
+            Assert.Equal("max_edge", error.Element);
+            Assert.Contains(MeshEdits.Invariant($"more than {stop:N0} new vertices, over the budget of {stop:N0}"), error.ToString());
+            Assert.Equal(4, mesh.Vertices.Count);
+        }
+        Assert.True(Tessellation.Tessellate(mesh, maxEdge, null, made).Succeeded);
+    }
+
+    [Fact]
+    public void A_thin_strip_turned_off_the_axes_is_refused_plainly()
+    {
+        // RV-101: 20 x 0.002 turned 10 degrees at max_edge 0.002 is refused by the triangulation (a bug, B-15); the message is plain.
+        var (c, s) = (MathF.Cos(MathF.PI / 18), MathF.Sin(MathF.PI / 18));
+        System.Numerics.Vector3 At(float x, float y) => new(x * c - y * s, x * s + y * c, 0);
+        var mesh = Make([At(0, 0), At(20, 0), At(20, 0.002f), At(0, 0.002f)], [[0, 1, 2, 3]]);
+        var r = Tessellation.Tessellate(mesh, 0.002);
+        Assert.False(r.Succeeded);
+        var error = r.Errors.Single();
+        Assert.Equal("faces[0]", error.Element);
+        Assert.Contains("is too thin for max_edge 0.002", error.ToString());
+        Assert.DoesNotContain("linked", error.ToString());
     }
 
     /// <summary>The lattice filter before RV-100: <see cref="PlaneGeometry.Inside"/> and every segment, for every point.</summary>
