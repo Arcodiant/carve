@@ -42,7 +42,9 @@ description: >-
 
 The last two pass the check. The only test of `Predicted` is on the unit quad.
 
-**Outcome:** fixed in 9f5722ad (claude-opus-5-5), within the person's ruling 2. `Predicted` now adds `Tessellation.StripPoints`, 3.5 points per `max_edge` of each selected face's loops (measured at 0.8 to 3.0). On the table: unit quad 191,948 predicted (191,085 made), 40 x 0.01 217,933 (196,325), 125 x 0.004 542,387 (268,339), 75 x 0.01 408,596 (368,134); made counts are this table's, the algorithm being unchanged, and the last three are now refused (the 40 x 0.01 strip, under the budget when made, is refused by the margin). A hard stop also refuses, with the budget error and before anything is committed, a call whose made vertices would pass the budget (after the edge points, after the lattice, or in `ConstrainedDelaunay.Refine`'s new point cap). Tests: `The_prediction_is_not_under_the_vertices_made` on scaled-down copies (a 0.25 quad, strips 2 x 0.01, 2 x 0.004 and 3 x 0.01 at 0.0025, each the table's width in `max_edge`), and `A_call_that_makes_more_than_the_hard_stop_is_refused_and_changes_nothing`, with the stop set under the made count through an internal overload.
+**Outcome:** fixed
+
+Within the person's ruling 2. `Predicted` now adds `Tessellation.StripPoints`, 3.5 points per `max_edge` of each selected face's loops (measured at 0.8 to 3.0). On the table: unit quad 191,948 predicted (191,085 made), 40 x 0.01 217,933 (196,325), 125 x 0.004 542,387 (268,339), 75 x 0.01 408,596 (368,134); made counts are this table's, the algorithm being unchanged, and the last three are now refused (the 40 x 0.01 strip, under the budget when made, is refused by the margin). A hard stop also refuses, with the budget error and before anything is committed, a call whose made vertices would pass the budget (after the edge points, after the lattice, or in `ConstrainedDelaunay.Refine`'s new point cap). Tests: `The_prediction_is_not_under_the_vertices_made` on scaled-down copies (a 0.25 quad, strips 2 x 0.01, 2 x 0.004 and 3 x 0.01 at 0.0025, each the table's width in `max_edge`), and `A_call_that_makes_more_than_the_hard_stop_is_refused_and_changes_nothing`, with the stop set under the made count through an internal overload. In 9f5722ad (claude-opus-5-5).
 
 ### `split` at summary still grows with the number of faces, so a whole-mesh tessellate breaks the 2,000-character budget
 
@@ -50,7 +52,9 @@ The last two pass the check. The only test of `Predicted` is on the unit quad.
 
 `split` has one entry per face cut, and no selection means every face. Failing case: 40 unit quads, every face at 0.3, gives a summary `split` of 3,463 characters across 40 entries. README:160-163 says every summary result is within the budget, and `DenseMeshBudgetTests` does not call tessellate. The ruling covered `pieces` only.
 
-**Outcome:** fixed in 9f5722ad (claude-opus-5-5), by Waystone's filter's answer of 2026-11-27 (for the person to confirm): at summary `split` is `{count, first}`, the number of faces cut and the first 10 entries `{face, pieces:{count, first}}`, through the same `MeshToolSupport.Split`/`Moved`; the whole list at `full`. `A_whole_mesh_of_40_faces_at_summary_is_within_the_result_budget` (40 unit quads at 0.3, every face) holds the result to 2,000 characters. The description, README, `TessellateToolTests` and `VerbosityToolTests` updated; the Cuts `TessellateStage` already asks for `full` and is unchanged.
+**Outcome:** fixed
+
+By Waystone's filter's answer of 2026-11-27 (for the person to confirm): at summary `split` is `{count, first}`, the number of faces cut and the first 10 entries `{face, pieces:{count, first}}`, through the same `MeshToolSupport.Split`/`Moved`; the whole list at `full`. `A_whole_mesh_of_40_faces_at_summary_is_within_the_result_budget` (40 unit quads at 0.3, every face) holds the result to 2,000 characters. The description, README, `TessellateToolTests` and `VerbosityToolTests` updated; the Cuts `TessellateStage` already asks for `full` and is unchanged. In 9f5722ad (claude-opus-5-5).
 
 ### "cannot be tessellated" can be triggered, so round 1's reason for leaving it untested does not hold
 
@@ -67,7 +71,9 @@ Thin strips not aligned to the face's axes are refused. Each is a single quad in
 
 The same strips axis-aligned, or 1 to 5 m long, succeed, so the failure starts at about 3,500:1 on a rotated face. The likely cause, not traced, is the tolerance `_eps = 1e-12 * size²` scaled to the face's box. The refusal changes nothing, but its message is internal.
 
-**Outcome:** fixed in 9f5722ad (claude-opus-5-5), by Waystone's filter's answer of 2026-11-27 (for the person to confirm): the refusal is now `faces[N]: is too thin for max_edge M; give a larger max_edge, or cut the face across first`, a tool error that changes nothing, pinned by `A_thin_strip_turned_off_the_axes_is_refused_plainly` (20 x 0.002 at 10°, `max_edge` 0.002). The triangulation's tolerance is unchanged; the cause is filed off-milestone as B-15.
+**Outcome:** fixed
+
+By Waystone's filter's answer of 2026-11-27 (for the person to confirm): the refusal is now `faces[N]: is too thin for max_edge M; give a larger max_edge, or cut the face across first`, a tool error that changes nothing, pinned by `A_thin_strip_turned_off_the_axes_is_refused_plainly` (20 x 0.002 at 10°, `max_edge` 0.002). The triangulation's tolerance is unchanged; the cause is filed off-milestone as B-15. In 9f5722ad (claude-opus-5-5).
 
 ## Summary
 
